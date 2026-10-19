@@ -240,7 +240,11 @@ public class AnalyticsSessionizer {
             (endedAt.getTime() - startedAt.getTime()) / 1000L)));
         session.setPageViews(pageViews);
         session.setEventCount(events.size());
-        session.setIsBounce(pageViews <= 1 && events.size() <= 1 ? "1" : "0");
+        // 跳出=只浏览了一个页面且没有搜索/注册等交互；page_leave 是收尾事件，不算交互
+        boolean interacted = events.stream().anyMatch(e ->
+            !PAGE_EVENTS.contains(String.valueOf(e.getEventName()))
+                && !"page_leave".equals(String.valueOf(e.getEventName())));
+        session.setIsBounce(pageViews <= 1 && !interacted ? "1" : "0");
         session.setEntryPage(entryPage);
         session.setExitPage(exitPage);
         session.setReferrer(referrer);

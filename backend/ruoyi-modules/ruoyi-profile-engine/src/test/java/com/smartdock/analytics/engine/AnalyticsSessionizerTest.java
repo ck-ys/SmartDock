@@ -70,6 +70,30 @@ class AnalyticsSessionizerTest {
     }
 
     @Test
+    void pageLeaveDoesNotBreakBounceDetection() {
+        List<AnalyticsSession> sessions = AnalyticsSessionizer.build("000000", "web", List.of(
+            event(1, "page_view", "v1", "s1", 0, "{\"pageUrl\":\"/home\"}"),
+            event(2, "page_leave", "v1", "s1", 1, "{\"pageUrl\":\"/home\"}")
+        ), Map.of());
+
+        assertThat(sessions).hasSize(1);
+        assertThat(sessions.get(0).getPageViews()).isEqualTo(1);
+        assertThat(sessions.get(0).getEventCount()).isEqualTo(2);
+        assertThat(sessions.get(0).getIsBounce()).isEqualTo("1");
+    }
+
+    @Test
+    void searchMakesSinglePageSessionNonBounce() {
+        List<AnalyticsSession> sessions = AnalyticsSessionizer.build("000000", "web", List.of(
+            event(1, "page_view", "v1", "s1", 0, "{\"pageUrl\":\"/home\"}"),
+            event(2, "search", "v1", "s1", 1, "{\"pageUrl\":\"/search\",\"searchTerm\":\"crm\"}")
+        ), Map.of());
+
+        assertThat(sessions.get(0).getPageViews()).isEqualTo(1);
+        assertThat(sessions.get(0).getIsBounce()).isEqualTo("0");
+    }
+
+    @Test
     void singlePageViewSessionIsBounceAndNewVisitorUsesFirstSeen() {
         Date base = new Date(1_700_000_000_000L);
         Map<String, Date> firstSeen = new HashMap<>();
