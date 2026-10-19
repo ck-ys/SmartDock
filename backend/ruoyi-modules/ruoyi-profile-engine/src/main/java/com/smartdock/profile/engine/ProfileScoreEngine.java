@@ -47,6 +47,7 @@ public class ProfileScoreEngine {
     private final ProfileEventMapper eventMapper;
     private final List<DimensionStrategy> strategies;
     private final List<ProfilePostProcessor> postProcessors;
+    private final ProfileReviewService reviewService;
 
     /**
      * 重算单主体并落一条快照。
@@ -128,6 +129,12 @@ public class ProfileScoreEngine {
                 snapshot.setDimensionDetail(JsonUtils.toJsonString(detail));
                 snapshotMapper.updateDimensionDetail(snapshot.getSnapshotId(), tenantId, snapshot.getDimensionDetail());
             }
+        }
+        try {
+            reviewService.evaluateAfterRecalc(snapshot);
+        } catch (Exception e) {
+            // 复核入队失败不影响快照
+            log.warn("[Profile] review enqueue failed subject={} err={}", subjectId, e.getMessage());
         }
         log.info("[Profile] snapshot written subject={} total={} dims={} prev={}",
             subjectId, total, detail.size(), snapshot.getPrevSnapshotId());

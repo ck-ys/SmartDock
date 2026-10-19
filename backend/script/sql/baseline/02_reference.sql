@@ -194,6 +194,25 @@ INSERT INTO public.profile_score_dimension (dimension_id, tenant_id, dim_code, d
 
 INSERT INTO public.profile_score_rule (rule_id, tenant_id, source, rule_version, rule_name, status, weights, remark, enabled, revision, create_dept, create_by, create_time, published_at, update_by, update_time, del_flag) VALUES (9600, '000000', 'dcs', 'v1-builtin', '内置权重', 'PUBLISHED', '{"quality": 0.25, "negative": 0.15, "response": 0.25, "completion": 0.35}', '内置四维权重，发布后不可原地修改', '1', 0, NULL, NULL, '2026-10-18 17:47:16.867569', '2026-10-18 17:47:16.867569', NULL, NULL, '0');
 
+--
+-- Data for Name: profile_score_model; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+INSERT INTO public.profile_score_model (model_id, tenant_id, source, model_code, model_name, model_type, model_version, config, score_max, enabled, builtin, remark, revision, create_dept, create_by, create_time, update_by, update_time, del_flag) VALUES (9700, '000000', 'dcs', 'rfm-default', 'RFM 分层', 'RFM', 'v1', '{"preset":"RFM","dimensions":[{"code":"R","name":"最近活跃","weight":1,"calc":{"type":"RECENCY_DAYS","eventTypes":[]},"bins":{"method":"percentile","direction":"lower","quantiles":[0.2,0.4,0.6,0.8],"scores":[1,2,3,4,5],"missingScore":1}},{"code":"F","name":"互动频次","weight":1,"calc":{"type":"COUNT","eventTypes":[]},"bins":{"method":"percentile","direction":"higher","quantiles":[0.2,0.4,0.6,0.8],"scores":[1,2,3,4,5],"missingScore":1}},{"code":"M","name":"交付贡献","weight":1,"calc":{"type":"COUNT","eventTypes":["data.audit_passed"]},"bins":{"method":"percentile","direction":"higher","quantiles":[0.2,0.4,0.6,0.8],"scores":[1,2,3,4,5],"missingScore":1}}]}', 100, '1', '1', '内置 RFM 演示模型, 可在工作室复制修改', 0, NULL, 1, '2026-10-19 00:00:00', NULL, NULL, '0');
+
+--
+-- Data for Name: profile_engine_config; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+INSERT INTO public.profile_engine_config (config_id, tenant_id, source, auto_recalc, review_enabled, review_threshold, debounce_ms, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) VALUES (9701, '000000', 'dcs', '1', '1', 60, 2000, '默认: 自动重算 + 低分复核', NULL, 1, '2026-10-19 00:00:00', NULL, NULL, '0');
+
+--
+-- Data for Name: profile_segment; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+INSERT INTO public.profile_segment (segment_id, tenant_id, source, segment_code, segment_name, segment_type, status, rule_config, description, member_count, builtin, revision, create_dept, create_by, create_time, update_by, update_time, del_flag) VALUES (9710, '000000', 'dcs', 'high_value_active', '高价值活跃', 'DYNAMIC', 'ENABLED', '{"match":"ALL","conditions":[{"field":"totalScore","op":"GTE","value":75}]}', '总分不低于 75 的主体', 0, '1', 0, NULL, 1, '2026-10-19 00:00:00', NULL, NULL, '0');
+INSERT INTO public.profile_segment (segment_id, tenant_id, source, segment_code, segment_name, segment_type, status, rule_config, description, member_count, builtin, revision, create_dept, create_by, create_time, update_by, update_time, del_flag) VALUES (9711, '000000', 'dcs', 'low_score_watch', '低分待关注', 'DYNAMIC', 'ENABLED', '{"match":"ALL","conditions":[{"field":"totalScore","op":"LT","value":60}]}', '总分低于 60、需要复核的主体', 0, '1', 0, NULL, 1, '2026-10-19 00:00:00', NULL, NULL, '0');
+
 
 --
 -- Data for Name: sys_client; Type: TABLE DATA; Schema: public; Owner: -
@@ -556,6 +575,12 @@ INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, com
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11977, '画像维度编辑', 9070, 9, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:dimension:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新增/修改/停用评分维度');
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11978, '画像规则编辑', 9070, 10, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:rule:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '创建/编辑/发布/归档评分规则');
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11979, '画像工作室', 9000, 2, 'profile-studio', 'dcs/profile/studio', '', '1', '0', 'C', '0', '0', 'profile:score:query', 'edit', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '维度/权重/覆盖度治理');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11980, '画像 RFM', 9000, 3, 'profile-rfm', 'dcs/profile/rfm', '', '1', '0', 'C', '0', '0', 'profile:model:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, 'RFM/通用评分模型');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11981, '画像分群', 9000, 4, 'profile-segments', 'dcs/profile/segments', '', '1', '0', 'C', '0', '0', 'profile:segment:query', 'peoples', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '动态/静态标签分群');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11982, '低分复核', 9000, 5, 'profile-review', 'dcs/profile/review', '', '1', '0', 'C', '0', '0', 'profile:review:query', 'validCode', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '低分主体复核队列');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11983, '画像模型编辑', 9070, 11, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:model:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新建/编辑/运行评分模型');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11984, '画像分群编辑', 9070, 12, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:segment:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新建/编辑/评估/导入分群');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11985, '低分复核处理', 9070, 13, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:review:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '确认/驳回低分复核');
 
 
 --

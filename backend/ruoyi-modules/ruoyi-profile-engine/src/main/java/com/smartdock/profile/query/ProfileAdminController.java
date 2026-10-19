@@ -1,11 +1,11 @@
 package com.smartdock.profile.query;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import com.smartdock.profile.ProfileEventPublisher;
 import com.smartdock.profile.engine.ProfileRecalcBatch;
 import com.smartdock.profile.engine.ProfileRecalcService;
-import com.smartdock.profile.mapper.ProfileRecalcBatchMapper;
 import com.smartdock.profile.event.ProfileEventBo;
+import com.smartdock.profile.event.ProfileEventServiceImpl;
+import com.smartdock.profile.mapper.ProfileRecalcBatchMapper;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,22 +32,17 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ProfileAdminController {
 
-    private final ProfileEventPublisher eventPublisher;
+    private final ProfileEventServiceImpl eventService;
     private final ProfileRecalcService recalcService;
     private final ProfileRecalcBatchMapper batchMapper;
 
     /**
-     * 事件灌数(数组): 逐条幂等, 返回新写入条数。
+     * 事件灌数(数组): 逐条幂等, 返回写入/重复/校验失败三类结果。
      */
     @SaCheckPermission("profile:event:publish")
     @PostMapping("/event/publish")
     public R<Map<String, Object>> publish(@RequestBody List<ProfileEventBo> events) {
-        int written = eventPublisher.publishBatch(events);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("received", events.size());
-        out.put("written", written);
-        out.put("duplicated", events.size() - written);
-        return R.ok(out);
+        return R.ok(eventService.publishBatchDetailed(events));
     }
 
     /**

@@ -165,4 +165,40 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
         """)
     ProfileOverview selectOverview(@Param("tenantId") String tenantId,
                                    @Param("source") String source);
+
+    /**
+     * 分群候选: 主体 + 最新维度快照(全量, 由 Java 规则引擎筛选)。
+     */
+    @Select("""
+        SELECT sub.subject_type, sub.subject_id, sub.display_name, sub.event_count, sub.last_event_time,
+               sub.properties::text AS properties,
+               s.total_score, s.dimension_detail::text AS dimension_detail
+        FROM profile_subject sub
+        LEFT JOIN LATERAL (
+            SELECT total_score, dimension_detail
+            FROM profile_score_snapshot snap
+            WHERE snap.tenant_id = sub.tenant_id AND snap.source = sub.source
+              AND snap.subject_type = sub.subject_type AND snap.subject_id = sub.subject_id
+              AND snap.del_flag = '0'
+            ORDER BY snap.calc_time DESC, snap.snapshot_id DESC
+            LIMIT 1
+        ) s ON TRUE
+        WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source} AND sub.del_flag = '0'
+        ORDER BY sub.subject_type, sub.subject_id
+        """)
+    List<ProfileSubjectRow> selectSegmentCandidates(@Param("tenantId") String tenantId,
+                                                    @Param("source") String source);
+
+    /**
+     * 每个主体最新维度快照(复核扫描用)。
+     */
+    @Select("""
+        SELECT DISTINCT ON (subject_type, subject_id)
+               snapshot_id, tenant_id, source, subject_type, subject_id, total_score, calc_time
+        FROM profile_score_snapshot
+        WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+        ORDER BY subject_type, subject_id, calc_time DESC, snapshot_id DESC
+        """)
+    List<com.smartdock.profile.engine.ProfileScoreSnapshot> selectLatestSnapshots(
+        @Param("tenantId") String tenantId, @Param("source") String source);
 }

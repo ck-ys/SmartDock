@@ -1,6 +1,7 @@
 package com.smartdock.profile.event;
 
 import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.engine.ProfileRecalcTrigger;
 import com.smartdock.profile.identity.ProfileIdentityService;
 import com.smartdock.profile.mapper.ProfileEventMapper;
 import com.smartdock.profile.protocol.ProfileSchemaService;
@@ -15,6 +16,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,23 +42,38 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     private final ProfileEventMapper eventMapper;
     private final ProfileSchemaService schemaService;
     private final ProfileIdentityService identityService;
+    private final ProfileRecalcTrigger recalcTrigger;
     private final TransactionTemplate requiresNew;
 
     public ProfileEventServiceImpl(ProfileEventMapper eventMapper,
                                    ProfileSchemaService schemaService,
                                    ProfileIdentityService identityService,
+                                   ProfileRecalcTrigger recalcTrigger,
                                    PlatformTransactionManager transactionManager) {
         this.eventMapper = eventMapper;
         this.schemaService = schemaService;
         this.identityService = identityService;
+        this.recalcTrigger = recalcTrigger;
         this.requiresNew = new TransactionTemplate(transactionManager);
         this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override
     public boolean publish(ProfileEventBo bo) {
-        Boolean written = requiresNew.execute(status -> doPublish(bo));
-        return Boolean.TRUE.equals(written);
+        ProfileEvent written = requiresNew.execute(status -> doPublish(bo));
+        if (written == null) {
+            return false;
+        }
+        // 事务提交后再异步重算, 避免异步线程读到未提交事件
+        try {
+            recalcTrigger.onEvent(written.getTenantId(), written.getSource(),
+                written.getSubjectType(), written.getSubjectId());
+        } catch (Exception e) {
+            // 自动重算调度失败不影响事件账本
+            log.warn("[Profile] auto recalc schedule failed subject={} err={}",
+                written.getSubjectId(), e.getMessage());
+        }
+        return true;
     }
 
     @Override
@@ -78,7 +95,48 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         return written;
     }
 
-    private boolean doPublish(ProfileEventBo bo) {
+    /**
+     * 管理端灌数: 区分「重复」与「校验失败」, 避免把坏数据误报成幂等命中。
+     */
+    public Map<String, Object> publishBatchDetailed(List<ProfileEventBo> events) {
+        int written = 0;
+        int duplicated = 0;
+        List<Map<String, String>> failures = new ArrayList<>();
+        if (events != null) {
+            for (ProfileEventBo bo : events) {
+                try {
+                    ProfileEvent event = requiresNew.execute(status -> doPublish(bo));
+                    if (event == null) {
+                        duplicated++;
+                        continue;
+                    }
+                    written++;
+                    try {
+                        recalcTrigger.onEvent(event.getTenantId(), event.getSource(),
+                            event.getSubjectType(), event.getSubjectId());
+                    } catch (Exception e) {
+                        log.warn("[Profile] auto recalc schedule failed subject={} err={}",
+                            event.getSubjectId(), e.getMessage());
+                    }
+                } catch (Exception e) {
+                    Map<String, String> failure = new LinkedHashMap<>();
+                    failure.put("eventUid", String.valueOf(bo.getEventUid()));
+                    failure.put("reason", String.valueOf(e.getMessage()));
+                    failures.add(failure);
+                    log.warn("[Profile] event publish skipped uid={} : {}", bo.getEventUid(), e.getMessage());
+                }
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("received", events == null ? 0 : events.size());
+        out.put("written", written);
+        out.put("duplicated", duplicated);
+        out.put("skipped", failures.size());
+        out.put("failures", failures);
+        return out;
+    }
+
+    private ProfileEvent doPublish(ProfileEventBo bo) {
         ProfileEvent e = toEntity(bo);
 
         // 已注册 schema 才校验; 未注册/旧库/解析失败一律放行
@@ -93,10 +151,10 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
 
         int rows = eventMapper.insertIgnore(e);
         if (rows == 0) {
-            return false;
+            return null;
         }
         upsertSubject(e, bo);
-        return true;
+        return e;
     }
 
     private String resolveCanonicalSubject(ProfileEvent e, ProfileEventBo bo) {

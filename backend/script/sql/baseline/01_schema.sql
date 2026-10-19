@@ -1306,6 +1306,265 @@ CREATE TABLE public.profile_identity_merge (
 
 
 --
+-- Name: profile_score_model; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_score_model (
+    model_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    model_code character varying(64) NOT NULL,
+    model_name character varying(100) NOT NULL,
+    model_type character varying(32) DEFAULT 'GENERIC'::character varying NOT NULL,
+    model_version character varying(32) DEFAULT 'v1'::character varying NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    score_max numeric(8,2) DEFAULT 100 NOT NULL,
+    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    builtin character(1) DEFAULT '0'::bpchar NOT NULL,
+    remark character varying(500),
+    revision integer DEFAULT 0 NOT NULL,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_score_model PRIMARY KEY (model_id)
+);
+
+CREATE UNIQUE INDEX uk_profile_model_code
+    ON public.profile_score_model USING btree (tenant_id, source, model_code)
+    WHERE (del_flag = '0'::bpchar);
+
+
+--
+-- Name: profile_model_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_model_run (
+    run_id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    source character varying(32) NOT NULL,
+    model_id bigint,
+    model_code character varying(64),
+    model_version character varying(32),
+    status character varying(16) DEFAULT 'RUNNING'::character varying NOT NULL,
+    trigger_type character varying(16) DEFAULT 'MANUAL'::character varying NOT NULL,
+    total_subjects integer DEFAULT 0 NOT NULL,
+    done_subjects integer DEFAULT 0 NOT NULL,
+    error_msg text,
+    started_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    finished_at timestamp without time zone,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_model_run PRIMARY KEY (run_id)
+);
+
+CREATE INDEX idx_profile_model_run_model
+    ON public.profile_model_run USING btree (tenant_id, source, model_code, create_time DESC);
+
+
+--
+-- Name: profile_model_snapshot; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_model_snapshot (
+    model_snapshot_id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    source character varying(32) NOT NULL,
+    model_id bigint,
+    model_code character varying(64) NOT NULL,
+    model_version character varying(32) NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
+    subject_id character varying(64) NOT NULL,
+    model_score numeric(8,2) DEFAULT 0 NOT NULL,
+    normalized_score numeric(8,2) DEFAULT 0 NOT NULL,
+    level character varying(64),
+    detail jsonb DEFAULT '{}'::jsonb NOT NULL,
+    run_id bigint,
+    prev_snapshot_id bigint,
+    calc_time timestamp without time zone NOT NULL,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_model_snapshot PRIMARY KEY (model_snapshot_id)
+);
+
+CREATE INDEX idx_profile_model_snap_latest
+    ON public.profile_model_snapshot USING btree
+    (tenant_id, source, model_code, subject_type, subject_id, calc_time DESC, model_snapshot_id DESC);
+CREATE INDEX idx_profile_model_snap_run
+    ON public.profile_model_snapshot USING btree (tenant_id, run_id);
+CREATE INDEX idx_profile_model_snap_level
+    ON public.profile_model_snapshot USING btree (tenant_id, source, model_code, level);
+
+
+--
+-- Name: profile_segment; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_segment (
+    segment_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    segment_code character varying(64) NOT NULL,
+    segment_name character varying(100) NOT NULL,
+    segment_type character varying(16) DEFAULT 'DYNAMIC'::character varying NOT NULL,
+    status character varying(16) DEFAULT 'ENABLED'::character varying NOT NULL,
+    rule_config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    description character varying(500),
+    member_count integer DEFAULT 0 NOT NULL,
+    last_run_id bigint,
+    last_eval_time timestamp without time zone,
+    builtin character(1) DEFAULT '0'::bpchar NOT NULL,
+    revision integer DEFAULT 0 NOT NULL,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_segment PRIMARY KEY (segment_id)
+);
+
+CREATE UNIQUE INDEX uk_profile_segment_code
+    ON public.profile_segment USING btree (tenant_id, source, segment_code)
+    WHERE (del_flag = '0'::bpchar);
+
+
+--
+-- Name: profile_segment_run; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_segment_run (
+    run_id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    source character varying(32) NOT NULL,
+    segment_id bigint NOT NULL,
+    trigger_type character varying(16) DEFAULT 'MANUAL'::character varying NOT NULL,
+    status character varying(16) DEFAULT 'RUNNING'::character varying NOT NULL,
+    total_candidates integer DEFAULT 0 NOT NULL,
+    member_count integer DEFAULT 0 NOT NULL,
+    error_msg text,
+    started_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    finished_at timestamp without time zone,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_segment_run PRIMARY KEY (run_id)
+);
+
+CREATE INDEX idx_profile_segment_run_segment
+    ON public.profile_segment_run USING btree (tenant_id, segment_id, create_time DESC);
+
+
+--
+-- Name: profile_segment_member; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_segment_member (
+    member_id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    source character varying(32) NOT NULL,
+    segment_id bigint NOT NULL,
+    run_id bigint NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
+    subject_id character varying(64) NOT NULL,
+    display_name character varying(128),
+    reason character varying(500),
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_segment_member PRIMARY KEY (member_id)
+);
+
+CREATE UNIQUE INDEX uk_profile_segment_member
+    ON public.profile_segment_member USING btree (run_id, subject_type, subject_id)
+    WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_profile_segment_member_segment
+    ON public.profile_segment_member USING btree (tenant_id, segment_id, subject_id);
+
+
+--
+-- Name: profile_review_queue; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_review_queue (
+    review_id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    source character varying(32) NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
+    subject_id character varying(64) NOT NULL,
+    display_name character varying(128),
+    snapshot_id bigint,
+    total_score numeric(6,2),
+    risk_level character varying(20) DEFAULT 'HIGH'::character varying NOT NULL,
+    trigger_reason character varying(500) NOT NULL,
+    status character varying(20) DEFAULT 'PENDING'::character varying NOT NULL,
+    conclusion character varying(32),
+    review_note character varying(500),
+    reviewed_by bigint,
+    reviewed_at timestamp without time zone,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_review_queue PRIMARY KEY (review_id),
+    CONSTRAINT ck_profile_review_status CHECK (
+        (status)::text = ANY (ARRAY['PENDING', 'CONFIRMED', 'DISMISSED', 'SUPERSEDED']::text[])
+    )
+);
+
+CREATE UNIQUE INDEX uk_profile_review_pending
+    ON public.profile_review_queue USING btree (tenant_id, source, subject_type, subject_id)
+    WHERE (status = 'PENDING'::character varying AND del_flag = '0'::bpchar);
+CREATE INDEX idx_profile_review_queue
+    ON public.profile_review_queue USING btree (tenant_id, source, status, create_time DESC);
+
+
+--
+-- Name: profile_engine_config; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_engine_config (
+    config_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    auto_recalc character(1) DEFAULT '1'::bpchar NOT NULL,
+    review_enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    review_threshold numeric(6,2) DEFAULT 60 NOT NULL,
+    debounce_ms integer DEFAULT 2000 NOT NULL,
+    remark character varying(500),
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_engine_config PRIMARY KEY (config_id)
+);
+
+CREATE UNIQUE INDEX uk_profile_engine_config
+    ON public.profile_engine_config USING btree (tenant_id, source)
+    WHERE (del_flag = '0'::bpchar);
+
+
+--
 -- Name: sys_client; Type: TABLE; Schema: public; Owner: -
 --
 
