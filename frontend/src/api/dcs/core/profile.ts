@@ -29,14 +29,17 @@ export interface ProfileDimensionDetail {
 }
 
 export interface ProfileSnapshot {
-  id: string;
+  snapshotId: string;
   source: string;
+  subjectType: string;
   subjectId: string;
   totalScore?: number;
   /** JSONB 列：接口层按字符串返回（MyBatis 映射），兼容已解析对象 */
   dimensionDetail?: string | Record<string, ProfileDimensionDetail>;
+  ruleVersion?: string;
   calcTime?: string;
-  prevId?: string;
+  /** 前一条快照(后端字段名 prevSnapshotId, 不是 prevId) */
+  prevSnapshotId?: string;
 }
 
 export const pageSubjects = (params?: { source?: string } & Record<string, unknown>): AxiosPromise<TableDataInfo<ProfileSubjectRow>> =>

@@ -42,6 +42,7 @@ public class DcsSubmissionService {
     private final DcsTaskFieldValidator validator;
     private final DcsNoticeService noticeService;
     private final ProfileEventPublisher eventPublisher;
+    private final com.smartdock.dcs.support.DcsSubjectNameResolver subjectNameResolver;
 
     /** 提交(首提或 REJECTED 重提; PENDING_AUDIT/APPROVED 在途则拒)。
      *  三审 dspro P1-1: 读-判-写在 READ COMMITTED 下是 TOCTOU——并发双击靠
@@ -134,6 +135,7 @@ public class DcsSubmissionService {
         e.setEventUid(eventUid);
         e.setSubjectType("user");
         e.setSubjectId(String.valueOf(subjectUserId));
+        e.setSubjectName(subjectNameResolver.resolve(subjectUserId));
         e.setOccurredTime(new Date());
         e.setProps(new LinkedHashMap<>(props));
         try {

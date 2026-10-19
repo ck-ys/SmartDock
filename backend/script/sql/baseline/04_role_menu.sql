@@ -194,4 +194,9 @@ INSERT INTO sys_role_menu (role_id, menu_id) VALUES
   (7, 9102),
   (7, 9103);
 
+-- 2026-10-19 画像管理按钮权限(超级管理员 / 租户管理员)
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 11971), (1, 11972),
+  (6, 11971), (6, 11972);
+
 

@@ -49,6 +49,7 @@ public class DcsAuditService {
     private final DcsTaskMapper taskMapper;
     private final DcsNoticeService noticeService;
     private final ProfileEventPublisher eventPublisher;
+    private final com.smartdock.dcs.support.DcsSubjectNameResolver subjectNameResolver;
 
     /** 待审列表: 我有权审的任务下的 PENDING_AUDIT 提交。
      *  三审 dspro P2-9: 按 audit_mode 分支——PUBLISHER 只认我发布的, ASSIGNED 只认审核人含我
@@ -162,6 +163,7 @@ public class DcsAuditService {
         e.setEventUid(eventUid);
         e.setSubjectType("user");
         e.setSubjectId(String.valueOf(subjectUserId));
+        e.setSubjectName(subjectNameResolver.resolve(subjectUserId));
         e.setOccurredTime(new Date());
         e.setProps(new LinkedHashMap<>(props));
         try {

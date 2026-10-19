@@ -224,7 +224,7 @@ const openDetail = async (row: RiskEventVO) => {
 };
 
 const viewProfile = (userId: number | string) => {
-  router.push(`/dcs/profile-detail/${userId}`);
+  router.push(`/dcs/profile-detail/risk/${userId}?subjectType=user`);
 };
 
 onMounted(loadEvents);

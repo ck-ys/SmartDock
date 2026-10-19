@@ -39,7 +39,8 @@ const total = ref(0);
 const source = ref('dcs');
 const query = reactive<any>({ pageNum: 1, pageSize: 20 });
 
-const goDetail = (row: ProfileSubjectRow) => router.push(`/dcs/profile-detail/${row.source}/${row.subjectId}`);
+const goDetail = (row: ProfileSubjectRow) =>
+  router.push(`/dcs/profile-detail/${row.source}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
 const load = async () => {
   loading.value = true;
   try {

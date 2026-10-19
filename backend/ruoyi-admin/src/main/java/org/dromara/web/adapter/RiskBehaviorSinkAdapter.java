@@ -5,6 +5,7 @@ import com.smartdock.profile.event.ProfileEventBo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.risk.support.RiskBehaviorSink;
+import org.dromara.common.core.service.UserService;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -31,6 +32,7 @@ import java.util.Map;
 public class RiskBehaviorSinkAdapter implements RiskBehaviorSink {
 
     private final ProfileEventPublisher eventPublisher;
+    private final UserService userService;
 
     @Override
     public void record(String tenantId, Long userId, String eventType, Date eventTime,
@@ -55,6 +57,17 @@ public class RiskBehaviorSinkAdapter implements RiskBehaviorSink {
             + (missionId == null ? "-" : missionId) + ":" + at);
         e.setSubjectType("user");
         e.setSubjectId(String.valueOf(userId));
+        // 主体名称是展示元数据: 查询失败不阻断埋点, 画像侧保留旧值
+        String nickName = TenantScopes.callInTenant(tenantId, () -> {
+            try {
+                return userService.selectNicknameById(userId);
+            } catch (Exception ex) {
+                return null;
+            }
+        });
+        if (nickName != null && !nickName.isBlank()) {
+            e.setSubjectName(nickName);
+        }
         e.setOccurredTime(eventTime == null ? new Date() : eventTime);
         Map<String, Object> props = new LinkedHashMap<>();
         props.put("sourceIp", sourceIp);

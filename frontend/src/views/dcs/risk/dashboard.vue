@@ -228,27 +228,8 @@
         <!-- ═══ 历史区: 风险评分与历史事件(旧能力保留, 替换红线·不倒退) ═══ -->
         <p class="pane-caption">基于风险评分的画像视角与历史事件统计</p>
 
-        <!-- 行动条(2026-08-23 B方案重构): 积压按红/橙/绿分档, 点击直达工作页;
-           批2迁出: 复核页移至任务中心「低分复核」, 路由 /dcs/profile-review -->
+        <!-- 行动条: 低分复核入口在批3 接入新规则等级后恢复, 当前先移除死链 404 -->
         <div class="action-row mb-4">
-          <button
-            v-hasPermi="['dcs:profile:review']"
-            type="button"
-            :class="['action-bar', `is-${reviewLevel}`]"
-            @click="router.push('/dcs/profile-review')"
-          >
-            <el-icon class="action-icon"><WarningFilled /></el-icon>
-            <div class="action-main">
-              <div class="action-title">
-                低分复核积压 <b class="action-num">{{ pendingUsers }}</b> 位用户
-                <el-tag size="small" :type="reviewTagType" effect="dark">{{ reviewLevelText }}</el-tag>
-              </div>
-              <div class="action-sub">同人多次评分已合并为一条，可按人一键复核</div>
-            </div>
-            <span class="action-go"
-              >去复核 <el-icon><ArrowRight /></el-icon
-            ></span>
-          </button>
           <button
             v-hasPermi="['dcs:risk:action:list']"
             type="button"
@@ -402,7 +383,7 @@
 
 <script setup lang="ts">
 import * as echarts from 'echarts';
-import { WarningFilled, Lock, ArrowRight, Refresh, CircleCloseFilled, CircleCheckFilled } from '@element-plus/icons-vue';
+import { Lock, ArrowRight, Refresh, CircleCloseFilled, CircleCheckFilled } from '@element-plus/icons-vue';
 import { getDashboard, type DashboardVO, type RiskEventVO, EVENT_TYPE_LABELS, EVENT_TYPE_COLORS, EVENT_SOURCE_LABELS } from '@/api/dcs/risk';
 import { safeLoad } from '../utils/safeLoad';
 import { formatRiskRelativeTime } from './riskDashboardPresentation';
@@ -475,12 +456,8 @@ const highRiskUsers = computed(() => {
   return (dashboard.value.levelStats || []).filter((l) => l.lvl === 'L3' || l.lvl === 'L4').reduce((s, l) => s + l.cnt, 0);
 });
 
-// 行动条: 待复核用户数(后端 2026-08-23 起口径=COUNT(DISTINCT user_id))与生效处置数
-const pendingUsers = computed(() => dashboard.value.pendingProfileReviews || 0);
+// 行动条: 生效处置数(低分复核入口待批3 接入新规则等级后恢复)
 const activeActions = computed(() => dashboard.value.activeActions || 0);
-const reviewLevel = computed(() => (pendingUsers.value === 0 ? 'ok' : pendingUsers.value <= 10 ? 'warning' : 'danger'));
-const reviewTagType = computed(() => (reviewLevel.value === 'ok' ? 'success' : reviewLevel.value));
-const reviewLevelText = computed(() => (reviewLevel.value === 'ok' ? '无积压' : reviewLevel.value === 'warning' ? '需关注' : '积压严重'));
 
 const levelCount = (lvl: string) => (dashboard.value.levelStats || []).find((l) => l.lvl === lvl)?.cnt || 0;
 

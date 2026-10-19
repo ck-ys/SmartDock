@@ -51,6 +51,7 @@ public class DcsTaskService {
     private final com.smartdock.dcs.mapper.DcsUserLookupMapper userLookupMapper;
     private final DcsNoticeService noticeService;
     private final ProfileEventPublisher eventPublisher;
+    private final com.smartdock.dcs.support.DcsSubjectNameResolver subjectNameResolver;
 
     /** 新建任务(DRAFT + 字段定义落库) */
     @Transactional(rollbackFor = Exception.class)
@@ -350,6 +351,7 @@ public class DcsTaskService {
         e.setEventUid(eventUid);
         e.setSubjectType("user");
         e.setSubjectId(String.valueOf(subjectUserId));
+        e.setSubjectName(subjectNameResolver.resolve(subjectUserId));
         e.setOccurredTime(new Date());
         e.setProps(new LinkedHashMap<>(props));
         try {

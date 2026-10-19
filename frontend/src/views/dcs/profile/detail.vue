@@ -3,7 +3,7 @@
     <el-card v-loading="loading" shadow="never">
       <template #header>
         <div class="card-header">
-          <span>画像详情：{{ source }} / {{ subjectId }}</span>
+          <span>画像详情：{{ source }} / {{ subjectType }} / {{ subjectId }}</span>
           <el-button @click="back">返回</el-button>
         </div>
       </template>
@@ -12,7 +12,7 @@
         <el-descriptions :column="3" border style="margin-bottom: 16px">
           <el-descriptions-item label="总分">{{ snap.totalScore ?? '—' }}</el-descriptions-item>
           <el-descriptions-item label="计算时间">{{ snap.calcTime || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="快照链前驱">{{ snap.prevId || '（首快照）' }}</el-descriptions-item>
+          <el-descriptions-item label="快照链前驱">{{ snap.prevSnapshotId || '（首快照）' }}</el-descriptions-item>
         </el-descriptions>
 
         <el-divider content-position="left">维度分数</el-divider>
@@ -25,7 +25,7 @@
 
         <el-divider content-position="left">最近快照链尾（新→旧）</el-divider>
         <el-timeline>
-          <el-timeline-item v-for="h in history" :key="h.id" :timestamp="h.calcTime">
+          <el-timeline-item v-for="h in history" :key="h.snapshotId" :timestamp="h.calcTime">
             总分 {{ h.totalScore ?? '—' }}
           </el-timeline-item>
         </el-timeline>
@@ -43,6 +43,8 @@ const router = useRouter();
 
 const source = computed(() => String(route.params.source));
 const subjectId = computed(() => String(route.params.subjectId));
+/** 列表页把主体类型放在 query 里; 老链接没有该参数时按 user 兼容 */
+const subjectType = computed(() => String(route.query.subjectType || 'user'));
 
 const loading = ref(false);
 const snap = ref<ProfileSnapshot | null>(null);
@@ -74,7 +76,7 @@ const dimensions = computed(() => {
 const load = async () => {
   loading.value = true;
   try {
-    const res = await getScore(source.value, subjectId.value);
+    const res = await getScore(source.value, subjectId.value, subjectType.value);
     snap.value = res.latest;
     history.value = res.history || [];
   } finally { loading.value = false; }
@@ -82,8 +84,8 @@ const load = async () => {
 
 onMounted(load);
 // 同组件内路由参数变化(列表页跳另一主体)必须重载, 否则停留在旧主体
-watch([source, subjectId], ([s, i], [os, oi]) => {
-  if ((s && s !== os) || (i && i !== oi)) load();
+watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
+  if ((s && s !== os) || (i && i !== oi) || (t && t !== ot)) load();
 });
 </script>
 

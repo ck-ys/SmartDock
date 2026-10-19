@@ -274,7 +274,8 @@ websocket:
 --- # 画像引擎（批1, 2026-10-18）
 profile:
   event:
-    # 标准事件保留天数; 0=关闭清理。快照是账本永不清理, 事件是原料可老化
+    # 标准事件保留天数; 0=关闭清理。快照是账本永不清理, 事件是原料可老化。
+    # 旧展示键 dcs.profile.history-retention-days 必须与此值一致(sys_config 仅展示)。
     retention-days: ${PROFILE_EVENT_RETENTION_DAYS:730}
 
 --- # DCS 定时任务（C2，方案 B：@Scheduled + @Lock4j）
