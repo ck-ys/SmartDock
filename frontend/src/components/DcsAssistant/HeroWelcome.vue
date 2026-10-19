@@ -312,8 +312,8 @@ const greet = computed(() => {
   const name = useUserStore().nickName || useUserStore().name || '';
   // 有 lastAsk 召回=老朋友回访（原型：back 存在时不用首访问候）
   const first = props.newbieUse < 1 && !lastAsk.value;
-  // 成员面彻底无催办词（v12:76 断言守护口径）
-  const cap = roleKey.value === 'member' ? '数据查询、提交状态、操作指引' : '数据查询、催办提醒、操作指引';
+  // 成员面彻底无催办词（v12:76 断言守护口径）；平台未注册催办工具，非成员侧也只能起草话术
+  const cap = roleKey.value === 'member' ? '数据查询、提交状态、操作指引' : '数据查询、催办话术、操作指引';
   if (first) {
     const h = new Date().getHours();
     const word = h < 6 ? '夜深了' : h < 12 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
@@ -321,7 +321,7 @@ const greet = computed(() => {
   }
   const variants = ['又见面了，我是 SmartDock 小助手', '接着上次聊的？', '今天从哪开始？'];
   const title = variants[new Date().getDate() % 3];
-  return { title, sub: roleKey.value === 'member' ? '查数据 · 讲操作' : '查数据 · 发催办 · 讲操作' };
+  return { title, sub: roleKey.value === 'member' ? '查数据 · 讲操作' : '查数据 · 写催办话术 · 讲操作' };
 });
 
 function refresh() {

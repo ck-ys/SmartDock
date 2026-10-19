@@ -388,7 +388,7 @@ const spfText = computed(() => {
   } else {
     tail = ' · 本轮未调用工具';
   }
-  return `智能体 · DCS 小助手${tail}`;
+  return `智能体 · SmartDock 小助手${tail}`;
 });
 const sumok = computed(() => !!props.turn?.stamp && !live.value && props.turn.phase !== 'waiting' && props.turn.phase !== 'stopped');
 

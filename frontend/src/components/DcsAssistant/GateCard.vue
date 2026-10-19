@@ -2,7 +2,7 @@
   <div class="dcs-gate">
     <div class="gcard">
       <span class="gwave"><IconSpan name="hand" :size="26" /></span>
-      <b>首次使用 DCS 小助手</b>
+      <b>首次使用 SmartDock 小助手</b>
       <p>开始前请知悉三条承诺：</p>
       <!-- GT-1：三条承诺卡=原型 .gli2/.pr 原文案（标题+副句），图标 🔒🧠🧾 按 EMO2IC 换 lock/brain/receipt；J-2 图标并入标题行防三行断裂。
            思考链路批(1008)：承诺 2/3 副句对齐真实能力——「想开随时开」实际需管理员开通；

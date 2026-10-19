@@ -8,7 +8,7 @@ import 'driver.js/dist/driver.css';
 export function startTour() {
   const steps = [
     {
-      element: '[aria-label="向 DCS 小助手提问"]',
+      element: '[aria-label="向 SmartDock 小助手提问"]',
       popover: {
         title: '直接开口问',
         description: '这里就是提问框。输入 / 有命令菜单（待办、压缩、切模型），输入 @ 能引用具体任务，↓↑ 挑、Tab 补全。'

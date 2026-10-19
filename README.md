@@ -173,6 +173,12 @@ ruoyi-admin
 - **快照账本**：快照只增不改，`prev_snapshot_id` 串起趋势；事件可按保留期清理，快照不清理。
 - **多租户**：所有表带 `tenant_id`；租户隔离由 MyBatis-Plus 租户插件与显式租户上下文共同保证。
 
+**界面实拍**（演示库，事件写入后自动登记主体）：
+
+[![用户画像主体列表](docs/images/screenshots/profile-list.png)](docs/images/screenshots/profile-list.png)
+
+<p align="center"><sub>图 2a · 画像主体列表：主体、事件数、首末事件时间；点「看画像」进入维度明细</sub></p>
+
 ### 3.2 事件接入协议
 
 业务侧只需要构造一个事件：
@@ -278,6 +284,12 @@ ruoyi-admin
 - 事件保留期由 `profile.event.retention-days` 控制，默认 **730 天**，设为 `0` 关闭清理；
   清理任务每日 03:30（GMT+8）分批删除过期事件，单轮 1 万行。
 - 快照不清理，趋势查询依赖 `prev_snapshot_id` 链。
+
+**界面实拍**（同一主体重算后）：
+
+[![画像详情](docs/images/screenshots/profile-detail.png)](docs/images/screenshots/profile-detail.png)
+
+<p align="center"><sub>图 2b · 画像详情：总分、四个维度的分数与缺失标记、快照链；缺证据的维度按 MissingPolicy 记中性分</sub></p>
 
 ### 3.6 扩展方式
 
@@ -609,6 +621,12 @@ thinking → acting → writing → done
 - `waiting`：等待用户确认写操作；
 - `done` / `stopped` / `error`：终态；
 - 计划卡、TODO 清单、数据卡、确认卡都由事件驱动，不在前端硬编码业务逻辑。
+
+**界面实拍**（管理员视角，抽屉形态）：
+
+<p align="center"><img src="docs/images/screenshots/assistant-drawer.png" width="420" alt="AI 助手抽屉"></p>
+
+<p align="center"><sub>图 3a · 助手抽屉：页面感知（定位「我的待办」）、身份徽标（管理员模式）、按当前页面推荐的四个快捷问题；首次提问后才出现三条使用承诺</sub></p>
 
 ## 5. 内置 demo 任务采集微核心
 

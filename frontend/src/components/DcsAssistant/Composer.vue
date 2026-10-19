@@ -87,7 +87,7 @@
         rows="1"
         :placeholder="disabled ? '管理员已暂停你的 AI 助手使用' : placeholder"
         maxlength="16000"
-        aria-label="向 DCS 小助手提问"
+        aria-label="向 SmartDock 小助手提问"
         :readonly="disabled"
         :class="{ 'ta-disabled': disabled }"
         @focus="focused = true"

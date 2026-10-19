@@ -16,7 +16,7 @@
         </el-descriptions>
 
         <el-divider content-position="left">维度分数</el-divider>
-        <el-table :data="snap.dimensions || []">
+        <el-table :data="dimensions">
           <el-table-column prop="dimensionCode" label="维度码" min-width="130" />
           <el-table-column prop="dimensionName" label="维度名" min-width="140" />
           <el-table-column prop="score" label="分数" width="100" />
@@ -36,7 +36,7 @@
 </template>
 
 <script setup name="DcsProfileDetail" lang="ts">
-import { getScore, type ProfileSnapshot } from '@/api/dcs/core/profile';
+import { getScore, type ProfileDimensionDetail, type ProfileSnapshot } from '@/api/dcs/core/profile';
 
 const route = useRoute();
 const router = useRouter();
@@ -49,6 +49,27 @@ const snap = ref<ProfileSnapshot | null>(null);
 const history = ref<ProfileSnapshot[]>([]);
 
 const back = () => router.back();
+
+/** 后端快照存的是 dimension_detail(JSONB 字符串: dimCode -> {score,dimName,...})，
+ *  表格需要扁平行；这里统一成 dimensionCode/dimensionName/score 供展示 */
+const dimensions = computed(() => {
+  const raw = snap.value?.dimensionDetail;
+  if (!raw) return [];
+  let obj: Record<string, ProfileDimensionDetail>;
+  try {
+    obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return [];
+  }
+  return Object.entries(obj || {})
+    .map(([code, v]) => ({
+      dimensionCode: code,
+      dimensionName: v?.dimName ?? code,
+      score: v?.score ?? '—',
+      level: v?.tags?.missing ? '缺证据' : ''
+    }))
+    .sort((a, b) => a.dimensionCode.localeCompare(b.dimensionCode));
+});
 
 const load = async () => {
   loading.value = true;

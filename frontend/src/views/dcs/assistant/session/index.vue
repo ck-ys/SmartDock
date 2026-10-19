@@ -206,7 +206,7 @@
     </section>
 
     <!-- 使用说明弹层（与抽屉共享 helpModal 单例开关） -->
-    <el-dialog :model-value="help.open.value" title="DCS 小助手 使用说明" width="480px" append-to-body @update:model-value="help.hide()">
+    <el-dialog :model-value="help.open.value" title="SmartDock 小助手 使用说明" width="480px" append-to-body @update:model-value="help.hide()">
       <div class="dcs-help-body">
         <h4>三步上手</h4>
         <ol class="help-steps">

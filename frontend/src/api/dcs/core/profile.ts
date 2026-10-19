@@ -18,12 +18,23 @@ export interface ProfileSubjectRow {
   eventCount: number;
 }
 
+/** 快照维度明细值：后端 dimension_detail 为 JSONB，key=dimCode */
+export interface ProfileDimensionDetail {
+  score?: number;
+  dimName?: string;
+  weight?: number;
+  calcMode?: string;
+  sampleCount?: number;
+  tags?: Record<string, unknown>;
+}
+
 export interface ProfileSnapshot {
   id: string;
   source: string;
   subjectId: string;
   totalScore?: number;
-  dimensions?: { dimensionCode: string; dimensionName?: string; score: number; level?: string }[];
+  /** JSONB 列：接口层按字符串返回（MyBatis 映射），兼容已解析对象 */
+  dimensionDetail?: string | Record<string, ProfileDimensionDetail>;
   calcTime?: string;
   prevId?: string;
 }

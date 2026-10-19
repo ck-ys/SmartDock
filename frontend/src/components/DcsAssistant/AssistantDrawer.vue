@@ -1,18 +1,19 @@
 <template>
   <teleport to="body">
     <div v-if="mounted" class="dcs-dw-mask" :class="{ open: modelValue }" @click="close" />
-    <aside class="dcs-dw" :class="{ open: modelValue, full: full }" role="dialog" aria-label="DCS 小助手">
+    <aside class="dcs-dw" :class="{ open: modelValue, full: full }" role="dialog" aria-label="SmartDock 小助手">
       <header v-show="!full" class="dw-head">
         <span class="orb"><IconSpan name="bot" :size="18" /></span>
         <div class="hd-txt">
-          <b>DCS 小助手</b>
+          <b>SmartDock</b>
           <!-- 业务批4 Q2 拍板二：任务上下文条下移到输入框上方（.ctx-bar），头部只留页面感知 -->
-          <span class="ctx"><IconSpan name="map-pin" /> 当前页面：{{ pageName }}</span>
+          <!-- 抽屉头部仅剩 109px，带「当前页面：」前缀会被截断成半字；用定位图标+页面名，语义靠 title -->
+          <span class="ctx" :title="`当前页面：${pageName}`"><IconSpan name="map-pin" /><span class="ct">{{ pageName }}</span></span>
         </div>
         <span class="role-tag" :title="roleLabel + '视角：可用的工具与建议按身份自动区分'">{{ roleLabel }}模式</span>
         <div class="hd-btns">
           <el-tooltip content="使用说明" :show-after="400">
-            <button class="ic" aria-label="使用说明" title="使用说明" @click="help.show()">
+            <button class="ic help-btn" aria-label="使用说明" title="使用说明" @click="help.show()">
               <IconSpan name="help" />
             </button>
           </el-tooltip>
@@ -275,7 +276,7 @@
     <el-dialog
       v-if="!route.path.startsWith('/ai/assistant')"
       :model-value="help.open.value"
-      title="DCS 小助手 使用说明"
+      title="SmartDock 小助手 使用说明"
       width="480px"
       append-to-body
       @update:model-value="help.hide()"
@@ -1619,6 +1620,9 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
       font-size: 15px;
       font-weight: 600;
       color: var(--dcs-text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .ctx {
       display: inline-flex;
@@ -1629,6 +1633,11 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+
+      .ct {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
     }
   }
   /* 身份徽标（原型 .tag.t-p：浅蓝描边方角小徽） */
@@ -1649,6 +1658,12 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
     display: flex;
     flex: none;
     gap: 2px;
+    /* 抽屉仅 336px：三键 40px + 徽标 82px 会把标题挤成省略号。
+       说明入口在欢迎卡「完整说明」与全屏模式均可达，这里只收起说明键；
+       其余两键保持 40×36 热区（业务反馈批1015b Q9）。 */
+    .ic.help-btn {
+      display: none;
+    }
   }
   .ic {
     border: none;
