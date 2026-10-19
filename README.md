@@ -79,7 +79,7 @@ SmartDock 围绕两个**边界清晰、可独立演进**的引擎组织：
 | 默认安全 | PII 出网脱敏、注入打标、16K 输入闸、角色/权限门控、写工具 ASK、租户隔离 |
 | 渐进披露 | 技能目录常驻、正文按需加载；系统提示词按角色与已注册工具裁剪 |
 | 可回归 | 后端 447 用例 + 前端 200 用例锁住权限矩阵、状态机、脱敏、注入与 AGUI 行为 |
-| 可拆装 | 画像引擎只依赖事件；助手业务工具走 `BizToolProvider` SPI；demo 与引擎通过事件/SPI 连接 |
+| 可拆装 | 画像引擎只依赖事件；助手业务工具走 `BizToolProvider` SPI；demo 与引擎以事件/SPI 解耦（`@` 候选数据源是唯一编译期例外，见 §2.2） |
 
 ### 1.4 与通用脚手架的差异
 
@@ -96,19 +96,20 @@ SmartDock 围绕两个**边界清晰、可独立演进**的引擎组织：
 
 [![SmartDock 技术架构](docs/images/architecture.svg)](docs/images/architecture.svg)
 
-<p align="center"><sub>图 1 · 分层架构：客户端 → Spring Boot 应用 → 两个引擎 + demo → 平台件 → 数据层</sub></p>
+<p align="center"><sub>图 1 · 分层架构：客户端 → Spring Boot 应用 → 两个引擎 + demo → 平台件 → 数据与外部服务</sub></p>
 
 ### 2.1 分层说明
 
 | 层 | 组成 | 职责 |
 |---|---|---|
-| 客户端 | Vue 3.5 SPA、Element Plus、Pinia、Vite | 画像看板、AI 助手（AGUI/SSE）、demo 任务中心、系统管理 |
+| 客户端 | Vue 3.5 SPA、Element Plus、Pinia、Vite | 画像看板、AI 助手（AGUI/SSE）、demo 任务中心、文件安全、系统管理 |
 | 接入层 | Spring MVC、Sa-Token、AGUI Starter、SSE | 认证鉴权、REST、`POST /agui/run/{agentId}` 流式响应、真实 HTTP 401 |
 | 应用层 | `ruoyi-admin` | 启动装配、模块聚合、全局配置；不承载业务实现 |
 | 引擎层 | `ruoyi-profile-engine`、`ruoyi-assistant`、`ruoyi-assistant-spi`、`ruoyi-ai-billing` | 画像评分、Agent 运行时、业务工具 SPI、模型网关/计价/钱包/积分 |
 | 业务样例 | `ruoyi-dcs` | 任务、字段、提交、审核、通知、统计；向画像发事件，向助手注册工具 |
 | 平台层 | `ruoyi-system`、`ruoyi-file-security`、`ruoyi-risk`、`ruoyi-job` | 多租户/权限/字典/OSS、文件安全、风控、调度 |
 | 数据层 | PostgreSQL、Redis、MinIO/S3 | 业务/画像/账本/Agent 状态；缓存/限流/准入；附件对象 |
+| 外部服务 | OpenAI 兼容模型供应商（14 预置） | 助手主链与后台 AI 调用的模型出网；PII 脱敏后发送，用量回传计费 |
 
 ### 2.2 模块与依赖方向
 
@@ -131,9 +132,10 @@ ruoyi-admin
 - 画像引擎对业务模块零编译依赖，接入新系统只需要发布同构事件。
 - 助手通过 `BizToolProvider` 接收业务工具；工具注册、权限规则与 schema 在同一个循环内生成，
   业务模块不修改助手核心代码。
-- demo 的 `DcsToolProvider` 是 SPI 的一个实现；它同时向助手提供可选的 `@` 任务候选服务
-  （通过 `ObjectProvider` 消费，业务模块缺席时返回空候选）。替换 demo 时，按同一 SPI 提供自己的工具，
-  并替换该候选端点的数据源。
+- demo 的 `DcsToolProvider` 是 SPI 的一个实现；它还向助手提供可选的 `@` 任务候选服务。
+  助手对业务工具面零编译依赖，但 `AssistantConversationController` 通过
+  `ObjectProvider<DcsTaskService>` 消费该候选，`ruoyi-assistant` 的 pom 因此保留对 `ruoyi-dcs` 的编译期依赖；
+  删除 demo 时需同步替换该数据源（见 §11.5）。
 - 两个引擎共享同一套租户、供应商配置与计费账本，但不共享业务表。
 
 ### 2.3 关键架构取舍
@@ -179,7 +181,7 @@ ruoyi-admin
 {
   "source": "dcs",
   "eventType": "data.submitted",
-  "eventUid": "submission:submit:9200000000000000001:v1",
+  "eventUid": "submission:submit:9200000000000000101:v1",
   "subjectType": "user",
   "subjectId": "9100000001",
   "occurredTime": "2026-10-18T10:30:00+08:00",
@@ -195,7 +197,7 @@ ruoyi-admin
 约定：
 
 - `source` 标识事件来自哪个系统；维度按 `source` 隔离，避免不同业务口径串味。
-- `eventUid` 是业务幂等键，建议包含「业务对象 + 动作 + 主键 + 版本」。
+- `eventUid` 是业务幂等键，格式为「业务对象 + 动作 + 主键 + 版本」，中段必须是业务主键本身（如提交 id），与 `props.submissionId` 对齐；同一任务下的不同提交/不同版本必须产生不同 uid，否则 `(tenant_id, source, event_uid)` 唯一约束会静默吞掉后续事件。
 - `props` 是 JSON 对象；数值型属性可直接参与 `SUM` / `AVG`，其他属性可用于 `COUNT` 的单键过滤。
 - 引擎不关心事件来自哪里：demo 的适配器只是示例，自有系统按同构事件接入即可。
 
@@ -313,7 +315,7 @@ public class DeliveryQualityStrategy implements DimensionStrategy {
 3. 为你的 `source` 配置维度（JSON 或 Strategy Bean）；
 4. 调用重算接口/任务，读取 `profile_score_snapshot` 做展示。
 
-demo 的接入面只有三步：业务动作 → 适配器 → `profile_event`。这也是替换 demo 时唯一需要照着改的地方。
+demo 的画像接入面只有三步：业务动作 → 适配器 → `profile_event`。替换 demo 时，画像侧只需照着改这一处；助手侧与输入框 `@` 候选的替换见 §11.5。
 
 ## 4. 引擎二 AI 助手
 
@@ -374,7 +376,7 @@ Spring AI 只服务后台一次性调用（画像诊断/字段生成/评分解�
 7. **事件输出**：AGUI 事件经 `AssistantEventEnricher` 增强（计划卡、TODO、成本帧、工具入参镜像），
    通过 SSE 逐帧下发；前端按事件更新回合状态。
 8. **持久化**：会话状态写入 PostgreSQL `agentscope` schema；会话、消息、运行记录、动作日志、
-   用量与成本账本分别落表。
+   模型用量与费用流水分别落表（`dcs_ai_usage` 等），钱包/积分扣减另有流水。
 
 ### 4.3 ReActAgent 装配
 
@@ -433,13 +435,13 @@ ReActAgent agent = ReActAgent.builder()
 | 3 | `DateInjectModelDecorator` | 在消息尾部追加「今天是 …」日期锚点 | 每轮动态区，不碰缓存前缀 |
 | 4 | `MemoryInjectModelDecorator` | 注入租户内长期记忆 | 仅租户 `memoryEnabled=1` 时装配 |
 | 5 | `AssistantPiiModelDecorator` | 出网前对姓名/手机/证件/邮箱脱敏 | PII 在内、计费在外 |
-| 6（最外） | `BillingModelDecorator` | 钱包/积分计费、成本账本、供应商 Key 池上报 | 优先用模型 usage；缺失时按出网字符估算 |
+| 6（最外） | `BillingModelDecorator` | 钱包/积分计费、回合成本汇总、供应商 Key 池上报 | 优先用模型 usage；缺失时按出网字符估算 |
 
 **为什么 PII 在计费内层**：PII 装饰器包在原生模型外，实际发给模型的内容已经脱敏；
 计费装饰器在最外层，优先使用模型返回的 usage，缺失时才按出网消息估算 token；账本只记录用量与金额，
 不落完整对话正文。
-**为什么技能注入在记忆内层**：技能正文是当前轮的临时系统指令，先于记忆/日期/PII 进入模型上下文，
-但不会被写进会话记忆。
+**为什么技能注入在记忆内层**：技能正文是当前轮的临时系统指令，位于记忆装饰器内层；
+装饰器一律在消息尾部追加，实际消息序为 `[原文…, 记忆段, 日期段, 技能段]`。技能段不会写进会话记忆，摘掉即无。
 
 ### 4.5 工具系统
 
@@ -485,7 +487,7 @@ ReActAgent agent = ReActAgent.builder()
 
 **HITL 写操作**：
 
-- `BizToolSpec.write(...)` 默认生成 `ASK` 规则与「确认要创建该任务吗」提示；
+- `BizToolSpec.write(...)` 生成 `ASK` 规则，确认话术由提供方传入（demo 传入「确认要创建该任务吗」）；
 - 模型只能起草，前端弹出确认卡；用户确认后原 run 恢复，取消则中止；
 - 工具结果统一经 `ToolSupport.secureJson` 出口，附带 PII 脱敏与注入打标；
 - 服务层仍会做「本任务发布人/审核人」硬校验，权限串通过了也不能越权操作别人的任务。
@@ -494,22 +496,23 @@ ReActAgent agent = ReActAgent.builder()
 
 **技能库（渐进披露）**：
 
-- 技能定义在 `prompts/skills/<id>.md`，frontmatter 含 `id/name/description/minRole` 与正文；
+- 技能正文放在 `prompts/skills/<id>.md`（可带 frontmatter 作编辑提示）；`id/name/description/minRole` 以内嵌技能表为准，外部文件只覆写正文，改文案不会改变权限语义；
 - 系统提示词只注入**技能目录**（id + 名称 + 一句话描述），目录预算 **600 字符**；
 - 正文只在两种时机进入上下文：用户当轮选中技能，或模型调用 `view_skill` 自取；
 - 单技能正文上限 **6000 字符**，超出截断并告警；
-- 加载三级兜底：外部 `config/prompts/skills/`（部署期热覆写）→ classpath → 内嵌常量；
+- 加载三级兜底：外部 `config/prompts/skills/` → classpath → 内嵌常量；
+- 外部目录相对启动进程工作目录（本地 `cd backend` 启动即 `backend/config/prompts/`）；进程内缓存不过期，变更后需重启，容器部署需自行挂载该目录；
 - 目录按 `minRole` 裁剪；`view_skill` 再按角色兜底。
 
 内置示例技能：`create-mission`（创建任务）、`create-template`（创建模板）、
-`data-reading`（数据解读）、`urge-wording`（催办话术）。
+`data-reading`（数据解读）、`urge-wording`（催办话术，仅起草文案，不发送）。
 
 **提示词资产**：
 
 - 段落化资产：角色、纪律、记忆、路由、布局、图表协议、速查卡；
-- 外部 `config/prompts/<file>` 可覆写，空白/读失败回退 classpath，再回退内嵌常量；
+- 外部 `config/prompts/<file>` 可覆写（路径与缓存规则同上），空白/读失败回退 classpath，再回退内嵌常量；
 - `PromptAssets.filterCheatsheet` 按**实际注册的工具名**裁剪速查卡，避免提示词里出现模型看不见的工具；
-- 催办纪律段仅在会话注册面包含催办工具时装配（当前平台工具无催办类，运行态不装配）；
+- 催办纪律段仅在会话注册面包含催办工具时装配；当前平台与 demo 均无催办工具，因此运行态不装配；
 - 技能目录按 `minRole` 裁剪，成员目录里不会出现发布人/管理员技能。
 
 ### 4.7 上下文、状态与可靠性
@@ -521,7 +524,7 @@ ReActAgent agent = ReActAgent.builder()
 | 自动压缩 | `DcsCompactionMiddleware` 继承 `CompactionMiddleware`，租户阈值默认 **60000 token**，保留约 1/10（下限 2000） |
 | 压缩标记 | 压缩后向会话写入分隔条，前端可渲染「已压缩」状态 |
 | 恢复 | `enablePendingToolRecovery(true)` 处理无结果的 `tool_use`；启动时把悬挂的 `asking` 翻转为 `allowed` |
-| 会话缓存 | 每会话装配 agent；模型选择、联网开关、技能等指纹变化时失效重建 |
+| 会话缓存 | 每会话装配 agent；模型选择、联网开关、自选范围指纹变化时失效重建；技能与思考档逐请求读取，下一轮即生效 |
 | 租户隔离 | 工具身份快照绑定 `userId/tenantId`；模型配置无可用行时抛错，不静默回退平台配置 |
 
 ### 4.8 安全模型
@@ -559,8 +562,8 @@ ReActAgent agent = ReActAgent.builder()
 - 租户钱包 + 钱包流水 + 充值单 + 告警阈值；
 - 积分订阅：每周积分池 + 默认 5 小时滚动窗（可配）+ 加油包；未订阅租户走钱包；
 - 模型价格目录：输入 / 缓存输入 / 输出三价，按百万 token 计；
-- 成本账本按 run 汇总，`cost_meta` CUSTOM 帧把本次费用与 token 数回传前端气泡；
-- 准入闸：租户级/全站级活跃会话数（Redis ZSET + Lua 原子）；
+- 回合成本汇总按 run 累计，`cost_meta` CUSTOM 帧把本次费用与 token 数回传前端气泡；持久化用量与金额在 `dcs_ai_usage`；
+- 准入闸：租户级/全站级活跃用户数（Redis ZSET + Lua 原子）；
 - 日配额：每用户每日回合数、租户日预算、每用户联网搜索日配额；管理员可对单用户覆盖或禁用。
 
 ### 4.10 AGUI 事件协议
@@ -620,7 +623,7 @@ thinking → acting → writing → done
 | 任务管理 | 发布人建任务：动态字段（text / number / date / select / multi_select / attachment）、指派成员；`DRAFT / COLLECTING → CLOSED` |
 | 填报 | 成员按字段定义渲染表单（必填校验）；版本化提交，被退回可修订重提，历史全保留 |
 | 审核 | 发布人直审或指定审核人；通过/退回（退回必填理由）；审核时间线可回放 |
-| 通知 | 站内通知（新任务/审核结果/催办）；`(tenant_id, user_id, dedup_key)` 幂等；顶栏铃铛 + 未读数 |
+| 通知 | 站内通知（新任务/新提交待审/审核结果）；`(tenant_id, user_id, dedup_key)` 幂等；顶栏铃铛 + 未读数 |
 | 统计 | 双视角看板：发布人（草稿/收集中/已关闭 + 待审队列）与成员（待办/待审/已通过/被退回） |
 
 状态机边界：
@@ -657,7 +660,7 @@ thinking → acting → writing → done
 ### 5.4 边界声明
 
 - demo 是**测试夹具**，不是通用采集产品；字段、审核、通知、统计都只覆盖验证引擎所需的最小闭环。
-- demo 可以被整体替换：画像侧继续发同构事件，助手侧继续按 `BizToolProvider` 注册工具。
+- demo 可以被整体替换：画像侧继续发同构事件，助手侧继续按 `BizToolProvider` 注册工具；此外还需替换输入框 `@` 任务候选的数据源（`AssistantConversationController`，助手唯一一处编译期直连 demo 的代码）。
 - demo 的账号、部门、任务与数据均为合成演示数据，不对应任何真实组织。
 
 ## 6. 技术栈
@@ -749,6 +752,7 @@ thinking → acting → writing → done
 - Node.js **>= 20.19.0**、npm **>= 8.19.0**
 - PostgreSQL **14+**（推荐 17）
 - Redis **7**
+- 本机演示建议可用内存 **≥ 4G**；浏览器需为支持 ES2020 的现代 Chrome / Edge / Firefox
 - 可选：MinIO 或任意 S3 兼容存储（附件功能需要）
 
 ### 7.2 方式一：本地开发
@@ -759,15 +763,17 @@ thinking → acting → writing → done
 # Windows Git Bash / Linux / macOS 都建议先设置，避免中文编码问题
 export PGCLIENTENCODING=UTF8
 
-createdb smartdock
+createdb -U postgres -E UTF8 smartdock
 
-psql -d smartdock -f backend/script/sql/baseline/01_schema.sql
-psql -d smartdock -f backend/script/sql/baseline/02_reference.sql
-psql -d smartdock -f backend/script/sql/baseline/03_identity.sql
-psql -d smartdock -f backend/script/sql/baseline/04_role_menu.sql
+psql -U postgres -d smartdock -f backend/script/sql/baseline/01_schema.sql
+psql -U postgres -d smartdock -f backend/script/sql/baseline/02_reference.sql
+psql -U postgres -d smartdock -f backend/script/sql/baseline/03_identity.sql
+psql -U postgres -d smartdock -f backend/script/sql/baseline/04_role_menu.sql
 # 可选：一条演示任务；跳过即为干净空库
-psql -d smartdock -f backend/script/sql/baseline/05_demo_data.optional.sql
+psql -U postgres -d smartdock -f backend/script/sql/baseline/05_demo_data.optional.sql
 ```
+
+Windows CMD 用 `set PGCLIENTENCODING=UTF8`，PowerShell 用 `$env:PGCLIENTENCODING='UTF8'`。
 
 基线说明见 [backend/script/sql/baseline/README.md](backend/script/sql/baseline/README.md)。
 
@@ -778,6 +784,8 @@ cd backend
 mvn clean package -DskipTests
 java -Duser.timezone=GMT+8 -jar ruoyi-admin/target/ruoyi-admin.jar --server.port=8090
 ```
+
+首次构建会下载 Maven 依赖，通常需要 5–15 分钟；后续增量构建会快很多。
 
 默认连接：
 
@@ -794,6 +802,8 @@ java -Duser.timezone=GMT+8 -jar ruoyi-admin/target/ruoyi-admin.jar \
 
 **步骤 3：启动前端**
 
+另开一个终端（回到仓库根目录）：
+
 ```bash
 cd frontend
 npm ci
@@ -801,6 +811,8 @@ npm run dev
 ```
 
 打开 <http://localhost:5188>。开发环境 `/dev-api` 由 Vite 代理到 `http://localhost:8090`。
+
+端口冲突时：前端改 `frontend/.env.development` 的 `VITE_APP_PORT`；后端用 `--server.port=` 覆盖；Compose 用 `HTTP_PORT`。
 
 ### 7.3 方式二：Docker Compose
 
@@ -818,7 +830,9 @@ npm run build:prod
 
 # 3. 启动五容器
 cd ../deploy
-POSTGRES_PASSWORD=请替换 REDIS_PASSWORD=请替换 MINIO_PASSWORD=请替换 \
+POSTGRES_PASSWORD=replace-with-strong-password \
+REDIS_PASSWORD=replace-with-strong-password \
+MINIO_PASSWORD=replace-with-strong-password \
   docker compose up -d --build
 ```
 
@@ -831,12 +845,12 @@ POSTGRES_PASSWORD=请替换 REDIS_PASSWORD=请替换 MINIO_PASSWORD=请替换 \
   不需要演示数据时，在首次启动前将 `05_demo_data.optional.sql` 移出该目录。
 - `deploy/data/postgres` 是持久化数据卷。修改基线 SQL 后，单纯重启不会重放；
   需要清空数据卷（会删除数据）后重新初始化。
-- 默认口令只用于本地演示：`POSTGRES_PASSWORD` / `REDIS_PASSWORD` / `MINIO_PASSWORD` 请务必覆盖。
+- 默认口令只用于本地演示：未覆盖时 PostgreSQL/Redis 为 `changeit`，MinIO 为 `minioadmin`；`POSTGRES_PASSWORD` / `REDIS_PASSWORD` / `MINIO_PASSWORD` 请务必覆盖。
 - 后端容器内部端口是 `8080`，由 nginx 代理；本地开发后端使用 `8090`，两者不是同一个运行形态。
 
 ### 7.4 首次配置
 
-1. 使用 `admin / admin123` 登录，**立即修改密码**；
+1. 使用 `admin / admin123` 登录，**立即到右上角头像 → 个人中心 → 修改密码** 修改默认口令；
 2. 进入「AI 模型配置」，选择供应商预置或填写自定义 Base URL / 模型名 / API Key；
 3. 打开「AI 助手管理」，把某个配置设为助手默认模型；
 4. 模型需要同时具备 CNY 价格行（价格目录维护或自动探测）才会进入可选列表，这是计费与 CNY 闸的要求；
@@ -877,6 +891,7 @@ backend/
 ├── ruoyi-admin/                    # 启动模块（聚合运行时）
 ├── ruoyi-common/                   # 基座公共件（core/web/mybatis/redis/oss/...）
 ├── ruoyi-extend/                   # monitor-admin / snailjob-server
+├── script/sql/baseline/            # 单一基线 SQL（01→05）
 └── ruoyi-modules/
     ├── ruoyi-system/               # 用户/租户/部门/角色/菜单/字典/OSS
     ├── ruoyi-profile-engine/       # 引擎一：画像事件/维度/算子/评分/快照
@@ -887,7 +902,6 @@ backend/
     ├── ruoyi-file-security/        # 文件安全：守卫 + 审核
     ├── ruoyi-risk/                 # 风控：事件/规则/白名单/行动留痕
     └── ruoyi-job/                  # SnailJob 任务
-    └── script/sql/baseline/        # 单一基线 SQL（01→05）
 
 frontend/
 ├── src/
@@ -994,7 +1008,7 @@ npm run build:prod
 - 画像侧：继续发 `task.published` / `data.submitted` / `data.audit_*` 同构事件，或定义自己的事件类型；
 - 助手侧：实现自己的 `BizToolProvider`，在工具描述里写清业务语义与权限；
 - 若保留输入框的 `@` 任务候选，替换 `AssistantConversationController` 的数据源，或把它迁成新的 SPI；
-- 前端：删除 `views/dcs` 与 demo 菜单，保留 `components/DcsAssistant` 与画像页即可。
+- 前端：删除 demo 页面（`views/dcs/mission|todo|audit|notice|dashboard`）与对应菜单；保留 `views/dcs/profile`、`views/dcs/assistant`、AI 配置/计费页与 `components/DcsAssistant`。
 
 ## 12. 设计权衡与边界
 
@@ -1044,7 +1058,7 @@ npm run build:prod
 - 本项目使用 **Apache License 2.0**，见 [LICENSE](LICENSE)。
 - 基座来自 [RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) 5.6.1（MIT）；
   上游版权、许可与衍生说明见 [NOTICE](NOTICE)。
-- AI 运行时使用 [AgentScope](https://github.com/agentscope-ai/agentscope) 2.0.3；
+- AI 运行时使用 [AgentScope（Java）](https://github.com/agentscope-ai/agentscope-java) 2.0.3；
   模型访问使用 [Spring AI](https://spring.io/projects/spring-ai) 1.1.5。
 - 感谢所有上游开源项目与贡献者。
 

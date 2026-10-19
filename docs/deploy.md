@@ -15,7 +15,7 @@ mvn clean package -DskipTests
 
 # 前端：产出 frontend/dist/
 cd frontend
-npm i && npm run build:prod
+npm ci && npm run build:prod
 ```
 
 ## 3. 一键起栈（deploy/）
@@ -35,7 +35,7 @@ docker compose up -d --build
 | backend | 自建（JDK21）| 8080；数据源/Redis 全走环境变量注入 |
 | frontend | nginx:1.27-alpine | 80；等保加固头 + 登录限流 + SSE 直通代理 |
 
-默认口令均为 `changeit`，请用环境变量覆盖：
+PostgreSQL/Redis 默认口令为 `changeit`，MinIO 为 `minioadmin`，请用环境变量覆盖：
 
 ```bash
 POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... docker compose up -d
@@ -44,7 +44,7 @@ POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... docker compose up -d
 ## 4. 首启后的一次性配置
 
 1. 登录 `http://<host>/`（admin / admin123，**立即改密**）；
-2. 「系统 → AI 配置」录入供应商 API Key（基线刻意不带任何密钥）；
+2. 「AI 模型配置」录入供应商 API Key（基线刻意不带任何密钥）；
 3. 附件直连：若浏览器经宿主机访问 MinIO，把 `sys_oss_config` 中 minio 行的
    `endpoint` 改为宿主机可达地址（如 `192.168.x.x:9000`）并在 MinIO 控制台为
    后端机器创建桶策略（演示口径 minioadmin/minioadmin，生产必改）；
@@ -54,7 +54,7 @@ POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... docker compose up -d
 
 ## 5. 裸机部署（不用 Docker）
 
-1. PostgreSQL 17：建空库后按序执行 `backend/script/sql/baseline/` 四个 SQL；
+1. PostgreSQL 17：建空库后按序执行 `backend/script/sql/baseline/` 的五个 SQL（01→05；05 为可选演示数据，不需要时移出该目录）；
 2. Redis 7：设置 requirepass；
 3. 启动：
    ```bash

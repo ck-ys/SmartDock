@@ -7,7 +7,7 @@ Vue 3 + TypeScript + Element Plus + Vite 单页应用，与后端微核心契约
 
 ```bash
 npm i
-npm run dev        # http://localhost:5188，代理到 127.0.0.1:8090
+npm run dev        # http://localhost:5188，代理到 localhost:8090
 npm test           # vitest（200 用例）
 npm run build:prod # 产物 dist/
 ```
