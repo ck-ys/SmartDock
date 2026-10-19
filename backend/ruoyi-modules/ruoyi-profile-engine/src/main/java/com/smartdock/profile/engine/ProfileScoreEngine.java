@@ -82,6 +82,14 @@ public class ProfileScoreEngine {
                 continue;
             }
             entry.put("score", r.getScore());
+            // 不同维度 scoreMax 可能不同；总分口径统一归一到 100，再按权重合成
+            BigDecimal scoreMax = dim.getScoreMax() == null || dim.getScoreMax().signum() <= 0
+                ? BigDecimal.valueOf(100) : dim.getScoreMax();
+            BigDecimal normalized = r.getScore().multiply(BigDecimal.valueOf(100))
+                .divide(scoreMax, 2, RoundingMode.HALF_UP);
+            entry.put("scoreMax", scoreMax);
+            entry.put("normalizedScore", normalized);
+            entry.put("weightedScore", normalized.multiply(BigDecimal.valueOf(w)).setScale(2, RoundingMode.HALF_UP));
             if (r.getMetric() != null) {
                 entry.put("metric", r.getMetric());
             }
@@ -90,7 +98,7 @@ public class ProfileScoreEngine {
                 entry.put("tags", r.getTags());
             }
             detail.put(key, entry);
-            weightedSum = weightedSum.add(r.getScore().multiply(BigDecimal.valueOf(w)));
+            weightedSum = weightedSum.add(normalized.multiply(BigDecimal.valueOf(w)));
             weightSum = weightSum.add(BigDecimal.valueOf(w));
         }
 
@@ -192,7 +200,8 @@ public class ProfileScoreEngine {
     private ProfileScoreRule latestRule(String source) {
         return ruleMapper.selectList(new LambdaQueryWrapper<ProfileScoreRule>()
                 .eq(ProfileScoreRule::getSource, source)
-                .eq(ProfileScoreRule::getEnabled, "1")
+                .eq(ProfileScoreRule::getStatus, "PUBLISHED")
+                .orderByDesc(ProfileScoreRule::getPublishedAt)
                 .orderByDesc(ProfileScoreRule::getCreateTime)
                 .last("LIMIT 1"))
             .stream().findFirst().orElse(null);

@@ -1,14 +1,7 @@
 package com.smartdock.profile.query;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.smartdock.profile.domain.ProfileScoreDimension;
-import com.smartdock.profile.mapper.ProfileScoreDimensionMapper;
-import com.smartdock.profile.engine.ProfileScoreEngine;
-import com.smartdock.profile.engine.ProfileScoreSnapshot;
-import com.smartdock.profile.event.ProfileSubject;
-import com.smartdock.profile.mapper.ProfileSubjectMapper;
+import com.smartdock.profile.engine.ProfileQueryService;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -19,11 +12,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * 画像查询接口(只读)。
+ * 画像查询接口(只读): 列表/总览/排行/详情。
  *
  * @author smartdock
  */
@@ -32,25 +25,40 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ProfileQueryController {
 
-    private final ProfileSubjectMapper subjectMapper;
-    private final ProfileScoreDimensionMapper dimensionMapper;
-    private final ProfileScoreEngine scoreEngine;
+    private final ProfileQueryService queryService;
 
     /**
-     * 主体分页(按 source 过滤)。
+     * 主体分页(带最新快照与筛选/排序)。
      */
     @SaCheckPermission("profile:score:query")
     @GetMapping("/subject/page")
-    public TableDataInfo<ProfileSubject> subjectPage(String source, PageQuery pageQuery) {
-        Page<ProfileSubject> page = subjectMapper.selectPage(pageQuery.build(),
-            new LambdaQueryWrapper<ProfileSubject>()
-                .eq(source != null && !source.isBlank(), ProfileSubject::getSource, source)
-                .orderByDesc(ProfileSubject::getLastEventTime));
-        return TableDataInfo.build(page);
+    public TableDataInfo<ProfileSubjectRow> subjectPage(ProfileSubjectQuery query, PageQuery pageQuery) {
+        return queryService.subjectPage(query, pageQuery);
     }
 
     /**
-     * 单主体画像: 最新快照 + 维度明细 + 最近 N 次快照链尾。
+     * 画像总览: 主体数/已算分/平均分/风险分层。
+     */
+    @SaCheckPermission("profile:score:query")
+    @GetMapping("/overview")
+    public R<ProfileOverview> overview(@RequestParam String source) {
+        return R.ok(queryService.overview(source));
+    }
+
+    /**
+     * 维度排行: dimension 为空按总分。
+     */
+    @SaCheckPermission("profile:score:query")
+    @GetMapping("/ranking")
+    public R<List<ProfileRankingRow>> ranking(@RequestParam String source,
+                                              @RequestParam(required = false) String subjectType,
+                                              @RequestParam(required = false) String dimension,
+                                              @RequestParam(defaultValue = "10") int limit) {
+        return R.ok(queryService.ranking(source, subjectType, dimension, limit));
+    }
+
+    /**
+     * 单主体画像: 主体 + 最新快照 + 维度/证据 + 排名/风险 + 趋势。
      */
     @SaCheckPermission("profile:score:query")
     @GetMapping("/score/{source}/{subjectId}")
@@ -58,21 +66,6 @@ public class ProfileQueryController {
                                         @PathVariable String subjectId,
                                         @RequestParam(defaultValue = "user") String subjectType,
                                         @RequestParam(defaultValue = "5") int tail) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        ProfileScoreSnapshot latest = scoreEngine.latestSnapshot(source, subjectType, subjectId);
-        out.put("latest", latest);
-        out.put("history", scoreEngine.snapshotTail(source, subjectType, subjectId, tail));
-        return R.ok(out);
-    }
-
-    /**
-     * 维度配置列表(按 source 过滤)。
-     */
-    @SaCheckPermission("profile:score:query")
-    @GetMapping("/dimension/list")
-    public R<java.util.List<ProfileScoreDimension>> dimensionList(String source) {
-        return R.ok(dimensionMapper.selectList(new LambdaQueryWrapper<ProfileScoreDimension>()
-            .eq(source != null && !source.isBlank(), ProfileScoreDimension::getSource, source)
-            .orderByAsc(ProfileScoreDimension::getSortOrder)));
+        return R.ok(queryService.detail(source, subjectType, subjectId, tail));
     }
 }

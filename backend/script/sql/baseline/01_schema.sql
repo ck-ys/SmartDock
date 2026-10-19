@@ -1136,7 +1136,14 @@ CREATE TABLE public.profile_score_rule (
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     source character varying(32) NOT NULL,
     rule_version character varying(32) NOT NULL,
+    rule_name character varying(100),
+    status character varying(16) DEFAULT 'PUBLISHED'::character varying NOT NULL,
     weights jsonb DEFAULT '{}'::jsonb NOT NULL,
+    remark character varying(500),
+    published_at timestamp without time zone,
+    published_by bigint,
+    base_rule_version character varying(32),
+    revision integer DEFAULT 0 NOT NULL,
     enabled character(1) DEFAULT '1'::bpchar NOT NULL,
     create_dept bigint,
     create_by bigint,
@@ -2771,6 +2778,41 @@ CREATE INDEX idx_profile_schema_source ON public.profile_schema_registry USING b
 --
 
 CREATE INDEX idx_profile_snap_subject ON public.profile_score_snapshot USING btree (tenant_id, source, subject_id, calc_time DESC);
+
+
+--
+-- Name: idx_profile_snap_latest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_snap_latest ON public.profile_score_snapshot USING btree (tenant_id, source, subject_type, subject_id, calc_time DESC, snapshot_id DESC);
+
+
+--
+-- Name: idx_profile_snap_rank; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_snap_rank ON public.profile_score_snapshot USING btree (tenant_id, source, total_score DESC);
+
+
+--
+-- Name: idx_profile_rule_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_rule_source ON public.profile_score_rule USING btree (tenant_id, source, status, create_time DESC);
+
+
+--
+-- Name: uk_profile_rule_published; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_profile_rule_published ON public.profile_score_rule USING btree (tenant_id, source) WHERE ((status = 'PUBLISHED'::text) AND (del_flag = '0'::bpchar));
+
+
+--
+-- Name: uk_profile_rule_draft; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_profile_rule_draft ON public.profile_score_rule USING btree (tenant_id, source) WHERE ((status = 'DRAFT'::text) AND (del_flag = '0'::bpchar));
 
 
 --

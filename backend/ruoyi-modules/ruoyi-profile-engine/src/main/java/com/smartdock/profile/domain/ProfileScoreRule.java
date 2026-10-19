@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 import org.dromara.common.mybatis.core.domain.BaseEntity;
 
 import java.io.Serial;
+import java.util.Date;
 
 /**
  * 权重规则 profile_score_rule。
@@ -31,8 +32,26 @@ public class ProfileScoreRule extends BaseEntity {
 
     private String ruleVersion;
 
+    /** 规则显示名(草稿/发布版本共用) */
+    private String ruleName;
+
+    /** DRAFT / PUBLISHED / ARCHIVED */
+    private String status;
+
     /** {"completion":0.35,...} 值和=1; 只对启用维度生效, 跳过维度触发归一化 */
     private String weights;
+
+    private String remark;
+
+    private Date publishedAt;
+
+    private Long publishedBy;
+
+    /** 草稿来源版本(用于 diff) */
+    private String baseRuleVersion;
+
+    /** 乐观锁版本号 */
+    private Integer revision;
 
     private String enabled;
 }

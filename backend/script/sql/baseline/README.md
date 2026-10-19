@@ -23,6 +23,7 @@ psql -d smartdock -f 06_profile_protocol.sql     # 画像接入协议与内置�
 
 ```bash
 psql -d smartdock -f ../migration/2026-10-19_profile_protocol_v1.sql
+psql -d smartdock -f ../migration/2026-10-19_profile_studio.sql
 psql -d smartdock -f 06_profile_protocol.sql
 ```
 

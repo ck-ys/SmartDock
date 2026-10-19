@@ -4,8 +4,13 @@ import com.smartdock.profile.engine.ProfileScoreSnapshot;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 分数快照 Mapper。
@@ -44,4 +49,44 @@ public interface ProfileScoreSnapshotMapper extends BaseMapperPlus<ProfileScoreS
         """)
     int updateDimensionDetail(@Param("snapshotId") Long snapshotId, @Param("tenantId") String tenantId,
                               @Param("detail") String detail);
+
+    /**
+     * 各维度在“每主体最新快照”中的覆盖次数。
+     */
+    @Select("""
+        SELECT key AS dim_code, COUNT(*) AS covered
+        FROM (
+            SELECT DISTINCT ON (subject_type, subject_id) dimension_detail
+            FROM profile_score_snapshot
+            WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+            ORDER BY subject_type, subject_id, calc_time DESC, snapshot_id DESC
+        ) t, LATERAL jsonb_each(t.dimension_detail)
+        GROUP BY key
+        """)
+    List<Map<String, Object>> selectDimensionCoverage(@Param("tenantId") String tenantId,
+                                                      @Param("source") String source);
+
+    /**
+     * 有最新快照的主体数。
+     */
+    @Select("""
+        SELECT COUNT(*) FROM (
+            SELECT DISTINCT ON (subject_type, subject_id) 1
+            FROM profile_score_snapshot
+            WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+            ORDER BY subject_type, subject_id, calc_time DESC, snapshot_id DESC
+        ) t
+        """)
+    Long countLatestSnapshotSubjects(@Param("tenantId") String tenantId,
+                                     @Param("source") String source);
+
+    /**
+     * 最近一次算分时间。
+     */
+    @Select("""
+        SELECT MAX(calc_time) FROM profile_score_snapshot
+        WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+        """)
+    Date selectLastCalcTime(@Param("tenantId") String tenantId,
+                            @Param("source") String source);
 }

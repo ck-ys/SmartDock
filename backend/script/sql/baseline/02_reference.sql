@@ -192,7 +192,7 @@ INSERT INTO public.profile_score_dimension (dimension_id, tenant_id, dim_code, d
 -- Data for Name: profile_score_rule; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.profile_score_rule (rule_id, tenant_id, source, rule_version, weights, enabled, create_dept, create_by, create_time, update_by, update_time, del_flag) VALUES (9600, '000000', 'dcs', 'v1-builtin', '{"quality": 0.25, "negative": 0.15, "response": 0.25, "completion": 0.35}', '1', NULL, NULL, '2026-10-18 17:47:16.867569', NULL, NULL, '0');
+INSERT INTO public.profile_score_rule (rule_id, tenant_id, source, rule_version, rule_name, status, weights, remark, enabled, revision, create_dept, create_by, create_time, published_at, update_by, update_time, del_flag) VALUES (9600, '000000', 'dcs', 'v1-builtin', '内置权重', 'PUBLISHED', '{"quality": 0.25, "negative": 0.15, "response": 0.25, "completion": 0.35}', '内置四维权重，发布后不可原地修改', '1', 0, NULL, NULL, '2026-10-18 17:47:16.867569', '2026-10-18 17:47:16.867569', NULL, NULL, '0');
 
 
 --
@@ -553,6 +553,9 @@ INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, com
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11974, '画像协议编辑', 9070, 6, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:protocol:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '校验/发布画像接入协议');
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11975, '事件Schema查询', 9070, 7, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:schema:query', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '查看事件schema');
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11976, '事件Schema编辑', 9070, 8, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:schema:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '注册/更新事件schema');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11977, '画像维度编辑', 9070, 9, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:dimension:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新增/修改/停用评分维度');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11978, '画像规则编辑', 9070, 10, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:rule:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '创建/编辑/发布/归档评分规则');
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11979, '画像工作室', 9000, 2, 'profile-studio', 'dcs/profile/studio', '', '1', '0', 'C', '0', '0', 'profile:score:query', 'edit', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '维度/权重/覆盖度治理');
 
 
 --
