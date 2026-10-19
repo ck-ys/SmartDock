@@ -190,6 +190,7 @@
             :follow="follow"
             :full="full"
             :snap="full ? snapItems : undefined"
+            dock-pending
             @scroll-lock="onScrollLock"
             @resolve-hitl="resolveHitl"
             @pick="(p) => onSend(p, '')"
@@ -233,6 +234,24 @@
             <span v-if="taskMenuOpen" class="tmenu" role="menu">
               <button v-for="m in TASK_MENU" :key="m[1]" role="menuitem" @click="onTaskMenu(m[2])"><IconSpan :name="m[0]" /> {{ m[1] }}</button>
             </span>
+          </div>
+
+          <!-- 波 0：待确认卡停靠输入框上方——同一时刻只渲染最后一张未裁决卡；
+               resolve 后 dock 消失，流内回执随 cardState 翻转成结果卡 -->
+          <div v-if="pendingHitl" class="hitl-dock" role="region" aria-label="待确认操作">
+            <form-card
+              v-if="pendingHitl.toolName === 'act_create_mission'"
+              :ask="pendingHitl"
+              @resolve="resolveHitl"
+              @revise="(m) => onSend(m, '')"
+            />
+            <template-card
+              v-else-if="pendingHitl.toolName === 'act_create_template'"
+              :ask="pendingHitl"
+              @resolve="resolveHitl"
+              @revise="(m) => onSend(m, '')"
+            />
+            <confirm-card v-else :ask="pendingHitl" @resolve="resolveHitl" />
           </div>
 
           <composer
@@ -365,7 +384,7 @@ import { getTask, statsOverview } from '@/api/dcs/core/task';
 import { useUserStore } from '@/store/modules/user';
 import { getAssistant, tryAcquireRemoteWatch, releaseRemoteWatch } from './useAssistant';
 import { relTime, cnEpoch } from './time';
-import type { AssistantBindings, AssistantTurn } from './useAssistant';
+import type { AssistantBindings, AssistantTurn, HitlAsk } from './useAssistant';
 import { roleOf, roleLabelOf, pageNameOf, taskCtxOf, suggestionsFor } from './assistantCtx';
 import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
@@ -373,6 +392,9 @@ import MsgFlow from './MsgFlow.vue';
 import { startTour } from './useTour';
 import IconSpan from './IconSpan.vue';
 import Composer from './Composer.vue';
+import ConfirmCard from './ConfirmCard.vue';
+import FormCard from './FormCard.vue';
+import TemplateCard from './TemplateCard.vue';
 import GateCard from './GateCard.vue';
 import AssistantToasts from './AssistantToasts.vue';
 import StatPanel from './StatPanel.vue';
@@ -971,6 +993,18 @@ const {
   branchFrom
 } = getAssistant(userStore.userId);
 
+/** 波 0：停靠输入框上方的待确认卡——取最后一个 waiting 且尚未裁决的回合；
+ *  同一时刻只渲染一张（后端一次 run 可挂多个，但当前实现一次只发起一张）。 */
+const pendingHitl = computed<HitlAsk | null>(() => {
+  for (let i = state.turns.length - 1; i >= 0; i--) {
+    const t = state.turns[i];
+    if (t.phase === 'waiting' && t.hitl && t.hitl.cardState === 'pending') {
+      return t.hitl;
+    }
+  }
+  return null;
+});
+
 /** Q2（20261011 拍板A）：todo 清单行跳转目标——清单是会话级而步骤分属各回合，
  *  跨回合取最近一次 todo_write 步骤 id；无（回放/未写过清单）=面板行不可点。
  *  批1审查 P2：读 state 的 computed 必须挂在解构之后（防 future immediate 消费 TDZ） */
@@ -1248,7 +1282,7 @@ function onKeydown(e: KeyboardEvent) {
   // 批W2（SPEC §2.1 可达性）：Esc 链最前置=有 pending 确认卡——写操作未决时
   // 不收面板不停止，先提示去处理（卡容器已 tabindex=-1 可被 Esc 聚焦链覆盖）
   if (state.turns.some((t) => t.hitl?.cardState === 'pending')) {
-    pushToast('还有一条确认未处理：请先在对话里选择确认或取消', 'info');
+    pushToast('还有一条确认未处理：请先在输入框上方选择确认或取消', 'info');
     return;
   }
   if (help.open.value) {
@@ -1492,6 +1526,37 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
   padding-right: var(--sp-strip, 0px);
   transition: padding-right 0.3s ease;
 }
+/* 波 0：待确认卡停靠输入框上方——限高滚动，长表单不会把输入框挤出屏幕；
+   抽屉/全屏宿主只渲染最后一张 pending 卡（见 pendingHitl） */
+.hitl-dock {
+  flex: none;
+  max-height: 42vh;
+  margin: 0 14px 8px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+
+  :deep(.dcs-confirm) {
+    width: 100%;
+    margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+    margin: 0 0 8px;
+  }
+}
+/* 全屏形态：与输入框同侧距（.dcs-comp.full padding 24px） */
+.dcs-dw.full .hitl-dock {
+  margin-left: 24px;
+  margin-right: 24px;
+
+  @media (max-width: 768px) {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
 /* 业务批4 Q2：任务上下文条（紧贴输入框上方）——顶层选择器（原块嵌在 .hd-txt 里是头部
    chip 时代的残留，Q2 模板搬走后 .dw-head .hd-txt .ctx-bar 永假=整块样式静默失效，
    U7 视觉席"控件落第二行/条无样式"实根因；scoped 属性隔离下顶层无串扰） */

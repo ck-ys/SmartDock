@@ -38,7 +38,8 @@ const settingsStore = useSettingsStore();
 const theme = computed(() => settingsStore.theme);
 const sidebar = computed(() => useAppStore().sidebar);
 const device = computed(() => useAppStore().device);
-const needTagsView = computed(() => settingsStore.tagsView);
+// 波 0：手机不显示页签栏（50px 竖向空间让给内容），仍尊重「显示页签」设置
+const needTagsView = computed(() => settingsStore.tagsView && device.value !== 'mobile');
 const fixedHeader = computed(() => settingsStore.fixedHeader);
 const layout = computed(() => settingsStore.navType);
 

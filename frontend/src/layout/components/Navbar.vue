@@ -10,47 +10,48 @@
       <top-bar id="topbar-container" class="topbar-container" />
     </template>
     <div class="right-menu flex align-center">
-      <template v-if="appStore.device !== 'mobile'">
-        <el-select
-          v-if="userId === 1 && tenantEnabled"
-          v-model="companyName"
-          class="min-w-244px mr-2"
-          clearable
-          filterable
-          reserve-keyword
-          :loading="tenantSwitching"
-          :placeholder="proxy.$t('navbar.selectTenant')"
-          @change="dynamicTenantEvent"
-          @clear="dynamicClearEvent"
-        >
-          <el-option v-for="item in tenantList" :key="item.tenantId" :label="item.companyName" :value="item.tenantId"> </el-option>
-          <template #prefix><svg-icon icon-class="company" class="el-input__icon input-icon" /></template>
-        </el-select>
+      <!-- 波 0：手机顶栏保留「搜索 + 消息」两条高频入口（此前整块被 device 判断隐藏，
+           手机上既看不到未读也搜不到菜单）；租户切换/全屏/语言/字号/仓库链接仍只在桌面出现 -->
+      <el-select
+        v-if="appStore.device !== 'mobile' && userId === 1 && tenantEnabled"
+        v-model="companyName"
+        class="min-w-244px mr-2"
+        clearable
+        filterable
+        reserve-keyword
+        :loading="tenantSwitching"
+        :placeholder="proxy.$t('navbar.selectTenant')"
+        @change="dynamicTenantEvent"
+        @clear="dynamicClearEvent"
+      >
+        <el-option v-for="item in tenantList" :key="item.tenantId" :label="item.companyName" :value="item.tenantId"> </el-option>
+        <template #prefix><svg-icon icon-class="company" class="el-input__icon input-icon" /></template>
+      </el-select>
 
-        <search-menu ref="searchMenuRef" />
-        <el-tooltip content="搜索" effect="dark" placement="bottom">
-          <div class="right-menu-item hover-effect" @click="openSearchMenu">
-            <svg-icon class-name="search-icon" icon-class="search" />
-          </div>
-        </el-tooltip>
-        <!-- 消息 -->
-        <el-tooltip :content="proxy.$t('navbar.message')" effect="dark" placement="bottom">
-          <div style="display: flex; align-items: center">
-            <el-popover placement="bottom" trigger="click" transition="el-zoom-in-top" :width="300" :persistent="false">
-              <template #reference>
-                <el-badge :value="newNotice > 0 ? newNotice : ''" :max="99">
-                  <div class="right-menu-item hover-effect"><svg-icon icon-class="message" /></div>
-                </el-badge>
-              </template>
-              <template #default>
-                <notice></notice>
-              </template>
-            </el-popover>
-          </div>
-        </el-tooltip>
+      <search-menu ref="searchMenuRef" />
+      <el-tooltip content="搜索" effect="dark" placement="bottom">
+        <div class="right-menu-item hover-effect" @click="openSearchMenu">
+          <svg-icon class-name="search-icon" icon-class="search" />
+        </div>
+      </el-tooltip>
+      <!-- 消息 -->
+      <el-tooltip :content="proxy.$t('navbar.message')" effect="dark" placement="bottom">
+        <div style="display: flex; align-items: center">
+          <el-popover placement="bottom" trigger="click" transition="el-zoom-in-top" :width="300" :persistent="false">
+            <template #reference>
+              <el-badge :value="newNotice > 0 ? newNotice : ''" :max="99">
+                <div class="right-menu-item hover-effect"><svg-icon icon-class="message" /></div>
+              </el-badge>
+            </template>
+            <template #default>
+              <notice></notice>
+            </template>
+          </el-popover>
+        </div>
+      </el-tooltip>
+      <template v-if="appStore.device !== 'mobile'">
         <!-- 反馈问题（三件套 2026-09-24：全员入口，弹窗内提交/追踪两页签） -->
-        <el-tooltip content="反馈问题" effect="dark" placement="bottom">
-        </el-tooltip>
+        <el-tooltip content="反馈问题" effect="dark" placement="bottom"></el-tooltip>
         <el-tooltip v-if="showRepositoryLink" content="Github" effect="dark" placement="bottom">
           <ruo-yi-git id="ruoyi-git" class="right-menu-item hover-effect" />
         </el-tooltip>
@@ -371,6 +372,24 @@ onMounted(() => {
           top: 25px;
           font-size: 12px;
         }
+      }
+    }
+  }
+
+  /* 波 0：手机顶栏触控面 ≥44px（图标视觉大小不变），并收紧头像右侧留白 */
+  @media (max-width: 768px) {
+    .right-menu {
+      gap: 2px;
+
+      .right-menu-item {
+        min-width: 44px;
+        height: 44px;
+        padding: 0 6px;
+      }
+
+      .avatar-container {
+        /* 头像右侧 22px：给下拉箭头（right:-20px）留位，8px 会让箭头被 navbar overflow 裁掉 */
+        margin-right: 22px;
       }
     }
   }

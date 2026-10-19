@@ -188,23 +188,36 @@
     <!-- 等待确认 or 已裁决（取消/执行完回执保留展示） -->
     <!-- 批F2 表单卡分派（SPEC §2.2 二站）：建任务=真实 EP 控件表单，改一改=当前值回注对话；
          R4a：建模板=同族 TemplateCard（字段清单动态行） -->
+    <!-- 波 0：dock-pending=true 时，待确认卡停靠宿主输入框上方（AssistantDrawer .hitl-dock），
+         流内只留一行回执；已裁决（run/done）仍留在流内当历史，会话页不传该 prop 行为不变 -->
     <form-card
-      v-if="turn.hitl && turn.hitl.toolName === 'act_create_mission' && (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending')"
+      v-if="
+        turn.hitl &&
+        turn.hitl.toolName === 'act_create_mission' &&
+        (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending') &&
+        !(dockPending && turn.hitl.cardState === 'pending')
+      "
       :ask="turn.hitl"
       @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
       @revise="(m) => emit('ask', m)"
     />
     <template-card
-      v-else-if="turn.hitl && turn.hitl.toolName === 'act_create_template' && (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending')"
+      v-else-if="
+        turn.hitl &&
+        turn.hitl.toolName === 'act_create_template' &&
+        (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending') &&
+        !(dockPending && turn.hitl.cardState === 'pending')
+      "
       :ask="turn.hitl"
       @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
       @revise="(m) => emit('ask', m)"
     />
     <confirm-card
-      v-else-if="turn.hitl && (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending')"
+      v-else-if="turn.hitl && (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending') && !(dockPending && turn.hitl.cardState === 'pending')"
       :ask="turn.hitl"
       @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
     />
+    <div v-if="dockPending && turn.hitl && turn.hitl.cardState === 'pending'" class="hitl-receipt" role="status">⏳ 已在输入框上方等待你确认</div>
 
     <!-- 来源折叠条（批C：🗂 N 个来源 ▾；rows 型工具=DataCard 数据原件，其余=文本摘要） -->
     <div v-if="hasFoot && turn.toolCalls > 0" class="srcwrap">
@@ -369,7 +382,15 @@ import { submitFeedback, listConversations, listMessages, exportAssistantReport 
 import { pushToast } from './toastStore';
 import { useFavs } from './favStore';
 
-const props = defineProps<{ turn: AssistantTurn; turnIndex?: number; now: number; threadId?: string; showThink?: boolean }>();
+const props = defineProps<{
+  turn: AssistantTurn;
+  turnIndex?: number;
+  now: number;
+  threadId?: string;
+  showThink?: boolean;
+  /** 波 0：待确认卡停靠宿主输入框上方（抽屉），流内只留一行回执 */
+  dockPending?: boolean;
+}>();
 const rootEl = ref<HTMLElement | null>(null);
 const emit = defineEmits<{
   resume: [];
@@ -1052,6 +1073,22 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   flex-direction: column;
   gap: 10px;
   margin-top: 8px;
+
+  /* 波 0：待确认卡停靠输入框后，流内回执行——只报「在哪里等你」，不复述卡内容 */
+  .hitl-receipt {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 5px 12px;
+    border: 1px dashed #f3d19e;
+    border-radius: 999px;
+    background: #fffcf5;
+    color: #b8860b;
+    font-size: 12.5px;
+    line-height: 20px;
+  }
 
   /* 批3 Q6/Q7（回修 P2-1）：站内链/任务卡/表格容器挂根级 :deep——正文气泡 .md 与
      思考块 .tk-b 两处 v-html 共用同一份样式，思考块内不再是死按钮+裸样式 */

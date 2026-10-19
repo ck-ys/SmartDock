@@ -406,6 +406,16 @@ function onRevise() {
       background: #ecf5ff;
     }
   }
+  /* 波 0：窄屏停靠卡去掉「AI 填/你改过」徽标并把标签列收窄——
+     16px 输入字号下，日期值（2026-10-20 09:00）会被徽标挤到只剩半截 */
+  @media (max-width: 768px) {
+    .frow .k {
+      flex-basis: 56px;
+    }
+    .frow .ctrl .badge {
+      display: none;
+    }
+  }
 
   .cwhy {
     margin: 0 12px 8px;

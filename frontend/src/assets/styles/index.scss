@@ -8,6 +8,8 @@
 @use './dcs-tokens.scss';
 @use './dcs-profile-v7.scss';
 @use './dcs-operations.scss';
+/* 波 0 响应式基线（16px 防 iOS 聚焦放大 + 底部安全区）；@use 必须在任何规则之前 */
+@use './dcs-responsive.scss';
 @use 'animate.css';
 @use 'element-plus/dist/index.css';
 

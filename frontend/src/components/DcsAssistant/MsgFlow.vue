@@ -70,6 +70,7 @@
         :now="ti === state.turns.length - 1 && state.sending ? now : 0"
         :thread-id="state.threadId"
         :show-think="state.showThink"
+        :dock-pending="dockPending"
         @resume="emit('resume')"
         @stop="emit('stop')"
         @resolve-hitl="(a, r, e) => emit('resolve-hitl', a, r, e)"
@@ -134,6 +135,8 @@ const props = defineProps<{
   follow: boolean;
   full?: boolean;
   snap?: SnapItem[];
+  /** 波 0：待确认卡停靠宿主输入框（抽屉）；流内回合只渲染一行回执 */
+  dockPending?: boolean;
 }>();
 
 /** 原型 .avatar：用户气泡右端首字圆标（昵称>账号兜底） */

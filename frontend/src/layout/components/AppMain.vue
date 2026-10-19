@@ -53,8 +53,9 @@ function addIframe() {
 
 <style lang="scss" scoped>
 .app-main {
-  /* 50= navbar  50  */
+  /* 50= navbar  50；dvh 跟随手机地址栏收放，vh 作旧浏览器兜底 */
   min-height: calc(100vh - 50px);
+  min-height: calc(100dvh - 50px);
   width: 100%;
   position: relative;
   overflow: hidden;
@@ -66,8 +67,9 @@ function addIframe() {
 
 .hasTagsView {
   .app-main {
-    /* 84 = navbar + tags-view = 50 + 34 */
+    /* 84 = navbar + tags-view = 50 + 34；dvh 跟随手机地址栏收放，vh 作旧浏览器兜底 */
     min-height: calc(100vh - 84px);
+    min-height: calc(100dvh - 84px);
   }
 
   .fixed-header + .app-main {
