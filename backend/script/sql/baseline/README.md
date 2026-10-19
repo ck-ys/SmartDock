@@ -15,6 +15,7 @@ psql -d smartdock -f 03_identity.sql    # 合成身份块（租户/部门/用户
 psql -d smartdock -f 04_role_menu.sql   # 角色菜单绑定
 psql -d smartdock -f 05_demo_data.optional.sql   # （可选）一条开箱演示任务；跳过即为干净空库
 psql -d smartdock -f 06_profile_protocol.sql     # 画像接入协议与内置事件 Schema（可重复执行）
+psql -d smartdock -f 07_analytics.sql            # 分析中心：会话/日汇总/漏斗/采集站点（可重复执行）
 ```
 
 ## 已有库升级

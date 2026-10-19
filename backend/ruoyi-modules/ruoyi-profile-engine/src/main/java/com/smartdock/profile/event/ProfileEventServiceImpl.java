@@ -1,5 +1,6 @@
 package com.smartdock.profile.event;
 
+import com.smartdock.analytics.engine.AnalyticsRollupTrigger;
 import com.smartdock.profile.ProfileEventPublisher;
 import com.smartdock.profile.engine.ProfileRecalcTrigger;
 import com.smartdock.profile.identity.ProfileIdentityService;
@@ -43,17 +44,20 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     private final ProfileSchemaService schemaService;
     private final ProfileIdentityService identityService;
     private final ProfileRecalcTrigger recalcTrigger;
+    private final AnalyticsRollupTrigger analyticsRollupTrigger;
     private final TransactionTemplate requiresNew;
 
     public ProfileEventServiceImpl(ProfileEventMapper eventMapper,
                                    ProfileSchemaService schemaService,
                                    ProfileIdentityService identityService,
                                    ProfileRecalcTrigger recalcTrigger,
+                                   AnalyticsRollupTrigger analyticsRollupTrigger,
                                    PlatformTransactionManager transactionManager) {
         this.eventMapper = eventMapper;
         this.schemaService = schemaService;
         this.identityService = identityService;
         this.recalcTrigger = recalcTrigger;
+        this.analyticsRollupTrigger = analyticsRollupTrigger;
         this.requiresNew = new TransactionTemplate(transactionManager);
         this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -68,8 +72,9 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         try {
             recalcTrigger.onEvent(written.getTenantId(), written.getSource(),
                 written.getSubjectType(), written.getSubjectId());
+            analyticsRollupTrigger.onEvent(written.getTenantId(), written.getSource());
         } catch (Exception e) {
-            // 自动重算调度失败不影响事件账本
+            // 自动重算/汇总调度失败不影响事件账本
             log.warn("[Profile] auto recalc schedule failed subject={} err={}",
                 written.getSubjectId(), e.getMessage());
         }
@@ -114,6 +119,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
                     try {
                         recalcTrigger.onEvent(event.getTenantId(), event.getSource(),
                             event.getSubjectType(), event.getSubjectId());
+                        analyticsRollupTrigger.onEvent(event.getTenantId(), event.getSource());
                     } catch (Exception e) {
                         log.warn("[Profile] auto recalc schedule failed subject={} err={}",
                             event.getSubjectId(), e.getMessage());

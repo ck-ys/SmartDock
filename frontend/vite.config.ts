@@ -31,6 +31,12 @@ export default defineConfig(({ mode, command }) => {
           changeOrigin: true,
           ws: true,
           rewrite: (path) => path.replace(new RegExp('^' + env.VITE_APP_BASE_API), '')
+        },
+        // 分析采集是公开接口，SDK 默认按 location.origin + /analytics/collect 上报；
+        // 开发态直连后端，生产态由 nginx 把 /analytics/ 反代到后端。
+        '/analytics': {
+          target: 'http://localhost:8090',
+          changeOrigin: true
         }
       }
     },
