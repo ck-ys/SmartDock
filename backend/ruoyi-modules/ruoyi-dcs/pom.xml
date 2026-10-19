@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>ruoyi-dcs</artifactId>
+
+    <description>
+        dcs 参考微核心 (Mini Core, 批3 重写) —— 教科书级参考业务壳
+        - 任务→填报→提交→审核 主链 + 站内通知 + 双视角统计
+        - 双状态机: 任务 DRAFT/COLLECTING/CLOSED + 提交 PENDING_AUDIT/APPROVED/REJECTED
+        - 事件翻译点 5 个 → profile_event (喂画像引擎, 开箱即出画像)
+        - DcsToolProvider 4 工具经 assistant-spi 进 AI 助手
+        铁律: 仅依赖 common-* + profile-engine + assistant-spi, 零 billing/risk/file-security。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-satoken</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-json</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-tenant</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-idempotent</artifactId>
+        </dependency>
+
+        <!-- 事件翻译 → 画像引擎(单向依赖) -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-profile-engine</artifactId>
+        </dependency>
+        <!-- 助手工具 SPI 契约(纯 JDK) -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-assistant-spi</artifactId>
+        </dependency>
+
+        <!-- 单测: 状态机/校验器/事件 uid 纯函数层, 不起 Spring -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

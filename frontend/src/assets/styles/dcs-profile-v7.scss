@@ -1,0 +1,305 @@
+/**
+ * V7「EP 企业风」画像域主题（2026-10-16 用户拍板 V7 落地；同日否墨青蓝=回归系统 EP 主色；
+ * 2026-10-17 用户否衬线/刻度线=数字跟随系统无衬线，删装饰刻度线，chrome 全收口 EP 中性灰）
+ * 色板（大地色带，仅用于数据语义）：橄榄绿 #3f6f3f / 芥末 #8a6d1c / 锈橙 #c2410c / 紫酱 #5b4a8a / 青绿 #4a7d6e / 米灰 #7a7263
+ */
+.v7-theme {
+  /* —— Y3 a11y: 画像域可点元素统一键盘焦点环(2026-10-17 五维批) —— */
+  a:focus-visible,
+  button:focus-visible,
+  [role='button']:focus-visible,
+  [tabindex]:focus-visible:not([tabindex='-1']) {
+    outline: 2px solid var(--el-color-primary);
+    outline-offset: 2px;
+  }
+
+  /* —— 大数字（系统无衬线同源，tabular-nums 防重算抖动） —— */
+  .v7-num {
+    display: block;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 28px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--el-text-color-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 数字行：数字 + 单位小字 + 右侧占比辅助 */
+  .v7-num-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .v7-num-row .v7-num {
+    display: inline;
+    font-size: 28px;
+  }
+
+  .v7-num__unit {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--el-text-color-secondary);
+  }
+
+  .v7-num__sub {
+    margin-left: auto;
+    font-size: 12px;
+    color: #606266;
+  }
+
+  /* 高风险卡可点暗示: 行动短语用主色, 与其余三张不可点卡的纯灰口径句区分 */
+  .v7-kpi-card__go {
+    color: var(--el-color-primary);
+  }
+
+  .v7-num.v7-num--sm {
+    font-size: 15px;
+  }
+
+  .v7-num.v7-num--risk {
+    color: #c2410c;
+  }
+
+  .v7-num.v7-num--churn {
+    color: #8a6d1c;
+  }
+
+  /* —— KPI 卡带（EP 中性 chrome，语义色只留在数据上） —— */
+  .v7-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .v7-kpi-card {
+    padding: 12px 14px;
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: var(--dcs-radius-sm);
+  }
+
+  .v7-kpi-card__label {
+    color: var(--el-text-color-regular);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .v7-kpi-card__note {
+    margin-top: 6px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    line-height: 17px;
+  }
+
+  .v7-kpi-card--attn {
+    box-shadow: inset 0 3px 0 0 #c2410c;
+    cursor: pointer;
+  }
+
+  .v7-kpi-card--attn:hover {
+    border-color: #c2410c;
+  }
+
+  /* —— 5 秒结论横幅（EP 主色左边线，跟随系统主题） —— */
+  .v7-verdict {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    background: var(--el-color-primary-light-9);
+    border: 1px solid #d9ecff;
+    border-left: 3px solid var(--el-color-primary);
+    border-radius: var(--dcs-radius-xs);
+    font-size: 13px;
+    color: var(--el-text-color-regular);
+  }
+
+  .v7-verdict b {
+    color: var(--el-text-color-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .v7-verdict__go {
+    margin-left: auto;
+    color: var(--el-color-primary);
+    font-size: 12.5px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .v7-verdict__meta {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+  }
+
+  /* 拍板Q4b-A(1017): KPI 带收起钮——收起后结论行即摘要 */
+  .v7-verdict__toggle {
+    margin-left: 4px;
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  .v7-verdict__toggle .v7-toggle-icon {
+    margin-left: 2px;
+    transition: transform 0.2s;
+    transform: rotate(180deg);
+  }
+  .v7-verdict__toggle .v7-toggle-icon.is-collapsed {
+    transform: rotate(0);
+  }
+
+  /* —— 大地色语义 tag（替换画像域 EP 亮色 tag） —— */
+  .v7-tag {
+    display: inline-block;
+    padding: 0 8px;
+    line-height: 22px;
+    border-radius: var(--dcs-radius-xs);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .v7-tag--primary {
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+  }
+
+  .v7-tag--ok {
+    background: #e9f0e6;
+    color: #3f6f3f;
+  }
+
+  .v7-tag--warn {
+    background: #f6f0dd;
+    color: #8a6d1c;
+  }
+
+  .v7-tag--risk {
+    background: #f6e5da;
+    color: #c2410c;
+  }
+
+  .v7-tag--neutral {
+    background: #eee9df;
+    color: #7a7263;
+  }
+
+  .v7-tag--ai {
+    background: #ebe7f3;
+    color: #5b4a8a;
+  }
+
+  .v7-tag--active {
+    background: #e6efec;
+    color: #4a7d6e;
+  }
+
+  /* —— 洞察一卡三视图（EP 中性 chrome） —— */
+  .v7-insight {
+    margin-bottom: 12px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: var(--dcs-radius-sm);
+    background: var(--el-bg-color);
+  }
+
+  /* R3: 全局样式文件里 :deep() 是死规则(编译时不转换, 浏览器直接丢弃)——改裸选择器 */
+  .v7-insight .el-card__header {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+
+  /* R4: 列表筛选态常驻条(命中数+逐项撤销+全部清除) */
+  .filter-state-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 6px 10px;
+    background: var(--el-fill-color-light);
+    border-radius: var(--dcs-radius-sm);
+  }
+  .filter-state-bar__label {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+  .filter-state-bar__hint {
+    font-size: 12px;
+    color: var(--el-text-color-placeholder);
+  }
+
+  /* —— 容器批方案A: 洞察+四页签一张大卡(细线分隔+下划线页签, 消灭主缝) —— */
+  .v7-workbench > .el-card__body {
+    /* 同规范反制 ruoyi.scss 卡体 !important padding——内边距由内部段自理 */
+    padding: 0 !important;
+  }
+  .v7-workbench .ins-body {
+    padding: 14px 16px 4px;
+  }
+  .v7-workbench .wb-tabs .el-tabs__header {
+    margin: 0;
+    padding: 0 16px;
+    border-top: 1px solid var(--el-border-color-lighter);
+  }
+  .v7-workbench .wb-tabs .el-tabs__content {
+    padding: 12px 16px 16px;
+  }
+
+  .v7-insight__cap {
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+  }
+
+  /* 折叠态: 清掉 card body 空白, 卡片收到贴近 header(ruoyi.scss 对 card body 有 !important 覆盖, 同规范反制) */
+  .v7-insight.is-collapsed .el-card__body {
+    padding: 0 !important;
+  }
+
+  /* —— 拍板Q1-A/Q7-A(1017f): 结论卡一张(KPI+洞察+概念链, 一个收起钮) + 工作台独立白底容器 —— */
+  .v7-conclusion > .el-card__body {
+    padding: 0 !important;
+  }
+  .v7-conclusion .v7-verdict {
+    margin: 12px 16px;
+  }
+  .v7-conclusion .v7-kpi-strip {
+    padding: 0 16px;
+    margin-bottom: 12px;
+  }
+  .v7-conclusion .ins-header {
+    padding: 8px 16px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+  .v7-conclusion .ins-body {
+    padding: 14px 16px 4px;
+  }
+  .v7-concept-inline {
+    margin: 0 16px;
+    padding: 8px 0 12px;
+    border-top: 1px dashed var(--el-border-color-lighter);
+  }
+  /* Q7: 结论区与工作区拉出组间距, 页签容器自带白底卡边界 */
+  .v7-workbench-shell {
+    margin-top: 28px;
+  }
+
+  /* —— 趋势涨跌 —— */
+  .v7-up {
+    color: #3f6f3f;
+  }
+
+  .v7-dn {
+    color: #c2410c;
+  }
+}
+
+@media (max-width: 980px) {
+  .v7-theme .v7-kpi-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

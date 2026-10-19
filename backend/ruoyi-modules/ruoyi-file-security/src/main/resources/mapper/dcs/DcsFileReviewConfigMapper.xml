@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartdock.mapper.DcsFileReviewConfigMapper">
+
+    <!--
+        租户级配置幂等 upsert（12b, 合同 P1-3; 批三扩 file-guard 三列）
+        两管理员并发首存: 一行 INSERT 一行转 UPDATE, 不再 UNIQUE(tenant_id) 冲突。
+        ON CONFLICT 判定列 = uq_dcs_file_review_config_tenant。
+    -->
+    <insert id="upsertConfig">
+        INSERT INTO dcs_file_review_config
+            (config_id, tenant_id, enabled, categories,
+             guard_mode, guard_whitelist, guard_deep_scan_max_mb,
+             create_by, create_time, update_by, update_time)
+        VALUES
+            (#{configId}, #{tenantId}, #{enabled}, #{categories},
+             #{guardMode}, #{guardWhitelist}, #{guardDeepScanMaxMb},
+             #{operatorId}, CURRENT_TIMESTAMP, #{operatorId}, CURRENT_TIMESTAMP)
+        ON CONFLICT (tenant_id) DO UPDATE
+        SET enabled    = EXCLUDED.enabled,
+            categories = EXCLUDED.categories,
+            guard_mode = EXCLUDED.guard_mode,
+            guard_whitelist = EXCLUDED.guard_whitelist,
+            guard_deep_scan_max_mb = EXCLUDED.guard_deep_scan_max_mb,
+            update_by  = EXCLUDED.update_by,
+            update_time = CURRENT_TIMESTAMP
+    </insert>
+
+</mapper>

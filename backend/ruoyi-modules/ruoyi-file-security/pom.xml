@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>ruoyi-file-security</artifactId>
+
+    <description>
+        文件安全家族模块 (File Security: fileguard + file-review)
+        - 文件安全检测 fileguard: 魔数校验/Office 宏/PDF JS/SVG XSS 扫描与裁决
+        - 文件审核中心 file-review: 先审后可见闸门(实现 system 的 FileReviewGate/FileGuardChecker 端口)/审核单/配置
+        - 驳回通知发 FileReviewNoticeEvent 域事件, 由 dcs 侧 DcsFileReviewNoticePublisher 翻译进通知管道(同步 @EventListener 相位红线)
+        - 任务审核人存在性经 MissionReviewProbe 端口反转, dcs 侧 MissionReviewProbeImpl 落地查询
+        2026-09-24 从 ruoyi-dcs 机械迁移成独立模块(拍板 Q1:A,
+        见 document/plans/FILESECURITY_AIGATEWAY_RECONCILE_PLAN_20260924.md);
+        Java 包名保留 com.smartdock.*(零 import 改动), 依赖方向 dcs→file-security 单向,
+        本模块依赖 ruoyi-system(端口)/ruoyi-risk(风控上报), 不依赖 ruoyi-dcs。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-satoken</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-tenant</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-idempotent</artifactId>
+        </dependency>
+        <!-- FileReviewGate/FileGuardChecker 端口 + SysRole/SysUserRole/ISysUserService -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-system</artifactId>
+        </dependency>
+        <!-- 文件审核驳回/命中向风控上报 RiskEventCollector -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-risk</artifactId>
+        </dependency>
+        <!-- PDF 内嵌 JavaScript 深度扫描(PdfJsScanner); 版本由根 pom dependencyManagement 统一钉住 -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+        </dependency>
+        <!-- Office 宏扫描(OfficeMacroScanner 读 OLE 结构); 版本由根 pom 统一钉住 -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+        </dependency>
+
+        <!-- 单测: 与 ruoyi-admin 同款 test 域依赖(照 ruoyi-risk/ruoyi-ai-billing 先例) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

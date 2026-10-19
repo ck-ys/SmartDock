@@ -1,0 +1,32 @@
+SmartDock
+Copyright 2026 SmartDock Contributors
+
+This product includes software developed at the SmartDock project.
+It is derived from RuoYi-Vue-Plus (https://github.com/dromara/RuoYi-Vue-Plus).
+
+======================================================================
+This product is based on RuoYi-Vue-Plus (https://github.com/dromara/RuoYi-Vue-Plus),
+Copyright (c) 2019-2026 RuoYi-Vue-Plus, licensed under the MIT License
+(see backend/LICENSE and frontend/LICENSE.txt for the full text).
+
+This product includes and acknowledges the following open-source components:
+
+Backend:
+  - Spring Boot / Spring Framework (Apache License 2.0)
+  - MyBatis-Plus (Apache License 2.0)
+  - Sa-Token (Apache License 2.0)
+  - Redisson (Apache License 2.0)
+  - Hutool (Mulan PSL v2)
+  - Lombok (MIT License)
+  - Agentscope-java runtime (Apache License 2.0)
+
+Frontend:
+  - Vue 3 (MIT License)
+  - Element Plus (MIT License)
+  - Vite (MIT License)
+  - Pinia / Vue Router (MIT License)
+  - ECharts (Apache License 2.0)
+  - axios (MIT License)
+
+Third-party trademark notices: MinIO, PostgreSQL, Redis and Docker are
+trademarks of their respective owners and are not affiliated with this project.

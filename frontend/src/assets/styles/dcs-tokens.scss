@@ -1,0 +1,70 @@
+/**
+ * DCS 设计系统 token(P2-1)。
+ *
+ * 设计原则: 映射 Element Plus CSS 变量, 提供语义命名, 替代硬编码色。
+ * 用法(SCSS 里):
+ *   color: var(--dcs-text-primary);
+ *   background: var(--dcs-bg-card);
+ *
+ * 用法(template inline style 里, 不推荐但兼容):
+ *   style="color: var(--dcs-color-danger)"
+ *
+ * 不适用场景(保留硬编码):
+ *   - ECharts 图表内部数据色(用 palette.ts 管)
+ *   - 大屏(ScreenView)暗色主题专用背景
+ *   - 渐变装饰(用 --dcs-gradient-*)
+ */
+:root {
+  // === 语义色(映射 Element Plus) ===
+  --dcs-color-primary: var(--el-color-primary);
+  --dcs-color-success: var(--el-color-success);
+  --dcs-color-warning: var(--el-color-warning);
+  --dcs-color-danger: var(--el-color-danger);
+  --dcs-color-info: var(--el-color-info);
+
+  // === 文字层次 ===
+  --dcs-text-primary: var(--el-text-color-primary);
+  --dcs-text-regular: var(--el-text-color-regular);
+  --dcs-text-secondary: var(--el-text-color-secondary);
+  --dcs-text-placeholder: var(--el-text-color-placeholder);
+
+  // === 背景 ===
+  --dcs-bg-page: var(--el-bg-color);
+  --dcs-bg-card: var(--el-bg-color-overlay);
+  --dcs-bg-fill-light: var(--el-fill-color-light);
+  --dcs-bg-fill-lighter: var(--el-fill-color-lighter);
+
+  // === 边框 ===
+  --dcs-border-color: var(--el-border-color);
+  --dcs-border-color-light: var(--el-border-color-light);
+  --dcs-border-color-lighter: var(--el-border-color-lighter);
+
+  // === 渐变规范 ===
+  --dcs-gradient-primary: linear-gradient(135deg, var(--el-color-primary), var(--el-color-primary-light-3));
+  --dcs-gradient-success: linear-gradient(135deg, var(--el-color-success), var(--el-color-success-light-3));
+  --dcs-gradient-danger: linear-gradient(135deg, var(--el-color-danger), var(--el-color-danger-light-3));
+  --dcs-gradient-warning: linear-gradient(135deg, var(--el-color-warning), var(--el-color-warning-light-3));
+
+  // === 圆角 4 档(2026-10-17 画像五维批 Y1 收敛, 禁新增档外值) ===
+  --dcs-radius-xs: 2px; // 徽标/进度条圆头内元素
+  --dcs-radius-sm: 4px; // 按钮/输入框/胶囊(EP 默认对齐)
+  --dcs-radius-md: 8px; // 卡片/弹层/抽屉内区块
+  --dcs-radius-lg: 12px; // 大卡/hero 区
+
+  // === 字号 7 档(0.5 微差已归一, 禁新增档外值) ===
+  --dcs-font-xs: 11px; // 辅助注脚/规则版本小字
+  --dcs-font-sm: 12px; // 次要说明/tag
+  --dcs-font-base: 12.5px; // 正文密度(表格/表单)
+  --dcs-font-md: 13px; // 卡片正文
+  --dcs-font-lg: 14px; // 小标题/模板卡标题
+  --dcs-font-xl: 15px; // 区块标题
+  --dcs-font-2xl: 18px; // 页面级标题
+
+  // === 间距 6 档(纵向节奏) ===
+  --dcs-space-xs: 4px; // 行内元素间隔
+  --dcs-space-sm: 8px; // 紧凑组内
+  --dcs-space-md: 12px; // 组间
+  --dcs-space-lg: 16px; // 区块间
+  --dcs-space-xl: 24px; // hero 内边距
+  --dcs-space-2xl: 32px; // 页面级留白
+}

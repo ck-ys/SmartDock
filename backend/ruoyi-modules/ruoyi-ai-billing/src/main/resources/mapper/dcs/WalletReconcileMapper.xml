@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartdock.mapper.WalletReconcileMapper">
+
+    <!-- 检查①: 逐钱包 余额 vs 流水净额(无流水的钱包净额 0, 差额即余额本身) -->
+    <select id="selectWalletNet" resultType="com.smartdock.domain.vo.WalletReconcileNetVo">
+        SELECT w.wallet_id,
+               w.tenant_id,
+               w.balance_amount,
+               COALESCE(SUM(CASE l.direction WHEN 'IN' THEN l.amount ELSE -l.amount END), 0) AS ledger_net
+          FROM dcs_tenant_wallet w
+          LEFT JOIN dcs_tenant_wallet_ledger l
+                 ON l.wallet_id = w.wallet_id AND l.del_flag = '0'
+         WHERE w.del_flag = '0'
+         GROUP BY w.wallet_id, w.tenant_id, w.balance_amount
+    </select>
+
+    <!-- 检查②: 流水链断裂(同钱包按 ledger_id 排序做 LAG 邻接比对; 首笔无前笔跳过) -->
+    <select id="selectChainBreaks" resultType="com.smartdock.domain.vo.WalletReconcileChainBreakVo">
+        SELECT ledger_id,
+               wallet_id,
+               tenant_id,
+               balance_before,
+               prev_after
+          FROM (
+                SELECT ledger_id,
+                       wallet_id,
+                       tenant_id,
+                       balance_before,
+                       LAG(balance_after) OVER (PARTITION BY wallet_id ORDER BY ledger_id) AS prev_after
+                  FROM dcs_tenant_wallet_ledger
+                 WHERE del_flag = '0'
+               ) t
+         WHERE prev_after IS NOT NULL
+           AND balance_before &lt;&gt; prev_after
+    </select>
+
+    <!-- 检查③: 按租户统计 DEDUCT 空 biz_id 存量(基线自批1起移至配置 dcs.wallet.reconcile.deduct-null-baseline(dev 带现值,交付零基线)) -->
+    <select id="selectDeductNullByTenant" resultType="com.smartdock.domain.vo.WalletReconcileDeductNullVo">
+        SELECT tenant_id,
+               COUNT(*) AS null_biz_count
+          FROM dcs_tenant_wallet_ledger
+         WHERE del_flag = '0'
+           AND biz_type = 'DEDUCT'
+           AND biz_id IS NULL
+         GROUP BY tenant_id
+    </select>
+
+    <!-- 检查④(批D D1-⑤): 助手会话计费对账——ASSISTANT_CHAT 成功单 vs AI_ASSISTANT_CHAT 流水。
+         漏扣异常 = 有成本(ROUND 后>0)+无流水+无免扣标记(walletDeducted:false 覆盖非本币/余额不足两类有意免扣;
+         匹配须 % 包裹——mergeSnapshotFlag 把标记拼在 JSON 内部, 裸串等值匹配恒不中=免扣行全误报, glm53 终审 P1 实锤;
+         COALESCE 兜 NULL 快照——NULL NOT LIKE 结果为 NULL 被 FILTER 吞=真漏扣反向漏判);
+         non_cny_exempt = 非本币有意免扣单独立计数(免费敞口可见, 不混入漏扣也不静默);
+         金额口径 = usage.cost 四舍五入到 4 位(与扣款同精度, 坑68), 与流水合计比对;
+         dcs_ai_usage 无 del_flag 列(2026-10-05 核实), 不做软删过滤 -->
+    <select id="selectAssistantUsageLedgerDiff" resultType="com.smartdock.domain.vo.WalletReconcileAssistantVo">
+        SELECT u.tenant_id,
+               COUNT(*) AS usage_count,
+               COUNT(*) FILTER (WHERE u.wallet_ledger_id IS NULL
+                                  AND COALESCE(u.pricing_snapshot, '') NOT LIKE &apos;%"walletDeducted":false%&apos;
+                                  AND ROUND(u.cost_amount, 4) &gt; 0) AS deduct_missing,
+               COUNT(*) FILTER (WHERE u.wallet_ledger_id IS NULL
+                                  AND u.pricing_snapshot LIKE &apos;%"reason":"currency:%&apos;) AS non_cny_exempt,
+               COALESCE(SUM(ROUND(u.cost_amount, 4)) FILTER (WHERE u.wallet_ledger_id IS NOT NULL), 0) AS usage_sum,
+               COALESCE((SELECT SUM(l.amount) FROM dcs_tenant_wallet_ledger l
+                          WHERE l.del_flag = &apos;0&apos;
+                            AND l.service_code = &apos;AI_ASSISTANT_CHAT&apos;
+                            AND l.tenant_id = u.tenant_id), 0) AS ledger_sum
+          FROM dcs_ai_usage u
+         WHERE u.caller = &apos;ASSISTANT_CHAT&apos;
+           AND u.success = &apos;1&apos;
+         GROUP BY u.tenant_id
+    </select>
+</mapper>

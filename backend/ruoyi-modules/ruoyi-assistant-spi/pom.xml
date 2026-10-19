@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>ruoyi-assistant-spi</artifactId>
+
+    <description>
+        AI 助手业务工具 SPI 契约模块 (批3 从 ruoyi-assistant 抽出, 解 assistant↔dcs 循环)
+        - 任何业务模块实现 BizToolProvider 三行接口并注册为 Spring Bean, 工具即进 AI 助手
+        - 铁律: 纯 JDK + lombok, 零框架零业务依赖——业务侧 import 不牵 agentscope/Spring
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>ruoyi-profile-engine</artifactId>
+
+    <description>
+        画像引擎模块 (Profile Engine) —— 业务侧通用画像内核
+        - 标准事件模型 profile_event（append-only，event_uid 幂等）
+        - EVENT_AGG 算子族（COUNT/COUNT_DISTINCT/SUM/AVG/RATE/LAST_VALUE）零代码维度
+        - 维度治理 + 权重规则 + 分数快照链 + 断点重算
+        - SPI：DimensionStrategy（自定义维度）/ ProfilePostProcessor（后处理挂点）
+        铁律：零业务模块依赖（不依赖 dcs/assistant/billing/risk），契约自包含。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-satoken</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-json</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-tenant</artifactId>
+        </dependency>
+
+        <!-- 单测: 纯函数层(打分映射/缺失策略/窗口/uid/配置模型), 不起 Spring 不连库 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

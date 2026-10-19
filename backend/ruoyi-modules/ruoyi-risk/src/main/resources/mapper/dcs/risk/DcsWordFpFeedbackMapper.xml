@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartdock.risk.mapper.DcsWordFpFeedbackMapper">
+
+    <!-- 窗口内按词聚合误报数(U03): 大盘 TOP 词表误报率分子; 判误报写入, 无软删全量计数 -->
+    <select id="fpCountByWord" resultType="java.util.Map">
+        SELECT word_text AS "word",
+               COUNT(*)  AS "fpCnt"
+          FROM dcs_word_fp_feedback
+         WHERE create_time &gt;= #{startTime}
+         GROUP BY word_text
+    </select>
+</mapper>

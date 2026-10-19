@@ -1,0 +1,36 @@
+# ===== 构建产物 =====
+**/target/
+**/node_modules/
+**/dist/
+**/logs/
+*.log
+*.class
+**/*.jar
+
+# ===== 运行时数据 =====
+**/script/docker/redis/data/
+
+# ===== 本地配置与运行数据 =====
+# 锚定根目录：只忽略仓库根的 config/ data/，不误伤 Java 源码里的 config 包
+/config/
+/data/
+
+# ===== 本地工作资料（提示词/设计文档/脚本/日志/截图）=====
+/.workshop/
+
+# ===== IDE / 编辑器 =====
+**/.idea/
+**/*.iml
+**/.vscode/
+
+# ===== 操作系统 =====
+.DS_Store
+Thumbs.db
+.playwright-mcp/
+
+# ===== Maven 构建产物（flatten 产物不入库） =====
+**/.flattened-pom.xml
+
+# 助手工作区运行产物（workspace.db 索引，误提交风险）
+backend/data/
+backend/ruoyi-admin/data/

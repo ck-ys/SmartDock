@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>ruoyi-ai-billing</artifactId>
+
+    <description>
+        AI 服务与计费中心模块 (AI Service &amp; Billing Center)
+        - AI 基础设施: 模型配置/连通探测/官方价格/用量台账/SSRF 域名白名单
+        - 计费底座: 租户钱包/充值订单/流水/服务计费规则(通用 serviceCode 口径, 未来非 AI 消费方可直接接入)
+        - 钱包告警发 WalletAlertEvent 域事件, 由 dcs 侧 WalletAlertNoticeAdapter 翻译进通知管道
+        2026-09-24 从 ruoyi-dcs 机械迁移成独立模块(grill Q1-Q7 全 A 拍板,
+        见 document/plans/AI_WALLET_MODULE_SPLIT_PLAN_20260924.md);
+        Java 包名保留 com.smartdock.*(Q3A 零 import 改动), 依赖方向 dcs→ai-billing 单向(Q2A)。
+        注意: spring-ai 必须用 starter(DcsAiChatClientFactory 注入的 RetryTemplate 由其自动配置供应)。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-mybatis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-satoken</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-tenant</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-ratelimiter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-idempotent</artifactId>
+        </dependency>
+        <!-- AI 缺口批 Q7（2026-10-14）：用量/流水导出 Excel——ExcelUtil(EasyExcel) 所在公共件 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-excel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-json</artifactId>
+        </dependency>
+        <!-- DcsAiConfig.api_key @EncryptField 加解密 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-encrypt</artifactId>
+        </dependency>
+        <!-- @Lock4j 分布式锁(批2 2026-09-25 拍板 Q6:A): 钱包对账/低余额扫描调度入口跨节点互斥, 范式同 ruoyi-dcs 调度器 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-system</artifactId>
+        </dependency>
+        <!-- RetryTemplate/OpenAiChatModel 等 Spring AI 能力(版本由根 pom spring-ai-bom 管理); 禁止降级为裸 spring-ai-openai -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-model-openai</artifactId>
+        </dependency>
+
+        <!-- 单测: 与 ruoyi-admin 同款 test 域依赖(照 ruoyi-risk 先例) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

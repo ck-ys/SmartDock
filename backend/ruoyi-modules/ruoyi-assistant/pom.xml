@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>ruoyi-assistant</artifactId>
+
+    <description>
+        DCS 工作助手模块 (AI Work Assistant) — AgentScope Java 驱动
+        - P0 阶段（当前）：仅探针模块骨架 + AgentScope 七件套依赖引入，不含任何业务代码
+        - 一站规划：HarnessAgent 推理循环/query_*+act_* 工具面/HITL 确认卡/计费装饰/workspace md 体系
+        - 实现依据 document/DCS_ASSISTANT_SPEC_20260923.md；进度计划 document/plans/DCS_ASSISTANT_P0_VERIFICATION_PLAN_20260923.md
+        - 版本纪律：全家走根 pom 的 io.agentscope:agentscope-bom 钉版本（升级只改一个号）
+    </description>
+
+    <dependencies>
+        <!-- ===== AgentScope 七件套（版本全部由根 pom agentscope-bom 管理，此处不写 version） ===== -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-harness</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-redis</artifactId>
+            <!-- T5 预警坑提前实锤(2026-10-03): 本件传递 redisson 4.2.0 会顶掉项目基线 3.52.0
+                 (4.x 移除 org.redisson.api.NameMapper 等 → ruoyi-common-redis RedisConfig introspect 失败,
+                  admin 全部 Spring 测试上下文起不来)。排除之, extensions-redis 走项目自带 3.52.0;
+                 版本对账结论记 document/evidence/assistant-p0/00-deptree.txt (Task 5 全量复核) -->
+            <exclusions>
+                <exclusion>
+                    <groupId>org.redisson</groupId>
+                    <artifactId>redisson</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-ratelimiter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-agui-spring-boot-starter</artifactId>
+            <!-- scope 一律 compile 不设 provided：starter 需要运行时 classpath（Task 0 口径） -->
+        </dependency>
+
+        <!-- ===== 项目基础件 ===== -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-assistant-spi</artifactId>
+            <version>${revision}</version>
+        </dependency>
+        <!-- 批3: OssTextExtractor(附件文本解析)自 dcs 迁入, pdfbox/poi 随迁 -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
+        <!-- A2 身份钩子：LoginHelper 读 Sa-Token 登录态 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-satoken</artifactId>
+        </dependency>
+        <!-- B1 工具登录重建：登录链（登录日志/设备信息）读 ServletUtils.getRequest().getHeader，
+             无请求属性时 NPE（stub 测实证）——MockHttpServletRequest 进编译期（P04 runAs 完整形态） -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+        </dependency>
+        <!-- B1 查询工具：直用 DCS 服务（待办链），此前经 ai-billing 传递、现显式声明 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-dcs</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 最小生产装配(T12)：DcsAiConfig 实体+Mapper（TenantHelper 经本件传递引入） -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-ai-billing</artifactId>
+        </dependency>
+        <!-- 单测: 与 ruoyi-admin/ai-billing 同款 test 域依赖(批2 Q8 提示词护栏单测) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

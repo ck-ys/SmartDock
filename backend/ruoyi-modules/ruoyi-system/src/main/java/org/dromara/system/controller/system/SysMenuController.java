@@ -1,0 +1,220 @@
+package org.dromara.system.controller.system;
+
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaMode;
+import cn.hutool.core.lang.tree.Tree;
+import lombok.RequiredArgsConstructor;
+import org.dromara.common.core.constant.SystemConstants;
+import org.dromara.common.core.constant.TenantConstants;
+import org.dromara.common.core.domain.R;
+import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
+import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.web.core.BaseController;
+import org.dromara.system.domain.SysMenu;
+import org.dromara.system.domain.bo.SysMenuBo;
+import org.dromara.system.domain.vo.RouterVo;
+import org.dromara.system.domain.vo.SysMenuVo;
+import org.dromara.system.service.ISysMenuService;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 菜单信息
+ *
+ * @author Lion Li
+ */
+@Validated
+@RequiredArgsConstructor
+@RestController
+@RequestMapping("/system/menu")
+public class SysMenuController extends BaseController {
+
+    private final ISysMenuService menuService;
+
+    /**
+     * 获取路由信息
+     *
+     * @return 路由信息
+     */
+    @GetMapping("/getRouters")
+    public R<List<RouterVo>> getRouters() {
+        List<SysMenu> menus = menuService.selectMenuTreeByUserId(LoginHelper.getUserId());
+        return R.ok(menuService.buildMenus(menus));
+    }
+
+    /**
+     * 获取菜单列表
+     */
+    @SaCheckRole(value = {
+        TenantConstants.SUPER_ADMIN_ROLE_KEY,
+        TenantConstants.TENANT_ADMIN_ROLE_KEY
+    }, mode = SaMode.OR)
+    @SaCheckPermission("system:menu:list")
+    @GetMapping("/list")
+    public R<List<SysMenuVo>> list(SysMenuBo menu) {
+        List<SysMenuVo> menus = menuService.selectMenuList(menu, LoginHelper.getUserId());
+        return R.ok(menus);
+    }
+
+    /**
+     * 根据菜单编号获取详细信息
+     *
+     * @param menuId 菜单ID
+     */
+    @SaCheckRole(value = {
+        TenantConstants.SUPER_ADMIN_ROLE_KEY,
+        TenantConstants.TENANT_ADMIN_ROLE_KEY
+    }, mode = SaMode.OR)
+    @SaCheckPermission("system:menu:query")
+    @GetMapping(value = "/{menuId}")
+    public R<SysMenuVo> getInfo(@PathVariable Long menuId) {
+        return R.ok(menuService.selectMenuById(menuId));
+    }
+
+    /**
+     * 获取菜单下拉树列表
+     */
+    // 角色管理弹窗依赖本接口画权限树, 而租户套餐有意不发菜单权限(sys_menu为全局表, 租户不得改),
+    // 单卡 system:menu:query 会让租户管理员"有角色增改权限却打不开弹窗"(2026-09-29 生产实证)。
+    // 放行为 OR: 持菜单查询或角色列表任一即可——role:list 是进入角色管理页的充要凭证,
+    // 与同页部门树接口 /system/role/deptTree 的守卫口径一致(SysRoleController);
+    // system:role:query(菜单1008)不是每个套餐都授予, 不能作为放行依据。
+    // 返回值本就按当前用户过滤(SysMenuServiceImpl#selectMenuList), 不泄全局菜单
+    @SaCheckPermission(value = {"system:menu:query", "system:role:list"}, mode = SaMode.OR)
+    @GetMapping("/treeselect")
+    public R<List<Tree<Long>>> treeselect(SysMenuBo menu) {
+        List<SysMenuVo> menus = menuService.selectMenuList(menu, LoginHelper.getUserId());
+        return R.ok(menuService.buildMenuTreeSelect(menus));
+    }
+
+    /**
+     * 加载对应角色菜单列表树
+     *
+     * @param roleId 角色ID
+     */
+    // 同 /treeselect: 角色编辑弹窗回显已勾菜单必需, 放行口径与 treeselect / deptTree 一致(role:list 或 menu:query)
+    @SaCheckPermission(value = {"system:menu:query", "system:role:list"}, mode = SaMode.OR)
+    @GetMapping(value = "/roleMenuTreeselect/{roleId}")
+    public R<MenuTreeSelectVo> roleMenuTreeselect(@PathVariable("roleId") Long roleId) {
+        List<SysMenuVo> menus = menuService.selectMenuList(LoginHelper.getUserId());
+        MenuTreeSelectVo selectVo = new MenuTreeSelectVo(
+            menuService.selectMenuListByRoleId(roleId),
+            menuService.buildMenuTreeSelect(menus));
+        return R.ok(selectVo);
+    }
+
+    /**
+     * 加载对应租户套餐菜单列表树
+     *
+     * @param packageId 租户套餐ID
+     */
+    @SaCheckRole(TenantConstants.SUPER_ADMIN_ROLE_KEY)
+    @SaCheckPermission("system:menu:query")
+    @GetMapping(value = "/tenantPackageMenuTreeselect/{packageId}")
+    public R<MenuTreeSelectVo> tenantPackageMenuTreeselect(@PathVariable("packageId") Long packageId) {
+        List<SysMenuVo> menus = menuService.selectMenuList(LoginHelper.getUserId());
+        List<Tree<Long>> list = menuService.buildMenuTreeSelect(menus);
+        // 删除租户管理菜单
+        list.removeIf(menu -> menu.getId() == 6L);
+        List<Long> ids = new ArrayList<>();
+        if (packageId > 0L) {
+            ids = menuService.selectMenuListByPackageId(packageId);
+        }
+        MenuTreeSelectVo selectVo = new MenuTreeSelectVo(ids, list);
+        return R.ok(selectVo);
+    }
+
+    /**
+     * 新增菜单
+     */
+    @SaCheckRole(TenantConstants.SUPER_ADMIN_ROLE_KEY)
+    @SaCheckPermission("system:menu:add")
+    @Log(title = "菜单管理", businessType = BusinessType.INSERT)
+    @RepeatSubmit()
+    @PostMapping
+    public R<Void> add(@Validated @RequestBody SysMenuBo menu) {
+        if (!menuService.checkMenuNameUnique(menu)) {
+            return R.fail("新增菜单'" + menu.getMenuName() + "'失败，菜单名称已存在");
+        } else if (SystemConstants.YES_FRAME.equals(menu.getIsFrame()) && !StringUtils.ishttp(menu.getPath())) {
+            return R.fail("新增菜单'" + menu.getMenuName() + "'失败，地址必须以http(s)://开头");
+        } else if (!menuService.checkRouteConfigUnique(menu)) {
+            return R.fail("新增菜单'" + menu.getMenuName() + "'失败，路由名称或地址已存在");
+        }
+        return toAjax(menuService.insertMenu(menu));
+    }
+
+    /**
+     * 修改菜单
+     */
+    @SaCheckRole(TenantConstants.SUPER_ADMIN_ROLE_KEY)
+    @SaCheckPermission("system:menu:edit")
+    @Log(title = "菜单管理", businessType = BusinessType.UPDATE)
+    @RepeatSubmit()
+    @PutMapping
+    public R<Void> edit(@Validated @RequestBody SysMenuBo menu) {
+        if (!menuService.checkMenuNameUnique(menu)) {
+            return R.fail("修改菜单'" + menu.getMenuName() + "'失败，菜单名称已存在");
+        } else if (SystemConstants.YES_FRAME.equals(menu.getIsFrame()) && !StringUtils.ishttp(menu.getPath())) {
+            return R.fail("修改菜单'" + menu.getMenuName() + "'失败，地址必须以http(s)://开头");
+        } else if (menu.getMenuId().equals(menu.getParentId())) {
+            return R.fail("修改菜单'" + menu.getMenuName() + "'失败，上级菜单不能选择自己");
+        } else if (!menuService.checkRouteConfigUnique(menu)) {
+            return R.fail("修改菜单'" + menu.getMenuName() + "'失败，路由名称或地址已存在");
+        }
+        return toAjax(menuService.updateMenu(menu));
+    }
+
+    /**
+     * 删除菜单
+     *
+     * @param menuId 菜单ID
+     */
+    @SaCheckRole(TenantConstants.SUPER_ADMIN_ROLE_KEY)
+    @SaCheckPermission("system:menu:remove")
+    @Log(title = "菜单管理", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{menuId}")
+    public R<Void> remove(@PathVariable("menuId") Long menuId) {
+        if (menuService.hasChildByMenuId(menuId)) {
+            return R.warn("存在子菜单,不允许删除");
+        }
+        if (menuService.checkMenuExistRole(menuId)) {
+            return R.warn("菜单已分配,不允许删除");
+        }
+        return toAjax(menuService.deleteMenuById(menuId));
+    }
+
+    /**
+     * 角色菜单列表树信息
+     *
+     * @param checkedKeys 选中菜单列表
+     * @param menus       菜单下拉树结构列表
+     */
+    public record MenuTreeSelectVo(List<Long> checkedKeys, List<Tree<Long>> menus) {
+    }
+
+    /**
+     * 批量级联删除菜单
+     *
+     * @param menuIds 菜单ID串
+     */
+    @SaCheckRole(TenantConstants.SUPER_ADMIN_ROLE_KEY)
+    @SaCheckPermission("system:menu:remove")
+    @Log(title = "菜单管理", businessType = BusinessType.DELETE)
+    @DeleteMapping("/cascade/{menuIds}")
+    public R<Void> remove(@PathVariable("menuIds") Long[] menuIds) {
+        List<Long> menuIdList = List.of(menuIds);
+        if (menuService.hasChildByMenuId(menuIdList)) {
+            return R.warn("存在子菜单,不允许删除");
+        }
+        menuService.deleteMenuById(menuIdList);
+        return R.ok();
+    }
+
+}

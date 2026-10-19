@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartdock.mapper.DcsFileReviewMapper">
+
+    <!--
+        文件审核单自定义 SQL（12b）
+        ============================================================
+        租户条件: selectByOssId/selectByOssIds/countPending 依赖租户拦截器自动追加 tenant_id;
+        markApproved/markRejected 参照 DcsReviewTaskMapper 惯例显式带 tenant_id 双保险。
+        热路径红线: selectByOssId 走 UNIQUE(oss_id) 索引单查, 判定结果严禁进 SYS_OSS 缓存(合同#3)。
+    -->
+
+    <select id="selectByOssId" resultType="com.smartdock.domain.DcsFileReview">
+        SELECT * FROM dcs_file_review WHERE oss_id = #{ossId}
+    </select>
+
+    <select id="selectByOssIds" resultType="com.smartdock.domain.DcsFileReview">
+        SELECT * FROM dcs_file_review WHERE oss_id IN
+        <foreach collection="ossIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <!--
+        CAS 通过: PENDING → APPROVED（终态）。
+        WHERE 押 status='PENDING' —— 多审核员并发时后提交者影响 0 行, 服务层报"该单已被处理"。
+    -->
+    <update id="markApproved">
+        UPDATE dcs_file_review
+           SET status = 'APPROVED', reviewer_id = #{reviewerId}, reviewer_name = #{reviewerName},
+               review_time = CURRENT_TIMESTAMP, update_by = #{reviewerId}, update_time = CURRENT_TIMESTAMP
+         WHERE tenant_id = #{tenantId}
+           AND review_id = #{reviewId}
+           AND status = 'PENDING'
+    </update>
+
+    <!-- CAS 驳回: PENDING → REJECTED（终态）, 必填理由随通知发给上传人 -->
+    <update id="markRejected">
+        UPDATE dcs_file_review
+           SET status = 'REJECTED', reviewer_id = #{reviewerId}, reviewer_name = #{reviewerName},
+               review_time = CURRENT_TIMESTAMP, reject_reason = #{reason},
+               update_by = #{reviewerId}, update_time = CURRENT_TIMESTAMP
+         WHERE tenant_id = #{tenantId}
+           AND review_id = #{reviewId}
+           AND status = 'PENDING'
+    </update>
+
+    <!--
+        删 oss 级联闭单: 仍在 PENDING 的单批量置 REJECTED。
+        场景: SysOssServiceImpl.deleteWithValidByIds 删文件前调用(经 FileReviewGate.onOssDeleted),
+        防止"文件已删但待审单还在"的幽灵单污染审核队列。
+    -->
+    <update id="closePendingByOssIds">
+        UPDATE dcs_file_review
+           SET status = 'REJECTED', reject_reason = #{reason}, review_time = CURRENT_TIMESTAMP,
+               reviewer_name = '系统', update_by = #{operatorId}, update_time = CURRENT_TIMESTAMP
+         WHERE status = 'PENDING'
+           AND oss_id IN
+        <foreach collection="ossIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <select id="countPending" resultType="long">
+        SELECT COUNT(*) FROM dcs_file_review WHERE tenant_id = #{tenantId} AND status = 'PENDING'
+    </select>
+
+</mapper>

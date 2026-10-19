@@ -1,0 +1,217 @@
+.dcs-ops-page {
+  min-height: 100%;
+  padding: 20px;
+  background: var(--el-bg-color-page);
+}
+
+.dcs-ops-header {
+  margin-bottom: 16px;
+}
+
+.dcs-ops-header__intro {
+  padding: 2px 2px 0;
+}
+
+.dcs-ops-header__eyebrow {
+  margin-bottom: 5px;
+  color: var(--el-color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dcs-ops-header__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.dcs-ops-header__title {
+  margin: 0;
+  color: var(--el-text-color-primary);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.dcs-ops-header__subtitle {
+  max-width: 760px;
+  margin: 7px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.dcs-ops-header__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.dcs-ops-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.dcs-ops-metric {
+  position: relative;
+  min-height: 92px;
+  padding: 15px 18px;
+  overflow: hidden;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgb(31 42 68 / 4%);
+}
+
+.dcs-ops-metric::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--el-color-primary);
+  content: '';
+}
+
+.dcs-ops-metric--success::before {
+  background: var(--el-color-success);
+}
+
+.dcs-ops-metric--warning::before {
+  background: var(--el-color-warning);
+}
+
+.dcs-ops-metric--danger::before {
+  background: var(--el-color-danger);
+}
+
+.dcs-ops-metric--neutral::before {
+  background: var(--el-text-color-placeholder);
+}
+
+.dcs-ops-metric__label,
+.dcs-ops-metric__hint {
+  display: block;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.dcs-ops-metric__value {
+  display: block;
+  margin: 7px 0 3px;
+  color: var(--el-text-color-primary);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.dcs-ops-filter-card,
+.dcs-ops-table-card {
+  border-color: var(--el-border-color-lighter);
+  border-radius: 10px;
+}
+
+.dcs-ops-filter-card {
+  margin-bottom: 12px;
+}
+
+.dcs-ops-filter-card .el-card__body {
+  padding: 16px 18px 4px;
+}
+
+.dcs-ops-filter-card .el-form-item {
+  margin-bottom: 12px;
+}
+
+.dcs-ops-table-card .el-card__body {
+  padding: 0;
+}
+
+.dcs-ops-table-card > .el-card__body > .search-form {
+  margin: 0;
+  padding: 16px 18px 4px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.dcs-ops-table-card > .el-card__body > .el-table {
+  border-right: 0;
+  border-left: 0;
+}
+
+.dcs-ops-table-card > .el-card__body > .el-pagination,
+.dcs-ops-table-card > .el-card__body > .pagination-container {
+  padding-right: 16px;
+  padding-left: 16px;
+}
+
+.dcs-ops-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.dcs-ops-table-toolbar__title {
+  color: var(--el-text-color-primary);
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.dcs-ops-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.dcs-ops-empty {
+  padding: 26px 0 34px;
+}
+
+.order-empty-hint {
+  max-width: 420px;
+  margin: 0 0 14px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.dcs-ops-id {
+  color: var(--el-text-color-regular);
+  font-family: 'JetBrains Mono', Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dcs-ops-pagination {
+  padding: 4px 16px 12px;
+}
+
+@media (max-width: 960px) {
+  .dcs-ops-page {
+    padding: 14px;
+  }
+
+  .dcs-ops-header__title-row {
+    flex-direction: column;
+  }
+
+  .dcs-ops-header__actions {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dcs-ops-page *,
+  .dcs-ops-page *::before,
+  .dcs-ops-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

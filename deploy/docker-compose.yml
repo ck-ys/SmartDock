@@ -1,0 +1,104 @@
+name: smartdock
+
+# SmartDock 一键部署（教科书口径）：postgres + redis + minio + backend + frontend
+# 首次启动前：先构建产物（backend: mvn package；frontend: npm run build:prod），
+# PostgreSQL 首次初始化会自动按序执行 ../backend/script/sql/baseline/ 的 4 个基线 SQL（05_demo_data.optional.sql 为可选演示数据，initdb 不会自动执行）。
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: smartdock-postgres
+    environment:
+      POSTGRES_DB: smartdock
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeit}
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ../backend/script/sql/baseline:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d smartdock"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartdock-redis
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-changeit}", "--appendonly", "yes"]
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-changeit} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  minio:
+    # MinIO 2025-10 起撤下 Docker Hub 官方镜像，改用 quay.io 构建；版本钉死保证可复现
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: smartdock-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}   # 演示默认与基线 sys_oss_config 同口径, 生产必改
+      TZ: Asia/Shanghai
+    ports:
+      - "9000:9000"     # S3 API：浏览器直连下载附件
+      - "127.0.0.1:9001:9001"  # 管理台只绑本机回环
+    volumes:
+      - ./data/minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend/Dockerfile
+    container_name: smartdock-backend
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "-Xms512m -Xmx2g"
+      # JDBC 参数只留 PG 认识的 reWriteBatchedInserts(useUnicode/useSSL 是 MySQL 驱动参数, 全审 P1)
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:postgresql://postgres:5432/smartdock?reWriteBatchedInserts=true
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: postgres
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${POSTGRES_PASSWORD:-changeit}
+      # P0(全审): dev profile 默认激活且自带 redis port/database, 只注入 host/password 会打到错误端口——
+      # port/database 显式注入双保险(与 dev yml 已改回 6379/0 配套), boot-admin 客户端容器内无监控服务可连, 关闭
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_DATABASE: 0
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-changeit}
+      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+    volumes:
+      - ./logs/backend:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/frontend/Dockerfile
+    container_name: smartdock-frontend
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - backend
+    restart: unless-stopped

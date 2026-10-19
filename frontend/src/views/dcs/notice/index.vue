@@ -1,0 +1,85 @@
+<template>
+  <div class="app-container">
+    <el-card shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>我的消息</span>
+          <el-radio-group v-model="query.readFlag" size="small" @change="load">
+            <el-radio-button value="">全部</el-radio-button>
+            <el-radio-button value="0">未读</el-radio-button>
+            <el-radio-button value="1">已读</el-radio-button>
+          </el-radio-group>
+        </div>
+      </template>
+      <el-table v-loading="loading" :data="rows" @row-click="read">
+        <el-table-column label="标题" min-width="260">
+          <template #default="{ row }">
+            <span :style="row.readFlag === '0' ? 'font-weight: 600' : ''">
+              {{ typeBadge(row.noticeType) }} {{ row.title }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="内容" min-width="280">
+          <template #default="{ row }">{{ row.content }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="80">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.readFlag === '0' ? 'warning' : 'info'">{{ row.readFlag === '0' ? '未读' : '已读' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" label="时间" width="170" />
+      </el-table>
+      <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
+    </el-card>
+  </div>
+</template>
+
+<script setup name="DcsNotice" lang="ts">
+import { myNotices, markNoticeRead, type DcsNoticeRow } from '@/api/dcs/core/notice';
+import { useNoticeStore } from '@/store/modules/notice';
+
+const noticeStore = useNoticeStore();
+
+const loading = ref(false);
+const rows = ref<DcsNoticeRow[]>([]);
+const total = ref(0);
+const query = reactive<any>({ pageNum: 1, pageSize: 20, readFlag: '' });
+
+const TYPE_LABEL: Record<string, string> = {
+  TASK_PUBLISHED: '[新任务]',
+  SUBMITTED: '[新提交]',
+  AUDIT_RESULT: '[审核结果]',
+  FILE_REVIEW_REJECT: '[文件驳回]',
+  WALLET_LOW_BALANCE: '[余额]',
+  WALLET_EXHAUSTED: '[余额]',
+  WALLET_RECONCILE_MISMATCH: '[对账]',
+  CREDIT_SUBSCRIPTION_EXPIRING: '[订阅]',
+  CREDIT_WEEK_EXHAUSTED: '[额度]',
+  CREDIT_TANK_LOW: '[额度]'
+};
+const typeBadge = (t: string) => TYPE_LABEL[t] || '[通知]';
+
+const load = async () => {
+  loading.value = true;
+  try {
+    const res = await myNotices({ ...query, readFlag: query.readFlag || undefined });
+    rows.value = res.rows;
+    total.value = res.total;
+  } finally { loading.value = false; }
+};
+
+const read = async (row: DcsNoticeRow) => {
+  if (row.readFlag === '0') {
+    await markNoticeRead(row.id);
+    row.readFlag = '1';
+    // 本页标读与铃铛是两套状态, 顺手校准避免数字悬停(全审 P2)
+    noticeStore.refreshUnreadCount().catch(() => undefined);
+  }
+};
+
+onMounted(load);
+</script>
+
+<style scoped>
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+</style>

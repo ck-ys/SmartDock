@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartdock.risk.mapper.DcsRiskEventMapper">
+
+<!--
+  风险事件(dcs_risk_event)与规则(dcs_risk_rule): 记录用户/IP 的风险行为事件,
+  按规则累加分值并映射到风险等级(L0~L4), 用于风控决策(如限制登录、触发验证码)。
+  规则按 event_type 聚合, 每个事件类型有独立的阈值(threshold_l1~l4)和时间窗口(window_minutes)。
+-->
+
+    <!--
+      计算各事件类型对当前 user/ip 的累计分及对应等级: 回答"这个用户/IP 现在算几级风险"。
+      - 内层子查询: dcs_risk_rule LEFT JOIN dcs_risk_event(窗口内、命中 user 或 ip 的事件);
+        GROUP BY event_type 聚合, 用 SUM(CASE WHEN ... THEN risk_score ELSE 0) 分别累加 user 命中分和 ip 命中分,
+        GREATEST 取两者较大值(同一事件按 user 和 ip 各算一次, 取严不取松)。
+      - 外层 CASE: 按阈值门槛从高到低判定等级(L4>=threshold_l4 > L3 > L2 > L1 > 0), 命中即停。
+    -->
+    <select id="eventRuleScores" resultType="com.smartdock.risk.domain.vo.RiskRuleScoreVo">
+        SELECT scored.event_type,
+               scored.score,
+               CASE
+                 WHEN scored.score &gt;= scored.threshold_l4 THEN 4
+                 WHEN scored.score &gt;= scored.threshold_l3 THEN 3
+                 WHEN scored.score &gt;= scored.threshold_l2 THEN 2
+                 WHEN scored.score &gt;= scored.threshold_l1 THEN 1
+                 ELSE 0
+               END AS level
+          FROM (
+            SELECT r.event_type,
+                   r.threshold_l1,
+                   r.threshold_l2,
+                   r.threshold_l3,
+                   r.threshold_l4,
+                   GREATEST(
+                     COALESCE(SUM(CASE
+                       WHEN #{userId} IS NOT NULL AND e.user_id = #{userId} THEN e.risk_score
+                       ELSE 0
+                     END), 0),
+                     COALESCE(SUM(CASE
+                       WHEN #{ip} IS NOT NULL AND #{ip} != '' AND e.ip = #{ip} THEN e.risk_score
+                       ELSE 0
+                     END), 0)
+                   ) AS score
+              FROM dcs_risk_rule r
+              LEFT JOIN dcs_risk_event e
+                ON e.tenant_id = r.tenant_id
+               AND e.event_type = r.event_type
+               AND e.created_time &gt;= CURRENT_TIMESTAMP
+                   - (COALESCE(r.window_minutes, 60) * INTERVAL '1 minute')
+               AND (
+                 (#{userId} IS NOT NULL AND e.user_id = #{userId})
+                 OR (#{ip} IS NOT NULL AND #{ip} != '' AND e.ip = #{ip})
+               )
+             WHERE r.rule_scope = 'EVENT'
+               AND r.enabled = '1'
+               AND r.tenant_id = #{tenantId}
+             GROUP BY r.event_type, r.threshold_l1, r.threshold_l2,
+                      r.threshold_l3, r.threshold_l4
+          ) scored
+         ORDER BY scored.event_type
+    </select>
+
+    <!-- 统计用户在时间窗口内的风险分总和(显式租户隔离, 防拦截器失效跨租户聚合) -->
+    <select id="sumUserRiskScore" resultType="int">
+        SELECT COALESCE(SUM(re.risk_score), 0)
+          FROM dcs_risk_event re
+         WHERE re.user_id = #{userId}
+           AND re.tenant_id = #{tenantId}
+           AND re.created_time &gt;= #{startTime}
+    </select>
+
+    <!-- 统计 IP 在时间窗口内的风险分总和(显式租户隔离, 防拦截器失效跨租户聚合) -->
+    <select id="sumIpRiskScore" resultType="int">
+        SELECT COALESCE(SUM(re.risk_score), 0)
+          FROM dcs_risk_event re
+         WHERE re.ip = #{ip}
+           AND re.tenant_id = #{tenantId}
+           AND re.created_time &gt;= #{startTime}
+    </select>
+
+    <!-- 各事件类型在窗口内的次数 -->
+    <select id="eventTypeStats" resultType="java.util.Map">
+        SELECT re.event_type AS "eventType",
+               COUNT(*)      AS cnt,
+               COALESCE(SUM(re.risk_score), 0) AS "totalScore"
+          FROM dcs_risk_event re
+         WHERE re.created_time &gt;= #{startTime}
+         GROUP BY re.event_type
+         ORDER BY "totalScore" DESC
+    </select>
+
+    <!--
+      各风险等级的用户数
+      等级由用户近 24h 累计分决定, 这里用 CASE 表达式分组:
+        L0: 0-19   L1: 20-39   L2: 40-59   L3: 60-79   L4: 80+
+    -->
+    <select id="userRiskLevelStats" resultType="java.util.Map">
+        SELECT lvl, COUNT(*) AS cnt FROM (
+            SELECT user_id,
+                   CASE
+                     WHEN SUM(risk_score) &gt;= 80 THEN 'L4'
+                     WHEN SUM(risk_score) &gt;= 60 THEN 'L3'
+                     WHEN SUM(risk_score) &gt;= 40 THEN 'L2'
+                     WHEN SUM(risk_score) &gt;= 20 THEN 'L1'
+                     ELSE 'L0'
+                   END AS lvl
+              FROM dcs_risk_event
+             WHERE created_time &gt;= #{startTime}
+               AND user_id IS NOT NULL
+             GROUP BY user_id
+        ) t GROUP BY lvl
+    </select>
+
+    <!-- 最近 N 条事件 -->
+    <select id="recentEvents" resultType="com.smartdock.risk.domain.DcsRiskEvent">
+        SELECT * FROM dcs_risk_event
+         WHERE created_time &gt;= #{startTime}
+         ORDER BY created_time DESC
+         LIMIT #{limit}
+    </select>
+
+    <!-- 用户最近 N 条事件 -->
+    <select id="userRecentEvents" resultType="com.smartdock.risk.domain.DcsRiskEvent">
+        SELECT * FROM dcs_risk_event
+         WHERE user_id = #{userId}
+         ORDER BY created_time DESC
+         LIMIT #{limit}
+    </select>
+
+    <!-- 策略命中排行 TOP N（B 档新增，业务调优参考） -->
+    <select id="topRulesByCount" resultType="java.util.Map">
+        SELECT re.event_type AS "eventType",
+               COUNT(*)      AS "cnt"
+          FROM dcs_risk_event re
+         WHERE re.created_time &gt;= #{startTime}
+         GROUP BY re.event_type
+         ORDER BY "cnt" DESC
+         LIMIT #{limit}
+    </select>
+
+    <!-- 内容机审当日统计(风控2.0 批1): BLOCK/REVIEW 分开计数, 前缀口径与 ContentModerationService 写入文案一致 -->
+    <select id="contentModerationTodayStats" resultType="java.util.Map">
+        SELECT COALESCE(COUNT(*) FILTER (WHERE detail LIKE '内容机检:命中BLOCK%'), 0) AS "blocked",
+               COALESCE(COUNT(*) FILTER (WHERE detail LIKE '内容机检:命中REVIEW%'), 0) AS "review"
+          FROM dcs_risk_event
+         WHERE event_type = 'TASK_CONTENT_RISK'
+           AND created_time &gt;= date_trunc('day', CURRENT_TIMESTAMP)
+    </select>
+
+    <!-- 事件来源分布(风控2.0 批1): 窗口内按 source 计数(FORM/ONLINE/EXCEL/FILE/CHAT) -->
+    <select id="sourceStats" resultType="java.util.Map">
+        SELECT source AS "source",
+               COUNT(*) AS cnt
+          FROM dcs_risk_event
+         WHERE created_time &gt;= #{startTime}
+           AND source IS NOT NULL
+         GROUP BY source
+         ORDER BY cnt DESC
+    </select>
+
+    <!-- TOP 命中词(风控2.0 批1): hit_word 非空事件按词聚合, 大盘词库调优数据源 -->
+    <select id="topHitWords" resultType="java.util.Map">
+        SELECT hit_word AS "word",
+               COUNT(*)  AS cnt
+          FROM dcs_risk_event
+         WHERE created_time &gt;= #{startTime}
+           AND hit_word IS NOT NULL
+         GROUP BY hit_word
+         ORDER BY cnt DESC
+         LIMIT #{limit}
+    </select>
+
+    <!-- 全量按词命中数(收尾批 Q1, 2026-09-23): 同 topHitWords 口径不限条数, 词库页误报率分母 -->
+    <select id="hitCountByWord" resultType="java.util.Map">
+        SELECT hit_word AS "word",
+               COUNT(*)  AS cnt
+          FROM dcs_risk_event
+         WHERE created_time &gt;= #{startTime}
+           AND hit_word IS NOT NULL
+         GROUP BY hit_word
+    </select>
+
+</mapper>
