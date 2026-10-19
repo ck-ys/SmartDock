@@ -69,6 +69,19 @@
 接入新业务只需两步：向 `profile_event` 写事件（或走 admin 端点的 publish API），
 配置维度规则后触发 recalc——不需要改引擎代码。
 
+批 1–4 在此基础上扩出四个子域，仍共用一本事件账本：
+
+| 子域 | 核心表 | 说明 |
+|---|---|---|
+| 通用协议 | `profile_protocol`、`profile_schema_registry`、`profile_identity_link/merge` | `profile.protocol/v1` 登记；Schema 轻校验；匿名→登录身份归并 |
+| 评分模型 | `profile_score_model`、`profile_model_run/snapshot` | 分箱+权重的 JSON 模型；RFM 只是预设；快照链串趋势 |
+| 标签分群/复核 | `profile_segment*`、`profile_review_queue`、`profile_engine_config` | 规则/静态名单分群；低分复核抑制重复入队；按源开关自动重算 |
+| 分析中心 | `analytics_session/daily/funnel/site` | 会话化（显式 sessionId 或 30 分钟切分）→ 日汇总 → 趋势/漏斗/留存/自定义 |
+
+分析中心不新增埋点：复用 `profile_event`，按 `source` 重建。公开采集口
+`POST /analytics/collect` 以 `siteKey` 定位租户与业务源，事件写入仍走幂等与 Schema 校验。
+`web` 源在 `profile_engine_config` 中默认关闭自动重算与低分复核，避免流量事件污染画像队列。
+
 ## 4. 文件安全（ruoyi-file-security，包 com.smartdock）
 
 OSS 上传事件 → `OssUploadedEventListener` 建单，判定序（顺序不可调换）：

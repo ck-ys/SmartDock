@@ -29,7 +29,7 @@ docker compose up -d --build
 
 | 服务 | 镜像 | 说明 |
 |---|---|---|
-| postgres | postgres:17-alpine | 首次启动自动执行 `../backend/script/sql/baseline/`（01→05 依序，含 05 演示数据；不需要时在首次启动前移出该文件）|
+| postgres | postgres:17-alpine | 首次启动自动执行 `../backend/script/sql/baseline/`（01→07 依序，含 05 演示数据；不需要时在首次启动前移出该文件）|
 | redis | redis:7-alpine | 会话/幂等/限流，AOF 开启 |
 | minio | quay.io/minio（钉版）| 附件对象存储；9000 API / 9001 管理台（仅本机回环）|
 | backend | 自建（JDK21）| 8080；数据源/Redis 全走环境变量注入 |
@@ -54,7 +54,7 @@ POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... docker compose up -d
 
 ## 5. 裸机部署（不用 Docker）
 
-1. PostgreSQL 17：建空库后按序执行 `backend/script/sql/baseline/` 的五个 SQL（01→05；05 为可选演示数据，不需要时移出该目录）；
+1. PostgreSQL 17：建空库后按序执行 `backend/script/sql/baseline/` 的七个 SQL（01→07；05 为可选演示数据，不需要时移出该目录）；
 2. Redis 7：设置 requirepass；
 3. 启动：
    ```bash
