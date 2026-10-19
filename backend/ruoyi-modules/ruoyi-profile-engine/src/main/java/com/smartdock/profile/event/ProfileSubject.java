@@ -41,4 +41,7 @@ public class ProfileSubject extends BaseEntity {
     private Date lastEventTime;
 
     private Long eventCount;
+
+    /** 主体属性(JSONB 合并 traits; 画像/分群的静态事实来源) */
+    private String properties;
 }

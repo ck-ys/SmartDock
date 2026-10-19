@@ -9,12 +9,24 @@
 
 ```bash
 createdb smartdock
-psql -d smartdock -f 01_schema.sql      # 71 张业务表 + agentscope 独立 schema
+psql -d smartdock -f 01_schema.sql      # 业务表 + agentscope 独立 schema
 psql -d smartdock -f 02_reference.sql   # 框架与领域参考数据（菜单/字典/模型目录/画像维度/风控规则…）
 psql -d smartdock -f 03_identity.sql    # 合成身份块（租户/部门/用户/角色/OSS/钱包）
 psql -d smartdock -f 04_role_menu.sql   # 角色菜单绑定
 psql -d smartdock -f 05_demo_data.optional.sql   # （可选）一条开箱演示任务；跳过即为干净空库
+psql -d smartdock -f 06_profile_protocol.sql     # 画像接入协议与内置事件 Schema（可重复执行）
 ```
+
+## 已有库升级
+
+基线只用于空库安装。已经在跑的库请在备份后执行增量脚本：
+
+```bash
+psql -d smartdock -f ../migration/2026-10-19_profile_protocol_v1.sql
+psql -d smartdock -f 06_profile_protocol.sql
+```
+
+升级脚本全部幂等，可重复执行；只新增列/表/索引/权限，不删改历史数据。
 
 ## 内置账号（口令均为 `admin123`）
 

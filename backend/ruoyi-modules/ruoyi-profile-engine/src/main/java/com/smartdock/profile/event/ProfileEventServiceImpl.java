@@ -1,7 +1,9 @@
 package com.smartdock.profile.event;
 
 import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.identity.ProfileIdentityService;
 import com.smartdock.profile.mapper.ProfileEventMapper;
+import com.smartdock.profile.protocol.ProfileSchemaService;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.utils.StringUtils;
@@ -14,16 +16,20 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 事件发布实现: 幂等写入 + 主体登记 upsert。
+ * 事件发布实现: schema 校验 + 身份解析 + 幂等写入 + 主体登记 upsert。
  *
  * <p>每条事件独立事务(REQUIRES_NEW)。不用方法级 {@code @Transactional} 的原因:
  * {@link #publishBatch} 若直接调用同类 {@link #publish}, Spring 代理不生效,
  * 外层事务会把整批事件绑在一起——单条坏数据会拖垮整批。这里用 TransactionTemplate
  * 显式开新事务, 单条失败只跳该条。</p>
+ *
+ * <p>协议/Schema/身份表尚未迁移的旧库: schema 查询与身份解析均按“放行/降级”
+ * 处理, 不阻断主事件链路。</p>
  *
  * @author smartdock
  */
@@ -32,10 +38,17 @@ import java.util.Map;
 public class ProfileEventServiceImpl implements ProfileEventPublisher {
 
     private final ProfileEventMapper eventMapper;
+    private final ProfileSchemaService schemaService;
+    private final ProfileIdentityService identityService;
     private final TransactionTemplate requiresNew;
 
-    public ProfileEventServiceImpl(ProfileEventMapper eventMapper, PlatformTransactionManager transactionManager) {
+    public ProfileEventServiceImpl(ProfileEventMapper eventMapper,
+                                   ProfileSchemaService schemaService,
+                                   ProfileIdentityService identityService,
+                                   PlatformTransactionManager transactionManager) {
         this.eventMapper = eventMapper;
+        this.schemaService = schemaService;
+        this.identityService = identityService;
         this.requiresNew = new TransactionTemplate(transactionManager);
         this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -67,20 +80,59 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
 
     private boolean doPublish(ProfileEventBo bo) {
         ProfileEvent e = toEntity(bo);
+
+        // 已注册 schema 才校验; 未注册/旧库/解析失败一律放行
+        List<String> schemaErrors = schemaService.validate(e.getTenantId(), e.getSource(), e.getEventName(),
+            e.getSchemaVersion(), bo.getProps(), bo.getContext(), bo.getTraits());
+        if (!schemaErrors.isEmpty()) {
+            throw new IllegalArgumentException("profile event schema invalid: " + String.join("; ", schemaErrors));
+        }
+
+        // 身份解析失败不阻断事件(链接表是索引, 事件是账本); 下一条事件会再补
+        e.setSubjectId(resolveCanonicalSubject(e, bo));
+
         int rows = eventMapper.insertIgnore(e);
         if (rows == 0) {
             return false;
         }
-        upsertSubject(e, bo.getSubjectName());
+        upsertSubject(e, bo);
         return true;
+    }
+
+    private String resolveCanonicalSubject(ProfileEvent e, ProfileEventBo bo) {
+        Map<String, String> identifiers = new LinkedHashMap<>();
+        if (bo.getIdentifiers() != null) {
+            bo.getIdentifiers().forEach((key, value) -> {
+                if (StringUtils.isNotBlank(key) && StringUtils.isNotBlank(value)) {
+                    identifiers.put(key, value);
+                }
+            });
+        }
+        if ("user".equals(e.getSubjectType()) && StringUtils.isNotBlank(e.getSubjectId())
+            && !e.getSubjectId().equals(e.getAnonymousId())) {
+            identifiers.putIfAbsent("user_id", e.getSubjectId());
+        }
+        if (StringUtils.isNotBlank(e.getAnonymousId())) {
+            identifiers.putIfAbsent("anonymous_id", e.getAnonymousId());
+        }
+        try {
+            return identityService.resolveAndLink(e.getTenantId(), e.getSource(), e.getSubjectType(),
+                e.getSubjectId(), identifiers);
+        } catch (Exception ex) {
+            log.warn("[Profile] identity resolve failed (non-fatal) subject={} err={}",
+                e.getSubjectId(), ex.getMessage());
+            return e.getSubjectId();
+        }
     }
 
     private ProfileEvent toEntity(ProfileEventBo bo) {
         if (StringUtils.isBlank(bo.getSource())) {
             throw new IllegalArgumentException("profile event source is required");
         }
-        if (StringUtils.isBlank(bo.getEventType())) {
-            throw new IllegalArgumentException("profile event eventType is required");
+        String eventName = firstNonBlank(bo.getEventName(), bo.getEventType());
+        String eventType = firstNonBlank(bo.getEventType(), bo.getEventName());
+        if (StringUtils.isBlank(eventName)) {
+            throw new IllegalArgumentException("profile event eventName/eventType is required");
         }
         if (StringUtils.isBlank(bo.getEventUid())) {
             throw new IllegalArgumentException("profile event eventUid is required (idempotency key)");
@@ -88,28 +140,64 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         if (StringUtils.isBlank(bo.getSubjectId())) {
             throw new IllegalArgumentException("profile event subjectId is required");
         }
+        String subjectType = StringUtils.isBlank(bo.getSubjectType()) ? "user" : bo.getSubjectType();
+        String schemaVersion = StringUtils.isBlank(bo.getSchemaVersion()) ? "1-0-0" : bo.getSchemaVersion().trim();
         // 与 DDL 长度对齐——超长值在 PG 22001 之前拦下, 报可读错误
         // (subjectName 除外: 可选字段走 upsert 侧截断)
         checkLen("source", bo.getSource(), 32);
-        checkLen("eventType", bo.getEventType(), 64);
+        checkLen("eventName", eventName, 64);
+        checkLen("eventType", eventType, 64);
         checkLen("eventUid", bo.getEventUid(), 128);
-        checkLen("subjectType", bo.getSubjectType(), 32);
+        checkLen("subjectType", subjectType, 32);
         checkLen("subjectId", bo.getSubjectId(), 64);
+        checkLen("anonymousId", bo.getAnonymousId(), 128);
+        checkLen("sessionId", bo.getSessionId(), 128);
+        checkLen("schemaVersion", schemaVersion, 32);
+
         ProfileEvent e = new ProfileEvent();
         e.setEventId(IdWorker.getId());
         e.setTenantId(currentTenant());
         e.setSource(bo.getSource());
-        e.setEventType(bo.getEventType());
+        e.setEventType(eventType);
+        e.setEventName(eventName);
         e.setEventUid(bo.getEventUid());
-        e.setSubjectType(StringUtils.isBlank(bo.getSubjectType()) ? "user" : bo.getSubjectType());
+        e.setSubjectType(subjectType);
         e.setSubjectId(bo.getSubjectId());
+        e.setAnonymousId(bo.getAnonymousId());
+        e.setSessionId(bo.getSessionId());
+        e.setSchemaVersion(schemaVersion);
         e.setOccurredTime(bo.getOccurredTime() != null ? bo.getOccurredTime() : new Date());
-        Map<String, Object> props = bo.getProps() == null ? Map.of() : bo.getProps();
-        e.setProps(JsonUtils.toJsonString(props));
+        e.setProps(toJson(bo.getProps()));
+        e.setContext(toJson(bo.getContext()));
+        e.setTraits(toJson(bo.getTraits()));
+        e.setIdentifiers(toJson(storedIdentifiers(bo, subjectType)));
         return e;
     }
 
-    private void upsertSubject(ProfileEvent e, String displayName) {
+    /**
+     * 事件行里保留的标识符快照: 调用方显式传入的 + 由 subject 推导的。
+     * 登录事件的 user_id 保持“登录前的原始值”, 规范化后的主体 ID 单独落在 subject_id。
+     */
+    private Map<String, String> storedIdentifiers(ProfileEventBo bo, String subjectType) {
+        Map<String, String> ids = new LinkedHashMap<>();
+        if (bo.getIdentifiers() != null) {
+            bo.getIdentifiers().forEach((key, value) -> {
+                if (StringUtils.isNotBlank(key) && StringUtils.isNotBlank(value)) {
+                    ids.put(key, value);
+                }
+            });
+        }
+        if ("user".equals(subjectType) && StringUtils.isNotBlank(bo.getSubjectId())
+            && !bo.getSubjectId().equals(bo.getAnonymousId())) {
+            ids.putIfAbsent("user_id", bo.getSubjectId());
+        }
+        if (StringUtils.isNotBlank(bo.getAnonymousId())) {
+            ids.putIfAbsent("anonymous_id", bo.getAnonymousId());
+        }
+        return ids;
+    }
+
+    private void upsertSubject(ProfileEvent e, ProfileEventBo bo) {
         try {
             ProfileSubject s = new ProfileSubject();
             s.setId(IdWorker.getId());
@@ -117,17 +205,43 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
             s.setSource(e.getSource());
             s.setSubjectType(e.getSubjectType());
             s.setSubjectId(e.getSubjectId());
-            // 超长显示名截断而非拒件: 可选元数据不值得拖累事件本体
-            s.setDisplayName(displayName != null && displayName.length() > 128
-                ? displayName.substring(0, 128) : displayName);
+            s.setDisplayName(resolveDisplayName(bo));
             s.setFirstEventTime(e.getOccurredTime());
             s.setLastEventTime(e.getOccurredTime());
+            s.setProperties(toJson(bo.getTraits()));
             eventMapper.upsertSubject(s);
         } catch (Exception ex) {
             // 主体登记失败不阻断事件(事件是账本, 登记是索引; 下一条事件会再补)
             log.warn("[Profile] subject upsert failed (non-fatal) subject={} err={}",
                 e.getSubjectId(), ex.getMessage());
         }
+    }
+
+    private String resolveDisplayName(ProfileEventBo bo) {
+        String displayName = bo.getSubjectName();
+        if (StringUtils.isBlank(displayName) && bo.getTraits() != null) {
+            Object name = bo.getTraits().get("name");
+            if (name == null) {
+                name = bo.getTraits().get("nickName");
+            }
+            if (name == null) {
+                name = bo.getTraits().get("displayName");
+            }
+            if (name != null && StringUtils.isNotBlank(String.valueOf(name))) {
+                displayName = String.valueOf(name);
+            }
+        }
+        // 超长显示名截断而非拒件: 可选元数据不值得拖累事件本体
+        return displayName != null && displayName.length() > 128
+            ? displayName.substring(0, 128) : displayName;
+    }
+
+    private String toJson(Map<String, ?> map) {
+        return JsonUtils.toJsonString(map == null || map.isEmpty() ? Map.of() : map);
+    }
+
+    private String firstNonBlank(String first, String second) {
+        return StringUtils.isNotBlank(first) ? first : second;
     }
 
     private void checkLen(String field, String value, int max) {

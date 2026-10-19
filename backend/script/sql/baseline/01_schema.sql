@@ -1058,11 +1058,18 @@ CREATE TABLE public.profile_event (
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     source character varying(32) NOT NULL,
     event_type character varying(64) NOT NULL,
+    event_name character varying(64),
     event_uid character varying(128) NOT NULL,
     subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
     subject_id character varying(64) NOT NULL,
+    anonymous_id character varying(128),
+    session_id character varying(128),
+    schema_version character varying(32) DEFAULT '1-0-0'::character varying NOT NULL,
     occurred_time timestamp without time zone NOT NULL,
     props jsonb DEFAULT '{}'::jsonb NOT NULL,
+    context jsonb DEFAULT '{}'::jsonb NOT NULL,
+    traits jsonb DEFAULT '{}'::jsonb NOT NULL,
+    identifiers jsonb DEFAULT '{}'::jsonb NOT NULL,
     create_dept bigint,
     create_by bigint,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -1178,12 +1185,116 @@ CREATE TABLE public.profile_subject (
     first_event_time timestamp without time zone,
     last_event_time timestamp without time zone,
     event_count bigint DEFAULT 0 NOT NULL,
+    properties jsonb DEFAULT '{}'::jsonb NOT NULL,
     create_dept bigint,
     create_by bigint,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     update_by bigint,
     update_time timestamp without time zone,
     del_flag character(1) DEFAULT '0'::bpchar
+);
+
+
+--
+-- Name: profile_protocol; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_protocol (
+    protocol_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    version character varying(32) NOT NULL,
+    status character varying(16) DEFAULT 'PUBLISHED'::character varying NOT NULL,
+    manifest jsonb NOT NULL,
+    checksum character varying(64) NOT NULL,
+    published_at timestamp without time zone,
+    published_by bigint,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_protocol PRIMARY KEY (protocol_id),
+    CONSTRAINT uk_profile_protocol_version UNIQUE (tenant_id, source, version)
+);
+
+
+--
+-- Name: profile_schema_registry; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_schema_registry (
+    schema_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    event_name character varying(64) NOT NULL,
+    schema_version character varying(32) DEFAULT '1-0-0'::character varying NOT NULL,
+    schema_json jsonb NOT NULL,
+    status character varying(16) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_schema_registry PRIMARY KEY (schema_id),
+    CONSTRAINT uk_profile_schema UNIQUE (tenant_id, source, event_name, schema_version)
+);
+
+
+--
+-- Name: profile_identity_link; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_identity_link (
+    link_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
+    subject_id character varying(64) NOT NULL,
+    identifier_type character varying(32) NOT NULL,
+    identifier_value character varying(128) NOT NULL,
+    identifier_hash character varying(128),
+    confidence numeric(5,4) DEFAULT 1.0 NOT NULL,
+    is_secure character(1) DEFAULT '0'::bpchar NOT NULL,
+    status character varying(16) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    first_seen timestamp without time zone,
+    last_seen timestamp without time zone,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    CONSTRAINT pk_profile_identity_link PRIMARY KEY (link_id),
+    CONSTRAINT uk_profile_identity_link UNIQUE (tenant_id, source, identifier_type, identifier_value),
+    CONSTRAINT ck_profile_identity_confidence CHECK (confidence >= 0 AND confidence <= 1)
+);
+
+
+--
+-- Name: profile_identity_merge; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_identity_merge (
+    merge_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
+    from_subject_id character varying(64) NOT NULL,
+    to_subject_id character varying(64) NOT NULL,
+    reason character varying(32) NOT NULL,
+    rule_version character varying(32) NOT NULL,
+    actor character varying(64),
+    occurred_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    reversible_until timestamp without time zone,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    CONSTRAINT pk_profile_identity_merge PRIMARY KEY (merge_id),
+    CONSTRAINT ck_profile_identity_merge_diff CHECK (from_subject_id <> to_subject_id)
 );
 
 
@@ -2604,6 +2715,55 @@ CREATE INDEX idx_profile_event_query ON public.profile_event USING btree (tenant
 --
 
 CREATE INDEX idx_profile_event_time ON public.profile_event USING btree (occurred_time);
+
+
+--
+-- Name: idx_profile_event_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_event_name ON public.profile_event USING btree (tenant_id, source, event_name, occurred_time DESC);
+
+
+--
+-- Name: idx_profile_event_session; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_event_session ON public.profile_event USING btree (tenant_id, source, session_id, occurred_time DESC) WHERE (session_id IS NOT NULL);
+
+
+--
+-- Name: idx_profile_identity_link_subject; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_identity_link_subject ON public.profile_identity_link USING btree (tenant_id, source, subject_type, subject_id);
+
+
+--
+-- Name: idx_profile_identity_merge_from; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_identity_merge_from ON public.profile_identity_merge USING btree (tenant_id, source, subject_type, from_subject_id);
+
+
+--
+-- Name: idx_profile_protocol_current; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_protocol_current ON public.profile_protocol USING btree (tenant_id, source, status);
+
+
+--
+-- Name: uk_profile_protocol_published; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_profile_protocol_published ON public.profile_protocol USING btree (tenant_id, source) WHERE ((status = 'PUBLISHED'::text) AND (del_flag = '0'::bpchar));
+
+
+--
+-- Name: idx_profile_schema_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_schema_source ON public.profile_schema_registry USING btree (tenant_id, source, event_name);
 
 
 --

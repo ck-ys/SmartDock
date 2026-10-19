@@ -2,6 +2,7 @@ package org.dromara.test.adapter;
 
 import com.smartdock.profile.ProfileEventPublisher;
 import com.smartdock.profile.event.ProfileEventBo;
+import org.dromara.common.core.service.UserService;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.web.adapter.RiskBehaviorSinkAdapter;
 import org.junit.jupiter.api.Tag;
@@ -32,7 +33,8 @@ import static org.mockito.Mockito.when;
 class RiskBehaviorSinkAdapterTest {
 
     private final ProfileEventPublisher publisher = mock(ProfileEventPublisher.class);
-    private final RiskBehaviorSinkAdapter adapter = new RiskBehaviorSinkAdapter(publisher);
+    private final UserService userService = mock(UserService.class);
+    private final RiskBehaviorSinkAdapter adapter = new RiskBehaviorSinkAdapter(publisher, userService);
 
     private static MockedStatic<TenantHelper> tenantPassThrough() {
         MockedStatic<TenantHelper> t = mockStatic(TenantHelper.class);

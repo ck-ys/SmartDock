@@ -199,4 +199,9 @@ INSERT INTO sys_role_menu (role_id, menu_id) VALUES
   (1, 11971), (1, 11972),
   (6, 11971), (6, 11972);
 
+-- 2026-10-19 画像协议 / 事件 Schema 权限(超级管理员 / 租户管理员)
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 11973), (1, 11974), (1, 11975), (1, 11976),
+  (6, 11973), (6, 11974), (6, 11975), (6, 11976);
+
 

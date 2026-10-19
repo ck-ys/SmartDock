@@ -33,30 +33,35 @@ public interface ProfileEventMapper extends BaseMapperPlus<ProfileEvent, Profile
      */
     @Insert("""
         INSERT INTO profile_event
-            (event_id, tenant_id, source, event_type, event_uid, subject_type, subject_id,
-             occurred_time, props, create_time)
+            (event_id, tenant_id, source, event_type, event_name, event_uid, subject_type, subject_id,
+             anonymous_id, session_id, schema_version, occurred_time, props, context, traits, identifiers,
+             create_time)
         VALUES
-            (#{e.eventId}, #{e.tenantId}, #{e.source}, #{e.eventType}, #{e.eventUid},
-             #{e.subjectType}, #{e.subjectId}, #{e.occurredTime}, #{e.props}::jsonb, CURRENT_TIMESTAMP)
+            (#{e.eventId}, #{e.tenantId}, #{e.source}, #{e.eventType}, #{e.eventName}, #{e.eventUid},
+             #{e.subjectType}, #{e.subjectId}, #{e.anonymousId}, #{e.sessionId}, #{e.schemaVersion},
+             #{e.occurredTime}, #{e.props}::jsonb, #{e.context}::jsonb, #{e.traits}::jsonb,
+             #{e.identifiers}::jsonb, CURRENT_TIMESTAMP)
         ON CONFLICT (tenant_id, source, event_uid) DO NOTHING
         """)
     int insertIgnore(@Param("e") ProfileEvent e);
 
     /**
      * 主体登记 upsert: 首末事件时间取 min/max, 计数 +1(仅事件新写入后调用)。
+     * properties 做 JSONB 浅合并, 新 traits 覆盖旧同名键。
      */
     @Insert("""
         INSERT INTO profile_subject
             (id, tenant_id, source, subject_type, subject_id, display_name,
-             first_event_time, last_event_time, event_count, create_time)
+             first_event_time, last_event_time, event_count, properties, create_time)
         VALUES
             (#{s.id}, #{s.tenantId}, #{s.source}, #{s.subjectType}, #{s.subjectId}, #{s.displayName},
-             #{s.firstEventTime}, #{s.lastEventTime}, 1, CURRENT_TIMESTAMP)
+             #{s.firstEventTime}, #{s.lastEventTime}, 1, #{s.properties}::jsonb, CURRENT_TIMESTAMP)
         ON CONFLICT (tenant_id, source, subject_type, subject_id) DO UPDATE SET
             last_event_time  = GREATEST(profile_subject.last_event_time, EXCLUDED.last_event_time),
             first_event_time = LEAST(profile_subject.first_event_time, EXCLUDED.first_event_time),
             event_count      = profile_subject.event_count + 1,
             display_name     = COALESCE(EXCLUDED.display_name, profile_subject.display_name),
+            properties       = profile_subject.properties || EXCLUDED.properties,
             update_time      = CURRENT_TIMESTAMP
         """)
     int upsertSubject(@Param("s") ProfileSubject s);
