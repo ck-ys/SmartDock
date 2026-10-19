@@ -3,7 +3,7 @@
 ## 1. 前置要求
 
 - Docker 24+ / Docker Compose v2
-- 构建机：JDK 21 + Maven 3.8+（后端），Node 18+（前端）
+- 构建机：JDK 21 + Maven 3.8+（后端），Node 20.19+（前端）
 - 内存 ≥ 4G（JVM 默认 -Xmx2g 可在 compose 里调）
 
 ## 2. 构建产物
@@ -29,7 +29,7 @@ docker compose up -d --build
 
 | 服务 | 镜像 | 说明 |
 |---|---|---|
-| postgres | postgres:17-alpine | 首次启动自动执行 `../backend/script/sql/baseline/`（01→04 依序）|
+| postgres | postgres:17-alpine | 首次启动自动执行 `../backend/script/sql/baseline/`（01→05 依序，含 05 演示数据；不需要时在首次启动前移出该文件）|
 | redis | redis:7-alpine | 会话/幂等/限流，AOF 开启 |
 | minio | quay.io/minio（钉版）| 附件对象存储；9000 API / 9001 管理台（仅本机回环）|
 | backend | 自建（JDK21）| 8080；数据源/Redis 全走环境变量注入 |
