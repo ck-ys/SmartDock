@@ -79,7 +79,6 @@
           <template #header>
             <div class="panel-head">
               <span>流量趋势</span>
-              <span class="muted">PV / UV / 访问次数</span>
             </div>
           </template>
           <v-chart class="trend-chart" :option="trendOption" autoresize />
@@ -115,7 +114,7 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 页面与搜索 -->
-      <el-tab-pane label="页面与搜索" name="page">
+      <el-tab-pane label="页面与搜索" name="page" lazy>
         <el-row :gutter="14">
           <el-col :xs="24" :lg="14">
             <el-card shadow="never" class="panel-card" v-loading="pageLoading">
@@ -187,7 +186,7 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 转化漏斗 -->
-      <el-tab-pane label="转化漏斗" name="funnel">
+      <el-tab-pane label="转化漏斗" name="funnel" lazy>
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="panel-head">
@@ -196,7 +195,7 @@
                 <el-select v-model="funnelId" placeholder="选择漏斗" style="width: 220px" @change="loadFunnelResult">
                   <el-option v-for="f in funnels" :key="f.funnelId" :label="`${f.funnelName} · ${f.windowDays}天`" :value="f.funnelId" />
                 </el-select>
-                <el-button v-hasPermi="['analytics:center:edit']" @click="openFunnelDialog()">新建漏斗</el-button>
+                <el-button v-hasPermi="['analytics:center:edit']" type="primary" @click="openFunnelDialog()">新建漏斗</el-button>
                 <el-button v-if="currentFunnel" v-hasPermi="['analytics:center:edit']" @click="openFunnelDialog(currentFunnel)">编辑</el-button>
                 <el-button
                   v-if="currentFunnel && currentFunnel.builtin !== '1'"
@@ -230,7 +229,7 @@
                     <strong>{{ step.count }}</strong>
                     <span class="muted">人 · 总转化 {{ formatPercent(step.rate) }}</span>
                     <el-tag v-if="index > 0" size="small" :type="Number(step.stepRate) >= 50 ? 'success' : 'warning'" effect="plain">
-                      环比 {{ formatPercent(step.stepRate) }}
+                      步骤转化 {{ formatPercent(step.stepRate) }}
                     </el-tag>
                     <span v-if="index > 0" class="muted">平均 {{ formatDuration(step.avgSeconds) }}</span>
                   </div>
@@ -252,7 +251,7 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 留存 -->
-      <el-tab-pane label="留存分析" name="retention">
+      <el-tab-pane label="留存分析" name="retention" lazy>
         <el-card shadow="never" class="panel-card" v-loading="retentionLoading">
           <template #header>
             <div class="panel-head">
@@ -283,7 +282,7 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 访问明细 -->
-      <el-tab-pane label="访问明细" name="sessions">
+      <el-tab-pane label="访问明细" name="sessions" lazy>
         <el-card shadow="never" class="panel-card">
           <div class="filter-bar">
             <el-input v-model="sessionQuery.keyword" placeholder="访客/主体/落地页" clearable style="width: 200px" @keyup.enter="searchSessions" />
@@ -338,7 +337,7 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 自定义分析 -->
-      <el-tab-pane label="自定义分析" name="custom">
+      <el-tab-pane label="自定义分析" name="custom" lazy>
         <el-card shadow="never" class="panel-card">
           <div class="filter-bar">
             <el-select v-model="customForm.dimension" style="width: 160px" @change="loadCustom">
@@ -365,7 +364,7 @@
               <el-radio-button :value="20">Top 20</el-radio-button>
               <el-radio-button :value="50">Top 50</el-radio-button>
             </el-radio-group>
-            <el-button :loading="customLoading" @click="loadCustom">运行</el-button>
+            <el-button type="primary" :loading="customLoading" @click="loadCustom">运行</el-button>
           </div>
           <v-chart class="custom-chart" :option="customOption" autoresize v-loading="customLoading" />
           <el-table :data="customRows" size="small" class="custom-table">
@@ -379,7 +378,7 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 数据采集 -->
-      <el-tab-pane label="数据采集" name="collect">
+      <el-tab-pane label="数据采集" name="collect" lazy>
         <el-row :gutter="14">
           <el-col :xs="24" :lg="12">
             <el-card shadow="never" class="panel-card" v-loading="siteLoading">
@@ -431,11 +430,12 @@
           <el-input
             v-model="csvText"
             type="textarea"
-            :rows="8"
+            :rows="5"
             placeholder="eventName,anonymousId,sessionId,occurredTime,pageUrl&#10;page_view,demo-visitor,demo-session,2026-10-19 10:00:00,/home"
           />
           <div class="import-actions">
             <el-button @click="fillCsvSample">填入示例</el-button>
+            <el-button @click="csvText = ''">清空</el-button>
             <el-button v-hasPermi="['analytics:center:edit']" type="primary" :loading="importing" @click="submitCsv">导入</el-button>
           </div>
         </el-card>
@@ -680,21 +680,55 @@ const snippet = computed(() => {
 // ---------------------------------------------------------------- 概览
 const trendOption = computed<any>(() => ({
   tooltip: { trigger: 'axis' },
-  legend: { data: ['PV', 'UV', '访问次数'], right: 10, top: 0, itemWidth: 12, itemHeight: 8 },
-  grid: { left: 48, right: 20, top: 36, bottom: 32 },
+  legend: { data: ['PV', 'UV', '访问次数'], left: 'center', top: 0, itemWidth: 14, itemHeight: 8 },
+  grid: { left: 52, right: 74, top: 34, bottom: 32 },
   xAxis: { type: 'category', boundaryGap: false, data: trend.value.map((p) => p.statDate) },
-  yAxis: { type: 'value', minInterval: 1 },
+  // PV 与 UV/访问次数量级差一个数量级，分左右轴，避免 UV 贴在 0 轴上看不见
+  yAxis: [
+    { type: 'value', name: 'PV', nameGap: 16, minInterval: 1, axisLabel: { color: '#909399' } },
+    {
+      type: 'value',
+      name: 'UV / 访问',
+      nameGap: 16,
+      minInterval: 1,
+      nameTextStyle: { fontSize: 11 },
+      axisLabel: { color: '#909399' },
+      splitLine: { show: false }
+    }
+  ],
   series: [
     {
       name: 'PV',
       type: 'line',
+      yAxisIndex: 0,
       smooth: true,
       symbolSize: 5,
       areaStyle: { opacity: 0.08 },
       data: trend.value.map((p) => Number(p.pv || 0))
     },
-    { name: 'UV', type: 'line', smooth: true, symbolSize: 5, data: trend.value.map((p) => Number(p.uv || 0)) },
-    { name: '访问次数', type: 'line', smooth: true, symbolSize: 5, data: trend.value.map((p) => Number(p.visits || 0)) }
+    {
+      name: '访问次数',
+      type: 'line',
+      yAxisIndex: 1,
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { width: 1.5, color: '#8a8f99' },
+      itemStyle: { color: '#8a8f99' },
+      data: trend.value.map((p) => Number(p.visits || 0))
+    },
+    {
+      // UV 画在最上层并改用虚线暖色：UV 与访问次数同值时也能分辨两条线
+      name: 'UV',
+      type: 'line',
+      yAxisIndex: 1,
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: 2.2, type: 'dashed', color: '#e6a23c' },
+      itemStyle: { color: '#e6a23c' },
+      z: 6,
+      data: trend.value.map((p) => Number(p.uv || 0))
+    }
   ]
 }));
 
@@ -1038,10 +1072,15 @@ const formatDuration = (value: number | string | undefined) => {
   const hours = Math.floor(minutes / 60);
   return `${hours} 时 ${minutes % 60} 分`;
 };
-const deltaValue = (key: string) => Number(overview.value.delta?.[key] ?? 0);
+const deltaRaw = (key: string) => overview.value.delta?.[key];
+const deltaValue = (key: string) => {
+  const raw = deltaRaw(key);
+  return raw === null || raw === undefined ? Number.NaN : Number(raw);
+};
 const deltaText = (key: string) => {
   const value = deltaValue(key);
-  if (!Number.isFinite(value) || value === 0) return '环比持平';
+  if (!Number.isFinite(value)) return '无对比数据';
+  if (value === 0) return '环比持平';
   return `环比 ${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
 };
 const deltaTone = (key: string) => {
@@ -1169,8 +1208,16 @@ onMounted(async () => {
   height: 280px;
   width: 100%;
 }
+.breakdown-row {
+  display: flex;
+  flex-wrap: wrap;
+}
 .breakdown-row :deep(.el-col) {
+  display: flex;
   margin-bottom: 14px;
+}
+.breakdown-row .panel-card {
+  width: 100%;
 }
 .share-cell {
   display: flex;

@@ -503,6 +503,9 @@ public class AnalyticsService {
                 point.put("value", metricValue(row, metric));
                 points.add(point);
             }
+            // 下钻接口固定按 PV 排序；自定义分析要按用户所选指标重排
+            points.sort(Comparator.comparingLong(
+                (Map<String, Object> point) -> longValue(point.get("value"))).reversed());
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dimension", dim);
@@ -802,7 +805,8 @@ public class AnalyticsService {
 
     private BigDecimal change(double current, double previous) {
         if (previous == 0) {
-            return current == 0 ? BigDecimal.ZERO : BigDecimal.valueOf(100).setScale(2, RoundingMode.HALF_UP);
+            // 没有上一周期基线时不能谎报 +100%，返回 null 由前端显示“无对比数据”
+            return current == 0 ? BigDecimal.ZERO : null;
         }
         return BigDecimal.valueOf((current - previous) * 100.0 / previous).setScale(2, RoundingMode.HALF_UP);
     }

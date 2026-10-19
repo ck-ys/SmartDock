@@ -94,6 +94,22 @@ class AnalyticsSessionizerTest {
     }
 
     @Test
+    void onlyFirstSessionOfVisitorIsNew() {
+        Date base = new Date(1_700_000_000_000L);
+        Map<String, Date> firstSeen = new HashMap<>();
+        firstSeen.put("v1", base);
+
+        List<AnalyticsSession> sessions = AnalyticsSessionizer.build("000000", "web", List.of(
+            event(1, "page_view", "v1", "s1", 0, "{\"pageUrl\":\"/home\"}"),
+            event(2, "page_view", "v1", "s2", 60, "{\"pageUrl\":\"/docs\"}")
+        ), firstSeen);
+
+        assertThat(sessions).hasSize(2);
+        assertThat(sessions.get(0).getIsNewVisitor()).isEqualTo("1");
+        assertThat(sessions.get(1).getIsNewVisitor()).isEqualTo("0");
+    }
+
+    @Test
     void singlePageViewSessionIsBounceAndNewVisitorUsesFirstSeen() {
         Date base = new Date(1_700_000_000_000L);
         Map<String, Date> firstSeen = new HashMap<>();

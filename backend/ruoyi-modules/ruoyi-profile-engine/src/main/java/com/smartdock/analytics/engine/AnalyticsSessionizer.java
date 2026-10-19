@@ -13,8 +13,6 @@ import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -232,7 +230,10 @@ public class AnalyticsSessionizer {
         session.setSubjectId(subjectId);
         session.setAnonymousId(anonymousId);
         Date firstVisit = earliestFirstSeen(events, firstSeen);
-        session.setIsNewVisitor(firstVisit != null && firstVisit.getTime() >= startOfDay(startedAt) ? "1" : "0");
+        // 只有该访问者的第一次会话算新访；同一访客当天的后续会话不能重复计新
+        boolean newVisitor = firstVisit != null
+            && Math.abs(firstVisit.getTime() - startedAt.getTime()) <= 1000L;
+        session.setIsNewVisitor(newVisitor ? "1" : "0");
         session.setStartedAt(startedAt);
         session.setEndedAt(endedAt);
         session.setLastEventAt(endedAt);
@@ -301,11 +302,6 @@ public class AnalyticsSessionizer {
             }
         }
         return min;
-    }
-
-    private static long startOfDay(Date date) {
-        LocalDate day = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        return day.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
     }
 
     private static String pageUrl(Map<String, Object> context, Map<String, Object> props) {
