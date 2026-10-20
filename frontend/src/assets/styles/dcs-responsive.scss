@@ -1,14 +1,19 @@
 /**
- * 全站响应式基线（波 0）。
+ * 全站响应式基线（波 0；波 0.1 断点对齐）。
  *
  * 只管两件会影响整站的事，页面级排版留给各页自己的媒体查询：
- * 1) 手机上输入/选择/文本域统一 16px —— iOS Safari 对聚焦时字号 <16px 的控件会自动放大页面，
+ * 1) 手机形态下输入/选择/文本域统一 16px —— iOS Safari 对聚焦时字号 <16px 的控件会自动放大页面，
  *    用户点一次输入框整页就歪了；16px 是 Safari 不再放大的最低值。
  * 2) 底部安全区 —— 全面屏手机的手势条会盖住页面最底一行，给固定/滚动到底的容器留出
  *    env(safe-area-inset-bottom)。
+ *
+ * 波 0.1（多审 P1）：断点从 768 提到 992 —— 壳层的设备判定是 width-1<992（≤992 即手机形态，
+ * 含 iPad 竖屏 810/834、iPhone 横屏 844-932），原 768 断点让 769-992 既按手机跑又拿不到
+ * 16px/触控补偿；与判定严格对齐后才不漏。安全区生效前提是 viewport 带 viewport-fit=cover
+ * （见 index.html），否则 env() 恒 0。
  */
 
-@media (max-width: 768px) {
+@media (max-width: 992px) {
   /* 用 !important 覆盖各组件 scoped 样式里更小的字号（scoped 属性选择器特异性高于裸标签） */
   input:not([type='checkbox']):not([type='radio']),
   select,
@@ -19,13 +24,17 @@
     font-size: 16px !important;
   }
 
-  /* 页面主区滚到底时不压到手势条 */
+  /* 页面主区滚到底时不压到手势条；横屏时刘海侧也留白（env 无关时为 0） */
   .app-main {
     padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   /* AI 助手抽屉/全屏底部留白（输入框贴底） */
   .dcs-dw .dw-body {
     padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 }

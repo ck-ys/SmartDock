@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.3.1',
+    date: '2026-10-19',
+    title: '修掉手机和平板上的几个小毛病',
+    items: [
+      '平板竖屏、手机横屏时点输入框，页面不会再突然放大。',
+      '小助手的确认按钮遇到网络卡顿失灵的问题已修复，现在可以正常再点。',
+      '手机上从详情返回列表，之前填的筛选条件不会再丢。'
+    ]
+  },
+  {
     version: 'v1.3',
     date: '2026-10-19',
     title: '手机上更好找、更好点、更好读',

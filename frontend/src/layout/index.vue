@@ -13,7 +13,10 @@
       </el-scrollbar> -->
       <div :class="{ 'fixed-header': fixedHeader }">
         <navbar ref="navbarRef" @set-layout="setLayout" />
-        <tags-view v-if="needTagsView" />
+        <!-- 波 0.1（多审 P2）：手机用 v-show 而非 v-if——addView（visitedViews/cachedViews 的唯一写入点）
+             在 TagsView 内部 watch 路由，v-if 卸载后手机 keep-alive 整体失效（返回丢筛选/滚动）；
+             保留挂载只藏 DOM，设置关掉页签时仍彻底卸载 -->
+        <tags-view v-if="settingsStore.tagsView" v-show="needTagsView" />
       </div>
       <app-main />
       <settings ref="settingRef" />
@@ -38,7 +41,8 @@ const settingsStore = useSettingsStore();
 const theme = computed(() => settingsStore.theme);
 const sidebar = computed(() => useAppStore().sidebar);
 const device = computed(() => useAppStore().device);
-// 波 0：手机不显示页签栏（50px 竖向空间让给内容），仍尊重「显示页签」设置
+// 波 0：手机不显示页签栏（50px 竖向空间让给内容），仍尊重「显示页签」设置；
+// 组件本体仍挂载（v-show），否则 addView 停摆、手机 keep-alive 失效——见模板内注释
 const needTagsView = computed(() => settingsStore.tagsView && device.value !== 'mobile');
 const fixedHeader = computed(() => settingsStore.fixedHeader);
 const layout = computed(() => settingsStore.navType);

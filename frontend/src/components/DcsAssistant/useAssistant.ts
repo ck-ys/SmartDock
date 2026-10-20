@@ -1156,7 +1156,14 @@ export function useAssistant(options: UseAssistantOptions = {}) {
    * remember=true 且批准 → 工具名入 state.autoApproved（本会话同工具不再逐次确认）。
    */
   async function resolveHitl(approved: boolean, remember = false, edits?: HitlEdits) {
-    const turn = cur();
+    // 波 0.1（多审 P1-B）：确认卡可能不属于最后一个回合——H2 确认轮失败回滚 pending 后，
+    // cur() 是失败的 resume 回合（hitl 为空），盲取会让停靠区唯一可见的确认/取消静默失效；
+    // 先认 cur()，再按停靠渲染同款谓词（waiting+pending）反向兜底到卡的真实归属回合
+    const last = cur();
+    const turn =
+      last?.hitl && last.hitl.cardState === 'pending'
+        ? last
+        : ([...state.turns].reverse().find((t) => t.phase === 'waiting' && t.hitl?.cardState === 'pending') ?? last);
     if (!turn?.hitl || state.sending) {
       return;
     }
