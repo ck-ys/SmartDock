@@ -70,7 +70,6 @@
         :now="ti === state.turns.length - 1 && state.sending ? now : 0"
         :thread-id="state.threadId"
         :show-think="state.showThink"
-        :dock-pending="dockPending"
         @resume="emit('resume')"
         @stop="emit('stop')"
         @resolve-hitl="(a, r, e) => emit('resolve-hitl', a, r, e)"
@@ -128,6 +127,7 @@ import HeroWelcome, { type SnapItem } from './HeroWelcome.vue';
 import TurnBlock from './TurnBlock.vue';
 import IconSpan from './IconSpan.vue';
 import { useUserStore } from '@/store/modules/user';
+import { findVisibleHitlDock } from './util';
 
 const props = defineProps<{
   state: AssistantState;
@@ -135,8 +135,6 @@ const props = defineProps<{
   follow: boolean;
   full?: boolean;
   snap?: SnapItem[];
-  /** 波 0：待确认卡停靠宿主输入框（抽屉）；流内回合只渲染一行回执 */
-  dockPending?: boolean;
 }>();
 
 /** 原型 .avatar：用户气泡右端首字圆标（昵称>账号兜底） */
@@ -632,13 +630,18 @@ function jumpToStep(stepId: string) {
     nextTick(() => tryFlash());
   }
 }
-/** DP-3 原型 statJumpConfirm：面板 waiting 态点头→流内当前待确认卡
- *  AU-09(1007审查)：ConfirmCard 根类实际是 cardState=pending/run/done，旧选择器
- *  not(.ok):not(.err) 永不排除任何卡→总跳到历史第一张；改按 pending 精确定位 */
+/** DP-3 原型 statJumpConfirm：面板 waiting 态点头→待确认停靠区
+ *  确认卡已移到输入框位置（HitlDock），流内只有一行指路——
+ *  跳转=先把流贴底（露出触发确认的一问），再聚焦停靠区（键盘可直接操作） */
 function jumpToConfirm() {
-  const el = flowRef.value?.querySelector<HTMLElement>('.dcs-confirm.pending');
+  const flow = flowRef.value;
+  if (flow) {
+    flow.scrollTop = flow.scrollHeight;
+  }
+  const el = findVisibleHitlDock();
   if (el) {
-    flashTo(el);
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    el.focus({ preventScroll: true });
   }
 }
 defineExpose({ jumpToStep, jumpToConfirm });

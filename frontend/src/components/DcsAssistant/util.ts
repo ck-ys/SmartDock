@@ -18,3 +18,17 @@ export function fmtIsoTime(iso: unknown): string {
   const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(s);
   return m ? `${m[1]} ${m[2]}` : s.slice(0, 16);
 }
+
+/**
+ * 待确认停靠区定位（抽屉与会话页两个宿主并存，不能按 id 取唯一元素）。
+ * 几何可见性判定兜底屏外/缓存 DOM 的边角（keep-alive 移出文档树的宿主天然不可达）。
+ */
+export function findVisibleHitlDock(): HTMLElement | null {
+  const list = Array.from(document.querySelectorAll<HTMLElement>('.dcs-hitl-dock'));
+  return (
+    list.find((el) => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.right > 0 && r.left < window.innerWidth && r.bottom > 0;
+    }) ?? null
+  );
+}

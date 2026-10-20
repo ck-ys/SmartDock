@@ -25,8 +25,12 @@
       <div class="kvl">
         <span class="k">催办对象</span>
         <span class="v objs">
-          <template v-if="targetsLoading">正在加载催办对象…</template>
+          <!-- 回执只读态（卡移到停靠区后，回执里的卡是新实例、名单从未加载）：
+               不重新拉名单（时过境迁会失真），按模型原始入参说明当时确认的范围 -->
+          <template v-if="ask.cardState !== 'pending'">{{ receiptTargetText }}</template>
+          <template v-else-if="targetsLoading">正在加载催办对象…</template>
           <template v-else-if="targetsError">名单加载失败——确认后将催<b>全部</b>未交人员</template>
+          <template v-else-if="targetsUnavailable">按确认时的范围执行；具体名单请到任务页面查看</template>
           <template v-else-if="pendingTargets.length === 0">当前没有待催人员（均已提交或不合格）</template>
           <template v-else>
             <span v-if="hiddenChipCount > 0" class="omore">共 {{ keptTargets.length }} 人，前 {{ visibleChips.length }} 人：</span>
@@ -212,6 +216,7 @@ const GENERIC_TOOL_TXT: Record<string, { title: string; verb: string }> = {
 const TOOL_BODY_ZH: Record<string, string> = {
   web_search: '模型想联网搜索公开网络信息来回答你的问题，确认后才会执行搜索。'
 };
+/* 未登记的新写工具也要能读懂——act_ 前缀一律中文兜底，不再透出框架英文默认句 */
 const kindCfg = computed(() => {
   const override = GENERIC_TOOL_TXT[props.ask.toolName ?? ''];
   if (toolKind.value === 'generic' && override) {
@@ -223,6 +228,9 @@ const genericBodyText = computed(() => {
   const tn = props.ask.toolName ?? '';
   if (tn && TOOL_BODY_ZH[tn]) {
     return TOOL_BODY_ZH[tn];
+  }
+  if (tn.startsWith('act_')) {
+    return '这个操作会修改真实数据，确认后才会执行；取消不会产生任何变更。';
   }
   return props.ask.message || '这个操作会影响真实数据，请确认。';
 });
@@ -297,6 +305,21 @@ const auditVersion = computed(() => String(props.ask.toolInput?.expected_submiss
 const rejectReasonMissing = computed(() => toolKind.value === 'audit-reject' && props.ask.cardState === 'pending' && remarkInput.value.trim() === '');
 
 // ===== 催办目标名单（仅 pending 态拉取一次；run/done 复用已拉到的数据只读展示） =====
+/** 名单端点已随旧任务树退役（批5）：pending 态不再伪造「当前没有待催人员」 */
+const targetsUnavailable = ref(false);
+/** 镜像里的数组有两种形态（Map 形态 "[101, 102]" / JSON 形态 "[101,102]"）——统一按数字扫描 */
+function idListFrom(v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v.map((x) => String(x).trim()).filter((x) => /^\d+$/.test(x));
+  }
+  const s = v == null ? '' : String(v);
+  return s.match(/\d+/g) ?? [];
+}
+/** 回执只读态：不重新拉名单，按模型原始入参说明当时确认的范围 */
+const receiptTargetText = computed(() => {
+  const ids = idListFrom(props.ask.toolInput?.target_user_ids);
+  return ids.length > 0 ? `指定 ${ids.length} 人` : '全部未交人员（确认时的名单）';
+});
 const targetInfo = ref<{ missionName?: string; topicName?: string } | null>(null);
 const targets = ref<TopicUrgeTargetVO[]>([]);
 const targetsLoading = ref(false);
@@ -374,7 +397,7 @@ function removeTarget(t: TopicUrgeTargetVO) {
 
 function shortId(v: unknown): string {
   const s = v == null ? '' : String(v).trim();
-  return s ? `任务 ${s.slice(-4)}` : '';
+  return s ? `#${s.slice(-4)}` : '';
 }
 
 async function loadTargets() {
@@ -390,6 +413,7 @@ async function loadTargets() {
     targetInfo.value = { topicName: '催办请到任务页面操作' };
     targets.value = [];
     targetsError.value = false;
+    targetsUnavailable.value = true;
   } catch {
     targetsError.value = true;
   } finally {
@@ -424,18 +448,32 @@ function scrollAfterTargets() {
 watch(
   () => [props.ask.cardState, rich.value] as const,
   ([state, isRich]) => {
-    // 名单只属催办卡（三审 dsflash P2-2）：forward/audit 卡不展示名单，
-    // 富卡即拉一次 listPendingUsers 是白打接口（大任务 221 行 payload）
-    if (state === 'pending' && isRich && toolKind.value === 'remind' && !targetsLoading.value && targets.value.length === 0 && !targetsError.value) {
-      loadTargets();
-      // 附言预填：模型原始入参的 message（缺省走 placeholder 文案）
+    // 附言/备注先按模型原始入参回填——不再只限 pending：回执里的卡是新实例，
+    // 只读态也要能看出当时拟用/实际发送的附言（pending 时后续用户改写会覆盖）
+    if (isRich && toolKind.value === 'remind' && note.value === '') {
       const m = props.ask.toolInput?.message;
       note.value = typeof m === 'string' && m.trim() !== '' ? m : '';
     }
-    // 批W2：forward/audit 的备注/退回原因预填模型原始入参 remark（退回时为空=用户必填）
-    if (state === 'pending' && (toolKind.value === 'forward' || toolKind.value === 'audit-pass' || toolKind.value === 'audit-reject')) {
+    if (
+      isRich &&
+      (toolKind.value === 'forward' || toolKind.value === 'audit-pass' || toolKind.value === 'audit-reject') &&
+      remarkInput.value === ''
+    ) {
       const r = props.ask.toolInput?.remark;
       remarkInput.value = typeof r === 'string' && r.trim() !== '' ? r : '';
+    }
+    // 名单只属催办卡（三审 dsflash P2-2）：forward/audit 卡不展示名单，
+    // 富卡即拉一次 listPendingUsers 是白打接口（大任务 221 行 payload）；只读回执不拉（会失真）
+    if (
+      state === 'pending' &&
+      isRich &&
+      toolKind.value === 'remind' &&
+      !targetsLoading.value &&
+      targets.value.length === 0 &&
+      !targetsError.value &&
+      !targetsUnavailable.value
+    ) {
+      loadTargets();
     }
   },
   { immediate: true }

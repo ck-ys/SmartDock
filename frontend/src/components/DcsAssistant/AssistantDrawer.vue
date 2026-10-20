@@ -8,7 +8,9 @@
           <b>SmartDock</b>
           <!-- 业务批4 Q2 拍板二：任务上下文条下移到输入框上方（.ctx-bar），头部只留页面感知 -->
           <!-- 抽屉头部仅剩 109px，带「当前页面：」前缀会被截断成半字；用定位图标+页面名，语义靠 title -->
-          <span class="ctx" :title="`当前页面：${pageName}`"><IconSpan name="map-pin" /><span class="ct">{{ pageName }}</span></span>
+          <span class="ctx" :title="`当前页面：${pageName}`"
+            ><IconSpan name="map-pin" /><span class="ct">{{ pageName }}</span></span
+          >
         </div>
         <span class="role-tag" :title="roleLabel + '视角：可用的工具与建议按身份自动区分'">{{ roleLabel }}模式</span>
         <div class="hd-btns">
@@ -190,7 +192,6 @@
             :follow="follow"
             :full="full"
             :snap="full ? snapItems : undefined"
-            dock-pending
             @scroll-lock="onScrollLock"
             @resolve-hitl="resolveHitl"
             @pick="(p) => onSend(p, '')"
@@ -213,7 +214,7 @@
 
           <!-- 业务批4 Q2 拍板二：任务上下文条（原头部 chip 下移）——紧贴输入框上方，
                🎯 任务名 ▾ 四项菜单 + ✕ 可收（收=本会话不带任务上下文；tmenu 点外关沿用） -->
-          <div v-if="taskCtx.missionName && !ctxDismissed" class="ctx-bar">
+          <div v-if="taskCtx.missionName && !ctxDismissed && !pendingAsk" class="ctx-bar">
             <span
               class="cb-main"
               role="button"
@@ -236,23 +237,10 @@
             </span>
           </div>
 
-          <!-- 波 0：待确认卡停靠输入框上方——同一时刻只渲染最后一张未裁决卡；
-               resolve 后 dock 消失，流内回执随 cardState 翻转成结果卡 -->
-          <div v-if="pendingHitl" class="hitl-dock" role="region" aria-label="待确认操作">
-            <form-card
-              v-if="pendingHitl.toolName === 'act_create_mission'"
-              :ask="pendingHitl"
-              @resolve="resolveHitl"
-              @revise="(m) => onSend(m, '')"
-            />
-            <template-card
-              v-else-if="pendingHitl.toolName === 'act_create_template'"
-              :ask="pendingHitl"
-              @resolve="resolveHitl"
-              @revise="(m) => onSend(m, '')"
-            />
-            <confirm-card v-else :ask="pendingHitl" @resolve="resolveHitl" />
-          </div>
+          <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留）。
+               会话页有自己的停靠区：路由切过去时抽屉若还开着会出现两张卡，
+               removedIds 各持一份会发出用户没同意的全量催办——路由互斥只留一份 -->
+          <hitl-dock v-if="modelValue && !isAssistantSessionRoute" :ask="pendingAsk" :full="full" @resolve="resolveHitl" @revise="onDockRevise" />
 
           <composer
             ref="composerRef"
@@ -260,6 +248,7 @@
             :sending="state.sending"
             :active="modelValue || full"
             :full="full"
+            :blocked="!!pendingAsk"
             @send="onSend"
             @stop="onStop"
             @queue-edit="onQueueEdit"
@@ -384,21 +373,19 @@ import { getTask, statsOverview } from '@/api/dcs/core/task';
 import { useUserStore } from '@/store/modules/user';
 import { getAssistant, tryAcquireRemoteWatch, releaseRemoteWatch } from './useAssistant';
 import { relTime, cnEpoch } from './time';
-import type { AssistantBindings, AssistantTurn, HitlAsk } from './useAssistant';
+import type { AssistantBindings, AssistantTurn } from './useAssistant';
 import { roleOf, roleLabelOf, pageNameOf, taskCtxOf, suggestionsFor } from './assistantCtx';
 import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
 import MsgFlow from './MsgFlow.vue';
+import HitlDock from './HitlDock.vue';
 import { startTour } from './useTour';
 import IconSpan from './IconSpan.vue';
 import Composer from './Composer.vue';
-import ConfirmCard from './ConfirmCard.vue';
-import FormCard from './FormCard.vue';
-import TemplateCard from './TemplateCard.vue';
 import GateCard from './GateCard.vue';
 import AssistantToasts from './AssistantToasts.vue';
 import StatPanel from './StatPanel.vue';
-import { unwrap } from './util';
+import { findVisibleHitlDock, unwrap } from './util';
 import type { SnapItem } from './HeroWelcome.vue';
 // 批17 Q7：界面导览（聚光灯带看，新手首开引导）
 
@@ -952,7 +939,12 @@ async function loadSnap() {
     // 批5 契约迁移: 旧 todo 摘要退役, 改用微核心双视角统计
     const s = await statsOverview().catch(() => null);
     const si = (s as any)?.student ?? {};
-    const ss = { fillCount: si.todo ?? 0, reviewCount: si.pendingAudit ?? 0, reviseCount: si.rejected ?? 0, doneCount: (si.approved ?? 0) + (si.submitted ?? 0) };
+    const ss = {
+      fillCount: si.todo ?? 0,
+      reviewCount: si.pendingAudit ?? 0,
+      reviseCount: si.rejected ?? 0,
+      doneCount: (si.approved ?? 0) + (si.submitted ?? 0)
+    };
     const todo = (ss.fillCount ?? 0) + (ss.reviewCount ?? 0);
     snapItems.value =
       roleOf(userStore.roles, userStore.permissions) === 'admin'
@@ -993,16 +985,29 @@ const {
   branchFrom
 } = getAssistant(userStore.userId);
 
-/** 波 0：停靠输入框上方的待确认卡——取最后一个 waiting 且尚未裁决的回合；
+/** 停靠输入框上方的待确认卡——取最近一张 pending 卡（不要求 phase=waiting：
+ *  resume 失败回滚后回合的 phase 不一定是 waiting，但卡仍是用户唯一可操作的卡）；
  *  同一时刻只渲染一张（后端一次 run 可挂多个，但当前实现一次只发起一张）。 */
-const pendingHitl = computed<HitlAsk | null>(() => {
-  for (let i = state.turns.length - 1; i >= 0; i--) {
-    const t = state.turns[i];
-    if (t.phase === 'waiting' && t.hitl && t.hitl.cardState === 'pending') {
-      return t.hitl;
-    }
+const pendingTurn = computed(() => [...state.turns].reverse().find((t) => t.hitl?.cardState === 'pending') ?? null);
+const pendingAsk = computed(() => pendingTurn.value?.hitl ?? null);
+/** 会话页有自己的停靠区（审查回修 P1：两份卡 removedIds 不同步会发出未同意的全量催办）——
+ *  抽屉停靠区在会话页路由下不挂载，全站其它页面照常 */
+const isAssistantSessionRoute = computed(() => route.path.startsWith('/ai/assistant'));
+/** 停靠区「改一下」：先取消本次确认（cancelled resume 清服务端悬挂），
+ *  用户要求进排队，取消轮收尾后自动发出——不丢字，也不会把待确认 interrupt 冲掉 */
+function onDockRevise(m: string) {
+  const text = m.trim();
+  if (!text) {
+    return;
   }
-  return null;
+  resolveHitl(false);
+  onSend(text, '');
+}
+// 停靠区收卡（确认/取消）后把焦点还给输入框（ZCode 同款：对话框关闭焦点回 composer）
+watch(pendingAsk, (v, old) => {
+  if (old && !v) {
+    nextTick(() => composerRef.value?.focus());
+  }
 });
 
 /** Q2（20261011 拍板A）：todo 清单行跳转目标——清单是会话级而步骤分属各回合，
@@ -1281,8 +1286,13 @@ function onKeydown(e: KeyboardEvent) {
   }
   // 批W2（SPEC §2.1 可达性）：Esc 链最前置=有 pending 确认卡——写操作未决时
   // 不收面板不停止，先提示去处理（卡容器已 tabindex=-1 可被 Esc 聚焦链覆盖）
-  if (state.turns.some((t) => t.hitl?.cardState === 'pending')) {
-    pushToast('还有一条确认未处理：请先在输入框上方选择确认或取消', 'info');
+  if (pendingAsk.value) {
+    // 已进入停靠区：Esc 不收面板/不停止，把焦点送到卡上（卡内 Esc 再按=取消本次操作）
+    const dock = findVisibleHitlDock();
+    dock?.focus({ preventScroll: true });
+    if (!dock) {
+      pushToast('还有一条确认未处理：请先在输入框上方选择确认或取消', 'info');
+    }
     return;
   }
   if (help.open.value) {
@@ -1540,37 +1550,6 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
     padding-right: calc(var(--sp-strip, 0px) + env(safe-area-inset-right, 0px));
   }
 }
-/* 波 0：待确认卡停靠输入框上方——限高滚动，长表单不会把输入框挤出屏幕；
-   抽屉/全屏宿主只渲染最后一张 pending 卡（见 pendingHitl） */
-.hitl-dock {
-  flex: none;
-  max-height: 42vh;
-  margin: 0 14px 8px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-
-  :deep(.dcs-confirm) {
-    width: 100%;
-    margin: 0;
-  }
-
-  @media (max-width: 768px) {
-    width: 100%;
-    margin: 0 0 8px;
-  }
-}
-/* 全屏形态：与输入框同侧距（.dcs-comp.full padding 24px） */
-.dcs-dw.full .hitl-dock {
-  margin-left: 24px;
-  margin-right: 24px;
-
-  @media (max-width: 768px) {
-    margin-left: 0;
-    margin-right: 0;
-  }
-}
-
 /* 业务批4 Q2：任务上下文条（紧贴输入框上方）——顶层选择器（原块嵌在 .hd-txt 里是头部
    chip 时代的残留，Q2 模板搬走后 .dw-head .hd-txt .ctx-bar 永假=整块样式静默失效，
    U7 视觉席"控件落第二行/条无样式"实根因；scoped 属性隔离下顶层无串扰） */
@@ -1662,6 +1641,14 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
         background: var(--el-fill-color-light);
       }
     }
+  }
+}
+
+/* 小屏头部：品牌 + 角色 + 三个按钮挤不下，「SmartDock」会被截成「Smart...」——
+   角色在帮助与权限页仍可见，此处收起角色徽标，保品牌完整 */
+@media (max-width: 420px) {
+  .dw-head .role-tag {
+    display: none;
   }
 }
 

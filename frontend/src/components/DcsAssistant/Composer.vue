@@ -1,5 +1,5 @@
 <template>
-  <div ref="rootEl" class="dcs-comp" :class="{ full }">
+  <div ref="rootEl" class="dcs-comp" :class="{ full, blocked: !!blocked }" :aria-hidden="blocked || undefined" :inert="blocked || undefined">
     <!-- 队列条（v3.18 四件套展示位；aria-live 播报）。R1 回修：被禁态隐藏——
          活的"立即发送/继续发送"按钮与禁用横幅自相矛盾（dspro P1-3 配套） -->
     <div v-if="(state.queue.length > 0 || state.queuePaused) && !disabled" class="queue-bar" aria-live="polite">
@@ -487,7 +487,14 @@ import { unwrap } from './util';
 import { globalHeaders } from '@/utils/request';
 import { listAssistantAttachments, registerAssistantAttachment, removeAssistantAttachment, type AssistantAttachmentItem } from '@/api/dcs/assistant';
 
-const props = defineProps<{ state: AssistantState; sending: boolean; active?: boolean; full?: boolean }>();
+const props = defineProps<{
+  state: AssistantState;
+  sending: boolean;
+  active?: boolean;
+  full?: boolean;
+  /** 有待确认操作时收起输入框（保持挂载，草稿不丢）——对齐母仓 Q21-A / ZCode 口径 */
+  blocked?: boolean;
+}>();
 const emit = defineEmits<{
   send: [text: string, stamp: string, fwd: Record<string, unknown>];
   stop: [];
@@ -772,6 +779,16 @@ const roleChips = computed(() => CHIPS_BY_ROLE[roleKey.value] ?? CHIPS_BY_ROLE.t
 const draft = ref('');
 const focused = ref(false);
 const taRef = ref<HTMLTextAreaElement>();
+/** 待确认时输入框收起——先收焦点与弹层，防移动端键盘顶住停靠区、也防隐藏后仍能 Enter 发送 */
+watch(
+  () => props.blocked,
+  (b) => {
+    if (b) {
+      taRef.value?.blur();
+      addOpen.value = false;
+    }
+  }
+);
 /** 思考档位持久化（Q9 拍板）：按用户分键，刷新不回「平衡」；坏值/越界回默认 1 */
 const THINK_LEVEL_KEY = 'dcs:assistant:thinkLevel:' + userStore.userId;
 const thinkLevel = ref(
@@ -1350,7 +1367,7 @@ onBeforeUnmount(() => {
 /** BN-1 原型口径反转：欢迎卡在场时隐藏，开聊后显示（原实现空会话显示=反了） */
 const chipsVisible = computed(() => props.state.turns.length > 0 || props.state.queue.length > 0);
 const showChips = computed(() => chipsVisible.value);
-const canSend = computed(() => draft.value.trim().length > 0);
+const canSend = computed(() => !props.blocked && draft.value.trim().length > 0);
 const phPool = computed(() => PHINT[roleKey.value] ?? PHINT.teacher);
 const placeholder = computed(() => {
   if (props.sending) {
@@ -1947,6 +1964,10 @@ defineExpose({
 <style lang="scss" scoped>
 .dcs-comp {
   flex: none;
+  /* 待确认期间收起（保持挂载，draft/附件/弹层状态不丢） */
+  &.blocked {
+    display: none;
+  }
   /* 原型 .dw-input：transparent 无边框，padding 8px 14px 12px（批J-2 对齐） */
   padding: 8px 14px 12px;
   background: transparent;

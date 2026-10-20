@@ -2,7 +2,7 @@
   <div
     class="dcs-fab"
     :class="{ dragging, gray, flip: menuFlip }"
-    :style="{ right: pos.x + 'px', bottom: pos.y + 'px' }"
+    :style="fabStyle"
     @pointerdown="onDown"
     @pointermove="onMove"
     @pointerup="onUp"
@@ -156,6 +156,11 @@ let activePointerId: number | null = null;
 let snapTimer: number | null = null;
 /** 球贴屏幕左半时菜单翻到球右侧弹出（批H dspro P1-3：默认球左侧弹出，贴左屏会整菜单出屏） */
 const menuFlip = computed(() => pos.value.x > window.innerWidth / 2);
+/** 球底距叠加安全区，iPhone 手势条不压球 */
+const fabStyle = computed(() => ({
+  right: `${pos.value.x}px`,
+  bottom: `calc(${pos.value.y}px + env(safe-area-inset-bottom, 0px))`
+}));
 
 function onDown(e: PointerEvent) {
   // 仅主键：右键/中键松手同样派发 pointerup，不过滤会被当成单击激活（开抽屉→球隐藏）
@@ -555,6 +560,51 @@ defineExpose({ closeMenu });
     }
   }
 }
+/* 手机端主动卡改底部 sheet，不再贴着球浮在小角落遮挡内容 */
+@media (max-width: 992px) {
+  .dcs-fab {
+    width: 60px;
+    height: 60px;
+  }
+
+  .proactive {
+    position: fixed;
+    right: 12px;
+    bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    width: auto;
+    max-width: none;
+    padding: 14px 14px 12px;
+    border-radius: 14px;
+    transform-origin: bottom center;
+  }
+
+  .proactive::after {
+    display: none;
+  }
+
+  .proactive .x {
+    top: 2px;
+    right: 2px;
+    width: 44px;
+    height: 44px;
+    font-size: 14px;
+  }
+
+  .proactive .pac button {
+    height: 44px;
+    padding: 0 16px;
+    font-size: 13px;
+  }
+
+  .proactive .pa-ai {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 2px;
+  }
+}
+
 @keyframes dcs-fab-zoom {
   from {
     opacity: 0;

@@ -11,7 +11,7 @@
     />
 
     <el-card shadow="never">
-      <el-table v-loading="loading" :data="rows">
+      <el-table class="dcs-table-only" v-loading="loading" :data="rows">
         <el-table-column label="任务" min-width="240">
           <template #default="{ row }">
             <el-link type="primary" @click="goFill(row)">{{ row.title }}</el-link>
@@ -34,6 +34,28 @@
           </template>
         </el-table-column>
       </el-table>
+      <!-- ≤992：表格改卡片 -->
+      <div class="dcs-mobile-list">
+        <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
+        <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title" @click="goFill(row)">{{ row.title }}</span>
+            <span class="dcs-card-badge"
+              ><el-tag :type="row.myStatus === '未提交' ? 'info' : 'danger'">{{ row.myStatus }}</el-tag></span
+            >
+          </div>
+          <div class="dcs-card-meta">
+            <span :style="overdue(row) ? 'color: var(--el-color-danger)' : ''">截止 {{ row.deadline || '—' }}</span>
+            <span>发布于 {{ row.publishTime || '—' }}</span>
+          </div>
+          <div class="dcs-card-foot">
+            <div class="dcs-card-actions">
+              <el-button link type="primary" @click="goFill(row)">去填报</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
     </el-card>
   </div>

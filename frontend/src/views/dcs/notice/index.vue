@@ -19,7 +19,7 @@
     </dcs-operations-page-header>
 
     <el-card shadow="never">
-      <el-table v-loading="loading" :data="rows" @row-click="read">
+      <el-table class="dcs-table-only" v-loading="loading" :data="rows" @row-click="read">
         <el-table-column label="标题" min-width="260">
           <template #default="{ row }">
             <span :style="row.readFlag === '0' ? 'font-weight: 600' : ''"> {{ typeBadge(row.noticeType) }} {{ row.title }} </span>
@@ -35,6 +35,25 @@
         </el-table-column>
         <el-table-column prop="createTime" label="时间" width="170" />
       </el-table>
+      <!-- ≤992：表格改卡片；点卡片=标为已读（与行点击同口径） -->
+      <div class="dcs-mobile-list">
+        <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
+        <div v-for="row in rows" :key="row.id" class="dcs-mobile-card notice-card" @click="read(row)">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title" :style="row.readFlag === '0' ? 'font-weight: 700' : ''"
+              >{{ typeBadge(row.noticeType) }} {{ row.title }}</span
+            >
+            <span class="dcs-card-badge">
+              <el-tag size="small" :type="row.readFlag === '0' ? 'warning' : 'info'">{{ row.readFlag === '0' ? '未读' : '已读' }}</el-tag>
+            </span>
+          </div>
+          <div class="dcs-card-field">
+            <span class="dcs-card-field__value">{{ row.content }}</span>
+          </div>
+          <div class="dcs-card-time">{{ row.createTime }}</div>
+        </div>
+      </div>
+
       <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
     </el-card>
   </div>
@@ -91,6 +110,9 @@ onMounted(load);
 </script>
 
 <style scoped>
+.notice-card {
+  cursor: pointer;
+}
 .card-header {
   display: flex;
   justify-content: space-between;

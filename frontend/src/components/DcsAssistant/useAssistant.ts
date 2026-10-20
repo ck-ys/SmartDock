@@ -52,7 +52,9 @@ export const ACT: Record<string, string> = {
   act_forward: '转发任务',
   act_audit: '审核提交',
   // 批F2 二站表单卡（2026-10-12）：建任务草稿
-  act_create_mission: '创建任务'
+  act_create_mission: '创建任务',
+  // 同族 TemplateCard 早就在用，但步骤行/账本一直英文直出（漏登记教训）
+  act_create_template: '创建模板'
 };
 
 /** 账本状态→中文（批I 账本两列：真实落库值 DONE/EXECUTING/FAILED/REJECTED/PENDING——
@@ -989,7 +991,26 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   }
 
   /** 队列六条④前的统一消费口（v3.18）：草稿自动排队→补发队首→全部答完回执 */
+  /** 是否存在未处理的确认（停靠区期间输入框锁定） */
+  function hasPendingHitl(): boolean {
+    return state.turns.some((t) => t.hitl?.cardState === 'pending');
+  }
+
+  /** 与停靠区同源的取卡口径——反向找最近一张 pending 卡。
+   *  resume 失败时原卡回 pending，而 cur() 是刚 push 的 resume 回合（hitl=null）——
+   *  旧口径 cur() 会静默 return，卡点不动+输入框被锁=会话死锁。 */
+  function pendingHitlTurn(): AssistantTurn | null {
+    for (let i = state.turns.length - 1; i >= 0; i--) {
+      if (state.turns[i].hitl?.cardState === 'pending') return state.turns[i];
+    }
+    return null;
+  }
+
   function consumeQueue(wasStoppedTurn = false) {
+    // 待确认期间冻结队列——否则 interrupt 刚挂起就被下一条消息冲掉
+    if (hasPendingHitl()) {
+      return;
+    }
     // 暂停态不自动续发（批H P2-13）：「队列已暂停待手动恢复」的 UI 承诺与自动补发矛盾
     if (state.queuePaused) {
       return;
@@ -1031,6 +1052,12 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   function send(question: string, stamp = '', fwd: Record<string, unknown> = {}) {
     const q = question.trim();
     if (!q) {
+      return;
+    }
+    // 有未处理的确认时禁止新消息——发新轮会冲掉服务端 interrupt，
+    // 停靠区只能确认或取消（输入框此时已收起，这里挡快捷问/主动卡/程序化入口）
+    if (hasPendingHitl()) {
+      toast('请先确认或取消上面的操作，再继续提问', 'info');
       return;
     }
     // 全屏「今日概况」行的 🕒 上次使用时间（抽屉/全屏/会话页统一走本入口）
@@ -1157,14 +1184,15 @@ export function useAssistant(options: UseAssistantOptions = {}) {
    */
   async function resolveHitl(approved: boolean, remember = false, edits?: HitlEdits) {
     // 波 0.1（多审 P1-B）：确认卡可能不属于最后一个回合——H2 确认轮失败回滚 pending 后，
-    // cur() 是失败的 resume 回合（hitl 为空），盲取会让停靠区唯一可见的确认/取消静默失效；
-    // 先认 cur()，再按停靠渲染同款谓词（waiting+pending）反向兜底到卡的真实归属回合
-    const last = cur();
-    const turn =
-      last?.hitl && last.hitl.cardState === 'pending'
-        ? last
-        : ([...state.turns].reverse().find((t) => t.phase === 'waiting' && t.hitl?.cardState === 'pending') ?? last);
-    if (!turn?.hitl || state.sending) {
+    // cur() 是失败的 resume 回合（hitl 为空），盲取会让停靠区唯一可见的确认/取消静默失效。
+    // 取卡口径与停靠区同源：优先最近一张 pending 卡，取不到再回退 cur()；
+    // 两头都没有时给一次人话提示而非静默吞掉点击
+    const turn = pendingHitlTurn() ?? cur();
+    if (!turn?.hitl) {
+      toast('确认卡已处理或失效，稍等片刻再试', 'info');
+      return;
+    }
+    if (state.sending) {
       return;
     }
     // R1：批准类确认卡也走禁用闸（本路径 client.startTurn 不经 runTurn；取消放行——
@@ -1259,6 +1287,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
               return merged;
             })()
           : undefined;
+    // 把实际执行的参数回写到卡上——停靠区收卡后卡组件销毁，回执详情是新实例，
+    // 只能靠 toolInput 还原「当时改成了什么」（否则回执只显示模型原始值，改过的附言/名单丢失）
+    if (approved && editedArgs) {
+      turn.hitl.toolInput = { ...(turn.hitl.toolInput ?? {}), ...editedArgs };
+    }
     const resumePayload = (hitlIds.length > 0 ? hitlIds : [turn.hitl.interruptId]).map((id) =>
       id === turn.hitl!.interruptId
         ? {

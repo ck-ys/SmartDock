@@ -12,7 +12,7 @@
     </dcs-operations-page-header>
 
     <el-card shadow="never">
-      <el-table v-loading="loading" :data="rows">
+      <el-table class="dcs-table-only" v-loading="loading" :data="rows">
         <el-table-column prop="taskId" label="任务ID" min-width="170" />
         <el-table-column prop="submitterUserId" label="提交人" width="110" />
         <el-table-column prop="version" label="版本" width="70" />
@@ -28,6 +28,33 @@
           </template>
         </el-table-column>
       </el-table>
+      <!-- ≤992：表格改卡片 -->
+      <div class="dcs-mobile-list">
+        <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
+        <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title">任务 #{{ String(row.taskId).slice(-6) }}</span>
+            <span class="dcs-card-badge"
+              ><el-tag size="small" type="info">第 v{{ row.version }} 版</el-tag></span
+            >
+          </div>
+          <div class="dcs-card-meta">
+            <span>提交人 {{ row.submitterUserId }}</span>
+            <span>{{ row.submittedAt }}</span>
+          </div>
+          <div class="dcs-card-field">
+            <span class="dcs-card-field__value">{{ dataPreview(row.data) }}</span>
+          </div>
+          <div class="dcs-card-foot">
+            <div class="dcs-card-actions">
+              <el-button v-hasPermi="['dcs:audit:audit']" link type="success" @click="decide(row, 'PASS')">通过</el-button>
+              <el-button v-hasPermi="['dcs:audit:audit']" link type="danger" @click="decide(row, 'REJECT')">退回</el-button>
+              <el-button v-hasPermi="['dcs:submission:submit']" link @click="showTrail(row)">轨迹</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
     </el-card>
 

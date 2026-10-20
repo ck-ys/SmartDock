@@ -33,7 +33,7 @@
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="rows">
+      <el-table class="dcs-table-only" v-loading="loading" :data="rows">
         <el-table-column label="任务" min-width="220">
           <template #default="{ row }">
             <el-link type="primary" @click="goDetail(row.id)">{{ row.title }}</el-link>
@@ -57,6 +57,32 @@
           </template>
         </el-table-column>
       </el-table>
+      <!-- ≤992：表格改卡片（身份+状态+主操作；次要字段进 meta 行） -->
+      <div class="dcs-mobile-list">
+        <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
+        <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title" @click="goDetail(row.id)">{{ row.title }}</span>
+            <span class="dcs-card-badge"
+              ><el-tag :type="statusTag(row.status)">{{ statusLabel(row.status) }}</el-tag></span
+            >
+          </div>
+          <div class="dcs-card-meta">
+            <span>成员 {{ assigneeCount(row) }} 人</span>
+            <span>截止 {{ row.deadline || '—' }}</span>
+          </div>
+          <div class="dcs-card-time">创建于 {{ row.createTime || '—' }}</div>
+          <div class="dcs-card-foot">
+            <div class="dcs-card-actions">
+              <el-button v-if="row.status === 'DRAFT'" v-hasPermi="['dcs:task:publish']" link type="primary" @click="publish(row)">发布</el-button>
+              <el-button v-if="row.status === 'COLLECTING'" v-hasPermi="['dcs:task:publish']" link type="warning" @click="close(row)">关闭</el-button>
+              <el-button v-if="row.status === 'DRAFT'" v-hasPermi="['dcs:task:edit']" link @click="openEdit(row)">编辑</el-button>
+              <el-button link @click="goDetail(row.id)">详情</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
     </el-card>
 

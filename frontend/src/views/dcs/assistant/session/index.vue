@@ -1,13 +1,15 @@
 <template>
   <div class="app-container dcs-as-session">
-    <!-- 左：会话列表（搜索/新会话/置顶/时间分组/归档折叠） -->
-    <aside class="side">
+    <!-- 左：会话列表（搜索/新会话/置顶/时间分组/归档折叠）；≤992 变历史会话抽屉 -->
+    <div v-if="sideOpen" class="side-mask" @click="sideOpen = false"></div>
+    <aside class="side" :class="{ 'mobile-open': sideOpen }">
       <div class="side-hd">
         <span class="side-t">我的助手会话</span>
         <div class="side-ops">
           <el-button link type="primary" :loading="loading" title="刷新" @click="loadConversations"><IconSpan name="refresh" /></el-button>
           <el-button link type="primary" title="新会话" @click="onNewSession"><IconSpan name="plus" /> 新会话</el-button>
         </div>
+        <button class="side-close" type="button" aria-label="关闭会话列表" @click="sideOpen = false"><IconSpan name="x" /></button>
       </div>
       <el-input v-model="kw" class="side-search" placeholder="搜索会话标题" clearable :prefix-icon="SearchIcon" />
 
@@ -120,6 +122,7 @@
          本层只消费变量——消息列与输入框同让同回，浮层面板不吃 padding -->
     <section class="main">
       <div class="main-hd">
+        <button class="side-toggle" type="button" @click="sideOpen = true"><IconSpan name="history" /> 历史会话</button>
         <span>{{ selected ? selected.title || '（未命名会话）' : '新会话' }}</span>
         <el-tag v-if="selected" size="small" type="info">thread {{ selected.threadId?.slice(0, 8) }}</el-tag>
         <el-tag v-if="selected?.status === 'ARCHIVED'" size="small" type="warning">已归档（只读回放，发消息前先恢复）</el-tag>
@@ -151,12 +154,16 @@
         @plan-cancel="onPlanCancel"
       />
 
+      <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留） -->
+      <hitl-dock :ask="pendingAsk" full @resolve="resolveHitl" @revise="onDockRevise" />
+
       <composer
         ref="composerRef"
         full
         active
         :state="state"
         :sending="state.sending"
+        :blocked="!!pendingAsk"
         @send="onSend"
         @stop="onStop"
         @queue-edit="onQueueEdit"
@@ -256,6 +263,7 @@ import { useHelpModal } from '@/components/DcsAssistant/helpModal';
 import { relTime, cnEpoch, cnDayDiff } from '@/components/DcsAssistant/time';
 import { pushToast } from '@/components/DcsAssistant/toastStore';
 import MsgFlow from '@/components/DcsAssistant/MsgFlow.vue';
+import HitlDock from '@/components/DcsAssistant/HitlDock.vue';
 import { startTour } from '@/components/DcsAssistant/useTour';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import Composer from '@/components/DcsAssistant/Composer.vue';
@@ -274,6 +282,8 @@ const selectedId = ref<number | string>('');
 const actions = ref<AssistantAction[]>([]);
 const kw = ref('');
 const archOpen = ref(false);
+// ≤992 左侧会话栏改成「历史会话」抽屉
+const sideOpen = ref(false);
 
 /** 置顶（localStorage 一期，跨设备同步登记二站） */
 const PIN_KEY = 'dcs:assistant:pins';
@@ -491,6 +501,25 @@ const hostBinding: AssistantBindings = {
 };
 getAssistant(userStore.userId).bind(hostBinding);
 
+/** 停靠区数据源（与抽屉同口径）：最近一张 pending 卡 */
+const pendingTurn = computed(() => [...state.turns].reverse().find((t) => t.hitl?.cardState === 'pending') ?? null);
+const pendingAsk = computed(() => pendingTurn.value?.hitl ?? null);
+/** 停靠区「改一下」：先取消本次确认（cancelled resume 清服务端悬挂），
+ *  用户要求进排队，取消轮收尾后自动发出 */
+function onDockRevise(m: string) {
+  const text = m.trim();
+  if (!text) {
+    return;
+  }
+  resolveHitl(false);
+  onSend(text, '');
+}
+// 停靠区收卡后焦点还给输入框（与抽屉同口径）
+watch(pendingAsk, (v, old) => {
+  if (old && !v) {
+    nextTick(() => composerRef.value?.focus());
+  }
+});
 const composerRef = ref<InstanceType<typeof Composer>>();
 /** DP-3：统计面板跳转通道（step-jump/jump-confirm → MsgFlow expose） */
 const msgFlowRef = ref<InstanceType<typeof MsgFlow>>();
@@ -687,6 +716,8 @@ async function loadMoreConversations() {
 /** 打开会话：DB messages 重放进单例（rebuildFromHistory 同步 threadId+清队列，P1-4/P1-3）+动作账本 */
 let openSeq = 0;
 async function openConversation(c: AssistantConversation) {
+  // 手机端选完会话即收起历史抽屉，主对话区全宽
+  sideOpen.value = false;
   // 自查回修(dspro P2)：临时行=当前正在用的会话本身，点它只对齐选中态即可——
   // 走下方真实加载会拿 'tmp' 打 messages 接口报"会话加载失败"，还会先白停一次在途生成
   if (c.id === 'tmp') {
@@ -1130,6 +1161,96 @@ onUnmounted(() => {
       :deep(.el-collapse-item__content) {
         padding: 0 14px 10px;
       }
+    }
+  }
+}
+
+/* ≤992：左侧会话栏改历史抽屉，主对话区全宽 */
+.side-toggle,
+.side-close,
+.side-mask {
+  display: none;
+}
+
+@media (max-width: 992px) {
+  .dcs-as-session {
+    gap: 0;
+    height: calc(100vh - 120px);
+    height: calc(100dvh - 120px);
+    padding: 8px;
+
+    .side {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 1201;
+      width: min(320px, 86vw);
+      height: 100dvh;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      border-top: 0;
+      border-bottom: 0;
+      border-left: 0;
+      border-radius: 0;
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+
+      &.mobile-open {
+        transform: translateX(0);
+      }
+    }
+
+    .side-mask {
+      display: block;
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgb(0 0 0 / 32%);
+    }
+
+    .side-toggle {
+      display: inline-flex;
+      align-items: center;
+      flex: none;
+      gap: 4px;
+      min-height: 32px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--el-color-primary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .side-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      width: 44px;
+      height: 44px;
+      margin-left: auto;
+      border: none;
+      background: none;
+      color: var(--dcs-text-secondary);
+      cursor: pointer;
+    }
+
+    .main {
+      width: 100%;
+      padding-right: 0;
+
+      /* 手机端不占对话宽度；进度信息在消息流里仍可见 */
+      :deep(.stat-panel) {
+        display: none;
+      }
+    }
+
+    .main .main-hd {
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 12px;
     }
   }
 }

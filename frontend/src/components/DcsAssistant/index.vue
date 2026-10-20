@@ -92,12 +92,15 @@ const hasDot = ref(false);
 /* ===== 主动提示卡（原型 proactive）：有 REVISE 待办→每日冒一次「去看退回意见」 ===== */
 /** AU-01(1007拍板Q1-C)：卡携带定位字段——todo 行本就返回，只是旧代码只取了 missionName 丢弃其余 */
 const proactive = ref<{ missionName: string; missionId?: string; detailId?: string } | null>(null);
-const PRO_KEY = 'dcs:assistant:pro-dismissed';
+// 按租户+用户隔离，避免同一浏览器换账号后继承别人的“今日已关闭”
+const proKey = () => `dcs:assistant:pro-dismissed:${userStore.tenantId || '000000'}:${userStore.userId || 'anon'}`;
 const today = () => new Date().toISOString().slice(0, 10);
+// 主动卡只在首页出现；任务列表、详情、审核等页面不遮挡内容
+const isHomePath = (path: string) => path === '/' || path === '/index';
 function dismissPro() {
   proactive.value = null;
   try {
-    localStorage.setItem(PRO_KEY, today());
+    localStorage.setItem(proKey(), today());
   } catch {
     /* 忽略 */
   }
@@ -125,7 +128,7 @@ function onProAi() {
 }
 async function probeProactive() {
   try {
-    if (localStorage.getItem(PRO_KEY) === today()) {
+    if (!isHomePath(route.path) || localStorage.getItem(proKey()) === today()) {
       return;
     }
     // 批5 契约迁移: 旧 todo REVISE 端点退役; 回修A后 my 已回填 mySubmissionStatus, 不再逐任务 getTask
@@ -192,7 +195,13 @@ watch(
 // 无需整页刷新（探一次 status 很轻；仍灰=原地不动无闪烁）
 watch(
   () => route.path,
-  () => {
+  (path) => {
+    // 离开首页即收起主动卡；回到首页再按「今日未关闭」探测一次
+    if (!isHomePath(path)) {
+      proactive.value = null;
+    } else if (mode.value === 'normal') {
+      probeProactive();
+    }
     if (mode.value === 'gray') {
       probeStatus();
     }

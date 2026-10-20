@@ -184,40 +184,43 @@
       ><span class="sn-hint">（按原问题重新生成完整回答，不是从断处接着写）</span>
     </div>
 
-    <!-- HITL 确认卡（E3：waiting 态渲染；resolve 链路上浮到状态机 resolveHitl） -->
-    <!-- 等待确认 or 已裁决（取消/执行完回执保留展示） -->
-    <!-- 批F2 表单卡分派（SPEC §2.2 二站）：建任务=真实 EP 控件表单，改一改=当前值回注对话；
-         R4a：建模板=同族 TemplateCard（字段清单动态行） -->
-    <!-- 波 0：dock-pending=true 时，待确认卡停靠宿主输入框上方（AssistantDrawer .hitl-dock），
-         流内只留一行回执；已裁决（run/done）仍留在流内当历史，会话页不传该 prop 行为不变 -->
-    <form-card
-      v-if="
-        turn.hitl &&
-        turn.hitl.toolName === 'act_create_mission' &&
-        (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending') &&
-        !(dockPending && turn.hitl.cardState === 'pending')
-      "
-      :ask="turn.hitl"
-      @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
-      @revise="(m) => emit('ask', m)"
-    />
-    <template-card
-      v-else-if="
-        turn.hitl &&
-        turn.hitl.toolName === 'act_create_template' &&
-        (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending') &&
-        !(dockPending && turn.hitl.cardState === 'pending')
-      "
-      :ask="turn.hitl"
-      @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
-      @revise="(m) => emit('ask', m)"
-    />
-    <confirm-card
-      v-else-if="turn.hitl && (turn.phase === 'waiting' || turn.hitl.cardState !== 'pending') && !(dockPending && turn.hitl.cardState === 'pending')"
-      :ask="turn.hitl"
-      @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
-    />
-    <div v-if="dockPending && turn.hitl && turn.hitl.cardState === 'pending'" class="hitl-receipt" role="status">⏳ 已在输入框上方等待你确认</div>
+    <!-- HITL 确认卡（E3 → 停靠区）：待确认卡占据输入框位置（HitlDock），
+         流内只留一行状态；确认/取消后收成一行回执，点「详情」展开原卡只读内容 -->
+    <div v-if="turn.hitl" class="hitl-history">
+      <button v-if="hitlPending" type="button" class="hitl-line pending" title="确认卡停在输入框位置，点此把焦点移过去" @click="focusHitlDock">
+        <IconSpan name="loader-circle" :size="13" />
+        <span class="hl-t">{{ hitlReceiptText }}</span>
+        <span class="hl-ln">去确认</span>
+      </button>
+      <template v-else>
+        <button
+          type="button"
+          class="hitl-line"
+          :class="{ cancelled: turn.hitl.cancelled, stopped: turn.hitl.stopped }"
+          :aria-expanded="receiptOpen"
+          @click="receiptOpen = !receiptOpen"
+        >
+          <IconSpan :name="turn.hitl.cancelled ? 'x' : turn.hitl.stopped ? 'pause' : 'check'" :size="13" />
+          <span class="hl-t">{{ hitlReceiptText }}</span>
+          <span class="hl-ln">{{ receiptOpen ? '收起' : '详情' }}</span>
+        </button>
+        <div v-if="receiptOpen" class="hitl-detail">
+          <form-card
+            v-if="turn.hitl.toolName === 'act_create_mission'"
+            :ask="turn.hitl"
+            @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
+            @revise="(m) => emit('ask', m)"
+          />
+          <template-card
+            v-else-if="turn.hitl.toolName === 'act_create_template'"
+            :ask="turn.hitl"
+            @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)"
+            @revise="(m) => emit('ask', m)"
+          />
+          <confirm-card v-else :ask="turn.hitl" @resolve="(a, r, e) => emit('resolve-hitl', a, r, e)" />
+        </div>
+      </template>
+    </div>
 
     <!-- 来源折叠条（批C：🗂 N 个来源 ▾；rows 型工具=DataCard 数据原件，其余=文本摘要） -->
     <div v-if="hasFoot && turn.toolCalls > 0" class="srcwrap">
@@ -381,6 +384,7 @@ import { parseToolJson, summarizeArgs } from './toolJson';
 import { submitFeedback, listConversations, listMessages, exportAssistantReport } from '@/api/dcs/assistant';
 import { pushToast } from './toastStore';
 import { useFavs } from './favStore';
+import { findVisibleHitlDock } from './util';
 
 const props = defineProps<{
   turn: AssistantTurn;
@@ -388,10 +392,35 @@ const props = defineProps<{
   now: number;
   threadId?: string;
   showThink?: boolean;
-  /** 波 0：待确认卡停靠宿主输入框上方（抽屉），流内只留一行回执 */
-  dockPending?: boolean;
 }>();
 const rootEl = ref<HTMLElement | null>(null);
+
+/** 流内回执——待确认只留一行指路（真卡在输入框位置的停靠区），
+ *  完成/取消后折叠为一行（详情可展开原卡只读内容） */
+const receiptOpen = ref(false);
+const HITL_LABELS: Record<string, string> = {
+  act_create_mission: '创建任务草稿',
+  act_create_template: '创建模板',
+  act_remind: '催办',
+  act_forward: '转发',
+  act_audit: '审核'
+};
+const hitlPending = computed(() => props.turn.hitl?.cardState === 'pending');
+const hitlLabel = computed(() => HITL_LABELS[props.turn.hitl?.toolName ?? ''] ?? '操作');
+const hitlReceiptText = computed(() => {
+  const h = props.turn.hitl;
+  if (!h) return '';
+  if (h.cardState === 'pending') return `等待确认 · ${hitlLabel.value}`;
+  if (h.cancelled) return `已取消 · ${hitlLabel.value}（未执行）`;
+  if (h.stopped) return `已停止 · ${hitlLabel.value}（执行结果未知）`;
+  return `已确认执行 · ${hitlLabel.value}`;
+});
+function focusHitlDock() {
+  const el = findVisibleHitlDock();
+  if (!el) return;
+  el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  el.focus({ preventScroll: true });
+}
 const emit = defineEmits<{
   resume: [];
   /** Q12-② 停止思考：思考进行中胶囊旁中断入口——上浮到宿主 onStop（复用整轮停止通道） */
@@ -1074,20 +1103,63 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   gap: 10px;
   margin-top: 8px;
 
-  /* 波 0：待确认卡停靠输入框后，流内回执行——只报「在哪里等你」，不复述卡内容 */
-  .hitl-receipt {
-    align-self: flex-start;
-    display: inline-flex;
+  /* HITL 流内回执行——待确认只留一行指路（真卡在输入框位置的停靠区），
+     完成后收成一行回执，点「详情」展开原卡只读内容 */
+  .hitl-history {
+    margin-top: 6px;
+    max-width: 100%;
+  }
+  .hitl-line {
+    display: flex;
     align-items: center;
     gap: 6px;
     max-width: 100%;
-    padding: 5px 12px;
-    border: 1px dashed #f3d19e;
-    border-radius: 999px;
-    background: #fffcf5;
-    color: #b8860b;
+    padding: 5px 10px;
+    font: inherit;
     font-size: 12.5px;
-    line-height: 20px;
+    line-height: 1.5;
+    color: var(--dcs-text-secondary);
+    background: var(--el-fill-color-lighter, #f5f7fa);
+    border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+
+    .hl-t {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hl-ln {
+      flex: none;
+      font-size: 12px;
+      color: var(--el-color-primary);
+    }
+    &:hover .hl-ln {
+      text-decoration: underline;
+    }
+
+    /* 待确认：虚线+主色（动作还没做完，提示去停靠区） */
+    &.pending {
+      color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9, #ecf5ff);
+      border-style: dashed;
+      border-color: var(--el-color-primary-light-7, #a0cfff);
+    }
+    &.cancelled {
+      color: var(--dcs-text-placeholder);
+      background: transparent;
+    }
+    &.stopped {
+      color: var(--el-color-warning, #e6a23c);
+      border-color: var(--el-color-warning-light-7, #f3d19e);
+      background: var(--el-color-warning-light-9, #fdf6ec);
+    }
+  }
+  .hitl-detail {
+    margin-top: 8px;
   }
 
   /* 批3 Q6/Q7（回修 P2-1）：站内链/任务卡/表格容器挂根级 :deep——正文气泡 .md 与

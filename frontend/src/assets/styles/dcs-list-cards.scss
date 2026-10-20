@@ -1,0 +1,132 @@
+/**
+ * 列表卡片化通用件（对齐母仓批19 Q3-A，断点统一到本站 ≤992）。
+ *
+ * 用法：
+ *   <el-table class="dcs-table-only"> ... </el-table>
+ *   <div class="dcs-mobile-list">
+ *     <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
+ *       <div class="dcs-card-head">
+ *         <span class="dcs-card-title">任务/对象名</span>
+ *         <span class="dcs-card-badge"><el-tag /></span>
+ *       </div>
+ *       <div class="dcs-card-meta"><span>提交人</span><span>来源</span></div>
+ *       <div class="dcs-card-foot">
+ *         <span class="dcs-card-time">时间</span>
+ *         <div class="dcs-card-actions"><el-button /></div>
+ *       </div>
+ *     </div>
+ *   </div>
+ *
+ * 口径：>992 只显示表格；≤992 表格隐藏、卡片单列；641–992 卡片两列（避免单卡过宽）。
+ * 卡片只承载「身份 + 状态 + 主操作」，次要字段进 meta 行，操作按钮保持 44px 触控高度。
+ */
+.dcs-mobile-list {
+  display: none;
+}
+
+.dcs-mobile-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  background: var(--el-bg-color);
+}
+
+.dcs-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dcs-card-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcs-card-badge {
+  flex: 0 0 auto;
+}
+
+.dcs-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+}
+
+.dcs-card-field {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  min-width: 0;
+}
+
+.dcs-card-field__label {
+  flex: 0 0 auto;
+  color: var(--el-text-color-secondary);
+}
+
+.dcs-card-field__value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dcs-card-time {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.dcs-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.dcs-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+@media (max-width: 992px) {
+  .dcs-table-only {
+    display: none !important;
+  }
+
+  .dcs-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dcs-card-actions .el-button,
+  .dcs-mobile-card .el-button {
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 992px) {
+  .dcs-mobile-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
