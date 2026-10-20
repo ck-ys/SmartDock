@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="SmartDock — AI 助手引擎 × 用户画像引擎" width="100%">
+  <img src="docs/images/banner.svg" alt="SmartDock — 通用智能体引擎 × 用户画像引擎" width="100%">
 </p>
 
 <p align="center">
@@ -15,10 +15,13 @@
 
 ---
 
-SmartDock 的主打是一套**可以放进真实业务对话的 AI 助手引擎**：基于 **AgentScope 2.0.3
-ReActAgent** 的流式助手，具备工具循环、角色与权限裁剪、AGUI/SSE 事件流、技能渐进披露、
-PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费账本；业务工具通过
-`BizToolProvider` SPI 接入。
+SmartDock 的主打是一套**通用智能体（Agent）引擎**：基于 **AgentScope 2.0.3 ReActAgent** 的流式运行时。
+一个 agent 由「模型 + 工具 + 权限 + 记忆 + 技能 + 计费」装配而成，按 `agentId` 注册到同一个端点
+（`POST /agui/run/{agentId}`），每个 agent 可按登录租户惰性创建；业务能力通过 `BizToolProvider` SPI
+变成工具，不需要改引擎代码。
+
+仓库内置一个开箱可用的**助手应用**（`dcs-assistant`）作为这套运行时的参考实现：抽屉式对话、页面感知、
+HITL 确认卡、成本气泡、会话管理——它是"引擎能跑成什么样"的样例，不是能力的边界。
 
 与之配套的第二个引擎是**用户画像引擎**：事件源架构。业务动作只负责发事件，维度规则、时间窗、
 打分映射与缺失策略全部配置化；事件幂等写入、批量重算、版本化快照，接入新系统不需要改评分链路；
@@ -41,7 +44,7 @@ PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费�
 - [2. 核心能力速览](#2-核心能力速览)
 - [3. 技术架构](#3-技术架构)
 - [4. 快速开始](#4-快速开始)
-- [5. 引擎：AI 助手](#5-引擎ai-助手)
+- [5. 引擎：智能体运行时](#5-引擎智能体运行时)
 - [6. 引擎：用户画像](#6-引擎用户画像)
 - [7. 内置 demo：任务采集微核心](#7-内置-demo任务采集微核心)
 - [8. 技术栈](#8-技术栈)
@@ -60,7 +63,7 @@ PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费�
 
 | 维度 | 说明 |
 |---|---|
-| AI 助手 | 可放进真实对话场景的助手骨架：会调工具、按角色裁剪、出网先脱敏、写操作先确认、花钱有账本 |
+| 智能体引擎 | 通用 Agent 运行时：按 `agentId` 注册、工具走 SPI、权限/记忆/技能/计费可装配；内置助手应用作为参考实现 |
 | 用户画像 | 面向任意业务主体（人 / 部门 / 设备……）的事件源评分引擎，输出可解释的维度得分与历史快照 |
 | 业务样例 | 一个刻意做小的任务采集 demo，演示「业务动作如何变成画像事件」与「业务能力如何变成助手工具」 |
 | 工程基线 | 继承并增强 RuoYi-Vue-Plus 的平台能力：多租户、权限、字典、OSS、文件安全、风控、定时任务、监控；可独立作为通用后台基线使用 |
@@ -81,7 +84,7 @@ PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费�
 |---|---|
 | 事件源优先 | 业务只发事实，评分规则可回放；`profile_event` 追加写入，`(tenant_id, source, event_uid)` 幂等 |
 | 配置优先，代码兜底 | 80% 的画像维度用 JSON 算子表达；复杂口径再实现 `DimensionStrategy` Java Bean |
-| 协议先行 | 助手主链使用 AGUI 事件协议（共 28 类事件）；前端按事件驱动渲染，不依赖后端内部对象 |
+| 协议先行 | 智能体主链使用 AGUI 事件协议（共 28 类事件）；前端按事件驱动渲染，不依赖后端内部对象 |
 | 默认安全 | PII 出网脱敏、注入打标、16K 输入闸、角色/权限门控、写工具 ASK、租户隔离 |
 | 渐进披露 | 技能目录常驻、正文按需加载；系统提示词按角色与已注册工具裁剪 |
 | 可回归 | 后端 447 用例 + 前端 200 用例锁住权限矩阵、状态机、脱敏、注入与 AGUI 行为 |
@@ -103,23 +106,28 @@ PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费�
 
 ## 2. 核心能力速览
 
-**AI 助手（主打）**——访客打开抽屉即可感知的能力：
+**智能体引擎（主打）**：
 
-- 🔁 **流式工具循环**：ReAct 推理循环自主决定调用哪些工具，「思考 → 调工具 → 写答案」全程流式展示
-- 🧰 **开箱 10 个工具**：6 个平台工具（联网搜索 / 附件读取 / 计划卡 / TODO / 长期记忆 / 技能查看）
-  + 4 个 demo 业务工具；业务工具经 `BizToolProvider` SPI 注册，不改助手核心代码
-- ✋ **写操作先确认（HITL）**：模型只能起草，前端弹确认卡，用户放行才执行、取消即中止
+- 🧩 **多智能体注册**：一套运行时按 `agentId` 注册与路由（`/agui/run/{agentId}`），
+  每个 agent 可按登录租户惰性创建；内置 `dcs-assistant` 只是其中一个实例
+- 🔁 **ReAct 工具循环**：模型自主决定调哪些工具，「思考 → 调工具 → 写答案」全程流式展示
+- 🧰 **工具即业务能力**：6 个平台工具 + 业务工具经 `BizToolProvider` SPI 注册，不改引擎核心代码
 - 🛂 **角色与权限裁剪**：工具按角色档位 + 权限串决定是否注册——低权限用户**根本看不见**，不是置灰
+- ✋ **写操作先确认（HITL）**：模型只能起草，前端弹确认卡，用户放行才执行、取消即中止
 - 🧬 **默认安全**：PII 出网脱敏、工具结果注入打标、单轮 16K 输入闸、租户隔离
-- 🔌 **14 家 OpenAI 兼容供应商预置**：会话内可切模型、思考档位（快 / 平衡 / 深）、联网开关
-- 💰 **花钱有账本**：每回合成本气泡（金额 + token）；钱包 / 积分双轨计费、准入闸与日配额
+- 🔌 **模型与计费**：14 家 OpenAI 兼容供应商预置、多 Key 池；钱包 / 积分双轨、准入闸与日配额
 - 🧠 **记忆与技能**：租户级长期记忆；技能渐进披露（目录常驻、正文按需注入）
-- 🖥️ **页面感知**：抽屉随当前页面推荐快捷问题，输入框 `@` 直接引用任务
+
+**内置应用：AI 助手**（`dcs-assistant`，运行时的参考实现）：
+
+- 🖥️ **页面感知抽屉**：随当前页面推荐快捷问题，输入框 `@` 直接引用业务对象
+- 🧭 **思考档位与联网开关**：快 / 平衡 / 深三档，会话内可切模型
+- 📋 **过程可视化**：计划卡、TODO 清单、数据卡、工具入参与耗时
 - 📚 **多会话管理**：会话列表 / 重命名 / 导出 / 手动压缩 / 恢复，附追问建议与回答反馈
 
 <p align="center"><img src="docs/images/screenshots/assistant-drawer.png" width="420" alt="AI 助手抽屉"></p>
 
-<p align="center"><sub>图 2 · 助手抽屉：页面感知（定位「我的待办」）、身份徽标（管理员模式）、按当前页面推荐的四个快捷问题</sub></p>
+<p align="center"><sub>图 2 · 内置助手应用：页面感知（定位「我的待办」）、身份徽标（管理员模式）、按当前页面推荐的四个快捷问题</sub></p>
 
 **用户画像（配套引擎）**：
 
@@ -131,9 +139,9 @@ PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费�
 **平台基线（底座）**：
 
 - 🏢 **完整的通用后台基座**：继承并增强 RuoYi-Vue-Plus——多租户、权限、字典、OSS、文件安全、
-  风控、调度、监控开箱即用；AI 助手因此生长在企业级底座上，而不是孤立的对话 demo
+  风控、调度、监控开箱即用；内置助手因此生长在企业级底座上，而不是孤立的对话 demo
 
-实现细节（装配代码、装饰器链、AGUI 事件全集、管理面）见 [docs/assistant.md](docs/assistant.md)
+实现细节（装配代码、装饰器链、AGUI 事件全集、管理面）见 [docs/agent-engine.md](docs/agent-engine.md)
 与 [docs/profile-engine.md](docs/profile-engine.md)。
 
 ## 3. 技术架构
@@ -151,7 +159,7 @@ PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费�
 | 业务样例 | `ruoyi-dcs` | 任务、字段、提交、审核、通知、统计；向画像发事件，向助手注册工具 |
 | 平台层 | `ruoyi-system`、`ruoyi-file-security`、`ruoyi-risk`、`ruoyi-job` | 多租户/权限/字典/OSS、文件安全、风控、调度 |
 | 数据层 | PostgreSQL、Redis、MinIO/S3 | 业务/画像/账本/Agent 状态；缓存/限流/准入；附件对象 |
-| 外部服务 | OpenAI 兼容模型供应商（14 预置） | 助手主链与后台 AI 调用的模型出网；PII 脱敏后发送，用量回传计费 |
+| 外部服务 | OpenAI 兼容模型供应商（14 预置） | 智能体主链与后台 AI 调用的模型出网；PII 脱敏后发送，用量回传计费 |
 
 ### 3.1 模块与依赖方向
 
@@ -159,7 +167,7 @@ PII 出网脱敏、HITL 写操作确认、上下文自动压缩与完整计费�
 ruoyi-admin
   └─ ruoyi-modules
        ├─ ruoyi-profile-engine      # 引擎：只依赖 common-*，不依赖任何业务模块
-       ├─ ruoyi-assistant           # 引擎：Agent 运行时 + 工具注册 + AGUI 事件
+       ├─ ruoyi-assistant           # 引擎：智能体运行时（注册/工具/AGUI）+ 内置助手应用
        ├─ ruoyi-assistant-spi       # 业务工具契约（BizToolProvider / BizToolSpec）
        ├─ ruoyi-ai-billing          # Spring AI 网关、供应商配置、钱包、积分、价格、用量
        ├─ ruoyi-dcs                 # 内置 demo：依赖 profile-engine + assistant-spi
@@ -173,11 +181,11 @@ ruoyi-admin
 
 - 画像引擎对业务模块零编译依赖，接入新系统只需要发布同构事件。
 - 助手通过 `BizToolProvider` 接收业务工具；工具注册、权限规则与 schema 在同一个循环内生成，
-  业务模块不修改助手核心代码。
+  业务模块不修改引擎核心代码。
 - demo 的 `DcsToolProvider` 是 SPI 的一个实现；它还向助手提供可选的 `@` 任务候选服务。
   助手对业务工具面零编译依赖，但 `AssistantConversationController` 通过
   `ObjectProvider<DcsTaskService>` 消费该候选，`ruoyi-assistant` 的 pom 因此保留对 `ruoyi-dcs` 的编译期依赖；
-  删除 demo 时需同步替换该数据源（见 §12.5）。
+  删除 demo 时需同步替换该数据源（见 §12.6）。
 - 两个引擎共享同一套租户、供应商配置与计费账本，但不共享业务表。
 
 <details>
@@ -188,7 +196,7 @@ ruoyi-admin
 | 事件源 vs 直接改分 | `profile_event` 追加写入 + 批量重算 | 可回放、可对账、可换规则；错分可定位到原始事件 |
 | JSON 规则 vs 全代码 | `EVENT_AGG` 优先，`STRATEGY` 兜底 | 常见指标运营可配；复杂状态机/外部调用再用 Java Bean |
 | Agent 运行时 | AgentScope `ReActAgent` | 原生工具循环、权限上下文、状态存储、AGUI 事件模型，避免自研 Agent 框架 |
-| 模型访问 | AgentScope OpenAI 扩展 + Spring AI 网关双路 | 助手主链需要流式 tool-call；后台一次性调用与 embedding 交给 Spring AI 更稳 |
+| 模型访问 | AgentScope OpenAI 扩展 + Spring AI 网关双路 | 智能体主链需要流式 tool-call；后台一次性调用与 embedding 交给 Spring AI 更稳 |
 | 会话状态 | PostgreSQL `agentscope` schema（JDBC） | 持久、可审计、少一个必需中间件；Redis 只承担缓存/限流/准入 |
 | 前端流式 | `fetch` + `ReadableStream` 解析 SSE | 可显式携带 Authorization 头；避免 EventSource 无法带自定义头的限制 |
 
@@ -306,16 +314,36 @@ MINIO_PASSWORD=replace-with-strong-password \
 仓库内的 JWT secret、RSA 密钥对、AES 加密口令以及数据库/Redis/MinIO 默认口令均为演示值，
 上生产前必须全部替换。
 
-## 5. 引擎：AI 助手
+## 5. 引擎：智能体运行时
 
-[![AI 助手请求链路](docs/images/ai-flow.svg)](docs/images/ai-flow.svg)
+[![智能体请求链路](docs/images/ai-flow.svg)](docs/images/ai-flow.svg)
 
 <p align="center"><sub>图 3 · 一次请求：接入 → ReAct 推理循环 → 工具行动 → AGUI 流式输出</sub></p>
 
 > 装配代码、装饰器链全表、技能与提示词细则、状态可靠性、AGUI 28 类事件全集与管理运维面，
-> 见 [docs/assistant.md](docs/assistant.md)。
+> 见 [docs/agent-engine.md](docs/agent-engine.md)。
 
-### 5.1 双框架分工
+### 5.1 注册模型：一个运行时，多个 agent
+
+agent 不是硬编码的单例，而是注册到 AGUI 注册表里的工厂。官方扩展点
+`AguiAgentRegistryCustomizer` 收集所有 `@Bean`，在注册表就绪后回调：
+
+```java
+@Bean
+public AguiAgentRegistryCustomizer dcsAssistantAgentRegistryCustomizer() {
+    return registry -> registry.registerFactory(
+        AssistantAgentFactory.AGENT_ID,      // "dcs-assistant"
+        agentFactory::createFromLogin);      // 按登录租户惰性创建
+}
+```
+
+- **路由**：`POST /agui/run/{agentId}`；不带 `agentId` 的请求由 `app.agui.default-agent-id` 兜底到默认 agent；
+- **隔离**：每个 agent 按 `userId + threadId` 创建实例，模型配置按租户解析，多租户各配各的；
+- **扩展**：新增一个 agent = 新增一个 `registerFactory(agentId, factory)`，共用工具注册、权限、记忆、
+  技能、计费与 AGUI 协议，见 [§12.2](#122-新增一个智能体)；工具面通过 `BizToolProvider` SPI 提供；
+- **当前内置**：`dcs-assistant`（AI 助手应用）。多 agent 协同编排（handoff / 团队模式）不在本仓库范围内。
+
+### 5.2 双框架分工
 
 SmartDock 同时使用 AgentScope 与 Spring AI，但两者职责严格分离，不重复造轮子：
 
@@ -323,7 +351,7 @@ SmartDock 同时使用 AgentScope 与 Spring AI，但两者职责严格分离，
 |---|---|---|
 | 角色 | **Agent 运行时** | **模型访问网关** |
 | 关键能力 | `ReActAgent`、`Toolkit`、`PermissionContextState`、`AguiEventType`、状态存储、压缩中间件 | `OpenAiChatModel`、`OpenAiEmbeddingModel`、`RetryTemplate` |
-| 使用位置 | 助手主链：推理循环、工具调用、权限、AGUI | 后台 AI 调用：画像诊断、字段生成、评分解释、规则推荐、embedding |
+| 使用位置 | 智能体主链：推理循环、工具调用、权限、AGUI | 后台 AI 调用：画像诊断、字段生成、评分解释、规则推荐、embedding |
 | 代码入口 | `AssistantAgentFactory` → `AssistantModelFactory` | `AiGateway` → `DcsAiChatClientFactory` |
 | 模型协议 | OpenAI-compatible Chat Completions（流式 + tool calls，`DeepSeekFormatter`） | OpenAI-compatible API（Spring AI 抽象） |
 | 版本管理 | 根 `agentscope-bom` 2.0.3 | 根 `spring-ai-bom` 1.1.5 |
@@ -339,11 +367,11 @@ Spring AI 侧使用 `spring-ai-starter-model-openai`，由 `spring-ai-bom` 统�
 `DcsAiChatClientFactory` 是唯一允许构造 Spring AI 客户端的类，`AiGateway` 是唯一业务入口——
 重试、计费、扣钱包、元数据回执全部收敛在工厂内。
 
-需要特别说明：**助手主链的模型调用走 AgentScope 的 `OpenAIChatModel`，不经过 Spring AI**；
+需要特别说明：**智能体主链的模型调用走 AgentScope 的 `OpenAIChatModel`，不经过 Spring AI**；
 Spring AI 只服务后台一次性调用与 embedding。两条路共享同一套 `dcs_ai_config` 供应商配置与计费能力，
 但运行时互不缠绕。
 
-### 5.2 一次请求的生命周期
+### 5.3 一次请求的生命周期
 
 1. **前端发起**：Composer 将消息、历史与 `forwardedProps` 发到
    `POST /agui/run/dcs-assistant`。`forwardedProps` 可携带 `thinkTier`、`modelConfigId`、
@@ -367,7 +395,7 @@ Spring AI 只服务后台一次性调用与 embedding。两条路共享同一套
 8. **持久化**：会话状态写入 PostgreSQL `agentscope` schema；会话、消息、运行记录、动作日志、
    模型用量与费用流水分别落表（`dcs_ai_usage` 等），钱包/积分扣减另有流水。
 
-### 5.3 工具系统
+### 5.4 工具系统
 
 工具注册分两条通道，统一生成 `Toolkit` 与 `PermissionContextState`。
 
@@ -407,7 +435,7 @@ Spring AI 只服务后台一次性调用与 embedding。两条路共享同一套
 - 工具结果统一经 `ToolSupport.secureJson` 出口，附带 PII 脱敏与注入打标；
 - 服务层仍会做「本任务发布人/审核人」硬校验，权限串通过了也不能越权操作别人的任务。
 
-### 5.4 安全模型
+### 5.5 安全模型
 
 | 防线 | 机制 |
 |---|---|
@@ -422,7 +450,7 @@ Spring AI 只服务后台一次性调用与 embedding。两条路共享同一套
 | 平台侧 | 文件安全守卫（宏/伪装/敏感词/人工审核队列）、风控规则与验证码、登录与操作日志 |
 | 密钥 | 基线不含任何真实 Key；`DcsAiConfig.apiKey` 使用 `@EncryptField(AES)` 加密存储 |
 
-### 5.5 模型接入、计费与配额
+### 5.6 模型接入、计费与配额
 
 **供应商预置（14）**：OpenAI、DeepSeek、通义千问、智谱/Z.AI、Kimi、百度千帆、腾讯混元、
 讯飞星火、MiniMax、硅基流动、OpenCode Go、阶跃星辰、OpenRouter、自定义（完整清单与默认模型见 §8）。
@@ -445,7 +473,7 @@ Spring AI 只服务后台一次性调用与 embedding。两条路共享同一套
 - 准入闸：租户级/全站级活跃用户数（Redis ZSET + Lua 原子）；
 - 日配额：每用户每日回合数、租户日预算、每用户联网搜索日配额；管理员可对单用户覆盖或禁用。
 
-### 5.6 技能与提示词
+### 5.7 技能与提示词
 
 - 技能正文放在 `prompts/skills/<id>.md`；系统提示词只注入**技能目录**（预算 600 字符），
   正文只在「用户当轮选中」或「模型调用 `view_skill`」两种时机进入上下文（单技能上限 6000 字符）；
@@ -454,13 +482,13 @@ Spring AI 只服务后台一次性调用与 embedding。两条路共享同一套
   `filterCheatsheet` 按**实际注册的工具名**裁剪，避免提示词里出现模型看不见的工具；
 - 内置示例技能：`create-mission`、`create-template`、`data-reading`、`urge-wording`（仅起草文案，不发送）。
 
-细则（目录预算、缓存规则、催办纪律段的条件装配）见 [docs/assistant.md](docs/assistant.md) §3。
+细则（目录预算、缓存规则、催办纪律段的条件装配）见 [docs/agent-engine.md](docs/agent-engine.md) §3。
 
-### 5.7 AGUI 协议与前端状态机
+### 5.8 AGUI 协议与前端状态机
 
 **端点**：`POST ${VITE_APP_BASE_API}/agui/run/dcs-assistant`。前端用 `fetch` + `ReadableStream`
 解析 SSE 帧，以便显式携带 `Authorization`。标准事件共 **28 类**（Run/Text/Tool/State/Reasoning/Step/Raw，
-全集见 [docs/assistant.md](docs/assistant.md) §5）；`AssistantEventEnricher` 另外转发三类 CUSTOM 帧：
+全集见 [docs/agent-engine.md](docs/agent-engine.md) §5）；`AssistantEventEnricher` 另外转发三类 CUSTOM 帧：
 `plan`（计划卡）、`todo`（会话清单）、`cost_meta`（本回合金额与 token）。
 
 助手前端把事件映射为回合状态机：
@@ -663,8 +691,8 @@ thinking → acting → writing → done
 ### 7.3 边界声明
 
 - demo 是**测试夹具**，不是通用采集产品；字段、审核、通知、统计都只覆盖验证引擎所需的最小闭环。
-- demo 可以被整体替换：画像侧继续发同构事件，助手侧继续按 `BizToolProvider` 注册工具；
-  另需替换输入框 `@` 任务候选的数据源（`AssistantConversationController`，助手唯一一处编译期直连 demo 的代码，见 §12.5）。
+- demo 可以被整体替换：画像侧继续发同构事件，智能体侧继续按 `BizToolProvider` 注册工具；
+  另需替换输入框 `@` 任务候选的数据源（`AssistantConversationController`，助手唯一一处编译期直连 demo 的代码，见 §12.6）。
 - demo 的账号、部门、任务与数据均为合成演示数据，不对应任何真实组织。
 
 ## 8. 技术栈
@@ -818,7 +846,7 @@ deploy/
 
 docs/
 ├── architecture.md                 # 模块边界、权限串、事件流、状态机
-├── assistant.md                    # AI 助手引擎深度文档
+├── agent-engine.md                 # 智能体引擎深度文档
 ├── profile-engine.md               # 用户画像引擎深度文档
 ├── usage.md                        # 按角色走读功能
 ├── deploy.md                       # 裸机与容器部署
@@ -853,7 +881,18 @@ cd frontend && npm test && npm run build:prod
 **复杂维度**：实现 `DimensionStrategy`（只读，禁止写表）→ 注册为 Spring Bean →
 维度行设置 `calc_mode=STRATEGY` → 在快照 `dimension_detail` 中核对证据字段。
 
-### 12.2 新增业务工具
+### 12.2 新增一个智能体
+
+1. 实现一个工厂：返回按登录租户构建好的 `ReActAgent`（可复用 `AssistantAgentFactory` 的装配方式，
+   或按业务裁剪模型、工具面与系统提示词）；
+2. 注册：`@Bean AguiAgentRegistryCustomizer` 中调用 `registry.registerFactory("your-agent-id", factory)`；
+3. 调用：`POST /agui/run/your-agent-id`；要让它成为默认 agent 时改 `app.agui.default-agent-id`；
+4. 业务工具仍走 `BizToolProvider`；权限、记忆、技能、计费与 AGUI 事件由引擎统一提供，无需重复实现。
+
+一个运行时可同时注册多个 agent，共用同一套租户、供应商配置与计费账本；
+多 agent 协同（handoff / 团队编排）需自行在工厂层实现。
+
+### 12.3 新增业务工具
 
 1. 在业务模块实现 `BizToolProvider`，返回 `BizToolSpec` 列表；
 2. 只读工具用 `BizToolSpec.readOnly(...)`，写工具用 `BizToolSpec.write(..., 确认话术)`；
@@ -863,23 +902,23 @@ cd frontend && npm test && npm run build:prod
 
 工具返回建议使用统一的 `BizToolResult` 结构；异常统一转人话，不把 SQL/堆栈带进对话上下文。
 
-### 12.3 接入新的模型供应商
+### 12.4 接入新的模型供应商
 
 - **无代码**：在「AI 模型配置」选择「自定义」，填写 OpenAI 兼容的 Base URL、模型名、API Key；
 - **内置预置**：在 `DcsAiProvider` 增加枚举项（label/baseUrl/defaultModel），前端预设列表自动出现；
 - 需要特殊请求头/鉴权的网关，参考 `AssistantModelFactory` 对 `OPENCODE` 的处理；
 - 多 Key、余额探测、超时、最大输出、思考档位都在供应商/模型配置层处理，不需要改 Agent 代码。
 
-### 12.4 接入自己的事件源
+### 12.5 接入自己的事件源
 
 复用画像引擎模块与表结构 → 业务动作处调用 `ProfileEventPublisher` →
 保证 `(source, eventUid)` 幂等 → 为你的 `source` 配置维度 → 用 `ProfileRecalcService`
 或调度任务触发重算。
 
-### 12.5 替换 demo
+### 12.6 替换 demo
 
 - 画像侧：继续发 `task.published` / `data.submitted` / `data.audit_*` 同构事件，或定义自己的事件类型；
-- 助手侧：实现自己的 `BizToolProvider`，在工具描述里写清业务语义与权限；
+- 智能体侧：实现自己的 `BizToolProvider`，在工具描述里写清业务语义与权限；
 - 若保留输入框的 `@` 任务候选，替换 `AssistantConversationController` 的数据源，或把它迁成新的 SPI；
 - 前端：删除 demo 页面（`views/dcs/mission|todo|audit|notice|dashboard`）与对应菜单；保留 `views/dcs/profile`、`views/dcs/assistant`、AI 配置/计费页与 `components/DcsAssistant`。
 
@@ -905,7 +944,7 @@ AI 输出不保证正确（所有写操作必须 HITL，统计/画像结论保�
 | 文档 | 内容 |
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 模块划分、权限串、事件流、状态机与判定序 |
-| [docs/assistant.md](docs/assistant.md) | AI 助手深度：装配代码、装饰器链、技能与提示词、AGUI 事件全集、管理运维面 |
+| [docs/agent-engine.md](docs/agent-engine.md) | 智能体引擎深度：注册模型、装配代码、装饰器链、技能与提示词、AGUI 事件全集、管理运维面 |
 | [docs/profile-engine.md](docs/profile-engine.md) | 画像深度：完整数据模型、通用协议、评分模型/RFM、分群、行为分析中心 |
 | [docs/usage.md](docs/usage.md) | 按角色的一天，走读全部功能入口 |
 | [docs/deploy.md](docs/deploy.md) | 裸机与容器部署细节、参数覆盖、升级与回滚 |

@@ -97,8 +97,9 @@ OSS 上传事件 → `OssUploadedEventListener` 建单，判定序（顺序不�
 
 审核决定产生 `FILE_REVIEW_REJECT` 通知（经 admin 的 FileReviewNoticeAdapter 桥接到微核心通知表）。
 
-## 5. AI 助手（ruoyi-assistant）
+## 5. 智能体运行时（ruoyi-assistant）
 
+- Agent 按 `agentId` 注册到 AGUI 注册表，统一从 `POST /agui/run/{agentId}` 进入（内置 `dcs-assistant` 助手应用）；
 - SSE 流式（前端 `utils/sse.ts`），AG-UI 风格事件协议；
 - 工具循环（查待办/任务进度/看板口径）通过 SPI 注入，页面上下文随对话框携带；
 - 会话状态落 `agentscope` schema（JDBC state store，独立 schema 隔离）；

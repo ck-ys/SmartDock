@@ -1,9 +1,31 @@
-# AI 助手引擎 · 深度文档
+# 智能体引擎 · 深度文档
 
-> 本文承接 README「引擎：AI 助手」章节的实现细节：装配代码、装饰器链、技能与提示词、
-> 状态可靠性、AGUI 事件全集与管理运维面。能力概览与工具系统见 README §5。
+> 本文承接 README「引擎：智能体运行时」章节的实现细节：注册模型、装配代码、装饰器链、
+> 技能与提示词、状态可靠性、AGUI 事件全集与管理运维面。能力概览与工具系统见 README §5。
 
-## 1. ReActAgent 装配
+## 1. 多智能体注册模型
+
+agent 不是硬编码单例，而是注册表中的工厂。starter 通过 `ObjectProvider` 收集所有
+`AguiAgentRegistryCustomizer`，在注册表就绪后回调：
+
+```java
+@Bean
+public AguiAgentRegistryCustomizer dcsAssistantAgentRegistryCustomizer() {
+    return registry -> registry.registerFactory(
+        AssistantAgentFactory.AGENT_ID,      // "dcs-assistant"
+        agentFactory::createFromLogin);      // 按登录租户惰性创建
+}
+```
+
+| 关注点 | 行为 |
+|---|---|
+| 路由 | `POST /agui/run/{agentId}`；不带 `agentId` 时由 `app.agui.default-agent-id`（默认 `dcs-assistant`）兜底 |
+| 创建时机 | 首个请求线程按登录租户惰性创建；未配置模型的租户收到 `AiNotConfiguredException`，不做静默降级 |
+| 实例粒度 | 每次新会话（`userId + threadId`）新建实例，配合 `AssistantRuntimeContextResolver` 的租户作用域实现会话隔离 |
+| 共享能力 | 工具注册、权限上下文、记忆、技能、PII、计费、AGUI 事件、状态存储由引擎统一提供 |
+| 多 agent | 一个运行时可注册多个工厂，共用租户、供应商配置与计费账本；协同编排（handoff/团队）需在工厂层自行实现 |
+
+## 2. ReActAgent 装配
 
 以下代码摘自 `AssistantAgentFactory`（为可读性做了换行与去参，顺序与真实装配一致）：
 
@@ -49,7 +71,9 @@ ReActAgent agent = ReActAgent.builder()
     .build();
 ```
 
-## 2. 模型装饰器链
+新增 agent 时，`name`、系统提示词与工具面可按业务裁剪，其余装配顺序可直接复用。
+
+## 3. 模型装饰器链
 
 装饰器从内到外依次包裹。顺序不是随意的：越靠内越接近模型，越靠外越接近请求边界。
 
@@ -69,7 +93,7 @@ ReActAgent agent = ReActAgent.builder()
 **为什么技能注入在记忆内层**：技能正文是当前轮的临时系统指令，位于记忆装饰器内层；
 装饰器一律在消息尾部追加，实际消息序为 `[原文…, 记忆段, 日期段, 技能段]`。技能段不会写进会话记忆，摘掉即无。
 
-## 3. 技能与提示词资产
+## 4. 技能与提示词资产
 
 **技能库（渐进披露）**：
 
@@ -92,7 +116,7 @@ ReActAgent agent = ReActAgent.builder()
 - 催办纪律段仅在会话注册面包含催办工具时装配；当前平台与 demo 均无催办工具，因此运行态不装配；
 - 技能目录按 `minRole` 裁剪，成员目录里不会出现发布人/管理员技能。
 
-## 4. 上下文、状态与可靠性
+## 5. 上下文、状态与可靠性
 
 | 能力 | 实现 |
 |---|---|
@@ -104,9 +128,9 @@ ReActAgent agent = ReActAgent.builder()
 | 会话缓存 | 每会话装配 agent；模型选择、联网开关、自选范围指纹变化时失效重建；技能与思考档逐请求读取，下一轮即生效 |
 | 租户隔离 | 工具身份快照绑定 `userId/tenantId`；模型配置无可用行时抛错，不静默回退平台配置 |
 
-## 5. AGUI 事件协议全集
+## 6. AGUI 事件协议全集
 
-**端点**：`POST ${VITE_APP_BASE_API}/agui/run/dcs-assistant`（开发环境 `/dev-api` 由 Vite 代理到 8090）。
+**端点**：`POST ${VITE_APP_BASE_API}/agui/run/{agentId}`（开发环境 `/dev-api` 由 Vite 代理到 8090）。
 前端使用 `fetch` + `ReadableStream` 读取 SSE 帧，而不是 `EventSource`，以便显式携带 `Authorization`。
 
 AgentScope 2.0.3 的 `AguiEventType` 共 **28 类**：
@@ -129,9 +153,9 @@ AgentScope 2.0.3 的 `AguiEventType` 共 **28 类**：
 | `todo` | `todo_write` 生成的会话清单 |
 | `cost_meta` | 本回合金额与 token 数（前端只展示，不自行算价） |
 
-## 6. 管理与运维面
+## 7. 管理与运维面
 
-助手除了对话主链，还配套一组管理页面与接口（控制器位于
+智能体除了对话主链，还配套一组管理页面与接口（控制器位于
 `ruoyi-assistant` 的 `controller/` 包，前端页面在 `views/dcs/assistant/` 下）：
 
 | 面 | 内容 |
@@ -139,6 +163,6 @@ AgentScope 2.0.3 的 `AguiEventType` 共 **28 类**：
 | 会话管理页 | 会话列表、消息回放、重命名、导出、手动压缩、恢复、治理（管理端可清理） |
 | 记忆管理页 | 租户长期记忆条目的查看与维护 |
 | 助手管理页（管理端） | 使用统计、会话治理、联网搜索配置与连通测试、公告发布/撤回、反馈列表与统计、配额覆盖（单用户日配额覆盖或禁用） |
-| 能力全景 | `AssistantCapabilityPanoramaController` 输出当前租户可用的模型/工具/开关面，供诊断「为什么我的助手没有某能力」 |
+| 能力全景 | `AssistantCapabilityPanoramaController` 输出当前租户可用的模型/工具/开关面，供诊断「为什么我的智能体没有某能力」 |
 | HITL | `AssistantHitlController` 承接确认卡的放行/中止，恢复原 run |
 | 附件 | `AssistantAttachmentController` 管理当前会话附件，供 `read_attachment` 工具读取 |
