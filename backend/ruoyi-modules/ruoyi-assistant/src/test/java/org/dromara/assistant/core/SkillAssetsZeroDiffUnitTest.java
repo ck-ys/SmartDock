@@ -52,6 +52,9 @@ class SkillAssetsZeroDiffUnitTest {
             try (InputStream in = SkillAssets.class.getResourceAsStream("/prompts/skills/" + s.id() + ".md")) {
                 String head = new String(in.readAllBytes(), StandardCharsets.UTF_8);
                 assertThat(head).startsWith("---\nid: " + s.id() + "\n");
+                // 能力① Q7：触发词 frontmatter 行与内嵌表一致（逗号串 ↔ List 同源零漂移）
+                assertThat(head).as("技能 %s triggers 行与内嵌表一致", s.id())
+                    .contains("triggers: " + String.join(", ", s.triggers()) + "\n");
             }
         }
     }

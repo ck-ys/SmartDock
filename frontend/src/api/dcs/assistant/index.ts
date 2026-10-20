@@ -87,6 +87,13 @@ export function getAssistantHealth() {
   return request<AssistantHealthReport>({ url: '/dcs/assistant/admin/health', method: 'get' });
 }
 
+/* ===== 能力① Q4/Q7：用户视角技能目录（触发词一并下发；perm=use） ===== */
+export function getAssistantSkillCatalog() {
+  return request<
+    Array<{ id: string; name: string; desc: string; minRole: 'member' | 'publisher'; triggers?: string[] }>
+  >({ url: '/dcs/assistant/skills', method: 'get' });
+}
+
 /** 业务反馈批1015b Q14：搜索连通测试（key 可选=先验新钥匙再替换；不带=测当前生效 key） */
 export function testWebsearch(key?: string) {
   return request<{ ok: boolean; latencyMs?: number; message: string }>({

@@ -51,6 +51,32 @@ public class AssistantStatusController extends BaseController {
     private final org.dromara.assistant.service.AssistantFollowupService followupService;
 
     /**
+     * 能力① Q4 轻量（2026-10-20）：用户视角技能目录（perm=use——panorama 是管理端点，
+     * 普通用户拉不到）。前端 SKILL_CATALOG 编译期兜底之上动态化：后端加/改技能无需发版。
+     * 触发词（Q7）一并透出——前端输入命中时自动挂载（可撤销）。
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/skills")
+    public R<java.util.List<Map<String, Object>>> skillCatalog() {
+        int level = org.dromara.assistant.tools.ToolIdentity.from(
+            org.dromara.common.satoken.utils.LoginHelper.getLoginUser()).getRoleLevel();
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (org.dromara.assistant.core.SkillAssets.LoadedSkill s : org.dromara.assistant.core.SkillAssets.skills()) {
+            if (s.minRole() > level) {
+                continue;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", s.id());
+            row.put("name", s.name());
+            row.put("desc", s.description());
+            row.put("minRole", s.minRole() == 0 ? "member" : "publisher");
+            row.put("triggers", s.triggers());
+            out.add(row);
+        }
+        return R.ok(out);
+    }
+
+    /**
      * 稳流② Q8②（2026-10-20）：助手运行健康（管理页「运行健康」卡数据源）。
      * 两张分布表=进程内累计（重启归零，since=本次启动时刻）——追问哑火/看门狗误判
      * 高危样本（心跳=0 且静默大的 run）从这先看出趋势，需要持久化再落表（观察期后决定）。

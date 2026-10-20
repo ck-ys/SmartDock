@@ -38,7 +38,7 @@ public class AssistantCapabilityPanoramaController extends BaseController {
 
     /** 业务批7 Q9：技能库全景行（正文折叠展示；注入方式口径与 SkillAssets 三级兜底一致） */
     public record PanoramaSkill(String id, String name, String description, int minRoleLevel,
-                                String injectNote, String body) {
+                                String injectNote, java.util.List<String> triggers, String body) {
     }
 
     /** 全景聚合：工具清单 + 系统提示词（memoryOn 拼接口径与 agent 一致）+ 租户开关；
@@ -80,7 +80,7 @@ public class AssistantCapabilityPanoramaController extends BaseController {
         List<PanoramaSkill> skills = new ArrayList<>();
         for (org.dromara.assistant.core.SkillAssets.LoadedSkill sk : org.dromara.assistant.core.SkillAssets.skills()) {
             skills.add(new PanoramaSkill(sk.id(), sk.name(), sk.description(), sk.minRole(),
-                "会话中 ➕ 面板选中才注入：仅选中会话按轮生效，未选中不产生额外消耗", sk.body()));
+                "会话中 ➕ 面板选中才注入：仅选中会话按轮生效，未选中不产生额外消耗", sk.triggers(), sk.body()));
         }
         AssistantConfigService.EffectiveConfig cfg = assistantConfigService.effective(tenantId);
         boolean memoryOn = "1".equals(cfg.memoryEnabled());

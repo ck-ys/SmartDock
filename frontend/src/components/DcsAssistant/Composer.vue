@@ -118,11 +118,15 @@
         </button>
 
         <!-- 业务批7 Q3：技能胶囊挪到联网开关旁（会话级开关联动族：➕ 选完=本会话增强，
-             与联网同侧语义一致；小屏 <560px 沿用 bpill 图标化规则不挤爆） -->
+             与联网同侧语义一致；小屏 <560px 沿用 bpill 图标化规则不挤爆）。
+             能力① Q7：自动挂载态加「自动」角标——点 × 撤销后本组件生命周期内不再自动挂 -->
         <span
           v-if="skillCur"
           class="btool bpill spill"
-          :title="`技能「${skillCur.name}」本会话每轮生效：${skillCur.desc}。点 × 停用`"
+          :class="{ auto: autoSkillApplied === skillCur.id }"
+          :title="autoSkillApplied === skillCur.id
+            ? `从你的输入认出了「${skillCur.name}」需求，已自动挂载：${skillCur.desc}。点 × 移除`
+            : `技能「${skillCur.name}」本会话每轮生效：${skillCur.desc}。点 × 停用`"
           role="button"
           tabindex="0"
           @click="addOpen = true"
@@ -130,7 +134,13 @@
         >
           <IconSpan name="sparkles" :size="14" />
           <span class="tlabel">{{ skillCur.name }}</span>
-          <button class="sx" aria-label="停用技能" title="停用技能（本会话不再按它执行）" @click.stop="clearSkill">
+          <span v-if="autoSkillApplied === skillCur.id" class="tauto">自动</span>
+          <button
+            class="sx"
+            aria-label="停用技能"
+            :title="autoSkillApplied === skillCur.id ? '移除自动挂载的技能（这次不再自动加回来）' : '停用技能（本会话不再按它执行）'"
+            @click.stop="revokeAutoSkill"
+          >
             <IconSpan name="x" :size="12" />
           </button>
         </span>
@@ -470,11 +480,11 @@
  * +思考三档（forwardedProps 透传）+发送键状态机（dim/橙+角标/title 三态）+占位轮换（身份词典 5s）
  * +/命令与@引用 cmdPop（↑↓EnterEsc）+ArrowUp 召回上一问+IME 守卫+拖文件虚线高亮。
  */
-import { getAssistantStatus, getAssistantModelChoice, compactAssistantContext, type AssistantModelChoice } from '@/api/dcs/assistant';
+import { getAssistantStatus, getAssistantModelChoice, compactAssistantContext, getAssistantSkillCatalog, type AssistantModelChoice } from '@/api/dcs/assistant';
 import { getMyCreditSummary, type CreditSummaryVO } from '@/api/dcs/ai-credit';
 import { checkPermi } from '@/utils/permission';
 import { readWebOn, writeWebOn, webOnKey } from './webOnState';
-import { SKILL_CATALOG, readSkillId, writeSkillId, isSkillKey } from './skillState';
+import { skillCatalog, applyRemoteCatalog, matchSkillTrigger, readSkillId, writeSkillId, isSkillKey } from './skillState';
 import { matchAiCapability } from '@/api/dcs/ai';
 import { mentionTasks } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
@@ -1021,9 +1031,12 @@ const skillPublisherLevel = computed(() => {
   const p = userStore.permissions ?? [];
   return roleKey.value === 'admin' || p.includes('*:*:*') || p.includes('dcs:task:edit') || p.includes('dcs:audit:audit');
 });
-/** 目录裁剪：无发布人级权限只留全员技能（与后端 SkillAssets 目录同口径） */
-const skillCatalogForRole = computed(() => (skillPublisherLevel.value ? SKILL_CATALOG : SKILL_CATALOG.filter((s) => s.minRole === 'member')));
-const skillCur = computed(() => SKILL_CATALOG.find((s) => s.id === skillId.value) ?? null);
+/** 目录裁剪：无发布人级权限只留全员技能（与后端 SkillAssets 目录同口径）；
+ *  能力① Q4：SKILL_CATALOG 静态兜底 → skillCatalog 动态目录（onMounted 拉后端刷新） */
+const skillCatalogForRole = computed(() =>
+  skillPublisherLevel.value ? skillCatalog.value : skillCatalog.value.filter((s) => s.minRole === 'member')
+);
+const skillCur = computed(() => skillCatalog.value.find((s) => s.id === skillId.value) ?? null);
 /** 技能瓦片配色：复用语义色（建=主蓝/板·读=绿/催=琥珀），不新增调色板 */
 function skillTileCls(id: string): string {
   return { 'create-mission': 'todo', 'create-template': 'cast', 'data-reading': 'cast', 'urge-wording': 'urge' }[id] ?? 'todo';
@@ -1031,14 +1044,55 @@ function skillTileCls(id: string): string {
 function readSkillSync() {
   skillId.value = readSkillId(userStore.userId, props.state.threadId, localStorage);
 }
+/* ===== 能力① Q7：触发词自动挂载（可撤销）=====
+ * 用户没手动动过技能（skillUserTouched）且未撤销过该技能（revokedAuto）时，
+ * 输入命中触发词 → 自动写入同款会话键（后端注入通道零改动）+「自动挂载」角标；
+ * 撤销=移除键+记忆（本组件生命周期内不再自动挂该技能）。 */
+const skillUserTouched = ref(false);
+const revokedAutoSkills = new Set<string>();
+const autoSkillApplied = ref<string | null>(null);
+watch(
+  () => draft.value,
+  (v) => {
+    if (skillUserTouched.value || skillId.value) {
+      return;
+    }
+    const hit = matchSkillTrigger(v ?? '');
+    if (!hit || revokedAutoSkills.has(hit.id)) {
+      return;
+    }
+    autoSkillApplied.value = hit.id;
+    skillId.value = hit.id;
+    writeSkillId(userStore.userId, props.state.threadId, hit.id, localStorage);
+    pushToast(`检测到你想${hit.name}，已自动挂载「${hit.name}」技能——点胶囊 × 可移除`, 'info');
+  }
+);
+/** 撤销自动挂载：清键+记忆（手动点胶囊也算 touched，此后不再自动） */
+function revokeAutoSkill() {
+  const id = autoSkillApplied.value;
+  if (id) {
+    revokedAutoSkills.add(id);
+    autoSkillApplied.value = null;
+  }
+  if (skillId.value) {
+    const label = skillCatalog.value.find((s) => s.id === skillId.value)?.name ?? skillId.value;
+    skillId.value = null;
+    writeSkillId(userStore.userId, props.state.threadId, null, localStorage);
+    pushToast(`已移除技能「${label}」`, 'info');
+  }
+}
 function toggleSkill(id: string) {
+  skillUserTouched.value = true;
+  autoSkillApplied.value = null;
   const next = skillId.value === id ? null : id;
   skillId.value = next;
   writeSkillId(userStore.userId, props.state.threadId, next, localStorage);
-  const label = SKILL_CATALOG.find((s) => s.id === id)?.name ?? id;
+  const label = skillCatalog.value.find((s) => s.id === id)?.name ?? id;
   pushToast(next ? `已启用技能「${label}」：本会话每轮按它的指引执行，点输入条上的胶囊 × 可停用` : `已停用技能「${label}」`, 'ok');
 }
 function clearSkill() {
+  skillUserTouched.value = true;
+  autoSkillApplied.value = null;
   if (skillId.value) {
     toggleSkill(skillId.value);
   }
@@ -1208,6 +1262,17 @@ onMounted(() => {
   readSkillSync();
   if (amActive()) void refreshStatus();
   window.addEventListener('storage', onWebOnStorage);
+  // 能力① Q4：目录动态化——编译期兜底之上按后端 /skills 刷新（失败静默保持兜底）
+  getAssistantSkillCatalog()
+    .then((res) => {
+      const rows = (res as unknown as { rows?: unknown; data?: unknown })?.rows
+        ?? (res as unknown as { data?: unknown })?.data
+        ?? res;
+      applyRemoteCatalog(Array.isArray(rows) ? (rows as Parameters<typeof applyRemoteCatalog>[0]) : null);
+    })
+    .catch(() => {
+      /* 目录端点不可达=保持兜底目录 */
+    });
 });
 onBeforeUnmount(() => {
   window.removeEventListener('storage', onWebOnStorage);
@@ -2411,6 +2476,16 @@ defineExpose({
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    /* 能力① Q7：自动挂载角标（弱化小字，与技能名区分——不是用户亲手选的） */
+    .tauto {
+      flex: none;
+      padding: 0 4px;
+      border-radius: 4px;
+      font-size: 10px;
+      line-height: 14px;
+      background: rgb(64 158 255 / 12%);
+      opacity: 0.85;
     }
     .sx {
       flex: none;

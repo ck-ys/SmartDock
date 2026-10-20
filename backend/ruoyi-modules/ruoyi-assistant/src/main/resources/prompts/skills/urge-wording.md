@@ -3,6 +3,7 @@ id: urge-wording
 name: 催办话术
 description: 写不伤人的催办提醒（有依据、给出路、不施压过度）
 minRole: publisher
+triggers: 催办话术, 写个催办, 帮我写催办, 怎么催比较好, 提醒话术
 ---
 你正在使用「催办话术」技能。目标：帮用户起草一条得体的催办留言。
 

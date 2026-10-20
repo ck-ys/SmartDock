@@ -18,7 +18,7 @@ export interface KVLike {
   removeItem(k: string): void;
 }
 
-/** 前端技能目录行（展示用四元组；正文在后端） */
+/** 前端技能目录行（展示用五元组；正文在后端） */
 export interface SkillCatalogItem {
   id: string;
   name: string;
@@ -26,14 +26,62 @@ export interface SkillCatalogItem {
   /** 最低角色：'member'=全员，'publisher'=发布人/管理员（与 roleOf 的 RoleKey 对齐） */
   minRole: 'member' | 'publisher';
   tile: string;
+  /** 能力① Q7：触发词（输入命中任一 → 前端自动挂载，可撤销）；来自后端目录，兜底目录常配 */
+  triggers?: string[];
 }
 
 export const SKILL_CATALOG: SkillCatalogItem[] = [
-  { id: 'create-mission', name: '创建任务', desc: '把「帮我建任务」引导成完整草稿', minRole: 'publisher', tile: '建' },
-  { id: 'create-template', name: '创建模板', desc: '把「做个采集模板」引导成字段清单再建', minRole: 'publisher', tile: '板' },
-  { id: 'data-reading', name: '数据解读', desc: '查到的数字讲成人话结论，口径说清', minRole: 'member', tile: '读' },
-  { id: 'urge-wording', name: '催办话术', desc: '写不伤人的催办提醒', minRole: 'publisher', tile: '催' }
+  { id: 'create-mission', name: '创建任务', desc: '把「帮我建任务」引导成完整草稿', minRole: 'publisher', tile: '建', triggers: ['帮我建任务', '建个任务', '新建任务', '创建任务', '发起一个任务', '发个任务让大家'] },
+  { id: 'create-template', name: '创建模板', desc: '把「做个采集模板」引导成字段清单再建', minRole: 'publisher', tile: '板', triggers: ['做个模板', '建个模板', '创建模板', '新建模板', '做个表单', '建个采集模板'] },
+  { id: 'data-reading', name: '数据解读', desc: '查到的数字讲成人话结论，口径说清', minRole: 'member', tile: '读', triggers: ['数据解读', '解读数据', '帮我解读', '分析这些数据', '这数据怎么看'] },
+  { id: 'urge-wording', name: '催办话术', desc: '写不伤人的催办提醒', minRole: 'publisher', tile: '催', triggers: ['催办话术', '写个催办', '帮我写催办', '怎么催比较好', '提醒话术'] }
 ];
+
+/* ===== 能力① Q4 轻量（2026-10-20）：目录动态化——编译期兜底之上按后端 /skills 刷新 =====
+ * 模块级 ref（nameState 同模式）；tile 纯展示字，远端行缺省时按兜底目录或名称首字补。 */
+import { ref } from 'vue';
+
+export const skillCatalog = ref<SkillCatalogItem[]>(SKILL_CATALOG);
+
+/** 远端目录行（/dcs/assistant/skills 出参形状） */
+export interface RemoteSkillRow {
+  id: string;
+  name: string;
+  desc: string;
+  minRole: 'member' | 'publisher';
+  triggers?: string[];
+}
+
+/** 喂远端目录（后端加/改技能无需前端发版；空/异常静默保持兜底目录） */
+export function applyRemoteCatalog(rows: RemoteSkillRow[] | null | undefined): void {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return;
+  }
+  const fallback = new Map(SKILL_CATALOG.map((s) => [s.id, s]));
+  skillCatalog.value = rows
+    .filter((r) => r && typeof r.id === 'string' && r.id)
+    .map((r) => ({
+      id: r.id,
+      name: r.name || fallback.get(r.id)?.name || r.id,
+      desc: r.desc || fallback.get(r.id)?.desc || '',
+      minRole: r.minRole === 'member' ? 'member' : 'publisher',
+      tile: fallback.get(r.id)?.tile || (r.name || r.id).slice(0, 1),
+      triggers: Array.isArray(r.triggers) ? r.triggers.filter((t) => typeof t === 'string' && t) : []
+    }));
+}
+
+/** 输入文本 → 命中技能（首个命中即返回；无命中=null）——能力① Q7 自动挂载判定 */
+export function matchSkillTrigger(text: string): SkillCatalogItem | null {
+  if (!text) {
+    return null;
+  }
+  for (const s of skillCatalog.value) {
+    if (s.triggers?.some((t) => t && text.includes(t))) {
+      return s;
+    }
+  }
+  return null;
+}
 
 export function skillKey(userId: string | number, threadId: string): string {
   return `dcs:assistant:skill:${userId}:${threadId}`;
@@ -52,7 +100,7 @@ export function readSkillId(userId: string | number, threadId: string, storage: 
     if (!v) {
       return null;
     }
-    if (SKILL_CATALOG.some((s) => s.id === v)) {
+    if (skillCatalog.value.some((s) => s.id === v)) {
       return v;
     }
     storage.removeItem(key);
@@ -69,7 +117,7 @@ export function writeSkillId(userId: string | number, threadId: string, id: stri
   }
   try {
     const key = skillKey(userId, threadId);
-    if (id && SKILL_CATALOG.some((s) => s.id === id)) {
+    if (id && skillCatalog.value.some((s) => s.id === id)) {
       storage.setItem(key, id);
     } else {
       storage.removeItem(key);
