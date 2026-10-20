@@ -13,6 +13,11 @@
  * （见 index.html），否则 env() 恒 0。
  */
 
+/* 顶部安全区变量（刘海/状态栏）：壳层各固定件统一消费，桌面恒 0 */
+:root {
+  --sp-top: env(safe-area-inset-top, 0px);
+}
+
 @media (max-width: 992px) {
   /* 用 !important 覆盖各组件 scoped 样式里更小的字号（scoped 属性选择器特异性高于裸标签） */
   input:not([type='checkbox']):not([type='radio']),

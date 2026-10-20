@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.4.3',
+    date: '2026-10-20',
+    title: '小屏上的搜索、分页和助手会话又顺了一截',
+    items: [
+      '手机上打开顶部搜索，弹窗不再超出屏幕，输入框和结果都能完整操作。',
+      'AI 助手会话页在手机上重新占满可用高度，底部不再留一大片空白。',
+      '窄屏分页自动收起页码跳转与每页条数；富文本输入在手机上聚焦时不再被整页放大。'
+    ]
+  },
+  {
     version: 'v1.4.2',
     date: '2026-10-20',
     title: '手机上的任务列表和 AI 助手更好用了',

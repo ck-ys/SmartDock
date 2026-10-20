@@ -1,6 +1,6 @@
 <template>
   <div class="layout-search-dialog">
-    <el-dialog v-model="state.isShowSearch" destroy-on-close width="600px" top="12vh" title="搜索">
+    <el-dialog v-model="state.isShowSearch" destroy-on-close width="92%" top="12vh" title="搜索">
       <div class="layout-search-dialog__content">
         <el-autocomplete
           ref="layoutMenuAutocompleteRef"
@@ -135,6 +135,7 @@ defineExpose({
 /* 六反馈⑦: 弹窗恢复可见关闭按钮(header 不再隐藏) */
 .layout-search-dialog {
   :deep(.el-dialog) {
+    max-width: 600px;
     border-radius: var(--app-radius-base);
     overflow: visible;
     /* 六反馈⑦: header 不再隐藏, 恢复右上角关闭按钮(弹窗此前没有任何可见关闭方式) */

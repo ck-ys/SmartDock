@@ -905,7 +905,9 @@ onUnmounted(() => {
 .dcs-as-session {
   display: flex;
   gap: 12px;
-  height: calc(100vh - 120px);
+  /* 壳层高度由 AppMain 写 --session-chrome（无页签 58 / 有页签 92，含 8px 呼吸位） */
+  height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px));
+  height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px));
   padding: 12px;
 
   .side {
@@ -1175,8 +1177,8 @@ onUnmounted(() => {
 @media (max-width: 992px) {
   .dcs-as-session {
     gap: 0;
-    height: calc(100vh - 120px);
-    height: calc(100dvh - 120px);
+    height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px));
+    height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px));
     padding: 8px;
 
     .side {

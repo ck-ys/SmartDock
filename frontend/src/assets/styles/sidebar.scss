@@ -256,6 +256,8 @@
     .sidebar-container {
       transition: transform 0.28s;
       width: $base-sidebar-width !important;
+      /* 顶部安全区：抽屉展开时首项不钻到状态栏/刘海下 */
+      padding-top: var(--sp-top, 0px);
     }
 
     &.hideSidebar {

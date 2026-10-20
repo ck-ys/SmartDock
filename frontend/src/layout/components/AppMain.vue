@@ -53,27 +53,31 @@ function addIframe() {
 
 <style lang="scss" scoped>
 .app-main {
-  /* 50= navbar  50；dvh 跟随手机地址栏收放，vh 作旧浏览器兜底 */
-  min-height: calc(100vh - 50px);
-  min-height: calc(100dvh - 50px);
+  /* 50= navbar  50；dvh 跟随手机地址栏收放，vh 作旧浏览器兜底；
+     --sp-top=顶部安全区（刘海/状态栏），桌面为 0 */
+  min-height: calc(100vh - 50px - var(--sp-top, 0px));
+  min-height: calc(100dvh - 50px - var(--sp-top, 0px));
+  /* 会话页等「满屏内滚」容器用它扣壳层：默认 nav 50 + 8 呼吸位 */
+  --session-chrome: 58px;
   width: 100%;
   position: relative;
   overflow: hidden;
 }
 
 .fixed-header + .app-main {
-  padding-top: 50px;
+  padding-top: calc(50px + var(--sp-top, 0px));
 }
 
 .hasTagsView {
   .app-main {
+    --session-chrome: 92px;
     /* 84 = navbar + tags-view = 50 + 34；dvh 跟随手机地址栏收放，vh 作旧浏览器兜底 */
-    min-height: calc(100vh - 84px);
-    min-height: calc(100dvh - 84px);
+    min-height: calc(100vh - 84px - var(--sp-top, 0px));
+    min-height: calc(100dvh - 84px - var(--sp-top, 0px));
   }
 
   .fixed-header + .app-main {
-    padding-top: 84px;
+    padding-top: calc(84px + var(--sp-top, 0px));
   }
 }
 </style>

@@ -1541,6 +1541,11 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
       全局的 env() 右留白会被这里的 --sp-strip 覆盖掉（右侧失效）；
    ② 抽屉是右贴边定宽容器，左侧 env() 与它无关（会凭空多出左内边距），只全屏形态吃左右两侧 */
 @media (max-width: 992px) {
+  /* 顶部安全区：抽屉头不钻到状态栏下 */
+  .dcs-dw {
+    padding-top: var(--sp-top, 0px);
+  }
+
   .dw-body {
     padding-right: calc(var(--sp-strip, 0px) + env(safe-area-inset-right, 0px));
   }

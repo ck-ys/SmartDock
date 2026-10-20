@@ -174,6 +174,13 @@ const handleUploadError = (err: any) => {
 .quill-img {
   display: none;
 }
+/* 富文本是 contenteditable，不在全局 input 16px 规则覆盖范围内；
+   手机上 <16px 聚焦会被 iOS 整页放大 */
+@media (max-width: 992px) {
+  .ql-editor {
+    font-size: 16px;
+  }
+}
 .ql-snow .ql-tooltip[data-mode='link']::before {
   content: '请输入链接地址:';
 }

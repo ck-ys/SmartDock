@@ -5,7 +5,7 @@
         <h1 class="cl-h1">更新日志</h1>
         <p class="cl-sub">每次改进都用大白话记在这里，方便你快速知道系统变了什么。</p>
       </div>
-      <span class="cl-latest" aria-label="最新版本">最新 · {{ latest.version }}</span>
+      <span v-if="latest" class="cl-latest" aria-label="最新版本">最新 · {{ latest.version }}</span>
     </header>
 
     <section class="cl-list" aria-label="版本记录">
@@ -33,7 +33,7 @@
 import { CHANGELOG_ENTRIES, type ChangelogEntry } from './changelog';
 
 const entries: ChangelogEntry[] = CHANGELOG_ENTRIES;
-const latest = entries[0];
+const latest = entries[0] ?? null;
 
 /** 2026-10-19 → 2026年10月19日（业务口径，不用斜杠/ISO） */
 const formatDate = (date: string): string => {
