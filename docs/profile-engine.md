@@ -1,0 +1,137 @@
+# 用户画像引擎 · 深度文档
+
+> 本文承接 README「引擎：用户画像」章节的实现细节：完整数据模型、通用接入协议、
+> 评分模型与 RFM、标签分群与低分复核、行为分析中心。能力概览与接入三步见 README §6。
+
+## 1. 完整数据模型
+
+| 表 | 作用 | 关键字段 |
+|---|---|---|
+| `profile_event` | 原始事件（追加写入） | `source`、`event_type`、`event_uid`、`subject_type`、`subject_id`、`occurred_time`、`props(jsonb)` |
+| `profile_subject` | 主体登记（事件写入时 upsert） | 主体、首末事件时间、事件计数 |
+| `profile_protocol` | 业务源接入协议清单（`profile.protocol/v1`） | `source`、事件清单、主体类型、保留期 |
+| `profile_schema_registry` | 事件 Schema 注册与轻校验 | `event_name`、`schema_version`、`required`、`properties` |
+| `profile_identity_link` / `profile_identity_merge` | 身份图谱：匿名 → 登录主体归并 | `identity_type`、`identity_value`、`subject_id`、合并记录 |
+| `profile_score_dimension` | 维度治理 | `dim_code`、`source`、`calc_mode`、`calc_config(jsonb)`、`score_max`、`enabled`、`builtin` |
+| `profile_score_rule` | 评分规则/权重 | `rule_version`、`weights(jsonb)`、`enabled` |
+| `profile_recalc_batch` | 批量重算批次 | `status`、`total_subjects`、`done_subjects`、`last_subject_id`、`error_msg` |
+| `profile_score_snapshot` | 版本化快照 | `total_score`、`dimension_detail(jsonb)`、`rule_version`、`prev_snapshot_id`、`calc_time` |
+| `profile_score_model` / `profile_model_run` / `profile_model_snapshot` | 通用评分模型（RFM 只是预设） | `model_config(jsonb)`、分箱/权重、模型快照链 |
+| `profile_segment` / `profile_segment_member` / `profile_segment_run` | 标签分群 | 规则 DSL、静态名单、成员快照、运行记录 |
+| `profile_review_queue` | 低分复核队列 | 触发来源、分数、状态、确认/忽略人 |
+| `profile_engine_config` | 按业务源的引擎开关 | 自动重算、复核、去抖窗口 |
+| `analytics_session` / `analytics_daily` | 行为分析：会话与日汇总 | 访客、渠道、设备、地域、PV/UV/访问次数、跳出 |
+| `analytics_funnel` / `analytics_site` | 漏斗定义与采集站点 | 步骤 JSON、窗口天数、`siteKey`、允许域名 |
+
+设计要点：
+
+- **幂等**：`(tenant_id, source, event_uid)` 唯一；同一业务事件重复投递只写一次。
+- **主体登记**：首次事件 upsert 主体；后续事件更新首末时间与计数，画像页无需回扫事件表。
+- **快照账本**：快照只增不改，`prev_snapshot_id` 串起趋势；事件可按保留期清理，快照不清理。
+- **多租户**：所有表带 `tenant_id`；租户隔离由 MyBatis-Plus 租户插件与显式租户上下文共同保证。
+
+## 2. 通用接入协议
+
+画像引擎不绑定具体业务。任何系统接入时，先登记一份协议（`profile_protocol`），
+再用同构事件写入；协议版本为 `profile.protocol/v1`。
+
+| 协议要素 | 说明 |
+|---|---|
+| `source` | 业务源标识（订单、供应链、工程、电商、租赁、用户……），维度、模型、分群均按它隔离 |
+| `subjectTypes` | 主体类型清单，如 `user` / `order` / `supplier` / `project` / `tenant` |
+| `events` | 事件名、Schema 版本、必填 `props` / `context` |
+| `retentionDays` | 事件保留期；快照与模型结果不受影响 |
+
+事件信封（写入 `profile_event`）：
+
+```json
+{
+  "eventName": "order.paid",
+  "eventUid": "order:paid:202610190001:v1",
+  "subjectType": "order",
+  "subjectId": "202610190001",
+  "anonymousId": "visitor-a1b2",
+  "sessionId": "s-9f8e",
+  "occurredTime": "2026-10-19T10:30:00+08:00",
+  "schemaVersion": "1-0-0",
+  "props": { "amount": 399, "channel": "wechat" },
+  "context": { "pageUrl": "/checkout", "deviceType": "mobile" }
+}
+```
+
+- **身份归并**：同一 `anonymousId` 先产生匿名事件，登录后带 `userId`（`subjectType=user`）的事件
+  会把身份链写入 `profile_identity_link`；分析会话优先采用归并后的登录主体。
+- **Schema 轻校验**：只检查必填键和基础类型；未注册 Schema 的事件直接放行，保证旧接入零破坏。
+- **三种扩展点**：`DimensionStrategy`（自定义维度口径）、`ProfilePostProcessor`（快照后处理）、
+  `EventQueryPort`（事件查询端口），均为 Spring Bean，只读、不写表。
+
+## 3. 评分模型与 RFM
+
+`profile_score_model` 把「指标 → 分箱 → 权重 → 等级」做成 JSON 配置，RFM 只是内置预设之一。
+同一张表可以配置订单金额模型、供应商履约模型、工程进度模型，无需新增 Java 类。
+
+| 能力 | 说明 |
+|---|---|
+| 模型管理 | 新建/复制/启停/删除；内置模型不可删，可改分箱与权重 |
+| 运行与快照 | 每次运行写 `profile_model_run` 与逐主体 `profile_model_snapshot`，`prev_snapshot_id` 串趋势 |
+| 分箱 | `fixed`（固定边界）或 `percentile`（分位点）；方向 `higher` / `lower` |
+| RFM 预设 | R/F/M 三维 × 2 分位 = 8 个中文分层（重要价值客户、一般保持客户……），另附高/中/低价值兜底 |
+| 自动重算 | 新事件写入后按 `profile_engine_config.debounce_ms` 合并触发，同主体只算一次 |
+
+画像 RFM 页面提供分层分布、维度质量、平均标准分趋势、主体明细和模型配置编辑。
+
+## 4. 标签分群与低分复核
+
+**分群**（`profile_segment`）支持两种成员来源：
+
+1. **规则分群**：条件树 `all` / `any`，叶子为「主体属性 / 维度分 / 事件计数」比较，
+   可带时间窗；先预览命中人数，再固化为成员快照（`profile_segment_member`）。
+2. **静态名单**：CSV 或逐行主体 ID 导入，适合线下名单、白名单、实验组。
+
+每次执行写 `profile_segment_run`，成员快照可追溯；分群结果可被助手工具、运营页面复用。
+
+**复核**（`profile_review_queue`）用于低分主体的人工兜底：分数低于阈值时入队，
+确认或忽略后，除非分数继续下降，否则不再重复入队（抑制重复打扰）。
+复核、自动重算、去抖窗口都由 `profile_engine_config` 按业务源单独开关。
+
+## 5. 行为分析中心
+
+分析中心和分析画像共用同一本事件账本，不额外埋点：
+
+```text
+profile_event
+  └─ 会话重建（analytics_session）
+       ├─ 显式 sessionId 优先
+       └─ 否则按访问者 + 30 分钟无操作切分
+            └─ 日汇总（analytics_daily）→ 趋势 / 渠道 / 设备 / 浏览器 / 地域
+                 ├─ 漏斗（analytics_funnel）：按访客顺序匹配步骤，窗口限制相邻间隔
+                 ├─ 留存：按首次访问日分组，统计第 N 天回访
+                 ├─ 页面与搜索：page_view / keyword 下钻
+                 ├─ 自定义分析：维度 × 指标（PV / UV / 访问次数 / 事件数）
+                 └─ 访问明细：会话 + 事件时间线
+```
+
+口径固定且可解释：
+
+- **PV** = `page_view` 事件数；**UV** = 去重访客；**访问次数** = 去重会话。
+- **跳出** = 只浏览一个页面且没有搜索、注册等交互；`page_leave` 是收尾事件，不算交互。
+- **新访客** = 该业务源内首次出现；回访 = 之前已有会话。
+- 漏斗步骤按访客「首次满足顺序」计数，跨会话超过窗口不累计。
+
+采集侧提供两种入口：
+
+- **公开采集口** `POST /analytics/collect`（`@SaIgnore`，按 `siteKey` 定位租户/业务源，
+  单批最多 200 条，事件按 `eventUid` 幂等）。
+- **零依赖 SDK** `frontend/public/sdk/smartdock-analytics.js`：访客 ID、30 分钟会话、
+  SPA 路由变化、`track/page/identify`、批量上报、`sendBeacon` 兜底。
+
+```html
+<script src="/sdk/smartdock-analytics.js"></script>
+<script>
+  SmartdockAnalytics.init({ siteKey: 'sd_demo_site', endpoint: '/analytics/collect' });
+</script>
+```
+
+离线数据可通过 CSV 导入（最多 5000 行），事件同样走 Schema 校验与幂等写入。
+分析页面在「任务中心 → 数据分析」，包含流量概览、页面与搜索、转化漏斗、留存、
+访问明细、自定义分析和数据采集七个页签。
