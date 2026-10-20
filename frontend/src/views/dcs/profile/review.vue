@@ -11,7 +11,7 @@
             <el-option label="dcs 数据采集" value="dcs" />
             <el-option label="risk 风控" value="risk" />
           </el-select>
-          <el-button :loading="scanning" type="primary" @click="scan">扫描当前快照</el-button>
+          <el-button v-hasPermi="['profile:review:edit']" :loading="scanning" type="primary" @click="scan">扫描当前快照</el-button>
           <el-button :loading="loading" @click="loadAll">刷新</el-button>
         </div>
       </div>
@@ -64,7 +64,7 @@
           <el-input-number v-model="config.debounceMs" :min="0" :max="5000" :step="500" controls-position="right" style="width: 140px" />
           <span class="muted small">毫秒，连续事件只算一次</span>
         </div>
-        <el-button type="primary" :loading="configSaving" @click="saveConfig">保存策略</el-button>
+        <el-button v-hasPermi="['profile:review:edit']" type="primary" :loading="configSaving" @click="saveConfig">保存策略</el-button>
       </div>
     </el-card>
 
@@ -127,8 +127,8 @@
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <template v-if="row.status === 'PENDING'">
-              <el-button link type="success" @click="openAction(row, 'confirm')">确认</el-button>
-              <el-button link type="warning" @click="openAction(row, 'dismiss')">驳回</el-button>
+              <el-button v-hasPermi="['profile:review:edit']" link type="success" @click="openAction(row, 'confirm')">确认</el-button>
+              <el-button v-hasPermi="['profile:review:edit']" link type="warning" @click="openAction(row, 'dismiss')">驳回</el-button>
             </template>
             <el-button link @click="goProfile(row)">看画像</el-button>
             <el-button link @click="openDetail(row)">详情</el-button>
@@ -178,7 +178,7 @@
       />
       <template #footer>
         <el-button @click="actionVisible = false">取消</el-button>
-        <el-button :type="actionMode === 'confirm' ? 'success' : 'warning'" :loading="actionSaving" @click="submitAction">
+        <el-button v-hasPermi="['profile:review:edit']" :type="actionMode === 'confirm' ? 'success' : 'warning'" :loading="actionSaving" @click="submitAction">
           {{ actionMode === 'confirm' ? '确认低分' : '驳回' }}
         </el-button>
       </template>

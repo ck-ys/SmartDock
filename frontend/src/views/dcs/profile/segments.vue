@@ -11,7 +11,7 @@
             <el-option label="dcs 数据采集" value="dcs" />
             <el-option label="risk 风控" value="risk" />
           </el-select>
-          <el-button type="primary" @click="openCreate">新建分群</el-button>
+          <el-button v-hasPermi="['profile:segment:edit']" type="primary" @click="openCreate">新建分群</el-button>
           <el-button :loading="loading" @click="loadAll">刷新</el-button>
         </div>
       </div>
@@ -72,7 +72,7 @@
         </div>
 
         <div class="segment-actions">
-          <el-button
+          <el-button v-hasPermi="['profile:segment:edit']"
             v-if="segment.segmentType === 'DYNAMIC'"
             size="small"
             type="primary"
@@ -81,15 +81,15 @@
           >
             评估
           </el-button>
-          <el-button v-else size="small" type="primary" @click="openImport(segment)">导入名单</el-button>
+          <el-button v-hasPermi="['profile:segment:edit']" v-else size="small" type="primary" @click="openImport(segment)">导入名单</el-button>
           <el-button size="small" @click="openMembers(segment)">成员</el-button>
           <el-button size="small" @click="openRuns(segment)">运行记录</el-button>
-          <el-button size="small" @click="openEdit(segment)">编辑</el-button>
-          <el-button v-if="segment.builtin !== '1'" size="small" type="danger" plain @click="remove(segment)">删除</el-button>
+          <el-button v-hasPermi="['profile:segment:edit']" size="small" @click="openEdit(segment)">编辑</el-button>
+          <el-button v-hasPermi="['profile:segment:edit']" v-if="segment.builtin !== '1'" size="small" type="danger" plain @click="remove(segment)">删除</el-button>
         </div>
       </el-card>
       <el-empty v-if="!loading && segments.length === 0" description="当前业务源还没有分群">
-        <el-button type="primary" @click="openCreate">新建第一个分群</el-button>
+        <el-button v-hasPermi="['profile:segment:edit']" type="primary" @click="openCreate">新建第一个分群</el-button>
       </el-empty>
     </div>
 
@@ -175,7 +175,7 @@
       <template #footer>
         <el-button v-if="form.segmentType === 'DYNAMIC'" :loading="previewing" @click="preview">预览命中</el-button>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+        <el-button v-hasPermi="['profile:segment:edit']" type="primary" :loading="saving" @click="save">保存</el-button>
       </template>
     </el-dialog>
 
@@ -201,7 +201,7 @@
       </el-form>
       <template #footer>
         <el-button @click="importVisible = false">取消</el-button>
-        <el-button type="primary" :loading="importing" @click="doImport">导入</el-button>
+        <el-button v-hasPermi="['profile:segment:edit']" type="primary" :loading="importing" @click="doImport">导入</el-button>
       </template>
     </el-dialog>
 

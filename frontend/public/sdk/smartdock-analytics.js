@@ -1,6 +1,6 @@
 /*
  * SmartDock Analytics SDK v1
- * 零依赖、可异步加载：访客 ID、30 分钟会话、SPA 路由、批量上报、失败重试。
+ * 零依赖、可异步加载：访客 ID、30 分钟会话、SPA 路由、批量上报、sendBeacon 兜底（网络失败暂不重试, 二期补离线重试）。
  *
  * 用法：
  *   <script src="/sdk/smartdock-analytics.js"></script>

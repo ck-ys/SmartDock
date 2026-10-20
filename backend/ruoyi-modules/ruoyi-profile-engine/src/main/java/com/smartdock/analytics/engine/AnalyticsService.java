@@ -569,6 +569,10 @@ public class AnalyticsService {
         if (StringUtils.isBlank(bo.getCsv())) {
             throw new ServiceException("CSV 内容不能为空");
         }
+        // 内存防线: 5000 行限制要在解析前拦住超大输入, 否则先全量解析已把内存吃满
+        if (bo.getCsv().length() > 5_000_000) {
+            throw new ServiceException("CSV 内容过大(>5MB), 请分批导入");
+        }
         List<List<String>> rows = parseCsv(bo.getCsv());
         if (rows.size() < 2) {
             throw new ServiceException("CSV 至少需要表头和一行数据");
@@ -586,6 +590,7 @@ public class AnalyticsService {
             throw new ServiceException("CSV 缺少 eventName 列");
         }
         int limit = Math.min(rows.size() - 1, MAX_CSV_ROWS);
+        int invalidTime = 0;
         List<ProfileEventBo> events = new ArrayList<>();
         for (int i = 1; i <= limit; i++) {
             List<String> line = rows.get(i);
@@ -608,7 +613,13 @@ public class AnalyticsService {
             event.setSubjectName(cell(line, index, "subjectname", "subject_name"));
             String occurred = cell(line, index, "occurredtime", "occurred_time", "time");
             if (StringUtils.isNotBlank(occurred)) {
-                event.setOccurredTime(parseTime(occurred));
+                Date occurredAt = parseTime(occurred);
+                if (occurredAt == null) {
+                    // 非法时间静默取当前时间会把脏数据混进历史统计, 整行拒绝并计数
+                    invalidTime++;
+                    continue;
+                }
+                event.setOccurredTime(occurredAt);
             }
             Map<String, Object> props = parseJsonObject(cell(line, index, "props", "properties"));
             String pageUrl = cell(line, index, "pageurl", "page_url", "url");
@@ -644,6 +655,8 @@ public class AnalyticsService {
         out.put("received", events.size());
         out.put("written", written);
         out.put("skipped", events.size() - written);
+        out.put("dropped", Math.max(0, rows.size() - 1 - limit));
+        out.put("invalidTime", invalidTime);
         return out;
     }
 
@@ -939,6 +952,7 @@ public class AnalyticsService {
         }
     }
 
+    /** @return 解析失败返回 null, 由调用方决定拒绝策略 */
     private Date parseTime(String raw) {
         try {
             return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(raw);
@@ -946,7 +960,7 @@ public class AnalyticsService {
             try {
                 return new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").parse(raw);
             } catch (Exception e) {
-                return new Date();
+                return null;
             }
         }
     }

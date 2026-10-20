@@ -27,7 +27,7 @@
         <el-tab-pane label="维度配置" name="dimension">
           <div class="toolbar">
             <div class="toolbar-left">
-              <el-button type="primary" @click="openCreateDimension">新建维度</el-button>
+              <el-button v-hasPermi="['profile:dimension:edit']" type="primary" @click="openCreateDimension">新建维度</el-button>
               <el-button :loading="coverageLoading" @click="loadDimensions">刷新覆盖率</el-button>
             </div>
             <div class="toolbar-right muted">共 {{ dimensions.length }} 个维度，启用 {{ enabledDimensions.length }} 个</div>
@@ -79,10 +79,10 @@
             <el-table-column label="排序" width="80" prop="sortOrder" />
             <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
-                <el-button link type="primary" @click="openEditDimension(row)">编辑</el-button>
+                <el-button v-hasPermi="['profile:dimension:edit']" link type="primary" @click="openEditDimension(row)">编辑</el-button>
                 <el-button link type="primary" @click="openPreview(row)">试算</el-button>
-                <el-button v-if="row.enabled === '1'" link type="danger" :disabled="row.builtin === '1'" @click="disableDim(row)"> 停用 </el-button>
-                <el-button v-else link type="success" @click="openEditDimension(row)">启用</el-button>
+                <el-button v-hasPermi="['profile:dimension:edit']" v-if="row.enabled === '1'" link type="danger" :disabled="row.builtin === '1'" @click="disableDim(row)"> 停用 </el-button>
+                <el-button v-hasPermi="['profile:dimension:edit']" v-else link type="success" @click="openEditDimension(row)">启用</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -153,7 +153,7 @@
                     </el-select>
                   </el-form-item>
                 </el-form>
-                <el-button type="primary" :loading="ruleActionLoading" @click="createDraft">创建草稿</el-button>
+                <el-button v-hasPermi="['profile:rule:edit']" type="primary" :loading="ruleActionLoading" @click="createDraft">创建草稿</el-button>
                 <p class="muted small">同一业务源同时只能有一个草稿；发布前权重必须覆盖全部启用维度且合计为 1。</p>
               </div>
 
@@ -192,21 +192,21 @@
                     合计 {{ formatNumber(draftSum, 4) }}
                     <span v-if="!sumOk" class="sum-hint">需等于 1</span>
                   </div>
-                  <el-button size="small" @click="balanceWeights">平均分配</el-button>
-                  <el-button size="small" @click="normalizeWeights">归一化</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="balanceWeights">平均分配</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="normalizeWeights">归一化</el-button>
                   <el-select v-model="applyTemplateCode" clearable placeholder="套用模板" size="small" style="width: 150px">
                     <el-option v-for="tpl in ruleTemplates" :key="tpl.code" :label="tpl.name" :value="tpl.code" />
                   </el-select>
-                  <el-button size="small" @click="applyTemplate">套用</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="applyTemplate">套用</el-button>
                 </div>
 
                 <div class="draft-actions wrap">
-                  <el-button type="primary" size="small" :loading="ruleActionLoading" @click="saveDraft">保存草稿</el-button>
-                  <el-button size="small" @click="validateDraft">校验</el-button>
-                  <el-button size="small" @click="showDiff">对比当前</el-button>
-                  <el-button size="small" @click="showImpact">影响评估</el-button>
-                  <el-button type="success" size="small" @click="openPublish">发布</el-button>
-                  <el-button type="danger" plain size="small" @click="deleteDraft">删除草稿</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" type="primary" size="small" :loading="ruleActionLoading" @click="saveDraft">保存草稿</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="validateDraft">校验</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="showDiff">对比当前</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="showImpact">影响评估</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" type="success" size="small" @click="openPublish">发布</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" type="danger" plain size="small" @click="deleteDraft">删除草稿</el-button>
                 </div>
               </div>
             </div>
@@ -236,9 +236,9 @@
             </el-table-column>
             <el-table-column label="操作" width="190" fixed="right">
               <template #default="{ row }">
-                <el-button v-if="row.status === 'DRAFT'" link type="primary" @click="focusDraft">继续编辑</el-button>
-                <el-button v-if="row.status !== 'DRAFT'" link type="primary" @click="copyAsDraft(row)">复制为草稿</el-button>
-                <el-button v-if="row.status === 'PUBLISHED'" link type="warning" @click="archiveRule(row)">归档</el-button>
+                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status === 'DRAFT'" link type="primary" @click="focusDraft">继续编辑</el-button>
+                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status !== 'DRAFT'" link type="primary" @click="copyAsDraft(row)">复制为草稿</el-button>
+                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status === 'PUBLISHED'" link type="warning" @click="archiveRule(row)">归档</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -351,14 +351,14 @@
           <div v-if="dimForm.scoreType === 'bucket'" class="bucket-editor">
             <div class="bucket-head">
               <span>分档（按顺序匹配，lte 留空 = 兜底档）</span>
-              <el-button link type="primary" @click="addBucket">+ 添加档位</el-button>
+              <el-button v-hasPermi="['profile:dimension:edit']" link type="primary" @click="addBucket">+ 添加档位</el-button>
             </div>
             <div v-for="(bucket, index) in dimForm.buckets" :key="index" class="bucket-row">
               <span class="bucket-index">#{{ index + 1 }}</span>
               <el-input v-model="bucket.lte" placeholder="lte，留空=兜底" style="width: 170px" />
               <span class="muted">→</span>
               <el-input-number v-model="bucket.score" :min="0" :max="1000" controls-position="right" style="width: 130px" />
-              <el-button link type="danger" :disabled="dimForm.buckets.length <= 1" @click="removeBucket(index)">删除</el-button>
+              <el-button v-hasPermi="['profile:dimension:edit']" link type="danger" :disabled="dimForm.buckets.length <= 1" @click="removeBucket(index)">删除</el-button>
             </div>
           </div>
         </template>
@@ -400,7 +400,7 @@
         <div class="dialog-footer">
           <el-button @click="dimDialogVisible = false">取消</el-button>
           <el-button @click="openPreview()">试算</el-button>
-          <el-button type="primary" :loading="dimSaving" @click="saveDimension">保存</el-button>
+          <el-button v-hasPermi="['profile:dimension:edit']" type="primary" :loading="dimSaving" @click="saveDimension">保存</el-button>
         </div>
       </template>
     </el-dialog>
@@ -475,7 +475,7 @@
       />
       <template #footer>
         <el-button @click="publishVisible = false">取消</el-button>
-        <el-button type="success" :loading="ruleActionLoading" @click="publishDraft">确认发布</el-button>
+        <el-button v-hasPermi="['profile:rule:edit']" type="success" :loading="ruleActionLoading" @click="publishDraft">确认发布</el-button>
       </template>
     </el-dialog>
 

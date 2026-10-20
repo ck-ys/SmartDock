@@ -411,7 +411,7 @@
                 </div>
               </template>
               <pre class="code-block">{{ snippet }}</pre>
-              <p class="muted small">SDK 自动完成：访客 ID、30 分钟会话、page_view、SPA 路由变化、批量上报与失败重试。</p>
+              <p class="muted small">SDK 自动完成：访客 ID、30 分钟会话、page_view、SPA 路由变化、批量上报与 sendBeacon 兜底。</p>
             </el-card>
           </el-col>
         </el-row>

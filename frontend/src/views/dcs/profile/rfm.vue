@@ -17,16 +17,16 @@
               <span class="option-meta">{{ m.modelType }} / {{ m.modelVersion }}</span>
             </el-option>
           </el-select>
-          <el-button :disabled="!currentModel" @click="openModelDialog('edit')">编辑模型</el-button>
-          <el-button v-if="currentModel && currentModel.builtin !== '1'" type="danger" plain @click="removeCurrent"> 删除 </el-button>
-          <el-button type="primary" :disabled="!currentModel" @click="createNewModel">新建模型</el-button>
-          <el-button :disabled="!currentModel" :loading="running" @click="runCurrent">运行模型</el-button>
+          <el-button v-hasPermi="['profile:model:edit']" :disabled="!currentModel" @click="openModelDialog('edit')">编辑模型</el-button>
+          <el-button v-hasPermi="['profile:model:edit']" v-if="currentModel && currentModel.builtin !== '1'" type="danger" plain @click="removeCurrent"> 删除 </el-button>
+          <el-button v-hasPermi="['profile:model:edit']" type="primary" :disabled="!currentModel" @click="createNewModel">新建模型</el-button>
+          <el-button v-hasPermi="['profile:model:edit']" :disabled="!currentModel" :loading="running" @click="runCurrent">运行模型</el-button>
           <el-button :loading="loading" @click="loadAll">刷新</el-button>
         </div>
       </div>
 
       <el-empty v-if="!loading && models.length === 0" description="当前业务源还没有评分模型">
-        <el-button type="primary" @click="createNewModel">用 RFM 预设新建</el-button>
+        <el-button v-hasPermi="['profile:model:edit']" type="primary" @click="createNewModel">用 RFM 预设新建</el-button>
       </el-empty>
 
       <template v-else>
@@ -243,7 +243,7 @@
       </el-form>
       <template #footer>
         <el-button @click="modelDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveModel">保存</el-button>
+        <el-button v-hasPermi="['profile:model:edit']" type="primary" :loading="saving" @click="saveModel">保存</el-button>
       </template>
     </el-dialog>
 
