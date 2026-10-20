@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 事件保留期清理: 每日 03:30(GMT+8) 删过期事件, 单轮 1 万行分批。
@@ -45,7 +46,7 @@ public class ProfileRetentionJob {
             return;
         }
         try {
-            Date before = new Date(System.currentTimeMillis() - retentionDays * 24L * 3600_0000L);
+            Date before = new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(retentionDays));
             long total = TenantHelper.ignore(() -> {
                 long deleted = 0;
                 int rows;

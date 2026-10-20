@@ -33,6 +33,21 @@ public interface AnalyticsSessionMapper extends BaseMapperPlus<AnalyticsSession,
                     @Param("from") Date from,
                     @Param("to") Date to);
 
+    /**
+     * 按 session_key 精确清理: 重建时起点在窗口外的边界会话 deleteRange 删不到, 不清会撞唯一键。
+     */
+    @Delete("""
+        <script>
+        DELETE FROM analytics_session
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND session_key IN
+          <foreach collection="keys" item="key" open="(" separator="," close=")">#{key}</foreach>
+        </script>
+        """)
+    int deleteByKeys(@Param("tenantId") String tenantId,
+                     @Param("source") String source,
+                     @Param("keys") List<String> keys);
+
     @Select("""
         SELECT count(*) AS "visits",
                count(DISTINCT visitor_id) AS "uv",

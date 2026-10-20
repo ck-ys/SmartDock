@@ -70,6 +70,38 @@ class AnalyticsSessionizerTest {
     }
 
     @Test
+    void implicitSessionKeyAnchorsOnFirstEventNotRolling() {
+        // 0/10/20 分钟连续访问: 旧实现取“上一事件”的分钟桶, 第三条会滚到新键把访问拆碎
+        List<AnalyticsSession> sessions = AnalyticsSessionizer.build("000000", "web", List.of(
+            event(1, "page_view", "v1", null, 0, "{\"pageUrl\":\"/home\"}"),
+            event(2, "page_view", "v1", null, 10, "{\"pageUrl\":\"/docs\"}"),
+            event(3, "page_view", "v1", null, 20, "{\"pageUrl\":\"/pricing\"}")
+        ), Map.of());
+
+        assertThat(sessions).hasSize(1);
+        assertThat(sessions.get(0).getEventCount()).isEqualTo(3);
+        assertThat(sessions.get(0).getPageViews()).isEqualTo(3);
+        assertThat(sessions.get(0).getEntryPage()).isEqualTo("/home");
+        assertThat(sessions.get(0).getExitPage()).isEqualTo("/pricing");
+    }
+
+    @Test
+    void implicitSecondSessionAnchorsOnItsOwnFirstEvent() {
+        // 第二段访问(45 分钟处)必须以自己的首事件为键, 不再受第一段影响
+        List<AnalyticsSession> sessions = AnalyticsSessionizer.build("000000", "web", List.of(
+            event(1, "page_view", "v1", null, 0, "{\"pageUrl\":\"/home\"}"),
+            event(2, "page_view", "v1", null, 10, "{\"pageUrl\":\"/docs\"}"),
+            event(3, "page_view", "v1", null, 45, "{\"pageUrl\":\"/pricing\"}"),
+            event(4, "page_view", "v1", null, 55, "{\"pageUrl\":\"/about\"}")
+        ), Map.of());
+
+        assertThat(sessions).hasSize(2);
+        assertThat(sessions.get(0).getEventCount()).isEqualTo(2);
+        assertThat(sessions.get(1).getEventCount()).isEqualTo(2);
+        assertThat(sessions.get(1).getEntryPage()).isEqualTo("/pricing");
+    }
+
+    @Test
     void pageLeaveDoesNotBreakBounceDetection() {
         List<AnalyticsSession> sessions = AnalyticsSessionizer.build("000000", "web", List.of(
             event(1, "page_view", "v1", "s1", 0, "{\"pageUrl\":\"/home\"}"),

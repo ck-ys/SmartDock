@@ -39,6 +39,7 @@ public class AnalyticsRollupTrigger {
         if (running.putIfAbsent(key, Boolean.TRUE) != null) {
             return;
         }
+        boolean interrupted = false;
         try {
             Thread.sleep(2000);
             while (true) {
@@ -54,9 +55,11 @@ public class AnalyticsRollupTrigger {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            interrupted = true;
         } finally {
             running.remove(key);
-            if (flag.getAndSet(false)) {
+            // 被中断时不再就地递归补触发: 中断标志未清会立刻再抛 InterruptedException 直到栈溢出
+            if (!interrupted && flag.getAndSet(false)) {
                 onEvent(tenantId, source);
             }
         }

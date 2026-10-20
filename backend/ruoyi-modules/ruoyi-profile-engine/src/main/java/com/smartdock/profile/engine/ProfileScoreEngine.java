@@ -27,6 +27,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 画像打分引擎: 载入维度 → 逐维度执行(EVENT_AGG / STRATEGY) → 权重合成 → 快照落库(前链)。
@@ -287,7 +288,7 @@ public class ProfileScoreEngine {
 
         private Date windowStart(Integer windowDays) {
             return windowDays == null || windowDays <= 0 ? null
-                : new Date(System.currentTimeMillis() - windowDays * 24L * 3600_0000L);
+                : new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(windowDays));
         }
 
         @Override

@@ -45,6 +45,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 分析中心：会话重建、日汇总、趋势/下钻/留存/漏斗/自定义分析与 CSV 导入。
@@ -74,33 +76,60 @@ public class AnalyticsService {
     /** ObjectProvider 打破 AnalyticsService → 事件发布器 → 自动汇总触发器 的构造环 */
     private final ObjectProvider<ProfileEventPublisher> eventPublisherProvider;
 
+    /**
+     * 同一 (租户,业务源) 的重建互斥: 手动重建与自动汇总并发时会互相删插对方的会话。
+     * 单 JVM 锁; 多实例分布式锁在二期批 10。
+     */
+    private final Map<String, ReentrantLock> rebuildLocks = new ConcurrentHashMap<>();
+
+    private ReentrantLock rebuildLock(String tenantId, String source) {
+        return rebuildLocks.computeIfAbsent(tenantId + "|" + source, k -> new ReentrantLock());
+    }
+
     // ---------------------------------------------------------------- 重建 / 汇总
 
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> rebuild(String source, int days) {
         requireSource(source);
         String tenantId = currentTenant();
-        Date from = startOfDaysAgo(days);
-        Date to = startOfTomorrow();
-        int sessions = sessionizer.rebuild(tenantId, source, from, to);
-        int dailyRows = rollup(tenantId, source, from, to);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("source", source);
-        out.put("days", days);
-        out.put("sessions", sessions);
-        out.put("dailyRows", dailyRows);
-        out.put("from", from);
-        out.put("to", to);
-        return out;
+        ReentrantLock lock = rebuildLock(tenantId, source);
+        lock.lock();
+        try {
+            Date from = startOfDaysAgo(days);
+            Date to = startOfTomorrow();
+            int sessions = sessionizer.rebuild(tenantId, source, from, to);
+            int dailyRows = rollup(tenantId, source, from, to);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("source", source);
+            out.put("days", days);
+            out.put("sessions", sessions);
+            out.put("dailyRows", dailyRows);
+            out.put("from", from);
+            out.put("to", to);
+            return out;
+        } finally {
+            lock.unlock();
+        }
     }
 
     /**
      * 事件写入后重建最近两天：会话与日汇总一起刷新。
+     * 拿不到锁说明手动重建正在进行, 直接跳过——下一个事件会再次触发。
      */
+    @Transactional(rollbackFor = Exception.class)
     public void rebuildRecent(String tenantId, String source) {
-        Date from = startOfDaysAgo(2);
-        Date to = startOfTomorrow();
-        sessionizer.rebuild(tenantId, source, from, to);
-        rollup(tenantId, source, from, to);
+        ReentrantLock lock = rebuildLock(tenantId, source);
+        if (!lock.tryLock()) {
+            return;
+        }
+        try {
+            Date from = startOfDaysAgo(2);
+            Date to = startOfTomorrow();
+            sessionizer.rebuild(tenantId, source, from, to);
+            rollup(tenantId, source, from, to);
+        } finally {
+            lock.unlock();
+        }
     }
 
     private int rollup(String tenantId, String source, Date from, Date to) {
@@ -253,10 +282,13 @@ public class AnalyticsService {
         }
         Date from = new Date(session.getStartedAt().getTime() - 60_000L);
         Date to = new Date(session.getLastEventAt().getTime() + 60_000L);
-        List<AnalyticsEventRow> events = eventMapper.selectVisitorEvents(session.getTenantId(),
-            session.getSource(), session.getVisitorId(), from, to);
         boolean explicit = session.getSessionKey() != null && session.getSessionKey().startsWith("s:");
         String externalSession = explicit ? session.getSessionKey().substring(2) : null;
+        // 显式会话按 sessionId 查: 登录前(匿名 ID)与登录后(用户 ID)的事件都能进时间线;
+        // 按 visitorId 查会把匿名期事件过滤掉
+        List<AnalyticsEventRow> events = explicit
+            ? eventMapper.selectSessionEvents(session.getTenantId(), session.getSource(), externalSession, from, to)
+            : eventMapper.selectVisitorEvents(session.getTenantId(), session.getSource(), session.getVisitorId(), from, to);
         List<Map<String, Object>> timeline = new ArrayList<>();
         for (AnalyticsEventRow event : events) {
             boolean same = explicit
@@ -548,7 +580,9 @@ public class AnalyticsService {
             event.setSource(bo.getSource());
             event.setEventName(eventName.trim());
             event.setEventType(eventName.trim());
-            event.setEventUid("csv-" + UUID.randomUUID());
+            // 尊重 CSV 里的 eventUid 列: 同一份文件重复导入时幂等键才一致, 不会重复计数
+            String csvUid = cell(line, index, "eventuid", "event_uid");
+            event.setEventUid(StringUtils.isNotBlank(csvUid) ? csvUid.trim() : "csv-" + UUID.randomUUID());
             event.setSubjectType(defaultIfBlank(cell(line, index, "subjecttype", "subject_type"), "user"));
             event.setSubjectId(defaultIfBlank(cell(line, index, "subjectid", "subject_id"),
                 defaultIfBlank(cell(line, index, "anonymousid", "anonymous_id"), "csv-unknown")));

@@ -110,23 +110,37 @@ public class ProfileIdentityService {
             }
         }
 
-        // anonymous_id: 登录后把匿名主体并入规范主体; 强冲突时保留原链接不动
+        // anonymous_id: 登录后把匿名主体并入规范主体; 挂载方是真实用户时绝不搬链接
         String anonymousId = ids.get("anonymous_id");
         if (anonymousId != null) {
             ProfileIdentityLink existing = linkMapper.selectLink(tenantId, source, "anonymous_id", anonymousId);
             if (existing != null && StringUtils.isNotBlank(existing.getSubjectId())
                 && !existing.getSubjectId().equals(canonical)) {
+                String holder = existing.getSubjectId();
                 if (strongConflict) {
                     conflictingTypes.add("anonymous_id");
+                } else if (linkMapper.countStrongLinks(tenantId, source, holder) > 0) {
+                    // 匿名 ID 已挂在真实用户名下:
+                    // 匿名回访 → 沿用该用户, 事件归因不断链;
+                    // 共享浏览器换账号(userId 已定新 canonical) → 只把匿名链接改挂到新主体, 不搬对方身份
+                    if (userId == null && !canonicalFixed) {
+                        canonical = holder;
+                        canonicalFixed = true;
+                    } else {
+                        log.info("[Profile] anonymous_id re-pointed (shared device, no merge) "
+                                + "source={} {} : {} -> {}", source, anonymousId, holder, canonical);
+                    }
                 } else {
-                    mergeSubject(tenantId, source, subjectType, existing.getSubjectId(), canonical,
+                    // 挂载点是纯匿名主体: 正常"登录升级"并入规范主体
+                    mergeSubject(tenantId, source, subjectType, holder, canonical,
                         userId != null ? "login" : "anonymous_merge", actor);
                 }
             }
         }
 
-        // 事件主体本身是匿名主体时, 并入规范主体; 强身份冲突时不动(避免误合并两个用户)
-        if (!strongConflict && !canonical.equals(subjectId)) {
+        // 事件主体本身是匿名主体且本次是登录: 并入规范主体;
+        // 匿名回访(userId 为空)不走这里, 否则每次回访都会追加一条 merge 审计
+        if (!strongConflict && userId != null && !canonical.equals(subjectId)) {
             mergeSubject(tenantId, source, subjectType, subjectId, canonical,
                 userId != null ? "login" : "anonymous_merge", actor);
         }

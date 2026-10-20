@@ -20,6 +20,7 @@ import java.math.RoundingMode;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 /**
@@ -236,7 +237,8 @@ public class DimensionEvaluator {
         if (w == null || !w.isRolling()) {
             return null;
         }
-        return new Date(System.currentTimeMillis() - w.getDays() * 24L * 3600_0000L);
+        // 按“天”换算滚动窗口: 手写 24*3600_0000 会多一个零(10 倍窗口), 所有维度口径失真
+        return new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(w.getDays()));
     }
 
     private MetricSpec.TargetSpec requireTarget(MetricSpec m, String field) {

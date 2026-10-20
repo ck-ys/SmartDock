@@ -120,6 +120,7 @@ public interface AnalyticsEventMapper {
 
     /**
      * 单个访问者在时间窗内的事件（会话时间线）。
+     * 登录会话的 visitorId 是用户 ID, 而登录前事件只带 anonymousId: 两种键都要能命中。
      */
     @Select("""
         SELECT event_id AS "eventId", event_name AS "eventName", subject_type AS "subjectType",
@@ -128,7 +129,8 @@ public interface AnalyticsEventMapper {
                occurred_time AS "occurredTime", props::text AS props, context::text AS context
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND COALESCE(NULLIF(anonymous_id, ''), subject_id) = #{visitorKey}
+          AND (COALESCE(NULLIF(anonymous_id, ''), subject_id) = #{visitorKey}
+               OR subject_id = #{visitorKey})
           AND occurred_time >= #{from} AND occurred_time < #{to}
           AND del_flag = '0'
         ORDER BY occurred_time, event_id
@@ -136,6 +138,27 @@ public interface AnalyticsEventMapper {
     List<AnalyticsEventRow> selectVisitorEvents(@Param("tenantId") String tenantId,
                                                 @Param("source") String source,
                                                 @Param("visitorKey") String visitorKey,
+                                                @Param("from") Date from,
+                                                @Param("to") Date to);
+
+    /**
+     * 显式会话的事件: 按 sessionId 查, 登录前后(匿名 ID → 用户 ID)的事件都能取到。
+     */
+    @Select("""
+        SELECT event_id AS "eventId", event_name AS "eventName", subject_type AS "subjectType",
+               subject_id AS "subjectId", anonymous_id AS "anonymousId", session_id AS "sessionId",
+               COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey",
+               occurred_time AS "occurredTime", props::text AS props, context::text AS context
+        FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND session_id = #{sessionId}
+          AND occurred_time >= #{from} AND occurred_time < #{to}
+          AND del_flag = '0'
+        ORDER BY occurred_time, event_id
+        """)
+    List<AnalyticsEventRow> selectSessionEvents(@Param("tenantId") String tenantId,
+                                                @Param("source") String source,
+                                                @Param("sessionId") String sessionId,
                                                 @Param("from") Date from,
                                                 @Param("to") Date to);
 }

@@ -53,6 +53,16 @@
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-common-tenant</artifactId>
         </dependency>
+        <!-- 公开采集口 IP 限流(@RateLimiter), 防灌水 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-ratelimiter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <!-- 单测: 纯函数层(打分映射/缺失策略/窗口/uid/配置模型), 不起 Spring 不连库 -->
         <dependency>

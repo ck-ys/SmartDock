@@ -81,4 +81,18 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
                     @Param("subjectType") String subjectType,
                     @Param("fromSubjectId") String fromSubjectId,
                     @Param("toSubjectId") String toSubjectId);
+
+    /**
+     * 主体名下的强标识(user_id/email/...)链接数: 大于 0 即真实用户, 合并前必查, 防止搬走真实用户身份。
+     */
+    @Select("""
+        SELECT count(*)
+        FROM profile_identity_link
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND subject_id = #{subjectId} AND status = 'ACTIVE'
+          AND identifier_type IN ('user_id','email_sha256','phone_sha256','crm_id','member_id','account_id')
+        """)
+    int countStrongLinks(@Param("tenantId") String tenantId,
+                         @Param("source") String source,
+                         @Param("subjectId") String subjectId);
 }

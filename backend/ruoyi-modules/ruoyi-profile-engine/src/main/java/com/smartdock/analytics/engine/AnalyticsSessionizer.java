@@ -44,8 +44,10 @@ public class AnalyticsSessionizer {
     private final AnalyticsEventMapper eventMapper;
 
     public int rebuild(String tenantId, String source, Date from, Date to) {
-        sessionMapper.deleteRange(tenantId, source, from, to);
-        List<AnalyticsEventRow> events = eventMapper.selectEvents(tenantId, source, from, to);
+        // 读取窗口向左多取一个会话间隔: 起点落在窗口前的边界会话才能被完整重建
+        Date readFrom = new Date(from.getTime() - SESSION_GAP_MS);
+        sessionMapper.deleteRange(tenantId, source, readFrom, to);
+        List<AnalyticsEventRow> events = eventMapper.selectEvents(tenantId, source, readFrom, to);
         if (events.isEmpty()) {
             return 0;
         }
@@ -58,6 +60,14 @@ public class AnalyticsSessionizer {
             }
         }
         List<AnalyticsSession> sessions = build(tenantId, source, events, firstSeen);
+        // 起点在窗口外的长会话 deleteRange 删不到, 按 key 精确清理, 避免撞 uk_analytics_session_key
+        List<String> keys = new ArrayList<>(sessions.size());
+        for (AnalyticsSession session : sessions) {
+            keys.add(session.getSessionKey());
+        }
+        for (int i = 0; i < keys.size(); i += 500) {
+            sessionMapper.deleteByKeys(tenantId, source, keys.subList(i, Math.min(i + 500, keys.size())));
+        }
         for (AnalyticsSession session : sessions) {
             sessionMapper.insert(session);
         }
@@ -78,6 +88,7 @@ public class AnalyticsSessionizer {
 
         Map<String, List<AnalyticsEventRow>> groups = new LinkedHashMap<>();
         Map<String, Date> lastImplicit = new HashMap<>();
+        Map<String, String> activeKey = new HashMap<>();
         for (AnalyticsEventRow event : sorted) {
             if (event.getOccurredTime() == null) {
                 continue;
@@ -91,8 +102,10 @@ public class AnalyticsSessionizer {
                 if (last == null || event.getOccurredTime().getTime() - last.getTime() > SESSION_GAP_MS) {
                     sessionKey = "v:" + visitor + ":" + (event.getOccurredTime().getTime() / 60000L);
                 } else {
-                    sessionKey = "v:" + visitor + ":" + (last.getTime() / 60000L);
+                    // 会话键必须锚定首事件: 用上一事件的分钟桶会把同一段访问滚动拆碎
+                    sessionKey = activeKey.get(visitor);
                 }
+                activeKey.put(visitor, sessionKey);
                 lastImplicit.put(visitor, event.getOccurredTime());
             }
             groups.computeIfAbsent(sessionKey, key -> new ArrayList<>()).add(event);
