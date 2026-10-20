@@ -42,5 +42,8 @@ public class ProfileEngineConfig extends BaseEntity {
     /** 自动重算合并窗口(毫秒) */
     private Integer debounceMs;
 
+    /** 复核 SLA 天数(批9, 按业务源; 默认 7) */
+    private Integer reviewSlaDays;
+
     private String remark;
 }

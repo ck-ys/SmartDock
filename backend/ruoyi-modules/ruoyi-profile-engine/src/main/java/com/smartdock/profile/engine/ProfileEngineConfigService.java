@@ -56,6 +56,7 @@ public class ProfileEngineConfigService {
         created.setReviewEnabled("1");
         created.setReviewThreshold(DEFAULT_THRESHOLD);
         created.setDebounceMs(2000);
+        created.setReviewSlaDays(7);
         created.setRemark("默认配置");
         created.setCreateBy(currentUser());
         try {
@@ -90,6 +91,12 @@ public class ProfileEngineConfigService {
                 throw new ServiceException("合并窗口必须在 0~60000 毫秒之间");
             }
             config.setDebounceMs(bo.getDebounceMs());
+        }
+        if (bo.getReviewSlaDays() != null) {
+            if (bo.getReviewSlaDays() < 1 || bo.getReviewSlaDays() > 365) {
+                throw new ServiceException("复核 SLA 天数必须在 1~365 之间");
+            }
+            config.setReviewSlaDays(bo.getReviewSlaDays());
         }
         if (bo.getRemark() != null) {
             config.setRemark(StringUtils.substring(bo.getRemark(), 0, 500));

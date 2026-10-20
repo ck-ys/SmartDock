@@ -51,6 +51,9 @@ public class ProfileSegment extends BaseEntity {
 
     private Date lastEvalTime;
 
+    /** OFF / DAILY / HOURLY（批9 定时刷新模式） */
+    private String refreshMode;
+
     private String builtin;
 
     private Integer revision;

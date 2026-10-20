@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.smartdock.profile.domain.ProfileEngineConfig;
 import com.smartdock.profile.domain.ProfileReviewQueue;
 import com.smartdock.profile.event.ProfileSubject;
+import com.smartdock.profile.mapper.ProfileEngineConfigMapper;
 import com.smartdock.profile.mapper.ProfileReviewQueueMapper;
 import com.smartdock.profile.mapper.ProfileSubjectMapper;
 import com.smartdock.profile.query.ProfileReviewActionBo;
@@ -37,8 +38,9 @@ import java.util.Map;
 public class ProfileReviewService {
 
     private final ProfileReviewQueueMapper reviewMapper;
-    private final ProfileSubjectMapper subjectMapper;
+    private final ProfileEngineConfigMapper configMapper;
     private final ProfileEngineConfigService configService;
+    private final ProfileSubjectMapper subjectMapper;
 
     /**
      * 重算后回调: 低于阈值入 PENDING, 回升则把存量 PENDING 置 SUPERSEDED。
@@ -122,7 +124,85 @@ public class ProfileReviewService {
                 .like(ProfileReviewQueue::getDisplayName, keyword))
             .orderByDesc(ProfileReviewQueue::getCreateTime);
         reviewMapper.selectPage(page, wrapper);
+        attachOverdue(page.getRecords());
         return page;
+    }
+
+    /** 复核 SLA 概况(批9 助手只读工具用)。 */
+    public Map<String, Object> summary(String source) {
+        LambdaQueryWrapper<ProfileReviewQueue> wrapper = new LambdaQueryWrapper<ProfileReviewQueue>()
+            .eq(StringUtils.isNotBlank(source), ProfileReviewQueue::getSource, source)
+            .eq(ProfileReviewQueue::getStatus, "PENDING");
+        List<ProfileReviewQueue> pending = reviewMapper.selectList(wrapper);
+        Map<String, Long> bySource = new LinkedHashMap<>();
+        long overdue = 0;
+        Date now = new Date();
+        Map<String, Integer> slaBySource = slaBySource();
+        Date oldest = null;
+        for (ProfileReviewQueue r : pending) {
+            bySource.merge(r.getSource(), 1L, Long::sum);
+            Integer sla = slaBySource.getOrDefault(slaKey(r.getTenantId(), r.getSource()), 7);
+            if (slaOverdueDays(r.getCreateTime(), sla, now) > 0) {
+                overdue++;
+            }
+            if (r.getCreateTime() != null && (oldest == null || r.getCreateTime().before(oldest))) {
+                oldest = r.getCreateTime();
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("pendingTotal", pending.size());
+        out.put("pendingBySource", bySource);
+        out.put("overdueTotal", overdue);
+        out.put("oldestCreatedAt", oldest);
+        out.put("reviewEnabled", configService.getOrCreate(
+            StringUtils.isBlank(source) ? "web" : source).getReviewEnabled());
+        return out;
+    }
+
+    /** 超时天数现算(批9 Q4/Q8-A: 入队时间+SLA, 改配置立即生效, 不回填)。 */
+    private void attachOverdue(List<ProfileReviewQueue> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        Map<String, Integer> slaBySource = slaBySource();
+        Date now = new Date();
+        for (ProfileReviewQueue r : rows) {
+            Integer sla = slaBySource.getOrDefault(slaKey(r.getTenantId(), r.getSource()), 7);
+            long overdue = slaOverdueDays(r.getCreateTime(), sla, now);
+            r.setOverdueDays(overdue);
+            r.setSlaDays(sla);
+        }
+        // 超时的排前面(同组内按超时天数降序)
+        rows.sort((a, b) -> Long.compare(b.getOverdueDays() == null ? 0 : b.getOverdueDays(),
+            a.getOverdueDays() == null ? 0 : a.getOverdueDays()));
+    }
+
+    private Map<String, Integer> slaBySource() {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        try {
+            for (ProfileEngineConfig config : TenantHelper.ignore(() ->
+                configMapper.selectList(new LambdaQueryWrapper<ProfileEngineConfig>()))) {
+                // 键带租户: 多租户共用同名 source(如 web)时不能互相覆盖
+                out.put(slaKey(config.getTenantId(), config.getSource()),
+                    config.getReviewSlaDays() == null ? 7 : config.getReviewSlaDays());
+            }
+        } catch (Exception ignored) {
+            // 配置表不可用时走默认
+        }
+        return out;
+    }
+
+    private static String slaKey(String tenantId, String source) {
+        return (tenantId == null ? "" : tenantId) + "|" + (source == null ? "" : source);
+    }
+
+    static long slaOverdueDays(Date createdAt, Integer slaDays, Date now) {
+        if (createdAt == null) {
+            return 0;
+        }
+        long sla = (slaDays == null ? 7 : slaDays) * 86_400_000L;
+        long age = now.getTime() - createdAt.getTime();
+        return age <= sla ? 0 : (age - sla) / 86_400_000L + 1;
     }
 
     public ProfileReviewQueue get(Long reviewId) {

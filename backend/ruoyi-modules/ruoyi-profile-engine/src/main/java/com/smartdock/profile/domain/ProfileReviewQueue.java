@@ -57,4 +57,12 @@ public class ProfileReviewQueue extends BaseEntity {
     private Long reviewedBy;
 
     private Date reviewedAt;
+
+    /** 超时天数(现算, 批9 Q4; >0 即超 SLA) */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private Long overdueDays;
+
+    /** 该来源的 SLA 天数(现算透出) */
+    @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+    private Integer slaDays;
 }

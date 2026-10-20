@@ -1322,6 +1322,7 @@ CREATE TABLE public.profile_score_model (
     enabled character(1) DEFAULT '1'::bpchar NOT NULL,
     builtin character(1) DEFAULT '0'::bpchar NOT NULL,
     remark character varying(500),
+    status character varying(16) DEFAULT 'PUBLISHED'::character varying NOT NULL,
     revision integer DEFAULT 0 NOT NULL,
     create_dept bigint,
     create_by bigint,
@@ -1329,7 +1330,8 @@ CREATE TABLE public.profile_score_model (
     update_by bigint,
     update_time timestamp without time zone,
     del_flag character(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_profile_score_model PRIMARY KEY (model_id)
+    CONSTRAINT pk_profile_score_model PRIMARY KEY (model_id),
+    CONSTRAINT ck_profile_score_model_status CHECK (status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED'))
 );
 
 CREATE UNIQUE INDEX uk_profile_model_code
@@ -1423,6 +1425,7 @@ CREATE TABLE public.profile_segment (
     member_count integer DEFAULT 0 NOT NULL,
     last_run_id bigint,
     last_eval_time timestamp without time zone,
+    refresh_mode character varying(16) DEFAULT 'OFF'::character varying NOT NULL,
     builtin character(1) DEFAULT '0'::bpchar NOT NULL,
     revision integer DEFAULT 0 NOT NULL,
     create_dept bigint,
@@ -1431,7 +1434,8 @@ CREATE TABLE public.profile_segment (
     update_by bigint,
     update_time timestamp without time zone,
     del_flag character(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_profile_segment PRIMARY KEY (segment_id)
+    CONSTRAINT pk_profile_segment PRIMARY KEY (segment_id),
+    CONSTRAINT ck_profile_segment_refresh_mode CHECK (refresh_mode IN ('OFF', 'DAILY', 'HOURLY'))
 );
 
 CREATE UNIQUE INDEX uk_profile_segment_code
@@ -1549,6 +1553,7 @@ CREATE TABLE public.profile_engine_config (
     review_enabled character(1) DEFAULT '1'::bpchar NOT NULL,
     review_threshold numeric(6,2) DEFAULT 60 NOT NULL,
     debounce_ms integer DEFAULT 2000 NOT NULL,
+    review_sla_days integer DEFAULT 7 NOT NULL,
     remark character varying(500),
     create_dept bigint,
     create_by bigint,
@@ -1556,12 +1561,105 @@ CREATE TABLE public.profile_engine_config (
     update_by bigint,
     update_time timestamp without time zone,
     del_flag character(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_profile_engine_config PRIMARY KEY (config_id)
+    CONSTRAINT pk_profile_engine_config PRIMARY KEY (config_id),
+    CONSTRAINT ck_profile_engine_sla_days CHECK (review_sla_days BETWEEN 1 AND 365)
 );
 
 CREATE UNIQUE INDEX uk_profile_engine_config
     ON public.profile_engine_config USING btree (tenant_id, source)
     WHERE (del_flag = '0'::bpchar);
+
+
+--
+-- Name: profile_reach_batch; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_reach_batch (
+    reach_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    segment_id bigint NOT NULL,
+    segment_name character varying(100),
+    channel character varying(16) DEFAULT 'inapp'::character varying NOT NULL,
+    title character varying(200),
+    content character varying(1000),
+    masked character(1) DEFAULT '0'::bpchar,
+    total_count integer DEFAULT 0 NOT NULL,
+    success_count integer DEFAULT 0 NOT NULL,
+    fail_count integer DEFAULT 0 NOT NULL,
+    retry_count integer DEFAULT 0 NOT NULL,
+    status character varying(16) DEFAULT 'RUNNING'::character varying NOT NULL,
+    error_msg character varying(500),
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_reach_batch PRIMARY KEY (reach_id),
+    CONSTRAINT ck_profile_reach_channel CHECK (channel IN ('inapp', 'export')),
+    CONSTRAINT ck_profile_reach_status CHECK (status IN ('RUNNING', 'DONE', 'PARTIAL', 'FAILED'))
+);
+
+CREATE INDEX idx_profile_reach_batch_segment
+    ON public.profile_reach_batch USING btree (tenant_id, segment_id, create_time DESC);
+
+CREATE INDEX idx_profile_reach_batch_source
+    ON public.profile_reach_batch USING btree (tenant_id, source, create_time DESC);
+
+
+--
+-- Name: profile_reach_item; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_reach_item (
+    item_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    reach_id bigint NOT NULL,
+    subject_type character varying(32),
+    subject_id character varying(64),
+    user_id bigint,
+    user_name character varying(64),
+    dedup_key character varying(128) NOT NULL,
+    status character varying(16) DEFAULT 'PENDING'::character varying NOT NULL,
+    error_msg character varying(500),
+    sent_time timestamp without time zone,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_profile_reach_item PRIMARY KEY (item_id),
+    CONSTRAINT uk_profile_reach_item UNIQUE (reach_id, dedup_key),
+    CONSTRAINT ck_profile_reach_item_status CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED'))
+);
+
+CREATE INDEX idx_profile_reach_item_user
+    ON public.profile_reach_item USING btree (tenant_id, user_id);
+
+CREATE INDEX idx_profile_reach_item_reach_status
+    ON public.profile_reach_item USING btree (reach_id, status);
+
+
+--
+-- Name: profile_model_config_snapshot; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.profile_model_config_snapshot (
+    config_snapshot_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    model_id bigint NOT NULL,
+    model_code character varying(64) NOT NULL,
+    model_version character varying(32) NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    score_max numeric(8,2) DEFAULT 100 NOT NULL,
+    published_by bigint,
+    published_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_model_config_snapshot PRIMARY KEY (config_snapshot_id),
+    CONSTRAINT uk_profile_model_config_snapshot UNIQUE (tenant_id, model_id, model_version)
+);
+
+CREATE INDEX idx_profile_model_cfg_snap_model
+    ON public.profile_model_config_snapshot USING btree (tenant_id, model_id, published_at DESC);
 
 
 --

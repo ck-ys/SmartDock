@@ -317,6 +317,8 @@ export interface ProfileScoreModel {
   modelName: string;
   modelType: string;
   modelVersion: string;
+  /** DRAFT 草稿 / PUBLISHED 已发布 / ARCHIVED 已归档 */
+  status?: string;
   /** JSON 字符串(ProfileModelDefinition) */
   config: string;
   scoreMax: number | string;
@@ -431,6 +433,54 @@ export interface ProfileModelTrendPoint {
   avgScore?: number | string;
 }
 
+/** 配置版本存档（发布纪律：每次发布落一份，回滚从存档写回） */
+export interface ProfileModelConfigSnapshot {
+  configSnapshotId: string;
+  tenantId: string;
+  source: string;
+  modelId: string;
+  modelCode: string;
+  modelVersion: string;
+  /** JSON 字符串(ProfileModelDefinition) */
+  config: string;
+  scoreMax: number | string;
+  publishedBy?: number;
+  createTime?: string;
+}
+
+/** 版本对比/试算共用结构：升降分布 + 等级迁移 + Top 变化主体 */
+export interface ProfileModelCompareResult {
+  deltaStat: { up: number; down: number; flat: number; onlyInBase: number; onlyInCand: number };
+  migration: { path: string; count: number }[];
+  topMovers: {
+    subjectType: string;
+    subjectId: string;
+    displayName?: string;
+    baseScore?: number | string | null;
+    candScore?: number | string | null;
+    delta?: number | string;
+    baseLevel?: string;
+    candLevel?: string;
+  }[];
+  compared: number;
+  /** 版本对比时为 runA/runB 摘要；试算时为 modelId/modelStatus/currentVersion */
+  runA?: Record<string, any>;
+  runB?: Record<string, any>;
+  modelId?: string;
+  modelStatus?: string;
+  currentVersion?: string;
+  psi: { psi: number | string; verdict: 'STABLE' | 'MODERATE' | 'SHIFTED' };
+  distribution: {
+    level: string;
+    baseCount: number;
+    candCount: number;
+    delta: number;
+    baseRate: number | string;
+    candRate: number | string;
+    smallSample: boolean;
+  }[];
+}
+
 export interface ProfileModelPreset {
   code: string;
   name: string;
@@ -472,6 +522,25 @@ export const getModelSubject = (modelId: string, subjectId: string, subjectType 
 export const getModelTrend = (modelId: string, days = 30): Promise<ProfileModelTrendPoint[]> =>
   r<ProfileModelTrendPoint[]>({ url: `${BASE}/model/${modelId}/trend`, method: 'get', params: { days } });
 
+// 发布纪律（批9）：草稿试算 / 发布 / 回滚 / 配置历史 / 版本对比
+export const listModelRuns = (modelId: string): Promise<ProfileModelRun[]> =>
+  r<ProfileModelRun[]>({ url: `${BASE}/model/${modelId}/runs`, method: 'get' });
+
+export const compareModelRuns = (modelId: string, runA: string, runB: string): Promise<ProfileModelCompareResult> =>
+  r<ProfileModelCompareResult>({ url: `${BASE}/model/${modelId}/compare`, method: 'get', params: { runA, runB } });
+
+export const dryRunModel = (modelId: string): Promise<ProfileModelCompareResult> =>
+  r<ProfileModelCompareResult>({ url: `${BASE}/model/${modelId}/dry-run`, method: 'post' });
+
+export const publishModel = (modelId: string, data: { version?: string; note?: string }): Promise<Record<string, any>> =>
+  r<Record<string, any>>({ url: `${BASE}/model/${modelId}/publish`, method: 'post', data });
+
+export const rollbackModel = (modelId: string, version: string): Promise<Record<string, any>> =>
+  r<Record<string, any>>({ url: `${BASE}/model/${modelId}/rollback`, method: 'post', params: { version } });
+
+export const listModelConfigSnapshots = (modelId: string): Promise<ProfileModelConfigSnapshot[]> =>
+  r<ProfileModelConfigSnapshot[]>({ url: `${BASE}/model/${modelId}/config-snapshots`, method: 'get' });
+
 // ---------------------------------------------------------------- 标签分群
 
 export interface ProfileSegment {
@@ -482,6 +551,8 @@ export interface ProfileSegment {
   segmentName: string;
   segmentType: string;
   status: string;
+  /** 动态分群刷新方式: OFF 手动 / DAILY 每天 / HOURLY 每小时 */
+  refreshMode?: string;
   /** JSON 字符串(ProfileSegmentRule) */
   ruleConfig: string;
   description?: string;
@@ -562,6 +633,72 @@ export const pageSegmentMembers = (
 export const listSegmentRuns = (segmentId: string): Promise<ProfileSegmentRun[]> =>
   r<ProfileSegmentRun[]>({ url: `${BASE}/segment/${segmentId}/runs`, method: 'get' });
 
+// ---------------------------------------------------------------- 触达 / 导出（批9）
+
+/** 触达批次：发送时冻结收件人快照，逐人明细可追溯 */
+export interface ProfileReachBatch {
+  reachId: string;
+  tenantId: string;
+  source: string;
+  segmentId: string;
+  segmentName?: string;
+  /** inapp 站内信 / export 导出 */
+  channel: string;
+  title?: string;
+  content?: string;
+  masked?: string;
+  totalCount?: number;
+  successCount?: number;
+  failCount?: number;
+  retryCount?: number;
+  status?: string;
+  errorMsg?: string;
+  createTime?: string;
+}
+
+export interface ProfileReachItem {
+  itemId: string;
+  reachId: string;
+  subjectType: string;
+  subjectId: string;
+  userId?: number | string;
+  userName?: string;
+  dedupKey?: string;
+  /** PENDING / SUCCESS / FAILED */
+  status: string;
+  errorMsg?: string;
+  sentTime?: string;
+  createTime?: string;
+}
+
+export interface ProfileReachPreview {
+  segmentId: string;
+  segmentName: string;
+  memberCount: number;
+  reachableCount: number;
+  skippedNonUser: number;
+  lastRunId?: string;
+  channels: { channel: string; name: string; describe: string }[];
+}
+
+export const reachPreview = (segmentId: string): Promise<ProfileReachPreview> =>
+  r<ProfileReachPreview>({ url: `${BASE}/segment/${segmentId}/reach/preview`, method: 'get' });
+
+export const reachSend = (segmentId: string, data: { title: string; content: string }): Promise<ProfileReachBatch> =>
+  r<ProfileReachBatch>({ url: `${BASE}/segment/${segmentId}/reach/send`, method: 'post', data });
+
+export const reachRetry = (reachId: string): Promise<ProfileReachBatch> =>
+  r<ProfileReachBatch>({ url: `${BASE}/segment/reach/${reachId}/retry`, method: 'post' });
+
+export const reachRecords = (
+  segmentId: string,
+  params: { channel?: string; pageNum?: number; pageSize?: number } = {}
+): Promise<TableDataInfo<ProfileReachBatch>> =>
+  table<ProfileReachBatch>({ url: `${BASE}/segment/${segmentId}/reach/records`, method: 'get', params });
+
+export const reachItems = (reachId: string, limit = 200): Promise<ProfileReachItem[]> =>
+  r<ProfileReachItem[]>({ url: `${BASE}/segment/reach/${reachId}/items`, method: 'get', params: { limit } });
+
 // ---------------------------------------------------------------- 低分复核 / 引擎配置
 
 export interface ProfileReview {
@@ -581,6 +718,9 @@ export interface ProfileReview {
   reviewedBy?: number;
   reviewedAt?: string;
   createTime?: string;
+  /** 超时天数（现算：入队时间 + 源 SLA；>0 即超时） */
+  overdueDays?: number;
+  slaDays?: number;
 }
 
 export interface ProfileEngineConfig {
@@ -591,6 +731,8 @@ export interface ProfileEngineConfig {
   reviewEnabled: string;
   reviewThreshold: number | string;
   debounceMs: number;
+  /** 复核 SLA（天）：超时未处理每天提醒管理员，1-365 */
+  reviewSlaDays?: number;
   remark?: string;
 }
 
@@ -628,8 +770,39 @@ export interface ProfileSubjectQuery {
   keyword?: string;
   minScore?: number;
   maxScore?: number;
+  /** 风险档筛选: HIGH / MEDIUM / LOW（阈值由 /profile/risk-bands 单源下发） */
+  risk?: string;
   sortBy?: string;
   sortOrder?: string;
   pageNum?: number;
   pageSize?: number;
 }
+
+/** 风险分档阈值（后端单一来源，前端不再硬编码 75/60） */
+export interface ProfileRiskBands {
+  mediumMin: number;
+  highBelow: number;
+  lowMin: number;
+}
+
+/** 单主体画像依据摘要（"查看依据"抽屉） */
+export interface ProfileSubjectSummary {
+  found: boolean;
+  subjectType?: string;
+  subjectId?: string;
+  displayName?: string;
+  source?: string;
+  eventCount?: number;
+  lastEventTime?: string;
+  scored?: boolean;
+  totalScore?: number | string;
+  ruleVersion?: string;
+  calcTime?: string;
+  dimensionDetail?: Record<string, ProfileDimensionDetail>;
+}
+
+export const getRiskBands = (): Promise<ProfileRiskBands> =>
+  r<ProfileRiskBands>({ url: `${BASE}/risk-bands`, method: 'get' });
+
+export const getSubjectSummary = (subjectId: string, subjectType = 'user', source?: string): Promise<ProfileSubjectSummary> =>
+  r<ProfileSubjectSummary>({ url: `${BASE}/subject/summary`, method: 'get', params: { subjectId, subjectType, source: source || undefined } });

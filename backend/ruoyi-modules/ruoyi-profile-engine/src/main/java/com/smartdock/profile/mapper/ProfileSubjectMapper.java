@@ -57,6 +57,19 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
         <if test="q.maxScore != null">
           AND s.total_score &lt;= #{q.maxScore}
         </if>
+        <if test="q.risk != null and q.risk != ''">
+          <choose>
+            <when test="q.risk == 'HIGH'">
+              AND COALESCE(s.total_score, 0) &lt; #{q.riskMedium}
+            </when>
+            <when test="q.risk == 'MEDIUM'">
+              AND s.total_score &gt;= #{q.riskMedium} AND s.total_score &lt; #{q.riskHigh}
+            </when>
+            <otherwise>
+              AND s.total_score &gt;= #{q.riskHigh}
+            </otherwise>
+          </choose>
+        </if>
         ORDER BY
         <choose>
           <when test="q.sortBy == 'score'">s.total_score</when>

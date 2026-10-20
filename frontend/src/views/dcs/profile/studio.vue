@@ -249,151 +249,163 @@
 
     <!-- 维度编辑 -->
     <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="780px" top="4vh" destroy-on-close>
-      <el-form label-width="108px" class="dim-form">
-        <div class="form-grid">
-          <el-form-item label="维度编码">
-            <el-input v-model="dimForm.dimCode" :disabled="Boolean(dimForm.dimensionId)" placeholder="字母开头，如 activity" maxlength="64" />
-          </el-form-item>
-          <el-form-item label="维度名称">
-            <el-input v-model="dimForm.dimName" placeholder="如 活跃度" maxlength="100" />
-          </el-form-item>
-          <el-form-item label="计算方式">
-            <el-select v-model="dimForm.calcMode" style="width: 100%">
-              <el-option label="EVENT_AGG · 事件聚合" value="EVENT_AGG" />
-              <el-option label="STRATEGY · 业务 Bean" value="STRATEGY" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="打分上限">
-            <el-input-number v-model="dimForm.scoreMax" :min="1" :max="1000" controls-position="right" style="width: 100%" />
-          </el-form-item>
-          <el-form-item label="排序">
-            <el-input-number v-model="dimForm.sortOrder" :min="0" :max="9999" controls-position="right" style="width: 100%" />
-          </el-form-item>
-          <el-form-item label="状态">
-            <el-switch v-model="dimForm.enabled" active-value="1" inactive-value="0" active-text="启用" inactive-text="停用" />
-          </el-form-item>
-        </div>
-
-        <template v-if="dimForm.calcMode === 'EVENT_AGG'">
-          <el-divider content-position="left">指标口径</el-divider>
-          <div class="form-grid">
-            <el-form-item label="算子">
-              <el-select v-model="dimForm.operator" style="width: 100%" @change="onOperatorChange">
-                <el-option label="COUNT · 次数" value="COUNT" />
-                <el-option label="COUNT_DISTINCT · 去重数" value="COUNT_DISTINCT" />
-                <el-option label="SUM · 求和" value="SUM" />
-                <el-option label="AVG · 平均" value="AVG" />
-                <el-option label="RATE · 比率" value="RATE" />
-                <el-option label="LAST_VALUE · 最近值" value="LAST_VALUE" />
-              </el-select>
-            </el-form-item>
-            <el-form-item v-if="dimForm.operator !== 'RATE'" label="目标事件">
-              <el-input v-model="dimForm.targetEvent" placeholder="如 data.submitted" />
-            </el-form-item>
-            <el-form-item v-if="dimForm.operator === 'RATE'" label="分子事件">
-              <el-input v-model="dimForm.numeratorEvent" placeholder="如 data.audit_passed" />
-            </el-form-item>
-            <el-form-item v-if="dimForm.operator === 'RATE'" label="分母事件">
-              <el-input v-model="dimForm.denominatorEvent" placeholder="如 data.submitted" />
-            </el-form-item>
-            <el-form-item v-if="['SUM', 'AVG', 'LAST_VALUE'].includes(dimForm.operator)" label="属性键">
-              <el-input v-model="dimForm.prop" placeholder="props 中的数值键，如 duration" />
-            </el-form-item>
-            <el-form-item v-if="dimForm.operator === 'COUNT_DISTINCT'" label="去重键">
-              <el-input v-model="dimForm.dedupKey" placeholder="props 中的去重键，如 taskId" />
-            </el-form-item>
-            <el-form-item v-if="dimForm.operator === 'COUNT'" label="过滤键">
-              <el-input v-model="dimForm.filterKey" placeholder="可选，如 result" />
-            </el-form-item>
-            <el-form-item v-if="dimForm.operator === 'COUNT'" label="过滤值">
-              <el-input v-model="dimForm.filterValue" placeholder="可选，如 pass" />
-            </el-form-item>
-            <el-form-item label="时间窗">
-              <el-select v-model="dimForm.windowType" style="width: 100%">
-                <el-option label="全量" value="all" />
-                <el-option label="滚动窗口" value="rolling" />
-              </el-select>
-            </el-form-item>
-            <el-form-item v-if="dimForm.windowType === 'rolling'" label="最近天数">
-              <el-input-number v-model="dimForm.windowDays" :min="1" :max="3650" controls-position="right" style="width: 100%" />
-            </el-form-item>
-          </div>
-
-          <el-divider content-position="left">打分映射</el-divider>
-          <div class="form-grid">
-            <el-form-item label="映射方式">
-              <el-select v-model="dimForm.scoreType" style="width: 100%">
-                <el-option label="linear · 线性" value="linear" />
-                <el-option label="bucket · 分档" value="bucket" />
-              </el-select>
-            </el-form-item>
-            <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标下界">
-              <el-input-number v-model="dimForm.lo" :controls="false" style="width: 100%" />
-            </el-form-item>
-            <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标上界">
-              <el-input-number v-model="dimForm.hi" :controls="false" style="width: 100%" />
-            </el-form-item>
-            <el-form-item v-if="dimForm.scoreType === 'linear'" label="方向">
-              <el-select v-model="dimForm.direction" style="width: 100%">
-                <el-option label="越高越好" value="higher" />
-                <el-option label="越低越好" value="lower" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="缺失策略">
-              <el-select v-model="dimForm.missing" style="width: 100%">
-                <el-option label="neutral · 中性分" value="neutral" />
-                <el-option label="zero · 0 分" value="zero" />
-                <el-option label="skip · 跳过本维度" value="skip" />
-              </el-select>
-            </el-form-item>
-          </div>
-
-          <div v-if="dimForm.scoreType === 'bucket'" class="bucket-editor">
-            <div class="bucket-head">
-              <span>分档（按顺序匹配，lte 留空 = 兜底档）</span>
-              <el-button v-hasPermi="['profile:dimension:edit']" link type="primary" @click="addBucket">+ 添加档位</el-button>
+            <el-form label-width="108px" class="dim-form">
+        <el-collapse v-model="formSections" class="dim-sections">
+          <el-collapse-item name="src">
+            <template #title><span class="section-num">①</span> 数据源 —— 这个维度看什么、叫什么</template>
+            <div class="form-grid">
+              <el-form-item label="维度编码">
+                <el-input v-model="dimForm.dimCode" :disabled="Boolean(dimForm.dimensionId)" placeholder="字母开头，如 activity" maxlength="64" />
+              </el-form-item>
+              <el-form-item label="维度名称">
+                <el-input v-model="dimForm.dimName" placeholder="如 活跃度" maxlength="100" />
+              </el-form-item>
+              <el-form-item label="计算方式">
+                <el-select v-model="dimForm.calcMode" style="width: 100%">
+                  <el-option label="EVENT_AGG · 事件聚合" value="EVENT_AGG" />
+                  <el-option label="STRATEGY · 业务 Bean" value="STRATEGY" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="打分上限">
+                <el-input-number v-model="dimForm.scoreMax" :min="1" :max="1000" controls-position="right" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="排序">
+                <el-input-number v-model="dimForm.sortOrder" :min="0" :max="9999" controls-position="right" style="width: 100%" />
+              </el-form-item>
+              <el-form-item label="状态">
+                <el-switch v-model="dimForm.enabled" active-value="1" inactive-value="0" active-text="启用" inactive-text="停用" />
+              </el-form-item>
             </div>
-            <div v-for="(bucket, index) in dimForm.buckets" :key="index" class="bucket-row">
-              <span class="bucket-index">#{{ index + 1 }}</span>
-              <el-input v-model="bucket.lte" placeholder="lte，留空=兜底" style="width: 170px" />
-              <span class="muted">→</span>
-              <el-input-number v-model="bucket.score" :min="0" :max="1000" controls-position="right" style="width: 130px" />
-              <el-button v-hasPermi="['profile:dimension:edit']" link type="danger" :disabled="dimForm.buckets.length <= 1" @click="removeBucket(index)">删除</el-button>
-            </div>
-          </div>
-        </template>
+          </el-collapse-item>
 
-        <template v-else>
-          <el-divider content-position="left">策略 Bean</el-divider>
-          <el-form-item label="Bean">
-            <el-select v-model="dimForm.strategyBean" placeholder="选择已注册的 DimensionStrategy" style="width: 100%" @change="onStrategyBeanChange">
-              <el-option
-                v-for="bean in capabilities.strategyBeans"
-                :key="bean.bean"
-                :label="`${bean.source} / ${bean.dimCode} · ${bean.bean}`"
-                :value="bean.bean"
+          <el-collapse-item name="calc">
+            <template #title><span class="section-num">②</span> 计算 —— 指标口径与打分映射</template>
+            <template v-if="dimForm.calcMode === 'EVENT_AGG'">
+              <div class="form-grid">
+                <el-form-item label="算子">
+                  <el-select v-model="dimForm.operator" style="width: 100%" @change="onOperatorChange">
+                    <el-option label="COUNT · 次数" value="COUNT" />
+                    <el-option label="COUNT_DISTINCT · 去重数" value="COUNT_DISTINCT" />
+                    <el-option label="SUM · 求和" value="SUM" />
+                    <el-option label="AVG · 平均" value="AVG" />
+                    <el-option label="RATE · 比率" value="RATE" />
+                    <el-option label="LAST_VALUE · 最近值" value="LAST_VALUE" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item v-if="dimForm.operator !== 'RATE'" label="目标事件">
+                  <el-input v-model="dimForm.targetEvent" placeholder="如 data.submitted" />
+                </el-form-item>
+                <el-form-item v-if="dimForm.operator === 'RATE'" label="分子事件">
+                  <el-input v-model="dimForm.numeratorEvent" placeholder="如 data.audit_passed" />
+                </el-form-item>
+                <el-form-item v-if="dimForm.operator === 'RATE'" label="分母事件">
+                  <el-input v-model="dimForm.denominatorEvent" placeholder="如 data.submitted" />
+                </el-form-item>
+                <el-form-item v-if="['SUM', 'AVG', 'LAST_VALUE'].includes(dimForm.operator)" label="属性键">
+                  <el-input v-model="dimForm.prop" placeholder="props 中的数值键，如 duration" />
+                </el-form-item>
+                <el-form-item v-if="dimForm.operator === 'COUNT_DISTINCT'" label="去重键">
+                  <el-input v-model="dimForm.dedupKey" placeholder="props 中的去重键，如 taskId" />
+                </el-form-item>
+                <el-form-item v-if="dimForm.operator === 'COUNT'" label="过滤键">
+                  <el-input v-model="dimForm.filterKey" placeholder="可选，如 result" />
+                </el-form-item>
+                <el-form-item v-if="dimForm.operator === 'COUNT'" label="过滤值">
+                  <el-input v-model="dimForm.filterValue" placeholder="可选，如 pass" />
+                </el-form-item>
+                <el-form-item label="时间窗">
+                  <el-select v-model="dimForm.windowType" style="width: 100%">
+                    <el-option label="全量" value="all" />
+                    <el-option label="滚动窗口" value="rolling" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item v-if="dimForm.windowType === 'rolling'" label="最近天数">
+                  <el-input-number v-model="dimForm.windowDays" :min="1" :max="3650" controls-position="right" style="width: 100%" />
+                </el-form-item>
+                <el-form-item label="映射方式">
+                  <el-select v-model="dimForm.scoreType" style="width: 100%">
+                    <el-option label="linear · 线性" value="linear" />
+                    <el-option label="bucket · 分档" value="bucket" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标下界">
+                  <el-input-number v-model="dimForm.lo" :controls="false" style="width: 100%" />
+                </el-form-item>
+                <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标上界">
+                  <el-input-number v-model="dimForm.hi" :controls="false" style="width: 100%" />
+                </el-form-item>
+                <el-form-item v-if="dimForm.scoreType === 'linear'" label="方向">
+                  <el-select v-model="dimForm.direction" style="width: 100%">
+                    <el-option label="越高越好" value="higher" />
+                    <el-option label="越低越好" value="lower" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="缺失策略">
+                  <el-select v-model="dimForm.missing" style="width: 100%">
+                    <el-option label="neutral · 中性分" value="neutral" />
+                    <el-option label="zero · 0 分" value="zero" />
+                    <el-option label="skip · 跳过本维度" value="skip" />
+                  </el-select>
+                </el-form-item>
+              </div>
+
+              <div v-if="dimForm.scoreType === 'bucket'" class="bucket-editor">
+                <div class="bucket-head">
+                  <span>分档（按顺序匹配，lte 留空 = 兜底档）</span>
+                  <el-button v-hasPermi="['profile:dimension:edit']" link type="primary" @click="addBucket">+ 添加档位</el-button>
+                </div>
+                <div v-for="(bucket, index) in dimForm.buckets" :key="index" class="bucket-row">
+                  <span class="bucket-index">#{{ index + 1 }}</span>
+                  <el-input v-model="bucket.lte" placeholder="lte，留空=兜底" style="width: 170px" />
+                  <span class="muted">→</span>
+                  <el-input-number v-model="bucket.score" :min="0" :max="1000" controls-position="right" style="width: 130px" />
+                  <el-button
+                    v-hasPermi="['profile:dimension:edit']"
+                    link
+                    type="danger"
+                    :disabled="dimForm.buckets.length <= 1"
+                    @click="removeBucket(index)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </div>
+            </template>
+
+            <template v-else>
+              <el-form-item label="Bean">
+                <el-select v-model="dimForm.strategyBean" placeholder="选择已注册的 DimensionStrategy" style="width: 100%" @change="onStrategyBeanChange">
+                  <el-option
+                    v-for="bean in capabilities.strategyBeans"
+                    :key="bean.bean"
+                    :label="`${bean.source} / ${bean.dimCode} · ${bean.bean}`"
+                    :value="bean.bean"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-alert
+                type="warning"
+                :closable="false"
+                show-icon
+                title="STRATEGY 维度由后端 Bean 直接产出分数，管理面只能改名称/上限/启停，不能试算。"
               />
-            </el-select>
-          </el-form-item>
-          <el-alert
-            type="warning"
-            :closable="false"
-            show-icon
-            title="STRATEGY 维度由后端 Bean 直接产出分数，管理面只能改名称/上限/启停，不能试算。"
-          />
-        </template>
+            </template>
+          </el-collapse-item>
 
-        <el-divider content-position="left">其它</el-divider>
-        <el-form-item label="备注">
-          <el-input v-model="dimForm.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
-        </el-form-item>
-        <el-form-item label="高级 JSON">
-          <div class="advanced-block">
-            <el-switch v-model="dimForm.advanced" active-text="直接编辑 calc_config" />
-            <el-input v-if="dimForm.advanced" v-model="dimForm.advancedJson" type="textarea" :rows="9" class="mono" placeholder="calc_config JSON" />
-            <p v-if="dimForm.advanced" class="muted small">开启后保存以这段 JSON 为准；关闭则按上面的结构化表单生成。</p>
-          </div>
-        </el-form-item>
+          <el-collapse-item name="gov">
+            <template #title><span class="section-num">③</span> 治理 —— 备注与高级配置</template>
+            <el-form-item label="备注">
+              <el-input v-model="dimForm.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
+            </el-form-item>
+            <el-form-item label="高级 JSON">
+              <div class="advanced-block">
+                <el-switch v-model="dimForm.advanced" active-text="直接编辑 calc_config" />
+                <el-input v-if="dimForm.advanced" v-model="dimForm.advancedJson" type="textarea" :rows="9" class="mono" placeholder="calc_config JSON" />
+                <p v-if="dimForm.advanced" class="muted small">开启后保存以这段 JSON 为准；关闭则按上面的结构化表单生成。</p>
+              </div>
+            </el-form-item>
+          </el-collapse-item>
+        </el-collapse>
       </el-form>
 
       <template #footer>
@@ -713,6 +725,9 @@ const dimForm = reactive({
 });
 
 const dimDialogVisible = ref(false);
+
+/** 维度编辑三区段（批9）：数据源 / 计算 / 治理，默认全开 */
+const formSections = ref(['src', 'calc', 'gov']);
 const previewVisible = ref(false);
 const previewForm = reactive({ subjectType: 'user', subjectId: '' });
 const previewResult = ref<ProfileDimensionPreview | null>(null);
@@ -1489,6 +1504,20 @@ onMounted(async () => {
   flex-wrap: wrap;
   padding-top: 10px;
   border-top: 1px solid var(--el-border-color-lighter);
+}
+.dim-sections {
+  border-top: none;
+  border-bottom: none;
+}
+.dim-sections :deep(.el-collapse-item__header) {
+  font-weight: 600;
+}
+.dim-sections :deep(.el-collapse-item__content) {
+  padding-bottom: 14px;
+}
+.section-num {
+  margin-right: 8px;
+  color: var(--el-color-primary);
 }
 .form-grid {
   display: grid;

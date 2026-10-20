@@ -236,11 +236,11 @@ public class ProfileQueryService {
             out.put("color", "info");
             return out;
         }
-        if (total.compareTo(BigDecimal.valueOf(75)) >= 0) {
+        if (total.compareTo(RISK_HIGH) >= 0) {
             out.put("level", "LOW");
             out.put("label", "低风险");
             out.put("color", "success");
-        } else if (total.compareTo(BigDecimal.valueOf(60)) >= 0) {
+        } else if (total.compareTo(RISK_MEDIUM) >= 0) {
             out.put("level", "MEDIUM");
             out.put("label", "关注");
             out.put("color", "warning");
@@ -271,7 +271,90 @@ public class ProfileQueryService {
         return "偏弱";
     }
 
+    /** 风险分档阈值(批9 Q7-A 单一来源): HIGH < 60, MEDIUM 60~75, LOW >= 75 */
+    public static final java.math.BigDecimal RISK_MEDIUM = java.math.BigDecimal.valueOf(60);
+    public static final java.math.BigDecimal RISK_HIGH = java.math.BigDecimal.valueOf(75);
+
+    public Map<String, Object> subjectSummary(String subjectType, String subjectId) {
+        return subjectSummary(subjectType, subjectId, null);
+    }
+
+    /**
+     * 单主体摘要(批9 Q5/Q7-A): 基本信息 + 最新维度快照(分数/维度贡献/规则版本/计算时间)。
+     * "查看依据"抽屉与助手只读工具共用此口径; source 可选(同 ID 跨源时避免取错)。
+     */
+    public Map<String, Object> subjectSummary(String subjectType, String subjectId, String source) {
+        if (StringUtils.isBlank(subjectId)) {
+            throw new ServiceException("subjectId 不能为空");
+        }
+        String type = StringUtils.isBlank(subjectType) ? "user" : subjectType.trim();
+        com.smartdock.profile.event.ProfileSubject subject = subjectMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.smartdock.profile.event.ProfileSubject>()
+                .eq(com.smartdock.profile.event.ProfileSubject::getTenantId, currentTenant())
+                .eq(com.smartdock.profile.event.ProfileSubject::getSubjectType, type)
+                .eq(com.smartdock.profile.event.ProfileSubject::getSubjectId, subjectId.trim())
+                .eq(StringUtils.isNotBlank(source), com.smartdock.profile.event.ProfileSubject::getSource, source)
+                .last("LIMIT 1"))
+            .stream().findFirst().orElse(null);
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (subject == null) {
+            out.put("found", false);
+            out.put("subjectType", type);
+            out.put("subjectId", subjectId);
+            return out;
+        }
+        out.put("found", true);
+        out.put("subjectType", subject.getSubjectType());
+        out.put("subjectId", subject.getSubjectId());
+        out.put("displayName", subject.getDisplayName());
+        out.put("source", subject.getSource());
+        out.put("eventCount", subject.getEventCount());
+        out.put("lastEventTime", subject.getLastEventTime());
+        List<com.smartdock.profile.engine.ProfileScoreSnapshot> latest = snapshotMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.smartdock.profile.engine.ProfileScoreSnapshot>()
+                .eq(com.smartdock.profile.engine.ProfileScoreSnapshot::getTenantId, subject.getTenantId())
+                .eq(com.smartdock.profile.engine.ProfileScoreSnapshot::getSource, subject.getSource())
+                .eq(com.smartdock.profile.engine.ProfileScoreSnapshot::getSubjectType, subject.getSubjectType())
+                .eq(com.smartdock.profile.engine.ProfileScoreSnapshot::getSubjectId, subject.getSubjectId())
+                .orderByDesc(com.smartdock.profile.engine.ProfileScoreSnapshot::getCalcTime)
+                .orderByDesc(com.smartdock.profile.engine.ProfileScoreSnapshot::getSnapshotId)
+                .last("LIMIT 1"));
+        if (latest.isEmpty()) {
+            out.put("scored", false);
+        } else {
+            com.smartdock.profile.engine.ProfileScoreSnapshot snap = latest.get(0);
+            out.put("scored", true);
+            out.put("totalScore", snap.getTotalScore());
+            out.put("ruleVersion", snap.getRuleVersion());
+            out.put("calcTime", snap.getCalcTime());
+            out.put("dimensionDetail", parseSnapshotDetail(snap.getDimensionDetail()));
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> parseSnapshotDetail(String json) {
+        if (StringUtils.isBlank(json)) {
+            return Map.of();
+        }
+        try {
+            Map<String, Object> parsed = org.dromara.common.json.utils.JsonUtils.parseMap(json);
+            return parsed == null ? Map.of() : parsed;
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
     private void normalizeQuery(ProfileSubjectQuery query) {
+        if (query.getRisk() != null) {
+            String risk = query.getRisk().trim().toUpperCase();
+            if (!java.util.Set.of("HIGH", "MEDIUM", "LOW").contains(risk)) {
+                throw new ServiceException("risk 只支持 HIGH / MEDIUM / LOW");
+            }
+            query.setRisk(risk);
+        }
+        query.setRiskHigh(RISK_HIGH);
+        query.setRiskMedium(RISK_MEDIUM);
         if (StringUtils.isBlank(query.getSortBy()) || !SORT_FIELDS.contains(query.getSortBy())) {
             query.setSortBy("lastEvent");
         }

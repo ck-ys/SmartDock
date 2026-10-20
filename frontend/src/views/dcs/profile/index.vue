@@ -55,6 +55,11 @@
             </el-select>
             <el-input-number v-model="query.minScore" :min="0" :max="100" placeholder="最低分" controls-position="right" style="width: 120px" />
             <el-input-number v-model="query.maxScore" :min="0" :max="100" placeholder="最高分" controls-position="right" style="width: 120px" />
+            <el-select v-model="query.risk" clearable placeholder="风险档" style="width: 120px" @change="search">
+              <el-option label="高风险" value="HIGH" />
+              <el-option label="关注" value="MEDIUM" />
+              <el-option label="低风险" value="LOW" />
+            </el-select>
             <el-select v-model="query.sortBy" style="width: 130px">
               <el-option label="最近事件" value="lastEvent" />
               <el-option label="总分" value="score" />
@@ -109,9 +114,10 @@
                 <span v-else class="muted">—</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="110" fixed="right">
+            <el-table-column label="操作" width="160" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" @click="goDetail(row)">看画像</el-button>
+                <el-button link @click="openBasis(row)">依据</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -164,6 +170,58 @@
         </el-tab-pane>
       </el-tabs>
     </el-card>
+
+    <!-- 查看依据（单主体画像摘要） -->
+    <el-drawer v-model="basisVisible" title="画像依据" size="560px" destroy-on-close>
+      <div v-loading="basisLoading" class="drawer-body">
+        <template v-if="basisData">
+          <template v-if="basisData.found">
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="主体">{{ basisData.displayName || basisData.subjectId }}</el-descriptions-item>
+              <el-descriptions-item label="主体类型">{{ basisData.subjectType }}</el-descriptions-item>
+              <el-descriptions-item label="业务源">{{ basisData.source || '—' }}</el-descriptions-item>
+              <el-descriptions-item label="事件数">{{ basisData.eventCount ?? '—' }}</el-descriptions-item>
+              <el-descriptions-item label="最近事件" :span="2">{{ basisData.lastEventTime || '—' }}</el-descriptions-item>
+            </el-descriptions>
+            <template v-if="basisData.scored">
+              <div class="basis-score">
+                <div>
+                  <span class="muted">总分</span>
+                  <strong :class="scoreClass(Number(basisData.totalScore))">{{ formatScore(basisData.totalScore) }}</strong>
+                </div>
+                <div>
+                  <span class="muted">规则版本</span>
+                  <strong class="mono">{{ basisData.ruleVersion || '—' }}</strong>
+                </div>
+                <div>
+                  <span class="muted">计算时间</span>
+                  <strong>{{ basisData.calcTime || '—' }}</strong>
+                </div>
+              </div>
+              <h4 class="basis-title">维度贡献</h4>
+              <el-table :data="basisDimensions" size="small" stripe>
+                <el-table-column label="维度" min-width="130">
+                  <template #default="{ row }"
+                    >{{ row.dimName || row.code }} <span class="mono muted">{{ row.code }}</span></template
+                  >
+                </el-table-column>
+                <el-table-column label="得分" width="80">
+                  <template #default="{ row }">{{ formatScore(row.score) }}</template>
+                </el-table-column>
+                <el-table-column label="权重" width="70">
+                  <template #default="{ row }">{{ row.weight ?? '—' }}</template>
+                </el-table-column>
+                <el-table-column label="加权分" width="90">
+                  <template #default="{ row }">{{ formatScore(row.weightedScore) }}</template>
+                </el-table-column>
+              </el-table>
+            </template>
+            <el-empty v-else :image-size="60" description="该主体还没有评分快照（等待事件触发重算）" />
+          </template>
+          <el-empty v-else :image-size="60" description="没有找到该主体（可能已被清理）" />
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -171,13 +229,16 @@
 import {
   getOverview,
   getRanking,
+  getRiskBands,
+  getSubjectSummary,
   listDimensions,
   pageSubjects,
   type ProfileDimension,
   type ProfileDimensionDetail,
   type ProfileOverview,
   type ProfileRankingRow,
-  type ProfileSubjectRow
+  type ProfileSubjectRow,
+  type ProfileSubjectSummary
 } from '@/api/dcs/core/profile';
 
 const router = useRouter();
@@ -200,10 +261,24 @@ const query = reactive({
   keyword: '',
   minScore: undefined as number | undefined,
   maxScore: undefined as number | undefined,
+  risk: '',
   sortBy: 'lastEvent',
   sortOrder: 'desc'
 });
 const ranking = reactive({ dimension: '', limit: 10 });
+
+/** 风险分档阈值（批9 Q7-A 单源：后端下发，前端不再硬编码） */
+const riskBands = reactive({ mediumMin: 60, highBelow: 60, lowMin: 75 });
+const loadRiskBands = async () => {
+  try {
+    const bands = await getRiskBands();
+    riskBands.mediumMin = Number(bands.mediumMin);
+    riskBands.highBelow = Number(bands.highBelow);
+    riskBands.lowMin = Number(bands.lowMin);
+  } catch {
+    // 接口不可用时退回默认 60/75
+  }
+};
 
 const clamp = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
 const formatScore = (value?: number | string | null) => {
@@ -211,12 +286,13 @@ const formatScore = (value?: number | string | null) => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(1) : String(value);
 };
-const scoreColor = (value: number) => (value >= 75 ? '#67c23a' : value >= 60 ? '#e6a23c' : '#f56c6c');
+const scoreColor = (value: number) => (value >= riskBands.lowMin ? '#67c23a' : value >= riskBands.highBelow ? '#e6a23c' : '#f56c6c');
+const scoreClass = (value: number) => (value >= riskBands.lowMin ? 'dim-good' : value >= riskBands.highBelow ? 'dim-mid' : 'dim-low');
 const riskOf = (value?: number | string | null) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return { label: '未算分', color: 'info' as const };
-  if (n >= 75) return { label: '低风险', color: 'success' as const };
-  if (n >= 60) return { label: '关注', color: 'warning' as const };
+  if (n >= riskBands.lowMin) return { label: '低风险', color: 'success' as const };
+  if (n >= riskBands.highBelow) return { label: '关注', color: 'warning' as const };
   return { label: '高风险', color: 'danger' as const };
 };
 
@@ -265,6 +341,7 @@ const loadList = async () => {
       keyword: query.keyword || undefined,
       minScore: query.minScore,
       maxScore: query.maxScore,
+      risk: query.risk || undefined,
       sortBy: query.sortBy,
       sortOrder: query.sortOrder
     });
@@ -287,7 +364,7 @@ const loadRanking = async () => {
   }
 };
 const loadAll = async () => {
-  await Promise.all([loadOverview(), loadDimensions(), loadList()]);
+  await Promise.all([loadOverview(), loadDimensions(), loadList(), loadRiskBands()]);
   if (activeTab.value === 'ranking') await loadRanking();
 };
 const onSourceChange = () => {
@@ -306,6 +383,7 @@ const resetQuery = () => {
   query.keyword = '';
   query.minScore = undefined;
   query.maxScore = undefined;
+  query.risk = '';
   query.sortBy = 'lastEvent';
   query.sortOrder = 'desc';
   query.pageNum = 1;
@@ -314,6 +392,33 @@ const resetQuery = () => {
 const goDetail = (row: ProfileSubjectRow | ProfileRankingRow) =>
   router.push(`/insight/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
 const goStudio = () => router.push('/insight/profile-studio');
+
+// ---------------------------------------------------------------- 查看依据（批9）
+const basisVisible = ref(false);
+const basisLoading = ref(false);
+const basisData = ref<ProfileSubjectSummary | null>(null);
+const basisDimensions = computed(() => {
+  const detail = basisData.value?.dimensionDetail;
+  if (!detail) return [];
+  return Object.entries(detail).map(([code, entry]) => ({
+    code,
+    dimName: entry.dimName,
+    score: entry.normalizedScore ?? entry.score,
+    weight: entry.weight,
+    weightedScore: entry.weightedScore,
+    skipped: entry.skipped
+  }));
+});
+const openBasis = async (row: ProfileSubjectRow) => {
+  basisVisible.value = true;
+  basisLoading.value = true;
+  basisData.value = null;
+  try {
+    basisData.value = await getSubjectSummary(row.subjectId, row.subjectType || 'user', source.value);
+  } finally {
+    basisLoading.value = false;
+  }
+};
 
 onMounted(loadAll);
 </script>
@@ -418,6 +523,30 @@ onMounted(loadAll);
 }
 .muted {
   color: var(--el-text-color-placeholder);
+}
+.mono {
+  font-family: var(--el-font-family-mono, ui-monospace, SFMono-Regular, Consolas, monospace);
+}
+.drawer-body {
+  min-height: 160px;
+}
+.basis-score {
+  display: flex;
+  gap: 28px;
+  margin: 14px 0;
+}
+.basis-score > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.basis-score strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.basis-title {
+  margin: 12px 0 8px;
+  font-size: 14px;
 }
 .dim-good {
   color: var(--el-color-success);

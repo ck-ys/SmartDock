@@ -64,6 +64,11 @@
           <el-input-number v-model="config.debounceMs" :min="0" :max="5000" :step="500" controls-position="right" style="width: 140px" />
           <span class="muted small">毫秒，连续事件只算一次</span>
         </div>
+        <div class="config-item">
+          <span class="config-label">复核 SLA</span>
+          <el-input-number v-model="config.reviewSlaDays" :min="1" :max="365" controls-position="right" style="width: 120px" />
+          <span class="muted small">天，超时每天 09:10 提醒管理员</span>
+        </div>
         <el-button v-hasPermi="['profile:review:edit']" type="primary" :loading="configSaving" @click="saveConfig">保存策略</el-button>
       </div>
     </el-card>
@@ -123,6 +128,15 @@
         </el-table-column>
         <el-table-column label="入队时间" width="170">
           <template #default="{ row }">{{ row.createTime || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="SLA" width="110">
+          <template #default="{ row }">
+            <el-tag v-if="row.status === 'PENDING' && Number(row.overdueDays) > 0" type="danger" effect="light" size="small">
+              超时 {{ row.overdueDays }} 天
+            </el-tag>
+            <span v-else-if="row.status === 'PENDING' && row.slaDays" class="muted small">{{ row.slaDays }} 天内</span>
+            <span v-else class="muted">—</span>
+          </template>
         </el-table-column>
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
@@ -322,7 +336,8 @@ const config = reactive<Partial<ProfileEngineConfig>>({
   autoRecalc: '1',
   reviewEnabled: '1',
   reviewThreshold: 60,
-  debounceMs: 2000
+  debounceMs: 2000,
+  reviewSlaDays: 7
 });
 
 const loadConfig = async () => {
@@ -333,7 +348,8 @@ const loadConfig = async () => {
       autoRecalc: res.autoRecalc,
       reviewEnabled: res.reviewEnabled,
       reviewThreshold: Number(res.reviewThreshold),
-      debounceMs: res.debounceMs
+      debounceMs: res.debounceMs,
+      reviewSlaDays: res.reviewSlaDays ?? 7
     });
   } finally {
     configLoading.value = false;
@@ -347,7 +363,8 @@ const saveConfig = async () => {
       autoRecalc: config.autoRecalc,
       reviewEnabled: config.reviewEnabled,
       reviewThreshold: config.reviewThreshold,
-      debounceMs: config.debounceMs
+      debounceMs: config.debounceMs,
+      reviewSlaDays: config.reviewSlaDays
     });
     ElMessage.success('策略已保存');
   } finally {

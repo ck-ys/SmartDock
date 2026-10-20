@@ -33,4 +33,13 @@ public class ProfileSubjectQuery implements Serializable {
 
     /** desc(缺省) | asc */
     private String sortOrder = "desc";
+
+    /** 风险筛选: HIGH / MEDIUM / LOW(阈值由后端单源下发, 批9 Q7-A) */
+    private String risk;
+
+    /** 风险阈值(服务端填充, SQL 只认参数; HIGH = score < riskMedium) */
+    private transient java.math.BigDecimal riskHigh;
+
+    /** 中风险下限(60) */
+    private transient java.math.BigDecimal riskMedium;
 }

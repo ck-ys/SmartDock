@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -30,10 +31,31 @@ public class ProfileQueryController {
     /**
      * 主体分页(带最新快照与筛选/排序)。
      */
+    /** 风险分档阈值单源下发(批9 Q7-A: 消除前端+SQL 双处硬编码 75/60)。 */
     @SaCheckPermission("profile:score:query")
+    @GetMapping("/risk-bands")
+    public R<Map<String, Object>> riskBands() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("mediumMin", ProfileQueryService.RISK_MEDIUM);
+        out.put("highBelow", ProfileQueryService.RISK_MEDIUM);
+        out.put("lowMin", ProfileQueryService.RISK_HIGH);
+        return R.ok(out);
+    }
+
     @GetMapping("/subject/page")
     public TableDataInfo<ProfileSubjectRow> subjectPage(ProfileSubjectQuery query, PageQuery pageQuery) {
         return queryService.subjectPage(query, pageQuery);
+    }
+
+    /**
+     * 单主体画像依据摘要(批9 Q7-A): 主体基本信息 + 最新维度快照, "查看依据"抽屉用。
+     */
+    @SaCheckPermission("profile:score:query")
+    @GetMapping("/subject/summary")
+    public R<Map<String, Object>> subjectSummary(@RequestParam(required = false, defaultValue = "user") String subjectType,
+                                                 @RequestParam String subjectId,
+                                                 @RequestParam(required = false) String source) {
+        return R.ok(queryService.subjectSummary(subjectType, subjectId, source));
     }
 
     /**

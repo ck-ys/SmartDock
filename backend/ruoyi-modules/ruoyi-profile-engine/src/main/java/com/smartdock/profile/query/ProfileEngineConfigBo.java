@@ -30,4 +30,7 @@ public class ProfileEngineConfigBo implements Serializable {
     private Integer debounceMs;
 
     private String remark;
+
+    /** 复核 SLA 天数(1~365) */
+    private Integer reviewSlaDays;
 }

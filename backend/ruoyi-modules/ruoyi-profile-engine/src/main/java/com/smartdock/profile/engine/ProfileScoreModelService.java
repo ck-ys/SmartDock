@@ -16,7 +16,10 @@ import com.smartdock.profile.mapper.ProfileSubjectMapper;
 import com.smartdock.profile.model.ProfileBinResolver;
 import com.smartdock.profile.model.ProfileModelConfig;
 import com.smartdock.profile.model.ProfileModelDefinition;
+import com.smartdock.profile.domain.ProfileModelConfigSnapshot;
+import com.smartdock.profile.mapper.ProfileModelConfigSnapshotMapper;
 import com.smartdock.profile.model.ProfileRfmLevel;
+import com.smartdock.profile.query.ProfileModelPublishBo;
 import com.smartdock.profile.query.ProfileModelSubjectRow;
 import com.smartdock.profile.query.ProfileScoreModelBo;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +67,7 @@ public class ProfileScoreModelService {
     private final ProfileModelSnapshotMapper snapshotMapper;
     private final ProfileModelMetricMapper metricMapper;
     private final ProfileSubjectMapper subjectMapper;
+    private final ProfileModelConfigSnapshotMapper configSnapshotMapper;
 
     private final Map<String, CachedModelData> populationCache = new ConcurrentHashMap<>();
 
@@ -149,6 +153,7 @@ public class ProfileScoreModelService {
         model.setBuiltin("0");
         model.setRemark(StringUtils.substring(bo.getRemark(), 0, 500));
         model.setRevision(0);
+        model.setStatus("DRAFT");
         model.setCreateBy(currentUser());
         modelMapper.insertJsonb(model);
         invalidate();
@@ -176,9 +181,14 @@ public class ProfileScoreModelService {
         existing.setScoreMax(bo.getScoreMax());
         existing.setEnabled("0".equals(bo.getEnabled()) ? "0" : "1");
         existing.setRemark(StringUtils.substring(bo.getRemark(), 0, 500));
+        if (!"DRAFT".equals(existing.getStatus())) {
+            existing.setStatus("DRAFT");
+        }
         existing.setRevision((existing.getRevision() == null ? 0 : existing.getRevision()) + 1);
         existing.setUpdateBy(currentUser());
-        modelMapper.updateJsonb(existing);
+        if (modelMapper.updateJsonb(existing) == 0) {
+            throw new ServiceException("模型已被其他人修改, 请刷新后重试");
+        }
         invalidate();
         return existing;
     }
@@ -198,6 +208,22 @@ public class ProfileScoreModelService {
      */
     public ProfileModelRun run(Long modelId, String triggerType) {
         ProfileScoreModel model = get(modelId);
+        if (!"PUBLISHED".equals(model.getStatus())) {
+            throw new ServiceException("只有已发布模型可以全量重算, 草稿请先试算并发布");
+        }
+        // 先回收僵尸 RUNNING(进程重启遗留), 阈值须大于最长合法重算时长
+        runMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProfileModelRun>()
+            .eq(ProfileModelRun::getModelId, modelId)
+            .eq(ProfileModelRun::getStatus, "RUNNING")
+            .lt(ProfileModelRun::getStartedAt, new Date(System.currentTimeMillis() - 30 * 60_000L))
+            .set(ProfileModelRun::getStatus, "FAILED")
+            .set(ProfileModelRun::getErrorMsg, "stale RUNNING reclaimed (进程重启遗留)"));
+        Long running = runMapper.selectCount(new LambdaQueryWrapper<ProfileModelRun>()
+            .eq(ProfileModelRun::getModelId, modelId)
+            .eq(ProfileModelRun::getStatus, "RUNNING"));
+        if (running != null && running > 0) {
+            throw new ServiceException("该模型已有重算在进行中, 请稍后再试");
+        }
         ProfileModelDefinition def = parseDefinition(model.getConfig());
         List<String> errors = ProfileModelConfig.validate(def);
         if (!errors.isEmpty()) {
@@ -247,7 +273,8 @@ public class ProfileScoreModelService {
         List<ProfileScoreModel> models = modelMapper.selectList(new LambdaQueryWrapper<ProfileScoreModel>()
             .eq(ProfileScoreModel::getTenantId, tenantId)
             .eq(ProfileScoreModel::getSource, source)
-            .eq(ProfileScoreModel::getEnabled, "1"));
+            .eq(ProfileScoreModel::getEnabled, "1")
+            .eq(ProfileScoreModel::getStatus, "PUBLISHED"));
         for (ProfileScoreModel model : models) {
             try {
                 ProfileModelDefinition def = parseDefinition(model.getConfig());
@@ -289,7 +316,7 @@ public class ProfileScoreModelService {
     public Map<String, Object> overview(Long modelId) {
         ProfileScoreModel model = get(modelId);
         List<ProfileModelSubjectRow> rows = snapshotMapper.selectLatestAll(
-            model.getTenantId(), model.getSource(), model.getModelCode());
+            model.getTenantId(), model.getSource(), model.getModelCode(), model.getModelVersion());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("modelId", model.getModelId());
         out.put("modelCode", model.getModelCode());
@@ -332,7 +359,7 @@ public class ProfileScoreModelService {
         Page<ProfileModelSubjectRow> page = new Page<>(Math.max(1, pageNum), Math.min(Math.max(1, pageSize), 200));
         page.setOptimizeCountSql(false);
         return snapshotMapper.selectLatestPage(page, model.getTenantId(), model.getSource(),
-            model.getModelCode(), level, keyword);
+            model.getModelCode(), model.getModelVersion(), level, keyword);
     }
 
     public Map<String, Object> subjectDetail(Long modelId, String subjectType, String subjectId) {
@@ -362,6 +389,250 @@ public class ProfileScoreModelService {
         ProfileScoreModel model = get(modelId);
         return snapshotMapper.selectTrend(model.getTenantId(), model.getSource(), model.getModelCode(),
             Math.min(Math.max(1, days), 365));
+    }
+
+    // ---------------------------------------------------------------- 批9: 版本对比与发布纪律
+
+    /**
+     * 模型运行记录(版本对比的选材来源; 只列最近 50 条)。
+     */
+    public List<ProfileModelRun> runs(Long modelId) {
+        ProfileScoreModel model = get(modelId);
+        return runMapper.selectList(new LambdaQueryWrapper<ProfileModelRun>()
+            .eq(ProfileModelRun::getModelId, modelId)
+            .eq(ProfileModelRun::getTenantId, model.getTenantId())
+            .orderByDesc(ProfileModelRun::getCreateTime)
+            .last("LIMIT 50"));
+    }
+
+    /**
+     * 版本对比(批9 Q1-A): 只允许选「已完成」的两次 run, 逐主体对比分数/分层。
+     */
+    public Map<String, Object> compare(Long modelId, Long runAId, Long runBId) {
+        ProfileScoreModel model = get(modelId);
+        ProfileModelRun runA = requireDoneRun(model, runAId);
+        ProfileModelRun runB = requireDoneRun(model, runBId);
+        List<ProfileModelCompare.SubjectVersion> a = subjectVersionsOfRun(model.getTenantId(), runA);
+        List<ProfileModelCompare.SubjectVersion> b = subjectVersionsOfRun(model.getTenantId(), runB);
+        Map<String, Object> out = ProfileModelCompare.compare(a, b, 20);
+        out.put("modelId", model.getModelId());
+        out.put("runA", runBrief(runA));
+        out.put("runB", runBrief(runB));
+        out.put("psi", ProfilePsi.of(ProfileModelCompare.levelDistribution(a), ProfileModelCompare.levelDistribution(b)));
+        out.put("distribution", ProfilePsi.distribution(ProfileModelCompare.levelDistribution(a),
+            ProfileModelCompare.levelDistribution(b)));
+        return out;
+    }
+
+    /**
+     * 试算预览(批9 Q6-A): 用模型当前(草稿)配置对存量主体影子计算, 不落任何快照。
+     * 输出新旧分布对比 + PSI 稳定性 + 样本量提示。
+     */
+    public Map<String, Object> dryRun(Long modelId) {
+        ProfileScoreModel model = get(modelId);
+        ProfileModelDefinition def = parseDefinition(model.getConfig());
+        List<String> errors = ProfileModelConfig.validate(def);
+        if (!errors.isEmpty()) {
+            throw new ServiceException("模型配置不合法: " + String.join("; ", errors));
+        }
+        List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
+            .eq(ProfileSubject::getTenantId, model.getTenantId())
+            .eq(ProfileSubject::getSource, model.getSource())
+            .orderByAsc(ProfileSubject::getSubjectType)
+            .orderByAsc(ProfileSubject::getSubjectId));
+        CachedModelData data = loadModelData(model, def, true);
+        List<ProfileModelCompare.SubjectVersion> candidate = new ArrayList<>();
+        for (ProfileSubject subject : subjects) {
+            String key = subjectKey(subject.getSubjectType(), subject.getSubjectId());
+            Map<String, BigDecimal> values = new HashMap<>();
+            for (ProfileModelDefinition.ModelDimension dim : def.getDimensions()) {
+                values.put(dim.getCode(), data.values.getOrDefault(dim.getCode(), Map.of()).get(key));
+            }
+            ProfileModelSnapshot snapshot = scoreOne(model, def, subject, values, data, null);
+            candidate.add(new ProfileModelCompare.SubjectVersion(subject.getSubjectType(), subject.getSubjectId(),
+                subject.getDisplayName(), snapshot.getLevel(), snapshot.getNormalizedScore()));
+        }
+        List<ProfileModelSubjectRow> current = snapshotMapper.selectLatestAll(
+            model.getTenantId(), model.getSource(), model.getModelCode(), model.getModelVersion());
+        List<ProfileModelCompare.SubjectVersion> base = new ArrayList<>();
+        for (ProfileModelSubjectRow row : current) {
+            base.add(new ProfileModelCompare.SubjectVersion(row.getSubjectType(), row.getSubjectId(),
+                row.getDisplayName(), row.getLevel(), row.getNormalizedScore()));
+        }
+        Map<String, Object> out = ProfileModelCompare.compare(base, candidate, 20);
+        out.put("modelId", model.getModelId());
+        out.put("modelStatus", model.getStatus());
+        out.put("currentVersion", model.getModelVersion());
+        out.put("psi", ProfilePsi.of(ProfileModelCompare.levelDistribution(base), ProfileModelCompare.levelDistribution(candidate)));
+        out.put("distribution", ProfilePsi.distribution(ProfileModelCompare.levelDistribution(base),
+            ProfileModelCompare.levelDistribution(candidate)));
+        return out;
+    }
+
+    /**
+     * 发布(批9 Q6-A): 版本号落定 + 配置存档 + 状态切 PUBLISHED + 触发全量重算。
+     * 读侧只认「已完成 run」的快照(SnapshotMapper 已过滤), 重算期间线上分数不混拼。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> publish(Long modelId, ProfileModelPublishBo bo) {
+        ProfileScoreModel model = get(modelId);
+        if ("PUBLISHED".equals(model.getStatus())) {
+            throw new ServiceException("模型已是发布态, 请先编辑存草稿再发布新版本");
+        }
+        String version = resolveVersion(model, bo == null ? null : bo.getVersion());
+        ProfileModelConfigSnapshot archive = new ProfileModelConfigSnapshot();
+        archive.setConfigSnapshotId(IdWorker.getId());
+        archive.setTenantId(model.getTenantId());
+        archive.setSource(model.getSource());
+        archive.setModelId(model.getModelId());
+        archive.setModelCode(model.getModelCode());
+        archive.setModelVersion(version);
+        archive.setConfig(model.getConfig());
+        archive.setScoreMax(model.getScoreMax());
+        archive.setPublishedBy(currentUser());
+        configSnapshotMapper.upsertJsonb(archive);
+        if (bo != null && StringUtils.isNotBlank(bo.getNote())) {
+            model.setRemark(StringUtils.substring(bo.getNote(), 0, 500));
+        }
+        model.setStatus("PUBLISHED");
+        model.setModelVersion(version);
+        model.setRevision((model.getRevision() == null ? 0 : model.getRevision()) + 1);
+        model.setUpdateBy(currentUser());
+        if (modelMapper.updateJsonb(model) == 0) {
+            throw new ServiceException("模型已被其他人修改, 请刷新后重试");
+        }
+        invalidate();
+        ProfileModelRun run = run(modelId, "PUBLISH");
+        if (!"DONE".equals(run.getStatus())) {
+            // 重算失败则整个发布回滚: 避免出现"已发布新版本但线上全是旧分数"的错位态
+            throw new ServiceException("发布未生效, 全量重算失败: " + run.getErrorMsg());
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("model", model);
+        out.put("run", run);
+        out.put("version", version);
+        return out;
+    }
+
+    /**
+     * 一键回滚(批9 Q6-A): 把存档版本配置写回模型并重新发布重算。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> rollback(Long modelId, String version) {
+        ProfileScoreModel model = get(modelId);
+        if (StringUtils.isBlank(version)) {
+            throw new ServiceException("回滚版本不能为空");
+        }
+        ProfileModelConfigSnapshot archived = configSnapshotMapper.selectByVersion(
+            model.getTenantId(), modelId, version.trim());
+        if (archived == null) {
+            throw new ServiceException("该版本没有配置存档: " + version);
+        }
+        model.setConfig(archived.getConfig());
+        model.setScoreMax(archived.getScoreMax());
+        model.setStatus("PUBLISHED");
+        model.setModelVersion(archived.getModelVersion());
+        model.setRevision((model.getRevision() == null ? 0 : model.getRevision()) + 1);
+        model.setUpdateBy(currentUser());
+        if (modelMapper.updateJsonb(model) == 0) {
+            throw new ServiceException("模型已被其他人修改, 请刷新后重试");
+        }
+        invalidate();
+        ProfileModelRun run = run(modelId, "ROLLBACK");
+        if (!"DONE".equals(run.getStatus())) {
+            throw new ServiceException("回滚未生效, 全量重算失败: " + run.getErrorMsg());
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("model", model);
+        out.put("run", run);
+        out.put("rolledBackTo", archived.getModelVersion());
+        return out;
+    }
+
+    /** 配置版本存档列表(历史可 diff / 回滚选材)。 */
+    public List<ProfileModelConfigSnapshot> configSnapshots(Long modelId) {
+        ProfileScoreModel model = get(modelId);
+        return configSnapshotMapper.selectByModel(model.getTenantId(), modelId, 50);
+    }
+
+    private ProfileModelRun requireDoneRun(ProfileScoreModel model, Long runId) {
+        if (runId == null) {
+            throw new ServiceException("runId 不能为空");
+        }
+        ProfileModelRun run = runMapper.selectById(runId);
+        if (run == null || !model.getModelId().equals(run.getModelId())) {
+            throw new ServiceException("运行记录不属于该模型: " + runId);
+        }
+        if (!"DONE".equals(run.getStatus())) {
+            throw new ServiceException("只能对比已完成的运行(该 run 状态=" + run.getStatus() + ")");
+        }
+        return run;
+    }
+
+    private List<ProfileModelCompare.SubjectVersion> subjectVersionsOfRun(String tenantId, ProfileModelRun run) {
+        List<ProfileModelCompare.SubjectVersion> out = new ArrayList<>();
+        for (Map<String, Object> row : snapshotMapper.selectByRun(tenantId, run.getRunId())) {
+            out.add(new ProfileModelCompare.SubjectVersion(
+                String.valueOf(row.get("subjectType")), String.valueOf(row.get("subjectId")), null,
+                row.get("level") == null ? null : String.valueOf(row.get("level")),
+                toDecimal(row.get("normalizedScore"))));
+        }
+        return out;
+    }
+
+    private Map<String, Object> runBrief(ProfileModelRun run) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("runId", run.getRunId());
+        out.put("modelVersion", run.getModelVersion());
+        out.put("status", run.getStatus());
+        out.put("triggerType", run.getTriggerType());
+        out.put("totalSubjects", run.getTotalSubjects());
+        out.put("startedAt", run.getStartedAt());
+        out.put("finishedAt", run.getFinishedAt());
+        return out;
+    }
+
+    /** 版本号解析: 未指定则自动递增(v12 → v13)。 */
+    private String resolveVersion(ProfileScoreModel model, String provided) {
+        String version;
+        if (StringUtils.isNotBlank(provided)) {
+            version = provided.trim();
+            if (version.length() > 32) {
+                throw new ServiceException("版本号不能超过 32 个字符");
+            }
+        } else {
+            version = nextVersion(model.getModelVersion());
+        }
+        if (version.equals(model.getModelVersion())) {
+            throw new ServiceException("新版本号不能与当前版本相同: " + version);
+        }
+        // 版本号不允许与已存档版本撞车（撞车会让 upsert 覆盖历史存档, 回滚链被破坏）
+        int guard = 0;
+        while (configSnapshotMapper.selectByVersion(model.getTenantId(), model.getModelId(), version) != null) {
+            if (++guard > 100) {
+                throw new ServiceException("版本号冲突无法自增, 请手动指定版本号");
+            }
+            version = nextVersion(version);
+        }
+        return version;
+    }
+
+    static String nextVersion(String current) {
+        if (current == null || current.isBlank()) {
+            return "v1";
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.*?)(\\d+)$").matcher(current.trim());
+        if (m.matches()) {
+            try {
+                long n = Long.parseLong(m.group(2));
+                if (n < 9_999) {
+                    return m.group(1) + (n + 1);
+                }
+            } catch (NumberFormatException overflow) {
+                // 数字后缀超出 long 范围(版本号最长 32 位)时走 -next 兜底
+            }
+        }
+        return current + "-next";
     }
 
     // ---------------------------------------------------------------- 运行内核

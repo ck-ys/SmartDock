@@ -18,11 +18,11 @@ public interface ProfileScoreModelMapper extends BaseMapperPlus<ProfileScoreMode
     @Insert("""
         INSERT INTO profile_score_model
             (model_id, tenant_id, source, model_code, model_name, model_type, model_version,
-             config, score_max, enabled, builtin, remark, revision, create_by, create_time)
+             config, score_max, enabled, builtin, remark, status, revision, create_by, create_time)
         VALUES
             (#{m.modelId}, #{m.tenantId}, #{m.source}, #{m.modelCode}, #{m.modelName}, #{m.modelType},
              #{m.modelVersion}, #{m.config}::jsonb, #{m.scoreMax}, #{m.enabled}, #{m.builtin},
-             #{m.remark}, #{m.revision}, #{m.createBy}, CURRENT_TIMESTAMP)
+             #{m.remark}, #{m.status}, #{m.revision}, #{m.createBy}, CURRENT_TIMESTAMP)
         """)
     int insertJsonb(@Param("m") ProfileScoreModel m);
 
@@ -30,9 +30,10 @@ public interface ProfileScoreModelMapper extends BaseMapperPlus<ProfileScoreMode
         UPDATE profile_score_model
         SET model_name = #{m.modelName}, model_type = #{m.modelType}, model_version = #{m.modelVersion},
             config = #{m.config}::jsonb, score_max = #{m.scoreMax}, enabled = #{m.enabled},
-            remark = #{m.remark}, revision = #{m.revision}, update_by = #{m.updateBy},
+            remark = #{m.remark}, status = #{m.status}, revision = #{m.revision}, update_by = #{m.updateBy},
             update_time = CURRENT_TIMESTAMP
         WHERE model_id = #{m.modelId} AND tenant_id = #{m.tenantId} AND del_flag = '0'
+          AND revision = #{m.revision} - 1
         """)
     int updateJsonb(@Param("m") ProfileScoreModel m);
 }

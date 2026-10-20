@@ -46,6 +46,8 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
             WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
               AND subject_type = sub.subject_type AND subject_id = sub.subject_id
               AND del_flag = '0'
+              AND model_version = #{modelVersion}
+              AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
             ORDER BY calc_time DESC, model_snapshot_id DESC
             LIMIT 1
         ) ms ON TRUE
@@ -65,6 +67,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
         @Param("tenantId") String tenantId,
         @Param("source") String source,
         @Param("modelCode") String modelCode,
+        @Param("modelVersion") String modelVersion,
         @Param("level") String level,
         @Param("keyword") String keyword);
     /**
@@ -80,6 +83,8 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
             WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
               AND subject_type = sub.subject_type AND subject_id = sub.subject_id
               AND del_flag = '0'
+              AND model_version = #{modelVersion}
+              AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
             ORDER BY calc_time DESC, model_snapshot_id DESC
             LIMIT 1
         ) ms ON TRUE
@@ -88,7 +93,8 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
         """)
     List<ProfileModelSubjectRow> selectLatestAll(@Param("tenantId") String tenantId,
                                                  @Param("source") String source,
-                                                 @Param("modelCode") String modelCode);
+                                                 @Param("modelCode") String modelCode,
+                                                 @Param("modelVersion") String modelVersion);
 
     @Select("""
         SELECT model_snapshot_id AS "modelSnapshotId", model_score AS "modelScore",
@@ -98,6 +104,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
         FROM profile_model_snapshot
         WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
           AND subject_type = #{subjectType} AND subject_id = #{subjectId} AND del_flag = '0'
+          AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
         ORDER BY calc_time DESC, model_snapshot_id DESC
         LIMIT #{limit}
         """)
@@ -120,6 +127,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
             WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
               AND calc_time >= now() - make_interval(days => #{days})
               AND del_flag = '0'
+              AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
             ORDER BY subject_type, subject_id, to_char(calc_time, 'YYYY-MM-DD'), calc_time DESC
         ) t
         GROUP BY day
@@ -137,6 +145,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
             FROM profile_model_snapshot
             WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
               AND del_flag = '0'
+              AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
             ORDER BY subject_type, subject_id, calc_time DESC, model_snapshot_id DESC
         ) t
         GROUP BY level
@@ -155,9 +164,24 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
         FROM profile_model_snapshot
         WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
           AND del_flag = '0'
+          AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
         ORDER BY subject_type, subject_id, calc_time DESC, model_snapshot_id DESC
         """)
     List<Map<String, Object>> selectLatestIds(@Param("tenantId") String tenantId,
                                               @Param("source") String source,
                                               @Param("modelCode") String modelCode);
+
+    /**
+     * 指定 run 的全部快照(版本对比用, 批9 Q1-A)。
+     */
+    @Select("""
+        SELECT subject_type AS "subjectType", subject_id AS "subjectId",
+               model_score AS "modelScore", normalized_score AS "normalizedScore",
+               level, detail, model_version AS "modelVersion", calc_time AS "calcTime"
+        FROM profile_model_snapshot
+        WHERE tenant_id = #{tenantId} AND run_id = #{runId} AND del_flag = '0'
+        ORDER BY subject_type, subject_id
+        """)
+    List<Map<String, Object>> selectByRun(@Param("tenantId") String tenantId,
+                                           @Param("runId") Long runId);
 }

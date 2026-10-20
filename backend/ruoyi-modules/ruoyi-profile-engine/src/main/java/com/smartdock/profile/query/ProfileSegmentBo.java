@@ -37,5 +37,8 @@ public class ProfileSegmentBo implements Serializable {
 
     private String description;
 
+    /** OFF / DAILY / HOURLY */
+    private String refreshMode;
+
     private Integer revision;
 }

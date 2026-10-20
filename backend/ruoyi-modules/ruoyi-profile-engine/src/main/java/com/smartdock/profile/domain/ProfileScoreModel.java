@@ -52,4 +52,7 @@ public class ProfileScoreModel extends BaseEntity {
 
     /** 乐观锁: 每次编辑 +1, 运行记录使用编辑时的版本 */
     private Integer revision;
+
+    /** DRAFT / PUBLISHED / ARCHIVED（批9 发布纪律） */
+    private String status;
 }

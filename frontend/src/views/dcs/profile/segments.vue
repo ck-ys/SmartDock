@@ -46,6 +46,9 @@
             <el-tag :type="segment.segmentType === 'DYNAMIC' ? 'primary' : 'info'" effect="plain" size="small">
               {{ segment.segmentType === 'DYNAMIC' ? '动态' : '静态' }}
             </el-tag>
+            <el-tag v-if="refreshModeLabel(segment.refreshMode)" type="success" effect="plain" size="small">
+              {{ refreshModeLabel(segment.refreshMode) }}
+            </el-tag>
             <el-tag :type="segment.status === 'ENABLED' ? 'success' : 'info'" effect="plain" size="small">
               {{ segment.status === 'ENABLED' ? '启用' : '停用' }}
             </el-tag>
@@ -84,8 +87,20 @@
           <el-button v-hasPermi="['profile:segment:edit']" v-else size="small" type="primary" @click="openImport(segment)">导入名单</el-button>
           <el-button size="small" @click="openMembers(segment)">成员</el-button>
           <el-button size="small" @click="openRuns(segment)">运行记录</el-button>
-          <el-button v-hasPermi="['profile:segment:edit']" size="small" @click="openEdit(segment)">编辑</el-button>
-          <el-button v-hasPermi="['profile:segment:edit']" v-if="segment.builtin !== '1'" size="small" type="danger" plain @click="remove(segment)">删除</el-button>
+          <el-dropdown trigger="click" @command="(cmd: string) => onMoreCommand(cmd, segment)">
+            <el-button size="small">
+              更多<el-icon class="el-icon--right"><arrow-down /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-hasPermi="['profile:reach:edit']" command="notify">发通知（站内信）</el-dropdown-item>
+                <el-dropdown-item command="records">触达 / 导出记录</el-dropdown-item>
+                <el-dropdown-item v-hasPermi="['profile:reach:edit']" command="export">导出成员 CSV</el-dropdown-item>
+                <el-dropdown-item v-hasPermi="['profile:segment:edit']" command="edit" divided>编辑</el-dropdown-item>
+                <el-dropdown-item v-hasPermi="['profile:segment:edit']" v-if="segment.builtin !== '1'" command="delete">删除</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </el-card>
       <el-empty v-if="!loading && segments.length === 0" description="当前业务源还没有分群">
@@ -120,6 +135,15 @@
               <el-select v-model="form.status" style="width: 100%">
                 <el-option label="启用" value="ENABLED" />
                 <el-option label="停用" value="DISABLED" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col v-if="form.segmentType === 'DYNAMIC'" :span="12">
+            <el-form-item label="自动刷新">
+              <el-select v-model="form.refreshMode" style="width: 100%">
+                <el-option label="手动（点「评估」）" value="OFF" />
+                <el-option label="每天自动" value="DAILY" />
+                <el-option label="每小时自动" value="HOURLY" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -243,11 +267,12 @@
       />
     </el-drawer>
 
-    <!-- 运行记录 -->
+    <!-- 运行记录（含人数趋势） -->
     <el-drawer v-model="runVisible" :title="`运行记录 · ${activeSegment?.segmentName || ''}`" size="720px" destroy-on-close>
+      <v-chart v-if="runs.length >= 2" class="run-trend-chart" :option="runTrendOption" autoresize />
       <el-table v-loading="runLoading" :data="runs" stripe size="small">
         <el-table-column label="运行 ID" prop="runId" min-width="180" />
-        <el-table-column label="触发" width="90">
+        <el-table-column label="触发" width="110">
           <template #default="{ row }">{{ triggerLabel(row.triggerType) }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90">
@@ -265,11 +290,155 @@
       </el-table>
       <el-empty v-if="!runLoading && runs.length === 0" description="还没有运行记录" />
     </el-drawer>
+
+    <!-- 发通知向导（预览 → 发送） -->
+    <el-dialog v-model="reachVisible" :title="`发通知 · ${reachSegment?.segmentName || ''}`" width="620px" destroy-on-close>
+      <div v-loading="reachPreviewLoading" class="drawer-body">
+        <template v-if="reachPreviewData">
+          <div class="reach-summary">
+            <div class="reach-stat">
+              <span>当前成员</span>
+              <strong>{{ reachPreviewData.memberCount }}</strong>
+            </div>
+            <div class="reach-stat">
+              <span>可触达（登录用户）</span>
+              <strong>{{ reachPreviewData.reachableCount }}</strong>
+            </div>
+            <div class="reach-stat">
+              <span>跳过（非用户主体）</span>
+              <strong>{{ reachPreviewData.skippedNonUser }}</strong>
+            </div>
+          </div>
+          <el-alert type="info" :closable="false" show-icon class="reach-alert" :title="`发送时冻结当前成员快照，逐人去重（同一人只收一次）；渠道：站内信`" />
+          <el-form label-width="80px">
+            <el-form-item label="标题">
+              <el-input v-model="reachForm.title" maxlength="100" placeholder="如：低分预警周报" />
+            </el-form-item>
+            <el-form-item label="内容">
+              <el-input v-model="reachForm.content" type="textarea" :rows="5" maxlength="1000" placeholder="站内信正文，支持简单文本" />
+            </el-form-item>
+          </el-form>
+        </template>
+      </div>
+      <template #footer>
+        <el-button @click="reachVisible = false">取消</el-button>
+        <el-button
+          v-hasPermi="['profile:reach:edit']"
+          type="primary"
+          :loading="reachSending"
+          :disabled="!reachPreviewData || reachPreviewData.reachableCount === 0"
+          @click="sendReach"
+        >
+          发送给 {{ reachPreviewData?.reachableCount ?? 0 }} 人
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 触达/导出记录 -->
+    <el-drawer v-model="recordsVisible" :title="`触达与导出记录 · ${activeSegment?.segmentName || ''}`" size="760px" destroy-on-close>
+      <el-table
+        v-loading="recordsLoading"
+        :data="reachBatches"
+        stripe
+        size="small"
+        row-key="reachId"
+        @expand-change="(row: ProfileReachBatch, expanded: ProfileReachBatch[]) => expanded.length && loadItems(row)"
+      >
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div class="reach-items-wrap">
+              <el-table v-loading="itemsLoadingId === row.reachId" :data="reachItemsData[row.reachId] || []" size="small" stripe>
+                <el-table-column prop="subjectId" label="主体 ID" min-width="160" />
+                <el-table-column prop="userName" label="接收用户" width="120">
+                  <template #default="{ row: item }">{{ item.userName || item.userId || '—' }}</template>
+                </el-table-column>
+                <el-table-column label="状态" width="90">
+                  <template #default="{ row: item }">
+                    <el-tag :type="item.status === 'SUCCESS' ? 'success' : item.status === 'FAILED' ? 'danger' : 'info'" size="small">
+                      {{ item.status === 'SUCCESS' ? '成功' : item.status === 'FAILED' ? '失败' : '待发' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="errorMsg" label="失败原因" min-width="140">
+                  <template #default="{ row: item }"><span class="muted">{{ item.errorMsg || '—' }}</span></template>
+                </el-table-column>
+                <el-table-column prop="sentTime" label="发送时间" width="160">
+                  <template #default="{ row: item }">{{ item.sentTime || '—' }}</template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="渠道" width="80">
+          <template #default="{ row }">{{ row.channel === 'export' ? '导出' : '站内信' }}</template>
+        </el-table-column>
+        <el-table-column prop="title" label="标题" min-width="150" />
+        <el-table-column label="结果" width="130">
+          <template #default="{ row }">
+            成功 {{ row.successCount ?? 0 }} / 失败 {{ row.failCount ?? 0 }}
+            <el-tag v-if="row.masked === '1'" size="small" effect="plain" class="masked-tag">脱敏</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag :type="reachStatusType(row.status)" size="small">{{ reachStatusLabel(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="createTime" label="时间" width="160" />
+        <el-table-column label="操作" width="90" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.failCount > 0"
+              v-hasPermi="['profile:reach:edit']"
+              link
+              type="warning"
+              :loading="retryingId === row.reachId"
+              @click="retryReach(row)"
+            >
+              重试失败
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <pagination
+        v-show="recordsTotal > 0"
+        v-model:page="recordsQuery.pageNum"
+        v-model:limit="recordsQuery.pageSize"
+        :total="recordsTotal"
+        @pagination="loadRecords"
+      />
+      <el-empty v-if="!recordsLoading && reachBatches.length === 0" description="还没有触达或导出记录" />
+    </el-drawer>
+
+    <!-- 导出成员 -->
+    <el-dialog v-model="exportVisible" :title="`导出成员 · ${activeSegment?.segmentName || ''}`" width="480px" destroy-on-close>
+      <el-form label-width="100px">
+        <el-form-item label="脱敏导出">
+          <el-switch v-model="exportForm.masked" active-text="隐藏中间字符" inactive-text="明文（会记审计）" />
+        </el-form-item>
+      </el-form>
+      <el-alert
+        :type="exportForm.masked ? 'info' : 'warning'"
+        :closable="false"
+        show-icon
+        :title="exportForm.masked ? 'ID 与名称只保留首尾字符，如 use***01。' : '明文导出会记录一条审计，请确认有权限与必要性。'"
+      />
+      <template #footer>
+        <el-button @click="exportVisible = false">取消</el-button>
+        <el-button v-hasPermi="['profile:reach:edit']" type="primary" :loading="exporting" @click="doExport">导出 CSV</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup name="DcsProfileSegments" lang="ts">
+import { use } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+import { LineChart } from 'echarts/charts';
+import { GridComponent, TooltipComponent } from 'echarts/components';
+import VChart from 'vue-echarts';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { download } from '@/utils/request';
 import {
   createSegment,
   deleteSegment,
@@ -279,12 +448,22 @@ import {
   listSegments,
   pageSegmentMembers,
   previewSegment,
+  reachItems,
+  reachPreview,
+  reachRecords,
+  reachRetry,
+  reachSend,
   updateSegment,
+  type ProfileReachBatch,
+  type ProfileReachItem,
+  type ProfileReachPreview,
   type ProfileSegment,
   type ProfileSegmentMemberRow,
   type ProfileSegmentPreview,
   type ProfileSegmentRun
 } from '@/api/dcs/core/profile';
+
+use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 
 const source = ref('dcs');
 const segments = ref<ProfileSegment[]>([]);
@@ -294,6 +473,12 @@ const evaluatingId = ref('');
 const dynamicCount = computed(() => segments.value.filter((s) => s.segmentType === 'DYNAMIC').length);
 const staticCount = computed(() => segments.value.filter((s) => s.segmentType === 'STATIC').length);
 const segmentMemberTotal = computed(() => segments.value.reduce((sum, s) => sum + Number(s.memberCount || 0), 0));
+
+const refreshModeLabel = (mode?: string) => {
+  if (mode === 'HOURLY') return '自动·每小时';
+  if (mode === 'DAILY') return '自动·每天';
+  return '';
+};
 
 const formatScore = (value?: number | string | null) => {
   if (value === null || value === undefined || value === '') return '—';
@@ -392,6 +577,7 @@ const form = reactive({
   segmentName: '',
   segmentType: 'DYNAMIC',
   status: 'ENABLED',
+  refreshMode: 'OFF',
   description: '',
   match: 'ALL',
   conditions: [] as ConditionForm[],
@@ -405,6 +591,7 @@ const resetForm = () => {
     segmentName: '',
     segmentType: 'DYNAMIC',
     status: 'ENABLED',
+    refreshMode: 'OFF',
     description: '',
     match: 'ALL',
     conditions: [{ field: 'totalScore', op: 'GTE', value: '75' }],
@@ -427,6 +614,7 @@ const openEdit = (segment: ProfileSegment) => {
     segmentName: segment.segmentName,
     segmentType: segment.segmentType,
     status: segment.status,
+    refreshMode: segment.refreshMode || 'OFF',
     description: segment.description || '',
     match: rule.match || 'ALL',
     conditions: (rule.conditions || []).map((c) => ({
@@ -490,6 +678,7 @@ const save = async () => {
       segmentName: form.segmentName.trim(),
       segmentType: form.segmentType,
       status: form.status,
+      refreshMode: form.segmentType === 'DYNAMIC' ? form.refreshMode : 'OFF',
       description: form.description,
       ruleConfig: form.segmentType === 'DYNAMIC' ? buildRule() : {}
     };
@@ -588,7 +777,155 @@ const openRuns = async (segment: ProfileSegment) => {
     runLoading.value = false;
   }
 };
-const triggerLabel = (trigger?: string) => (trigger === 'IMPORT' ? '名单导入' : trigger === 'INIT' ? '初始化' : '手动');
+const triggerLabel = (trigger?: string) =>
+  trigger === 'IMPORT' ? '名单导入' : trigger === 'INIT' ? '初始化' : trigger === 'SCHEDULE' ? '定时' : '手动';
+
+/** 人数趋势：运行记录倒序，反转为时间正序 */
+const runTrendOption = computed<any>(() => {
+  const ordered = [...runs.value].reverse();
+  return {
+    title: { text: '人数趋势（按运行记录）', left: 0, top: 0, textStyle: { fontSize: 13, fontWeight: 600 } },
+    tooltip: { trigger: 'axis' },
+    grid: { left: 40, right: 16, top: 34, bottom: 26 },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: ordered.map((run, i) => (run.finishedAt || run.startedAt || `#${i + 1}`).slice(5, 16))
+    },
+    yAxis: { type: 'value', minInterval: 1 },
+    series: [{ type: 'line', smooth: true, symbolSize: 6, areaStyle: { opacity: 0.12 }, data: ordered.map((run) => run.memberCount) }]
+  };
+});
+
+// ---------------------------------------------------------------- 触达向导 / 记录 / 导出（批9）
+const onMoreCommand = (cmd: string, segment: ProfileSegment) => {
+  if (cmd === 'notify') openReach(segment);
+  else if (cmd === 'records') openRecords(segment);
+  else if (cmd === 'export') openExport(segment);
+  else if (cmd === 'edit') openEdit(segment);
+  else if (cmd === 'delete') remove(segment);
+};
+
+const reachVisible = ref(false);
+const reachPreviewLoading = ref(false);
+const reachSending = ref(false);
+const reachSegment = ref<ProfileSegment | null>(null);
+const reachPreviewData = ref<ProfileReachPreview | null>(null);
+const reachForm = reactive({ title: '', content: '' });
+
+const openReach = async (segment: ProfileSegment) => {
+  reachSegment.value = segment;
+  reachVisible.value = true;
+  reachPreviewLoading.value = true;
+  reachPreviewData.value = null;
+  reachForm.title = '';
+  reachForm.content = '';
+  try {
+    reachPreviewData.value = await reachPreview(segment.segmentId);
+  } finally {
+    reachPreviewLoading.value = false;
+  }
+};
+const sendReach = async () => {
+  if (!reachSegment.value) return;
+  if (!reachForm.title.trim()) return ElMessage.warning('请填写标题');
+  if (!reachForm.content.trim()) return ElMessage.warning('请填写内容');
+  reachSending.value = true;
+  try {
+    const batch = await reachSend(reachSegment.value.segmentId, { title: reachForm.title.trim(), content: reachForm.content.trim() });
+    if (batch.status === 'DONE') {
+      ElMessage.success(`发送完成：成功 ${batch.successCount} 人`);
+    } else if (batch.status === 'PARTIAL') {
+      ElMessage.warning(`部分成功：成功 ${batch.successCount}，失败 ${batch.failCount}（可在触达记录里重试）`);
+    } else {
+      ElMessage.error(batch.errorMsg || `发送失败：${batch.status}`);
+    }
+    reachVisible.value = false;
+    await loadAll();
+  } finally {
+    reachSending.value = false;
+  }
+};
+
+const recordsVisible = ref(false);
+const recordsLoading = ref(false);
+const reachBatches = ref<ProfileReachBatch[]>([]);
+const recordsTotal = ref(0);
+const recordsQuery = reactive({ pageNum: 1, pageSize: 10 });
+const itemsLoadingId = ref('');
+/** 逐人明细按批次分桶: 多行同时展开时不能共用一份数据 */
+const reachItemsData = ref<Record<string, ProfileReachItem[]>>({});
+const retryingId = ref('');
+
+const openRecords = async (segment: ProfileSegment) => {
+  activeSegment.value = segment;
+  recordsVisible.value = true;
+  recordsQuery.pageNum = 1;
+  await loadRecords();
+};
+const loadRecords = async () => {
+  if (!activeSegment.value) return;
+  recordsLoading.value = true;
+  try {
+    const res = await reachRecords(activeSegment.value.segmentId, {
+      pageNum: recordsQuery.pageNum,
+      pageSize: recordsQuery.pageSize
+    });
+    reachBatches.value = res.rows;
+    recordsTotal.value = res.total;
+    reachItemsData.value = {};
+  } finally {
+    recordsLoading.value = false;
+  }
+};
+const reachStatusType = (status?: string) =>
+  status === 'DONE' ? ('success' as const) : status === 'FAILED' ? ('danger' as const) : ('warning' as const);
+const reachStatusLabel = (status?: string) => (status === 'DONE' ? '完成' : status === 'PARTIAL' ? '部分成功' : status === 'FAILED' ? '失败' : '进行中');
+
+/** 展开行时加载该批次逐人明细 */
+const loadItems = async (row: ProfileReachBatch) => {
+  if (itemsLoadingId.value === row.reachId) return;
+  itemsLoadingId.value = row.reachId;
+  try {
+    reachItemsData.value[row.reachId] = await reachItems(row.reachId, 200);
+  } finally {
+    itemsLoadingId.value = '';
+  }
+};
+const retryReach = async (row: ProfileReachBatch) => {
+  await ElMessageBox.confirm(`重试批次中失败的 ${row.failCount} 人？已成功的不重发。`, '重试失败', { type: 'warning' });
+  retryingId.value = row.reachId;
+  try {
+    const batch = await reachRetry(row.reachId);
+    ElMessage.success(`重试完成：累计成功 ${batch.successCount}，仍失败 ${batch.failCount}`);
+    await loadRecords();
+  } finally {
+    retryingId.value = '';
+  }
+};
+
+const exportVisible = ref(false);
+const exporting = ref(false);
+const exportForm = reactive({ masked: true });
+
+const openExport = (segment: ProfileSegment) => {
+  activeSegment.value = segment;
+  exportForm.masked = true;
+  exportVisible.value = true;
+};
+const doExport = async () => {
+  if (!activeSegment.value) return;
+  exporting.value = true;
+  try {
+    const seg = activeSegment.value;
+    await download(`/profile/segment/${seg.segmentId}/export`, { masked: String(exportForm.masked) }, `${seg.segmentName}-成员.csv`);
+    exportVisible.value = false;
+  } catch {
+    // download 内部已提示
+  } finally {
+    exporting.value = false;
+  }
+};
 
 onMounted(loadAll);
 </script>
@@ -727,6 +1064,43 @@ onMounted(loadAll);
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  align-items: center;
+}
+.run-trend-chart {
+  height: 200px;
+  width: 100%;
+  margin-bottom: 12px;
+}
+.reach-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.reach-stat {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.reach-stat span {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.reach-stat strong {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.reach-alert {
+  margin-bottom: 12px;
+}
+.reach-items-wrap {
+  padding: 6px 18px;
+}
+.masked-tag {
+  margin-left: 6px;
 }
 .rule-toolbar {
   display: flex;

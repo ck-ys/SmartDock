@@ -95,6 +95,7 @@ public class ProfileSegmentService {
             : JsonUtils.toJsonString(bo.getRuleConfig()));
         segment.setDescription(StringUtils.substring(bo.getDescription(), 0, 500));
         segment.setMemberCount(0);
+        segment.setRefreshMode(normalizeRefreshMode(bo.getRefreshMode()));
         segment.setBuiltin("0");
         segment.setRevision(0);
         segment.setCreateBy(currentUser());
@@ -120,6 +121,7 @@ public class ProfileSegmentService {
         existing.setRuleConfig(STATIC.equals(existing.getSegmentType()) ? "{}"
             : JsonUtils.toJsonString(bo.getRuleConfig()));
         existing.setDescription(StringUtils.substring(bo.getDescription(), 0, 500));
+        existing.setRefreshMode(normalizeRefreshMode(bo.getRefreshMode()));
         existing.setRevision((existing.getRevision() == null ? 0 : existing.getRevision()) + 1);
         existing.setUpdateBy(currentUser());
         segmentMapper.updateJsonb(existing);
@@ -180,6 +182,14 @@ public class ProfileSegmentService {
      * 评估动态分群: 生成新 run + 成员快照, 更新分群统计。
      */
     public ProfileSegmentRun evaluate(Long segmentId) {
+        return evaluate(segmentId, "MANUAL");
+    }
+
+    /**
+     * 评估动态分群(批9: trigger 可为 MANUAL/SCHEDULE)。每次 run 可重跑可追溯;
+     * 完成后按 run 保留最近 30 次, 更老的成员明细清理防膨胀。
+     */
+    public ProfileSegmentRun evaluate(Long segmentId, String trigger) {
         ProfileSegment segment = get(segmentId);
         if (!DYNAMIC.equalsIgnoreCase(segment.getSegmentType())) {
             throw new ServiceException("静态分群请使用名单导入");
@@ -201,7 +211,9 @@ public class ProfileSegmentService {
                     row.getDisplayName(), reason));
             }
         }
-        return writeRun(segment, "MANUAL", candidates.size(), matched);
+        ProfileSegmentRun run = writeRun(segment, StringUtils.isBlank(trigger) ? "MANUAL" : trigger.trim().toUpperCase(), candidates.size(), matched);
+        pruneRuns(segment);
+        return run;
     }
 
     /**
@@ -287,6 +299,32 @@ public class ProfileSegmentService {
     }
 
     // ---------------------------------------------------------------- 内部
+
+    /** 只保留最近 30 个 run 的成员明细(批9 Q2-A 防膨胀; run 头记录保留, 成员行清理)。 */
+    private void pruneRuns(ProfileSegment segment) {
+        try {
+            List<ProfileSegmentRun> keep = runMapper.selectList(new LambdaQueryWrapper<ProfileSegmentRun>()
+                .eq(ProfileSegmentRun::getSegmentId, segment.getSegmentId())
+                .eq(ProfileSegmentRun::getTenantId, segment.getTenantId())
+                .orderByDesc(ProfileSegmentRun::getCreateTime)
+                .last("LIMIT " + KEEP_RUNS));
+            Long total = runMapper.selectCount(new LambdaQueryWrapper<ProfileSegmentRun>()
+                .eq(ProfileSegmentRun::getSegmentId, segment.getSegmentId()));
+            if (total == null || total <= KEEP_RUNS || keep.isEmpty()) {
+                return;
+            }
+            // 不圈 200 窗口: 直接删「不在保留名单里」的全部成员行, 否则第 201 个及更老的 run 永远清不到
+            memberMapper.delete(new LambdaQueryWrapper<ProfileSegmentMember>()
+                .eq(ProfileSegmentMember::getSegmentId, segment.getSegmentId())
+                .eq(ProfileSegmentMember::getTenantId, segment.getTenantId())
+                .notIn(ProfileSegmentMember::getRunId,
+                    keep.stream().map(ProfileSegmentRun::getRunId).toList()));
+        } catch (Exception e) {
+            log.warn("[Profile] segment run prune failed segment={} err={}", segment.getSegmentId(), e.getMessage());
+        }
+    }
+
+    private static final int KEEP_RUNS = 30;
 
     private ProfileSegmentRun writeRun(ProfileSegment segment, String trigger, int candidates,
                                        List<MemberDraft> members) {
@@ -423,6 +461,11 @@ public class ProfileSegmentService {
                 throw new ServiceException("分群规则不合法: " + String.join("; ", errors));
             }
         }
+    }
+
+    /** OFF/DAILY/HOURLY 归一, 非法值一律 OFF（保守: 不刷新不影响存量行为）。 */
+    private String normalizeRefreshMode(String mode) {
+        return "DAILY".equalsIgnoreCase(mode) ? "DAILY" : "HOURLY".equalsIgnoreCase(mode) ? "HOURLY" : "OFF";
     }
 
     private String normalizeType(String type) {
