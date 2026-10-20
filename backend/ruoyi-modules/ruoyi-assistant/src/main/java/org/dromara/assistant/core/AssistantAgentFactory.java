@@ -187,6 +187,11 @@ public class AssistantAgentFactory {
             .stateStore(stateStore)
             .toolkit(toolkit)
             .permissionContext(pb.build())
+            // 稳流① Q1（2026-10-20 拍板 A①）：流层真事件心跳——20s 一帧 dcs-heartbeat
+            // CUSTOM 帧（合法静默期也出网：联网搜索/慢首 token/自动压缩摘要期），喂前端
+            // 600s 看门狗+刷新 Recorder lastEventAt（工具/压缩段豁免的事件层实现）。
+            // order=0 链位最外层，包住压缩中间件的 onReasoning
+            .middleware(new DcsHeartbeatMiddleware())
             // 批17 Q2：自动压缩通道——上下文越过租户阈值（默认 60000 token）时
             // 每轮推理前自动打包成摘要（九段中文模板），并落 system 分隔条行让前端
             // 渲染「已压缩」标记；配置双显式（trigger+keep），不依赖模型自报窗口（P14 Step5）

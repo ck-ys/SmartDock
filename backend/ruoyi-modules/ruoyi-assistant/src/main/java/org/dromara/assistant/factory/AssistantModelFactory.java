@@ -93,6 +93,9 @@ public class AssistantModelFactory {
 
     /** J 批一期：配置解析委托单点解析器（本类不再自带查询+CNY 闸） */
     private final com.smartdock.service.IDcsAiConfigService aiConfigService;
+
+    /** 稳流① Q8③：轻快侧车思考可关判定（能力目录查询） */
+    private final org.dromara.assistant.service.CapabilityService capabilityService;
     /** 批3 Q11：助手默认槽（AI 助手管理页设置，优先于接口默认星标） */
     private final org.dromara.assistant.service.AssistantModelSettingService modelSettingService;
 
@@ -141,17 +144,51 @@ public class AssistantModelFactory {
      * 业务反馈批1015b Q2：侧车"轻快模型"——优先取该租户最便宜的启用 CHAT 行（倍率=档位信号：
      * 免费/flash 档天生轻快），任何失败回退默认链。追问是 3 条短 JSON 的小任务，不该跟主对话
      * 抢同一个默认模型（默认模型忙/限流时两败俱伤=追问失败主因）。
+     *
+     * <p><b>稳流① Q8③ 护栏</b>（2026-10-20，Q8↔Q9 联动）：侧车带 thinkingBudget(0) 关思考省时省钱，
+     * 但能力目录判"思考不可关"的模型（如 MiniMax-M3.1-Flash：TIERS low~max 无 none 档，effort
+     * 关闭值直发 400）会让侧车稳定失败——最便宜行恰好是这类时跳过，回退默认链（租户只配了
+     * 这类模型时两侧车同命，属配置面问题不归护栏管）。判定经能力目录 tierValues 含
+     * none/off/disabled 之一=可关；NONE（无思考能力）天然可关；目录不可达放宽放行（不因护栏误伤）。</p>
      */
     public DcsAiConfig resolveLightweightConfig(String tenantId) {
         try {
             DcsAiConfig cheap = aiConfigService.resolveCheapestEnabledConfig(tenantId, "CHAT");
-            if (cheap != null) {
+            if (cheap != null && thinkingDismissible(tenantId, cheap)) {
                 return cheap;
+            }
+            if (cheap != null) {
+                log.warn("[ModelFactory] 轻快行思考不可关, 跳过回退默认链 tenant={} provider={} model={}",
+                    tenantId, cheap.getProvider(), cheap.getModelName());
             }
         } catch (Exception e) {
             log.debug("[ModelFactory] 轻快模型解析失败, 回退默认链 tenant={}: {}", tenantId, e.getMessage());
         }
         return resolveConfig(tenantId);
+    }
+
+    /**
+     * 稳流① Q8③：轻快侧车的"思考可关"判定（防 thinkingBudget(0) 撞不可关档模型稳定 400）。
+     * 口径：NONE（无思考能力）=天然可关；TIERS/SWITCH 的 tierValues 含
+     * none/off/disabled（大小写不敏感）=可关；其余（如 low~max 全开档）=不可关。
+     * 能力目录异常=放宽放行（护栏不因目录不可达误伤侧车）。
+     */
+    private boolean thinkingDismissible(String tenantId, DcsAiConfig cfg) {
+        try {
+            org.dromara.assistant.service.CapabilityService.CapabilityVo cap =
+                capabilityService.matchCapability(tenantId, cfg.getProvider(), cfg.getModelName());
+            if (cap == null || cap.getTierKind() == null || "NONE".equals(cap.getTierKind())) {
+                return true;
+            }
+            return cap.getTierValues().stream()
+                .anyMatch(v -> v != null
+                    && ("none".equalsIgnoreCase(v.trim()) || "off".equalsIgnoreCase(v.trim())
+                        || "disabled".equalsIgnoreCase(v.trim())));
+        } catch (Exception e) {
+            log.debug("[ModelFactory] 思考可关判定失败, 放宽放行 tenant={} model={}: {}",
+                tenantId, cfg.getModelName(), e.getMessage());
+            return true;
+        }
     }
 
     public DcsAiConfig resolveConfigWithUserChoice(String tenantId, String threadId) {

@@ -14,6 +14,7 @@
  * </ul>
  */
 import { reactive } from 'vue';
+import { ElMessageBox } from 'element-plus';
 import { readWebOn } from './webOnState';
 import { readSkillId } from './skillState';
 import { createAguiClient, type AguiClientOptions, type AguiTurnHandle } from '@/api/dcs/assistant/aguiClient';
@@ -24,8 +25,11 @@ import { renderMd } from './md';
 
 /** 批5 Q7-3：追问拉取递进间隔（侧车写库实测比 done 慢 2~8s）。
  *  业务反馈批1015b Q2：累计窗口 18s→30s——侧车生成允许跑到 45s，前端 18s 就放弃
- *  会永远等不到慢生成（刷新反而看得到）；30s 兜住绝大多数慢轮，末轮后照旧判"未生成" */
-const FOLLOWUP_PULL_DELAYS = [3500, 5500, 9000, 6500, 5500];
+ *  会永远等不到慢生成（刷新反而看得到）。
+ *  稳流① Q8①（2026-10-20）：30s→90s——侧车 45s 超时 × 单线程池 8 深队列，忙时
+ *  30s 窗口在队列里还没轮到；90s 兜住两轮生成周期，且配合聚焦/回页补拉（见
+ *  scheduleFollowupPull），离开页面期间到手的建议回来立刻可见 */
+const FOLLOWUP_PULL_DELAYS = [3500, 5500, 9000, 12000, 16000, 20000, 24000];
 
 /** 工具名 → 人话动词（前端展示层映射；未知工具退化为去下划线）。
  *  二站① AU-52 起导出共用——管理端「运行记录」动作列与回合步骤行同词典（批I 账本列同源） */
@@ -702,6 +706,21 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           if (items.length > 0 && state.sending) {
             state.todoItems = items;
           }
+        }
+      },
+      onStall: async () => {
+        // 稳流① Q1（拍板 A②）：600s 无帧（含 20s 心跳都没到=链路真断）不再自动重发
+        // ——重发撞 409 防双计费；裁决交用户。继续等=再挂一个看门狗窗；停止=按手动停止收口
+        try {
+          await ElMessageBox.confirm(
+            '等了很久还没有新内容，连接可能出了问题。继续等待，还是停止这一轮？',
+            '还在等待回复',
+            { confirmButtonText: '继续等待', cancelButtonText: '停止', type: 'warning' }
+          );
+          toast('继续等待中——若仍无进展可随时点「停止」结束本轮', 'info');
+          return 'keep-waiting';
+        } catch {
+          return 'stop';
         }
       },
       onFinished: (outcome) => {
@@ -1508,48 +1527,74 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       return;
     }
     const stillMine = () => state.turns[state.turns.length - 1] === turn && ['done', 'error', 'stopped'].includes(turn.phase);
+    const done = () => !stillMine() || !!turn.followups?.length;
+    // 稳流① Q8①：聚焦/回页即拉（90s 窗口内切回来不等下一个轮询间隔）；声明前置供 pull 引用
+    const detachFocusPull = () => {
+      if (typeof globalThis.removeEventListener === 'function') {
+        globalThis.removeEventListener('focus', onFocusPull);
+        globalThis.removeEventListener('visibilitychange', onFocusPull);
+      }
+    };
+    /** 单次拉取：onEmpty=空结果继续策略；onFail=请求失败收尾策略；均由调用方按轮次给 */
+    const pull = (onEmpty?: () => void, onFail?: () => void) => {
+      // 全防御：同步抛（测试环境无 request）与异步 rejection 都不得逃逸——
+      // 假定时器场景一个抛错会打断同批 timer 队列（队列补发实测被打断的教训）
+      try {
+        getFollowups(tid)
+          .then((res) => {
+            if (done()) {
+              detachFocusPull();
+              return;
+            }
+            // request 层返回整个 body（{code,msg,data}——getConversationTodo 同款取法）
+            const items = (res as unknown as { data?: { followups?: string[] } })?.data?.followups;
+            if (Array.isArray(items) && items.length > 0) {
+              turn.followups = items.filter((x) => typeof x === 'string').slice(0, 3);
+              detachFocusPull();
+              return;
+            }
+            onEmpty?.();
+          })
+          .catch(() => onFail?.());
+      } catch {
+        onFail?.();
+      }
+    };
     const attempt = (idx: number) => {
       // globalThis 而非 window：vitest 是 node 环境（queue 用例实锤 window 引用同步抛）
       globalThis.setTimeout(() => {
-        if (!stillMine() || turn.followups?.length) {
+        if (done()) {
+          detachFocusPull();
           return;
         }
-        // 全防御：同步抛（测试环境无 request）与异步 rejection 都不得逃逸——
-        // 假定时器场景一个抛错会打断同批 timer 队列（队列补发实测被打断的教训）
-        try {
-          getFollowups(tid)
-            .then((res) => {
-              if (!stillMine() || turn.followups?.length) {
-                return;
-              }
-              // request 层返回整个 body（{code,msg,data}——getConversationTodo 同款取法）
-              const items = (res as unknown as { data?: { followups?: string[] } })?.data?.followups;
-              if (Array.isArray(items) && items.length > 0) {
-                turn.followups = items.filter((x) => typeof x === 'string').slice(0, 3);
-                return;
-              }
-              // 侧车尚未写完（常见）或模型输出不合规（少数）：还有额度就再等一轮；
-              // 最后一轮仍空 → 定论"未生成"，灰字标注才允许显示，不再糊弄
-              if (idx + 1 < FOLLOWUP_PULL_DELAYS.length && !turn.followups?.length) {
-                attempt(idx + 1);
-              } else if (!turn.followups?.length) {
-                settleFollowups(turn);
-              }
-            })
-            .catch(() => {
-              /* 静默回退静态池（最后一次失败也不再试） */
-              if (idx + 1 >= FOLLOWUP_PULL_DELAYS.length && !turn.followups?.length) {
-                settleFollowups(turn);
-              }
-            });
-        } catch {
-          /* 静默回退静态池 */
-          if (idx + 1 >= FOLLOWUP_PULL_DELAYS.length && !turn.followups?.length) {
+        // 侧车尚未写完（常见）或模型输出不合规（少数）：空结果还有额度就再等一轮；
+        // 最后一轮仍空 → 定论"未生成"，灰字标注才允许显示，不再糊弄；
+        // 请求失败=静默停轮（回退静态池，最后一次失败也不再试）——attempt 语义与旧版逐字对齐
+        const last = idx + 1 >= FOLLOWUP_PULL_DELAYS.length;
+        const settleIfEmpty = () => {
+          if (!turn.followups?.length) {
             settleFollowups(turn);
           }
-        }
+          detachFocusPull();
+        };
+        pull(
+          () => (last ? settleIfEmpty() : attempt(idx + 1)),
+          () => (last ? settleIfEmpty() : undefined)
+        );
       }, FOLLOWUP_PULL_DELAYS[idx]);
     };
+    const onFocusPull = () => {
+      if (done() || turn.followupsSettled) {
+        detachFocusPull();
+        return;
+      }
+      // 拉到即写；空/失败不打断 attempt 序列自己的收尾节奏
+      pull();
+    };
+    if (typeof globalThis.addEventListener === 'function') {
+      globalThis.addEventListener('focus', onFocusPull);
+      globalThis.addEventListener('visibilitychange', onFocusPull);
+    }
     attempt(0);
   }
 

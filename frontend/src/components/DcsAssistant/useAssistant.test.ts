@@ -30,11 +30,13 @@ vi.mock('@/api/dcs/assistant/aguiClient', () => ({
 }));
 // 思考链路批(1008)：REST 桶 '@/api/dcs/assistant' 会拉起 utils/request→router→window
 // （node 环境无 window，文件级导入失败=存量假红）——mock 掉恢复本文件可运行
-// TODO 恢复路径（k3 P2-5 补测）：可控应答器——默认整包 body 形态（{code,msg,data}）
+// 稳流① Q8①：追问拉取可控应答器（聚焦补拉用例）
 let todoResponder: (() => unknown) | null = null;
+let followupResponder: (() => unknown) | null = null;
 vi.mock('@/api/dcs/assistant', () => ({
   getPendingHitl: async () => ({ data: [] as unknown[] }),
-  getConversationTodo: async () => (todoResponder ? todoResponder() : { code: 200, msg: 'ok', data: [] })
+  getConversationTodo: async () => (todoResponder ? todoResponder() : { code: 200, msg: 'ok', data: [] }),
+  getFollowups: async () => (followupResponder ? followupResponder() : { code: 200, msg: 'ok', data: {} })
 }));
 
 import { useAssistant } from './useAssistant';
@@ -85,6 +87,7 @@ function stopTurn() {
 
 beforeEach(() => {
   todoResponder = null;
+  followupResponder = null;
   lastInput = null;
   liveHandlers = null;
   resolveDone = null;
@@ -216,8 +219,8 @@ describe('AGUI 事件桥', () => {
     expect(turn.hitl?.message).toContain('12 人');
   });
 
-  it('弃卡改问防御分支：文本帧到达但终态 handler 未触发 → 静默完成须扫掉旧 pending 确认卡（E2E 2026-10-10 实证）', async () => {
-    const { a } = setup();
+  it('弃卡改问防御分支：新回合创建须扫掉旧 pending 确认卡（E2E 2026-10-10 实证；稳流① 2026-10-20 改道）', async () => {
+    const { a, toasts } = setup();
     a.state.gateDone = true;
     a.send('催一下 022 班');
     await Promise.resolve();
@@ -230,15 +233,19 @@ describe('AGUI 事件桥', () => {
     await vi.waitFor(() => expect(a.state.sending).toBe(false));
     expect(turnA.phase).toBe('waiting');
     expect(turnA.hitl?.cardState).toBe('pending');
-    // 弃卡改问：服务端入口注入 resume=cancelled 自动解锁，新回合文本帧到达但终态
-    // handler 未触发（SSE 重连形态）——done resolve 'finished' 走防御分支
-    a.send('一句话回答：天空为什么是蓝色');
+    // 波B(d7753e3 2026-10-19)起 send() 有 pending 卡直接拦（停靠区锁输入框口径）——
+    // 先验证拦截生效，再改走仍开放的队列直发口（queueGo→runTurn 不过 send 闸）
+    a.send('直接再问一句');
+    expect(a.cur()).toBe(turnA);
+    expect(toasts).toContain('请先确认或取消上面的操作，再继续提问');
+    a.state.queue.push({ text: '一句话回答：天空为什么是蓝色', pendingId: 9001 });
+    a.queueGo(0);
     await Promise.resolve();
     const turnB = a.cur()!;
     expect(turnB).not.toBe(turnA);
     resolveDone?.('finished');
     await vi.waitFor(() => expect(turnB.phase).toBe('done'));
-    // 旧 pending 卡不得留屏成僵尸（服务端同 thread 已跑完新轮，旧卡必失效）
+    // 旧 pending 卡不得留屏成僵尸（runTurn 入口 sweep——glm53 P2-4 双待确认卡防线）
     expect(turnA.hitl?.cardState).toBe('done');
     expect(turnA.hitl?.cancelled).toBe(true);
   });
@@ -1220,5 +1227,64 @@ describe('TODO 清单（ZCode 对齐 Q2；k3 P2-5 补测）', () => {
     release({ code: 200, data: [{ content: '旧会话清单', status: 'pending', priority: 'low' }] });
     await p;
     expect(a.state.todoItems).toHaveLength(0);
+  });
+});
+
+describe('追问拉取（稳流① Q8①：90s 窗口 + 聚焦/回页补拉）', () => {
+  it('focus 事件在轮询间隔内触发 → 立即补拉写入，不等下一轮 attempt', async () => {
+    vi.useFakeTimers();
+    // node 的 globalThis 非 EventTarget（生产代码的 addEventListener 守卫正是为此）——
+    // 挂一个事件总线替身驱动 focus/visibilitychange 路径，测毕还原
+    const bus = new EventTarget();
+    const g = globalThis as unknown as Record<string, unknown>;
+    const savedAdd = g.addEventListener;
+    const savedRemove = g.removeEventListener;
+    const savedDispatch = g.dispatchEvent;
+    g.addEventListener = bus.addEventListener.bind(bus);
+    g.removeEventListener = bus.removeEventListener.bind(bus);
+    g.dispatchEvent = bus.dispatchEvent.bind(bus);
+    try {
+      const { a } = setup();
+      a.state.gateDone = true;
+      // 场景=侧车已写完（库里已有数据），轮询 3.5s 间隔还没到点——用户回页面立刻可见
+      let calls = 0;
+      followupResponder = () => {
+        calls += 1;
+        return { code: 200, msg: 'ok', data: { followups: ['查未交名单汇总', '怎么催信息部', '对比上周进度'] } };
+      };
+      a.send('查一下进度');
+      await Promise.resolve();
+      const turn = a.cur()!;
+      resolveDone?.('finished');
+      await vi.waitFor(() => expect(turn.phase).toBe('done'));
+      // attempt#1 的 3.5s 间隔只走过 1s——轮询还没到点，用户回到页面触发 focus
+      vi.advanceTimersByTime(1_000);
+      expect(turn.followups).toBeUndefined();
+      globalThis.dispatchEvent(new Event('focus'));
+      await vi.waitFor(() => expect(turn.followups).toHaveLength(3));
+      expect(turn.followups).toEqual(['查未交名单汇总', '怎么催信息部', '对比上周进度']);
+      expect(calls).toBe(1);
+      // 到手后监听自摘：再派 focus 不再发请求
+      globalThis.dispatchEvent(new Event('focus'));
+      await Promise.resolve();
+      expect(calls).toBe(1);
+    } finally {
+      if (savedAdd === undefined) {
+        delete g.addEventListener;
+      } else {
+        g.addEventListener = savedAdd;
+      }
+      if (savedRemove === undefined) {
+        delete g.removeEventListener;
+      } else {
+        g.removeEventListener = savedRemove;
+      }
+      if (savedDispatch === undefined) {
+        delete g.dispatchEvent;
+      } else {
+        g.dispatchEvent = savedDispatch;
+      }
+      vi.useRealTimers();
+    }
   });
 });

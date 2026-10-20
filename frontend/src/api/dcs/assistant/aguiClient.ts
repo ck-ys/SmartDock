@@ -38,8 +38,9 @@ export interface AguiClientOptions {
   schedule?: (fn: () => void, ms: number) => void;
   /** goal 加固 G1：无帧看门狗计时器注替（返回取消函数；生产缺省 setTimeout/clearTimeout 对） */
   setStallTimer?: (fn: () => void, ms: number) => () => void;
-  /** goal 加固 G1：停滞超时毫秒（连接活着但 0 字节）——默认 180s：深思考档大上下文
-   *  首 token 余量之上、nginx 600s 空闲切断之下；超时按断线语义走既有退避重试 */
+  /** goal 加固 G1（稳流① Q1 调整）：停滞超时毫秒（连接活着但 0 字节）——默认 600s：
+   *  后端已挂 20s 真事件心跳（dcs-heartbeat CUSTOM 帧），帧停 600s=链路真断而非合法静默；
+   *  超窗不自动重发（重发撞 409 防双计费），裁决交 AguiHandlers.onStall（无回调才退旧重试口径） */
   stallTimeoutMs?: number;
   jitter?: () => number;
 }
@@ -166,9 +167,12 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       const id = setTimeout(fn, ms);
       return () => clearTimeout(id);
     });
-  const stallTimeoutMs = options.stallTimeoutMs ?? 180_000;
+  const stallTimeoutMs = options.stallTimeoutMs ?? 600_000;
 
-  async function readStream(response: Response, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error'> {
+  /** 停滞哨兵：看门狗超窗以 resolve（非 reject）出循环——停滞≠断线，裁决权在 onStall */
+  const STALLED = { stalled: true } as const;
+
+  async function readStream(response: Response, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error' | 'stopped'> {
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
@@ -185,9 +189,14 @@ export function createAguiClient(options: AguiClientOptions = {}) {
         h.onRunError?.(m, c);
       }
     };
+    // 稳流① Q1：pending read 跨停滞窗口复用——用户裁决「继续等」后与同一 promise 续竞速
+    // （不二次调 read()，避免依赖 reader 的并发排队语义）
+    let pendingRead: Promise<ReadableStreamReadResult<Uint8Array>> | null = null;
     for (;;) {
+      if (!pendingRead) {
+        pendingRead = reader.read();
+      }
       // abort 竞速：真实 fetch 会联动取消 body 流，但 mock/降级环境不保证——统一竞速兜底
-      const read = reader.read();
       const aborted = new Promise<never>((_, reject) => {
         // 信号可能早于注册已 abort（stop 在 fetch resolve 前调用）——事件不会补发，必须预检
         if (signal.aborted) {
@@ -196,21 +205,50 @@ export function createAguiClient(options: AguiClientOptions = {}) {
         }
         signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
       });
-      // goal 加固 G1：无帧看门狗——停滞（连接活着但 0 字节，后端零心跳）时 reader.read()
-      // 会无限悬挂直到 nginx 600s 空闲切断；每次读循环武装计时器，收到任意字节由下一轮
-      // 重建即「重置」。超时按断线语义抛出，走既有退避重试（服务端 H1 会拒绝同 runId 重放
-      // 并以 RUN_ERROR 收口——停滞从无限转圈变成 3 分钟内的人话报错）
+      // goal 加固 G1（稳流① Q1 调整）：无帧看门狗——停滞（连接活着但 0 字节）时
+      // reader.read() 会无限悬挂；每次读循环武装计时器，收到任意字节（含后端 20s
+      // dcs-heartbeat 心跳帧）由下一轮重建即「重置」。超窗不自动重发：服务端可能仍在
+      // 生成，重发撞 409 防双计费——有 onStall 回调交用户裁决（继续等/停止），无回调
+      // （测试/降级环境）退旧口径 reject 走退避重试
       let stallCancel: (() => void) | null = null;
-      const stalled = new Promise<never>((_, reject) => {
-        stallCancel = setStallTimer(() => reject(new DOMException('stalled', 'AbortError')), stallTimeoutMs);
+      const stalled = new Promise<typeof STALLED>((resolve) => {
+        stallCancel = setStallTimer(() => resolve(STALLED), stallTimeoutMs);
       });
       let value: Uint8Array | undefined;
       let done: boolean;
       try {
-        const r = await Promise.race([read, aborted, stalled]);
+        const r = await Promise.race([pendingRead, aborted, stalled]);
         stallCancel?.();
+        if (r === STALLED) {
+          // 稳流① Q1（拍板 A②）：停滞裁决——keep-waiting 原流续等（重挂看门狗），
+          // stop 按手动停止收口；无 onStall 兜底旧 reject 口径
+          if (!h.onStall) {
+            try {
+              await reader.cancel();
+            } catch {
+              /* 对端已关流 */
+            }
+            throw new DOMException('stalled', 'AbortError');
+          }
+          let choice: 'keep-waiting' | 'stop';
+          try {
+            choice = await h.onStall();
+          } catch {
+            choice = 'stop';
+          }
+          if (choice === 'keep-waiting') {
+            continue;
+          }
+          try {
+            await reader.cancel();
+          } catch {
+            /* 对端已关流 */
+          }
+          return 'stopped';
+        }
         value = r.value;
         done = r.done;
+        pendingRead = null;
       } catch (e) {
         stallCancel?.();
         try {
@@ -263,7 +301,7 @@ export function createAguiClient(options: AguiClientOptions = {}) {
     return terminal ?? 'error';
   }
 
-  async function requestOnce(input: AguiRunInput, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error' | 'retry' | 'retry-stall'> {
+  async function requestOnce(input: AguiRunInput, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error' | 'stopped' | 'retry' | 'retry-stall'> {
     let response: Response;
     try {
       response = await fetch(url, {
@@ -309,7 +347,8 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       if (signal.aborted) {
         return 'finished';
       }
-      // goal 加固 G1：看门狗超时（非用户停止）带 stall 标记重试——onRetry 话术区分「连接停滞」
+      // goal 加固 G1：看门狗超时且无 onStall 裁决（非用户停止）带 stall 标记重试——
+      // onRetry 话术区分「连接停滞」；有 onStall 的生产路径停滞已在 readStream 内收口，不到这
       return e instanceof DOMException && e.message === 'stalled' ? 'retry-stall' : 'retry';
     }
   }

@@ -123,6 +123,16 @@ public class AssistantRunRecorder {
     /** 每 run 末次冲刷时的内容长度（内容无变不空写） */
     final Map<String, Integer> lastPartialLen = new ConcurrentHashMap<>();
 
+    // ===== 稳流① Q1（2026-10-20）：run 级诊断埋点——终局一行日志+终态计数（报表归稳流②） =====
+    /** 每 run 首事件时刻（终局算时长；零事件 run 恒缺=建侧失败路径自有 WARN） */
+    final Map<String, Long> runFirstEventAt = new ConcurrentHashMap<>();
+    /** 每 run 事件间最大静默毫秒（心跳帧计入——看 maxGap 与 heartbeats 的组合判性质） */
+    final Map<String, java.util.concurrent.atomic.AtomicLong> runMaxGapMs = new ConcurrentHashMap<>();
+    /** 每 run 心跳帧数（0=该 run 心跳未生效——流链路排障第一指标） */
+    final Map<String, java.util.concurrent.atomic.AtomicInteger> runHeartbeats = new ConcurrentHashMap<>();
+    /** 终态计数（status|reason → 次数；进程内累计，稳流②管理报表数据源） */
+    private final Map<String, java.util.concurrent.atomic.LongAdder> terminalOutcomeCounts = new ConcurrentHashMap<>();
+
     /** 失联判定阈值：须覆盖合法事件静默——dspro P1-1 回修 40s→60s：联网搜索等长工具
      *  实测静默 10-25s（WebSearchTools 不走 withTimeout），40s 余量仅 1.6×，多连发搜索
      *  或网络劣化即误杀；60s=2.4× 余量，且在飞标记只保护模型调用段（工具/收尾段裸奔） */
@@ -279,8 +289,15 @@ public class AssistantRunRecorder {
         }
         // 步骤缓冲键：thread 优先（HITL 中断→resume 跨 run 续接），退化 runId
         String stepKey = threadId != null ? threadId : runId;
-        // 批6-#2：冲刷/收割线程无 context——run 侧键与时刻在建侧（流线程）登记
-        lastEventAt.put(runId, System.currentTimeMillis());
+        // 批6-#2：冲刷/收割线程无 context——run 侧键与时刻在建侧（流线程）登记；
+        // 稳流① Q1：首事件时刻+事件间最大静默同刻埋点（终局诊断行数据源）
+        long nowMs = System.currentTimeMillis();
+        Long prevEventAt = lastEventAt.put(runId, nowMs);
+        runFirstEventAt.putIfAbsent(runId, nowMs);
+        if (prevEventAt != null) {
+            runMaxGapMs.computeIfAbsent(runId, k -> new java.util.concurrent.atomic.AtomicLong())
+                .accumulateAndGet(nowMs - prevEventAt, Math::max);
+        }
         runStepKeys.putIfAbsent(runId, stepKey);
         // G3：流线程刷新当前 run（工具执行若在同线程可读到当前 runId）
         AssistantRunContext.refresh(runId, threadId);
@@ -290,6 +307,14 @@ public class AssistantRunRecorder {
                     continue;
                 }
                 switch (event.getType()) {
+                    case CUSTOM -> {
+                        // 稳流① Q1：心跳帧计数（0=心跳未生效的 run——链路排障第一指标）
+                        if (event instanceof AguiEvent.Custom c
+                            && org.dromara.assistant.core.DcsHeartbeatMiddleware.HEARTBEAT_NAME.equals(c.name())) {
+                            runHeartbeats.computeIfAbsent(runId, k -> new java.util.concurrent.atomic.AtomicInteger())
+                                .incrementAndGet();
+                        }
+                    }
                     case TOOL_CALL_START -> {
                         if (event instanceof AguiEvent.ToolCallStart s) {
                             stepBuffers.computeIfAbsent(stepKey, k -> new LinkedHashMap<>())
@@ -501,6 +526,8 @@ public class AssistantRunRecorder {
     }
 
     private void finishRun(String runId, String status, String reason, String stepKey) {
+        // 稳流① Q1：终局诊断（时长/最大静默/心跳数+终态计数）
+        logRunDiagnostics(runId, status + "|" + (reason == null ? "-" : reason));
         // 批B B1 修：这里不再 clearLastUsage——RUN_FINISHED 与 TEXT_MESSAGE_END 仅差毫秒级，
         // 提前清会与异步落库线程的 awaitLastUsageChanged 轮询竞态（清完轮询恒 null=永远写不进 tokens）。
         // 清除移至落库任务 finally；未走落库的 run（中断/无终答文本）靠账本环形截断(512)兜底回收
@@ -613,6 +640,32 @@ public class AssistantRunRecorder {
     }
 
     /**
+     * 稳流① Q1（2026-10-20）：run 终局诊断——一行 INFO（时长/最大事件静默/心跳数）
+     * + 终态计数。心跳=0 且 maxGap 大的 run 即「看门狗误判高危样本」；正常 run 心跳
+     * 只在合法静默段出现。计数为进程内口径（重启归零），报表化归稳流②。
+     */
+    private void logRunDiagnostics(String runId, String outcome) {
+        Long first = runFirstEventAt.remove(runId);
+        java.util.concurrent.atomic.AtomicLong gap = runMaxGapMs.remove(runId);
+        java.util.concurrent.atomic.AtomicInteger hb = runHeartbeats.remove(runId);
+        terminalOutcomeCounts.computeIfAbsent(outcome, k -> new java.util.concurrent.atomic.LongAdder()).increment();
+        if (first == null) {
+            // 零事件 run（建侧失败路径）——建侧失败/兜底收割已有专门 WARN，此处只进计数
+            return;
+        }
+        log.info("[AssistantRecorder] run 终局诊断 runId={} outcome={} durationMs={} maxEventGapMs={} heartbeats={}",
+            runId, outcome, clock.millis() - first,
+            gap == null ? 0 : gap.get(), hb == null ? 0 : hb.get());
+    }
+
+    /** 终态分布快照（稳流②管理报表数据源；进程内累计） */
+    public Map<String, Long> terminalOutcomeSnapshot() {
+        Map<String, Long> out = new LinkedHashMap<>();
+        terminalOutcomeCounts.forEach((k, v) -> out.put(k, v.sum()));
+        return out;
+    }
+
+    /**
      * 080/ISSUE-R13-3 修（2026-10-14）：清人时逐 thread 清悬挂确认卡缓存。
      * 背景：管理员 purgeUser（GDPR 清人）删四表+附件+agentscope，但悬挂 HITL 条目
      * （含 argsJson 全量入参）按 threadId 驻留内存直至进程重启——被清用户数据残留。
@@ -716,6 +769,8 @@ public class AssistantRunRecorder {
                     dailyQuota.refundTurn(run.getTenantId(), run.getUserId());
                     log.warn("[AssistantRecorder] 零事件兜底收割 runId={}（建行≥{}s 无任何事件=建/流侧同步失败路径）："
                         + "INTERRUPTED/client-disconnect，回合已退", runId, STALL_MS / 1000);
+                    // 稳流① Q1：零事件路径也进终态计数（首事件恒缺，诊断行跳过）
+                    logRunDiagnostics(runId, "INTERRUPTED|zero-event");
                 }
             }
         } catch (Exception ex) {
@@ -825,6 +880,8 @@ public class AssistantRunRecorder {
                 dailyQuota.refundTurn(r.getTenantId(), r.getUserId());
                 log.warn("[AssistantRecorder] 失联收割 runId={}（事件停滞≥{}s=客户端断连拆链）："
                     + "INTERRUPTED/client-disconnect，回合已退", runId, STALL_MS / 1000);
+                // 稳流① Q1：收割终局也进诊断（对比真终态 run 的 maxGap/心跳分布）
+                logRunDiagnostics(runId, "INTERRUPTED|client-disconnect");
             }
         } catch (Exception ex) {
             // dspro P1-2回修：失败保留追踪，下一 tick 重试（updatePartial/finalizeStalled

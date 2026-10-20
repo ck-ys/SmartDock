@@ -105,4 +105,10 @@ export interface AguiHandlers {
   /** RUN_ERROR（服务端话术已人话化） */
   onRunError?: (message: string, code?: string) => void;
   onCustom?: (name: string, value: unknown) => void;
+  /**
+   * 稳流① Q1（2026-10-20 拍板 A②）：停滞超窗（默认 600s 无任何字节）裁决——
+   * 返回 'keep-waiting'=继续等（同一 read 续竞速并重挂看门狗）；'stop'=按手动停止收口。
+   * 停滞不自动重发：服务端可能仍在生成，重发撞 409 防双计费。无此回调时退回旧自动重试口径。
+   */
+  onStall?: () => Promise<'keep-waiting' | 'stop'> | 'keep-waiting' | 'stop';
 }
