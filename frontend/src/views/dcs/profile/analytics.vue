@@ -380,6 +380,56 @@
 
       <!-- ---------------------------------------------------------- 数据采集 -->
       <el-tab-pane label="数据采集" name="collect" lazy>
+        <el-card shadow="never" class="panel-card" v-loading="qualityLoading">
+          <template #header>
+            <div class="panel-head">
+              <span>采集质量</span>
+              <span class="muted">近 {{ quality?.days ?? 7 }} 天 · 拒收与跳过留痕，不进统计口径</span>
+            </div>
+          </template>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="stat-label">机器人拦截（事件）</span>
+              <strong>{{ formatNumber(reasonEvents('robot')) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">跨域拒绝（事件）</span>
+              <strong>{{ formatNumber(reasonEvents('domain_mismatch')) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">重复投递（事件）</span>
+              <strong>{{ formatNumber(reasonEvents('duplicate')) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">丢弃率</span>
+              <strong>{{ formatPercent(quality?.discardRate) }}</strong>
+            </div>
+          </div>
+          <el-empty v-if="quality && !quality.byReason?.length" :image-size="60" description="窗口期内没有丢弃记录，采集很干净" />
+          <el-row v-else :gutter="14">
+            <el-col :xs="24" :md="12">
+              <el-table :data="quality?.byReason || []" size="small">
+                <el-table-column prop="reason" label="丢弃原因" width="140">
+                  <template #default="{ row }">
+                    <el-tag size="small" :type="reasonMeta(row.reason).tag">{{ reasonMeta(row.reason).label }}</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="batches" label="批次数" width="80" />
+                <el-table-column prop="events" label="事件数" width="80" />
+              </el-table>
+            </el-col>
+            <el-col :xs="24" :md="12">
+              <p v-if="quality?.topRobots?.length" class="muted small">
+                Top 机器人：{{ quality.topRobots.slice(0, 3).map((x) => shortUa(x.userAgent)).join(' · ') }}
+              </p>
+              <p v-if="quality?.topMismatches?.length" class="muted small">
+                Top 被拒来源：{{ quality.topMismatches.slice(0, 3).map((x) => x.originHost || '(未知来源)').join(' · ') }}
+              </p>
+              <p class="muted small">丢弃原因：robot=机器人整批拒 · domain_mismatch=非白名单来源 · duplicate=重复 eventUid · schema_invalid=校验失败</p>
+            </el-col>
+          </el-row>
+        </el-card>
+
         <el-row :gutter="14">
           <el-col :xs="24" :lg="12">
             <el-card shadow="never" class="panel-card" v-loading="siteLoading">
@@ -411,7 +461,9 @@
                 </div>
               </template>
               <pre class="code-block">{{ snippet }}</pre>
-              <p class="muted small">SDK 自动完成：访客 ID、30 分钟会话、page_view、SPA 路由变化、批量上报与 sendBeacon 兜底。</p>
+              <p class="muted small">
+                SDK 自动完成：访客 ID、30 分钟会话、page_view、SPA 路由变化、批量上报与 sendBeacon 兜底；断网自动补传，setConsent(false) 可随时关闭采集。
+              </p>
             </el-card>
           </el-col>
         </el-row>
@@ -526,6 +578,7 @@ import {
   deleteAnalyticsFunnel,
   getAnalyticsBreakdown,
   getAnalyticsOverview,
+  getAnalyticsQuality,
   getAnalyticsRetention,
   getAnalyticsSession,
   getAnalyticsTrend,
@@ -543,6 +596,7 @@ import {
   type AnalyticsFunnelResult,
   type AnalyticsFunnelStepDef,
   type AnalyticsOverview,
+  type AnalyticsQuality,
   type AnalyticsRetention,
   type AnalyticsSession,
   type AnalyticsSessionDetail,
@@ -969,6 +1023,26 @@ const loadSites = async () => {
   }
 };
 
+const quality = ref<AnalyticsQuality | null>(null);
+const qualityLoading = ref(false);
+const REASON_META: Record<string, { label: string; tag: 'danger' | 'warning' | 'info' }> = {
+  robot: { label: '机器人', tag: 'danger' },
+  domain_mismatch: { label: '跨域拒绝', tag: 'warning' },
+  duplicate: { label: '重复投递', tag: 'info' },
+  schema_invalid: { label: 'Schema 拒收', tag: 'info' }
+};
+const reasonMeta = (reason: string) => REASON_META[reason] || { label: reason, tag: 'info' as const };
+const reasonEvents = (reason: string) => Number(quality.value?.byReason?.find((x) => x.reason === reason)?.events) || 0;
+const shortUa = (ua?: string) => (ua || '').split(')')[0].slice(0, 40) || '(空 UA)';
+const loadQuality = async () => {
+  qualityLoading.value = true;
+  try {
+    quality.value = await getAnalyticsQuality(source.value, 7);
+  } finally {
+    qualityLoading.value = false;
+  }
+};
+
 const copySnippet = async () => {
   try {
     await navigator.clipboard.writeText(snippet.value);
@@ -1041,7 +1115,7 @@ const reloadCurrent = async () => {
     } else if (tab.value === 'custom') {
       await loadCustom();
     } else if (tab.value === 'collect') {
-      await loadSites();
+      await Promise.all([loadSites(), loadQuality()]);
     }
   } finally {
     loading.value = false;

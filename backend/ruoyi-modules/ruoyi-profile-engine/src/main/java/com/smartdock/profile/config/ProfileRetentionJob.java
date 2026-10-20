@@ -1,5 +1,6 @@
 package com.smartdock.profile.config;
 
+import com.smartdock.analytics.mapper.AnalyticsCollectLogMapper;
 import com.smartdock.profile.mapper.ProfileEventMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,10 +28,15 @@ public class ProfileRetentionJob {
     private static final int BATCH_LIMIT = 10_000;
 
     private final ProfileEventMapper eventMapper;
+    private final AnalyticsCollectLogMapper collectLogMapper;
 
     /** 保留天数; 0 = 关闭清理 */
     @Value("${profile.event.retention-days:730}")
     private int retentionDays;
+
+    /** 采集丢弃留痕保留天数(批7, 只做质量排查用, 短于事件账本) */
+    @Value("${analytics.collect.log-retention-days:90}")
+    private int collectLogRetentionDays;
 
     private final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(false);
 
@@ -62,6 +68,34 @@ public class ProfileRetentionJob {
             }
         } catch (Exception e) {
             log.error("[Profile] retention cleanup failed", e);
+        } finally {
+            running.set(false);
+        }
+    }
+
+    /**
+     * 采集丢弃留痕清理(批7): 每日 03:40, 默认 90 天。
+     * 留痕只是质量报表原料, 爬虫灌水场景下比事件账本更易膨胀, 保留期刻意更短。
+     */
+    @Scheduled(cron = "0 40 3 * * ?")
+    public void cleanupCollectLogs() {
+        if (collectLogRetentionDays <= 0) {
+            return;
+        }
+        if (!running.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            Date before = new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(collectLogRetentionDays));
+            TenantHelper.ignore(() -> {
+                int rows;
+                int rounds = 0;
+                do {
+                    rows = collectLogMapper.deleteBefore(before, BATCH_LIMIT);
+                } while (rows >= BATCH_LIMIT && ++rounds < 100);
+            });
+        } catch (Exception e) {
+            log.error("[Analytics] collect log cleanup failed", e);
         } finally {
             running.set(false);
         }

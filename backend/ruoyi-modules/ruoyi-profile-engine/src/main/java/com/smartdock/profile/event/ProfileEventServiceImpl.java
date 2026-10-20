@@ -103,6 +103,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     /**
      * 管理端灌数: 区分「重复」与「校验失败」, 避免把坏数据误报成幂等命中。
      */
+    @Override
     public Map<String, Object> publishBatchDetailed(List<ProfileEventBo> events) {
         int written = 0;
         int duplicated = 0;

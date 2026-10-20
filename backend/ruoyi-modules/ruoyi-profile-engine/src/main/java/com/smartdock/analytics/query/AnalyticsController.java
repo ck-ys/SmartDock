@@ -133,4 +133,14 @@ public class AnalyticsController {
     public R<List<AnalyticsSite>> sites() {
         return R.ok(analyticsService.sites());
     }
+
+    /**
+     * 批7 采集质量报表：丢弃原因分布 / Top 机器人 / Top 跨域来源 / 最近留痕 / 丢弃率。
+     */
+    @SaCheckPermission("analytics:center:query")
+    @GetMapping("/quality")
+    public R<Map<String, Object>> quality(@RequestParam String source,
+                                          @RequestParam(defaultValue = "7") int days) {
+        return R.ok(analyticsService.quality(source, days));
+    }
 }

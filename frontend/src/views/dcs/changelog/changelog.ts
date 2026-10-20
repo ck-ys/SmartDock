@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.4.0',
+    date: '2026-10-20',
+    title: '报表数字更可信了：机器人与外来灌数不再混进统计',
+    items: [
+      '「数据采集」页新增采集质量卡片：今天拦了多少机器人、拒绝了哪些外来网站、重复上报多少，一目了然。',
+      '网站埋点脚本升级：断网或刷新期间的访问记录先存在浏览器里、网络恢复自动补传，关页面也不丢最后的停留时长。',
+      '访客可以一键撤回数据采集授权（setConsent(false)），撤回后立即停止采集并清空本地暂存。'
+    ]
+  },
+  {
     version: 'v1.3.2',
     date: '2026-10-19',
     title: '一处小细节修正',

@@ -2,8 +2,11 @@ package com.smartdock.analytics.query;
 
 import cn.dev33.satoken.annotation.SaIgnore;
 import com.smartdock.analytics.engine.AnalyticsCollectorService;
+import com.smartdock.analytics.quality.CollectRequestContext;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.core.utils.ServletUtils;
 import org.dromara.common.ratelimiter.annotation.RateLimiter;
 import org.dromara.common.ratelimiter.enums.LimitType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,7 +20,8 @@ import java.util.Map;
  * 公开采集口：浏览器 SDK 直接上报，不需要登录态。
  *
  * <p>安全边界：siteKey 只映射租户/业务源，不授予管理权限；
- * 事件大小与批量上限由服务层控制，敏感字段不落 IP。</p>
+ * 事件大小与批量上限由服务层控制，敏感字段不落 IP（只存哈希）；
+ * 机器人 UA 与非白名单来源整批拒绝并留痕（批 7 采集质量）。</p>
  *
  * @author smartdock
  */
@@ -36,7 +40,12 @@ public class AnalyticsCollectController {
      */
     @RateLimiter(time = 60, count = 300, limitType = LimitType.IP)
     @PostMapping("/collect")
-    public R<Map<String, Object>> collect(@RequestBody AnalyticsCollectBo bo) {
-        return R.ok(collectorService.collect(bo));
+    public R<Map<String, Object>> collect(@RequestBody AnalyticsCollectBo bo, HttpServletRequest request) {
+        CollectRequestContext ctx = new CollectRequestContext(
+            ServletUtils.getHeader(request, "User-Agent"),
+            ServletUtils.getHeader(request, "Origin"),
+            ServletUtils.getHeader(request, "Referer"),
+            ServletUtils.getClientIP());
+        return R.ok(collectorService.collect(bo, ctx));
     }
 }

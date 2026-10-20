@@ -186,7 +186,7 @@ public interface ProfileEventMapper extends BaseMapperPlus<ProfileEvent, Profile
      */
     @Delete("""
         DELETE FROM profile_event WHERE event_id IN (
-            SELECT event_id FROM profile_event WHERE occurred_time &lt; #{before} LIMIT #{limit}
+            SELECT event_id FROM profile_event WHERE occurred_time < #{before} LIMIT #{limit}
         )
         """)
     int deleteBefore(@Param("before") Date before, @Param("limit") int limit);
