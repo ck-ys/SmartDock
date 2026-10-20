@@ -1526,6 +1526,20 @@ defineExpose({ state, ask: (q: string) => onSend(q) });
   padding-right: var(--sp-strip, 0px);
   transition: padding-right 0.3s ease;
 }
+/* 波 0.1 续（四席复审 P2）：横屏刘海安全区必须在组件内叠加，不能放全局样式——
+   ① 全局 .dcs-dw .dw-body 与本 scoped 规则同特异性，本组件是异步 chunk、加载更晚，
+      全局的 env() 右留白会被这里的 --sp-strip 覆盖掉（右侧失效）；
+   ② 抽屉是右贴边定宽容器，左侧 env() 与它无关（会凭空多出左内边距），只全屏形态吃左右两侧 */
+@media (max-width: 992px) {
+  .dw-body {
+    padding-right: calc(var(--sp-strip, 0px) + env(safe-area-inset-right, 0px));
+  }
+
+  .dcs-dw.full .dw-body {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: calc(var(--sp-strip, 0px) + env(safe-area-inset-right, 0px));
+  }
+}
 /* 波 0：待确认卡停靠输入框上方——限高滚动，长表单不会把输入框挤出屏幕；
    抽屉/全屏宿主只渲染最后一张 pending 卡（见 pendingHitl） */
 .hitl-dock {

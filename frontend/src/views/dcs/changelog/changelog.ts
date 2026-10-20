@@ -19,6 +19,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.3.2',
+    date: '2026-10-19',
+    title: '一处小细节修正',
+    items: ['带刘海的手机横屏上，小助手面板里的内容不再贴进刘海区域。']
+  },
+  {
     version: 'v1.3.1',
     date: '2026-10-19',
     title: '修掉手机和平板上的几个小毛病',

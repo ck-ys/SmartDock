@@ -31,10 +31,11 @@
     padding-right: env(safe-area-inset-right);
   }
 
-  /* AI 助手抽屉/全屏底部留白（输入框贴底） */
+  /* AI 助手抽屉/全屏底部留白（输入框贴底）。
+     左右安全区不在全局打：抽屉是右贴边定宽容器（通用左 inset 反成多余内边距），
+     且会被组件 scoped 的 --sp-strip 按加载顺序覆盖——左右留白在 AssistantDrawer
+     组件内按抽屉/全屏两种形态分别处理（见其 .dw-body 媒体查询） */
   .dcs-dw .dw-body {
     padding-bottom: env(safe-area-inset-bottom);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
   }
 }
