@@ -186,6 +186,33 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 转化漏斗 -->
+      <!-- ---------------------------------------------------------- 路径分析（批8） -->
+      <el-tab-pane label="路径分析" name="paths" lazy>
+        <el-card shadow="never" class="panel-card" v-loading="pathsLoading">
+          <template #header>
+            <div class="panel-head">
+              <span>用户路径</span>
+              <div class="head-actions">
+                <el-select
+                  v-model="pathStart"
+                  placeholder="从哪页出发（默认入口视角）"
+                  clearable
+                  style="width: 240px"
+                  @change="loadPaths"
+                >
+                  <el-option v-for="e in pathsData?.entries || []" :key="e.page" :label="`${e.page}（${e.visitors} 人）`" :value="e.page" />
+                </el-select>
+              </div>
+            </div>
+          </template>
+          <v-chart v-if="pathsData?.links?.length" class="path-chart" :option="pathsOption" autoresize />
+          <el-empty v-else :image-size="60" description="窗口期内没有可分析的页面路径" />
+          <p class="muted small">
+            口径与转化漏斗一致：每位访客只取首次顺序走过的路径，连续重复页折叠为一步；线越粗走的人越多，鼠标悬停节点可看它通向哪里。带 ·2/·3 的节点表示该页在第 2/3 步被再次到达（按步分层，回访不会成环）。
+          </p>
+        </el-card>
+      </el-tab-pane>
+
       <el-tab-pane label="转化漏斗" name="funnel" lazy>
         <el-card shadow="never" class="panel-card">
           <template #header>
@@ -242,6 +269,48 @@
           </template>
         </el-card>
 
+        <el-card shadow="never" class="panel-card" v-if="funnelLoss && funnelLoss.steps.length > 1">
+          <template #header>
+            <div class="panel-head">
+              <span>流失去向</span>
+              <span class="muted">每步流失的人接下来去了哪（Top5）</span>
+            </div>
+          </template>
+          <div v-for="(step, index) in funnelLoss.steps.slice(0, -1)" :key="`loss-${index}`" class="loss-row">
+            <div class="loss-head">
+              <span class="funnel-index">{{ index + 1 }}</span>
+              <span>{{ step.eventName }}</span>
+              <el-tag size="small" type="danger" effect="plain">流失 {{ step.lost }} 人</el-tag>
+            </div>
+            <div v-if="step.next?.length" class="loss-next">
+              <el-tag v-for="n in step.next" :key="n.label" size="small" effect="plain" class="loss-tag">
+                {{ n.label }} · {{ n.count }}
+              </el-tag>
+            </div>
+            <div v-else class="muted small">本步无流失</div>
+          </div>
+        </el-card>
+
+        <el-card shadow="never" class="panel-card" v-loading="attributionLoading">
+          <template #header>
+            <div class="panel-head">
+              <span>渠道归因</span>
+              <span class="muted">
+                转化事件 {{ attributionData?.conversionEvent || '—' }} · 共 {{ attributionData?.conversions ?? 0 }} 次
+              </span>
+            </div>
+          </template>
+          <el-table v-if="attributionData?.rows?.length" :data="attributionData.rows" size="small">
+            <el-table-column prop="channel" label="渠道" min-width="110" />
+            <el-table-column prop="first" label="首次归因" width="90" />
+            <el-table-column prop="last" label="末次归因" width="90" />
+            <el-table-column prop="linear" label="线性" width="80" />
+            <el-table-column prop="visitors" label="触达访客" width="90" />
+          </el-table>
+          <el-empty v-else :image-size="50" description="窗口期内没有转化事件，无法归因" />
+          <p class="muted small">首次=最早带来的渠道记功；末次=临门一脚记功；线性=沿途触点平分。只统计转化发生之前的访问。</p>
+        </el-card>
+
         <el-card shadow="never" class="panel-card tip-card">
           <div class="tip-copy">
             <strong>怎么读？</strong>
@@ -282,6 +351,42 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 访问明细 -->
+      <!-- ---------------------------------------------------------- 活跃分析（批8） -->
+      <el-tab-pane label="活跃分析" name="activity" lazy>
+        <el-card shadow="never" class="panel-card" v-loading="activityLoading">
+          <template #header>
+            <div class="panel-head">
+              <span>活跃用户</span>
+              <span class="muted">DAU/WAU/MAU 滚动窗口 · 粘性 = DAU÷MAU</span>
+            </div>
+          </template>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="stat-label">日活 DAU（最新一天）</span>
+              <strong>{{ formatNumber(activityData?.latest?.dau) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">周活 WAU（近 7 天）</span>
+              <strong>{{ formatNumber(activityData?.latest?.wau) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">月活 MAU（近 30 天）</span>
+              <strong>{{ formatNumber(activityData?.latest?.mau) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">粘性 DAU/MAU</span>
+              <strong>{{ activityData?.latest?.sticky == null ? '—' : formatPercent(activityData.latest.sticky) }}</strong>
+            </div>
+          </div>
+          <v-chart v-if="activityData?.dayList?.length" class="trend-chart" :option="activityOption" autoresize />
+          <div class="muted small" style="margin-top: 8px">
+            最新一天（{{ activityData?.newVsReturning?.statDate || '—' }}）构成：新访客
+            {{ formatNumber(activityData?.newVsReturning?.newVisitors) }} 人 · 回访客
+            {{ formatNumber(activityData?.newVsReturning?.returningVisitors) }} 人
+          </div>
+        </el-card>
+      </el-tab-pane>
+
       <el-tab-pane label="访问明细" name="sessions" lazy>
         <el-card shadow="never" class="panel-card">
           <div class="filter-bar">
@@ -378,8 +483,68 @@
         </el-card>
       </el-tab-pane>
 
+      <!-- ---------------------------------------------------------- 实时看板（批8） -->
+      <el-tab-pane label="实时看板" name="realtime" lazy>
+        <el-card shadow="never" class="panel-card">
+          <template #header>
+            <div class="panel-head">
+              <span>近 {{ realtimeData?.windowMinutes ?? 5 }} 分钟</span>
+              <div class="head-actions">
+                <span class="muted small">每 5 秒自动刷新 · 数据延迟 ≤ 6 秒</span>
+                <el-switch v-model="realtimeAuto" active-text="自动" @change="toggleRealtime" />
+              </div>
+            </div>
+          </template>
+          <div class="stat-grid">
+            <div class="stat">
+              <span class="stat-label">在线访客</span>
+              <strong>{{ formatNumber(realtimeData?.summary?.visitors) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">页面浏览</span>
+              <strong>{{ formatNumber(realtimeData?.summary?.pv) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">事件</span>
+              <strong>{{ formatNumber(realtimeData?.summary?.events) }}</strong>
+            </div>
+            <div class="stat">
+              <span class="stat-label">新访客</span>
+              <strong>{{ formatNumber(realtimeData?.summary?.newVisitors) }}</strong>
+            </div>
+          </div>
+          <div class="realtime-pulse">
+            <i
+              v-for="m in realtimeData?.minutes || []"
+              :key="m.minute"
+              :style="{ height: pulseHeight(m.pv) }"
+              :title="`${m.minute} · 浏览 ${m.pv} · 事件 ${m.events}`"
+            />
+          </div>
+          <p class="muted small">更新于 {{ realtimeData?.now || '—' }}（按分钟的浏览量脉冲条，条越高那一分钟越热闹）</p>
+        </el-card>
+      </el-tab-pane>
+
       <!-- ---------------------------------------------------------- 数据采集 -->
       <el-tab-pane label="数据采集" name="collect" lazy>
+        <el-card shadow="never" class="panel-card" v-loading="crossLoading">
+          <template #header>
+            <div class="panel-head">
+              <span>全域总览</span>
+              <span class="muted">近 {{ crossData?.days ?? 30 }} 天 · 跨业务源直读事件账本</span>
+            </div>
+          </template>
+          <div class="stat-grid" v-if="crossData?.sources?.length">
+            <div class="stat" v-for="s in crossData.sources" :key="s.source">
+              <span class="stat-label">{{ s.source }} 事件</span>
+              <strong>{{ formatNumber(s.events) }}</strong>
+              <span class="muted small">访客 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
+            </div>
+          </div>
+          <el-empty v-else :image-size="50" description="还没有任何业务源写入事件" />
+          <p class="muted small">画像引擎按统一事件协议接收任意业务源（网站 / 订单 / 供应链…）；每个源独立统计互不混算。</p>
+        </el-card>
+
         <el-card shadow="never" class="panel-card" v-loading="qualityLoading">
           <template #header>
             <div class="panel-head">
@@ -570,7 +735,7 @@
 <script setup name="DcsProfileAnalytics" lang="ts">
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
-import { BarChart, LineChart } from 'echarts/charts';
+import { BarChart, LineChart, SankeyChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -579,6 +744,12 @@ import {
   getAnalyticsBreakdown,
   getAnalyticsOverview,
   getAnalyticsQuality,
+  getAnalyticsAttribution,
+  getAnalyticsActivity,
+  getAnalyticsCrossSource,
+  getAnalyticsFunnelLoss,
+  getAnalyticsPaths,
+  getAnalyticsRealtime,
   getAnalyticsRetention,
   getAnalyticsSession,
   getAnalyticsTrend,
@@ -597,6 +768,12 @@ import {
   type AnalyticsFunnelStepDef,
   type AnalyticsOverview,
   type AnalyticsQuality,
+  type AnalyticsAttribution,
+  type AnalyticsActivity,
+  type AnalyticsCrossSource,
+  type AnalyticsFunnelLoss,
+  type AnalyticsPaths,
+  type AnalyticsRealtime,
   type AnalyticsRetention,
   type AnalyticsSession,
   type AnalyticsSessionDetail,
@@ -605,7 +782,7 @@ import {
   type AnalyticsTrendPoint
 } from '@/api/dcs/core/analytics';
 
-use([CanvasRenderer, LineChart, BarChart, GridComponent, LegendComponent, TooltipComponent]);
+use([CanvasRenderer, LineChart, BarChart, SankeyChart, GridComponent, LegendComponent, TooltipComponent]);
 
 const source = ref('web');
 const days = ref(30);
@@ -838,9 +1015,15 @@ const loadFunnels = async () => {
 const loadFunnelResult = async () => {
   if (!funnelId.value) {
     funnelResult.value = null;
+    funnelLoss.value = null;
     return;
   }
-  funnelResult.value = await previewAnalyticsFunnel({ funnelId: funnelId.value, days: days.value });
+  const [result, loss] = await Promise.all([
+    previewAnalyticsFunnel({ funnelId: funnelId.value, days: days.value }),
+    getAnalyticsFunnelLoss({ funnelId: funnelId.value, days: days.value })
+  ]);
+  funnelResult.value = result;
+  funnelLoss.value = loss;
 };
 
 const funnelWidth = (count: number) => {
@@ -1043,6 +1226,132 @@ const loadQuality = async () => {
   }
 };
 
+// ---------------------------------------------------------------- 批8 分析深度
+const pathsData = ref<AnalyticsPaths | null>(null);
+const pathsLoading = ref(false);
+const pathStart = ref('');
+const loadPaths = async () => {
+  pathsLoading.value = true;
+  try {
+    pathsData.value = await getAnalyticsPaths(source.value, days.value, pathStart.value || undefined);
+  } finally {
+    pathsLoading.value = false;
+  }
+};
+const pathsOption = computed<any>(() => ({
+  tooltip: { trigger: 'item', triggerOn: 'mousemove' },
+  series: [
+    {
+      type: 'sankey',
+      left: 12,
+      right: 190,
+      top: 14,
+      bottom: 14,
+      nodeAlign: 'left',
+      emphasis: { focus: 'adjacency' },
+      data: (pathsData.value?.nodes || []).map((n) => ({ name: n.name, value: n.value })),
+      links: (pathsData.value?.links || []).map((l) => ({ source: l.source, target: l.target, value: l.value })),
+      label: { color: '#606266', fontSize: 11 },
+      lineStyle: { color: 'gradient', curveness: 0.5 },
+      itemStyle: { borderWidth: 0 }
+    }
+  ]
+}));
+
+const funnelLoss = ref<AnalyticsFunnelLoss | null>(null);
+const attributionData = ref<AnalyticsAttribution | null>(null);
+const attributionLoading = ref(false);
+const loadAttribution = async () => {
+  attributionLoading.value = true;
+  try {
+    attributionData.value = await getAnalyticsAttribution(source.value, days.value);
+  } finally {
+    attributionLoading.value = false;
+  }
+};
+
+const activityData = ref<AnalyticsActivity | null>(null);
+const activityLoading = ref(false);
+const loadActivity = async () => {
+  activityLoading.value = true;
+  try {
+    activityData.value = await getAnalyticsActivity(source.value, days.value);
+  } finally {
+    activityLoading.value = false;
+  }
+};
+const activityOption = computed<any>(() => ({
+  tooltip: { trigger: 'axis' },
+  legend: { bottom: 0, icon: 'circle', itemWidth: 8 },
+  grid: { left: 52, right: 24, top: 30, bottom: 44 },
+  xAxis: { type: 'category', data: activityData.value?.dayList || [] },
+  yAxis: { type: 'value', minInterval: 1 },
+  series: [
+    { name: 'DAU 日活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.dau || [], itemStyle: { color: '#409eff' } },
+    { name: 'WAU 周活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.wau || [], itemStyle: { color: '#e6a23c' }, lineStyle: { type: 'dashed' } },
+    { name: 'MAU 月活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.mau || [], itemStyle: { color: '#909399' }, lineStyle: { width: 1 } }
+  ]
+}));
+
+const realtimeData = ref<AnalyticsRealtime | null>(null);
+const realtimeAuto = ref(true);
+let realtimeTimer: number | null = null;
+const loadRealtime = async () => {
+  realtimeData.value = await getAnalyticsRealtime(source.value);
+};
+const startRealtime = () => {
+  if (realtimeTimer) return;
+  realtimeTimer = window.setInterval(async () => {
+    if (tab.value === 'realtime' && document.visibilityState === 'visible') {
+      await loadRealtime();
+    }
+  }, 5000);
+};
+const stopRealtime = () => {
+  if (realtimeTimer) {
+    window.clearInterval(realtimeTimer);
+    realtimeTimer = null;
+  }
+};
+const toggleRealtime = (on: any) => {
+  if (on) {
+    startRealtime();
+  } else {
+    stopRealtime();
+  }
+};
+const pulseHeight = (pv: number) => {
+  const max = Math.max(1, ...(realtimeData.value?.minutes || []).map((m) => Number(m.pv) || 0));
+  return `${Math.max(4, ((Number(pv) || 0) / max) * 100)}%`;
+};
+
+const crossData = ref<AnalyticsCrossSource | null>(null);
+const crossLoading = ref(false);
+const loadCross = async () => {
+  crossLoading.value = true;
+  try {
+    crossData.value = await getAnalyticsCrossSource(30);
+  } finally {
+    crossLoading.value = false;
+  }
+};
+const formatLastAt = (value: string | undefined) => {
+  if (!value) return '—';
+  // 后端时间是 GMT+8 墙上时间且不带时区标记，浏览器本地时区各不相同——
+  // 必须显式按 +08:00 解析，否则跨时区机器会把时间算成过去/未来，相对文案全错
+  const time = new Date(value.replace(' ', 'T') + '+08:00').getTime();
+  if (Number.isNaN(time)) return String(value);
+  const diffMin = Math.round((Date.now() - time) / 60000);
+  if (diffMin < 1) return '刚刚';
+  if (diffMin < 60) return `${diffMin} 分钟前`;
+  const diffHour = Math.round(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} 小时前`;
+  return `${Math.round(diffHour / 24)} 天前`;
+};
+onUnmounted(() => {
+  stopRealtime();
+});
+
 const copySnippet = async () => {
   try {
     await navigator.clipboard.writeText(snippet.value);
@@ -1107,15 +1416,24 @@ const reloadCurrent = async () => {
     } else if (tab.value === 'page') {
       await loadPageAnalysis();
     } else if (tab.value === 'funnel') {
-      await loadFunnels();
+      await Promise.all([loadFunnels(), loadAttribution()]);
     } else if (tab.value === 'retention') {
       await loadRetention();
+    } else if (tab.value === 'paths') {
+      await loadPaths();
+    } else if (tab.value === 'activity') {
+      await loadActivity();
+    } else if (tab.value === 'realtime') {
+      await loadRealtime();
+      if (realtimeAuto.value) {
+        startRealtime();
+      }
     } else if (tab.value === 'sessions') {
       await loadSessions();
     } else if (tab.value === 'custom') {
       await loadCustom();
     } else if (tab.value === 'collect') {
-      await Promise.all([loadSites(), loadQuality()]);
+      await Promise.all([loadSites(), loadQuality(), loadCross()]);
     }
   } finally {
     loading.value = false;
@@ -1123,6 +1441,9 @@ const reloadCurrent = async () => {
 };
 
 const onTabChange = async () => {
+  if (tab.value !== 'realtime') {
+    stopRealtime();
+  }
   await reloadCurrent();
 };
 
@@ -1464,6 +1785,47 @@ onMounted(async () => {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+}
+.path-chart {
+  /* 分层后节点数≈页数×3，420px 会裁掉最底一行——视觉复审实测要 560px */
+  height: 560px;
+}
+.loss-row {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+}
+.loss-row:last-child {
+  border-bottom: none;
+}
+.loss-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.loss-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-left: 26px;
+}
+.loss-tag {
+  font-family: inherit;
+}
+.realtime-pulse {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 64px;
+  margin: 10px 0 6px;
+}
+.realtime-pulse i {
+  flex: 1;
+  min-height: 3px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, #79bbff, #a0cfff);
+  transition: height 0.4s ease;
 }
 @media (max-width: 1200px) {
   .stat-grid {

@@ -143,4 +143,63 @@ public class AnalyticsController {
                                           @RequestParam(defaultValue = "7") int days) {
         return R.ok(analyticsService.quality(source, days));
     }
+
+    /**
+     * 批8 路径分析：页面桑基（start 为空 = 入口视角；非空 = 从该页出发）。
+     */
+    @SaCheckPermission("analytics:center:query")
+    @GetMapping("/paths")
+    public R<Map<String, Object>> paths(@RequestParam String source,
+                                        @RequestParam(defaultValue = "30") int days,
+                                        @RequestParam(required = false) String start) {
+        return R.ok(analyticsService.paths(source, days, start));
+    }
+
+    /**
+     * 批8 漏斗流失下钻：每步流失访客的下一页/下一事件 Top5。
+     */
+    @SaCheckPermission("analytics:center:query")
+    @PostMapping("/funnel/loss")
+    public R<Map<String, Object>> funnelLoss(@RequestBody AnalyticsFunnelBo bo) {
+        return R.ok(analyticsService.funnelLoss(bo));
+    }
+
+    /**
+     * 批8 渠道归因：首次/末次/线性三模型（event 为空 = signup）。
+     */
+    @SaCheckPermission("analytics:center:query")
+    @GetMapping("/attribution")
+    public R<Map<String, Object>> attribution(@RequestParam String source,
+                                              @RequestParam(defaultValue = "30") int days,
+                                              @RequestParam(required = false) String event) {
+        return R.ok(analyticsService.attribution(source, days, event));
+    }
+
+    /**
+     * 批8 活跃口径：DAU/WAU/MAU + 粘性 + 新老构成。
+     */
+    @SaCheckPermission("analytics:center:query")
+    @GetMapping("/activity")
+    public R<Map<String, Object>> activity(@RequestParam String source,
+                                           @RequestParam(defaultValue = "30") int days) {
+        return R.ok(analyticsService.activity(source, days));
+    }
+
+    /**
+     * 批8 实时看板：近 5 分钟直查事件账本（前端 5 秒轮询）。
+     */
+    @SaCheckPermission("analytics:center:query")
+    @GetMapping("/realtime")
+    public R<Map<String, Object>> realtime(@RequestParam String source) {
+        return R.ok(analyticsService.realtime(source));
+    }
+
+    /**
+     * 批8 全域总览：跨业务源事件量/访客数/最近写入。
+     */
+    @SaCheckPermission("analytics:center:query")
+    @GetMapping("/cross-source")
+    public R<Map<String, Object>> crossSource(@RequestParam(defaultValue = "30") int days) {
+        return R.ok(analyticsService.crossSource(days));
+    }
 }

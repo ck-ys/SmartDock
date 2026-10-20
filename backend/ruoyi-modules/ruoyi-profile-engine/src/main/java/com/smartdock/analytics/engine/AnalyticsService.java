@@ -705,6 +705,284 @@ public class AnalyticsService {
         return out;
     }
 
+    // ---------------------------------------------------------------- 批8 分析深度
+
+    /**
+     * 路径分析（拍板 Q1-A）：页面桑基，口径与漏斗一致（每访客首次顺序，连续重复页折叠）。
+     */
+    public Map<String, Object> paths(String source, int days, String startPage) {
+        requireSource(source);
+        int clampedDays = Math.min(Math.max(days, 1), 90);
+        Date from = startOfDaysAgo(clampedDays);
+        Date to = startOfTomorrow();
+        List<AnalyticsEventRow> events = eventMapper.selectEvents(currentTenant(), source, from, to);
+        List<AnalyticsPathBuilder.PathEvent> pageEvents = new ArrayList<>();
+        for (AnalyticsEventRow event : events) {
+            if (!isPageView(event.getEventName())) {
+                continue;
+            }
+            String page = firstString(parse(event.getContext()), "pageUrl", "url");
+            if (page == null) {
+                page = firstString(parse(event.getProps()), "pageUrl");
+            }
+            if (page == null || page.isBlank()) {
+                continue;
+            }
+            pageEvents.add(new AnalyticsPathBuilder.PathEvent(
+                event.getVisitorKey(), event.getOccurredTime().getTime(), page));
+        }
+        Map<String, Object> graph = AnalyticsPathBuilder.build(pageEvents, startPage, 3, 30);
+        graph.put("source", source);
+        graph.put("days", clampedDays);
+        graph.put("start", StringUtils.isBlank(startPage) ? null : startPage.trim());
+        return graph;
+    }
+
+    /**
+     * 漏斗流失下钻（拍板 Q2-A）：每步流失访客"接下来去了哪"Top5。
+     * 步进算法与 funnelAnalysis 完全一致（同窗口语义），保证两边计数可交叉对账。
+     */
+    public Map<String, Object> funnelLoss(AnalyticsFunnelBo bo) {
+        AnalyticsFunnel funnel = null;
+        List<Map<String, Object>> steps = bo == null ? null : bo.getSteps();
+        String source = bo == null ? null : bo.getSource();
+        int windowDays = bo == null || bo.getWindowDays() == null ? 7 : clampWindow(bo.getWindowDays());
+        if (bo != null && bo.getFunnelId() != null) {
+            funnel = funnelMapper.selectById(bo.getFunnelId());
+            if (funnel == null) {
+                throw new ServiceException("漏斗不存在");
+            }
+            source = funnel.getSource();
+            steps = parseSteps(funnel.getSteps());
+            windowDays = clampWindow(funnel.getWindowDays());
+        }
+        requireSource(source);
+        validateFunnel("临时漏斗", steps);
+        int days = bo == null || bo.getDays() == null ? 30 : Math.min(Math.max(bo.getDays(), 1), 365);
+        Date from = startOfDaysAgo(days);
+        Date to = startOfTomorrow();
+        List<AnalyticsEventRow> events = eventMapper.selectEvents(currentTenant(), source, from, to);
+        List<String> names = new ArrayList<>();
+        for (Map<String, Object> step : steps) {
+            names.add(String.valueOf(step.get("eventName")));
+        }
+        Map<String, List<AnalyticsEventRow>> all = new LinkedHashMap<>();
+        for (AnalyticsEventRow event : events) {
+            all.computeIfAbsent(event.getVisitorKey(), k -> new ArrayList<>()).add(event);
+        }
+        all.values().forEach(list -> list.sort(Comparator.comparing(AnalyticsEventRow::getOccurredTime)));
+        long windowMs = windowDays * 24L * 3600L * 1000L;
+        long[] counts = new long[names.size()];
+        Map<String, Integer> reached = new LinkedHashMap<>();
+        Map<String, Long> lastStepTime = new LinkedHashMap<>();
+        for (Map.Entry<String, List<AnalyticsEventRow>> entry : all.entrySet()) {
+            String visitor = entry.getKey();
+            int step = 0;
+            Date prev = null;
+            for (AnalyticsEventRow event : entry.getValue()) {
+                if (step >= names.size()) {
+                    break;
+                }
+                if (!names.get(step).equals(event.getEventName())) {
+                    continue;
+                }
+                if (step == 0) {
+                    counts[0]++;
+                    prev = event.getOccurredTime();
+                    step = 1;
+                } else if (event.getOccurredTime().getTime() - prev.getTime() <= windowMs) {
+                    counts[step]++;
+                    prev = event.getOccurredTime();
+                    step++;
+                }
+            }
+            int finalStep = step - 1;
+            reached.put(visitor, finalStep);
+            if (prev != null) {
+                lastStepTime.put(visitor, prev.getTime());
+            }
+        }
+        List<Map<String, Object>> outSteps = new ArrayList<>();
+        for (int i = 0; i < names.size(); i++) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("eventName", names.get(i));
+            item.put("count", counts[i]);
+            item.put("lost", i + 1 < names.size() ? counts[i] - counts[i + 1] : 0L);
+            if (i + 1 < names.size()) {
+                Map<String, Long> nextCount = new LinkedHashMap<>();
+                for (Map.Entry<String, Integer> r : reached.entrySet()) {
+                    if (r.getValue() != i) {
+                        continue;
+                    }
+                    Long anchor = lastStepTime.get(r.getKey());
+                    if (anchor == null) {
+                        continue;
+                    }
+                    String next = "(离开)";
+                    for (AnalyticsEventRow event : all.get(r.getKey())) {
+                        if (event.getOccurredTime().getTime() > anchor) {
+                            next = labelOf(event);
+                            break;
+                        }
+                    }
+                    nextCount.merge(next, 1L, Long::sum);
+                }
+                List<Map<String, Object>> top = new ArrayList<>();
+                nextCount.entrySet().stream()
+                    .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                    .limit(5)
+                    .forEach(e -> {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        row.put("label", e.getKey());
+                        row.put("count", e.getValue());
+                        top.add(row);
+                    });
+                item.put("next", top);
+            }
+            outSteps.add(item);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("funnelId", funnel == null ? null : funnel.getFunnelId());
+        out.put("source", source);
+        out.put("days", days);
+        out.put("windowDays", windowDays);
+        out.put("steps", outSteps);
+        return out;
+    }
+
+    /**
+     * 渠道归因（拍板 Q3-A）：触点=会话渠道来源，转化=目标事件首次发生（默认 signup）。
+     */
+    public Map<String, Object> attribution(String source, int days, String conversionEvent) {
+        requireSource(source);
+        int clampedDays = Math.min(Math.max(days, 1), 90);
+        String conversion = StringUtils.isBlank(conversionEvent) ? "signup" : conversionEvent.trim();
+        Date from = startOfDaysAgo(clampedDays);
+        Date to = startOfTomorrow();
+        String tenantId = currentTenant();
+        List<AttributionCalculator.Touch> touches = new ArrayList<>();
+        for (Map<String, Object> row : sessionMapper.selectChannelTouchpoints(tenantId, source, from, to)) {
+            touches.add(new AttributionCalculator.Touch(
+                String.valueOf(row.get("visitorId")),
+                ((Date) row.get("startedAt")).getTime(),
+                String.valueOf(row.get("channel"))));
+        }
+        Map<String, Long> firstConversion = new LinkedHashMap<>();
+        for (AnalyticsEventRow event : eventMapper.selectEvents(tenantId, source, from, to)) {
+            if (conversion.equals(event.getEventName()) && event.getVisitorKey() != null
+                && !firstConversion.containsKey(event.getVisitorKey())) {
+                firstConversion.put(event.getVisitorKey(), event.getOccurredTime().getTime());
+            }
+        }
+        List<AttributionCalculator.Conversion> conversions = new ArrayList<>();
+        firstConversion.forEach((visitor, time) -> conversions.add(new AttributionCalculator.Conversion(visitor, time)));
+        Map<String, Object> out = AttributionCalculator.attribute(touches, conversions);
+        out.put("source", source);
+        out.put("days", clampedDays);
+        out.put("conversionEvent", conversion);
+        return out;
+    }
+
+    /**
+     * 活跃口径（拍板 Q4-A）：DAU/WAU/MAU 滚动 + 粘性 + 最新日新老构成。
+     */
+    public Map<String, Object> activity(String source, int days) {
+        requireSource(source);
+        int clampedDays = Math.min(Math.max(days, 1), 90);
+        Date from = startOfDaysAgo(clampedDays);
+        Date to = startOfTomorrow();
+        String tenantId = currentTenant();
+        List<ActivityCalculator.ActiveDay> activeDays = new ArrayList<>();
+        for (Map<String, Object> row : eventMapper.selectDailyActiveVisitors(tenantId, source, from, to)) {
+            activeDays.add(new ActivityCalculator.ActiveDay(
+                String.valueOf(row.get("day")), String.valueOf(row.get("visitorKey"))));
+        }
+        Map<String, Object> out = ActivityCalculator.compute(activeDays, 30);
+        List<Map<String, Object>> trend = dailyMapper.selectTrend(tenantId, source,
+            new java.sql.Date(from.getTime()), new java.sql.Date(to.getTime()));
+        Map<String, Object> mix = new LinkedHashMap<>();
+        if (!trend.isEmpty()) {
+            Map<String, Object> last = trend.get(trend.size() - 1);
+            mix.put("statDate", last.get("statDate"));
+            mix.put("newVisitors", longValue(last.get("newVisitors")));
+            mix.put("returningVisitors", longValue(last.get("returningVisitors")));
+        }
+        out.put("newVsReturning", mix);
+        out.put("source", source);
+        out.put("days", clampedDays);
+        return out;
+    }
+
+    /**
+     * 实时看板（拍板 Q5-A）：近 5 分钟直查事件账本，不经会话重建，最坏延迟≈轮询间隔。
+     */
+    public Map<String, Object> realtime(String source) {
+        requireSource(source);
+        String tenantId = currentTenant();
+        Date now = new Date();
+        Date from = new Date(now.getTime() - 5 * 60_000L);
+        long events = 0;
+        long pv = 0;
+        List<Map<String, Object>> minutes = eventMapper.selectRealtimeBuckets(tenantId, source, from, now);
+        for (Map<String, Object> bucket : minutes) {
+            events += longValue(bucket.get("events"));
+            pv += longValue(bucket.get("pv"));
+        }
+        int visitors = eventMapper.selectWindowVisitors(tenantId, source, from, now).size();
+        long newVisitors = 0;
+        for (Map<String, Object> row : eventMapper.selectVisitorFirstSeen(tenantId, source)) {
+            Object firstSeen = row.get("firstSeen");
+            if (firstSeen instanceof Date d && !d.before(from)) {
+                newVisitors++;
+            }
+        }
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("visitors", visitors);
+        summary.put("pv", pv);
+        summary.put("events", events);
+        summary.put("newVisitors", newVisitors);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("source", source);
+        out.put("now", now);
+        out.put("windowMinutes", 5);
+        out.put("summary", summary);
+        out.put("minutes", minutes);
+        return out;
+    }
+
+    /**
+     * 全域总览（拍板 Q6-A）：跨业务源事件量/访客数/最近写入（直查账本，无需逐源重建）。
+     */
+    public Map<String, Object> crossSource(int days) {
+        int clampedDays = Math.min(Math.max(days, 1), 90);
+        Date from = startOfDaysAgo(clampedDays);
+        List<Map<String, Object>> rows = eventMapper.selectCrossSourceSummary(currentTenant(), from);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("days", clampedDays);
+        out.put("sources", rows);
+        return out;
+    }
+
+    private static boolean isPageView(String eventName) {
+        return "page_view".equals(eventName) || "pageview".equals(eventName) || "pv".equals(eventName);
+    }
+
+    /**
+     * 下钻标签：页面浏览事件显示页面路径，其余显示事件名。
+     */
+    private String labelOf(AnalyticsEventRow event) {
+        if (isPageView(event.getEventName())) {
+            String page = firstString(parse(event.getContext()), "pageUrl", "url");
+            if (page == null) {
+                page = firstString(parse(event.getProps()), "pageUrl");
+            }
+            if (page != null && !page.isBlank()) {
+                return page;
+            }
+        }
+        return event.getEventName();
+    }
+
     // ---------------------------------------------------------------- 内部工具
 
     private Map<String, Object> normalizeOverview(Map<String, Object> raw) {

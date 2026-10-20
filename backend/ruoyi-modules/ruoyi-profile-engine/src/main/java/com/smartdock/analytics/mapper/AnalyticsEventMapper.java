@@ -119,8 +119,12 @@ public interface AnalyticsEventMapper {
                                                      @Param("limit") int limit);
 
     /**
-     * 单个访问者在时间窗内的事件（会话时间线）。
-     * 登录会话的 visitorId 是用户 ID, 而登录前事件只带 anonymousId: 两种键都要能命中。
+     * 单个访问者的事件（隐式会话时间线）。
+     *
+     * <p>批8 串台修复：只按 visitorKey 严格匹配。隐式会话本身按 visitorKey 分组构建，
+     * 本会话事件必然同键命中；此前的 {@code OR subject_id = #{visitorKey}} 会把
+     * "同一登录主体在另一端/另一次访问"的无会话事件混进来（一期审查遗留串台 bug）。
+     * 登录前后跨键的完整时间线由显式会话走 selectSessionEvents（按 sessionId）。</p>
      */
     @Select("""
         SELECT event_id AS "eventId", event_name AS "eventName", subject_type AS "subjectType",
@@ -129,8 +133,7 @@ public interface AnalyticsEventMapper {
                occurred_time AS "occurredTime", props::text AS props, context::text AS context
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND (COALESCE(NULLIF(anonymous_id, ''), subject_id) = #{visitorKey}
-               OR subject_id = #{visitorKey})
+          AND COALESCE(NULLIF(anonymous_id, ''), subject_id) = #{visitorKey}
           AND occurred_time >= #{from} AND occurred_time < #{to}
           AND del_flag = '0'
         ORDER BY occurred_time, event_id
@@ -140,6 +143,71 @@ public interface AnalyticsEventMapper {
                                                 @Param("visitorKey") String visitorKey,
                                                 @Param("from") Date from,
                                                 @Param("to") Date to);
+
+    /**
+     * 实时看板（批8）：按分钟的浏览/事件/访客桶。
+     */
+    @Select("""
+        SELECT to_char(date_trunc('minute', occurred_time), 'YYYY-MM-DD HH24:MI') AS "minute",
+               count(*) AS "events",
+               count(*) FILTER (WHERE event_name IN ('page_view', 'pageview', 'pv')) AS "pv",
+               count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id)) AS "visitors"
+        FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
+        GROUP BY 1
+        ORDER BY 1
+        """)
+    List<Map<String, Object>> selectRealtimeBuckets(@Param("tenantId") String tenantId,
+                                                    @Param("source") String source,
+                                                    @Param("from") Date from,
+                                                    @Param("to") Date to);
+
+    /**
+     * 实时看板（批8）：窗口内去重访客键列表（跨分钟去重在 Java 侧 size 完成）。
+     */
+    @Select("""
+        SELECT DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey"
+        FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
+        """)
+    List<Map<String, Object>> selectWindowVisitors(@Param("tenantId") String tenantId,
+                                                    @Param("source") String source,
+                                                    @Param("from") Date from,
+                                                    @Param("to") Date to);
+
+    /**
+     * 活跃口径（批8）：天 × 访客 去重对（DAU/WAU/MAU 滚动窗口的原料）。
+     */
+    @Select("""
+        SELECT DISTINCT to_char(date_trunc('day', occurred_time), 'YYYY-MM-DD') AS "day",
+               COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey"
+        FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
+        ORDER BY 1
+        """)
+    List<Map<String, Object>> selectDailyActiveVisitors(@Param("tenantId") String tenantId,
+                                                        @Param("source") String source,
+                                                        @Param("from") Date from,
+                                                        @Param("to") Date to);
+
+    /**
+     * 全域总览（批8）：跨业务源的事件量/访客数/最近写入（只读事件账本，不依赖重建）。
+     */
+    @Select("""
+        SELECT source,
+               count(*) AS "events",
+               count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id)) AS "visitors",
+               max(occurred_time) AS "lastAt"
+        FROM profile_event
+        WHERE tenant_id = #{tenantId} AND occurred_time >= #{from} AND del_flag = '0'
+        GROUP BY source
+        ORDER BY "events" DESC
+        """)
+    List<Map<String, Object>> selectCrossSourceSummary(@Param("tenantId") String tenantId,
+                                                       @Param("from") Date from);
 
     /**
      * 显式会话的事件: 按 sessionId 查, 登录前后(匿名 ID → 用户 ID)的事件都能取到。

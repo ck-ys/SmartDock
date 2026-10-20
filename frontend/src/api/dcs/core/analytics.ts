@@ -320,3 +320,115 @@ export const listAnalyticsSites = () => r<AnalyticsSite[]>({ url: `${BASE}/sites
 
 export const getAnalyticsQuality = (source: string, days = 7) =>
   r<AnalyticsQuality>({ url: `${BASE}/quality`, method: 'get', params: { source, days } });
+
+// ---------------------------------------------------------------- 批8 分析深度
+
+export interface AnalyticsPathNode {
+  name: string;
+  value: number;
+}
+
+export interface AnalyticsPathLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface AnalyticsPaths {
+  source: string;
+  days: number;
+  start: string | null;
+  visitors: number;
+  nodes: AnalyticsPathNode[];
+  links: AnalyticsPathLink[];
+  entries: { page: string; visitors: number }[];
+}
+
+export interface AnalyticsFunnelLossStep {
+  eventName: string;
+  count: number;
+  lost: number;
+  next?: { label: string; count: number }[];
+}
+
+export interface AnalyticsFunnelLoss {
+  funnelId?: string;
+  source: string;
+  days: number;
+  windowDays: number;
+  steps: AnalyticsFunnelLossStep[];
+}
+
+export interface AnalyticsAttributionRow {
+  channel: string;
+  first: number;
+  last: number;
+  linear: number;
+  visitors: number;
+}
+
+export interface AnalyticsAttribution {
+  source: string;
+  days: number;
+  conversionEvent: string;
+  conversions: number;
+  channels: number;
+  rows: AnalyticsAttributionRow[];
+}
+
+export interface AnalyticsActivity {
+  source: string;
+  days: number;
+  dayList: string[];
+  dau: number[];
+  wau: number[];
+  mau: number[];
+  sticky: (number | null)[];
+  latest: { dau: number | null; wau: number | null; mau: number | null; sticky: number | null };
+  newVsReturning: { statDate?: string; newVisitors: number; returningVisitors: number };
+}
+
+export interface AnalyticsRealtimeMinute {
+  minute: string;
+  events: number;
+  pv: number;
+  visitors: number;
+}
+
+export interface AnalyticsRealtime {
+  source: string;
+  now: string;
+  windowMinutes: number;
+  summary: { visitors: number; pv: number; events: number; newVisitors: number };
+  minutes: AnalyticsRealtimeMinute[];
+}
+
+export interface AnalyticsCrossSourceRow {
+  source: string;
+  events: number;
+  visitors: number;
+  lastAt: string;
+}
+
+export interface AnalyticsCrossSource {
+  days: number;
+  sources: AnalyticsCrossSourceRow[];
+}
+
+export const getAnalyticsPaths = (source: string, days = 30, start?: string) =>
+  r<AnalyticsPaths>({ url: `${BASE}/paths`, method: 'get', params: { source, days, start } });
+
+export const getAnalyticsFunnelLoss = (data: { funnelId?: string; days?: number }) =>
+  r<AnalyticsFunnelLoss>({ url: `${BASE}/funnel/loss`, method: 'post', data });
+
+export const getAnalyticsAttribution = (source: string, days = 30, event?: string) =>
+  r<AnalyticsAttribution>({ url: `${BASE}/attribution`, method: 'get', params: { source, days, event } });
+
+export const getAnalyticsActivity = (source: string, days = 30) =>
+  r<AnalyticsActivity>({ url: `${BASE}/activity`, method: 'get', params: { source, days } });
+
+export const getAnalyticsRealtime = (source: string) =>
+  r<AnalyticsRealtime>({ url: `${BASE}/realtime`, method: 'get', params: { source } });
+
+export const getAnalyticsCrossSource = (days = 30) =>
+  r<AnalyticsCrossSource>({ url: `${BASE}/cross-source`, method: 'get', params: { days } });
