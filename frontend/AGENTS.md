@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents when working with code in this repository. 设计参照母仓 dcs（本机 git-se/dcs/RuoYi-Vue-Plus-front/AGENTS.md，只读）并按 smart-dock 开源版实况改写。
+This file provides guidance to AI coding agents when working with code in this repository. 设计参照内部母仓的同名文件（只读；母仓定位只记录在 `.workshop/` 内部资料，绝不写入 git）并按 smart-dock 开源版实况改写。
 
 ## Project Overview
 
@@ -15,7 +15,7 @@ Node >= 20.19.0 required。
 - **开发服务**：`npx vite --port 5188 --host` **直起**——⚠️ 不要用 npm run dev 脚本（本机有卡死历史）；**前端端口统一 5188**（不存在 5189 口径），80 留给其它窗口
 - **生产构建**：`npm run build:prod`（交付前必过）
 - **Lint**：`npm run lint:eslint` / `lint:eslint:fix`；**Format**：`npm run prettier`
-- **单测**：`npm run test`（Vitest，`vitest.config.ts`）——已有测试集中在 `api/dcs/assistant/aguiClient.test.ts` 与 `components/DcsAssistant/*.test.ts`；新增纯函数逻辑优先补 Vitest
+- **单测**：`npm run test`（Vitest，`vitest.config.ts`）——已有测试集中在助手 API 客户端（`api/**/assistant/aguiClient.test.ts`）与 AI 助手组件（`components/*Assistant*/*.test.ts`）；新增纯函数逻辑优先补 Vitest
 
 ## Auto-Import Behavior
 
@@ -34,9 +34,9 @@ Node >= 20.19.0 required。
 
 | Frontend | Backend |
 |----------|---------|
-| `src/api/dcs/core/analytics.ts` | `ruoyi-profile-engine/.../analytics/query/AnalyticsController.java` |
-| `src/api/dcs/core/profile.ts` | `ruoyi-profile-engine/.../profile/query/*Controller.java` |
-| `src/api/dcs/core/task.ts` | `ruoyi-dcs/.../controller/DcsTaskController.java` |
+| `src/api/**/core/analytics.ts` | `ruoyi-profile-engine/.../analytics/query/AnalyticsController.java` |
+| `src/api/**/core/profile.ts` | `ruoyi-profile-engine/.../profile/query/*Controller.java` |
+| `src/api/**/core/task.ts` | 采集 demo 模块 `.../controller/` 的任务 Controller |
 | Form model & rules | 后端 BO 字段 + Validation 注解 |
 | Table columns / TS 接口 | 后端 VO 字段 |
 | DictTag 渲染 | `sys_dict_data` |
@@ -69,18 +69,18 @@ Pinia dict store 缓存；`<DictTag :options>` 渲染。
 
 | 页面 | 路径 | 说明 |
 |------|------|------|
-| 画像总览/详情 | `views/dcs/profile/{index,detail}.vue` | 主体列表/排行/详情 |
-| 画像工作室 | `views/dcs/profile/studio.vue` | 维度/权重规则 CRUD，即时生效 |
-| 评分模型(RFM) | `views/dcs/profile/rfm.vue` | 模型配置/快照 |
-| 分群 | `views/dcs/profile/segments.vue` | 规则分群+静态名单 |
-| 低分复核 | `views/dcs/profile/review.vue` | 复核队列 |
-| 分析中心 | `views/dcs/profile/analytics.vue` | 流量/页面/漏斗/留存/访问明细/自定义分析/数据采集（多 Tab 大页） |
+| 画像总览/详情 | `profile/{index,detail}.vue` | 主体列表/排行/详情 |
+| 画像工作室 | `profile/studio.vue` | 维度/权重规则 CRUD，即时生效 |
+| 评分模型(RFM) | `profile/rfm.vue` | 模型配置/快照 |
+| 分群 | `profile/segments.vue` | 规则分群+静态名单 |
+| 低分复核 | `profile/review.vue` | 复核队列 |
+| 分析中心 | `profile/analytics.vue` | 流量/页面/漏斗/留存/访问明细/自定义分析/数据采集（多 Tab 大页） |
 | 采集 SDK | `public/sdk/smartdock-analytics.js` | 零依赖、可异步加载；改它必须同步更新接入片段文案 |
-| AI 助手 | `components/DcsAssistant/` + `views/dcs/assistant/` | 停靠抽屉 + 会话 |
-| 采集 demo | `views/dcs/{mission,todo}/` | 任务/待办最小闭环 |
-| 更新日志 | `views/dcs/changelog/changelog.ts` | 见下方铁律 |
+| AI 助手 | AI 助手组件 + `assistant` 页 | 停靠抽屉 + 会话 |
+| 采集 demo | `mission/todo` 页 | 任务/待办最小闭环 |
+| 更新日志 | `changelog/changelog.ts` | 见下方铁律 |
 
-API 文件在 `src/api/dcs/**`（core/assistant/…，子目录含 `index.ts` 与类型）。
+API 文件在 `src/api/**`（core/assistant/…，子目录含 `index.ts` 与类型）。
 
 ### Pinia Stores
 
@@ -109,11 +109,11 @@ API 文件在 `src/api/dcs/**`（core/assistant/…，子目录含 `index.ts` �
 
 ## 更新日志铁律（用户硬性要求）
 
-**任何修复类提交，必须在 `src/views/dcs/changelog/changelog.ts` 头部加人话版条目（≤3 条）**，并验收它在更新日志页首位正常渲染（含徽标）。没有条目的修复提交视为未收口。
+**任何修复类提交，必须在更新日志数据文件（`changelog/changelog.ts`）头部加人话版条目（≤3 条）**，并验收它在更新日志页首位正常渲染（含徽标）。没有条目的修复提交视为未收口。
 
 ## 多窗口并行纪律
 
-可能有其它窗口正在改壳层文件（`index.html` / 全局样式 / layout / changelog / DcsAssistant / `vite.wave0.config.ts`）——**只 git add 自己改的文件，禁 `git add -A`**，不碰他人文件。
+可能有其它窗口正在改壳层文件（`index.html` / 全局样式 / layout / changelog / AI 助手组件 / `vite.wave0.config.ts`）——**只 git add 自己改的文件，禁 `git add -A`**，不碰他人文件。
 
 ## E2E 已知坑（跑浏览器验收前必读，全量移植自母仓实战沉淀）
 

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents when working with code in this repository. 设计参照母仓 dcs（本机 git-se/dcs/RuoYi-Vue-Plus-5.X/AGENTS.md，只读）并按 smart-dock 开源版实况改写。
+This file provides guidance to AI coding agents when working with code in this repository. 设计参照内部母仓的同名文件（只读；母仓定位只记录在 `.workshop/` 内部资料，绝不写入 git）并按 smart-dock 开源版实况改写。
 
 ## Project Overview
 
@@ -40,7 +40,7 @@ ruoyi-modules/        # 业务模块：
   ruoyi-profile-engine  # ★ 画像引擎 + 行为分析中心（com.smartdock.profile + com.smartdock.analytics）
   ruoyi-assistant       # AI 助手（AgentScope 管主链；Spring AI 只管后台任务）
   ruoyi-assistant-spi   # 助手扩展接口
-  ruoyi-dcs             # 多任务采集 demo（任务/待办/审计最小闭环）
+  (采集demo模块)             # 多任务采集 demo（任务/待办/审计最小闭环）；模块目录名含内部代号，按文件名搜索定位
   ruoyi-ai-billing      # AI 计量计费
   ruoyi-file-security   # 文件审查
   ruoyi-risk            # 风险行为
@@ -98,9 +98,9 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 
 | Backend | Frontend |
 |---------|----------|
-| `ruoyi-profile-engine/.../query/*Controller` | `../frontend/src/api/dcs/core/{profile,analytics}.ts` |
-| `ruoyi-dcs/.../controller/` | `../frontend/src/api/dcs/core/task.ts` |
-| BO/VO 字段变更 | `../frontend/src/views/dcs/**` 表单 rules / 表格列 / TS 接口 |
+| `ruoyi-profile-engine/.../query/*Controller` | `../frontend/src/api/**/core/{profile,analytics}.ts` |
+| 采集 demo 模块 `.../controller/` | `../frontend/src/api/**/core/task.ts` |
+| BO/VO 字段变更 | `../frontend/src/views/**` 对应页面 表单 rules / 表格列 / TS 接口 |
 | 新权限串 | `sys_menu` perms + 前端 `v-hasPermi`（必须三段式） |
 
 ## Code Style
@@ -127,5 +127,5 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 
 ## API Design
 
-- 现存约定：GET 查询 / POST 写入；DELETE 存量存在于 dcs demo 模块——新接口跟随现有风格，改动词前先查同路径冲突
+- 现存约定：GET 查询 / POST 写入；DELETE 存量存在于采集 demo 模块——新接口跟随现有风格，改动词前先查同路径冲突
 - 分页：`PageQuery` 入 → `TableDataInfo<T>` 出；导出用 FastExcel（ruoyi-common-excel）

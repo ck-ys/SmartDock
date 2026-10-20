@@ -1,6 +1,6 @@
 # AGENTS.md
 
-这份文件约束 AI 编程代理在 smart-dock 项目里的工作方式，用来减少常见的 AI 编程失误。设计大范围参照母仓 dcs（`D:\Git\git-se\dcs`，本机只读参照，绝不动一个字）的同名文件，并按开源版定位改写。可在此基础上继续补充项目专属规则。
+这份文件约束 AI 编程代理在 smart-dock 项目里的工作方式，用来减少常见的 AI 编程失误。设计大范围参照内部母仓的同名文件（母仓定位与只读使用规则只记录在 `.workshop/` 内部资料，绝不写入 git，绝不动一个字），并按开源版定位改写。可在此基础上继续补充项目专属规则。
 取舍说明：这些规则偏向谨慎和可验证，而非最快完成。遇到很小的简单任务时，可按实际情况简化流程。
 
 ## 启动 Checklist（任何新会话 / 切换模型开始前必跑）
@@ -72,14 +72,14 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 ## 项目简介
 
-**SmartDock** — 内部系统 DCS（数据采集）的开源改造版，基于 RuoYi-Vue-Plus 5.6.1。
+**SmartDock** — 内部数据采集系统的开源改造版，基于 RuoYi-Vue-Plus 5.6.1。
 定位：**用户画像 + AI 助手双引擎**的通用平台；原多级任务转发采集退为内置 demo 能力。
 
 核心子系统：
 - **画像引擎**（`ruoyi-profile-engine` 的 `com.smartdock.profile`）：通用事件协议 v1 → 身份图谱 → 评分模型/RFM/分群/低分复核，快照链可追溯
 - **行为分析中心**（`com.smartdock.analytics`）：会话重建、日汇总、流量/页面/漏斗/留存/自定义分析、CSV 补录、公开采集口 + 零依赖 SDK
 - **AI 助手**（`ruoyi-assistant` + `ruoyi-assistant-spi`）：AgentScope 管主链，Spring AI 只管后台任务
-- **多任务采集 demo**（`ruoyi-dcs`）：保留任务/待办/审计最小闭环
+- **多任务采集 demo**（内置 demo 模块）：保留任务/待办/审计最小闭环
 
 技术栈：Spring Boot 3.5 / Java 21 / PostgreSQL 17 / MyBatis-Plus / Sa-Token / Redisson + Vue 3 / Vite / Element Plus / Pinia / TypeScript。
 
@@ -120,7 +120,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 | 触发条件 | 后端要改 | 前端要改 |
 |---------|---------|---------|
-| 新增 API 接口 | Controller + Service + BO/VO | `src/api/dcs/**` + TypeScript 类型 |
+| 新增 API 接口 | Controller + Service + BO/VO | `src/api/**` 对应业务目录 + TypeScript 类型 |
 | BO 字段增删/改名 | BO 类 + Validation 注解 | Form 的 model + rules |
 | VO 字段增删/改名 | VO 类 | Table 列定义 + TS 接口 |
 | 新增权限字符串 | `@SaCheckPermission("a:b:c")` | `sys_menu` 表 perms + `v-hasPermi="['a:b:c']"` |
@@ -131,14 +131,14 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 | 后端 | 前端 |
 |------|------|
-| `analytics/query/AnalyticsController.java` | `views/dcs/profile/analytics.vue` + `api/dcs/core/analytics.ts` |
+| `analytics/query/AnalyticsController.java` | `profile/analytics.vue` + `core/analytics.ts` |
 | `analytics/query/AnalyticsCollectController.java` | `public/sdk/smartdock-analytics.js`（采集 SDK） |
-| `profile/query/ProfileQueryController / ProfileDimensionController` | `views/dcs/profile/{index,studio,detail}.vue` + `api/dcs/core/profile.ts` |
-| `profile/query/ProfileScoreModelController` | `views/dcs/profile/rfm.vue` |
-| `profile/query/ProfileSegmentController` | `views/dcs/profile/segments.vue` |
-| `profile/query/ProfileReviewController` | `views/dcs/profile/review.vue` |
+| `profile/query/ProfileQueryController / ProfileDimensionController` | `profile/{index,studio,detail}.vue` + `core/profile.ts` |
+| `profile/query/ProfileScoreModelController` | `profile/rfm.vue` |
+| `profile/query/ProfileSegmentController` | `profile/segments.vue` |
+| `profile/query/ProfileReviewController` | `profile/review.vue` |
 | `profile/protocol/ProfileProtocol|SchemaController` | 协议/Schema 管理 UI（批 12 交付） |
-| `dcs/controller/DcsTaskController.java` | `views/dcs/{mission,todo}/` + `api/dcs/core/task.ts` |
+| 采集 demo 任务 Controller（demo 模块内） | `mission/todo` 页 + `core/task.ts` |
 
 ---
 
@@ -160,7 +160,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 1. 本项目所有开发、文档、测试和修复只提交到 `master`（开源主干）。
 2. 禁止新建功能分支、临时分支或 Git worktree；新会话启动先 `git branch --show-current` 确认。
 3. 提交按业务批次拆分并写清 subject（人话标题）——"只用一个分支"不等于把多个不相关需求混成一个提交。
-4. **多窗口并行纪律**：只 `git add` 自己改的文件；禁止 `git add -A` / `git add .`；push 前自查 `git diff --cached` 只含本批文件；他人正在改的文件（如前端壳层 index.html / layout / changelog / DcsAssistant / vite 配置）不碰。
+4. **多窗口并行纪律**：只 `git add` 自己改的文件；禁止 `git add -A` / `git add .`；push 前自查 `git diff --cached` 只含本批文件；他人正在改的文件（如前端壳层 index.html / layout / changelog / AI 助手组件 / vite 配置）不碰。
 5. jar 会被运行中的后端锁住：**先停进程再打包**。
 
 ## AI 协作规则
@@ -192,7 +192,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 - **防重复验收 / 双视角矩阵**：凡写进交付验收清单的步骤（哪个账号→哪个页面→点什么→应看到什么），交付前必须自己按**完全相同的步骤**走一遍，每个"应看到"亲眼确认；涉及权限/可见性/状态的改动至少验两个视角（超管 + 普通用户），只测超管等于只测一半；**首次路径**（清缓存冷启动）也要走
 - **缺陷定性必须交叉实证**：亲读代码 + git log + 存量数据 + 运行实证四路对质——审查报告（多席审查/子智能体）是**线索不是结论**，未经实证不得当 bug 修，也不得把未复现的问题谎报为已修
 - **替换已用顺手的界面须满足五条**：零操作默认价值 / 旧能力不倒退 / 核心路径 ≤2 次点击 / 真人可用 / 并行灰度过渡——不满足就别替换
-- 修复类提交必须在 `frontend/src/views/dcs/changelog/changelog.ts` 头部加人话条目（≤3 条）并验收首位徽标
+- 修复类提交必须在 `frontend` 更新日志数据文件（`changelog/changelog.ts`）头部加人话条目（≤3 条）并验收首位徽标
 - 人话日志追加 `.workshop/logs/`；选择题一律做 HTML 拍板页（双写归档），**答案唯一通道 = 用户在对话里明说**
 
 ---
