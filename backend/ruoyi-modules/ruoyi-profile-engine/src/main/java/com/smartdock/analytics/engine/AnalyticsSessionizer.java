@@ -60,12 +60,14 @@ public class AnalyticsSessionizer {
             }
         }
         List<AnalyticsSession> sessions = build(tenantId, source, events, firstSeen);
-        // 边界会话(起点在 from 之前)本次只读到部分事件, 重写会用残缺行覆盖完整旧行,
-        // 或因 key 变化复制成两行——一律跳过, 保留旧完整行, 等人工全量重建时覆盖
+        // deleteRange 只删 started_at >= readFrom 的行; 边界会话分两类处理:
+        // 起点在 readFrom 之后(含 [readFrom, from) 段)——旧行已被删, 事件基本读全, 必须重插;
+        // 起点在 readFrom 之前——旧行删不到且本次只读到尾部事件, 重插会用残缺行覆盖完整旧行,
+        // 或因 key 变化复制成两行, 一律跳过保留旧行, 等人工全量重建时覆盖
         List<AnalyticsSession> inWindow = new ArrayList<>(sessions.size());
         List<String> keys = new ArrayList<>(sessions.size());
         for (AnalyticsSession session : sessions) {
-            if (session.getStartedAt().before(from)) {
+            if (session.getStartedAt().before(readFrom)) {
                 continue;
             }
             inWindow.add(session);
