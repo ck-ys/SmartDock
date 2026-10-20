@@ -312,8 +312,8 @@ const resetQuery = () => {
   loadList();
 };
 const goDetail = (row: ProfileSubjectRow | ProfileRankingRow) =>
-  router.push(`/dcs/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
-const goStudio = () => router.push('/dcs/profile-studio');
+  router.push(`/insight/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
+const goStudio = () => router.push('/insight/profile-studio');
 
 onMounted(loadAll);
 </script>

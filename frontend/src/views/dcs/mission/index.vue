@@ -1,13 +1,21 @@
 <template>
   <div class="app-container">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>任务管理（发布人视角）</span>
-          <el-button v-hasPermi="['dcs:task:add']" type="primary" icon="Plus" @click="openCreate">新建任务</el-button>
-        </div>
+    <dcs-operations-page-header
+      title="任务管理"
+      subtitle="发布、编辑、关闭任务，并跟踪成员填报进度"
+      eyebrow="任务中心"
+      :metrics="[
+        { label: '任务总数', value: total },
+        { label: '本页草稿', value: draftCount, tone: 'neutral' },
+        { label: '本页收集中', value: collectingCount, tone: 'success' }
+      ]"
+    >
+      <template #actions>
+        <el-button v-hasPermi="['dcs:task:add']" type="primary" icon="Plus" @click="openCreate">新建任务</el-button>
       </template>
+    </dcs-operations-page-header>
 
+    <el-card shadow="never">
       <el-form :inline="true" @submit.prevent>
         <el-form-item label="标题">
           <el-input v-model="query.title" placeholder="按标题模糊" clearable style="width: 200px" @keyup.enter="load" />
@@ -79,7 +87,12 @@
             <el-option label="单选" value="select" />
             <el-option label="多选" value="multi_select" />
           </el-select>
-          <el-input v-if="f.fieldType === 'select' || f.fieldType === 'multi_select'" v-model="f.options" placeholder="选项,逗号分隔" style="width: 160px" />
+          <el-input
+            v-if="f.fieldType === 'select' || f.fieldType === 'multi_select'"
+            v-model="f.options"
+            placeholder="选项,逗号分隔"
+            style="width: 160px"
+          />
           <el-checkbox v-model="f.required" true-value="1" false-value="0" label="必填" />
           <el-button link type="danger" icon="Delete" @click="form.fields.splice(i, 1)" />
         </div>
@@ -96,6 +109,7 @@
 <script setup name="DcsMission" lang="ts">
 import { pageTasks, createTask, updateTask, publishTask, closeTask, getTask } from '@/api/dcs/core/task';
 import type { DcsTaskRow, DcsTaskFieldDef } from '@/api/dcs/core/task';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 const { proxy } = getCurrentInstance() as any;
 const router = useRouter();
@@ -103,13 +117,18 @@ const router = useRouter();
 const loading = ref(false);
 const rows = ref<DcsTaskRow[]>([]);
 const total = ref(0);
+const draftCount = computed(() => rows.value.filter((r) => r.status === 'DRAFT').length);
+const collectingCount = computed(() => rows.value.filter((r) => r.status === 'COLLECTING').length);
 const query = reactive<any>({ pageNum: 1, pageSize: 10, title: '', status: '' });
 
 const dialog = reactive({ visible: false, id: '' });
 const saving = ref(false);
 const formRef = ref();
 const form = reactive<{ id?: string; title: string; description: string; deadline: string; fields: DcsTaskFieldDef[] }>({
-  title: '', description: '', deadline: '', fields: []
+  title: '',
+  description: '',
+  deadline: '',
+  fields: []
 });
 const assigneeInput = ref('');
 const rules = { title: [{ required: true, message: '请输入标题', trigger: 'blur' }] };
@@ -124,7 +143,12 @@ const load = async () => {
     loading.value = false;
   }
 };
-const reset = () => { query.pageNum = 1; query.title = ''; query.status = ''; load(); };
+const reset = () => {
+  query.pageNum = 1;
+  query.title = '';
+  query.status = '';
+  load();
+};
 const goDetail = (id: string) => router.push(`/dcs/mission/detail/${id}`);
 const statusLabel = (s: string) => ({ DRAFT: '草稿', COLLECTING: '收集中', CLOSED: '已关闭' })[s] || s;
 const statusTag = (s: string) => ({ DRAFT: 'info', COLLECTING: 'primary', CLOSED: 'info' })[s] || 'info';
@@ -132,7 +156,10 @@ const statusTag = (s: string) => ({ DRAFT: 'info', COLLECTING: 'primary', CLOSED
 const addField = () => form.fields.push({ fieldCode: '', fieldName: '', fieldType: 'text', required: '1', options: '' });
 const openCreate = () => {
   dialog.id = '';
-  form.id = undefined; form.title = ''; form.description = ''; form.deadline = '';
+  form.id = undefined;
+  form.title = '';
+  form.description = '';
+  form.deadline = '';
   form.fields = [{ fieldCode: '', fieldName: '填报内容', fieldType: 'text', required: '1', options: '' }];
   assigneeInput.value = '';
   dialog.visible = true;
@@ -142,18 +169,26 @@ const openEdit = async (row: DcsTaskRow) => {
     const det = await getTask(row.id);
     const t = det.task;
     dialog.id = row.id;
-    form.id = row.id; form.title = t.title; form.description = t.description || ''; form.deadline = (t.deadline || '').slice(0, 10);
+    form.id = row.id;
+    form.title = t.title;
+    form.description = t.description || '';
+    form.deadline = (t.deadline || '').slice(0, 10);
     // options 出参可能是数组也可能是 JSON 字符串('["a","b"]')——先归一成数组再转逗号串
     form.fields = (det.fields || []).map((f: any) => {
       let opts: unknown = f.options;
       if (typeof opts === 'string') {
-        try { const parsed = JSON.parse(opts); if (Array.isArray(parsed)) opts = parsed; } catch { /* 本就是逗号串 */ }
+        try {
+          const parsed = JSON.parse(opts);
+          if (Array.isArray(parsed)) opts = parsed;
+        } catch {
+          /* 本就是逗号串 */
+        }
       }
       return { ...f, options: Array.isArray(opts) ? (opts as string[]).join(',') : opts };
     });
     // assigneeUserIds 后端出参是 JSON 字符串("[1,2]")而非数组——归一后再用
     const ids: unknown = (t as any).assigneeUserIds;
-    const idList: number[] = Array.isArray(ids) ? ids : (typeof ids === 'string' ? JSON.parse(ids || '[]') : []);
+    const idList: number[] = Array.isArray(ids) ? ids : typeof ids === 'string' ? JSON.parse(ids || '[]') : [];
     assigneeInput.value = idList.join(',');
     dialog.visible = true;
   } catch {
@@ -162,17 +197,27 @@ const openEdit = async (row: DcsTaskRow) => {
 };
 const assigneeCount = (row: DcsTaskRow) => {
   const v: unknown = (row as any).assigneeUserIds;
-  const list = Array.isArray(v) ? v : (typeof v === 'string' ? JSON.parse(v || '[]') : []);
+  const list = Array.isArray(v) ? v : typeof v === 'string' ? JSON.parse(v || '[]') : [];
   return list.length;
 };
 const save = async () => {
   await formRef.value?.validate();
-  const assigneeUserIds = assigneeInput.value.split(/[,，\s]+/).filter(Boolean).map(Number).filter((n) => Number.isFinite(n));
-  if (!assigneeUserIds.length) { proxy.$modal.msgError('请填写目标成员'); return; }
+  const assigneeUserIds = assigneeInput.value
+    .split(/[,，\s]+/)
+    .filter(Boolean)
+    .map(Number)
+    .filter((n) => Number.isFinite(n));
+  if (!assigneeUserIds.length) {
+    proxy.$modal.msgError('请填写目标成员');
+    return;
+  }
   const fields = form.fields.map((f, i) => {
     const row: any = { fieldCode: f.fieldCode || `f${i + 1}`, fieldName: f.fieldName, fieldType: f.fieldType, required: f.required };
     if ((f.fieldType === 'select' || f.fieldType === 'multi_select') && f.options) {
-      row.options = f.options.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+      row.options = f.options
+        .split(/[,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
     return row;
   });
@@ -185,7 +230,9 @@ const save = async () => {
     proxy.$modal.msgSuccess('已保存');
     dialog.visible = false;
     load();
-  } finally { saving.value = false; }
+  } finally {
+    saving.value = false;
+  }
 };
 const publish = async (row: DcsTaskRow) => {
   await proxy.$modal.confirm(`发布「${row.title}」？成员即可填报`);
@@ -204,7 +251,19 @@ onMounted(load);
 </script>
 
 <style scoped>
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.field-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
-.tip { color: var(--el-text-color-secondary); font-size: 12px; }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.field-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.tip {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
 </style>

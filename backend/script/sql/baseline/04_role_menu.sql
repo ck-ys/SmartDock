@@ -215,3 +215,8 @@ INSERT INTO sys_role_menu (role_id, menu_id) VALUES
   (6, 11980), (6, 11981), (6, 11982), (6, 11983), (6, 11984), (6, 11985);
 
 
+
+-- 2026-10-20 菜单 IA：画像与分析独立顶级组（双引擎定位；迁移自任务中心）
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 12000),
+  (6, 12000);

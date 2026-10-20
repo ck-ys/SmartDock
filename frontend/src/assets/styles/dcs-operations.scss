@@ -109,6 +109,28 @@
   line-height: 1;
 }
 
+@media (max-width: 992px) {
+  .dcs-ops-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .dcs-ops-metric {
+    min-height: 72px;
+    padding: 10px 12px;
+  }
+
+  .dcs-ops-metric__label {
+    font-size: 11px;
+  }
+
+  .dcs-ops-metric__value {
+    margin: 4px 0 0;
+    font-size: 20px;
+  }
+}
+
 .dcs-ops-filter-card,
 .dcs-ops-table-card {
   border-color: var(--el-border-color-lighter);

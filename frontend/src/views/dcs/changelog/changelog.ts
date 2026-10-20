@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.4.1',
+    date: '2026-10-20',
+    title: '首页换成双引擎驾驶舱，菜单重新分了组',
+    items: [
+      '首页现在能直接一句话问 AI 助手，画像健康、数据脉搏和最近更新一屏看完。',
+      '画像相关页面独立成「画像与分析」菜单，任务中心只留任务相关入口。',
+      '登录页视觉升级，表单更好看也更好点了。'
+    ]
+  },
+  {
     version: 'v1.4.0',
     date: '2026-10-20',
     title: '报表数字更可信了：机器人与外来灌数不再混进统计',

@@ -651,7 +651,7 @@ const openSubject = async (row: ProfileModelSubjectRow) => {
   }
 };
 const goProfile = (row: { subjectId: string; subjectType?: string }) =>
-  router.push(`/dcs/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
+  router.push(`/insight/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
 
 onMounted(loadAll);
 </script>

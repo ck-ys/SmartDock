@@ -1,9 +1,16 @@
 <template>
   <div class="app-container">
+    <dcs-operations-page-header
+      title="我的待办"
+      subtitle="只显示还没提交、或被退回需要重提的任务"
+      eyebrow="任务中心"
+      :metrics="[
+        { label: '待办任务', value: total },
+        { label: '本页被退回', value: rejectedCount, tone: 'danger' }
+      ]"
+    />
+
     <el-card shadow="never">
-      <template #header>
-        <span>我的待办（未完成填报的任务）</span>
-      </template>
       <el-table v-loading="loading" :data="rows">
         <el-table-column label="任务" min-width="240">
           <template #default="{ row }">
@@ -35,6 +42,7 @@
 <script setup name="DcsTodo" lang="ts">
 import { myTasks } from '@/api/dcs/core/task';
 import type { DcsTaskRow } from '@/api/dcs/core/task';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 const router = useRouter();
 
@@ -42,6 +50,7 @@ const loading = ref(false);
 const rows = ref<(DcsTaskRow & { myStatus: string })[]>([]);
 const total = ref(0);
 const query = reactive<any>({ pageNum: 1, pageSize: 20 });
+const rejectedCount = computed(() => rows.value.filter((r) => r.mySubmissionStatus === 'REJECTED').length);
 
 // 被退回的跳转带上 action=revise-reason, 详情页据此高亮退回意见(全审 P1-4)
 const goFill = (row: DcsTaskRow) =>
@@ -57,7 +66,9 @@ const load = async () => {
       .filter((t) => t.status === 'COLLECTING' && (!t.mySubmissionStatus || t.mySubmissionStatus === 'REJECTED'))
       .map((t) => ({ ...t, myStatus: t.mySubmissionStatus === 'REJECTED' ? '被退回(可重提)' : '未提交' }));
     total.value = res.total;
-  } finally { loading.value = false; }
+  } finally {
+    loading.value = false;
+  }
 };
 
 onMounted(load);

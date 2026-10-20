@@ -1,22 +1,28 @@
 <template>
   <div class="app-container">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>我的消息</span>
-          <el-radio-group v-model="query.readFlag" size="small" @change="load">
-            <el-radio-button value="">全部</el-radio-button>
-            <el-radio-button value="0">未读</el-radio-button>
-            <el-radio-button value="1">已读</el-radio-button>
-          </el-radio-group>
-        </div>
+    <dcs-operations-page-header
+      title="我的消息"
+      subtitle="任务分派、审核结果与系统提醒都在这里"
+      eyebrow="任务中心"
+      :metrics="[
+        { label: '消息总数', value: total },
+        { label: '本页未读', value: unreadCount, tone: 'warning' }
+      ]"
+    >
+      <template #actions>
+        <el-radio-group v-model="query.readFlag" @change="load">
+          <el-radio-button value="">全部</el-radio-button>
+          <el-radio-button value="0">未读</el-radio-button>
+          <el-radio-button value="1">已读</el-radio-button>
+        </el-radio-group>
       </template>
+    </dcs-operations-page-header>
+
+    <el-card shadow="never">
       <el-table v-loading="loading" :data="rows" @row-click="read">
         <el-table-column label="标题" min-width="260">
           <template #default="{ row }">
-            <span :style="row.readFlag === '0' ? 'font-weight: 600' : ''">
-              {{ typeBadge(row.noticeType) }} {{ row.title }}
-            </span>
+            <span :style="row.readFlag === '0' ? 'font-weight: 600' : ''"> {{ typeBadge(row.noticeType) }} {{ row.title }} </span>
           </template>
         </el-table-column>
         <el-table-column label="内容" min-width="280">
@@ -37,6 +43,7 @@
 <script setup name="DcsNotice" lang="ts">
 import { myNotices, markNoticeRead, type DcsNoticeRow } from '@/api/dcs/core/notice';
 import { useNoticeStore } from '@/store/modules/notice';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 const noticeStore = useNoticeStore();
 
@@ -44,6 +51,7 @@ const loading = ref(false);
 const rows = ref<DcsNoticeRow[]>([]);
 const total = ref(0);
 const query = reactive<any>({ pageNum: 1, pageSize: 20, readFlag: '' });
+const unreadCount = computed(() => rows.value.filter((r) => r.readFlag === '0').length);
 
 const TYPE_LABEL: Record<string, string> = {
   TASK_PUBLISHED: '[新任务]',
@@ -65,7 +73,9 @@ const load = async () => {
     const res = await myNotices({ ...query, readFlag: query.readFlag || undefined });
     rows.value = res.rows;
     total.value = res.total;
-  } finally { loading.value = false; }
+  } finally {
+    loading.value = false;
+  }
 };
 
 const read = async (row: DcsNoticeRow) => {
@@ -81,5 +91,9 @@ onMounted(load);
 </script>
 
 <style scoped>
-.card-header { display: flex; justify-content: space-between; align-items: center; }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

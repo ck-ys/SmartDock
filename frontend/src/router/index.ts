@@ -110,7 +110,7 @@ export const constantRoutes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: '/dcs/profile-detail',
+    path: '/insight/profile-detail',
     component: Layout,
     hidden: true,
     permissions: ['profile:score:query'],
@@ -119,9 +119,22 @@ export const constantRoutes: RouteRecordRaw[] = [
         path: ':source/:subjectId',
         component: () => import('@/views/dcs/profile/detail.vue'),
         name: 'DcsProfileDetail',
-        meta: { title: '画像详情', activeMenu: '/dcs/profile' }
+        meta: { title: '画像详情', activeMenu: '/insight/profile' }
       }
     ]
+  },
+  // 2026-10-20 菜单 IA：画像域迁入「画像与分析」，旧地址重定向兜底
+  // （对端批 8 E2E 若仍用旧地址也不会 404）
+  { path: '/dcs/profile', redirect: '/insight/profile', hidden: true },
+  { path: '/dcs/profile-studio', redirect: '/insight/profile-studio', hidden: true },
+  { path: '/dcs/profile-rfm', redirect: '/insight/profile-rfm', hidden: true },
+  { path: '/dcs/profile-segments', redirect: '/insight/profile-segments', hidden: true },
+  { path: '/dcs/profile-review', redirect: '/insight/profile-review', hidden: true },
+  { path: '/dcs/profile-analytics', redirect: '/insight/profile-analytics', hidden: true },
+  {
+    path: '/dcs/profile-detail/:source/:subjectId',
+    redirect: (to) => ({ path: `/insight/profile-detail/${to.params.source}/${to.params.subjectId}`, query: to.query }),
+    hidden: true
   },
   {
     path: '/dcs/review-task',

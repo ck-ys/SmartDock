@@ -1257,7 +1257,7 @@ const diffRows = computed(() => Object.entries(diffResult.value?.changes || {}).
 const publishVisible = ref(false);
 const publishForm = reactive({ version: '', note: '' });
 
-const goBack = () => router.push('/dcs/profile');
+const goBack = () => router.push('/insight/profile');
 
 onMounted(async () => {
   try {

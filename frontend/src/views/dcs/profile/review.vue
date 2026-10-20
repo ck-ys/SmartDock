@@ -394,7 +394,7 @@ const openDetail = (row: ProfileReview) => {
   detailVisible.value = true;
 };
 const goProfile = (row: ProfileReview) =>
-  router.push(`/dcs/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
+  router.push(`/insight/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
 
 const loadAll = async () => {
   await Promise.all([loadConfig(), loadList(), loadCounts()]);

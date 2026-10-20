@@ -163,7 +163,25 @@ async function probeStatus() {
   }
 }
 
-onMounted(probeStatus);
+/** 首页「双引擎驾驶舱」直问：window 事件解耦，首页无需依赖助手内部单例 */
+function onExternalAsk(e: Event) {
+  const q = (e as CustomEvent<{ q?: string }>).detail?.q?.trim();
+  if (!q) {
+    return;
+  }
+  if (mode.value === 'gray') {
+    onGrayTip();
+    return;
+  }
+  if (mode.value === 'normal') {
+    onQuickAsk(q);
+  }
+}
+
+onMounted(() => {
+  probeStatus();
+  window.addEventListener('dcs:assistant-ask', onExternalAsk);
+});
 // 权限晚到竞态（E2E 实锤 2026-10-07：后端重启慢加载时 permissions 未就绪，首探
 // checkPermi=false 直接 return 且永不重试=悬浮球永久隐藏）：权限列表就绪后再探一次
 watch(
@@ -183,6 +201,7 @@ watch(
 
 onUnmounted(() => {
   drawerOpen.value = false;
+  window.removeEventListener('dcs:assistant-ask', onExternalAsk);
   // S-38 硬销毁只在登出/换人（布局卸载）时发生——抽屉自身关闭不清会话（原型 stash 语义）
   disposeAssistant(userStore.userId);
 });

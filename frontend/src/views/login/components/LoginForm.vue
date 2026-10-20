@@ -440,15 +440,25 @@ onMounted(() => {
   }
   :deep(.el-input__wrapper),
   :deep(.el-select__wrapper) {
-    min-height: 48px;
+    min-height: 50px;
     padding: 1px 14px;
-    border-radius: 6px;
-    background: #fff;
-    box-shadow: 0 0 0 1px #cbd2e1 inset;
+    border-radius: 10px;
+    background: #fbfcff;
+    box-shadow: 0 0 0 1px #d3daea inset;
+    transition:
+      box-shadow 0.18s ease,
+      background 0.18s ease;
+  }
+  :deep(.el-input__wrapper:hover),
+  :deep(.el-select__wrapper:hover) {
+    box-shadow: 0 0 0 1px #b9c6e4 inset;
   }
   :deep(.el-input__wrapper.is-focus),
   :deep(.el-select__wrapper.is-focused) {
-    box-shadow: 0 0 0 1.5px var(--login-navy) inset;
+    background: #fff;
+    box-shadow:
+      0 0 0 1.5px #2f5fd0 inset,
+      0 0 0 4px rgba(47, 95, 208, 0.12);
   }
   :deep(.el-form-item.is-error .el-input__wrapper),
   :deep(.el-form-item.is-error .el-select__wrapper) {
@@ -690,11 +700,28 @@ onMounted(() => {
 }
 .login-submit {
   width: 100%;
-  height: 60px;
-  border-radius: 7px;
-  font-size: 21px;
-  font-weight: 500;
-  letter-spacing: 3px;
+  height: 52px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(120deg, #0b1f5c, #2f5fd0);
+  box-shadow: 0 10px 24px rgba(11, 31, 92, 0.24);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    filter 0.16s ease;
+
+  &:hover:not(.is-disabled) {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(11, 31, 92, 0.28);
+  }
+
+  &:active:not(.is-disabled) {
+    transform: translateY(0);
+  }
 }
 .login-form__register {
   margin-top: 16px;

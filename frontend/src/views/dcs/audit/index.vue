@@ -1,12 +1,17 @@
 <template>
   <div class="app-container">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>审核队列（待我审核的提交）</span>
-          <el-button icon="Refresh" @click="load">刷新</el-button>
-        </div>
+    <dcs-operations-page-header
+      title="审核队列"
+      subtitle="逐条通过或退回成员提交，退回必须填写理由"
+      eyebrow="任务中心"
+      :metrics="[{ label: '待我审核', value: total, tone: 'warning' }]"
+    >
+      <template #actions>
+        <el-button icon="Refresh" @click="load">刷新</el-button>
       </template>
+    </dcs-operations-page-header>
+
+    <el-card shadow="never">
       <el-table v-loading="loading" :data="rows">
         <el-table-column prop="taskId" label="任务ID" min-width="170" />
         <el-table-column prop="submitterUserId" label="提交人" width="110" />
@@ -36,8 +41,7 @@
 
     <el-dialog v-model="trailDialog.visible" title="审核轨迹" width="640px">
       <el-timeline>
-        <el-timeline-item v-for="t in trailDialog.rows" :key="t.id" :timestamp="t.createTime"
-          :type="t.decision === 'PASS' ? 'success' : 'danger'">
+        <el-timeline-item v-for="t in trailDialog.rows" :key="t.id" :timestamp="t.createTime" :type="t.decision === 'PASS' ? 'success' : 'danger'">
           {{ t.decision === 'PASS' ? '通过' : '退回' }} · 审核人 {{ t.auditorUserId }}
           <div v-if="t.comment" style="color: var(--el-text-color-secondary)">{{ t.comment }}</div>
         </el-timeline-item>
@@ -49,6 +53,7 @@
 
 <script setup name="DcsAudit" lang="ts">
 import { pendingAudits, decideAudit, auditTrail, type DcsSubmissionRow, type DcsAuditTrailRow } from '@/api/dcs/core/submission';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 const { proxy } = getCurrentInstance() as any;
 
@@ -68,11 +73,18 @@ const dataPreview = (d?: unknown) => {
   if (obj && typeof obj === 'object') {
     return Object.entries(obj as Record<string, unknown>)
       .map(([k, v]) => `${k}=${Array.isArray(v) ? v.join('、') : String(v)}`)
-      .join('；').slice(0, 100);
+      .join('；')
+      .slice(0, 100);
   }
   return String(d).slice(0, 100);
 };
-const safeParse = (s: string): unknown => { try { return JSON.parse(s); } catch { return null; } };
+const safeParse = (s: string): unknown => {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+};
 
 const load = async () => {
   loading.value = true;
@@ -80,7 +92,9 @@ const load = async () => {
     const res = await pendingAudits(query);
     rows.value = res.rows;
     total.value = res.total;
-  } finally { loading.value = false; }
+  } finally {
+    loading.value = false;
+  }
 };
 
 const decide = async (row: DcsSubmissionRow, decision: 'PASS' | 'REJECT') => {
@@ -96,19 +110,26 @@ const decide = async (row: DcsSubmissionRow, decision: 'PASS' | 'REJECT') => {
     await decideAudit(row.id, 'PASS');
     proxy.$modal.msgSuccess('已通过');
     load();
-  } finally { deciding.value = false; }
+  } finally {
+    deciding.value = false;
+  }
 };
 
 const confirmReject = async () => {
   if (!rejectDialog.row) return;
-  if (!rejectDialog.comment.trim()) { proxy.$modal.msgError('请填写退回理由'); return; }
+  if (!rejectDialog.comment.trim()) {
+    proxy.$modal.msgError('请填写退回理由');
+    return;
+  }
   deciding.value = true;
   try {
     await decideAudit(rejectDialog.row.id, 'REJECT', rejectDialog.comment.trim());
     proxy.$modal.msgSuccess('已退回');
     rejectDialog.visible = false;
     load();
-  } finally { deciding.value = false; }
+  } finally {
+    deciding.value = false;
+  }
 };
 
 const showTrail = async (row: DcsSubmissionRow) => {
@@ -120,5 +141,9 @@ onMounted(load);
 </script>
 
 <style scoped>
-.card-header { display: flex; justify-content: space-between; align-items: center; }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

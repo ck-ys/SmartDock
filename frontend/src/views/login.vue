@@ -44,6 +44,11 @@ const agreementHref = (path: string) => router.resolve(path).href;
           <header class="login-panel__heading">
             <div class="login-panel__logo" aria-hidden="true">SmartDock</div>
             <h1 id="login-title" class="login-panel__title">{{ t('login.welcome') }}</h1>
+            <p class="login-panel__tagline">用户画像 × AI 助手，双引擎工作台</p>
+            <div class="login-panel__engines" aria-hidden="true">
+              <span class="is-profile">👤 用户画像</span>
+              <span class="is-ai">🤖 AI 助手</span>
+            </div>
           </header>
           <LoginForm />
         </div>
@@ -75,13 +80,13 @@ const agreementHref = (path: string) => router.resolve(path).href;
   --el-border-color: #cdd3e1;
   --el-fill-color-blank: #fff;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(390px, 31.3%);
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 34%);
   width: 100%;
   height: 100vh;
   height: 100svh;
   min-height: 0;
   overflow: hidden;
-  background: #fff;
+  background: linear-gradient(180deg, #f7f9fd, #eef2f9);
   color: var(--login-navy);
   font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
 }
@@ -101,15 +106,17 @@ const agreementHref = (path: string) => router.resolve(path).href;
   height: 100%;
   box-sizing: border-box;
   overflow: hidden;
-  padding: 36px 32px 24px;
-  background: #fff;
+  padding: 28px 30px 20px;
+  background: radial-gradient(520px 260px at 100% 0%, rgba(59, 130, 246, 0.08), transparent 62%), linear-gradient(180deg, #ffffff, #f8fafd);
+  border-left: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: -28px 0 70px rgba(3, 10, 28, 0.32);
 }
 .login-panel__toolbar {
   display: flex;
   justify-content: flex-end;
   flex-shrink: 0;
   min-height: 32px;
-  margin-bottom: 30px;
+  margin-bottom: 14px;
 }
 .login-language {
   display: inline-flex;
@@ -138,19 +145,29 @@ const agreementHref = (path: string) => router.resolve(path).href;
   min-height: 0;
 }
 .login-panel__content {
-  width: 360px;
-  max-width: 100%;
+  width: 100%;
+  max-width: 396px;
+  padding: 26px 26px 22px;
+  border: 1px solid #e6ecf7;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(8, 24, 79, 0.04),
+    0 18px 46px rgba(8, 24, 79, 0.09);
 }
 .login-panel__heading {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 .login-panel__logo {
-  margin-bottom: 18px;
-  color: var(--login-navy);
-  font-size: 30px;
+  margin-bottom: 10px;
+  background: linear-gradient(120deg, #0b1f5c, #2f5fd0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1.2;
@@ -160,11 +177,37 @@ const agreementHref = (path: string) => router.resolve(path).href;
 .login-panel__title {
   margin: 0;
   color: var(--login-navy);
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 600;
   line-height: 1.35;
   letter-spacing: 2px;
   text-align: center;
+}
+.login-panel__tagline {
+  margin: 6px 0 0;
+  color: #66718c;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+.login-panel__engines {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  span {
+    padding: 3px 11px;
+    border-radius: 999px;
+    border: 1px solid #dbe6f7;
+    background: #f7faff;
+    color: #33507f;
+    font-size: 11.5px;
+    line-height: 1.6;
+    &.is-ai {
+      border-color: #d9ecdf;
+      background: #f5fcf8;
+      color: #167a54;
+    }
+  }
 }
 .login-panel__footer {
   flex-shrink: 0;
@@ -198,6 +241,9 @@ const agreementHref = (path: string) => router.resolve(path).href;
   .login-panel {
     padding: 24px 28px 16px;
   }
+  .login-panel__content {
+    padding: 20px 22px 18px;
+  }
   .login-panel__toolbar {
     margin-bottom: 18px;
   }
@@ -218,6 +264,16 @@ const agreementHref = (path: string) => router.resolve(path).href;
 @media (max-height: 800px) {
   .login-panel {
     padding: 14px 24px 12px;
+  }
+  .login-panel__content {
+    padding: 14px 18px 12px;
+    border-radius: 14px;
+  }
+  .login-panel__tagline {
+    display: none;
+  }
+  .login-panel__engines {
+    margin-top: 8px;
   }
   .login-panel__toolbar {
     min-height: 28px;
@@ -268,7 +324,18 @@ const agreementHref = (path: string) => router.resolve(path).href;
     flex: 1 1 auto;
     height: auto;
     min-height: 0;
-    padding: 14px 24px calc(12px + env(safe-area-inset-bottom));
+    padding: 14px 18px calc(12px + env(safe-area-inset-bottom));
+    box-shadow: none;
+  }
+  .login-panel__content {
+    padding: 18px 18px 16px;
+    border-radius: 16px;
+  }
+  .login-panel__engines {
+    display: none;
+  }
+  .login-panel__tagline {
+    margin-top: 4px;
   }
   // hero 占高后表单可能长于剩余空间(801-836px 高度档/全面屏首屏)——顶对齐+内部滚动兜底
   .login-panel__body {
