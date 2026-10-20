@@ -577,7 +577,8 @@ onMounted(() => {
 }
 .login-spec-item {
   margin-top: 10px;
-  margin-bottom: 0 !important;
+  // 预留校验错误行的绝对定位空间，否则「选择要登录的单位」会压到「记住我」
+  margin-bottom: 18px !important;
   text-align: left;
 }
 /* 多单位选择弹窗（3A+）：列表行选择态=主色边框+浅蓝底+左侧色点，EP 标准强调不引杂色 */

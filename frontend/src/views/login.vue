@@ -44,11 +44,6 @@ const agreementHref = (path: string) => router.resolve(path).href;
           <header class="login-panel__heading">
             <div class="login-panel__logo" aria-hidden="true">SmartDock</div>
             <h1 id="login-title" class="login-panel__title">{{ t('login.welcome') }}</h1>
-            <p class="login-panel__tagline">用户画像 × AI 助手，双引擎工作台</p>
-            <div class="login-panel__engines" aria-hidden="true">
-              <span class="is-profile">👤 用户画像</span>
-              <span class="is-ai">🤖 AI 助手</span>
-            </div>
           </header>
           <LoginForm />
         </div>
@@ -80,7 +75,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
   --el-border-color: #cdd3e1;
   --el-fill-color-blank: #fff;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 34%);
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 38%);
   width: 100%;
   height: 100vh;
   height: 100svh;
@@ -162,6 +157,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
   margin-bottom: 22px;
 }
 .login-panel__logo {
+  display: none;
   margin-bottom: 10px;
   background: linear-gradient(120deg, #0b1f5c, #2f5fd0);
   -webkit-background-clip: text;
@@ -182,32 +178,6 @@ const agreementHref = (path: string) => router.resolve(path).href;
   line-height: 1.35;
   letter-spacing: 2px;
   text-align: center;
-}
-.login-panel__tagline {
-  margin: 6px 0 0;
-  color: #66718c;
-  font-size: 12.5px;
-  letter-spacing: 0.02em;
-  text-align: center;
-}
-.login-panel__engines {
-  display: flex;
-  gap: 8px;
-  margin-top: 12px;
-  span {
-    padding: 3px 11px;
-    border-radius: 999px;
-    border: 1px solid #dbe6f7;
-    background: #f7faff;
-    color: #33507f;
-    font-size: 11.5px;
-    line-height: 1.6;
-    &.is-ai {
-      border-color: #d9ecdf;
-      background: #f5fcf8;
-      color: #167a54;
-    }
-  }
 }
 .login-panel__footer {
   flex-shrink: 0;
@@ -269,12 +239,6 @@ const agreementHref = (path: string) => router.resolve(path).href;
     padding: 14px 18px 12px;
     border-radius: 14px;
   }
-  .login-panel__tagline {
-    display: none;
-  }
-  .login-panel__engines {
-    margin-top: 8px;
-  }
   .login-panel__toolbar {
     min-height: 28px;
     margin-bottom: 8px;
@@ -297,9 +261,9 @@ const agreementHref = (path: string) => router.resolve(path).href;
     font-size: 10px;
   }
 }
-@media (max-height: 799px) {
-  // 680~799px 区间(常见 1366×768 笔记本)表单放不下且 overflow:hidden 会裁掉标题顶部——
-  // 滚动兜底断点从 679 提到 799，放得下的高度不出现滚动条、无副作用(2026-09-17 业务反馈#4)
+@media (max-height: 620px) {
+  // 620px 以下(横屏手机/极矮窗)卡片放不下，顶对齐+滚动兜底；
+  // 768 档在验证码关闭时卡片约 377–460px，仍可居中，不再提前顶对齐
   .login-panel__body {
     align-items: flex-start;
     overflow-y: auto;
@@ -309,7 +273,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
   }
 }
 @media (max-width: 1000px) {
-  // 手机端保留场景但压成 hero 带（原实现直接 display:none，品牌与视觉全丢）
+  // 手机端保留品牌带但压到 120–150px（原实现为 186–252px 的场景 hero）
   .login-page {
     display: flex;
     flex-direction: column;
@@ -317,8 +281,8 @@ const agreementHref = (path: string) => router.resolve(path).href;
   .login-page__scene {
     display: flex;
     flex: 0 0 auto;
-    height: clamp(186px, 25vh, 252px);
-    height: clamp(186px, 25svh, 252px);
+    height: clamp(120px, 18vh, 150px);
+    height: clamp(120px, 18svh, 150px);
   }
   .login-panel {
     flex: 1 1 auto;
@@ -330,12 +294,6 @@ const agreementHref = (path: string) => router.resolve(path).href;
   .login-panel__content {
     padding: 18px 18px 16px;
     border-radius: 16px;
-  }
-  .login-panel__engines {
-    display: none;
-  }
-  .login-panel__tagline {
-    margin-top: 4px;
   }
   // hero 占高后表单可能长于剩余空间(801-836px 高度档/全面屏首屏)——顶对齐+内部滚动兜底
   .login-panel__body {
@@ -357,6 +315,10 @@ const agreementHref = (path: string) => router.resolve(path).href;
   // 手机横屏：纵向空间不够，hero 让位给表单；整页滚动，避免页脚压住表单
   .login-page__scene {
     display: none;
+  }
+  .login-panel__logo {
+    display: block;
+    margin-bottom: 8px;
   }
   .login-page {
     height: auto;

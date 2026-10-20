@@ -1,851 +1,607 @@
-<script setup lang="ts">
-import { computed } from 'vue';
-import { useDocumentVisibility, useMediaQuery, usePreferredReducedMotion, useStorage } from '@vueuse/core';
-import { VideoPause, VideoPlay } from '@element-plus/icons-vue';
-import { useI18n } from 'vue-i18n';
-import { resolveSceneMode, type SceneMode } from '../sceneMotion';
-
-/**
- * 登录页左侧视觉：纯 CSS/SVG 绘制的「信号中枢」场景，零位图、零文案。
- * - 深色底 + 发光核心 + 环形轨道 + 汇入平台的光纤信号 + 抽象玻璃数据卡；
- * - 所有元素绝对定位按百分比排布，任意面板尺寸自适应；
- * - 手机端（≤1000px）降级为紧凑 hero：隐藏数据卡与开关，只留核心与平台。
- * 若需换主题：直接改样式区对应的色值与 .zone/.platform 系列尺寸即可，不涉及任何图片资产。
- */
-const { locale } = useI18n();
-const isEnglish = computed(() => locale.value.startsWith('en'));
-const savedMode = useStorage<SceneMode>('smartdock-login-scene-mode', 'dynamic');
-const reducedMotion = usePreferredReducedMotion();
-const visibility = useDocumentVisibility();
-const compact = useMediaQuery('(max-width: 1000px)');
-const mode = computed(() =>
-  resolveSceneMode({
-    choice: savedMode.value,
-    reduced: reducedMotion.value === 'reduce',
-    hidden: visibility.value === 'hidden',
-    compact: compact.value
-  })
-);
-const motionHint = computed(() => {
-  if (reducedMotion.value === 'reduce') return isEnglish.value ? 'Reduced motion is enabled in your system' : '已遵循系统减少动态效果设置';
-  return isEnglish.value ? 'Switch the scene between still and animated' : '切换静态与动态背景';
-});
-
-// viewBox 归一为 0..100，坐标即面板百分比；信号只汇到平台边缘，不穿入台面。
-const signals = [
-  { id: 'left', d: 'M -4 42 C 12 46 24 52 35 57', duration: '12s', delay: '-3s' },
-  { id: 'right', d: 'M 104 36 C 88 42 76 50 65 57', duration: '14s', delay: '-6s' },
-  { id: 'below', d: 'M 50 106 C 50 96 50 91 50 86', duration: '15s', delay: '-9s' }
-];
-const particles = [
-  { x: 12, y: 18, size: 3, delay: '-1s', duration: '6s' },
-  { x: 24, y: 64, size: 2, delay: '-3s', duration: '7s' },
-  { x: 8, y: 82, size: 2, delay: '-5s', duration: '8s' },
-  { x: 38, y: 12, size: 2, delay: '-2s', duration: '9s' },
-  { x: 64, y: 16, size: 3, delay: '-6s', duration: '7s' },
-  { x: 84, y: 22, size: 2, delay: '-4s', duration: '8s' },
-  { x: 92, y: 56, size: 3, delay: '-7s', duration: '9s' },
-  { x: 88, y: 78, size: 2, delay: '-2s', duration: '6s' },
-  { x: 70, y: 88, size: 2, delay: '-8s', duration: '10s' },
-  { x: 18, y: 40, size: 2, delay: '-9s', duration: '11s' },
-  { x: 30, y: 90, size: 2, delay: '-3s', duration: '8s' },
-  { x: 76, y: 70, size: 2, delay: '-5s', duration: '7s' }
-];
-const bars = [38, 62, 48, 78, 56];
-
-function toggleMotion() {
-  savedMode.value = savedMode.value === 'static' ? 'dynamic' : 'static';
-}
-</script>
-
 <template>
-  <div class="login-scene" :class="{ 'is-moving': mode === 'dynamic', 'is-compact': compact }" :data-scene-mode="mode">
-    <div class="scene-art" aria-hidden="true">
-      <span class="scene-aurora scene-aurora--a"></span>
-      <span class="scene-aurora scene-aurora--b"></span>
-      <span class="scene-pillar"></span>
-      <span class="scene-grid"></span>
-      <span class="scene-vignette"></span>
+  <div class="login-scene">
+    <span class="scene-grid" aria-hidden="true"></span>
+    <span class="scene-glow" aria-hidden="true"></span>
 
-      <svg class="scene-signals" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="signal-left" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#3ddad7" stop-opacity="0" />
-            <stop offset="48%" stop-color="#4fd6e8" stop-opacity="0.5" />
-            <stop offset="100%" stop-color="#a9d5ff" stop-opacity="0.95" />
-          </linearGradient>
-          <linearGradient id="signal-right" x1="1" y1="0" x2="0" y2="0">
-            <stop offset="0%" stop-color="#7c6cff" stop-opacity="0" />
-            <stop offset="55%" stop-color="#5ea8ff" stop-opacity="0.45" />
-            <stop offset="100%" stop-color="#a9d5ff" stop-opacity="0.9" />
-          </linearGradient>
-          <linearGradient id="signal-below" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stop-color="#3ddad7" stop-opacity="0" />
-            <stop offset="100%" stop-color="#a9d5ff" stop-opacity="0.85" />
-          </linearGradient>
-        </defs>
-        <path
-          v-for="signal in signals"
-          :key="signal.id"
-          class="signal-line"
-          :d="signal.d"
-          :stroke="signal.id === 'below' ? 'url(#signal-below)' : signal.id === 'left' ? 'url(#signal-left)' : 'url(#signal-right)'"
-          pathLength="1000"
-          vector-effect="non-scaling-stroke"
-        />
-        <path
-          v-for="signal in signals"
-          :key="`${signal.id}-glint`"
-          class="signal-glint"
-          :d="signal.d"
-          pathLength="1000"
-          vector-effect="non-scaling-stroke"
-          :style="{ animationDuration: signal.duration, animationDelay: signal.delay }"
-        />
-      </svg>
-      <span class="signal-node signal-node--sink" style="left: 50%; top: 86%"></span>
+    <header class="scene-brand">
+      <div class="scene-brand__word">SmartDock</div>
+      <p class="scene-brand__tagline">用户画像与 AI 助手的工作台</p>
+      <ul class="scene-brand__caps">
+        <li><b>画像</b><span>评分 · 分群</span></li>
+        <li><b>助手</b><span>查数 · 确认</span></li>
+        <li><b>分析</b><span>会话 · 漏斗</span></li>
+      </ul>
+    </header>
 
-      <div class="zone">
-        <span class="zone__halo"></span>
-        <span class="orbit orbit--far"></span>
-        <span class="orbit orbit--outer"></span>
-        <span class="orbit orbit--mid"></span>
-        <span class="orbit-arc"></span>
-        <span class="ripple ripple--a"></span>
-        <span class="ripple ripple--b"></span>
-        <span class="beam"></span>
-        <span class="platform"></span>
-        <span class="platform__ring platform__ring--a"></span>
-        <span class="platform__ring platform__ring--b"></span>
-        <span class="platform__glow"></span>
-        <span class="portal"></span>
-        <span class="portal__ring"></span>
-        <span class="signal-node signal-node--edge" style="left: 1%; top: 66%"></span>
-        <span class="signal-node signal-node--edge" style="left: 99%; top: 66%"></span>
-        <div class="core">
-          <span class="core__halo"></span>
-          <span class="core__orb"></span>
-          <span class="core__glint"></span>
-          <span class="core__ring"></span>
+    <div class="product-stage">
+      <div class="product-window" aria-hidden="true">
+        <div class="pw-bar"><i></i><i></i><i></i><span>SmartDock · 画像工作台</span></div>
+        <div class="pw-main">
+          <aside class="pw-side">
+            <b>工作台</b>
+            <span class="is-on">主体总览</span>
+            <span>分群管理</span>
+            <span>低分复核</span>
+            <span>评分模型</span>
+            <span>事件账本</span>
+          </aside>
+          <div class="pw-content">
+            <div class="pw-head">
+              <span class="pw-avatar">陈</span>
+              <div class="pw-person">
+                <b>陈××</b>
+                <small>最近活跃：今天 09:42 · 来源：官网</small>
+              </div>
+              <div class="pw-score"><b>82</b><span>综合评分</span></div>
+            </div>
+            <div class="pw-tags"><i>近 30 天活跃</i><i>高价值</i><i>华东</i><i>已绑定账号</i></div>
+            <div class="pw-cols">
+              <div class="pw-panel">
+                <div class="pw-panel__title">画像趋势<span>近 7 天</span></div>
+                <div class="pw-bars">
+                  <i style="height: 38%"></i><i style="height: 56%"></i><i style="height: 46%"></i> <i style="height: 72%"></i
+                  ><i style="height: 61%"></i><i style="height: 84%"></i>
+                  <i style="height: 76%"></i>
+                </div>
+                <div class="pw-axis"><span>周一</span><span>周三</span><span>周五</span><span>周日</span></div>
+              </div>
+              <div class="pw-panel">
+                <div class="pw-panel__title">最近事件<span>实时</span></div>
+                <div class="pw-events">
+                  <div class="pw-event"><em>09:42</em><span>查看了「方案对比」页面</span></div>
+                  <div class="pw-event"><em>昨天</em><span>完成一次会话 · 6m12s</span></div>
+                  <div class="pw-event"><em>10-18</em><span>进入高价值分群</span></div>
+                  <div class="pw-event"><em>10-17</em><span>提交了一条咨询</span></div>
+                  <div class="pw-event"><em>10-16</em><span>从匿名身份完成绑定</span></div>
+                  <div class="pw-event"><em>10-15</em><span>收藏了「解决方案」页面</span></div>
+                  <div class="pw-event"><em>10-14</em><span>评分从 78 升到 82</span></div>
+                  <div class="pw-event"><em>10-12</em><span>加入「近 30 天活跃」分群</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="pw-foot"><span>数据更新于 2 分钟前 · 模型 v3</span><b>可信度 96%</b></div>
+          </div>
         </div>
       </div>
-      <span class="scene-floor"></span>
 
-      <div class="tile tile--bars">
-        <span class="tile__label"></span>
-        <span class="tile__bars">
-          <i v-for="(height, index) in bars" :key="index" :style="{ height: `${height}%` }"></i>
-        </span>
+      <div class="assistant-float" aria-hidden="true">
+        <div class="assistant-float__head"><b>AI 助手</b><span>画像查询</span><i></i></div>
+        <div class="assistant-float__msg is-user">帮我圈出近 30 天没互动的客户</div>
+        <div class="assistant-float__msg is-ai">已找到 12 人，确认后生成名单</div>
+        <div class="assistant-float__acts"><span>调整条件</span><b>确认生成</b></div>
       </div>
-
-      <div class="tile tile--spark">
-        <svg viewBox="0 0 120 48" preserveAspectRatio="none">
-          <path class="tile__spark-line" d="M2 40 L18 29 L34 34 L52 20 L70 27 L88 12 L104 19 L118 6" />
-          <path class="tile__spark-glow" d="M2 40 L18 29 L34 34 L52 20 L70 27 L88 12 L104 19 L118 6" />
-        </svg>
-      </div>
-
-      <div class="tile tile--dots">
-        <span
-          v-for="n in 15"
-          :key="n"
-          class="tile__dot"
-          :class="{ 'is-on': [2, 3, 5, 8, 9, 12, 14].includes(n) }"
-        ></span>
-      </div>
-
-      <span
-        v-for="(particle, index) in particles"
-        :key="index"
-        class="particle"
-        :class="{ 'particle--cyan': [2, 5, 9].includes(index) }"
-        :style="{
-          left: `${particle.x}%`,
-          top: `${particle.y}%`,
-          width: `${particle.size}px`,
-          height: `${particle.size}px`,
-          animationDelay: particle.delay,
-          animationDuration: particle.duration
-        }"
-      ></span>
     </div>
 
-    <button
-      class="scene-motion-toggle"
-      type="button"
-      :aria-label="isEnglish ? 'Animated background' : '动态背景'"
-      :title="motionHint"
-      :aria-pressed="mode === 'dynamic'"
-      :disabled="reducedMotion === 'reduce'"
-      @click="toggleMotion"
-    >
-      <component :is="mode === 'dynamic' ? VideoPause : VideoPlay" aria-hidden="true" />
-    </button>
+    <div class="scene-caps" aria-hidden="true">
+      <span><b>画像</b> 评分 · 分群 · 复核</span>
+      <span><b>助手</b> 对话 · 人工确认</span>
+      <span><b>分析</b> 会话 · 漏斗</span>
+    </div>
+    <p class="scene-note">界面示意 · 数据为演示</p>
   </div>
 </template>
 
-<style scoped lang="scss">
+<style lang="scss" scoped>
 .login-scene {
   position: relative;
   width: 100%;
-  min-width: 0;
   height: 100%;
   overflow: hidden;
-  isolation: isolate;
   background:
-    radial-gradient(92% 58% at 22% 6%, rgb(70 130 220 / 16%) 0%, rgb(70 130 220 / 0%) 62%),
-    radial-gradient(110% 70% at 50% 108%, rgb(38 86 170 / 42%) 0%, rgb(38 86 170 / 0%) 62%),
-    linear-gradient(168deg, #071228 0%, #081b3a 46%, #0a2450 100%);
-}
-
-.scene-art {
-  position: absolute;
-  inset: 0;
-}
-
-/* ---------- 氛围层 ---------- */
-.scene-aurora {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(70px);
-}
-
-.scene-aurora--a {
-  left: -12%;
-  top: -16%;
-  width: 58%;
-  aspect-ratio: 1;
-  background: radial-gradient(circle, rgb(64 140 255 / 38%) 0%, rgb(64 140 255 / 0%) 68%);
-}
-
-.scene-aurora--b {
-  right: -16%;
-  bottom: -20%;
-  width: 56%;
-  aspect-ratio: 1;
-  background: radial-gradient(circle, rgb(108 92 231 / 28%) 0%, rgb(108 92 231 / 0%) 70%);
-}
-
-.scene-pillar {
-  position: absolute;
-  left: 50%;
-  top: 4%;
-  width: min(34%, 360px);
-  height: 66%;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, rgb(90 160 255 / 0%) 0%, rgb(90 160 255 / 9%) 48%, rgb(90 160 255 / 0%) 100%);
-  filter: blur(18px);
+    radial-gradient(70% 55% at 18% 8%, rgba(64, 128, 230, 0.24), transparent 62%),
+    radial-gradient(55% 45% at 92% 92%, rgba(61, 218, 215, 0.1), transparent 62%), linear-gradient(158deg, #061126, #081c3c 55%, #0a2450);
+  color: #f4f8ff;
 }
 
 .scene-grid {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgb(140 190 255 / 17%) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(140, 190, 255, 0.12) 1px, transparent 1px);
   background-size: 26px 26px;
-  mask-image: radial-gradient(120% 90% at 50% 54%, #000 8%, transparent 72%);
-  -webkit-mask-image: radial-gradient(120% 90% at 50% 54%, #000 8%, transparent 72%);
-}
-
-.scene-vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(120% 100% at 50% 46%, rgb(2 8 22 / 0%) 42%, rgb(2 8 22 / 55%) 100%);
-}
-
-/* ---------- 信号线 ---------- */
-.scene-signals {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-.signal-line {
-  fill: none;
-  stroke-width: 1.5px;
-  opacity: 0.95;
-}
-
-.signal-glint {
-  fill: none;
-  stroke: #dcf1ff;
-  stroke-width: 2px;
-  stroke-linecap: round;
-  stroke-dasharray: 14 986;
-  stroke-dashoffset: 1000;
-  opacity: 0;
-}
-
-.is-moving .signal-glint {
-  opacity: 0.9;
-  animation-name: signal-flow;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-
-/* ---------- 中枢：轨道 + 平台 + 核心 ---------- */
-.zone {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: min(52%, 660px);
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-}
-
-.zone__halo {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 150%;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgb(70 140 240 / 13%) 0%, rgb(70 140 240 / 0%) 62%);
-  filter: blur(8px);
-}
-
-.orbit {
-  position: absolute;
-  border-radius: 50%;
-}
-
-.orbit--far {
-  inset: -26%;
-  border: 1px solid rgb(110 160 235 / 7%);
-}
-
-.orbit--outer {
-  inset: 0;
-  border: 1px solid rgb(122 170 240 / 14%);
-}
-
-.orbit--mid {
-  inset: 9%;
-  border: 1px solid rgb(122 170 240 / 9%);
-}
-
-.orbit-arc {
-  position: absolute;
-  inset: 2.5%;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 210deg,
-    rgb(94 168 255 / 0%) 0deg 190deg,
-    rgb(94 168 255 / 85%) 236deg,
-    rgb(168 212 255 / 20%) 272deg,
-    rgb(94 168 255 / 0%) 300deg
-  );
-  mask-image: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
-  -webkit-mask-image: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
-}
-
-.is-moving .orbit-arc {
-  animation: orbit-spin 26s linear infinite;
-}
-
-/* 地面涟漪：围绕平台的扩散椭圆，填补下半区并制造纵深 */
-.ripple {
-  position: absolute;
-  left: 50%;
-  top: 66%;
-  border: 1px solid rgb(110 165 240 / 11%);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.ripple--a {
-  width: 132%;
-  aspect-ratio: 2.6 / 1;
-}
-
-.ripple--b {
-  width: 168%;
-  aspect-ratio: 2.8 / 1;
-  border-color: rgb(110 165 240 / 7%);
-}
-
-.platform {
-  position: absolute;
-  left: 50%;
-  top: 66%;
-  width: 100%;
-  aspect-ratio: 2.6 / 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background:
-    radial-gradient(ellipse at 50% 6%, rgb(150 205 255 / 24%) 0%, rgb(150 205 255 / 0%) 55%),
-    linear-gradient(180deg, rgb(30 68 118 / 92%) 0%, rgb(13 32 62 / 94%) 55%, rgb(6 16 34 / 96%) 100%);
-  box-shadow:
-    inset 0 1.5px 0 rgb(180 220 255 / 70%),
-    inset 0 -30px 50px -30px rgb(0 0 0 / 90%),
-    0 36px 80px -44px rgb(0 0 0 / 85%),
-    0 0 70px rgb(60 130 230 / 18%);
-}
-
-/* 台缘光环 */
-.platform::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border: 1px solid rgb(140 200 255 / 26%);
-  border-radius: 50%;
-  box-shadow: 0 0 26px rgb(90 160 255 / 26%);
-}
-
-/* 前左缘弧光：只亮一段，形成金属反光层次 */
-.platform::after {
-  content: '';
-  position: absolute;
-  inset: -1.5px;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 128deg,
-    rgb(170 220 255 / 0%) 0deg 44deg,
-    rgb(170 220 255 / 78%) 74deg,
-    rgb(170 220 255 / 0%) 108deg
-  );
-  mask-image: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-  -webkit-mask-image: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-}
-
-/* 台面同心刻环 */
-.platform__ring {
-  position: absolute;
-  left: 50%;
-  top: 66%;
-  border: 1px solid rgb(140 190 255 / 14%);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.platform__ring--a {
-  width: 78%;
-  aspect-ratio: 2.6 / 1;
-}
-
-.platform__ring--b {
-  width: 52%;
-  aspect-ratio: 2.6 / 1;
-  border-color: rgb(140 190 255 / 20%);
-}
-
-.platform__glow {
-  position: absolute;
-  left: 50%;
-  top: 66%;
-  width: 74%;
-  aspect-ratio: 3.4 / 1;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(ellipse, rgb(88 158 255 / 20%) 0%, rgb(88 158 255 / 0%) 68%);
-  filter: blur(16px);
-}
-
-/* 中枢井口：光环而非亮斑 */
-.portal {
-  position: absolute;
-  left: 50%;
-  top: 57%;
-  width: 20%;
-  aspect-ratio: 3.2 / 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse,
-    rgb(150 215 255 / 0%) 0% 32%,
-    rgb(120 195 255 / 36%) 52%,
-    rgb(70 130 225 / 16%) 72%,
-    rgb(70 130 225 / 0%) 100%
-  );
-  box-shadow: 0 0 36px rgb(100 180 255 / 30%);
-}
-
-.portal__ring {
-  position: absolute;
-  left: 50%;
-  top: 57%;
-  width: 13.5%;
-  aspect-ratio: 3.2 / 1;
-  transform: translate(-50%, -50%);
-  border: 1px solid rgb(140 230 235 / 50%);
-  border-radius: 50%;
-  box-shadow:
-    0 0 16px rgb(110 225 230 / 42%),
-    inset 0 0 12px rgb(110 225 230 / 22%);
-}
-
-.beam {
-  position: absolute;
-  left: 50%;
-  top: 44%;
-  width: 14%;
-  height: 13%;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, rgb(120 190 255 / 26%) 0%, rgb(120 190 255 / 0%) 100%);
-  border-radius: 50%;
-  filter: blur(10px);
-}
-
-.core {
-  /* zone 百分比定宽：与平台同一坐标系，窄桌面下井口环不会被球体盖住 */
-  position: absolute;
-  left: 50%;
-  top: 44%;
-  width: 22%;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-}
-
-.core__halo {
-  position: absolute;
-  inset: -46%;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgb(90 170 255 / 26%) 0%, rgb(90 170 255 / 0%) 68%);
-  filter: blur(10px);
-}
-
-.core__orb {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at 36% 30%, #dff2ff 0 5%, #b5ddff 15%, #79bdf5 33%, #3679cb 58%, #16407f 80%, #081a38 100%);
-  box-shadow:
-    inset 0 0 0 1px rgb(200 232 255 / 32%),
-    inset -12px -16px 32px rgb(0 18 55 / 55%),
-    0 0 40px rgb(96 180 255 / 38%);
-}
-
-/* 环绕轨道：给球体一个「卫星」层次，避免像纯渐变球 */
-.core__ring {
-  position: absolute;
-  inset: -16%;
-  border: 1px solid rgb(140 195 255 / 28%);
-  border-top-color: rgb(200 235 255 / 60%);
-  border-radius: 50%;
-  transform: rotate(-20deg) scaleY(0.36);
-}
-
-.core__glint {
-  position: absolute;
-  left: 26%;
-  top: 20%;
-  width: 24%;
-  height: 17%;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgb(255 255 255 / 62%), transparent);
-  filter: blur(3px);
-}
-
-.is-moving .core__orb {
-  animation: core-pulse 7.5s ease-in-out infinite;
-}
-
-/* 底部地面辉光：压住画面下缘，避免下方空洞 */
-.scene-floor {
-  position: absolute;
-  left: 50%;
-  bottom: -16%;
-  width: 86%;
-  aspect-ratio: 3 / 1;
-  transform: translateX(-50%);
-  background: radial-gradient(ellipse, rgb(48 110 205 / 20%) 0%, rgb(48 110 205 / 0%) 68%);
-  filter: blur(40px);
+  mask-image: radial-gradient(90% 80% at 45% 55%, #000 5%, transparent 78%);
+  -webkit-mask-image: radial-gradient(90% 80% at 45% 55%, #000 5%, transparent 78%);
   pointer-events: none;
 }
 
-/* 信号汇入点：--edge 贴平台左右缘(zone 坐标)，--sink 在场景下方汇入 */
-.signal-node {
+.scene-glow {
   position: absolute;
-  width: 5px;
-  height: 5px;
+  left: 14%;
+  top: 18%;
+  width: 66%;
+  height: 52%;
   border-radius: 50%;
-  background: #bfe4ff;
-  box-shadow: 0 0 12px rgb(150 210 255 / 85%);
-  opacity: 0.8;
+  background: radial-gradient(circle, rgba(64, 128, 230, 0.28), transparent 66%);
+  filter: blur(28px);
+  pointer-events: none;
 }
 
-.signal-node--sink {
-  margin: -2.5px 0 0 -2.5px;
-}
-
-.signal-node--edge {
-  margin: -2.5px 0 0 -2.5px;
-  z-index: 1;
-}
-
-/* ---------- 抽象玻璃数据卡（无文字） ---------- */
-.tile {
+.scene-brand {
   position: absolute;
-  border: 1px solid rgb(150 195 255 / 22%);
-  border-radius: 16px;
-  background: linear-gradient(150deg, rgb(120 170 255 / 12%), rgb(120 170 255 / 4%));
-  box-shadow:
-    inset 0 1px 0 rgb(220 240 255 / 22%),
-    0 20px 44px -30px rgb(0 0 0 / 60%);
-  backdrop-filter: blur(10px);
+  left: 48px;
+  top: 44px;
+  right: 48px;
+  z-index: 3;
 }
-
-.tile--bars {
-  left: 7%;
-  top: 13%;
-  width: clamp(120px, 12vw, 168px);
-  height: 104px;
-  padding: 16px;
-  transform: rotate(-7deg);
+.scene-brand__word {
+  font-size: 38px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
 }
-
-.tile__label {
-  display: block;
-  width: 44%;
-  height: 7px;
-  border-radius: 999px;
-  background: rgb(190 220 255 / 32%);
+.scene-brand__tagline {
+  margin: 10px 0 0;
+  color: #9db9dd;
+  font-size: 13px;
+  letter-spacing: 0.06em;
 }
-
-.tile__bars {
+.scene-brand__caps {
   display: flex;
-  align-items: flex-end;
-  gap: 7px;
-  height: 52px;
-  margin-top: 14px;
+  gap: 18px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 10px;
+  color: #9fbcdd;
+  li {
+    display: flex;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  b {
+    color: #eaf4ff;
+    font-weight: 600;
+  }
 }
 
-.tile__bars i {
-  flex: 1;
-  border-radius: 4px 4px 2px 2px;
-  background: linear-gradient(180deg, #8cc6ff 0%, rgb(94 168 255 / 26%) 100%);
-  box-shadow: 0 0 12px rgb(94 168 255 / 35%);
+.product-stage {
+  position: absolute;
+  left: 48px;
+  top: 190px;
+  z-index: 2;
+  width: 84%;
+  max-width: 800px;
+  aspect-ratio: 608 / 410;
 }
 
-.tile--spark {
-  right: 7%;
-  top: 22%;
-  width: clamp(132px, 11vw, 158px);
-  height: 92px;
-  padding: 14px;
-  transform: rotate(6deg);
-}
-
-.tile--spark svg {
-  display: block;
+.product-window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  overflow: hidden;
+  border: 1px solid rgba(180, 215, 255, 0.35);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 44px 90px -34px rgba(0, 0, 0, 0.78),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-.tile__spark-line {
-  fill: none;
-  stroke: #8cc6ff;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.pw-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  background: #0b1b33;
+  color: #8fb0d8;
+  i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #36507a;
+  }
+  i:nth-child(1) {
+    background: #ff6b6b;
+  }
+  i:nth-child(2) {
+    background: #f5b942;
+  }
+  i:nth-child(3) {
+    background: #3ddad7;
+  }
+  span {
+    margin-left: 8px;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
 }
 
-.tile__spark-glow {
-  fill: none;
-  stroke: rgb(94 168 255 / 45%);
-  stroke-width: 6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: blur(6px);
+.pw-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: #f6f8fc;
+  color: #1b2a4a;
 }
 
-.tile--dots {
-  left: 9%;
-  bottom: 15%;
-  display: grid;
-  grid-template-columns: repeat(5, 8px);
-  gap: 9px 12px;
-  padding: 16px;
-  transform: rotate(-4deg);
+.pw-side {
+  flex: none;
+  width: 96px;
+  padding: 12px 9px;
+  border-right: 1px solid #e6ecf7;
+  background: #fff;
+  font-size: 9px;
+  color: #66718c;
+  b {
+    display: block;
+    margin-bottom: 9px;
+    color: #08184f;
+    font-size: 9.5px;
+  }
+  span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 2px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    &.is-on {
+      background: #eef4ff;
+      color: #2b56a8;
+      font-weight: 600;
+    }
+    &::before {
+      content: '';
+      width: 4px;
+      height: 4px;
+      border-radius: 1px;
+      background: currentColor;
+      opacity: 0.45;
+    }
+  }
 }
 
-.tile__dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgb(160 200 250 / 22%);
+.pw-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 14px;
 }
 
-.tile__dot.is-on {
-  background: #7cc0ff;
-  box-shadow: 0 0 10px rgb(124 192 255 / 70%);
+.pw-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
 }
-
-.is-moving .tile {
-  animation: tile-float 11s ease-in-out infinite;
-}
-
-.is-moving .tile--spark {
-  animation-delay: -3.5s;
-}
-
-.is-moving .tile--dots {
-  animation-delay: -7s;
-}
-
-/* ---------- 光点 ---------- */
-.particle {
-  position: absolute;
-  border-radius: 50%;
-  background: #cfe8ff;
-  box-shadow: 0 0 10px rgb(160 215 255 / 80%);
-  opacity: 0.25;
-}
-
-.particle--cyan {
-  background: #8ff3ef;
-  box-shadow: 0 0 10px rgb(120 235 230 / 80%);
-}
-
-.is-moving .particle {
-  animation-name: particle-twinkle;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-/* ---------- 动效开关（纯图标，语义在 aria-label/title） ---------- */
-.scene-motion-toggle {
-  position: absolute;
-  z-index: 4;
-  right: clamp(16px, 2vw, 28px);
-  bottom: clamp(14px, 2vh, 24px);
-  display: inline-flex;
+.pw-avatar {
+  display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid rgb(130 180 255 / 26%);
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: rgb(12 30 62 / 55%);
-  color: rgb(208 228 255 / 82%);
-  font: inherit;
-  cursor: pointer;
+  background: linear-gradient(135deg, #2f5fd0, #3ddad7);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+.pw-person {
+  min-width: 0;
+  b {
+    display: block;
+    color: #08184f;
+    font-size: 12px;
+  }
+  small {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: #66718c;
+    font-size: 8px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.pw-score {
+  flex: none;
+  margin-left: auto;
+  text-align: right;
+  b {
+    display: block;
+    color: #167a54;
+    font-size: 20px;
+    line-height: 1;
+  }
+  span {
+    font-size: 7px;
+    color: #66718c;
+  }
+}
+.pw-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 9px;
+  i {
+    padding: 1px 6px;
+    border: 1px solid #dbe6f7;
+    border-radius: 999px;
+    background: #fff;
+    color: #33507f;
+    font-size: 7.5px;
+    font-style: normal;
+  }
+}
+.pw-cols {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 10px;
+  min-height: 0;
+  margin-top: 10px;
+}
+.pw-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 9px;
+  border: 1px solid #e6ecf7;
+  border-radius: 7px;
+  background: #fff;
+}
+.pw-panel__title {
+  display: flex;
+  justify-content: space-between;
+  color: #08184f;
+  font-size: 8.5px;
+  font-weight: 600;
+  span {
+    color: #8a93a8;
+    font-weight: 400;
+  }
+}
+.pw-bars {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  gap: 6px;
+  min-height: 46px;
+  margin-top: 6px;
+  i {
+    flex: 1;
+    border-radius: 2px 2px 0 0;
+    background: linear-gradient(180deg, #4d86e8, #2f5fd0);
+    opacity: 0.85;
+    &:nth-child(2n) {
+      background: linear-gradient(180deg, #6ccfc9, #2f8f8a);
+      opacity: 0.6;
+    }
+  }
+}
+.pw-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  color: #9aa4b8;
+  font-size: 7px;
+}
+.pw-events {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  margin-top: 5px;
+}
+.pw-event {
+  display: flex;
+  gap: 5px;
+  font-size: 8px;
+  color: #4a5878;
+  em {
+    flex: none;
+    color: #9aa4b8;
+    font-style: normal;
+    font-size: 7px;
+  }
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.pw-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 6px;
+  border-top: 1px solid #e6ecf7;
+  color: #8a93a8;
+  font-size: 7.5px;
+  b {
+    color: #167a54;
+    font-weight: 600;
+  }
+}
+
+.assistant-float {
+  position: absolute;
+  right: -20px;
+  bottom: -24px;
+  z-index: 4;
+  width: min(300px, 40%);
+  padding: 12px 13px;
+  border: 1px solid rgba(150, 195, 255, 0.28);
+  border-radius: 11px;
+  background: rgba(9, 27, 53, 0.93);
+  box-shadow:
+    0 26px 55px -22px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(220, 240, 255, 0.14);
   backdrop-filter: blur(10px);
-  transition:
-    color 0.2s ease,
-    border-color 0.2s ease,
-    background 0.2s ease;
+  color: #d8e8fb;
 }
-
-.scene-motion-toggle svg {
-  width: 16px;
-  height: 16px;
-}
-
-.scene-motion-toggle:hover:not(:disabled) {
-  border-color: rgb(150 195 255 / 55%);
-  background: rgb(20 44 86 / 78%);
-  color: #eaf4ff;
-}
-
-.scene-motion-toggle:focus-visible {
-  outline: 3px solid #5ea8ff;
-  outline-offset: 3px;
-}
-
-.scene-motion-toggle:disabled {
-  cursor: default;
-  opacity: 0.65;
-}
-
-/* ---------- 手机端紧凑 hero ---------- */
-.is-compact {
-  .zone {
-    width: min(54vw, 200px);
-    top: 53%;
+.assistant-float__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9db9dd;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  b {
+    color: #eef6ff;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
   }
-
-  .core {
-    width: 56px;
+  i {
+    width: 5px;
+    height: 5px;
+    margin-left: auto;
+    border-radius: 50%;
+    background: #3ddad7;
+    box-shadow: 0 0 8px #3ddad7;
   }
+}
+.assistant-float__msg {
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 9.5px;
+  line-height: 1.5;
+  &.is-user {
+    margin-left: 16%;
+    border: 1px solid rgba(160, 200, 255, 0.14);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  &.is-ai {
+    border: 1px solid rgba(61, 218, 215, 0.25);
+    background: rgba(61, 218, 215, 0.12);
+  }
+}
+.assistant-float__acts {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  span,
+  b {
+    flex: 1;
+    padding: 4px 0;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 8.5px;
+  }
+  span {
+    border: 1px solid rgba(160, 200, 255, 0.2);
+    color: #9db9dd;
+  }
+  b {
+    background: #2f5fd0;
+    color: #fff;
+  }
+}
 
-  .tile,
-  .scene-motion-toggle {
+.scene-caps {
+  position: absolute;
+  left: 48px;
+  bottom: 36px;
+  z-index: 3;
+  display: flex;
+  gap: 18px;
+  color: #9fbcdd;
+  font-size: 10px;
+  b {
+    color: #e2f0ff;
+    font-weight: 600;
+  }
+}
+.scene-note {
+  position: absolute;
+  right: 48px;
+  bottom: 26px;
+  z-index: 3;
+  margin: 0;
+  color: #66809f;
+  font-size: 8px;
+}
+
+@media (min-width: 1600px) {
+  .scene-brand__word {
+    font-size: 44px;
+  }
+  .scene-brand__tagline {
+    font-size: 14px;
+  }
+  .scene-brand__caps {
+    font-size: 10.5px;
+  }
+  .product-stage {
+    top: 50%;
+    max-width: 920px;
+    transform: translateY(-50%);
+  }
+  .scene-caps {
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 1279px) {
+  .scene-brand {
+    left: 32px;
+    top: 32px;
+    right: 32px;
+  }
+  .scene-brand__word {
+    font-size: 32px;
+  }
+  .scene-brand__tagline {
+    font-size: 11px;
+  }
+  .scene-brand__caps {
+    gap: 14px;
+    margin-top: 11px;
+    font-size: 8.5px;
+  }
+  .product-stage {
+    left: 32px;
+    // 1024×768 下固定 152px 会让窗口下方空出 200px+，按视口高度收一档
+    top: clamp(168px, 24vh, 190px);
+    width: 88%;
+    max-width: none;
+  }
+  .pw-side {
     display: none;
   }
-
-  .scene-grid {
-    background-size: 22px 22px;
+  .pw-event:nth-child(n + 7) {
+    display: none;
   }
-
-  .signal-line {
-    opacity: 0.55;
+  .assistant-float {
+    right: -8px;
+    bottom: -20px;
+    width: min(230px, 42%);
   }
-
-  .platform__glow {
-    opacity: 0.7;
+  .scene-caps {
+    left: 32px;
+    bottom: 24px;
+    gap: 14px;
+    font-size: 8.5px;
   }
-}
-
-@keyframes signal-flow {
-  0% {
-    stroke-dashoffset: 1000;
-    opacity: 0;
-  }
-
-  10%,
-  86% {
-    opacity: 0.9;
-  }
-
-  100% {
-    stroke-dashoffset: 0;
-    opacity: 0;
+  .scene-note {
+    right: 32px;
+    bottom: 18px;
+    font-size: 7.5px;
   }
 }
 
-@keyframes orbit-spin {
-  to {
-    transform: rotate(360deg);
+@media (max-width: 1000px) {
+  .scene-brand {
+    left: 20px;
+    top: 20px;
+    right: 20px;
   }
-}
-
-@keyframes core-pulse {
-  0%,
-  100% {
-    transform: translateY(0) scale(1);
+  .scene-brand__word {
+    font-size: 28px;
   }
-
-  50% {
-    transform: translateY(-9px) scale(1.015);
+  .scene-brand__tagline {
+    margin-top: 6px;
+    font-size: 10px;
   }
-}
-
-@keyframes tile-float {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-
-  50% {
-    translate: 0 -8px;
-  }
-}
-
-@keyframes particle-twinkle {
-  0%,
-  100% {
-    opacity: 0.18;
-    transform: scale(0.85);
-  }
-
-  50% {
-    opacity: 0.85;
-    transform: scale(1.15);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .login-scene *,
-  .login-scene *::before,
-  .login-scene *::after {
-    animation: none !important;
-  }
-
-  .signal-glint {
-    opacity: 0 !important;
+  .scene-brand__caps,
+  .product-stage,
+  .scene-caps,
+  .scene-note {
+    display: none;
   }
 }
 </style>

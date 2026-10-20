@@ -411,6 +411,7 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 .register-panel__logo {
+  display: none;
   margin-bottom: 12px;
   color: var(--register-navy);
   font-size: 26px;
@@ -593,6 +594,9 @@ onMounted(() => {
   }
   .register-page__scene {
     display: none;
+  }
+  .register-panel__logo {
+    display: block;
   }
   .register-panel {
     height: 100vh;
