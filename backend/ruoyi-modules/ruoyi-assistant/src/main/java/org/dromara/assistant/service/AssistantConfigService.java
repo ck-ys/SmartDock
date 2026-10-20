@@ -42,16 +42,18 @@ public class AssistantConfigService {
     public static final int PLATFORM_WEBSEARCH_LIMIT = 20;
     /** 平台默认：每日摘要关（五需求批 R4b / Q7-C；租户在管理页开） */
     public static final String PLATFORM_DIGEST_ENABLED = "0";
+    /** 平台默认：助手对外称呼（快刀批 Q6，2026-10-20；租户可改，前端 8 处硬编码收敛于此） */
+    public static final String PLATFORM_ASSISTANT_NAME = "SmartDock 小助手";
 
     private final AssistantConfigMapper configMapper;
     private final DcsAiConfigMapper aiConfigMapper;
     private final AssistantAdmissionGate admissionGate;
 
     /** 生效配置视图（行存在与否 + 两级默认合并结果；websearchLimitPerUser 批④起联网配额租户默认；
-     *  digestEnabled 五需求批 R4b 起每日摘要开关） */
+     *  digestEnabled 五需求批 R4b 起每日摘要开关；assistantName 快刀批 Q6 起助手称呼） */
     public record EffectiveConfig(boolean rowPresent, boolean enabled, int dailyRoundLimitPerUser,
                                   BigDecimal dailyBudgetAmount, String memoryEnabled, int compactionTriggerTokens,
-                                  int websearchLimitPerUser, String digestEnabled) {
+                                  int websearchLimitPerUser, String digestEnabled, String assistantName) {
     }
 
     /** 读租户生效配置：无行=平台默认（默认关闭） */
@@ -60,7 +62,7 @@ public class AssistantConfigService {
         if (row == null) {
             return new EffectiveConfig(false, false, PLATFORM_DAILY_ROUNDS,
                 PLATFORM_DAILY_BUDGET, PLATFORM_MEMORY_ENABLED, PLATFORM_COMPACTION_TOKENS,
-                PLATFORM_WEBSEARCH_LIMIT, PLATFORM_DIGEST_ENABLED);
+                PLATFORM_WEBSEARCH_LIMIT, PLATFORM_DIGEST_ENABLED, PLATFORM_ASSISTANT_NAME);
         }
         return new EffectiveConfig(true, "1".equals(row.getEnabled()),
             row.getDailyRoundLimitPerUser() == null ? PLATFORM_DAILY_ROUNDS : row.getDailyRoundLimitPerUser(),
@@ -68,7 +70,16 @@ public class AssistantConfigService {
             row.getMemoryEnabled() == null ? PLATFORM_MEMORY_ENABLED : row.getMemoryEnabled(),
             row.getCompactionTriggerTokens() == null ? PLATFORM_COMPACTION_TOKENS : row.getCompactionTriggerTokens(),
             row.getWebsearchLimitPerUser() == null ? PLATFORM_WEBSEARCH_LIMIT : row.getWebsearchLimitPerUser(),
-            row.getDigestEnabled() == null ? PLATFORM_DIGEST_ENABLED : row.getDigestEnabled());
+            row.getDigestEnabled() == null ? PLATFORM_DIGEST_ENABLED : row.getDigestEnabled(),
+            normalizeName(row.getAssistantName()));
+    }
+
+    /** 称呼归一（读侧）：空白一律=平台默认，非空 trim 后直出（写侧已限长） */
+    private static String normalizeName(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return PLATFORM_ASSISTANT_NAME;
+        }
+        return raw.trim();
     }
 
     /**
@@ -127,6 +138,15 @@ public class AssistantConfigService {
             && (config.getWebsearchLimitPerUser() < 0 || config.getWebsearchLimitPerUser() > 10000)) {
             throw new ServiceException("每人每日联网次数须在 0~10000 之间（0=关闭联网搜索）", 400);
         }
+        // 快刀批 Q6：助手称呼——提交了才动：trim、超长拒绝；空白=显式清除回落平台默认
+        // （空串哨兵直通合并，upsert 前归一为 NULL；null=未提交保持原值）
+        if (config.getAssistantName() != null) {
+            String n = config.getAssistantName().trim();
+            if (n.length() > 50) {
+                throw new ServiceException("助手称呼最多 50 个字", 400);
+            }
+            config.setAssistantName(n);
+        }
         DcsAssistantConfig existing = raw(config.getTenantId());
         if (existing != null) {
             if (config.getEnabled() == null) {
@@ -152,10 +172,18 @@ public class AssistantConfigService {
             if (config.getDigestEnabled() == null) {
                 config.setDigestEnabled(existing.getDigestEnabled());
             }
+            // 快刀批 Q6：称呼合并——null=未提交保持原值（"" 已是显式清除哨兵，不进这支）
+            if (config.getAssistantName() == null) {
+                config.setAssistantName(existing.getAssistantName());
+            }
         }
         if (config.getDigestEnabled() != null && !"0".equals(config.getDigestEnabled())
             && !"1".equals(config.getDigestEnabled())) {
             throw new ServiceException("每日摘要开关只接受 0/1", 400);
+        }
+        // 快刀批 Q6：空串哨兵归一为 NULL（读侧见 NULL/空白=平台默认；顺带自愈历史脏 "" 行）
+        if (config.getAssistantName() != null && config.getAssistantName().isEmpty()) {
+            config.setAssistantName(null);
         }
         TenantHelper.ignore(() -> configMapper.upsert(config));
     }

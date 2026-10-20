@@ -25,11 +25,11 @@ public interface AssistantConfigMapper extends BaseMapper<DcsAssistantConfig> {
      * 部分更新的真正保护在 service 层的在位行合并（业务批3-④ dspro 注记）。
      */
     @Insert("INSERT INTO dcs_assistant_config (tenant_id, enabled, daily_round_limit_per_user,"
-        + " daily_budget_amount, memory_enabled, compaction_trigger_tokens, websearch_limit_per_user, digest_enabled, create_time)"
+        + " daily_budget_amount, memory_enabled, compaction_trigger_tokens, websearch_limit_per_user, digest_enabled, assistant_name, create_time)"
         + " VALUES (#{c.tenantId}, COALESCE(#{c.enabled}, '0'), COALESCE(#{c.dailyRoundLimitPerUser}, 50),"
         + " COALESCE(#{c.dailyBudgetAmount}, 50.0000), COALESCE(#{c.memoryEnabled}, '0'),"
         + " COALESCE(#{c.compactionTriggerTokens}, 60000), COALESCE(#{c.websearchLimitPerUser}, 20),"
-        + " COALESCE(#{c.digestEnabled}, '0'), CURRENT_TIMESTAMP)"
+        + " COALESCE(#{c.digestEnabled}, '0'), #{c.assistantName}, CURRENT_TIMESTAMP)"
         + " ON CONFLICT (tenant_id) DO UPDATE SET"
         + " enabled = COALESCE(EXCLUDED.enabled, dcs_assistant_config.enabled),"
         + " daily_round_limit_per_user = COALESCE(EXCLUDED.daily_round_limit_per_user, dcs_assistant_config.daily_round_limit_per_user),"
@@ -38,6 +38,9 @@ public interface AssistantConfigMapper extends BaseMapper<DcsAssistantConfig> {
         + " compaction_trigger_tokens = COALESCE(EXCLUDED.compaction_trigger_tokens, dcs_assistant_config.compaction_trigger_tokens),"
         + " websearch_limit_per_user = COALESCE(EXCLUDED.websearch_limit_per_user, dcs_assistant_config.websearch_limit_per_user),"
         + " digest_enabled = COALESCE(EXCLUDED.digest_enabled, dcs_assistant_config.digest_enabled),"
+        // 快刀批 Q6：称呼列可空且 service 层已合并出终值（含""→NULL 显式清除）——
+        // 直写 EXCLUDED 不 COALESCE，否则清不掉旧称呼
+        + " assistant_name = EXCLUDED.assistant_name,"
         + " update_time = CURRENT_TIMESTAMP")
     int upsert(@Param("c") DcsAssistantConfig config);
 

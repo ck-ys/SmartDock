@@ -41,6 +41,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { disposeAssistant, getAssistant } from './useAssistant';
 import { roleOf } from './assistantCtx';
 import { pushToast } from './toastStore';
+import { applyAssistantName } from './nameState';
 import FabBall, { type BallMenuItem } from './FloatingBall.vue';
 
 const AssistantDrawer = defineAsyncComponent(() => import('./AssistantDrawer.vue'));
@@ -153,6 +154,8 @@ async function probeStatus() {
   try {
     const res = await getAssistantStatus();
     const d = (res?.data ?? res) as Record<string, unknown>;
+    // 快刀批 Q6：称呼随首探下发（此处是全站唯一兜底喂点——layout 挂悬浮球=每页必过）
+    applyAssistantName(d?.name);
     if (d?.enabled && d?.modelConfigured) {
       mode.value = 'normal';
     } else if (d?.enabled) {

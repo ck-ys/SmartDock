@@ -65,6 +65,20 @@
                 <span class="cell-note">停用前会再弹一次确认</span>
               </div>
             </el-descriptions-item>
+            <!-- 快刀批 Q6：助手对外称呼——用户端欢迎语/帮助弹窗/引导等 8 处随此变；清空=恢复平台默认 -->
+            <el-descriptions-item label="助手称呼">
+              <div class="cell-flex">
+                <el-input
+                  v-model="nameEdit"
+                  size="small"
+                  maxlength="50"
+                  placeholder="默认 SmartDock 小助手"
+                  style="width: 180px"
+                  @change="onNameSave"
+                />
+                <span class="cell-note">用户端下次进入页面生效 · 清空=恢复默认</span>
+              </div>
+            </el-descriptions-item>
             <el-descriptions-item label="每日回合上限">每人 {{ cfg.dailyRoundLimitPerUser }} 回合 · 明早 0 点恢复</el-descriptions-item>
             <!-- 业务批3-④：租户联网默认（每人每日免费次数；0=全租户关停。改值走「用户额度」页单人覆盖或租户配置 API，本页先展示） -->
             <el-descriptions-item label="每日联网次数">
@@ -984,6 +998,7 @@ import { useUserStore } from '@/store/modules/user';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import { ACT, LOG_ST, logSt } from '@/components/DcsAssistant/useAssistant';
 import { fmtIsoTime } from '@/components/DcsAssistant/util';
+import { applyAssistantName } from '@/components/DcsAssistant/nameState';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -1068,6 +1083,8 @@ async function loadConfig() {
     const e = res?.data?.effective ?? (res as { effective?: AssistantEffectiveConfig })?.effective;
     if (e) {
       cfg.value = e;
+      // 快刀批 Q6：称呼同步喂全局态（本页保存后悬浮球/抽屉即时换名，无需整页刷新）
+      applyAssistantName(e.assistantName);
     }
   } catch {
     ElMessage.error('配置加载失败，请稍后再试');
@@ -1191,6 +1208,29 @@ async function onDigestToggle() {
   } catch {
     ElMessage.error('保存失败，请稍后再试');
     cfg.value.digestEnabled = digestOn.value ? '0' : '1';
+  } finally {
+    saving.value = false;
+  }
+}
+
+/* ===== 助手称呼（快刀批 Q6）：改完回车/失焦生效，清空=回落平台默认 ===== */
+const nameEdit = ref('');
+watch(
+  () => cfg.value.assistantName,
+  (v) => {
+    nameEdit.value = v ?? '';
+  },
+  { immediate: true }
+);
+async function onNameSave() {
+  saving.value = true;
+  try {
+    const n = nameEdit.value.trim();
+    await updateAssistantConfig({ assistantName: n });
+    await loadConfig();
+    ElMessage.success(n ? `助手称呼已改为「${n}」——用户下次进入页面生效` : '已恢复默认「SmartDock 小助手」');
+  } catch {
+    ElMessage.error('称呼保存失败，请稍后再试');
   } finally {
     saving.value = false;
   }

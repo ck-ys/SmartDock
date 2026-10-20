@@ -479,6 +479,12 @@
               <el-select v-model="form.provider" placeholder="请选择模型厂商" style="width: 100%" @change="applyPreset">
                 <el-option v-for="item in providerOptions" :key="item.provider" :label="item.providerName" :value="item.provider" />
               </el-select>
+              <!-- 快刀批 Q9：选 MiniMax 提醒先申请钥匙（钥匙管理里没有 MiniMax 钥匙时选完也跑不通） -->
+              <div v-if="form.provider === 'MINIMAX'" class="field-hint">
+                国内站接口地址已预填 api.minimax.cn；使用前需先到
+                <a href="https://platform.minimax.cn" target="_blank" rel="noopener">MiniMax 开放平台</a>
+                申请 API 钥匙并在此录入，否则模型会显示不可用。国际站(api.minimax.io)请改走「自定义」。
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="12">

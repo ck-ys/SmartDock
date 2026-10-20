@@ -1,5 +1,6 @@
 import { driver } from 'driver.js';
 import 'driver.js/dist/driver.css';
+import { assistantName } from './nameState';
 
 /* ===== 批17 Q7：界面导览（driver.js 聚光灯带看）——欢迎卡「界面导览」按钮触发。
  * 抽屉与会话页共用：五幕元素在两个宿主同构（同一 Composer/MsgFlow）；
@@ -8,7 +9,8 @@ import 'driver.js/dist/driver.css';
 export function startTour() {
   const steps = [
     {
-      element: '[aria-label="向 SmartDock 小助手提问"]',
+      // 快刀批 Q6：选择器随称呼联动（Composer aria-label 同源 nameState，两处一起变）
+      element: `[aria-label="向 ${assistantName.value} 提问"]`,
       popover: {
         title: '直接开口问',
         description: '这里就是提问框。输入 / 有命令菜单（待办、压缩、切模型），输入 @ 能引用具体任务，↓↑ 挑、Tab 补全。'

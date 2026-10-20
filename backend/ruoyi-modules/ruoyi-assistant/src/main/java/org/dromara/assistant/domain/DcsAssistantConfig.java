@@ -47,4 +47,7 @@ public class DcsAssistantConfig implements Serializable {
 
     /** 每日摘要开关（五需求批 R4b / Q7-C）：1=每日 08:00 给发布人推未交摘要通知，0=关（平台默认） */
     private String digestEnabled;
+
+    /** 助手对外称呼（快刀批 Q6，2026-10-20）：空=用平台默认「SmartDock 小助手」；写侧空白串=清除回落默认 */
+    private String assistantName;
 }

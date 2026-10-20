@@ -87,7 +87,7 @@
         rows="1"
         :placeholder="disabled ? '管理员已暂停你的 AI 助手使用' : placeholder"
         maxlength="16000"
-        aria-label="向 SmartDock 小助手提问"
+        :aria-label="`向 ${assistantName} 提问`"
         :readonly="disabled"
         :class="{ 'ta-disabled': disabled }"
         @focus="focused = true"
@@ -243,8 +243,9 @@
             <span v-if="webDisabled" class="ctxsub">未开放（额度为 0）</span>
             <span class="ctxdiv" />
             <!-- 业务反馈批1015b Q11：改回「缓存命中」+ 恢复平均值口径（用户原话"为什么没有
-                 缓存平均值了"）——今日平均（LiteLLU 口径样本<3 显 —），单行不动用副行（拍板=尽量简洁） -->
-            <span class="ctxrow" title="缓存命中：重复内容直接走缓存，更快更省积分 · 这里显示今日平均（今天聊得还少时显示 —）">
+                 缓存平均值了"）——今日平均（LiteLLU 口径样本<3 显 —），单行不动用副行（拍板=尽量简洁）
+                 快刀批 Q5：tooltip 人话化（拍板页 v4 口径——何时掉、为什么聊天场景天然低于编码） -->
+            <span class="ctxrow" title="缓存命中：模型不用重读前文的重复部分，直接用缓存结果——更快更省（缓存价约为原价一折）。这里显示今日平均（今天聊得还少时显示 —）。什么时候会掉：新会话第一轮必不命中；会话中途开联网、换模型会让缓存重新预热。聊天场景普遍在 5~8 成，属健康区间，编码工具的 9 成以上学不来（场景不同）。">
               <span class="cl">缓存命中</span>
               <span>{{ cacheHitText }}</span>
             </span>
@@ -479,6 +480,7 @@ import { mentionTasks } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
 import { roleOf } from './assistantCtx';
 import { pushToast } from './toastStore';
+import { assistantName } from './nameState';
 import { ElMessageBox } from 'element-plus';
 import { useFavs } from './favStore';
 import IconSpan from './IconSpan.vue';

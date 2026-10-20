@@ -379,7 +379,8 @@ CREATE TABLE public.dcs_assistant_config (
     update_by bigint,
     update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     websearch_limit_per_user integer DEFAULT 20 NOT NULL,
-    digest_enabled character(1) DEFAULT '0'::bpchar NOT NULL
+    digest_enabled character(1) DEFAULT '0'::bpchar NOT NULL,
+    assistant_name character varying(50)
 );
 
 

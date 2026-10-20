@@ -70,9 +70,9 @@ class AssistantUserQuotaServiceUnitTest {
         return tenantDefault(rounds, 20);
     }
 
-    /** 批④起联网租户默认可自定义（websearch_limit_per_user 列） */
+    /** 批④起联网租户默认可自定义（websearch_limit_per_user 列）；称呼列快刀批 Q6 新增（此处不参与配额口径，占位即可） */
     private EffectiveConfig tenantDefault(int rounds, int websearch) {
-        return new EffectiveConfig(true, true, rounds, new BigDecimal("20"), "1", 60000, websearch, "0");
+        return new EffectiveConfig(true, true, rounds, new BigDecimal("20"), "1", 60000, websearch, "0", null);
     }
 
     /** 覆盖行实体（null 列=跟随默认） */

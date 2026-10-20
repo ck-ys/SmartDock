@@ -7,6 +7,8 @@ import request from '@/utils/request';
 
 /** 悬浮球出现条件+今日概况数据源（G1 status 端点；灰球=enabled 无模型） */
 export interface AssistantStatus {
+  /** 快刀批 Q6：助手对外称呼（租户可改；后端两级默认合并后必有值）——nameState 全局态数据源 */
+  name?: string;
   enabled: boolean;
   modelConfigured: boolean;
   degraded: boolean;
@@ -92,6 +94,8 @@ export interface AssistantEffectiveConfig {
   websearchLimitPerUser?: number;
   /** 每日摘要开关（五需求批 R4b：'1'=每日 08:00 给发布人推未交摘要，'0'=关） */
   digestEnabled?: string;
+  /** 助手对外称呼（快刀批 Q6；后端合并平台默认，非空=租户已自定义） */
+  assistantName?: string;
 }
 
 export function getAssistantConfig() {
@@ -113,6 +117,8 @@ export interface AssistantConfigUpdate {
   compactionTriggerTokens?: number;
   /** 五需求批 R4b：每日摘要开关（'1'=每日 08:00 发布人未交摘要通知） */
   digestEnabled?: '1' | '0';
+  /** 快刀批 Q6：助手称呼——非空=改；''=清除回落平台默认；不发/undefined=保持现值 */
+  assistantName?: string;
   tenantId?: string;
 }
 

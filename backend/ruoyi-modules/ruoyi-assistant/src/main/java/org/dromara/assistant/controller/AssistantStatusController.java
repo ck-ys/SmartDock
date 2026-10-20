@@ -60,6 +60,8 @@ public class AssistantStatusController extends BaseController {
         org.dromara.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits =
             quotaService.billingAwareLimits(tenantId, userId);
         Map<String, Object> out = new LinkedHashMap<>();
+        // 快刀批 Q6：助手称呼（租户可改，读侧两级默认合并后必有值）——前端 nameState 全局态数据源
+        out.put("name", cfg.assistantName());
         out.put("enabled", cfg.enabled());
         out.put("modelConfigured", cfg.enabled() && configService.modelConfigured(tenantId));
         out.put("degraded", configService.degraded());

@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.6.1',
+    date: '2026-10-20',
+    title: '助手名字可以自己起，MiniMax 换国内入口',
+    items: [
+      '管理员可以在「AI 助手管理」里给助手改名，欢迎语、使用说明弹窗会跟着变；清空就恢复默认「SmartDock 小助手」。',
+      'MiniMax 预置换成国内站接口，默认模型升到 M3.1-Flash；选它时页面会提醒先去开放平台申请钥匙再填进来。',
+      '聊天里的「缓存命中」加了说明：解释它为什么更快更省、几成算正常，以及什么时候会暂时变低。'
+    ]
+  },
+  {
     version: 'v1.6.0',
     date: '2026-10-20',
     title: '评分模型有了发布纪律，分群能发通知了',

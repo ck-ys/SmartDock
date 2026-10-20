@@ -32,8 +32,8 @@ public enum DcsAiProvider {
     TENCENT_HUNYUAN("腾讯混元", "https://api.hunyuan.cloud.tencent.com/v1", "hunyuan-pro"),
     /** 讯飞星火 */
     XFYUN_SPARK("讯飞星火", "https://spark-api-open.xf-yun.com/v1", "4.0Ultra"),
-    /** MiniMax */
-    MINIMAX("MiniMax", "https://api.minimax.io/v1", "MiniMax-M2"),
+    /** MiniMax(国内站；2026-10-20 快刀批 Q9：api.minimax.cn/v1 为官方文档现行端点，api.minimaxi.com 为历史别名同样存活，国际站 api.minimax.io 走「自定义」自填；默认模型升 M3.1-Flash——能力规则与人民币价格种子见 baseline/02_reference.sql + migration) */
+    MINIMAX("MiniMax", "https://api.minimax.cn/v1", "MiniMax-M3.1-Flash"),
     /** 硅基流动(聚合平台) */
     SILICONFLOW("硅基流动", "https://api.siliconflow.cn/v1", "Qwen/Qwen2.5-7B-Instruct"),
     /** OpenCode Go 订阅网关(月订阅,含限免免费模型;调用侧须带自报UA+x-opencode-session头,见 AssistantModelFactory) */

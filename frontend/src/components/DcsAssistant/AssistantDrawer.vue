@@ -1,11 +1,11 @@
 <template>
   <teleport to="body">
     <div v-if="mounted" class="dcs-dw-mask" :class="{ open: modelValue }" @click="close" />
-    <aside class="dcs-dw" :class="{ open: modelValue, full: full }" role="dialog" aria-label="SmartDock 小助手">
+    <aside class="dcs-dw" :class="{ open: modelValue, full: full }" role="dialog" :aria-label="assistantName">
       <header v-show="!full" class="dw-head">
         <span class="orb"><IconSpan name="bot" :size="18" /></span>
         <div class="hd-txt">
-          <b>SmartDock</b>
+          <b>{{ assistantName }}</b>
           <!-- 业务批4 Q2 拍板二：任务上下文条下移到输入框上方（.ctx-bar），头部只留页面感知 -->
           <!-- 抽屉头部仅剩 109px，带「当前页面：」前缀会被截断成半字；用定位图标+页面名，语义靠 title -->
           <span class="ctx" :title="`当前页面：${pageName}`"
@@ -284,7 +284,7 @@
     <el-dialog
       v-if="!route.path.startsWith('/ai/assistant')"
       :model-value="help.open.value"
-      title="SmartDock 小助手 使用说明"
+      :title="`${assistantName} 使用说明`"
       width="480px"
       append-to-body
       @update:model-value="help.hide()"
@@ -377,6 +377,7 @@ import type { AssistantBindings, AssistantTurn } from './useAssistant';
 import { roleOf, roleLabelOf, pageNameOf, taskCtxOf, suggestionsFor } from './assistantCtx';
 import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
+import { assistantName } from './nameState';
 import MsgFlow from './MsgFlow.vue';
 import HitlDock from './HitlDock.vue';
 import { startTour } from './useTour';

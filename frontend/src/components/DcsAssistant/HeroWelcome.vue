@@ -99,6 +99,7 @@ import { useHelpModal } from './helpModal';
 import IconSpan from './IconSpan.vue';
 import { getAssistantStatus } from '@/api/dcs/assistant';
 import { unwrap } from './util';
+import { assistantName } from './nameState';
 
 /** 今日概况条目（全屏形态；warn=true 警示色） */
 export interface SnapItem {
@@ -317,9 +318,9 @@ const greet = computed(() => {
   if (first) {
     const h = new Date().getHours();
     const word = h < 6 ? '夜深了' : h < 12 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
-    return { title: `${word}，我是 SmartDock 小助手`, sub: `${name ? name + '，' : ''}${cap}，直接开口问就行` };
+    return { title: `${word}，我是 ${assistantName.value}`, sub: `${name ? name + '，' : ''}${cap}，直接开口问就行` };
   }
-  const variants = ['又见面了，我是 SmartDock 小助手', '接着上次聊的？', '今天从哪开始？'];
+  const variants = [`又见面了，我是 ${assistantName.value}`, '接着上次聊的？', '今天从哪开始？'];
   const title = variants[new Date().getDate() % 3];
   return { title, sub: roleKey.value === 'member' ? '查数据 · 讲操作' : '查数据 · 写催办话术 · 讲操作' };
 });
