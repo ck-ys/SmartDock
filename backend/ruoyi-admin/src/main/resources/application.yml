@@ -287,13 +287,6 @@ dcs:
     # 看板 Redis 二级缓存 TTL(秒)：≤0=关闭缓存(验收要即时数据时用 0)，内部钳上限 1h；
     # 只作用于 summary 与 analytics/overview 两个重查询端点(冷 3-4s)，冷端点不入缓存。dspro专审P2-2。
     cache-ttl-seconds: ${DCS_DASHBOARD_CACHE_TTL_SECONDS:180}
-  profile:
-    embedding:
-      # 必须与 dcs_user_profile.embedding 的 vector(N) 一致；后续升级 4096 时同步改 migration 与配置。
-      dimensions: ${DCS_PROFILE_EMBEDDING_DIMENSIONS:1024}
-      max-similar-limit: ${DCS_PROFILE_EMBEDDING_MAX_SIMILAR_LIMIT:50}
-      max-batch-size: ${DCS_PROFILE_EMBEDDING_MAX_BATCH_SIZE:200}
-      probes: ${DCS_PROFILE_EMBEDDING_PROBES:10}
   rollout:
     # Security/profile rollout switches. Override with environment variables and restart.
     event-collection-enabled: ${DCS_EVENT_COLLECTION_ENABLED:true}

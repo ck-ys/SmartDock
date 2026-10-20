@@ -77,6 +77,12 @@ public class AnalyticsService {
     private final ObjectProvider<ProfileEventPublisher> eventPublisherProvider;
 
     /**
+     * 事务模板: 锁必须包住事务的提交边界。@Transactional 代理是"先开事务再进方法体拿锁",
+     * unlock 早于 commit, 两个重建仍可能在提交阶段撞唯一键; 显式模板让 lock() 在 BEGIN 之前。
+     */
+    private final org.springframework.transaction.support.TransactionTemplate txTemplate;
+
+    /**
      * 同一 (租户,业务源) 的重建互斥: 手动重建与自动汇总并发时会互相删插对方的会话。
      * 单 JVM 锁; 多实例分布式锁在二期批 10。
      */
@@ -88,45 +94,52 @@ public class AnalyticsService {
 
     // ---------------------------------------------------------------- 重建 / 汇总
 
-    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> rebuild(String source, int days) {
         requireSource(source);
+        int clampedDays = Math.min(Math.max(days, 1), 365);
         String tenantId = currentTenant();
         ReentrantLock lock = rebuildLock(tenantId, source);
         lock.lock();
         try {
-            Date from = startOfDaysAgo(days);
-            Date to = startOfTomorrow();
-            int sessions = sessionizer.rebuild(tenantId, source, from, to);
-            int dailyRows = rollup(tenantId, source, from, to);
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("source", source);
-            out.put("days", days);
-            out.put("sessions", sessions);
-            out.put("dailyRows", dailyRows);
-            out.put("from", from);
-            out.put("to", to);
-            return out;
+            return txTemplate.execute(status -> doRebuild(tenantId, source, clampedDays));
         } finally {
             lock.unlock();
         }
     }
 
+    private Map<String, Object> doRebuild(String tenantId, String source, int days) {
+        Date from = startOfDaysAgo(days);
+        Date to = startOfTomorrow();
+        int sessions = sessionizer.rebuild(tenantId, source, from, to);
+        int dailyRows = rollup(tenantId, source, from, to);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("source", source);
+        out.put("days", days);
+        out.put("sessions", sessions);
+        out.put("dailyRows", dailyRows);
+        out.put("from", from);
+        out.put("to", to);
+        return out;
+    }
+
     /**
      * 事件写入后重建最近两天：会话与日汇总一起刷新。
-     * 拿不到锁说明手动重建正在进行, 直接跳过——下一个事件会再次触发。
+     *
+     * @return 是否真正执行; false = 手动重建持锁中被跳过, 调用方应保留脏标记等下一个事件补
      */
-    @Transactional(rollbackFor = Exception.class)
-    public void rebuildRecent(String tenantId, String source) {
+    public boolean rebuildRecent(String tenantId, String source) {
         ReentrantLock lock = rebuildLock(tenantId, source);
         if (!lock.tryLock()) {
-            return;
+            return false;
         }
         try {
-            Date from = startOfDaysAgo(2);
-            Date to = startOfTomorrow();
-            sessionizer.rebuild(tenantId, source, from, to);
-            rollup(tenantId, source, from, to);
+            txTemplate.executeWithoutResult(status -> {
+                Date from = startOfDaysAgo(2);
+                Date to = startOfTomorrow();
+                sessionizer.rebuild(tenantId, source, from, to);
+                rollup(tenantId, source, from, to);
+            });
+            return true;
         } finally {
             lock.unlock();
         }
@@ -561,6 +574,10 @@ public class AnalyticsService {
             throw new ServiceException("CSV 至少需要表头和一行数据");
         }
         List<String> header = rows.get(0);
+        // Excel/Windows 导出的 CSV 首列常带 BOM, 不剥掉会导致 eventName/eventUid 列名匹配失败
+        if (!header.isEmpty() && header.get(0) != null && header.get(0).startsWith("\uFEFF")) {
+            header.set(0, header.get(0).substring(1));
+        }
         Map<String, Integer> index = new HashMap<>();
         for (int i = 0; i < header.size(); i++) {
             index.put(header.get(i).trim().toLowerCase(), i);
@@ -755,7 +772,8 @@ public class AnalyticsService {
     }
 
     private Date startOfDaysAgo(int days) {
-        LocalDate day = LocalDate.now().minusDays(Math.max(days, 1) - 1L);
+        // 统一 clamp 1..365: 防止恶意/误传超大 days 逐日循环拖垮数据源
+        LocalDate day = LocalDate.now().minusDays(Math.min(Math.max(days, 1), 365) - 1L);
         return Date.from(day.atStartOfDay(ZoneId.systemDefault()).toInstant());
     }
 

@@ -30,10 +30,11 @@ public class AnalyticsCollectController {
     private final AnalyticsCollectorService collectorService;
 
     /**
-     * 公开口必须限流: 单 IP 每分钟 120 批(单批上限 200 条由服务层控制),
-     * 否则可被灌水打满事件表并持续触发整源重建。
+     * 公开口必须限流: 单 IP 每分钟 300 批(单批上限 200 条由服务层控制)。
+     * SDK 默认 3 秒批量上报, 单页约 20 批/分钟; 300 兼顾企业 NAT/CGNAT 同出口多用户,
+     * 同时防止匿名灌水持续触发整源重建。
      */
-    @RateLimiter(time = 60, count = 120, limitType = LimitType.IP)
+    @RateLimiter(time = 60, count = 300, limitType = LimitType.IP)
     @PostMapping("/collect")
     public R<Map<String, Object>> collect(@RequestBody AnalyticsCollectBo bo) {
         return R.ok(collectorService.collect(bo));

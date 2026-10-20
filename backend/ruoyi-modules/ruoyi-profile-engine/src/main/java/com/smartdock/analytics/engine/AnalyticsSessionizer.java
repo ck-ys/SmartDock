@@ -44,7 +44,7 @@ public class AnalyticsSessionizer {
     private final AnalyticsEventMapper eventMapper;
 
     public int rebuild(String tenantId, String source, Date from, Date to) {
-        // 读取窗口向左多取一个会话间隔: 起点落在窗口前的边界会话才能被完整重建
+        // 读取窗口向左多取一个会话间隔: 起点落在窗口前的边界会话才能被识别出来
         Date readFrom = new Date(from.getTime() - SESSION_GAP_MS);
         sessionMapper.deleteRange(tenantId, source, readFrom, to);
         List<AnalyticsEventRow> events = eventMapper.selectEvents(tenantId, source, readFrom, to);
@@ -60,20 +60,26 @@ public class AnalyticsSessionizer {
             }
         }
         List<AnalyticsSession> sessions = build(tenantId, source, events, firstSeen);
-        // 起点在窗口外的长会话 deleteRange 删不到, 按 key 精确清理, 避免撞 uk_analytics_session_key
+        // 边界会话(起点在 from 之前)本次只读到部分事件, 重写会用残缺行覆盖完整旧行,
+        // 或因 key 变化复制成两行——一律跳过, 保留旧完整行, 等人工全量重建时覆盖
+        List<AnalyticsSession> inWindow = new ArrayList<>(sessions.size());
         List<String> keys = new ArrayList<>(sessions.size());
         for (AnalyticsSession session : sessions) {
+            if (session.getStartedAt().before(from)) {
+                continue;
+            }
+            inWindow.add(session);
             keys.add(session.getSessionKey());
         }
         for (int i = 0; i < keys.size(); i += 500) {
             sessionMapper.deleteByKeys(tenantId, source, keys.subList(i, Math.min(i + 500, keys.size())));
         }
-        for (AnalyticsSession session : sessions) {
+        for (AnalyticsSession session : inWindow) {
             sessionMapper.insert(session);
         }
-        log.info("[Analytics] sessions rebuilt source={} range={}~{} count={}",
-            source, from, to, sessions.size());
-        return sessions.size();
+        log.info("[Analytics] sessions rebuilt source={} range={}~{} count={} skippedBoundary={}",
+            source, from, to, inWindow.size(), sessions.size() - inWindow.size());
+        return inWindow.size();
     }
 
     /**

@@ -58,6 +58,10 @@ public class ProfileQueryService {
         }
         requireSource(query.getSource());
         normalizeQuery(query);
+        if (pageQuery.getPageSize() == null || pageQuery.getPageSize() > 200) {
+            // PageQuery 默认 pageSize=MAX_VALUE, 不封顶可一次拉全表
+            pageQuery.setPageSize(200);
+        }
         Page<ProfileSubjectRow> page = pageQuery.build();
         // 自定义 SQL 带 LATERAL + 计算列过滤, 关闭 count 优化, 用子查询包裹最稳
         page.setOptimizeCountSql(false);

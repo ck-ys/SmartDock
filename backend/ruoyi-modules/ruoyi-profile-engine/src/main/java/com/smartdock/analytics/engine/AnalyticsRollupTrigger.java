@@ -44,10 +44,17 @@ public class AnalyticsRollupTrigger {
             Thread.sleep(2000);
             while (true) {
                 flag.set(false);
+                boolean ran = false;
                 try {
-                    TenantHelper.dynamic(tenantId, () -> analyticsService.rebuildRecent(tenantId, source));
+                    Boolean result = TenantHelper.dynamic(tenantId,
+                        () -> analyticsService.rebuildRecent(tenantId, source));
+                    ran = Boolean.TRUE.equals(result);
                 } catch (Exception e) {
                     log.warn("[Analytics] rollup failed source={} err={}", source, e.getMessage());
+                }
+                if (!ran) {
+                    // 被手动重建持锁跳过: 保留脏标记退出, 下一个事件进来会补触发
+                    break;
                 }
                 if (!flag.getAndSet(false)) {
                     break;

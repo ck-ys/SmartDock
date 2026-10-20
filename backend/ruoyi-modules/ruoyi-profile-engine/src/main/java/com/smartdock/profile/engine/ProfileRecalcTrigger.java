@@ -46,6 +46,7 @@ public class ProfileRecalcTrigger {
             // 已有批次在跑, 标记 dirty 后直接返回; 跑批线程会再拉一轮
             return;
         }
+        boolean interrupted = false;
         try {
             int debounce = configService.debounceMs(tenantId, source);
             if (debounce > 0) {
@@ -67,10 +68,11 @@ public class ProfileRecalcTrigger {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            interrupted = true;
         } finally {
             running.remove(key);
-            // 极端竞态: 最后一个事件在退出判断后才到, 这里补一次
-            if (flag.getAndSet(false)) {
+            // 被中断时不再就地递归补触发: 中断标志未清会立刻再抛 InterruptedException 直到栈溢出
+            if (!interrupted && flag.getAndSet(false)) {
                 onEvent(tenantId, source, subjectType, subjectId);
             }
         }

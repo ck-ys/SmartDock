@@ -344,6 +344,7 @@
               <el-option label="按天" value="day" />
               <el-option label="页面" value="page" />
               <el-option label="渠道" value="channel" />
+              <el-option label="投放活动" value="campaign" />
               <el-option label="设备" value="device" />
               <el-option label="浏览器" value="browser" />
               <el-option label="操作系统" value="os" />

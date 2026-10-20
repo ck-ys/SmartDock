@@ -263,9 +263,6 @@ export const getDimensionCapabilities = (): Promise<ProfileDimensionCapabilities
 export const getDimensionCoverage = (source: string): Promise<ProfileDimensionCoverage[]> =>
   r<ProfileDimensionCoverage[]>({ url: `${BASE}/dimension/coverage`, method: 'get', params: { source } });
 
-export const getDimension = (dimensionId: string): Promise<ProfileDimension> =>
-  r<ProfileDimension>({ url: `${BASE}/dimension/${dimensionId}`, method: 'get' });
-
 export const createDimension = (data: Record<string, any>): Promise<ProfileDimension> =>
   r<ProfileDimension>({ url: `${BASE}/dimension`, method: 'post', data });
 
@@ -288,8 +285,6 @@ export const getRuleHistory = (source: string): Promise<ProfileRule[]> =>
 
 export const getRuleTemplates = (source: string): Promise<ProfileRuleTemplate[]> =>
   r<ProfileRuleTemplate[]>({ url: `${BASE}/rule/templates`, method: 'get', params: { source } });
-
-export const getRule = (ruleId: string): Promise<ProfileRule> => r<ProfileRule>({ url: `${BASE}/rule/${ruleId}`, method: 'get' });
 
 export const createRuleDraft = (data: { source: string; sourceRuleId?: string; ruleName?: string; remark?: string }): Promise<ProfileRule> =>
   r<ProfileRule>({ url: `${BASE}/rule/draft`, method: 'post', data });
@@ -448,8 +443,6 @@ export const listModels = (source: string): Promise<ProfileScoreModel[]> =>
 
 export const getModelPreset = (): Promise<ProfileModelPreset> => r<ProfileModelPreset>({ url: `${BASE}/model/preset`, method: 'get' });
 
-export const getModel = (modelId: string): Promise<ProfileScoreModel> => r<ProfileScoreModel>({ url: `${BASE}/model/${modelId}`, method: 'get' });
-
 export const createModel = (data: Record<string, any>): Promise<ProfileScoreModel> =>
   r<ProfileScoreModel>({ url: `${BASE}/model`, method: 'post', data });
 
@@ -543,8 +536,6 @@ export interface ProfileSegmentPreview {
 export const listSegments = (source: string): Promise<ProfileSegment[]> =>
   r<ProfileSegment[]>({ url: `${BASE}/segment/list`, method: 'get', params: { source } });
 
-export const getSegment = (segmentId: string): Promise<ProfileSegment> => r<ProfileSegment>({ url: `${BASE}/segment/${segmentId}`, method: 'get' });
-
 export const createSegment = (data: Record<string, any>): Promise<ProfileSegment> =>
   r<ProfileSegment>({ url: `${BASE}/segment`, method: 'post', data });
 
@@ -613,8 +604,6 @@ export const pageReviews = (
     pageSize?: number;
   } = {}
 ): Promise<TableDataInfo<ProfileReview>> => table<ProfileReview>({ url: `${BASE}/review/page`, method: 'get', params });
-
-export const getReview = (reviewId: string): Promise<ProfileReview> => r<ProfileReview>({ url: `${BASE}/review/${reviewId}`, method: 'get' });
 
 export const confirmReview = (reviewId: string, data: { note?: string; riskLevel?: string }): Promise<ProfileReview> =>
   r<ProfileReview>({ url: `${BASE}/review/${reviewId}/confirm`, method: 'post', data });
