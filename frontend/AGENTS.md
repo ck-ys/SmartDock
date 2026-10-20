@@ -12,7 +12,7 @@ Node >= 20.19.0 required。
 
 ## Build & Run
 
-- **开发服务**：`npx vite --port 5188 --host` **直起**——⚠️ 不要用 npm run dev 脚本（本机有卡死历史）；5188 是本项目端口，80 留给其它窗口
+- **开发服务**：`npx vite --port 5188 --host` **直起**——⚠️ 不要用 npm run dev 脚本（本机有卡死历史）；**前端端口统一 5188**（不存在 5189 口径），80 留给其它窗口
 - **生产构建**：`npm run build:prod`（交付前必过）
 - **Lint**：`npm run lint:eslint` / `lint:eslint:fix`；**Format**：`npm run prettier`
 - **单测**：`npm run test`（Vitest，`vitest.config.ts`）——已有测试集中在 `api/dcs/assistant/aguiClient.test.ts` 与 `components/DcsAssistant/*.test.ts`；新增纯函数逻辑优先补 Vitest

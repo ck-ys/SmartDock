@@ -201,6 +201,8 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 > 环境变量、后端构建/启停、单测、前端命令、测试账号、连接串，全部见
 > `.workshop/plans/acceptance-prompt-*.md`（gitignored，敏感信息只在 .workshop 内）。
+> **端口铁律（本机）**：后端统一 **8090**、前端统一 **5188**——8080/80 被另一窗口占用；
+> 前端一律 `npx vite --port 5188 --host` 直起，**不存在 5189 口径**，任何文档/提示词/验收步骤写端口只写 5188。
 > 高频入口：`.workshop/tmp/package-backend.ps1`（mvn 打包，内部已带本地仓+JDK21）、
 > `.workshop/tmp/start-backend-8090.ps1`、前端 `npx vite --port 5188 --host` 直起。
 > 工具降级（默认无 MCP/skill）：数据库 node+pg 或 psql（`PGCLIENTENCODING=UTF8`）、HTTP curl/node fetch、
