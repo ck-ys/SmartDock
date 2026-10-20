@@ -45,6 +45,27 @@ public class AssistantStatusController extends BaseController {
     private final com.smartdock.service.support.AiBillingService aiBillingService;
     /** 业务反馈批1015b Q14：搜索 key 掩码读（写走参数设置/system config 自带缓存刷新，此处零写） */
     private final org.dromara.common.core.service.ConfigService sysConfigService;
+    /** 稳流② Q8②：run 终态分布（进程内累计） */
+    private final org.dromara.assistant.persist.AssistantRunRecorder runRecorder;
+    /** 稳流② Q8②：追问失败分类分布（进程内累计） */
+    private final org.dromara.assistant.service.AssistantFollowupService followupService;
+
+    /**
+     * 稳流② Q8②（2026-10-20）：助手运行健康（管理页「运行健康」卡数据源）。
+     * 两张分布表=进程内累计（重启归零，since=本次启动时刻）——追问哑火/看门狗误判
+     * 高危样本（心跳=0 且静默大的 run）从这先看出趋势，需要持久化再落表（观察期后决定）。
+     */
+    @SaCheckPermission("dcs:assistant:config")
+    @GetMapping("/admin/health")
+    public R<Map<String, Object>> assistantHealth() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("since", java.time.LocalDateTime.ofInstant(
+            java.time.Instant.ofEpochMilli(java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime()),
+            java.time.ZoneId.of("Asia/Shanghai")).toString());
+        out.put("runOutcomes", runRecorder.terminalOutcomeSnapshot());
+        out.put("followupOutcomes", followupService.followupOutcomeSnapshot());
+        return R.ok(out);
+    }
 
     /** 租户三态感知（perm=dcs:assistant:use；批B B2：带 threadId 时附 contextTokens=
      *  该会话最新 assistant 消息的 total_tokens（末次模型调用 input+cached+output），

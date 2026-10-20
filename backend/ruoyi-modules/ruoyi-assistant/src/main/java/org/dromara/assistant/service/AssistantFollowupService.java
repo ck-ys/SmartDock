@@ -86,6 +86,23 @@ public class AssistantFollowupService {
     /** 池满丢弃计数（审查回修：静默 DiscardPolicy 换告警版拒绝处理器） */
     private final java.util.concurrent.atomic.AtomicLong discardedCount = new java.util.concurrent.atomic.AtomicLong();
 
+    // ===== 稳流② Q8②（2026-10-20）：追问失败分类记账（进程内累计，重启归零）——
+    // 管理端报表数据源；口径：kind 见 recordOutcome 调用点（succeeded/answer-too-short/
+    // pool-rejected/budget-gated/empty-raw/parse-failed/timeout/other）
+    private final java.util.Map<String, java.util.concurrent.atomic.LongAdder> outcomeCounts =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    void recordOutcome(String kind) {
+        outcomeCounts.computeIfAbsent(kind, k -> new java.util.concurrent.atomic.LongAdder()).increment();
+    }
+
+    /** 失败分布快照（管理端 /admin/health 数据源；进程内口径） */
+    public java.util.Map<String, Long> followupOutcomeSnapshot() {
+        java.util.Map<String, Long> out = new java.util.LinkedHashMap<>();
+        outcomeCounts.forEach((k, v) -> out.put(k, v.sum()));
+        return out;
+    }
+
     private final AssistantModelFactory modelFactory;
     private final AssistantPiiFilter piiFilter;
     private final AiBillingService aiBillingService;
@@ -135,6 +152,7 @@ public class AssistantFollowupService {
             // 锦上添花仍丢弃不阻塞，但运维至少能在日志看到丢了多少）
             (r, exec) -> {
                 discardedCount.incrementAndGet();
+                recordOutcome("pool-rejected");
                 if (discardedCount.get() == 1) {
                     log.warn("[AssistantFollowup] 侧车池满开始丢弃任务(后续静默计数), 累计丢弃={}", discardedCount.get());
                 } else if (discardedCount.get() % 50 == 0) {
@@ -158,6 +176,7 @@ public class AssistantFollowupService {
     public void tryStart(String tenantId, Long userId, Long messageId, String threadId,
                          String threadTitle, String question, String answer) {
         if (messageId == null || answer == null || answer.strip().length() < 20) {
+            recordOutcome("answer-too-short");
             return;
         }
         try {
@@ -174,8 +193,16 @@ public class AssistantFollowupService {
                     // 下方 catch 记日志，不影响对话主链），不再绕过三道限额击穿租户日预算。
                     // dspro 附带回修：credits 订阅模式跳过（预算闸只统计钱包流水，积分模式
                     // SUM 恒不增长——订阅租户当天有较大钱包消费时侧车会静默哑火，与主链口径不一致）
-                    if (!quotaService.billingAwareLimits(tenantId, userId).creditsMode()) {
-                        dailyQuota.checkBudget(tenantId, configService.effective(tenantId).dailyBudgetAmount());
+                    // 稳流② Q8②：预算拦下单独记账（budget-gated）后即哑火——不 rethrow，
+                    // 免得外层大 catch 再记一次 other（双记）
+                    try {
+                        if (!quotaService.billingAwareLimits(tenantId, userId).creditsMode()) {
+                            dailyQuota.checkBudget(tenantId, configService.effective(tenantId).dailyBudgetAmount());
+                        }
+                    } catch (org.dromara.common.core.exception.ServiceException be) {
+                        recordOutcome("budget-gated");
+                        log.info("[AssistantFollowup] 预算闸拦下侧车(不生成追问) message={} : {}", messageId, be.getMessage());
+                        return;
                     }
                     // 业务反馈批1015b Q2：侧车改走"轻快模型"（该租户最便宜启用行，倍率=档位信号），
                     // 不再跟主对话抢同一个默认模型——默认模型忙/限流时两败俱伤是追问失败主因；
@@ -242,13 +269,18 @@ public class AssistantFollowupService {
                 followups = cleanFollowups(raw);
             }
             if (followups == null) {
+                // 稳流② Q8②：空卷与解析失败分开记（前者=模型零输出，后者=输出无法解析/条数不足）
+                recordOutcome(raw == null || raw.isBlank() ? "empty-raw" : "parse-failed");
                 log.info("[AssistantFollowup] 响应无有效追问(前端回退静态池) message={} raw={}", messageId,
                     raw != null && raw.length() > 200 ? raw.substring(0, 200) : raw);
                 return;
             }
+            recordOutcome("succeeded");
             conversationService.writeFollowupSuggestions(tenantId, messageId, MAPPER.writeValueAsString(followups));
             log.info("[AssistantFollowup] 追问建议已生成 message={} {}", messageId, followups);
         } catch (Exception e) {
+            // 稳流② Q8②：reactor blockLast 超时=IllegalStateException("Timeout on blocking read…")
+            recordOutcome(e.getMessage() != null && e.getMessage().contains("Timeout") ? "timeout" : "other");
             log.warn("[AssistantFollowup] 生成失败(放弃, 前端回退静态池) message={}", messageId, e);
         }
     }

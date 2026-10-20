@@ -73,6 +73,20 @@ export function getWebsearchInfo() {
   });
 }
 
+/* ===== 稳流② Q8②：运行健康（run 终态分布 + 追问失败分类分布，进程内累计） ===== */
+export interface AssistantHealthReport {
+  /** 本次启动时刻（Asia/Shanghai ISO 串）——计数窗口起点 */
+  since: string;
+  /** run 终态分布：key=status|reason（如 FINISHED|normal / INTERRUPTED|client-disconnect） */
+  runOutcomes: Record<string, number>;
+  /** 追问分布：succeeded/answer-too-short/pool-rejected/budget-gated/empty-raw/parse-failed/timeout/other */
+  followupOutcomes: Record<string, number>;
+}
+
+export function getAssistantHealth() {
+  return request<AssistantHealthReport>({ url: '/dcs/assistant/admin/health', method: 'get' });
+}
+
 /** 业务反馈批1015b Q14：搜索连通测试（key 可选=先验新钥匙再替换；不带=测当前生效 key） */
 export function testWebsearch(key?: string) {
   return request<{ ok: boolean; latencyMs?: number; message: string }>({

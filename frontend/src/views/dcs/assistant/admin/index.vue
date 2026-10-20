@@ -37,6 +37,37 @@
       </div>
     </div>
 
+    <!-- 稳流② Q8②：运行健康（run 终态分布 + 追问失败分类；进程内累计=重启归零，够看趋势） -->
+    <el-card v-if="checkPermi(['dcs:assistant:config'])" shadow="never" class="adm-card health-card" v-loading="healthLoading">
+      <template #header>
+        <div class="health-head">
+          <b>运行健康</b>
+          <span class="cell-note">自本次启动累计（{{ healthSince }} 起）· 服务重启后重新计数</span>
+        </div>
+      </template>
+      <div class="health-grid">
+        <div>
+          <div class="health-sub">回答轮次收尾方式</div>
+          <div class="health-chips">
+            <span v-for="(v, k) in health.runOutcomes" :key="k" class="hchip" :class="runTone(String(k))">
+              <i>{{ v }}</i>{{ runLabel(String(k)) }}
+            </span>
+            <span v-if="!Object.keys(health.runOutcomes).length" class="cell-note">暂无数据</span>
+          </div>
+        </div>
+        <div>
+          <div class="health-sub">追问建议去向</div>
+          <div class="health-chips">
+            <span v-for="(v, k) in health.followupOutcomes" :key="k" class="hchip" :class="fuTone(String(k))">
+              <i>{{ v }}</i>{{ fuLabel(String(k)) }}
+            </span>
+            <span v-if="!Object.keys(health.followupOutcomes).length" class="cell-note">暂无数据</span>
+          </div>
+        </div>
+      </div>
+      <div class="field-hint">回答太短不发追问、超预算不发追问都属正常节流；「生成超时/解析失败」占比持续偏高时再去查模型侧配置。</div>
+    </el-card>
+
     <el-tabs v-model="tab" class="adm-tabs" @tab-change="onTabChange">
       <!-- 页签一：租户开关（方案A重构 2026-10-11：kvrow 手拼列 → el-descriptions 边框式描述列表，标签列 168px 统一对齐；状态长说明收进 ⓘ） -->
       <el-tab-pane label="租户设置" name="config">
@@ -978,7 +1009,9 @@ import {
   type AssistantPanoramaSkill,
   type AssistantQuotaRow,
   getWebsearchInfo,
-  testWebsearch
+  testWebsearch,
+  getAssistantHealth,
+  type AssistantHealthReport
 } from '@/api/dcs/assistant';
 import { listTenantWallet } from '@/api/dcs/tenant-wallet';
 import { addConfig, listConfig, updateConfig } from '@/api/system/config';
@@ -1904,6 +1937,54 @@ async function loadStats() {
   }
 }
 
+/* ===== 稳流② Q8②：运行健康卡（run 终态分布+追问失败分类；加载失败静默隐藏数字） ===== */
+const healthLoading = ref(false);
+const health = ref<AssistantHealthReport>({ since: '', runOutcomes: {}, followupOutcomes: {} });
+const healthSince = computed(() => (health.value.since ? health.value.since.replace('T', ' ').slice(0, 16) : '—'));
+async function loadHealth() {
+  healthLoading.value = true;
+  try {
+    const res = (await getAssistantHealth()) as unknown as { data?: AssistantHealthReport };
+    const d = res?.data;
+    if (d) {
+      health.value = d;
+    }
+  } catch {
+    /* 静默：卡片留「暂无数据」，不拖垮管理页 */
+  } finally {
+    healthLoading.value = false;
+  }
+}
+/** run 终态 → 人话标签（key=status|reason） */
+function runLabel(k: string): string {
+  const [status, reason] = k.split('|');
+  if (status === 'FINISHED') return '正常完成';
+  if (status === 'INTERRUPTED') return `中断（${reason === 'client-disconnect' ? '连接断开' : reason === 'zero-event' ? '无响应' : reason ?? '-'}）`;
+  if (status === 'FAILED') return `失败（${reason ?? '-'}）`;
+  return k;
+}
+function runTone(k: string): string {
+  const s = k.split('|')[0];
+  return s === 'FINISHED' ? 'ok' : s === 'FAILED' ? 'bad' : 'mid';
+}
+/** 追问分类 → 人话标签 */
+const FU_LABELS: Record<string, string> = {
+  succeeded: '已生成',
+  'answer-too-short': '回答太短跳过',
+  'pool-rejected': '排队已满丢弃',
+  'budget-gated': '超预算不发',
+  'empty-raw': '模型空回复',
+  'parse-failed': '内容解析失败',
+  timeout: '生成超时',
+  other: '其他失败'
+};
+function fuLabel(k: string): string {
+  return FU_LABELS[k] ?? k;
+}
+function fuTone(k: string): string {
+  return k === 'succeeded' ? 'ok' : k === 'answer-too-short' || k === 'budget-gated' ? 'mid' : 'bad';
+}
+
 /* ===== 能力全景页签（批C）：工具清单+系统提示词（批A 端点消费） ===== */
 const panoLoading = ref(false);
 const panoTools = ref<AssistantPanoramaTool[]>([]);
@@ -2234,6 +2315,7 @@ onMounted(() => {
     loadStats();
     loadModelSection();
     loadActionLog();
+    loadHealth();
   }
   if (checkPermi(['dcs:assistant:feedback:query'])) {
     loadFeedback();
@@ -2418,6 +2500,67 @@ onMounted(() => {
 
   .adm-card {
     border-radius: 10px;
+
+    /* 稳流② Q8②：运行健康卡（统计条下、页签上）——chips 与统计卡同视觉语系 */
+    &.health-card {
+      margin-bottom: 18px;
+
+      .health-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+
+        b {
+          font-size: 15px;
+        }
+      }
+      .health-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px 24px;
+      }
+      .health-sub {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--dcs-text-secondary);
+        margin-bottom: 8px;
+      }
+      .health-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .hchip {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        border: 1px solid var(--el-border-color-light);
+        color: var(--dcs-text-secondary);
+
+        i {
+          font-style: normal;
+          font-weight: 600;
+          font-variant-numeric: tabular-nums;
+        }
+        &.ok i {
+          color: var(--el-color-success);
+        }
+        &.mid i {
+          color: var(--el-color-warning);
+        }
+        &.bad i {
+          color: var(--el-color-danger);
+        }
+      }
+      @media (max-width: 992px) {
+        .health-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    }
 
     /* 卡片头两件套（批2 视觉回修：原先只在 .model-card 内定义，能力全景两卡没吃到，
        说明字未灰化弱化——提为 adm-card 共用） */

@@ -106,4 +106,60 @@ class AssistantFollowupServiceUnitTest {
             .contains("4~24 个字")
             .contains("{\"followups\":[\"...\",\"...\",\"...\"]}");
     }
+
+    /* ===== 稳流② Q8②：失败分类记账（runGenerationForTest 走生成内部——依赖全 null 即可） ===== */
+
+    /** 空输出模型：stream 立即完成零内容 */
+    private static io.agentscope.core.model.Model emptyModel() {
+        return new io.agentscope.core.model.Model() {
+            @Override
+            public reactor.core.publisher.Flux<io.agentscope.core.model.ChatResponse> stream(
+                java.util.List<io.agentscope.core.message.Msg> msgs,
+                java.util.List<io.agentscope.core.model.ToolSchema> tools,
+                io.agentscope.core.model.GenerateOptions opts) {
+                return reactor.core.publisher.Flux.empty();
+            }
+
+            @Override
+            public String getModelName() {
+                return "stub-empty";
+            }
+        };
+    }
+
+    /** 永不完成的模型：blockLast(timeout) 走超时分支 */
+    private static io.agentscope.core.model.Model neverModel() {
+        return new io.agentscope.core.model.Model() {
+            @Override
+            public reactor.core.publisher.Flux<io.agentscope.core.model.ChatResponse> stream(
+                java.util.List<io.agentscope.core.message.Msg> msgs,
+                java.util.List<io.agentscope.core.model.ToolSchema> tools,
+                io.agentscope.core.model.GenerateOptions opts) {
+                return reactor.core.publisher.Flux.never();
+            }
+
+            @Override
+            public String getModelName() {
+                return "stub-never";
+            }
+        };
+    }
+
+    private static AssistantFollowupService newService() {
+        return new AssistantFollowupService(null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    @Test
+    void outcomeAccountingEmptyRaw() {
+        AssistantFollowupService svc = newService();
+        svc.runGenerationForTest("000000", 9L, "input", emptyModel(), java.time.Duration.ofSeconds(1));
+        assertThat(svc.followupOutcomeSnapshot()).containsEntry("empty-raw", 1L);
+    }
+
+    @Test
+    void outcomeAccountingTimeout() {
+        AssistantFollowupService svc = newService();
+        svc.runGenerationForTest("000000", 9L, "input", neverModel(), java.time.Duration.ofMillis(50));
+        assertThat(svc.followupOutcomeSnapshot()).containsEntry("timeout", 1L);
+    }
 }
