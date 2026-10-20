@@ -517,7 +517,9 @@ onMounted(() => {
   object-fit: contain;
 }
 .login-form__remember {
-  margin-top: -4px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #eef2f8;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -777,6 +779,25 @@ onMounted(() => {
   .login-submit {
     height: 48px;
     font-size: 18px;
+  }
+}
+@media (max-width: 1000px) {
+  // 触屏上把两个勾选行的点按高度从 20px 提到 32px
+  .login-form__remember :deep(.el-checkbox),
+  .login-form__agreement :deep(.el-checkbox) {
+    min-height: 32px;
+    align-items: center;
+  }
+  .login-form__remember :deep(.el-checkbox__label),
+  .login-form__agreement :deep(.el-checkbox__label) {
+    line-height: 20px;
+  }
+}
+@media (max-width: 1000px) and (max-height: 560px) {
+  // 横屏手机：压缩分组线的上下留白，避免多出 7px 滚动
+  .login-form__remember {
+    margin-top: 6px;
+    padding-top: 8px;
   }
 }
 @media (max-width: 400px) {

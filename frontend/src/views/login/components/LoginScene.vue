@@ -4,7 +4,23 @@
     <span class="scene-glow" aria-hidden="true"></span>
 
     <header class="scene-brand">
-      <div class="scene-brand__word">SmartDock</div>
+      <div class="scene-brand__lockup">
+        <span class="scene-brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" focusable="false">
+            <defs>
+              <linearGradient id="brand-mark" x1="0" y1="0" x2="1" y2="1">
+                <stop stop-color="#5b8ff0" />
+                <stop offset="1" stop-color="#3ddad7" />
+              </linearGradient>
+            </defs>
+            <rect width="32" height="32" rx="9" fill="url(#brand-mark)" />
+            <rect x="8" y="17" width="4" height="8" rx="2" fill="#fff" opacity="0.92" />
+            <rect x="14" y="12" width="4" height="13" rx="2" fill="#fff" opacity="0.92" />
+            <rect x="20" y="7" width="4" height="18" rx="2" fill="#fff" opacity="0.92" />
+          </svg>
+        </span>
+        <div class="scene-brand__word">SmartDock</div>
+      </div>
       <p class="scene-brand__tagline">用户画像与 AI 助手的工作台</p>
       <ul class="scene-brand__caps">
         <li><b>画像</b><span>评分 · 分群</span></li>
@@ -16,14 +32,53 @@
     <div class="product-stage">
       <div class="product-window" aria-hidden="true">
         <div class="pw-bar"><i></i><i></i><i></i><span>SmartDock · 画像工作台</span></div>
+        <div class="pw-appbar">
+          <span class="pw-appbar__crumb">画像工作台 <i>/</i> 主体总览</span>
+          <span class="pw-appbar__search">搜索主体、分群…</span>
+          <span class="pw-appbar__avatar">管</span>
+        </div>
         <div class="pw-main">
           <aside class="pw-side">
             <b>工作台</b>
-            <span class="is-on">主体总览</span>
-            <span>分群管理</span>
-            <span>低分复核</span>
-            <span>评分模型</span>
-            <span>事件账本</span>
+            <span class="is-on">
+              <svg class="pw-ico" viewBox="0 0 12 12" aria-hidden="true">
+                <rect x="1.5" y="1.5" width="3.6" height="3.6" rx="1" />
+                <rect x="6.9" y="1.5" width="3.6" height="3.6" rx="1" />
+                <rect x="1.5" y="6.9" width="3.6" height="3.6" rx="1" />
+                <rect x="6.9" y="6.9" width="3.6" height="3.6" rx="1" />
+              </svg>
+              主体总览
+            </span>
+            <span>
+              <svg class="pw-ico" viewBox="0 0 12 12" aria-hidden="true">
+                <circle cx="3" cy="3" r="1.5" />
+                <circle cx="9" cy="3" r="1.5" />
+                <circle cx="6" cy="9" r="1.5" />
+                <path d="M4.2 4.1 5.3 7.7M7.8 4.1 6.7 7.7" />
+              </svg>
+              分群管理
+            </span>
+            <span>
+              <svg class="pw-ico" viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M6 1.6 10.4 10.4H1.6z" />
+                <path d="M6 4.4v2.8" />
+                <circle cx="6" cy="8.9" r="0.5" fill="currentColor" stroke="none" />
+              </svg>
+              低分复核
+            </span>
+            <span>
+              <svg class="pw-ico" viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M1.8 3.2h8.4M1.8 6h8.4M1.8 8.8h8.4" />
+                <circle cx="4.2" cy="3.2" r="1.3" fill="#fff" />
+                <circle cx="7.8" cy="6" r="1.3" fill="#fff" />
+                <circle cx="5" cy="8.8" r="1.3" fill="#fff" />
+              </svg>
+              评分模型
+            </span>
+            <span>
+              <svg class="pw-ico" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2.6h8M2 6h8M2 9.4h5.5" /></svg>
+              事件账本
+            </span>
           </aside>
           <div class="pw-content">
             <div class="pw-head">
@@ -32,16 +87,21 @@
                 <b>陈××</b>
                 <small>最近活跃：今天 09:42 · 来源：官网</small>
               </div>
-              <div class="pw-score"><b>82</b><span>综合评分</span></div>
+              <div class="pw-score">
+                <b>82</b><span>综合评分 <i>+4</i></span>
+              </div>
             </div>
             <div class="pw-tags"><i>近 30 天活跃</i><i>高价值</i><i>华东</i><i>已绑定账号</i></div>
             <div class="pw-cols">
               <div class="pw-panel">
-                <div class="pw-panel__title">画像趋势<span>近 7 天</span></div>
-                <div class="pw-bars">
-                  <i style="height: 38%"></i><i style="height: 56%"></i><i style="height: 46%"></i> <i style="height: 72%"></i
-                  ><i style="height: 61%"></i><i style="height: 84%"></i>
-                  <i style="height: 76%"></i>
+                <div class="pw-panel__title">画像趋势<span>近 7 天 · 评分</span></div>
+                <div class="pw-chart">
+                  <div class="pw-yaxis"><span>100</span><span>50</span><span>0</span></div>
+                  <div class="pw-bars">
+                    <i style="height: 38%"></i><i style="height: 56%"></i><i style="height: 46%"></i> <i style="height: 72%"></i
+                    ><i style="height: 61%"></i><i style="height: 84%"></i>
+                    <i style="height: 76%"></i>
+                  </div>
                 </div>
                 <div class="pw-axis"><span>周一</span><span>周三</span><span>周五</span><span>周日</span></div>
               </div>
@@ -69,18 +129,13 @@
       </div>
 
       <div class="assistant-float" aria-hidden="true">
-        <div class="assistant-float__head"><b>AI 助手</b><span>画像查询</span><i></i></div>
+        <div class="assistant-float__head"><span class="assistant-float__avatar">AI</span><b>AI 助手</b><span>画像查询</span><i></i></div>
         <div class="assistant-float__msg is-user">帮我圈出近 30 天没互动的客户</div>
         <div class="assistant-float__msg is-ai">已找到 12 人，确认后生成名单</div>
         <div class="assistant-float__acts"><span>调整条件</span><b>确认生成</b></div>
       </div>
     </div>
 
-    <div class="scene-caps" aria-hidden="true">
-      <span><b>画像</b> 评分 · 分群 · 复核</span>
-      <span><b>助手</b> 对话 · 人工确认</span>
-      <span><b>分析</b> 会话 · 漏斗</span>
-    </div>
     <p class="scene-note">界面示意 · 数据为演示</p>
   </div>
 </template>
@@ -126,16 +181,38 @@
   right: 48px;
   z-index: 3;
 }
+.scene-brand__lockup {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.scene-brand__mark {
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 11px;
+  box-shadow:
+    0 12px 28px rgba(61, 218, 215, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
 .scene-brand__word {
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   font-size: 38px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
 }
 .scene-brand__tagline {
   margin: 10px 0 0;
   color: #9db9dd;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.06em;
 }
 .scene-brand__caps {
@@ -144,7 +221,7 @@
   margin: 14px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 11px;
+  font-size: 11.5px;
   color: #a9c3e2;
   li {
     display: flex;
@@ -160,11 +237,13 @@
 .product-stage {
   position: absolute;
   left: 48px;
-  top: 190px;
+  // 在品牌块与底部能力行之间垂直居中，再略向下压 45px（避开顶部重量）
+  top: calc(50% + 45px);
   z-index: 2;
   width: 84%;
   max-width: 800px;
   aspect-ratio: 608 / 410;
+  transform: translateY(-50%);
 }
 
 .product-window {
@@ -213,6 +292,48 @@
   }
 }
 
+.pw-appbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border-bottom: 1px solid #e6ecf7;
+  background: #fff;
+  color: #4a5878;
+  font-size: 9px;
+}
+.pw-appbar__crumb {
+  color: #08184f;
+  font-weight: 600;
+  i {
+    margin: 0 3px;
+    color: #b8c2d4;
+    font-style: normal;
+    font-weight: 400;
+  }
+}
+.pw-appbar__search {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid #e2e9f5;
+  border-radius: 999px;
+  color: #9aa4b8;
+  font-size: 7.5px;
+}
+.pw-appbar__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2f5fd0, #3ddad7);
+  color: #fff;
+  font-size: 8px;
+}
+
 .pw-main {
   display: flex;
   flex: 1;
@@ -238,7 +359,7 @@
   span {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     margin-bottom: 2px;
     padding: 4px 6px;
     border-radius: 4px;
@@ -247,15 +368,18 @@
       color: #2b56a8;
       font-weight: 600;
     }
-    &::before {
-      content: '';
-      width: 4px;
-      height: 4px;
-      border-radius: 1px;
-      background: currentColor;
-      opacity: 0.45;
-    }
   }
+}
+.pw-ico {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.75;
 }
 
 .pw-content {
@@ -314,6 +438,16 @@
   span {
     font-size: 7px;
     color: #66718c;
+    i {
+      margin-left: 3px;
+      padding: 0 3px;
+      border-radius: 3px;
+      background: #e8f7ef;
+      color: #167a54;
+      font-size: 6.5px;
+      font-style: normal;
+      line-height: 1.5;
+    }
   }
 }
 .pw-tags {
@@ -359,13 +493,27 @@
     font-weight: 400;
   }
 }
+.pw-chart {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-height: 46px;
+  margin-top: 6px;
+}
+.pw-yaxis {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #9aa4b8;
+  font-size: 6.5px;
+  line-height: 1;
+}
 .pw-bars {
   display: flex;
   flex: 1;
   align-items: flex-end;
   gap: 6px;
-  min-height: 46px;
-  margin-top: 6px;
   background-image: repeating-linear-gradient(to top, rgba(8, 24, 79, 0.06) 0 1px, transparent 1px 25%);
   i {
     flex: 1;
@@ -396,6 +544,22 @@
   gap: 5px;
   font-size: 8px;
   color: #4a5878;
+  &::before {
+    content: '';
+    flex: none;
+    align-self: center;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #6f9bea;
+    opacity: 0.7;
+  }
+  &:nth-child(3n)::before {
+    background: #3ddad7;
+  }
+  &:nth-child(4n)::before {
+    background: #f5b942;
+  }
   em {
     flex: none;
     color: #9aa4b8;
@@ -445,6 +609,21 @@
   color: #9db9dd;
   font-size: 9.5px;
   letter-spacing: 0.05em;
+  .assistant-float__avatar {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2f5fd0, #3ddad7);
+    box-shadow: 0 4px 10px rgba(61, 218, 215, 0.28);
+    color: #fff;
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
   b {
     color: #eef6ff;
     font-size: 10.5px;
@@ -497,23 +676,9 @@
   }
 }
 
-.scene-caps {
-  position: absolute;
-  left: 48px;
-  bottom: 36px;
-  z-index: 3;
-  display: flex;
-  gap: 18px;
-  color: #a9c3e2;
-  font-size: 10.5px;
-  b {
-    color: #e2f0ff;
-    font-weight: 600;
-  }
-}
 .scene-note {
   position: absolute;
-  right: 48px;
+  left: 48px;
   bottom: 26px;
   z-index: 3;
   margin: 0;
@@ -542,26 +707,32 @@
       font-size: 22px;
     }
     span {
-      font-size: 7.5px;
+      font-size: 8px;
+      i {
+        font-size: 7px;
+      }
     }
   }
   .pw-tags i {
-    font-size: 8px;
+    font-size: 8.5px;
   }
   .pw-panel__title {
-    font-size: 9.5px;
+    font-size: 10px;
   }
   .pw-axis {
-    font-size: 7.5px;
+    font-size: 8px;
+  }
+  .pw-yaxis {
+    font-size: 8px;
   }
   .pw-event {
     font-size: 9px;
     em {
-      font-size: 7.5px;
+      font-size: 8px;
     }
   }
   .pw-foot {
-    font-size: 8px;
+    font-size: 8.5px;
   }
   .assistant-float__head {
     font-size: 10px;
@@ -581,22 +752,25 @@
 }
 
 @media (min-width: 1600px) {
+  .scene-brand__lockup {
+    gap: 15px;
+  }
+  .scene-brand__mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
   .scene-brand__word {
     font-size: 44px;
   }
   .scene-brand__tagline {
-    font-size: 14px;
+    font-size: 15px;
   }
   .scene-brand__caps {
-    font-size: 11.5px;
+    font-size: 12px;
   }
   .product-stage {
-    top: 50%;
     max-width: 920px;
-    transform: translateY(-50%);
-  }
-  .scene-caps {
-    font-size: 11.5px;
   }
 }
 
@@ -606,24 +780,31 @@
     top: 32px;
     right: 32px;
   }
+  .scene-brand__lockup {
+    gap: 10px;
+  }
+  .scene-brand__mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
   .scene-brand__word {
     font-size: 32px;
   }
   .scene-brand__tagline {
-    font-size: 11px;
+    font-size: 12px;
   }
   .scene-brand__caps {
     gap: 14px;
     margin-top: 11px;
-    font-size: 9.5px;
+    font-size: 10px;
   }
   .product-stage {
     left: 32px;
-    // 1024×768 下固定 152px 会让窗口下方空出 200px+，按视口高度收一档
-    top: clamp(168px, 24vh, 190px);
     width: 88%;
     max-width: none;
   }
+  .pw-appbar,
   .pw-side {
     display: none;
   }
@@ -636,14 +817,8 @@
     bottom: -34px;
     width: min(230px, 42%);
   }
-  .scene-caps {
-    left: 32px;
-    bottom: 24px;
-    gap: 14px;
-    font-size: 9.5px;
-  }
   .scene-note {
-    right: 32px;
+    left: 32px;
     bottom: 18px;
     font-size: 8.5px;
   }
@@ -655,16 +830,23 @@
     top: 20px;
     right: 20px;
   }
+  .scene-brand__lockup {
+    gap: 8px;
+  }
+  .scene-brand__mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+  }
   .scene-brand__word {
     font-size: 28px;
   }
   .scene-brand__tagline {
     margin-top: 6px;
-    font-size: 11px;
+    font-size: 11.5px;
   }
   .scene-brand__caps,
   .product-stage,
-  .scene-caps,
   .scene-note {
     display: none;
   }

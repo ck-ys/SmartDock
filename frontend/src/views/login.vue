@@ -94,6 +94,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
   background: #061126;
 }
 .login-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -102,9 +103,26 @@ const agreementHref = (path: string) => router.resolve(path).href;
   box-sizing: border-box;
   overflow: hidden;
   padding: 28px 30px 20px;
-  background: radial-gradient(520px 260px at 100% 0%, rgba(59, 130, 246, 0.08), transparent 62%), linear-gradient(180deg, #ffffff, #f8fafd);
+  background:
+    radial-gradient(420px 240px at 0% 100%, rgba(61, 218, 215, 0.05), transparent 65%),
+    radial-gradient(520px 260px at 100% 0%, rgba(59, 130, 246, 0.08), transparent 62%), linear-gradient(180deg, #ffffff, #f8fafd);
   border-left: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: -28px 0 70px rgba(3, 10, 28, 0.32);
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(rgba(8, 24, 79, 0.05) 1px, transparent 1px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(75% 70% at 60% 45%, #000 0%, transparent 78%);
+    -webkit-mask-image: radial-gradient(75% 70% at 60% 45%, #000 0%, transparent 78%);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+  > * {
+    position: relative;
+    z-index: 1;
+  }
 }
 .login-panel__toolbar {
   display: flex;
@@ -126,6 +144,9 @@ const agreementHref = (path: string) => router.resolve(path).href;
   font: inherit;
   font-size: 14px;
   cursor: pointer;
+  &:hover {
+    background: rgba(8, 24, 79, 0.05);
+  }
   &:focus-visible {
     outline: 2px solid var(--login-navy);
     outline-offset: 3px;
@@ -143,9 +164,11 @@ const agreementHref = (path: string) => router.resolve(path).href;
   width: 100%;
   max-width: 396px;
   padding: 26px 26px 22px;
-  border: 1px solid #e6ecf7;
+  border: 1px solid transparent;
   border-radius: 18px;
-  background: #fff;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(140deg, rgba(47, 95, 208, 0.3), rgba(61, 218, 215, 0.18)) border-box;
   box-shadow:
     0 1px 2px rgba(8, 24, 79, 0.04),
     0 18px 46px rgba(8, 24, 79, 0.09);
@@ -319,6 +342,9 @@ const agreementHref = (path: string) => router.resolve(path).href;
   .login-panel__logo {
     display: block;
     margin-bottom: 8px;
+  }
+  .login-panel__content {
+    padding-bottom: 12px;
   }
   .login-page {
     height: auto;
