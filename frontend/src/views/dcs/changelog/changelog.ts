@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.4.4',
+    date: '2026-10-20',
+    title: '首页几个数字的说法改准了',
+    items: [
+      '画像卡第三个数改为「低分主体」（此前误把低风险人数当成低分人数）。',
+      '首页「已提交待审」现在跳到我的待办，不再误跳审核队列；没有分析权限时不再显示「数据分析」按钮。',
+      '手机上历史会话抽屉关闭后，键盘 Tab 不会再钻进去；按 Esc 或点「新会话」会自动收起。'
+    ]
+  },
+  {
     version: 'v1.5.0',
     date: '2026-10-20',
     title: '分析中心新增路径、活跃、实时三张视图',

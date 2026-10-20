@@ -378,11 +378,12 @@ onMounted(() => {
 
   /* 波 0：手机顶栏触控面 ≥44px（图标视觉大小不变），并收紧头像右侧留白；
      波 0.1：断点 768→992 对齐壳层设备判定（width-1<992 即手机形态，iPad 竖屏/手机横屏同享补偿） */
-  @media (max-width: 992px) {
-    /* 顶部安全区：状态栏/刘海不吃进顶栏内容（env 在桌面恒 0） */
-    height: calc(50px + var(--sp-top, 0px));
-    padding-top: var(--sp-top, 0px);
+  /* 顶部安全区：状态栏/刘海不吃进顶栏内容（env 在桌面/无刘海设备恒 0）；
+     AppMain 的高度扣减在所有宽度都消费 --sp-top，这里同口径，避免宽屏错位 */
+  height: calc(50px + var(--sp-top, 0px));
+  padding-top: var(--sp-top, 0px);
 
+  @media (max-width: 992px) {
     .right-menu {
       gap: 2px;
 

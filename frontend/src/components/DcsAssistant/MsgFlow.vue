@@ -541,15 +541,7 @@ watch(
       if (!el) {
         return;
       }
-      if (cardArrived) {
-        // 六审回修（k3 P2）：卡到达时贴底会把卡面操作键压在视口底缘，问题上下文全在
-        // 视口外——改把待确认卡滚到视口顶（block:'start'），卡面+它上面的提问同屏可读
-        const card = el.querySelector<HTMLElement>('.dcs-confirm.pending');
-        if (card) {
-          card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          return;
-        }
-      }
+      // 待确认卡已移到输入框位置（HitlDock），流内只剩一行指路——贴底即可露出那一问
       el.scrollTop = el.scrollHeight;
     });
   }

@@ -14,7 +14,7 @@
         <span class="ck-chip" :class="profile ? 'is-on' : 'is-off'">
           <i class="ck-dot" />画像引擎 · {{ profile ? `最近计算 ${relTime(profile.lastCalcTime)}` : '暂无数据' }}
         </span>
-        <el-button class="ck-refresh" icon="Refresh" circle plain @click="loadAll" />
+        <el-button class="ck-refresh" icon="Refresh" circle plain aria-label="刷新数据" @click="loadAll" />
       </div>
     </header>
 
@@ -30,7 +30,7 @@
           <span class="ck-tier">{{ assistantReady ? '已连接' : '未配置' }}</span>
         </header>
         <div class="ck-ask">
-          <el-input v-model="askText" class="ck-ask__input" placeholder="比如：帮我圈出近 30 天没动静的人" clearable @keyup.enter="ask()" />
+          <el-input v-model="askText" class="ck-ask__input" placeholder="比如：帮我圈出近 30 天没动静的人" clearable @keyup.enter="onAskEnter" />
           <el-button type="primary" class="ck-ask__btn" :disabled="!assistantReady" @click="ask()">问助手</el-button>
         </div>
         <div class="ck-prompts">
@@ -56,14 +56,14 @@
             <span>平均分</span>
           </div>
           <div class="ck-metric is-warn">
-            <b>{{ profile?.lowRisk ?? '—' }}</b>
-            <span>低分待复核</span>
+            <b>{{ profile?.highRisk ?? '—' }}</b>
+            <span>低分主体</span>
           </div>
         </div>
         <div class="ck-links">
           <button type="button" @click="go('/insight/profile')">用户画像</button>
           <button type="button" @click="go('/insight/profile-studio')">画像工作室</button>
-          <button type="button" @click="go('/insight/profile-analytics')">数据分析</button>
+          <button v-if="canAnalytics" type="button" @click="go('/insight/profile-analytics')">数据分析</button>
         </div>
       </section>
     </div>
@@ -86,7 +86,7 @@
             <span>{{ m.label }}</span>
           </div>
         </div>
-        <div class="ck-spark" aria-label="近 7 天浏览量">
+        <div class="ck-spark" role="img" aria-label="近 7 天浏览量">
           <i v-for="(bar, i) in sparkBars" :key="i" :style="{ height: bar + '%' }" :title="`PV ${trend[i]?.pv ?? 0}`" />
         </div>
       </div>
@@ -109,9 +109,9 @@
             <b>{{ stats?.member?.todo ?? 0 }}</b
             ><span>待我完成</span>
           </button>
-          <button type="button" class="ck-task" @click="go('/dcs/audit')">
+          <button type="button" class="ck-task" @click="go('/dcs/todo')">
             <b>{{ stats?.member?.pendingAudit ?? 0 }}</b
-            ><span>待我审核</span>
+            ><span>已提交待审</span>
           </button>
           <button type="button" class="ck-task" @click="go('/dcs/notice')">
             <b>{{ stats?.member?.unreadNotices ?? 0 }}</b
@@ -196,11 +196,22 @@ const recentLogs = computed(() => CHANGELOG_ENTRIES.slice(0, 2));
 
 const go = (path: string) => router.push(path);
 
+/** 中文输入法回车=确认候选词，不能当成发送（Composer 同款 IME 守卫） */
+function onAskEnter(e: KeyboardEvent) {
+  if (e.isComposing) {
+    return;
+  }
+  ask();
+}
+
 function relTime(value?: string): string {
   if (!value) {
     return '—';
   }
-  const t = new Date(value.replace(' ', 'T')).getTime();
+  // 后端固定输出 GMT+8 墙钟；无时区后缀时显式补 +08:00，避免非东八区用户算成未来
+  const iso = value.includes('T') ? value : value.replace(' ', 'T');
+  const zoned = /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}+08:00`;
+  const t = new Date(zoned).getTime();
   if (Number.isNaN(t)) {
     return value;
   }

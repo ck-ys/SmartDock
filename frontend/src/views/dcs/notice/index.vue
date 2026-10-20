@@ -38,7 +38,16 @@
       <!-- ≤992：表格改卡片；点卡片=标为已读（与行点击同口径） -->
       <div class="dcs-mobile-list">
         <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
-        <div v-for="row in rows" :key="row.id" class="dcs-mobile-card notice-card" @click="read(row)">
+        <div
+          v-for="row in rows"
+          :key="row.id"
+          class="dcs-mobile-card notice-card"
+          role="button"
+          tabindex="0"
+          @click="read(row)"
+          @keydown.enter.prevent="read(row)"
+          @keydown.space.prevent="read(row)"
+        >
           <div class="dcs-card-head">
             <span class="dcs-card-title" :style="row.readFlag === '0' ? 'font-weight: 700' : ''"
               >{{ typeBadge(row.noticeType) }} {{ row.title }}</span

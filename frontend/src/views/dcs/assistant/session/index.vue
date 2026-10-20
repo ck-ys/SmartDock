@@ -2,7 +2,12 @@
   <div class="app-container dcs-as-session">
     <!-- 左：会话列表（搜索/新会话/置顶/时间分组/归档折叠）；≤992 变历史会话抽屉 -->
     <div v-if="sideOpen" class="side-mask" @click="sideOpen = false"></div>
-    <aside class="side" :class="{ 'mobile-open': sideOpen }">
+    <aside
+      class="side"
+      :class="{ 'mobile-open': sideOpen }"
+      :aria-hidden="isMobile && !sideOpen ? 'true' : undefined"
+      :inert="(isMobile && !sideOpen) || undefined"
+    >
       <div class="side-hd">
         <span class="side-t">我的助手会话</span>
         <div class="side-ops">
@@ -284,6 +289,12 @@ const kw = ref('');
 const archOpen = ref(false);
 // ≤992 左侧会话栏改成「历史会话」抽屉
 const sideOpen = ref(false);
+/** 壳层 992 断点判定（与 layout 的 width-1<992 同口径）：手机上抽屉关闭时从 Tab 序移除 */
+const mqMobile = window.matchMedia('(max-width: 992px)');
+const isMobile = ref(mqMobile.matches);
+const syncMobile = (e: MediaQueryListEvent) => {
+  isMobile.value = e.matches;
+};
 
 /** 置顶（localStorage 一期，跨设备同步登记二站） */
 const PIN_KEY = 'dcs:assistant:pins';
@@ -625,6 +636,8 @@ function onPlanCancel() {
 }
 
 function onNewSession() {
+  // 手机上点「新会话」后收起历史抽屉，新对话区直接可见
+  sideOpen.value = false;
   if (state.sending) {
     stop(true);
   }
@@ -880,6 +893,10 @@ function onPageEsc(e: KeyboardEvent) {
   if (e.key !== 'Escape') {
     return;
   }
+  if (sideOpen.value) {
+    sideOpen.value = false;
+    return;
+  }
   if (composerRef.value?.escClosePop()) {
     return;
   }
@@ -887,8 +904,14 @@ function onPageEsc(e: KeyboardEvent) {
     stop();
   }
 }
-onMounted(() => document.addEventListener('keydown', onPageEsc));
-onBeforeUnmount(() => document.removeEventListener('keydown', onPageEsc));
+onMounted(() => {
+  document.addEventListener('keydown', onPageEsc);
+  mqMobile.addEventListener('change', syncMobile);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onPageEsc);
+  mqMobile.removeEventListener('change', syncMobile);
+});
 // 路由离开弹栈归还绑定（批H P1-5）：抽屉 layout 常驻不重挂，不清会永久占用失效的 composerRef
 onUnmounted(() => {
   getAssistant(userStore.userId).unbind(hostBinding);
@@ -906,8 +929,8 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   /* 壳层高度由 AppMain 写 --session-chrome（无页签 58 / 有页签 92，含 8px 呼吸位） */
-  height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px));
-  height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px));
+  height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
+  height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
   padding: 12px;
 
   .side {
@@ -1177,8 +1200,8 @@ onUnmounted(() => {
 @media (max-width: 992px) {
   .dcs-as-session {
     gap: 0;
-    height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px));
-    height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px));
+    height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
     padding: 8px;
 
     .side {
@@ -1189,6 +1212,7 @@ onUnmounted(() => {
       z-index: 1201;
       width: min(320px, 86vw);
       height: 100dvh;
+      padding-top: var(--sp-top, 0px);
       padding-bottom: env(safe-area-inset-bottom, 0px);
       border-top: 0;
       border-bottom: 0;
@@ -1215,7 +1239,7 @@ onUnmounted(() => {
       align-items: center;
       flex: none;
       gap: 4px;
-      min-height: 32px;
+      min-height: 44px;
       padding: 0;
       border: none;
       background: none;
