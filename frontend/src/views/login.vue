@@ -71,7 +71,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
   --el-color-primary-dark-2: #06123d;
   --el-text-color-primary: var(--login-navy);
   --el-text-color-regular: #344164;
-  --el-text-color-placeholder: #828ba3;
+  --el-text-color-placeholder: #6b7590;
   --el-border-color: #cdd3e1;
   --el-fill-color-blank: #fff;
   display: grid;
@@ -182,7 +182,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
 .login-panel__footer {
   flex-shrink: 0;
   margin-top: 38px;
-  color: #77819d;
+  color: #66718c;
   font-size: 11px;
   line-height: 1.7;
   text-align: center;
@@ -194,7 +194,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
   gap: 6px;
   margin-top: 2px;
   a {
-    color: #77819d;
+    color: #66718c;
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -236,7 +236,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
     padding: 14px 24px 12px;
   }
   .login-panel__content {
-    padding: 14px 18px 12px;
+    padding: 14px 18px 16px;
     border-radius: 14px;
   }
   .login-panel__toolbar {

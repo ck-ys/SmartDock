@@ -46,7 +46,7 @@
                 <div class="pw-axis"><span>周一</span><span>周三</span><span>周五</span><span>周日</span></div>
               </div>
               <div class="pw-panel">
-                <div class="pw-panel__title">最近事件<span>实时</span></div>
+                <div class="pw-panel__title">最近事件<span>实时 · 128 条</span></div>
                 <div class="pw-events">
                   <div class="pw-event"><em>09:42</em><span>查看了「方案对比」页面</span></div>
                   <div class="pw-event"><em>昨天</em><span>完成一次会话 · 6m12s</span></div>
@@ -56,6 +56,10 @@
                   <div class="pw-event"><em>10-15</em><span>收藏了「解决方案」页面</span></div>
                   <div class="pw-event"><em>10-14</em><span>评分从 78 升到 82</span></div>
                   <div class="pw-event"><em>10-12</em><span>加入「近 30 天活跃」分群</span></div>
+                  <div class="pw-event"><em>10-11</em><span>完成首次画像评分</span></div>
+                  <div class="pw-event"><em>10-09</em><span>打开了「产品报价」页面</span></div>
+                  <div class="pw-event"><em>10-08</em><span>收到一条回访提醒</span></div>
+                  <div class="pw-event"><em>10-06</em><span>会话被标记为「高意向」</span></div>
                 </div>
               </div>
             </div>
@@ -140,15 +144,15 @@
   margin: 14px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 10px;
-  color: #9fbcdd;
+  font-size: 11px;
+  color: #a9c3e2;
   li {
     display: flex;
     gap: 5px;
     white-space: nowrap;
   }
   b {
-    color: #eaf4ff;
+    color: #f2f8ff;
     font-weight: 600;
   }
 }
@@ -362,6 +366,7 @@
   gap: 6px;
   min-height: 46px;
   margin-top: 6px;
+  background-image: repeating-linear-gradient(to top, rgba(8, 24, 79, 0.06) 0 1px, transparent 1px 25%);
   i {
     flex: 1;
     border-radius: 2px 2px 0 0;
@@ -499,8 +504,8 @@
   z-index: 3;
   display: flex;
   gap: 18px;
-  color: #9fbcdd;
-  font-size: 10px;
+  color: #a9c3e2;
+  font-size: 10.5px;
   b {
     color: #e2f0ff;
     font-weight: 600;
@@ -512,8 +517,67 @@
   bottom: 26px;
   z-index: 3;
   margin: 0;
-  color: #66809f;
-  font-size: 8px;
+  color: #8aa6c6;
+  font-size: 9px;
+}
+
+@media (min-width: 1280px) {
+  .pw-bar span {
+    font-size: 10px;
+  }
+  .pw-side {
+    font-size: 9.5px;
+    b {
+      font-size: 10px;
+    }
+  }
+  .pw-person b {
+    font-size: 13px;
+  }
+  .pw-person small {
+    font-size: 8.5px;
+  }
+  .pw-score {
+    b {
+      font-size: 22px;
+    }
+    span {
+      font-size: 7.5px;
+    }
+  }
+  .pw-tags i {
+    font-size: 8px;
+  }
+  .pw-panel__title {
+    font-size: 9.5px;
+  }
+  .pw-axis {
+    font-size: 7.5px;
+  }
+  .pw-event {
+    font-size: 9px;
+    em {
+      font-size: 7.5px;
+    }
+  }
+  .pw-foot {
+    font-size: 8px;
+  }
+  .assistant-float__head {
+    font-size: 10px;
+    b {
+      font-size: 11px;
+    }
+  }
+  .assistant-float__msg {
+    font-size: 10px;
+  }
+  .assistant-float__acts {
+    span,
+    b {
+      font-size: 9px;
+    }
+  }
 }
 
 @media (min-width: 1600px) {
@@ -524,7 +588,7 @@
     font-size: 14px;
   }
   .scene-brand__caps {
-    font-size: 10.5px;
+    font-size: 11.5px;
   }
   .product-stage {
     top: 50%;
@@ -532,7 +596,7 @@
     transform: translateY(-50%);
   }
   .scene-caps {
-    font-size: 10.5px;
+    font-size: 11.5px;
   }
 }
 
@@ -551,7 +615,7 @@
   .scene-brand__caps {
     gap: 14px;
     margin-top: 11px;
-    font-size: 8.5px;
+    font-size: 9.5px;
   }
   .product-stage {
     left: 32px;
@@ -563,24 +627,25 @@
   .pw-side {
     display: none;
   }
-  .pw-event:nth-child(n + 7) {
+  .pw-event:nth-child(n + 6) {
     display: none;
   }
   .assistant-float {
-    right: -8px;
-    bottom: -20px;
+    right: -6px;
+    // 1024 下浮层原本压住第 6 条事件，向下让出一行
+    bottom: -34px;
     width: min(230px, 42%);
   }
   .scene-caps {
     left: 32px;
     bottom: 24px;
     gap: 14px;
-    font-size: 8.5px;
+    font-size: 9.5px;
   }
   .scene-note {
     right: 32px;
     bottom: 18px;
-    font-size: 7.5px;
+    font-size: 8.5px;
   }
 }
 
@@ -595,7 +660,7 @@
   }
   .scene-brand__tagline {
     margin-top: 6px;
-    font-size: 10px;
+    font-size: 11px;
   }
   .scene-brand__caps,
   .product-stage,
