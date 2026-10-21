@@ -457,6 +457,10 @@ export interface AssistantPanoramaTool {
   behavior: string;
   minRoleLevel: number;
   gateDesc: string;
+  /** 批1 Q1=B：租户覆盖档（空=未覆盖走默认） */
+  toolGate?: string | null;
+  /** 批1 Q1=B：生效档（-1=本租户已关闭，0=全员，1=发布人及以上，2=仅管理员） */
+  effective?: number;
 }
 
 export interface AssistantPanorama {
@@ -479,6 +483,33 @@ export interface AssistantPanoramaSkill {
 
 export function getAssistantPanorama() {
   return request<AssistantPanorama>({ url: '/dcs/assistant/capability/panorama', method: 'get' });
+}
+
+/* ============ 批1 Q1=B：工具开关矩阵（租户级覆盖 off/member/admin，未配=默认内置档） ============ */
+
+/** 管理端工具开关行（SPECS 内置档 + 租户覆盖 + 生效档合成；多工具同档共进退） */
+export interface AssistantToolGateRow {
+  toolNames: string[];
+  displayName: string;
+  category: string;
+  gateDesc: string;
+  builtinLevel: number;
+  /** 租户覆盖：null/空=未覆盖走默认；off=关闭；member=全员；admin=仅管理员 */
+  override: string | null;
+  /** 生效档：-1=本租户已关闭，0=全员，1=发布人及以上，2=仅管理员 */
+  effective: number;
+  /** 代码强制项（内置 admin 档，UI 不可调） */
+  locked: boolean;
+  /** 执行前需用户确认（ASK 档） */
+  askConfirm: boolean;
+}
+
+export function getAssistantToolGate() {
+  return request<AssistantToolGateRow[]>({ url: '/dcs/assistant/toolgate', method: 'get' });
+}
+
+export function saveAssistantToolGate(gate: Record<string, string>) {
+  return request({ url: '/dcs/assistant/toolgate', method: 'put', data: gate });
 }
 
 /* ============ 批4 Q11：助手公告（管理台发布/撤回 + 用户侧横幅） ============ */

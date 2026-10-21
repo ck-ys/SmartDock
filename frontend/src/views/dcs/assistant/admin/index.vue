@@ -427,6 +427,18 @@
             <el-table-column label="使用门槛" prop="gateDesc" min-width="140">
               <template #default="{ row }">{{ row.gateDesc || '所有用户' }}</template>
             </el-table-column>
+            <!-- 批1 Q1=B：工具开关覆盖后的本租户实际生效档（-1=已关闭；关闭行通体标红提示） -->
+            <el-table-column label="本租户生效档" width="120">
+              <template #default="{ row }">
+                <el-tag
+                  size="small"
+                  effect="light"
+                  :type="row.effective < 0 ? 'danger' : row.effective >= 2 ? 'warning' : row.effective === 1 ? 'info' : 'success'"
+                >
+                  {{ row.effective < 0 ? '已关闭' : row.effective >= 2 ? '仅管理员' : row.effective === 1 ? '发布人及以上' : '全员可用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
           </el-table>
         </el-card>
 
@@ -483,6 +495,72 @@
               <pre v-else class="sys-prompt">{{ panoSysPrompt || '加载中…' }}</pre>
             </el-collapse-item>
           </el-collapse>
+        </el-card>
+      </el-tab-pane>
+
+      <!-- 页签二B：工具开关（批1 Q1=B 开关矩阵）：租户级逐工具三档覆盖 + 勾选批量；
+           生效口径=下一轮新会话（在跑会话不踢），仅管理员档只升不降 -->
+      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="工具开关" name="toolgate" lazy>
+        <el-card shadow="never" class="adm-card" v-loading="tgLoading">
+          <template #header>
+            <div class="card-head">
+              <b>工具开关矩阵</b>
+              <span class="head-note">
+                关闭=成员和管理员的助手都彻底不可见；仅管理员=普通成员不可见、管理员可用（门槛只升不降）。改动对下一轮新会话生效，进行中的对话不受影响，仅本租户。
+              </span>
+            </div>
+          </template>
+          <el-empty v-if="!tgLoading && tgRows.length === 0" description="工具清单加载失败——切换页签重试" :image-size="60" />
+          <template v-else>
+            <div v-for="g in tgGroups" :key="g.category" class="tg-group">
+              <div class="tg-group-head">
+                <el-checkbox
+                  :model-value="groupAllChecked(g)"
+                  :indeterminate="groupIndeterminate(g)"
+                  :disabled="g.rows.every((r) => r.locked)"
+                  @change="toggleGroup(g, $event)"
+                >{{ g.category }}（{{ g.rows.length }}）</el-checkbox>
+              </div>
+              <div v-for="row in g.rows" :key="row.key" class="tg-row" :class="{ 'tg-row-locked': row.locked }">
+                <el-checkbox v-model="tgChecked" :value="row.key" :disabled="row.locked" />
+                <span class="tool-name">{{ row.displayName }}</span>
+                <el-tag size="small" effect="plain" :type="row.askConfirm ? 'warning' : 'success'">
+                  {{ row.askConfirm ? '需确认' : '自动执行' }}
+                </el-tag>
+                <el-tag v-if="row.locked" size="small" type="info" effect="plain">🔒 强制仅管理员</el-tag>
+                <span class="field-hint tg-desc">{{ row.gateDesc || '所有用户' }}</span>
+                <span class="tg-status" :class="{ 'tg-off': row.effective < 0, 'tg-admin': row.effective >= 2 }">
+                  {{ tgEffectiveText(row) }}
+                </span>
+                <el-select
+                  :model-value="tgRowValue(row)"
+                  :disabled="row.locked"
+                  size="small"
+                  class="tg-select"
+                  @change="setRowValue(row, $event)"
+                >
+                  <el-option label="默认（内置档）" value="" />
+                  <el-option label="全员可用" value="member" />
+                  <el-option label="仅管理员" value="admin" />
+                  <el-option label="关闭" value="off" />
+                </el-select>
+              </div>
+            </div>
+            <div v-if="tgChecked.length > 0" class="tg-batch">
+              <span>已选 {{ tgChecked.length }} 项，批量设为：</span>
+              <el-button size="small" @click="batchSet('member')">全员可用</el-button>
+              <el-button size="small" @click="batchSet('admin')">仅管理员</el-button>
+              <el-button size="small" type="danger" plain @click="batchSet('off')">关闭</el-button>
+              <el-button size="small" @click="batchSet('')">恢复默认</el-button>
+            </div>
+            <div class="tg-save">
+              <el-button type="primary" :loading="tgSaving" :disabled="!tgDirty" @click="onSaveToolGate">
+                保存（{{ tgDirtyCount }} 项改动）
+              </el-button>
+              <el-button :disabled="!tgDirty || tgSaving" @click="resetToolGate">放弃改动</el-button>
+              <span v-if="tgDirty" class="field-hint">有未保存改动——保存后新会话才生效</span>
+            </div>
+          </template>
         </el-card>
       </el-tab-pane>
 
@@ -991,6 +1069,8 @@ import {
   getAssistantStatus,
   getAssistantAdminStats,
   getAssistantPanorama,
+  getAssistantToolGate,
+  saveAssistantToolGate,
   listActionLog,
   listFeedback,
   getFeedbackStats,
@@ -1007,6 +1087,7 @@ import {
   type AssistantEffectiveConfig,
   type AssistantPanoramaTool,
   type AssistantPanoramaSkill,
+  type AssistantToolGateRow,
   type AssistantQuotaRow,
   getWebsearchInfo,
   testWebsearch,
@@ -2025,6 +2106,111 @@ async function loadPanorama() {
   }
 }
 
+/* ===== 工具开关页签（批1 Q1=B）：租户级逐工具三档覆盖 + 勾选批量（用户要求多选） ===== */
+/** 行 UI 模型：key=多工具同档的合并键（勾选身份）；草稿/快照按工具名存（PUT 校验键∈allToolNames） */
+interface TgRowUi extends AssistantToolGateRow {
+  key: string;
+}
+interface TgGroup {
+  category: string;
+  rows: TgRowUi[];
+}
+const tgLoading = ref(false);
+const tgSaving = ref(false);
+const tgRows = ref<TgRowUi[]>([]);
+/** 已保存覆盖快照（工具名→off/member/admin；无键=默认内置档） */
+const tgSaved = ref<Record<string, string>>({});
+/** 草稿覆盖——保存时整份提交（后端全量覆盖语义，空表=全恢复默认） */
+const tgDraft = ref<Record<string, string>>({});
+const tgChecked = ref<string[]>([]);
+const tgGroups = computed<TgGroup[]>(() => {
+  const map = new Map<string, TgRowUi[]>();
+  for (const r of tgRows.value) {
+    const list = map.get(r.category) ?? [];
+    list.push(r);
+    map.set(r.category, list);
+  }
+  return [...map.entries()].map(([category, rows]) => ({ category, rows }));
+});
+const tgDirtyCount = computed(() =>
+  tgRows.value.filter((r) => (tgDraft.value[r.toolNames[0]] ?? '') !== (tgSaved.value[r.toolNames[0]] ?? '')).length
+);
+const tgDirty = computed(() => tgDirtyCount.value > 0);
+function tgRowValue(row: TgRowUi): string {
+  return tgDraft.value[row.toolNames[0]] ?? '';
+}
+function tgEffectiveText(row: TgRowUi): string {
+  if (row.effective < 0) return '本租户已关闭';
+  if (row.effective >= 2) return '仅管理员可用';
+  if (row.effective === 1) return '发布人及以上';
+  return '全员可用';
+}
+/** 多工具 spec 同档共进退：设值写到全部工具名（effectiveMinRole 任一命中即生效，全写避免先命中的残留旧值） */
+function setRowValue(row: TgRowUi, v: string) {
+  const next = { ...tgDraft.value };
+  for (const n of row.toolNames) {
+    if (v) next[n] = v;
+    else delete next[n];
+  }
+  tgDraft.value = next;
+}
+function groupAllChecked(g: TgGroup): boolean {
+  return g.rows.every((r) => r.locked || tgChecked.value.includes(r.key));
+}
+function groupIndeterminate(g: TgGroup): boolean {
+  const sel = g.rows.filter((r) => !r.locked && tgChecked.value.includes(r.key)).length;
+  const selectable = g.rows.filter((r) => !r.locked).length;
+  return sel > 0 && sel < selectable;
+}
+function toggleGroup(g: TgGroup, on: unknown) {
+  const keys = g.rows.filter((r) => !r.locked).map((r) => r.key);
+  if (on) tgChecked.value = [...new Set([...tgChecked.value, ...keys])];
+  else tgChecked.value = tgChecked.value.filter((k) => !keys.includes(k));
+}
+/** 批量设档：锁定项自动跳过并提示（代码强制项不参与租户覆盖） */
+function batchSet(v: string) {
+  const rows = tgRows.value.filter((r) => !r.locked && tgChecked.value.includes(r.key));
+  const skipped = tgChecked.value.length - rows.length;
+  if (skipped > 0) ElMessage.info(`${skipped} 项为代码强制档，已跳过`);
+  for (const r of rows) setRowValue(r, v);
+}
+async function loadToolGate() {
+  tgLoading.value = true;
+  try {
+    const res = (await getAssistantToolGate()) as unknown as { data?: AssistantToolGateRow[] };
+    const rows = res.data ?? [];
+    tgRows.value = rows.map((r) => ({ ...r, key: r.toolNames.join('/') }));
+    const saved: Record<string, string> = {};
+    for (const r of rows) {
+      if (r.override) for (const n of r.toolNames) saved[n] = r.override;
+    }
+    tgSaved.value = saved;
+    tgDraft.value = { ...saved };
+    tgChecked.value = [];
+  } catch {
+    ElMessage.error('工具开关清单加载失败，请稍后再试');
+  } finally {
+    tgLoading.value = false;
+  }
+}
+function resetToolGate() {
+  tgDraft.value = { ...tgSaved.value };
+  tgChecked.value = [];
+}
+async function onSaveToolGate() {
+  tgSaving.value = true;
+  try {
+    await saveAssistantToolGate(tgDraft.value);
+    tgSaved.value = { ...tgDraft.value };
+    tgChecked.value = [];
+    ElMessage.success('已保存——下一轮新会话起生效');
+  } catch {
+    ElMessage.error('保存失败，请稍后再试');
+  } finally {
+    tgSaving.value = false;
+  }
+}
+
 /** lazy 页签首访加载（批C）：能力全景切到才拉（工作面不预载用不到的数据） */
 /** 公告页签首开即拉列表（lazy 页签，与 panorama/quota 同款 onTabChange 模式）。
  *  dspro P2-5 回修：反馈页签每次切入重刷统计——原「fbRows 非空只刷一次」会让管理员
@@ -2032,6 +2218,9 @@ async function loadPanorama() {
 function onTabChange(name: string | number) {
   if (name === 'panorama' && panoTools.value.length === 0 && !panoLoading.value) {
     void loadPanorama();
+  }
+  if (name === 'toolgate' && tgRows.value.length === 0 && !tgLoading.value) {
+    void loadToolGate();
   }
   if (name === 'quota' && quotaRows.value.length === 0 && !quotaLoading.value) {
     void loadQuotaPage();
@@ -3122,5 +3311,68 @@ onMounted(() => {
 .quota-exhausted {
   color: var(--el-color-danger);
   font-weight: 600;
+}
+
+/* ===== 工具开关页签（批1 Q1=B）===== */
+.tg-group {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.tg-group-head {
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+}
+.tg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 4px;
+}
+.tg-row-locked {
+  opacity: 0.75;
+}
+.tg-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tg-status {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.tg-status.tg-off {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+.tg-status.tg-admin {
+  color: var(--el-color-warning);
+}
+.tg-select {
+  flex-shrink: 0;
+  width: 140px;
+}
+.tg-batch {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-top: 4px;
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 6px;
+}
+.tg-save {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
 }
 </style>
