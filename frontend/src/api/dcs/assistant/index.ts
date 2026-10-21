@@ -509,7 +509,7 @@ export function getAssistantToolGate() {
 }
 
 export function saveAssistantToolGate(gate: Record<string, string>) {
-  return request({ url: '/dcs/assistant/toolgate', method: 'put', data: gate });
+  return request({ url: '/dcs/assistant/toolgate', method: 'post', data: gate });
 }
 
 /* ============ 批4 Q11：助手公告（管理台发布/撤回 + 用户侧横幅） ============ */

@@ -430,7 +430,9 @@
             <!-- 批1 Q1=B：工具开关覆盖后的本租户实际生效档（-1=已关闭；关闭行通体标红提示） -->
             <el-table-column label="本租户生效档" width="120">
               <template #default="{ row }">
+                <el-tag v-if="row.effective == null" size="small" effect="plain" type="info">—</el-tag>
                 <el-tag
+                  v-else
                   size="small"
                   effect="light"
                   :type="row.effective < 0 ? 'danger' : row.effective >= 2 ? 'warning' : row.effective === 1 ? 'info' : 'success'"
@@ -504,9 +506,9 @@
         <el-card shadow="never" class="adm-card" v-loading="tgLoading">
           <template #header>
             <div class="card-head">
-              <b>工具开关矩阵</b>
+              <b>工具开关矩阵（平台工具）</b>
               <span class="head-note">
-                关闭=成员和管理员的助手都彻底不可见；仅管理员=普通成员不可见、管理员可用（门槛只升不降）。改动对下一轮新会话生效，进行中的对话不受影响，仅本租户。
+                平台内置工具的租户级开关；业务工具（任务/画像查询等）走角色权限另管。关闭=成员和管理员的助手都彻底不可见；仅管理员=普通成员不可见、管理员可用（门槛只升不降）。改动对下一轮新会话生效，进行中的对话不受影响，仅本租户。
               </span>
             </div>
           </template>
@@ -529,7 +531,7 @@
                 </el-tag>
                 <el-tag v-if="row.locked" size="small" type="info" effect="plain">🔒 强制仅管理员</el-tag>
                 <span class="field-hint tg-desc">{{ row.gateDesc || '所有用户' }}</span>
-                <span class="tg-status" :class="{ 'tg-off': row.effective < 0, 'tg-admin': row.effective >= 2 }">
+                <span class="tg-status" :class="{ 'tg-off': tgEffective(row) < 0, 'tg-admin': tgEffective(row) >= 2 }">
                   {{ tgEffectiveText(row) }}
                 </span>
                 <el-select
@@ -2139,10 +2141,21 @@ const tgDirty = computed(() => tgDirtyCount.value > 0);
 function tgRowValue(row: TgRowUi): string {
   return tgDraft.value[row.toolNames[0]] ?? '';
 }
+/** 三审回修（dsflash/dspro P1）：生效档按草稿即时推导（后端 effectiveMinRole 同口径
+ *  off=-1 / admin=max(builtin,2) / member=max(builtin,0) / 默认=builtin）——
+ *  保存前后状态列与下拉值始终一致，不再吃 GET 时的旧快照 */
+function tgEffective(row: TgRowUi): number {
+  const v = tgDraft.value[row.toolNames[0]] ?? '';
+  if (v === 'off') return -1;
+  if (v === 'admin') return Math.max(row.builtinLevel, 2);
+  if (v === 'member') return Math.max(row.builtinLevel, 0);
+  return row.builtinLevel;
+}
 function tgEffectiveText(row: TgRowUi): string {
-  if (row.effective < 0) return '本租户已关闭';
-  if (row.effective >= 2) return '仅管理员可用';
-  if (row.effective === 1) return '发布人及以上';
+  const e = tgEffective(row);
+  if (e < 0) return '本租户已关闭';
+  if (e >= 2) return '仅管理员可用';
+  if (e === 1) return '发布人及以上';
   return '全员可用';
 }
 /** 多工具 spec 同档共进退：设值写到全部工具名（effectiveMinRole 任一命中即生效，全写避免先命中的残留旧值） */
@@ -2169,10 +2182,10 @@ function toggleGroup(g: TgGroup, on: unknown) {
 }
 /** 批量设档：锁定项自动跳过并提示（代码强制项不参与租户覆盖） */
 function batchSet(v: string) {
-  const rows = tgRows.value.filter((r) => !r.locked && tgChecked.value.includes(r.key));
-  const skipped = tgChecked.value.length - rows.length;
-  if (skipped > 0) ElMessage.info(`${skipped} 项为代码强制档，已跳过`);
-  for (const r of rows) setRowValue(r, v);
+  // 勾选集只含可勾选行（行 checkbox/组头对 locked 均已禁用/过滤），无需跳过计数
+  for (const r of tgRows.value) {
+    if (!r.locked && tgChecked.value.includes(r.key)) setRowValue(r, v);
+  }
 }
 async function loadToolGate() {
   tgLoading.value = true;
@@ -2188,7 +2201,7 @@ async function loadToolGate() {
     tgDraft.value = { ...saved };
     tgChecked.value = [];
   } catch {
-    ElMessage.error('工具开关清单加载失败，请稍后再试');
+    // 具体错误 request 层已弹；失败态由页面空态文案兜底（切换页签可重试）
   } finally {
     tgLoading.value = false;
   }
@@ -2203,9 +2216,11 @@ async function onSaveToolGate() {
     await saveAssistantToolGate(tgDraft.value);
     tgSaved.value = { ...tgDraft.value };
     tgChecked.value = [];
+    // 全景缓存作废——「本租户生效档」列下次切入重拉（三审回修 P1）
+    panoTools.value = [];
     ElMessage.success('已保存——下一轮新会话起生效');
   } catch {
-    ElMessage.error('保存失败，请稍后再试');
+    // 值域/工具名校验的人话报错已由 request 层弹出，这里不再叠一层通用文案
   } finally {
     tgSaving.value = false;
   }
