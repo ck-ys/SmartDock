@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.8.1',
+    date: '2026-10-21',
+    title: '引擎升级到 AgentScope 2.0.4，两处暗雷排掉',
+    items: [
+      'AI 引擎底座升级到 AgentScope 2.0.4（对话/思考/工具/心跳/确认卡全链路实测正常），为后续技能与外部工具扩展铺路。',
+      '修掉一个暗改道问题：模型接口地址留空的配置行会让对话悄悄发往 OpenAI 官方地址然后超时，现在直接提示「请补全接口地址」，不再干等。',
+      '删除用户数据时框架会话表的清理补上了表名前缀，此前这步清理一直在静默失败重试。'
+    ]
+  },
+  {
     version: 'v1.8.0',
     date: '2026-10-20',
     title: '合规三件套：能打码、能删人、能追责',

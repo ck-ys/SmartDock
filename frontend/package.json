@@ -8,14 +8,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite serve --mode development",
-    "build:prod": "vite build --mode production",
+    "build:prod": "node scripts/typecheck-warn.mjs && vite build --mode production",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint:eslint": "eslint",
     "lint:eslint:fix": "eslint --fix",
-    "prettier": "prettier --write ."
+    "prettier": "prettier --write .",
+    "type-check": "vue-tsc --noEmit"
   },
   "repository": {
     "type": "git",
