@@ -45,6 +45,20 @@ public interface AssistantConfigMapper extends BaseMapper<DcsAssistantConfig> {
     int upsert(@Param("c") DcsAssistantConfig config);
 
     /**
+     * 批1 Q1=B：工具开关列专用 upsert（三审回修 P2——替代 select-then-insert/update，
+     * 消并发首插撞主键）。首插=平台默认 + enabled='0'（与 upsert 首插口径逐列一致，
+     * 保持"未配置=助手关闭"语义）；在位行只动 tool_gate（"" 哨兵直写可清空）。
+     */
+    @Insert("INSERT INTO dcs_assistant_config (tenant_id, enabled, daily_round_limit_per_user,"
+        + " daily_budget_amount, memory_enabled, compaction_trigger_tokens, websearch_limit_per_user,"
+        + " digest_enabled, tool_gate, create_time)"
+        + " VALUES (#{c.tenantId}, '0', 50, 50.0000, '0', 60000, 20, '0', #{c.toolGate}, CURRENT_TIMESTAMP)"
+        + " ON CONFLICT (tenant_id) DO UPDATE SET"
+        + " tool_gate = EXCLUDED.tool_gate,"
+        + " update_time = CURRENT_TIMESTAMP")
+    int upsertToolGate(@Param("c") DcsAssistantConfig config);
+
+    /**
      * 管理页统计头（ZCode 对齐 Q4 批C）：全租户四计数 + 本月费用单条聚合。
      * 费用谓词与预算闸（AssistantDailyQuota）逐字同源（dspro P2-2 回修：
      * del_flag='0'+biz_type='DEDUCT'，否则软删/冲正流水会让管理页与钱包对不上账）；

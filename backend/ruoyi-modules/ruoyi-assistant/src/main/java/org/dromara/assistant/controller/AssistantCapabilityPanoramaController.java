@@ -63,8 +63,10 @@ public class AssistantCapabilityPanoramaController extends BaseController {
     @GetMapping("/panorama")
     public R<PanoramaVo> panorama() {
         String tenantId = LoginHelper.getTenantId();
-        // 批1 Q1=B：先取生效配置——工具行带出 tool_gate 覆盖与 effective 生效档
-        java.util.Map<String, String> gate = assistantConfigService.effective(tenantId).toolGate();
+        // 批1 Q1=B：先取生效配置——工具行带出 tool_gate 覆盖与 effective 生效档；
+        // 三审回修（dspro P2-6）：与下方 memoryOn 同源复用，一次请求只查一次
+        AssistantConfigService.EffectiveConfig cfg = assistantConfigService.effective(tenantId);
+        java.util.Map<String, String> gate = cfg.toolGate();
         List<PanoramaTool> tools = new ArrayList<>();
         for (ToolRegistry.ToolSpec spec : ToolRegistry.SPECS) {
             int effective = ToolRegistry.effectiveMinRole(spec, gate);
@@ -89,7 +91,6 @@ public class AssistantCapabilityPanoramaController extends BaseController {
             skills.add(new PanoramaSkill(sk.id(), sk.name(), sk.description(), sk.minRole(),
                 "会话中 ➕ 面板选中才注入：仅选中会话按轮生效，未选中不产生额外消耗", sk.triggers(), sk.body()));
         }
-        AssistantConfigService.EffectiveConfig cfg = assistantConfigService.effective(tenantId);
         boolean memoryOn = "1".equals(cfg.memoryEnabled());
         // 批2 Q8：snapshot 单次读盘，拼装串与分段视图同源同刻（审查 P2-3）
         PromptAssets.Snapshot snap = PromptAssets.snapshot(memoryOn);

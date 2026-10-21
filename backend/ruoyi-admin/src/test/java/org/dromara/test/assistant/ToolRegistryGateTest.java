@@ -1,6 +1,7 @@
 package org.dromara.test.assistant;
 
 import org.dromara.assistant.core.ToolRegistry;
+import org.dromara.assistant.service.AssistantConfigService;
 import org.dromara.assistant.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,30 @@ class ToolRegistryGateTest {
         java.util.Set.of("gate_test_tool"), null, 0, null, null);
     private static final ToolRegistry.ToolSpec ADMIN_TOOL = new ToolRegistry.ToolSpec(
         java.util.Set.of("gate_admin_tool"), null, ToolIdentity.LEVEL_ADMIN, null, null);
+
+    /** 三审回修（dspro P1-2）：坏 JSON fail-closed——按全工具关闭处理，已关工具不复活 */
+    @Test
+    void corruptedJsonFailsClosedToAllOff() {
+        Map<String, String> gate = AssistantConfigService.parseToolGate("{\"web_search\": \"of");
+        assertEquals(ToolRegistry.allToolNames().size(), gate.size(), "坏 JSON=全工具兜底条目");
+        for (String v : gate.values()) {
+            assertEquals("off", v, "兜底值一律 off（fail-closed）");
+        }
+        // 全 off 走判定：真实工具注册面应全部跳过（关闭语义闭环；
+        // MEMBER_TOOL 是测试专用名不在 allToolNames，兜底表里没有它）
+        ToolRegistry.ToolSpec webSearch = new ToolRegistry.ToolSpec(
+            java.util.Set.of("web_search"), null, 0, null, null);
+        assertEquals(-1, ToolRegistry.effectiveMinRole(webSearch, gate));
+    }
+
+    /** 空/空白=空表（未配置，走内置门槛）——与坏 JSON 的全关兜底区分 */
+    @Test
+    void blankJsonMeansNoOverride() {
+        for (String raw : new String[] {null, "", "   "}) {
+            assertEquals(Map.of(), AssistantConfigService.parseToolGate(raw), "空配置(" + raw + ")=空表不覆盖");
+        }
+        assertEquals(0, ToolRegistry.effectiveMinRole(MEMBER_TOOL, AssistantConfigService.parseToolGate(null)));
+    }
 
     @Test
     void nullOrEmptyGateKeepsBuiltinRole() {

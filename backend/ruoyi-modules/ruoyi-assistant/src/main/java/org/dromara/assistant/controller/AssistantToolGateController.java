@@ -7,7 +7,9 @@ import org.dromara.assistant.service.AssistantConfigService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,7 +22,7 @@ import java.util.Set;
 /**
  * 批1 Q1=B（2026-10-21 开关矩阵）：租户级工具档位管理接口。
  * 权限复用 dcs:assistant:config（助手管理既有编辑权，零菜单 SQL）。
- * GET=合并视图（前端零拼装）；PUT=整列覆盖（值域/工具名校验，只升不降由
+ * GET=合并视图（前端零拼装）；POST=整列覆盖（值域/工具名校验，只升不降由
  * effectiveMinRole 的 max 语义结构性保证）。生效时机=下一轮建会话。
  */
 @RestController
@@ -60,7 +62,8 @@ public class AssistantToolGateController extends BaseController {
     }
 
     @SaCheckPermission("dcs:assistant:config")
-    @PutMapping
+    @Log(title = "AI助手-工具开关", businessType = BusinessType.UPDATE)
+    @PostMapping
     public R<Void> save(@RequestBody Map<String, String> gate) {
         Set<String> known = ToolRegistry.allToolNames();
         for (Map.Entry<String, String> e : gate.entrySet()) {

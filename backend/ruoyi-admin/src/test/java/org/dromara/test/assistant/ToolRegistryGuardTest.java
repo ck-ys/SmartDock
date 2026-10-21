@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>纯静态构造（不依赖 Spring 上下文与数据库）：工具构造器只存依赖引用，
  * null 依赖在本测试不触发调用。</p>
  */
-@Tag("dev")
+@Tag("local")
 class ToolRegistryGuardTest {
 
     /** 业务批3-④：web_search 受会话联网开关门控（Holder 按 threadId 判定，未登记恒关）。

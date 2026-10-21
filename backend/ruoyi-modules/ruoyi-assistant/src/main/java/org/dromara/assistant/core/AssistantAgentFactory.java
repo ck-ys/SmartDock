@@ -128,7 +128,11 @@ public class AssistantAgentFactory {
         org.dromara.assistant.core.AssistantWebSearchHolder.markBuilt(aguiThreadId,
             org.dromara.assistant.core.AssistantWebSearchHolder.isOn(aguiThreadId));
         // 二站④ AU-53：租户开长期记忆才装配记忆链路（注入装饰器+save_memory 工具+§13 提示词）
-        boolean memoryOn = "1".equals(assistantConfigService.effective(user.getTenantId()).memoryEnabled());
+        // 三审回修（dspro P2-6）：租户配置一次读全（此前 memoryOn/toolGate/compaction 各查一次，
+        // 三次快照有半新半旧窗口）——toolGate 在下方注册面消费，compaction 在压缩中间件消费
+        org.dromara.assistant.service.AssistantConfigService.EffectiveConfig tenantCfg =
+            assistantConfigService.effective(user.getTenantId());
+        boolean memoryOn = "1".equals(tenantCfg.memoryEnabled());
         // AU-03(Q3=C)→批2 双层档位: 最内层套思考档装饰器——按会话读 thinkTier 经能力目录
         // 翻译原生参数(TIERS→reasoning_effort / SWITCH→thinking.type)；装配期解析能力一次注入。
         // 外两层不变（计费按出网文本估算,PII 先脱敏再计费）。
@@ -172,7 +176,7 @@ public class AssistantAgentFactory {
                 webSearchQuota, quotaService), pb,
             // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
             // 管理员改完下一轮建会话即生效（注册面即时消失）
-            assistantConfigService.effective(user.getTenantId()).toolGate());
+            tenantCfg.toolGate());
         // 批2 SPI 化: BizToolProvider 通道(内置优先, 撞名让位)——注册与权限规则同循环;
         // 批3 起业务工具唯一来路（微核心 DcsToolProvider 在此挂载）
         registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb));
@@ -200,7 +204,7 @@ public class AssistantAgentFactory {
             // 渲染「已压缩」标记；配置双显式（trigger+keep），不依赖模型自报窗口（P14 Step5）
             .middleware(new DcsCompactionMiddleware(workspaceManager, model,
                 AssistantCompactionAssets.buildConfig(
-                    assistantConfigService.effective(user.getTenantId()).compactionTriggerTokens()),
+                    tenantCfg.compactionTriggerTokens()),
                 conversationService))
             // 业务批7 Q16-①：恢复态 pending（无结果的 tool_use）官方恢复分支——合成工具
             // 失败结果后会话继续；配合 AssistantStaleAskingRecovery 启动翻转 asking→allowed，

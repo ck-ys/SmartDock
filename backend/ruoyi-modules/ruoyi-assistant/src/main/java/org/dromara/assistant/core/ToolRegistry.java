@@ -179,7 +179,8 @@ public final class ToolRegistry {
     }
 
     /** 全量工具名（不分角色，守卫测试比对用）。 */
-    public static Set<String> allToolNames() {        Set<String> names = new LinkedHashSet<>();
+    public static Set<String> allToolNames() {
+        Set<String> names = new LinkedHashSet<>();
         for (ToolSpec spec : SPECS) {
             names.addAll(spec.toolNames());
         }

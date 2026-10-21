@@ -77,23 +77,47 @@ public class AssistantConfigService {
             parseToolGate(row.getToolGate()));
     }
 
-    /** 批1 Q1=B：tool_gate JSON 解析（工具名→off/member/admin）；空/坏 JSON=空表不覆盖 */
-    private static java.util.Map<String, String> parseToolGate(String raw) {
+    /**
+     * 批1 Q1=B：tool_gate JSON 解析（工具名→off/member/admin）；空=空表不覆盖。
+     * 三审回修（dspro P1-2）：坏 JSON/非法值 fail-closed——解析失败按「全部关闭」
+     * 处理并留 ERROR 日志，管理员已关的工具不会因配置被污染而静默复活（PUT 侧
+     * 有值域校验，脏值只可能来自手工改库，全关+日志=立刻可见可修，比放行安全）。
+     * public static 纯函数：跨模块单测（ToolRegistryGateTest）直调。
+     */
+    /** 独立 mapper（批1-C 回修）：JsonUtils 静态块依赖 Spring 容器，纯函数单测调不动（批1 旧坑） */
+    private static final com.fasterxml.jackson.databind.ObjectMapper GATE_MAPPER =
+        new com.fasterxml.jackson.databind.ObjectMapper();
+
+    public static java.util.Map<String, String> parseToolGate(String raw) {
         if (raw == null || raw.isBlank()) {
             return java.util.Map.of();
         }
         try {
-            java.util.Map<String, Object> parsed = org.dromara.common.json.utils.JsonUtils.parseMap(raw);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> parsed = GATE_MAPPER.readValue(raw, java.util.Map.class);
             java.util.Map<String, String> gate = new java.util.LinkedHashMap<>();
             parsed.forEach((k, v) -> {
                 if (k != null && v != null) {
-                    gate.put(k, String.valueOf(v).trim());
+                    // 值域归一（fail-closed 同口径）：非三态值（手工改库产物）一律按 off，
+                    // GET 视图可见 override=off，管理员一眼能改回
+                    String val = String.valueOf(v).trim();
+                    gate.put(k, "off".equals(val) || "member".equals(val) || "admin".equals(val) ? val : "off");
                 }
             });
             return gate;
         } catch (Exception e) {
-            return java.util.Map.of();
+            log.error("[AssistantConfig] tool_gate JSON 非法，按全关闭处理（tenant 配置被污染，请管理员重新保存开关矩阵）raw={}", raw, e);
+            return allOffGate();
         }
+    }
+
+    /** 坏配置兜底：全工具 off（与 ToolRegistry.allToolNames 单点同源，防解析失败时 fail-open） */
+    private static java.util.Map<String, String> allOffGate() {
+        java.util.Map<String, String> closed = new java.util.LinkedHashMap<>();
+        for (String name : org.dromara.assistant.core.ToolRegistry.allToolNames()) {
+            closed.put(name, "off");
+        }
+        return closed;
     }
 
     /** 称呼归一（读侧）：空白一律=平台默认，非空 trim 后直出（写侧已限长） */
@@ -146,36 +170,22 @@ public class AssistantConfigService {
     }
 
     /**
-     * 批1 Q1=B（2026-10-21）：工具开关矩阵整列写入（PUT /dcs/assistant/toolgate）。
+     * 批1 Q1=B（2026-10-21）：工具开关矩阵整列写入（POST /dcs/assistant/toolgate）。
      * 只动 tool_gate 列——不走 update() 整行合并，避免与联网/称呼校验互相牵连。
-     * 无行租户：按平台默认+enabled='0' 首插（保持"未配置=助手关闭"语义不翻车），仅落开关。
+     * 三审回修（三席共识 P2）：单条 upsertToolGate 替代 select-then-insert/update——
+     * 首插撞主键竞态消掉（并发首插后到者不再 500），在位行只 patch tool_gate。
      */
     public void updateToolGate(String tenantId, java.util.Map<String, String> gate) {
         if (tenantId == null || tenantId.isBlank()) {
             throw new ServiceException("tenantId 不能为空");
         }
-        // 清空用 "" 哨兵（MyBatis-Plus updateById 跳过 null 字段写不进；读侧 blank=空表）
+        // 清空用 "" 哨兵（SQL 直写 EXCLUDED 不 COALESCE；读侧 blank=空表）
         String json = (gate == null || gate.isEmpty()) ? ""
             : org.dromara.common.json.utils.JsonUtils.toJsonString(gate);
-        DcsAssistantConfig row = TenantHelper.ignore(() -> configMapper.selectById(tenantId));
-        if (row == null) {
-            DcsAssistantConfig insert = new DcsAssistantConfig();
-            insert.setTenantId(tenantId);
-            insert.setEnabled("0");
-            insert.setDailyRoundLimitPerUser(PLATFORM_DAILY_ROUNDS);
-            insert.setDailyBudgetAmount(PLATFORM_DAILY_BUDGET);
-            insert.setMemoryEnabled(PLATFORM_MEMORY_ENABLED);
-            insert.setCompactionTriggerTokens(PLATFORM_COMPACTION_TOKENS);
-            insert.setWebsearchLimitPerUser(PLATFORM_WEBSEARCH_LIMIT);
-            insert.setDigestEnabled(PLATFORM_DIGEST_ENABLED);
-            insert.setToolGate(json);
-            TenantHelper.ignore(() -> configMapper.insert(insert));
-            return;
-        }
         DcsAssistantConfig patch = new DcsAssistantConfig();
         patch.setTenantId(tenantId);
         patch.setToolGate(json);
-        TenantHelper.ignore(() -> configMapper.updateById(patch));
+        TenantHelper.ignore(() -> configMapper.upsertToolGate(patch));
     }
 
     /**
