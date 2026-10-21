@@ -155,10 +155,14 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 ---
 
-## 唯一开发分支策略
+## 分支与提交策略
 
-1. 本项目所有开发、文档、测试和修复只提交到 `master`（开源主干）。
-2. 禁止新建功能分支、临时分支或 Git worktree；新会话启动先 `git branch --show-current` 确认。
+1. **默认只提交到 `master`**（开源主干）；新会话启动先 `git branch --show-current` 确认。
+2. **显式例外**：仅当用户在当次提示词中明确要求「新建分支 / 开 PR / 隔离实验」时，才允许创建临时分支：
+   - 从最新 `origin/master` 切出，命名 `<type>/<简短主题>`（如 `docs/readme-slim`）；
+   - 只提交本任务涉及的文件，PR 目标分支为 `master`；
+   - 合并后删除分支并切回 `master`，不长期驻留；
+   - 未收到明确指令时，不得自行开分支、长期 feature 分支或 Git worktree。
 3. 提交按业务批次拆分并写清 subject（人话标题）——"只用一个分支"不等于把多个不相关需求混成一个提交。
 4. **多窗口并行纪律**：只 `git add` 自己改的文件；禁止 `git add -A` / `git add .`；push 前自查 `git diff --cached` 只含本批文件；他人正在改的文件（如前端壳层 index.html / layout / changelog / AI 助手组件 / vite 配置）不碰。
 5. jar 会被运行中的后端锁住：**先停进程再打包**。
@@ -212,7 +216,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 ## 🔥 当前入口（新会话先看）
 
-- 唯一工作区：`D:\Git\git-gitee\smart-dock`；唯一开发分支：`master`
+- 唯一工作区：`D:\Git\git-gitee\smart-dock`；默认开发分支：`master`（用户明确要求时可开临时分支，见「分支与提交策略」）
 - 二期计划入口：`.workshop/plans/phase2-development-plan.html`（批 7-12 + 一期遗留清零表）
 - 最近发生了什么：`git log --oneline -10` + `.workshop/logs/phase2-profile-analytics.md` 尾部
 - 每批开工前先出拍板页（选择题进 HTML，不弹问答、不臆测）；批 7-12：采集质量 → 分析深度 → 画像运营化 → 多实例 → 安全合规 → 体验交付
