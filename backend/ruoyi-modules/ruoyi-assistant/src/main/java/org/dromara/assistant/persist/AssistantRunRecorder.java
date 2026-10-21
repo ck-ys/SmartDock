@@ -544,7 +544,17 @@ public class AssistantRunRecorder {
         // 稳流① Q1：终局诊断（时长/最大静默/心跳数；终态计数改在 DB 写成功分支——
         // glm53 审查 P2-5：迟到终态（rows=0 被条件丢弃）不得与收割终态双计）
         final String outcome = status + "|" + (reason == null ? "-" : reason);
-        logRunDiagnostics(runId, tenantOfRun(runId), outcome);
+        // 三审回修（dspro P1-3/dsflash P2）：tenantOfRun 是同步 DB 查询，抖动异常若穿出
+        // 会连坐吞掉 finishRun 全部终态动作（缓冲清除/终态写/悬挂卡写入）——诊断行宁可
+        // 缺租户也不能断链
+        String terminalTenant;
+        try {
+            terminalTenant = tenantOfRun(runId);
+        } catch (Exception e) {
+            terminalTenant = null;
+            log.warn("[AssistantRecorder] 终态租户查询失败(诊断行缺租户) runId={}: {}", runId, e.getMessage());
+        }
+        logRunDiagnostics(runId, terminalTenant, outcome);
         // 批B B1 修：这里不再 clearLastUsage——RUN_FINISHED 与 TEXT_MESSAGE_END 仅差毫秒级，
         // 提前清会与异步落库线程的 awaitLastUsageChanged 轮询竞态（清完轮询恒 null=永远写不进 tokens）。
         // 清除移至落库任务 finally；未走落库的 run（中断/无终答文本）靠账本环形截断(512)兜底回收
@@ -561,15 +571,18 @@ public class AssistantRunRecorder {
             // partial 行无论有无残余都要删（空残余竞态下防孤儿 partial 行）
             String stepsJson = hasLeftover ? snapshotSteps(stepKey) : null;
             CompletableFuture.runAsync(() -> {
+                // 三审回修（dspro P1-1）：与 TEXT_MESSAGE_END 路径同序——先落权威
+                // truncated 行再删保底 partial 行；原「先删后插」在插入失败时唯一副本
+                // 已删=已生成内容永久丢失，成功时也有毫秒级整回合空白窗
+                if (hasLeftover) {
+                    persistAssistantMessage(runId, mergedLeftover, null, "truncated", stepsJson);
+                }
                 if (partialRef != null) {
                     try {
                         conversationService.deletePartialMessage(partialRef.tenantId(), partialRef.messageId());
                     } catch (Exception ex) {
                         log.warn("[AssistantRecorder] 终道 partial 行清理失败: {}", ex.getMessage());
                     }
-                }
-                if (hasLeftover) {
-                    persistAssistantMessage(runId, mergedLeftover, null, "truncated", stepsJson);
                 }
             }, pool);
         }
