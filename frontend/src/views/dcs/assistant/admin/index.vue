@@ -566,6 +566,126 @@
         </el-card>
       </el-tab-pane>
 
+      <!-- 页签二C：外部工具（批2 Q2=A MCP 试点）：服务注册+启停+调用审计；
+           试点=平台级只读免密钥服务，白名单外一律拒存，挂载失败不连坐助手会话 -->
+      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="外部工具" name="mcp" lazy>
+        <el-card shadow="never" class="adm-card" v-loading="mcpLoading">
+          <template #header>
+            <div class="card-head">
+              <b>外部工具（MCP 试点）</b>
+              <span class="head-note">
+                把只读 MCP 服务挂进助手工具面。试点只收免密钥服务；STDIO 仅允许 node 且脚本须在服务器允许目录内，HTTP 地址 host 须在白名单；改动对下一轮新会话生效。
+              </span>
+              <el-button size="small" type="primary" @click="openMcpForm()">注册服务</el-button>
+            </div>
+          </template>
+          <el-table :data="mcpRows" size="default" stripe>
+            <el-table-column label="服务名" prop="serverName" min-width="130" />
+            <el-table-column label="说明" prop="displayName" min-width="120" />
+            <el-table-column label="传输" width="130">
+              <template #default="{ row }">
+                <el-tag size="small" effect="plain">{{ row.transportType === 'STDIO' ? 'STDIO(node)' : row.transportType }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="命令 / 地址" min-width="240">
+              <template #default="{ row }">{{ row.transportType === 'STDIO' ? row.command + ' ' + (row.args || '') : row.url }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-switch :model-value="row.enabled === '1'" @change="(v: any) => onToggleMcp(row, v)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="mcpLogFilter = row.serverName; mcpLogPage = 1; loadMcpCallLog()">审计</el-button>
+                <el-button size="small" link type="danger" @click="onDeleteMcp(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+
+        <!-- 调用/挂载审计（双态落账：MOUNT_OK/MOUNT_ERROR/CALL_OK/CALL_ERROR/RATE_LIMITED） -->
+        <el-card shadow="never" class="adm-card">
+          <template #header>
+            <div class="card-head">
+              <b>调用审计</b>
+              <span class="head-note">每次挂载与每次真实调用都落账——限频 30 次/分/租户，超限调用对助手报人话错误</span>
+              <el-button v-if="mcpLogFilter" size="small" @click="mcpLogFilter = ''; loadMcpCallLog()">清除筛选：{{ mcpLogFilter }}</el-button>
+            </div>
+          </template>
+          <el-table :data="mcpLogRows" size="small" stripe>
+            <el-table-column label="时间" width="170">
+              <template #default="{ row }">{{ formatMcpTime(row.createTime) }}</template>
+            </el-table-column>
+            <el-table-column label="服务" prop="serverName" width="120" />
+            <el-table-column label="动作" width="120">
+              <template #default="{ row }">{{ MCP_ACTION_TXT[row.action] ?? row.action }}</template>
+            </el-table-column>
+            <el-table-column label="结果" width="80">
+              <template #default="{ row }">
+                <el-tag size="small" :type="row.status === '1' ? 'success' : 'danger'">{{ row.status === '1' ? '成功' : '失败' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="耗时" width="90">
+              <template #default="{ row }">{{ row.durationMs != null ? row.durationMs + 'ms' : '—' }}</template>
+            </el-table-column>
+            <el-table-column label="详情/错误" min-width="220">
+              <template #default="{ row }">{{ row.errorMsg || '—' }}</template>
+            </el-table-column>
+          </el-table>
+          <div class="mcp-log-pager">
+            <el-button size="small" :disabled="mcpLogPage <= 1" @click="mcpLogPage--; loadMcpCallLog()">上一页</el-button>
+            <span class="field-hint">第 {{ mcpLogPage }} 页 · 共 {{ mcpLogTotal }} 条</span>
+            <el-button size="small" :disabled="mcpLogPage * 20 >= mcpLogTotal" @click="mcpLogPage++; loadMcpCallLog()">下一页</el-button>
+          </div>
+        </el-card>
+
+        <!-- 注册/编辑抽屉 -->
+        <el-drawer v-model="mcpFormVisible" :title="mcpForm.id ? '编辑外部服务' : '注册外部服务'" size="480px">
+          <el-form label-width="92px">
+            <el-form-item label="服务名" required>
+              <el-input v-model="mcpForm.serverName" placeholder="小写字母/数字/下划线，3-30 位，如 weather_demo" :disabled="!!mcpForm.id" />
+            </el-form-item>
+            <el-form-item label="说明">
+              <el-input v-model="mcpForm.displayName" placeholder="如：天气查询（试点）" maxlength="100" />
+            </el-form-item>
+            <el-form-item label="传输类型" required>
+              <el-select v-model="mcpForm.transportType" style="width:100%" :disabled="!!mcpForm.id">
+                <el-option label="STDIO（node 脚本，试点推荐）" value="STDIO" />
+                <el-option label="STREAMABLE_HTTP" value="STREAMABLE_HTTP" />
+                <el-option label="SSE" value="SSE" />
+              </el-select>
+            </el-form-item>
+            <template v-if="mcpForm.transportType === 'STDIO'">
+              <el-form-item label="命令">
+                <el-input model-value="node" disabled />
+              </el-form-item>
+              <el-form-item label="脚本路径" required>
+                <el-input v-model="mcpForm.argsJson" placeholder='JSON 数组，如 ["D:/.../backend/mcp-demo/weather-server.mjs"]' />
+              </el-form-item>
+            </template>
+            <template v-else>
+              <el-form-item label="服务地址" required>
+                <el-input v-model="mcpForm.url" placeholder="http://127.0.0.1:3000/mcp（host 须在白名单）" />
+              </el-form-item>
+            </template>
+            <el-form-item label="请求头">
+              <el-input v-model="mcpForm.headers" placeholder="可选 JSON 对象；试点不接收鉴权类头" />
+            </el-form-item>
+            <el-form-item label="备注">
+              <el-input v-model="mcpForm.remark" type="textarea" :rows="2" maxlength="255" />
+            </el-form-item>
+            <el-form-item label="立即启用">
+              <el-switch v-model="mcpForm.enabledBool" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="mcpFormVisible = false">取消</el-button>
+            <el-button type="primary" :loading="mcpSaving" @click="onSaveMcp">保存</el-button>
+          </template>
+        </el-drawer>
+      </el-tab-pane>
+
       <!-- 页签三：错答反馈（perm=dcs:assistant:feedback:query；N 条待处理跳这）——方案A: 括号手拼计数 → el-badge 红色角标 -->
       <el-tab-pane v-if="checkPermi(['dcs:assistant:feedback:query'])" name="feedback">
         <template #label>错答反馈<el-badge v-if="fbTotal > 0" :value="fbTotal" class="tab-badge" /></template>
@@ -1073,6 +1193,13 @@ import {
   getAssistantPanorama,
   getAssistantToolGate,
   saveAssistantToolGate,
+  listAssistantMcpServers,
+  saveAssistantMcpServer,
+  toggleAssistantMcpServer,
+  deleteAssistantMcpServer,
+  pageAssistantMcpCallLog,
+  type AssistantMcpServerRow,
+  type AssistantMcpCallLog,
   listActionLog,
   listFeedback,
   getFeedbackStats,
@@ -2226,6 +2353,128 @@ async function onSaveToolGate() {
   }
 }
 
+/* ===== 外部工具页签（批2 Q2=A）：MCP 试点服务注册 + 调用审计 ===== */
+const mcpLoading = ref(false);
+const mcpSaving = ref(false);
+const mcpRows = ref<AssistantMcpServerRow[]>([]);
+const mcpFormVisible = ref(false);
+const mcpForm = reactive({
+  id: '',
+  serverName: '',
+  displayName: '',
+  transportType: 'STDIO' as 'STDIO' | 'STREAMABLE_HTTP' | 'SSE',
+  argsJson: '[""]',
+  url: '',
+  headers: '',
+  remark: '',
+  enabledBool: true
+});
+const mcpLogRows = ref<AssistantMcpCallLog[]>([]);
+const mcpLogTotal = ref(0);
+const mcpLogPage = ref(1);
+const mcpLogFilter = ref('');
+const MCP_ACTION_TXT: Record<string, string> = {
+  MOUNT_OK: '挂载成功',
+  MOUNT_ERROR: '挂载失败',
+  CALL_OK: '调用成功',
+  CALL_ERROR: '调用失败',
+  RATE_LIMITED: '触发限频'
+};
+async function loadMcpServers() {
+  mcpLoading.value = true;
+  try {
+    const res = (await listAssistantMcpServers()) as unknown as { data?: AssistantMcpServerRow[] };
+    mcpRows.value = res.data ?? [];
+  } catch {
+    // 具体错误 request 层已弹；空表即空态
+  } finally {
+    mcpLoading.value = false;
+  }
+}
+async function loadMcpCallLog() {
+  try {
+    const res = (await pageAssistantMcpCallLog({ serverName: mcpLogFilter.value || undefined, pageNum: mcpLogPage.value, pageSize: 20 })) as unknown as {
+      data?: { rows?: AssistantMcpCallLog[]; total?: number };
+    };
+    mcpLogRows.value = res.data?.rows ?? [];
+    mcpLogTotal.value = res.data?.total ?? 0;
+  } catch {
+    // 同上：request 层已弹
+  }
+}
+function openMcpForm(row?: AssistantMcpServerRow) {
+  if (row) {
+    mcpForm.id = row.id;
+    mcpForm.serverName = row.serverName;
+    mcpForm.displayName = row.displayName ?? '';
+    mcpForm.transportType = row.transportType;
+    mcpForm.argsJson = row.args ?? '[""]';
+    mcpForm.url = row.url ?? '';
+    mcpForm.headers = '';
+    mcpForm.remark = row.remark ?? '';
+    mcpForm.enabledBool = row.enabled === '1';
+  } else {
+    Object.assign(mcpForm, { id: '', serverName: '', displayName: '', transportType: 'STDIO', argsJson: '[""]', url: '', headers: '', remark: '', enabledBool: true });
+  }
+  mcpFormVisible.value = true;
+}
+async function onSaveMcp() {
+  mcpSaving.value = true;
+  try {
+    await saveAssistantMcpServer({
+      id: mcpForm.id || undefined,
+      serverName: mcpForm.serverName.trim(),
+      displayName: mcpForm.displayName.trim() || null,
+      transportType: mcpForm.transportType,
+      command: mcpForm.transportType === 'STDIO' ? 'node' : null,
+      args: mcpForm.transportType === 'STDIO' ? mcpForm.argsJson.trim() : null,
+      url: mcpForm.transportType === 'STDIO' ? null : mcpForm.url.trim(),
+      headers: mcpForm.headers.trim() || null,
+      remark: mcpForm.remark.trim() || null,
+      enabled: mcpForm.enabledBool ? '1' : '0'
+    });
+    mcpFormVisible.value = false;
+    await loadMcpServers();
+    ElMessage.success('已保存——下一轮新会话起挂载');
+  } catch {
+    // 白名单人话报错 request 层已弹，抽屉保留输入可改
+  } finally {
+    mcpSaving.value = false;
+  }
+}
+async function onToggleMcp(row: AssistantMcpServerRow, on: boolean) {
+  try {
+    await toggleAssistantMcpServer(row.id, on ? '1' : '0');
+    await loadMcpServers();
+    ElMessage.success(on ? '已启用——下一轮新会话挂载' : '已停用——新会话不再挂载');
+  } catch {
+    await loadMcpServers();
+  }
+}
+async function onDeleteMcp(row: AssistantMcpServerRow) {
+  try {
+    await ElMessageBox.confirm(
+      `删除服务「${row.serverName}」？已挂载会话不受影响，新会话不再挂载。审计记录保留。`,
+      '删除外部服务',
+      { type: 'warning' }
+    );
+  } catch {
+    return;
+  }
+  try {
+    await deleteAssistantMcpServer(row.id);
+    await loadMcpServers();
+    ElMessage.success('已删除');
+  } catch {
+    // request 层已弹
+  }
+}
+function formatMcpTime(t: string): string {
+  if (!t) return '—';
+  const d = new Date(Number(t));
+  return isNaN(d.getTime()) ? t : d.toLocaleString('zh-CN', { hour12: false });
+}
+
 /** lazy 页签首访加载（批C）：能力全景切到才拉（工作面不预载用不到的数据） */
 /** 公告页签首开即拉列表（lazy 页签，与 panorama/quota 同款 onTabChange 模式）。
  *  dspro P2-5 回修：反馈页签每次切入重刷统计——原「fbRows 非空只刷一次」会让管理员
@@ -2236,6 +2485,10 @@ function onTabChange(name: string | number) {
   }
   if (name === 'toolgate' && tgRows.value.length === 0 && !tgLoading.value) {
     void loadToolGate();
+  }
+  if (name === 'mcp' && mcpRows.value.length === 0 && !mcpLoading.value) {
+    void loadMcpServers();
+    void loadMcpCallLog();
   }
   if (name === 'quota' && quotaRows.value.length === 0 && !quotaLoading.value) {
     void loadQuotaPage();
@@ -3389,5 +3642,13 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   margin-top: 12px;
+}
+
+/* ===== 外部工具页签（批2 Q2=A）===== */
+.mcp-log-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
 }
 </style>

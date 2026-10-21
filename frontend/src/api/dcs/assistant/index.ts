@@ -512,6 +512,57 @@ export function saveAssistantToolGate(gate: Record<string, string>) {
   return request({ url: '/dcs/assistant/toolgate', method: 'post', data: gate });
 }
 
+/* ============ 批2 Q2=A：MCP 外部工具试点（管理台「外部工具」页签） ============ */
+
+/** 服务行（headers 只回键名——免密钥试点仍防误回显） */
+export interface AssistantMcpServerRow {
+  id: string;
+  serverName: string;
+  displayName: string | null;
+  transportType: 'STDIO' | 'STREAMABLE_HTTP' | 'SSE';
+  command: string | null;
+  args: string | null;
+  url: string | null;
+  headerKeys: string;
+  enabled: string;
+  remark: string | null;
+  updateTime: string | null;
+}
+
+/** 审计行（挂载/调用双态） */
+export interface AssistantMcpCallLog {
+  id: string;
+  tenantId: string;
+  userId: number;
+  serverName: string;
+  toolName: string | null;
+  action: string;
+  status: string;
+  durationMs: number | null;
+  errorMsg: string | null;
+  createTime: string;
+}
+
+export function listAssistantMcpServers() {
+  return request<AssistantMcpServerRow[]>({ url: '/dcs/assistant/mcp/list', method: 'get' });
+}
+
+export function saveAssistantMcpServer(data: Partial<AssistantMcpServerRow> & { headers?: string }) {
+  return request({ url: '/dcs/assistant/mcp/save', method: 'post', data });
+}
+
+export function toggleAssistantMcpServer(id: string, enabled: string) {
+  return request({ url: '/dcs/assistant/mcp/toggle', method: 'post', params: { id, enabled } });
+}
+
+export function deleteAssistantMcpServer(id: string) {
+  return request({ url: '/dcs/assistant/mcp/delete', method: 'post', params: { id } });
+}
+
+export function pageAssistantMcpCallLog(params: { serverName?: string; pageNum: number; pageSize: number }) {
+  return request<{ rows: AssistantMcpCallLog[]; total: number }>({ url: '/dcs/assistant/mcp/calllog', method: 'get', params });
+}
+
 /* ============ 批4 Q11：助手公告（管理台发布/撤回 + 用户侧横幅） ============ */
 
 /** 用户侧：当前租户最新一条生效公告（无=null 不渲染横幅） */
