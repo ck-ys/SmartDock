@@ -498,7 +498,15 @@
           </el-col>
         </el-row>
         <el-form-item label="Base URL" prop="baseUrl">
-          <el-input v-model="form.baseUrl" :disabled="!!accessInfo" placeholder="请输入 OpenAI 兼容接口地址" />
+          <!-- 批1：标准厂商按官方地址自动接入（applyPreset 已随厂商切换预填），仅自定义厂商手填；
+               已有厂商接入时维持只读展示（地址由接入层统一管理） -->
+          <el-input
+            v-if="form.provider === 'CUSTOM' || accessInfo"
+            v-model="form.baseUrl"
+            :disabled="!!accessInfo"
+            placeholder="请输入 OpenAI 兼容接口地址"
+          />
+          <div v-else class="field-hint">{{ form.baseUrl || presetBaseUrl(form.provider) }} · 已按厂商官方地址自动接入，无需手填</div>
           <div v-if="accessInfo" class="field-hint">接口地址由厂商接入统一管理，如需修改请点「管理钥匙」</div>
         </el-form-item>
         <el-row :gutter="20">
@@ -896,7 +904,13 @@
           <el-input v-model="accessForm.label" placeholder="如「主号 / 备1」，留空自动编号" style="width: 320px" />
         </el-form-item>
         <el-form-item label="Base URL" prop="baseUrl">
-          <el-input v-model="accessForm.baseUrl" placeholder="OpenAI 兼容接口地址（同厂多把钥匙通常相同）" />
+          <!-- 批1(2026-10-21 用户需求)：选了厂商就不该让人手填 URL——标准厂商按官方地址
+               自动接入（提交时后端同口径兜底补齐），只有「自定义」厂商显示手填框 -->
+          <el-input v-if="accessForm.provider === 'CUSTOM'" v-model="accessForm.baseUrl" placeholder="自定义厂商必须填写 OpenAI 兼容接口地址" />
+          <div v-else class="field-hint">
+            {{ presetBaseUrl(accessForm.provider) || '选择厂商后按官方地址自动接入' }} ·
+            已按厂商官方地址自动接入，无需手填；要走中转/代理地址请选「自定义」厂商
+          </div>
         </el-form-item>
         <el-form-item label="API Key" prop="apiKey">
           <el-input
@@ -1192,11 +1206,16 @@ const accessMaskInDialog = ref('');
 const accessHasKey = computed(() => !!accessMaskInDialog.value);
 const initAccessFormData: DcsAiProviderAccessForm = { tenantId: '', provider: '', baseUrl: '', apiKey: '', consoleUrl: '', remark: '' };
 const accessForm = ref<DcsAiProviderAccessForm>({ ...initAccessFormData });
-/** 首建必须填 Key；已有接入留空沿用（占位符/校验与后端 upsert 口径一致） */
+/** 首建必须填 Key；已有接入留空沿用（占位符/校验与后端 upsert 口径一致）；
+ *  批1：标准厂商地址自动接入，Base URL 仅「自定义」厂商必填 */
 const accessRules = computed(() => ({
-  baseUrl: [{ required: true, message: 'Base URL不能为空', trigger: 'blur' }],
+  baseUrl: accessForm.value.provider === 'CUSTOM'
+    ? [{ required: true, message: '自定义厂商必须填写接口地址', trigger: 'blur' }]
+    : [],
   apiKey: accessHasKey.value ? [] : [{ required: true, message: '首次配置接入必须填写 API Key', trigger: 'blur' }]
 }));
+/** 批1：厂商官方默认地址（providerOptions 即 presets 接口下发） */
+const presetBaseUrl = (provider: string) => providerOptions.value.find((item) => item.provider === provider)?.baseUrl || '';
 /** 接入状态请求定序令牌：租户/厂商快速切换时丢弃过期响应，防晚到的旧响应覆盖新形态 */
 let accessReqSeq = 0;
 /** 接入状态加载中（表单保存按钮防抖：未拉到状态就保存会走错分支） */
@@ -1333,7 +1352,7 @@ const onAddKeyForm = (tenantId?: string, provider?: string) => {
     ...initAccessFormData,
     tenantId: nextTenant,
     provider: nextProvider,
-    baseUrl: keepBaseUrl
+    baseUrl: keepBaseUrl || (nextProvider !== 'CUSTOM' ? presetBaseUrl(nextProvider) : '')
   };
   accessMaskInDialog.value = '';
   keyDrawer.title = `新增钥匙 · ${nextProvider ? getProviderName(nextProvider) : ''}（${nextTenant || '未选租户'}）`;
@@ -1467,6 +1486,11 @@ const onRefreshAllBalances = async () => {
 };
 
 const submitAccess = async () => {
+  // 批1：标准厂商地址自动接入（后端同口径兜底，这里先补齐让探测/校验链路都拿到值）
+  if (accessForm.value.provider !== 'CUSTOM') {
+    const preset = presetBaseUrl(accessForm.value.provider);
+    if (preset) accessForm.value.baseUrl = preset;
+  }
   await accessFormRef.value?.validate();
   accessSubmitting.value = true;
   try {
