@@ -104,6 +104,10 @@ public class AssistantRunRecorder {
     /** 时间线事件序（Q5-A：threadId → 单调计数器）——steps 与 thinkSegs 共用，
      *  落库后前端按 seq 交错恢复「思考①→工具→思考②」真实时序 */
     private final Map<String, AtomicInteger> orderCounters = new ConcurrentHashMap<>();
+    /** 三审遗留 P1-2（dspro）：终态写中标记——终态 UPDATE 在异步池排队期间 lastEventAt
+     *  已被清，零事件收割器会抢赢真终态（COMPLETED 被改写 client-disconnect+误退额度）；
+     *  finishRun 提交前登记、写完撤岗，收割器见此键让行 */
+    private final java.util.Set<String> terminalWritePending = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     // ===== 批6-#2 刷新保全（2026-10-13）：增量落库 + 失联收割 =====
     // 根因：客户端断连（刷新/断网）后框架往死 socket 写帧抛 IOException → Reactor 取消
@@ -594,7 +598,10 @@ public class AssistantRunRecorder {
         }
         // dspro P1-2 修：end_reason 列宽 64，provider 长文案会 value too long 吞终态+连坐 refund
         String safeReason = reason == null ? null : (reason.length() > 64 ? reason.substring(0, 64) : reason);
+        // P1-2：登记终态写中（收割器让行），异步块 finally 撤岗
+        terminalWritePending.add(runId);
         CompletableFuture.runAsync(() -> {
+            try {
             try {
                 // dspro P0-1③回修：0 行=run 已被收割/兜底抢先终局化，迟到真终态被条件
                 // 丢弃——WARN 留观测痕（否则线上完全不可见，误杀只能靠用户复盘）
@@ -617,11 +624,14 @@ public class AssistantRunRecorder {
                 if ("FAILED".equals(status)) {
                     DcsAssistantRun run = conversationService.runByRunId(runId);
                     if (run != null && "FAILED".equals(run.getStatus())) {
-                        dailyQuota.refundTurn(run.getTenantId(), run.getUserId());
+                        refundIfWallet(run.getTenantId(), run.getUserId());
                     }
                 }
             } catch (Exception e) {
                 log.warn("[AssistantRecorder] 失败回合补偿失败 runId={}: {}", runId, e.getMessage());
+            }
+            } finally {
+                terminalWritePending.remove(runId);
             }
         }, pool);
     }
@@ -656,7 +666,7 @@ public class AssistantRunRecorder {
         try {
             DcsAssistantRun run = conversationService.runByRunId(runId);
             if (run != null && "FAILED".equals(run.getStatus())) {
-                dailyQuota.refundTurn(run.getTenantId(), run.getUserId());
+                refundIfWallet(run.getTenantId(), run.getUserId());
             }
         } catch (Exception e) {
             log.warn("[AssistantRecorder] 建会话失败回合补偿失败 runId={}: {}", runId, e.getMessage());
@@ -813,7 +823,7 @@ public class AssistantRunRecorder {
             List<DcsAssistantRun> stale = conversationService.listRunningOlderThan((int) (STALL_MS / 1000));
             for (DcsAssistantRun run : stale) {
                 String runId = run.getRunId();
-                if (runId == null || lastEventAt.containsKey(runId)) {
+                if (runId == null || lastEventAt.containsKey(runId) || terminalWritePending.contains(runId)) {
                     continue;
                 }
                 if (costLedger.isInFlight(run.getThreadId())) {
@@ -821,7 +831,7 @@ public class AssistantRunRecorder {
                 }
                 List<DcsAssistantRun> closed = conversationService.finalizeStalledRun(run.getTenantId(), runId);
                 if (!closed.isEmpty()) {
-                    dailyQuota.refundTurn(run.getTenantId(), run.getUserId());
+                    refundIfWallet(run.getTenantId(), run.getUserId());
                     log.warn("[AssistantRecorder] 零事件兜底收割 runId={}（建行≥{}s 无任何事件=建/流侧同步失败路径）："
                         + "INTERRUPTED/client-disconnect，回合已退", runId, STALL_MS / 1000);
                     // 稳流① Q1：零事件路径也进终态计数（首事件恒缺，诊断行跳过）
@@ -933,7 +943,7 @@ public class AssistantRunRecorder {
             java.util.List<DcsAssistantRun> closed = conversationService.finalizeStalledRun(tenantId, runId);
             if (!closed.isEmpty()) {
                 DcsAssistantRun r = closed.get(0);
-                dailyQuota.refundTurn(r.getTenantId(), r.getUserId());
+                refundIfWallet(r.getTenantId(), r.getUserId());
                 log.warn("[AssistantRecorder] 失联收割 runId={}（事件停滞≥{}s=客户端断连拆链）："
                     + "INTERRUPTED/client-disconnect，回合已退", runId, STALL_MS / 1000);
                 // 稳流① Q1：收割终局也进诊断+计数（P2-2 租户分桶；P2-6 诊断行只在收割
@@ -963,6 +973,25 @@ public class AssistantRunRecorder {
             || pendingInterrupts.peek(stepKey).isEmpty())) {
             evictStepBuffers(List.of(stepKey));
         }
+    }
+
+    /** 三审 P2（dspro）：credits 订阅租户建侧 tryTurn 本就跳过（resolver 109-111），
+     *  终态/收割侧退款须同口径跳过——退了会误退当天早前钱包期扣的当日计数。
+     *  查不到模式（纯函数单测无 Spring 上下文/订阅查询闪断）按钱包口径退，
+     *  与 billingAwareLimits 的 fail-open 及既有行为一致。 */
+    private void refundIfWallet(String tenantId, Long userId) {
+        try {
+            org.dromara.assistant.service.AssistantUserQuotaService quotaService =
+                org.dromara.common.core.utils.SpringUtils.getBean(
+                    org.dromara.assistant.service.AssistantUserQuotaService.class);
+            if (quotaService.billingAwareLimits(tenantId, userId).creditsMode()) {
+                log.debug("[AssistantRecorder] credits 订阅租户退款跳过 tenant={} user={}", tenantId, userId);
+                return;
+            }
+        } catch (Exception ignore) {
+            // 无上下文/闪断：按钱包口径退（fail-open 同款）
+        }
+        dailyQuota.refundTurn(tenantId, userId);
     }
 
     /** 收割路径取 run 租户（步骤掩码用；查不到返回 null 由掩码侧跳过） */
