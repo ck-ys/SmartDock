@@ -533,7 +533,7 @@ export interface AssistantMcpServerRow {
 export interface AssistantMcpCallLog {
   id: string;
   tenantId: string;
-  userId: number;
+  userId: string;
   serverName: string;
   toolName: string | null;
   action: string;

@@ -597,6 +597,7 @@
             </el-table-column>
             <el-table-column label="操作" width="150">
               <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="openMcpForm(row)">编辑</el-button>
                 <el-button size="small" link type="primary" @click="mcpLogFilter = row.serverName; mcpLogPage = 1; loadMcpCallLog()">审计</el-button>
                 <el-button size="small" link type="danger" @click="onDeleteMcp(row)">删除</el-button>
               </template>
@@ -610,7 +611,7 @@
             <div class="card-head">
               <b>调用审计</b>
               <span class="head-note">每次挂载与每次真实调用都落账——限频 30 次/分/租户，超限调用对助手报人话错误</span>
-              <el-button v-if="mcpLogFilter" size="small" @click="mcpLogFilter = ''; loadMcpCallLog()">清除筛选：{{ mcpLogFilter }}</el-button>
+              <el-button v-if="mcpLogFilter" size="small" @click="mcpLogFilter = ''; mcpLogPage = 1; loadMcpCallLog()">清除筛选：{{ mcpLogFilter }}</el-button>
             </div>
           </template>
           <el-table :data="mcpLogRows" size="small" stripe>
@@ -2435,6 +2436,7 @@ async function onSaveMcp() {
     });
     mcpFormVisible.value = false;
     await loadMcpServers();
+    await loadMcpCallLog();
     ElMessage.success('已保存——下一轮新会话起挂载');
   } catch {
     // 白名单人话报错 request 层已弹，抽屉保留输入可改
@@ -2443,12 +2445,15 @@ async function onSaveMcp() {
   }
 }
 async function onToggleMcp(row: AssistantMcpServerRow, on: boolean) {
+  // 乐观更新防连点弹跳：先本地置态，失败回滚
+  const prev = row.enabled;
+  row.enabled = on ? '1' : '0';
   try {
     await toggleAssistantMcpServer(row.id, on ? '1' : '0');
-    await loadMcpServers();
+    await loadMcpCallLog();
     ElMessage.success(on ? '已启用——下一轮新会话挂载' : '已停用——新会话不再挂载');
   } catch {
-    await loadMcpServers();
+    row.enabled = prev;
   }
 }
 async function onDeleteMcp(row: AssistantMcpServerRow) {
@@ -2464,6 +2469,7 @@ async function onDeleteMcp(row: AssistantMcpServerRow) {
   try {
     await deleteAssistantMcpServer(row.id);
     await loadMcpServers();
+    await loadMcpCallLog();
     ElMessage.success('已删除');
   } catch {
     // request 层已弹
@@ -2488,6 +2494,8 @@ function onTabChange(name: string | number) {
   }
   if (name === 'mcp' && mcpRows.value.length === 0 && !mcpLoading.value) {
     void loadMcpServers();
+    void loadMcpCallLog();
+  } else if (name === 'mcp') {
     void loadMcpCallLog();
   }
   if (name === 'quota' && quotaRows.value.length === 0 && !quotaLoading.value) {
