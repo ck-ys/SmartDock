@@ -1296,6 +1296,9 @@ CREATE TABLE public.profile_identity_merge (
     actor character varying(64),
     occurred_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     reversible_until timestamp without time zone,
+    -- 批10 Q6: unmerge 审计(非空=已拆分, 不可重复拆)
+    reversed_at timestamp without time zone,
+    reversed_by character varying(64),
     create_dept bigint,
     create_by bigint,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -1555,6 +1558,9 @@ CREATE TABLE public.profile_engine_config (
     review_threshold numeric(6,2) DEFAULT 60 NOT NULL,
     debounce_ms integer DEFAULT 2000 NOT NULL,
     review_sla_days integer DEFAULT 7 NOT NULL,
+    -- 批10 Q4: 按源事件保留期(null=继承全局) + 过期去向(1=归档后删/0=直接删)
+    event_retention_days integer,
+    event_archive char(1) DEFAULT '1' NOT NULL,
     remark character varying(500),
     create_dept bigint,
     create_by bigint,
@@ -1563,8 +1569,14 @@ CREATE TABLE public.profile_engine_config (
     update_time timestamp without time zone,
     del_flag character(1) DEFAULT '0'::bpchar,
     CONSTRAINT pk_profile_engine_config PRIMARY KEY (config_id),
-    CONSTRAINT ck_profile_engine_sla_days CHECK (review_sla_days BETWEEN 1 AND 365)
-);
+    CONSTRAINT ck_profile_engine_sla_days CHECK (review_sla_days BETWEEN 1 AND 365),
+    CONSTRAINT ck_profile_engine_event_retention CHECK (event_retention_days IS NULL OR event_retention_days BETWEEN 1 AND 36500),
+    CONSTRAINT ck_profile_engine_event_archive CHECK (event_archive IN ('0', '1'))
+);;
+-- 批10 Q4: 事件归档表(过期先迁这里再删; 结构同 profile_event, 归档只进不出)
+CREATE TABLE public.profile_event_archive (LIKE public.profile_event INCLUDING DEFAULTS);
+ALTER TABLE public.profile_event_archive ADD CONSTRAINT pk_profile_event_archive PRIMARY KEY (event_id);
+CREATE INDEX idx_profile_event_archive_source ON public.profile_event_archive USING btree (tenant_id, source, occurred_time DESC);
 
 CREATE UNIQUE INDEX uk_profile_engine_config
     ON public.profile_engine_config USING btree (tenant_id, source)
@@ -1648,7 +1660,9 @@ CREATE TABLE public.profile_model_config_snapshot (
     source character varying(32) NOT NULL,
     model_id bigint NOT NULL,
     model_code character varying(64) NOT NULL,
-    model_version character varying(32) NOT NULL,
+    model_version character varying(32),
+    -- 批10 R5: 模型类型随档保存, 回滚恢复
+    model_type character varying(20) NOT NULL,
     config jsonb DEFAULT '{}'::jsonb NOT NULL,
     score_max numeric(8,2) DEFAULT 100 NOT NULL,
     published_by bigint,

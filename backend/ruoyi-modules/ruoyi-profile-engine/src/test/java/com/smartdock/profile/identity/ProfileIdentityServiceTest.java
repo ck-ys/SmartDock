@@ -26,7 +26,17 @@ class ProfileIdentityServiceTest {
 
     private final ProfileIdentityLinkMapper linkMapper = Mockito.mock(ProfileIdentityLinkMapper.class);
     private final ProfileIdentityMergeMapper mergeMapper = Mockito.mock(ProfileIdentityMergeMapper.class);
-    private final ProfileIdentityService service = new ProfileIdentityService(linkMapper, mergeMapper);
+    // 批10 Q6 起依赖四个协作件(拆分事务/回放/重算), 归一测试用不到但构造必须给
+    private final org.springframework.transaction.support.TransactionTemplate txTemplate =
+        Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class);
+    private final com.smartdock.analytics.engine.AnalyticsService analyticsService =
+        Mockito.mock(com.smartdock.analytics.engine.AnalyticsService.class);
+    private final com.smartdock.profile.engine.ProfileScoreEngine scoreEngine =
+        Mockito.mock(com.smartdock.profile.engine.ProfileScoreEngine.class);
+    private final com.smartdock.profile.engine.ProfileScoreModelService modelService =
+        Mockito.mock(com.smartdock.profile.engine.ProfileScoreModelService.class);
+    private final ProfileIdentityService service = new ProfileIdentityService(
+        linkMapper, mergeMapper, txTemplate, analyticsService, scoreEngine, modelService);
 
     private ProfileIdentityLink link(String subjectId) {
         ProfileIdentityLink link = new ProfileIdentityLink();

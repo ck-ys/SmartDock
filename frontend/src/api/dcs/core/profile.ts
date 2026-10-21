@@ -733,6 +733,10 @@ export interface ProfileEngineConfig {
   debounceMs: number;
   /** 复核 SLA（天）：超时未处理每天提醒管理员，1-365 */
   reviewSlaDays?: number;
+  /** 批10 Q4: 事件保留天数（1-36500；空=继承全局默认 730） */
+  eventRetentionDays?: number | null;
+  /** 批10 Q4: 过期去向 1=先归档再删（默认）/0=直接删 */
+  eventArchive?: string;
   remark?: string;
 }
 
@@ -806,3 +810,80 @@ export const getRiskBands = (): Promise<ProfileRiskBands> =>
 
 export const getSubjectSummary = (subjectId: string, subjectType = 'user', source?: string): Promise<ProfileSubjectSummary> =>
   r<ProfileSubjectSummary>({ url: `${BASE}/subject/summary`, method: 'get', params: { subjectId, subjectType, source: source || undefined } });
+
+// ---------------------------------------------------------------- 批10: 回放 / 健康 / 身份合并
+
+/** 回放任务（断点=currentDay，回放前后对账数字在 statsBefore/statsAfter） */
+export interface ProfileReplayTask {
+  replayId: string;
+  tenantId: string;
+  source: string;
+  fromDay: string;
+  toDay: string;
+  chains: string;
+  status: 'RUNNING' | 'PAUSED' | 'DONE' | 'FAILED';
+  currentDay?: string;
+  daysTotal: number;
+  daysDone: number;
+  statsBefore?: string;
+  statsAfter?: string;
+  errorMsg?: string;
+  createTime?: string;
+}
+
+export const listReplayTasks = (source?: string): Promise<ProfileReplayTask[]> =>
+  r<ProfileReplayTask[]>({ url: '/analytics/replay/list', method: 'get', params: { source } });
+
+export const getReplayTask = (replayId: string): Promise<ProfileReplayTask> =>
+  r<ProfileReplayTask>({ url: `/analytics/replay/${replayId}`, method: 'get' });
+
+export const startReplay = (data: {
+  source: string;
+  fromDate: string;
+  toDate: string;
+  chains: string[];
+}): Promise<ProfileReplayTask> =>
+  r<ProfileReplayTask>({ url: '/analytics/replay', method: 'post', data });
+
+export const resumeReplay = (replayId: string): Promise<ProfileReplayTask> =>
+  r<ProfileReplayTask>({ url: `/analytics/replay/${replayId}/resume`, method: 'post' });
+
+export const pauseReplay = (replayId: string): Promise<ProfileReplayTask> =>
+  r<ProfileReplayTask>({ url: `/analytics/replay/${replayId}/pause`, method: 'post' });
+
+/** 引擎健康四指标（批10 Q5） */
+export interface ProfileHealth {
+  source: string;
+  windowHours: number;
+  eventLatency: { p50?: number; p95?: number; times?: number };
+  rebuildDuration: { p50?: number; p95?: number; times?: number };
+  rebuildRecent: { durationMs?: number; sessions?: number; kind?: string; finishedAt?: string }[];
+  tasks: { total: number; failed: number; failRatePct: number };
+  backlog: { events: number; lastRebuildAt?: string };
+  thresholds: { failRatePct: number; backlog: number; latencyP95Ms: number; rebuildP95Ms: number };
+  alerts: { metric: string; value: string; message: string }[];
+}
+
+export const getEngineHealth = (source: string): Promise<ProfileHealth> =>
+  r<ProfileHealth>({ url: '/analytics/health', method: 'get', params: { source } });
+
+/** 身份合并记录（批10 Q6） */
+export interface ProfileIdentityMerge {
+  mergeId: string;
+  tenantId: string;
+  source: string;
+  subjectType: string;
+  fromSubjectId: string;
+  toSubjectId: string;
+  reason?: string;
+  actor?: string;
+  occurredAt?: string;
+  reversedAt?: string | null;
+  reversedBy?: string | null;
+}
+
+export const listIdentityMerges = (source?: string, subject?: string): Promise<ProfileIdentityMerge[]> =>
+  r<ProfileIdentityMerge[]>({ url: `${BASE}/identity/merges`, method: 'get', params: { source, subject } });
+
+export const unmergeIdentity = (mergeId: string): Promise<{ eventsReassigned: number; derivedReplayed: boolean }> =>
+  r<{ eventsReassigned: number; derivedReplayed: boolean }>({ url: `${BASE}/identity/unmerge/${mergeId}`, method: 'post' });

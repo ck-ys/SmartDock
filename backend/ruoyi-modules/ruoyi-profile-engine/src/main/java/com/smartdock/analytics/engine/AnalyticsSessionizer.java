@@ -42,6 +42,8 @@ public class AnalyticsSessionizer {
 
     private final AnalyticsSessionMapper sessionMapper;
     private final AnalyticsEventMapper eventMapper;
+    /** 批10 Q7: 首见物化表直查, 替换每次重建的全表聚合。 */
+    private final com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper;
 
     public int rebuild(String tenantId, String source, Date from, Date to) {
         // 读取窗口向左多取一个会话间隔: 起点落在窗口前的边界会话才能被识别出来
@@ -52,7 +54,7 @@ public class AnalyticsSessionizer {
             return 0;
         }
         Map<String, Date> firstSeen = new HashMap<>();
-        for (Map<String, Object> row : eventMapper.selectVisitorFirstSeen(tenantId, source)) {
+        for (Map<String, Object> row : firstSeenMapper.selectAll(tenantId, source)) {
             Object key = row.get("visitorKey");
             Object first = row.get("firstSeen");
             if (key != null && first instanceof Date date) {

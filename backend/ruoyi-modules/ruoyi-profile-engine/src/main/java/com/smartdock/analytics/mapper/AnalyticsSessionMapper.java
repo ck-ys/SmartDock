@@ -33,6 +33,21 @@ public interface AnalyticsSessionMapper extends BaseMapperPlus<AnalyticsSession,
                     @Param("from") Date from,
                     @Param("to") Date to);
 
+    /** 回放对账(批10 Q3): 窗口内会话数/浏览量/跳出数。 */
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT count(*) AS "sessions",
+               coalesce(sum(page_views), 0) AS "pageViews",
+               count(*) FILTER (WHERE is_bounce = '1') AS "bounces"
+        FROM analytics_session
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND started_at >= #{from} AND started_at < #{to}
+        """)
+    Map<String, Object> selectReplayStats(@Param("tenantId") String tenantId,
+                                          @Param("source") String source,
+                                          @Param("from") Date from,
+                                          @Param("to") Date to);
+
     /**
      * 按 session_key 精确清理: 重建时起点在窗口外的边界会话 deleteRange 删不到, 不清会撞唯一键。
      */

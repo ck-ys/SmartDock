@@ -45,5 +45,11 @@ public class ProfileEngineConfig extends BaseEntity {
     /** 复核 SLA 天数(批9, 按业务源; 默认 7) */
     private Integer reviewSlaDays;
 
+    /** 事件保留天数(批10 Q4, 按业务源; null=继承全局 profile.event.retention-days) */
+    private Integer eventRetentionDays;
+
+    /** 过期去向: 1=先迁归档表再删(默认), 0=直接删(测试源) */
+    private String eventArchive;
+
     private String remark;
 }

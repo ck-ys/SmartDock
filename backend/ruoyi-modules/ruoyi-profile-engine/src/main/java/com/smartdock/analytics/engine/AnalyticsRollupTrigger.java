@@ -7,6 +7,7 @@ import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -14,7 +15,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * 事件写入后异步刷新最近两天的会话与日汇总。
  *
- * <p>单 JVM 合并窗口：同一业务源 2 秒内的多条事件只重建一次。</p>
+ * <p>合并窗口(2 秒内多条事件只重建一次)仍是 JVM 内标记——它是"少干活"的优化,
+ * 不是正确性边界; 正确性由 {@link AnalyticsService#rebuildRecent} 的分布式锁保证:
+ * 双实例各跑各的去抖循环时, 同一源同一时刻只有一个真正执行重建, 另一个跳过
+ * 并保留脏标记等下一个事件补触发(批10 Q1)。</p>
+ *
+ * <p>批10 顺手修: dirty 标记条目在空闲退出时移除, 修复按(租户|源)无限累积。</p>
  *
  * @author smartdock
  */
@@ -29,7 +35,7 @@ public class AnalyticsRollupTrigger {
     private final Map<String, Boolean> running = new ConcurrentHashMap<>();
 
     @Async
-    public void onEvent(String tenantId, String source) {
+    public void onEvent(String tenantId, String source, Date occurredAt) {
         if (StringUtils.isBlank(tenantId) || StringUtils.isBlank(source)) {
             return;
         }
@@ -47,7 +53,7 @@ public class AnalyticsRollupTrigger {
                 boolean ran = false;
                 try {
                     Boolean result = TenantHelper.dynamic(tenantId,
-                        () -> analyticsService.rebuildRecent(tenantId, source));
+                        () -> analyticsService.rebuildRecent(tenantId, source, occurredAt));
                     ran = Boolean.TRUE.equals(result);
                 } catch (Exception e) {
                     log.warn("[Analytics] rollup failed source={} err={}", source, e.getMessage());
@@ -65,9 +71,11 @@ public class AnalyticsRollupTrigger {
             interrupted = true;
         } finally {
             running.remove(key);
-            // 被中断时不再就地递归补触发: 中断标志未清会立刻再抛 InterruptedException 直到栈溢出
+            // 空闲时清掉去抖条目, 修复无界增长; 仍有新事件则递归补一轮
             if (!interrupted && flag.getAndSet(false)) {
-                onEvent(tenantId, source);
+                onEvent(tenantId, source, occurredAt);
+            } else {
+                dirty.remove(key);
             }
         }
     }

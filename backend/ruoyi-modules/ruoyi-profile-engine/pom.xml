@@ -58,6 +58,11 @@
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-common-ratelimiter</artifactId>
         </dependency>
+        <!-- 批10 Q1: 多实例互斥的分布式锁(Redisson)。此前经 ratelimiter 传递可见, 显式声明防传递依赖变动后静默失效 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-redis</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>

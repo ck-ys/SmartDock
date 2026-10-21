@@ -20,13 +20,14 @@ public interface ProfileModelConfigSnapshotMapper extends BaseMapperPlus<Profile
     @Insert("""
         INSERT INTO profile_model_config_snapshot
             (config_snapshot_id, tenant_id, source, model_id, model_code, model_version,
-             config, score_max, published_by, published_at, create_time)
+             model_type, config, score_max, published_by, published_at, create_time)
         VALUES
             (#{s.configSnapshotId}, #{s.tenantId}, #{s.source}, #{s.modelId}, #{s.modelCode},
-             #{s.modelVersion}, #{s.config}::jsonb, #{s.scoreMax}, #{s.publishedBy},
+             #{s.modelVersion}, #{s.modelType}, #{s.config}::jsonb, #{s.scoreMax}, #{s.publishedBy},
              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (tenant_id, model_id, model_version) DO UPDATE
         SET config = EXCLUDED.config, score_max = EXCLUDED.score_max,
+            model_type = EXCLUDED.model_type,
             published_by = EXCLUDED.published_by, published_at = CURRENT_TIMESTAMP
         """)
     int upsertJsonb(@Param("s") ProfileModelConfigSnapshot snapshot);

@@ -40,7 +40,7 @@ public interface ProfileEventMapper extends BaseMapperPlus<ProfileEvent, Profile
             (#{e.eventId}, #{e.tenantId}, #{e.source}, #{e.eventType}, #{e.eventName}, #{e.eventUid},
              #{e.subjectType}, #{e.subjectId}, #{e.anonymousId}, #{e.sessionId}, #{e.schemaVersion},
              #{e.occurredTime}, #{e.props}::jsonb, #{e.context}::jsonb, #{e.traits}::jsonb,
-             #{e.identifiers}::jsonb, CURRENT_TIMESTAMP)
+             #{e.identifiers}::jsonb, #{e.createTime})
         ON CONFLICT (tenant_id, source, event_uid) DO NOTHING
         """)
     int insertIgnore(@Param("e") ProfileEvent e);
@@ -190,4 +190,87 @@ public interface ProfileEventMapper extends BaseMapperPlus<ProfileEvent, Profile
         )
         """)
     int deleteBefore(@Param("before") Date before, @Param("limit") int limit);
+
+    // ------------------------------------------------------------ 批10 Q4: 按源保留期与冷热归档
+
+    /**
+     * 候选业务源: 有事件早于该源生效截止日(自定义保留期或全局默认, 跨租户, 调用方须 TenantHelper.ignore)。
+     * 不能只按全局截止日圈源——自定义保留期更短的源, 其事件要等满全局天数才进候选, "每源可配"名存实亡。
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT DISTINCT e.tenant_id AS "tenantId", e.source
+        FROM profile_event e
+        LEFT JOIN profile_engine_config c
+          ON c.tenant_id = e.tenant_id AND c.source = e.source
+        WHERE e.occurred_time < now() - make_interval(days => COALESCE(c.event_retention_days, #{globalDays}))
+        """)
+    List<Map<String, Object>> selectSourcesWithOldEvents(@Param("globalDays") int globalDays);
+
+    /**
+     * 过期事件先迁归档表再删(单条 CTE 原子完成, 单轮限量)。手写 SQL 自带租户/源条件。
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Insert("""
+        WITH moved AS (
+            DELETE FROM profile_event WHERE event_id IN (
+                SELECT event_id FROM profile_event
+                WHERE tenant_id = #{tenantId} AND source = #{source} AND occurred_time < #{before}
+                LIMIT #{limit}
+            ) RETURNING *
+        )
+        INSERT INTO profile_event_archive SELECT * FROM moved
+        """)
+    int archiveExpiredBatch(@Param("tenantId") String tenantId, @Param("source") String source,
+                            @Param("before") Date before, @Param("limit") int limit);
+
+    /** 过期事件直接删(archive=0 的源, 如测试源), 单轮限量。 */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Delete("""
+        DELETE FROM profile_event WHERE event_id IN (
+            SELECT event_id FROM profile_event
+            WHERE tenant_id = #{tenantId} AND source = #{source} AND occurred_time < #{before}
+            LIMIT #{limit}
+        )
+        """)
+    int deleteExpiredBatch(@Param("tenantId") String tenantId, @Param("source") String source,
+                           @Param("before") Date before, @Param("limit") int limit);
+
+    // ------------------------------------------------------------ 批10 Q5: 健康指标
+
+    /** 活跃业务源(近窗口有过事件的), 健康巡检的遍历范围。 */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT DISTINCT tenant_id AS "tenantId", source
+        FROM profile_event
+        WHERE occurred_time >= #{since} AND del_flag = '0'
+        """)
+    List<Map<String, Object>> selectActiveSources(@Param("since") Date since);
+
+    /** 事件延迟分位数: 采集到落库(occurred→create)毫秒, 近窗口内。 */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY
+                   EXTRACT(EPOCH FROM (create_time - occurred_time)) * 1000) AS "p50",
+               percentile_cont(0.95) WITHIN GROUP (ORDER BY
+                   EXTRACT(EPOCH FROM (create_time - occurred_time)) * 1000) AS "p95",
+               count(*) AS "times"
+        FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND occurred_time >= #{from} AND del_flag = '0'
+        """)
+    Map<String, Object> selectLatencyPercentiles(@Param("tenantId") String tenantId,
+                                                 @Param("source") String source,
+                                                 @Param("from") Date from);
+
+    /** 队列积压口径: 上次重建完成之后写入的事件数(都还没被会话重建消化)。 */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT count(*) FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND create_time > #{since} AND del_flag = '0'
+        """)
+    long countCreatedAfter(@Param("tenantId") String tenantId,
+                           @Param("source") String source,
+                           @Param("since") Date since);
 }

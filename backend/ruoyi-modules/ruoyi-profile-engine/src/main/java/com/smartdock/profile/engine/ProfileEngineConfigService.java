@@ -98,6 +98,19 @@ public class ProfileEngineConfigService {
             }
             config.setReviewSlaDays(bo.getReviewSlaDays());
         }
+        if (bo.getEventRetentionDays() != null) {
+            if (bo.getEventRetentionDays() == 0) {
+                // 0=清空自定义, 回到继承全局默认(前端空输入即传 0; 不传字段则不动现值)
+                config.setEventRetentionDays(null);
+            } else if (bo.getEventRetentionDays() < 1 || bo.getEventRetentionDays() > 36_500) {
+                throw new ServiceException("事件保留天数必须在 0~36500 之间(0=继承全局默认)");
+            } else {
+                config.setEventRetentionDays(bo.getEventRetentionDays());
+            }
+        }
+        if (bo.getEventArchive() != null) {
+            config.setEventArchive("0".equals(bo.getEventArchive()) ? "0" : "1");
+        }
         if (bo.getRemark() != null) {
             config.setRemark(StringUtils.substring(bo.getRemark(), 0, 500));
         }

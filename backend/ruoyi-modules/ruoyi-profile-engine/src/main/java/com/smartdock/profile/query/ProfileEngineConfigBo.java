@@ -33,4 +33,10 @@ public class ProfileEngineConfigBo implements Serializable {
 
     /** 复核 SLA 天数(1~365) */
     private Integer reviewSlaDays;
+
+    /** 事件保留天数(批10 Q4, 1~36500; null=继承全局) */
+    private Integer eventRetentionDays;
+
+    /** 过期去向 1/0: 1=归档后删(默认), 0=直接删 */
+    private String eventArchive;
 }

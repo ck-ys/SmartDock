@@ -93,7 +93,7 @@ function parseArgs(argv) {
     const value = argv[i + 1];
     if (key === '--endpoint') out.endpoint = value;
     else if (key === '--siteKey') out.siteKey = value;
-    else if (key === '--days') out.days = Number(value);
+    else if (key === '--days') out.days = Math.max(1, Number(value) || 1); // days=0 曾在 intBetween(0,-1) 上死循环(批10 顺手修)
     else if (key === '--visitors') out.visitors = Number(value);
   }
   return out;

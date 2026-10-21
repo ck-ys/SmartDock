@@ -198,3 +198,60 @@ VALUES
     {"type":"object","properties":{"plan":{"type":"string"}}}
     $schema$::jsonb, 'ACTIVE', 1, '2026-10-19 00:00:00')
 ON CONFLICT DO NOTHING;
+
+
+-- ================================================================ 批10 (2026-10-20)
+
+-- 事件回放任务(批10 Q3): 天粒度断点(current_day), 回放前后对账数字落 stats_before/after
+CREATE TABLE IF NOT EXISTS public.analytics_replay_task (
+    replay_id      bigint       NOT NULL,
+    tenant_id      varchar(20)  NOT NULL DEFAULT '000000',
+    source         varchar(32)  NOT NULL,
+    from_day       date         NOT NULL,
+    to_day         date         NOT NULL,
+    chains         varchar(64)  NOT NULL,
+    status         varchar(16)  NOT NULL,
+    current_day    date,
+    days_total     integer      NOT NULL DEFAULT 0,
+    days_done      integer      NOT NULL DEFAULT 0,
+    stats_before   varchar(2000),
+    stats_after    varchar(2000),
+    error_msg      varchar(1000),
+    create_dept    bigint,
+    create_by      bigint,
+    create_time    timestamp    DEFAULT CURRENT_TIMESTAMP,
+    update_by      bigint,
+    update_time    timestamp,
+    del_flag       char(1)      DEFAULT '0',
+    CONSTRAINT pk_analytics_replay_task PRIMARY KEY (replay_id),
+    CONSTRAINT ck_analytics_replay_status CHECK (status IN ('RUNNING', 'PAUSED', 'DONE', 'FAILED')),
+    CONSTRAINT ck_analytics_replay_days CHECK (days_total >= 0 AND days_done >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_replay_tenant_source
+    ON public.analytics_replay_task USING btree (tenant_id, source, create_time DESC);
+
+-- 会话/日汇总重建耗时留痕(批10 Q5): 健康页'重建耗时分布/趋势'原料, 保留期任务清 30 天
+CREATE TABLE IF NOT EXISTS public.analytics_rebuild_log (
+    log_id      bigint      NOT NULL,
+    tenant_id   varchar(20) NOT NULL,
+    source      varchar(32) NOT NULL,
+    kind        varchar(16) NOT NULL,
+    duration_ms bigint      NOT NULL,
+    sessions    integer,
+    finished_at timestamp   NOT NULL,
+    read_watermark timestamp,
+    CONSTRAINT pk_analytics_rebuild_log PRIMARY KEY (log_id),
+    CONSTRAINT ck_analytics_rebuild_kind CHECK (kind IN ('RECENT', 'MANUAL', 'REPLAY', 'UNMERGE'))
+);
+CREATE INDEX IF NOT EXISTS idx_analytics_rebuild_log_source
+    ON public.analytics_rebuild_log USING btree (tenant_id, source, finished_at DESC);
+
+-- 访客首见物化表(批10 Q7): 键=COALESCE(NULLIF(anonymous_id,''), subject_id), 事件写入时 LEAST 增量维护;
+-- 部署时由 migration 从 profile_event 全量回填
+CREATE TABLE IF NOT EXISTS public.analytics_visitor_first_seen (
+    tenant_id   varchar(20)  NOT NULL,
+    source      varchar(32)  NOT NULL,
+    visitor_key varchar(128) NOT NULL,
+    first_seen  timestamp    NOT NULL,
+    CONSTRAINT pk_analytics_visitor_first_seen PRIMARY KEY (tenant_id, source, visitor_key)
+);

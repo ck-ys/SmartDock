@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 通用评分模型: N 维指标 → 分箱 → 加权 → 快照。
@@ -68,6 +69,10 @@ public class ProfileScoreModelService {
     private final ProfileModelMetricMapper metricMapper;
     private final ProfileSubjectMapper subjectMapper;
     private final ProfileModelConfigSnapshotMapper configSnapshotMapper;
+    /** 批10 Q2: 快照链 advisory 事务锁用(取前链+写快照包进一个事务) */
+    private final org.springframework.transaction.support.TransactionTemplate txTemplate;
+    /** 批10 R1: 模型运行互斥(publish/rollback/run/回放共用), 封死 RUNNING 可见性窗口 */
+    private final org.redisson.api.RedissonClient redisson;
 
     private final Map<String, CachedModelData> populationCache = new ConcurrentHashMap<>();
 
@@ -211,15 +216,38 @@ public class ProfileScoreModelService {
         if (!"PUBLISHED".equals(model.getStatus())) {
             throw new ServiceException("只有已发布模型可以全量重算, 草稿请先试算并发布");
         }
+        // 批10 R1: 分布式锁封死并发窗口——RUNNING 行要等外层事务提交才对其他会话可见,
+        // 纯靠它判重时 publish 大事务里的标记在提交前拦不住并发的直接 /run(批9 多审遗留①②)
+        org.redisson.api.RLock lock = redisson.getLock(ProfileLocks.modelRun(modelId));
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(0, ProfileLocks.MODEL_RUN_LEASE_MINUTES, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ServiceException("模型重算被中断, 请重试");
+        }
+        if (!acquired) {
+            throw new ServiceException("该模型已有重算在进行中, 请稍后再试");
+        }
+        try {
+            return doRun(model, triggerType);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+
+    private ProfileModelRun doRun(ProfileScoreModel model, String triggerType) {
         // 先回收僵尸 RUNNING(进程重启遗留), 阈值须大于最长合法重算时长
         runMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProfileModelRun>()
-            .eq(ProfileModelRun::getModelId, modelId)
+            .eq(ProfileModelRun::getModelId, model.getModelId())
             .eq(ProfileModelRun::getStatus, "RUNNING")
             .lt(ProfileModelRun::getStartedAt, new Date(System.currentTimeMillis() - 30 * 60_000L))
             .set(ProfileModelRun::getStatus, "FAILED")
             .set(ProfileModelRun::getErrorMsg, "stale RUNNING reclaimed (进程重启遗留)"));
         Long running = runMapper.selectCount(new LambdaQueryWrapper<ProfileModelRun>()
-            .eq(ProfileModelRun::getModelId, modelId)
+            .eq(ProfileModelRun::getModelId, model.getModelId())
             .eq(ProfileModelRun::getStatus, "RUNNING"));
         if (running != null && running > 0) {
             throw new ServiceException("该模型已有重算在进行中, 请稍后再试");
@@ -297,15 +325,20 @@ public class ProfileScoreModelService {
                         data.values.getOrDefault(dim.getCode(), Map.of()).get(key));
                 }
                 ProfileModelSnapshot snapshot = scoreOne(model, def, subject, values, data, null);
-                List<Map<String, Object>> history = snapshotMapper.selectHistory(model.getTenantId(),
-                    model.getSource(), model.getModelCode(), subjectType, subjectId, 1);
-                if (!history.isEmpty()) {
-                    Object prev = history.get(0).get("modelSnapshotId");
-                    if (prev != null) {
-                        snapshot.setPrevSnapshotId(Long.parseLong(String.valueOf(prev)));
+                // 批10 Q2: 增量写快照同样持 advisory 事务锁——与全量 run 在 DB 层排队,
+                // 前"取历史+定前链+写入"原子, 消除增量与全量并发时的链分叉
+                txTemplate.executeWithoutResult(status -> {
+                    snapshotMapper.advisoryXactLock(snapshotChainKey(model));
+                    List<Map<String, Object>> history = snapshotMapper.selectHistory(model.getTenantId(),
+                        model.getSource(), model.getModelCode(), subjectType, subjectId, 1);
+                    if (!history.isEmpty()) {
+                        Object prev = history.get(0).get("modelSnapshotId");
+                        if (prev != null) {
+                            snapshot.setPrevSnapshotId(Long.parseLong(String.valueOf(prev)));
+                        }
                     }
-                }
-                snapshotMapper.insertJsonb(snapshot);
+                    snapshotMapper.insertJsonb(snapshot);
+                });
             } catch (Exception e) {
                 log.warn("[Profile] model incremental failed model={} subject={} err={}",
                     model.getModelCode(), subjectId, e.getMessage());
@@ -487,6 +520,7 @@ public class ProfileScoreModelService {
         archive.setModelId(model.getModelId());
         archive.setModelCode(model.getModelCode());
         archive.setModelVersion(version);
+        archive.setModelType(model.getModelType());
         archive.setConfig(model.getConfig());
         archive.setScoreMax(model.getScoreMax());
         archive.setPublishedBy(currentUser());
@@ -530,6 +564,10 @@ public class ProfileScoreModelService {
         }
         model.setConfig(archived.getConfig());
         model.setScoreMax(archived.getScoreMax());
+        // 批10 R5: 模型类型随存档恢复(存档早于本批的行无 model_type, 保持当前值)
+        if (StringUtils.isNotBlank(archived.getModelType())) {
+            model.setModelType(archived.getModelType());
+        }
         model.setStatus("PUBLISHED");
         model.setModelVersion(archived.getModelVersion());
         model.setRevision((model.getRevision() == null ? 0 : model.getRevision()) + 1);
@@ -573,7 +611,8 @@ public class ProfileScoreModelService {
         List<ProfileModelCompare.SubjectVersion> out = new ArrayList<>();
         for (Map<String, Object> row : snapshotMapper.selectByRun(tenantId, run.getRunId())) {
             out.add(new ProfileModelCompare.SubjectVersion(
-                String.valueOf(row.get("subjectType")), String.valueOf(row.get("subjectId")), null,
+                String.valueOf(row.get("subjectType")), String.valueOf(row.get("subjectId")),
+                row.get("displayName") == null ? null : String.valueOf(row.get("displayName")),
                 row.get("level") == null ? null : String.valueOf(row.get("level")),
                 toDecimal(row.get("normalizedScore"))));
         }
@@ -640,6 +679,19 @@ public class ProfileScoreModelService {
     private void writeSnapshots(ProfileScoreModel model, ProfileModelDefinition def,
                                 List<ProfileSubject> subjects, CachedModelData data,
                                 ProfileModelRun run, String trigger) {
+        // 批10 Q2: 「取前链 + 写全部快照」包进一个持 pg advisory xact lock 的事务——
+        // 任何写入者(全量/增量/回放)先在 DB 层排队, 前链指向唯一, 链分叉结构上不可能。
+        // 单事务附带收益: 全量失败不再遗留"FAILED run 的孤儿快照"(整批回滚)。
+        // 代价: 进度更新随事务提交才可见, 演示量级毫秒级无感。
+        txTemplate.executeWithoutResult(status -> {
+            snapshotMapper.advisoryXactLock(snapshotChainKey(model));
+            doWriteSnapshots(model, def, subjects, data, run);
+        });
+    }
+
+    private void doWriteSnapshots(ProfileScoreModel model, ProfileModelDefinition def,
+                                  List<ProfileSubject> subjects, CachedModelData data,
+                                  ProfileModelRun run) {
         Map<String, Long> latest = latestIds(model);
         int done = 0;
         for (ProfileSubject subject : subjects) {
@@ -658,6 +710,11 @@ public class ProfileScoreModelService {
                 runMapper.updateById(run);
             }
         }
+    }
+
+    /** 快照链 advisory 键: 同租户同模型一条链一把锁(与 Redis 任务锁互补: DB 层防最后竞态)。 */
+    private String snapshotChainKey(ProfileScoreModel model) {
+        return "profile:snapshot:" + model.getTenantId() + ":" + model.getModelCode();
     }
 
     private ProfileModelSnapshot scoreOne(ProfileScoreModel model, ProfileModelDefinition def,

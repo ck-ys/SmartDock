@@ -19,6 +19,7 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
+import org.redisson.api.RLock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +30,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 分群触达编排（批9 拍板 Q3-A 风暴加固版）。
@@ -52,6 +54,10 @@ public class ProfileReachService {
     private final ProfileSegmentMapper segmentMapper;
     private final ProfileSegmentMemberMapper memberMapper;
     private final ObjectProvider<ProfileReachChannel> channelProvider;
+    /** 批10 R1: 冻结收件人用短事务模板(不再整个发送横跨逐人投递一个大事务) */
+    private final org.springframework.transaction.support.TransactionTemplate txTemplate;
+    /** 批10 R1: 重试互斥(并发重试不双发、计数不互相覆盖) */
+    private final org.redisson.api.RedissonClient redisson;
 
     /** 预览收件人：当前成员中站内通道可覆盖的用户型主体。 */
     public Map<String, Object> preview(Long segmentId) {
@@ -76,8 +82,11 @@ public class ProfileReachService {
 
     /**
      * 发送：冻结收件人 → 逐人明细 → 逐个投递 → 回写批次成败。
+     *
+     * <p>批10 R1(批9 多审遗留③): 拆掉横跨逐人投递的大事务——冻结(批次+明细)一个短事务,
+     * 投递在事务外逐人落库。收益: 单人投递失败不再把整批回滚成"从未发生过",
+     * 而是留下 PARTIAL/FAILED 现场可一键重试(重试幂等键不变, 已成功者不会重收)。</p>
      */
-    @Transactional(rollbackFor = Exception.class)
     public ProfileReachBatch send(Long segmentId, ProfileReachSendBo bo) {
         if (bo == null || StringUtils.isBlank(bo.getTitle())) {
             throw new ServiceException("通知标题不能为空");
@@ -99,26 +108,28 @@ public class ProfileReachService {
         batch.setRetryCount(0);
         batch.setStatus("RUNNING");
         batch.setCreateBy(currentUser());
-        reachMapper.insert(batch);
-
-        List<ProfileReachItem> items = new ArrayList<>();
-        for (ProfileSegmentMember m : members) {
-            if (!"user".equalsIgnoreCase(nullSafe(m.getSubjectType())) || m.getSubjectId() == null) {
-                continue;
+        List<ProfileReachItem> items = txTemplate.execute(status -> {
+            reachMapper.insert(batch);
+            List<ProfileReachItem> frozen = new ArrayList<>();
+            for (ProfileSegmentMember m : members) {
+                if (!"user".equalsIgnoreCase(nullSafe(m.getSubjectType())) || m.getSubjectId() == null) {
+                    continue;
+                }
+                ProfileReachItem item = new ProfileReachItem();
+                item.setItemId(IdWorker.getId());
+                item.setTenantId(segment.getTenantId());
+                item.setReachId(batch.getReachId());
+                item.setSubjectType(m.getSubjectType());
+                item.setSubjectId(m.getSubjectId());
+                item.setUserId(parseLong(m.getSubjectId()));
+                item.setUserName(m.getDisplayName());
+                item.setDedupKey(batch.getReachId() + ":" + m.getSubjectId());
+                item.setStatus("PENDING");
+                frozen.add(item);
+                itemMapper.insertItem(item);
             }
-            ProfileReachItem item = new ProfileReachItem();
-            item.setItemId(IdWorker.getId());
-            item.setTenantId(segment.getTenantId());
-            item.setReachId(batch.getReachId());
-            item.setSubjectType(m.getSubjectType());
-            item.setSubjectId(m.getSubjectId());
-            item.setUserId(parseLong(m.getSubjectId()));
-            item.setUserName(m.getDisplayName());
-            item.setDedupKey(batch.getReachId() + ":" + m.getSubjectId());
-            item.setStatus("PENDING");
-            items.add(item);
-            itemMapper.insertItem(item);
-        }
+            return frozen;
+        });
         batch.setTotalCount(items.size());
         if (items.isEmpty()) {
             batch.setStatus("FAILED");
@@ -132,8 +143,10 @@ public class ProfileReachService {
 
     /**
      * 失败重试：只重发 FAILED 明细（幂等键不变，已成功者不会重收）。
+     *
+     * <p>批10 R1(批9 多审遗留④): 分布式锁互斥——并发两次重试不再双读同一批 FAILED
+     * 双发双计数(通道幂等键兜底防重复通知, 但计数会互相覆盖成假账)。</p>
      */
-    @Transactional(rollbackFor = Exception.class)
     public ProfileReachBatch retry(Long reachId) {
         ProfileReachBatch batch = reachMapper.selectById(reachId);
         if (batch == null || "1".equals(batch.getDelFlag())) {
@@ -142,14 +155,31 @@ public class ProfileReachService {
         if (!CHANNEL_INAPP.equals(batch.getChannel())) {
             throw new ServiceException("只有站内通知批次支持重试");
         }
-        List<ProfileReachItem> failed = itemMapper.selectFailedItems(reachId);
-        if (failed.isEmpty()) {
-            return batch;
+        RLock lock = redisson.getLock(ProfileLocks.reachRetry(reachId));
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(0, ProfileLocks.REACH_RETRY_LEASE_MINUTES, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new ServiceException("重试被中断, 请重试");
         }
-        ProfileReachChannel channel = requireChannel(CHANNEL_INAPP);
-        batch.setRetryCount((batch.getRetryCount() == null ? 0 : batch.getRetryCount()) + 1);
-        dispatch(batch, failed, channel);
-        return batch;
+        if (!acquired) {
+            throw new ServiceException("该批次重试正在执行中, 请稍后再试");
+        }
+        try {
+            List<ProfileReachItem> failed = itemMapper.selectFailedItems(reachId);
+            if (failed.isEmpty()) {
+                return batch;
+            }
+            ProfileReachChannel channel = requireChannel(CHANNEL_INAPP);
+            batch.setRetryCount((batch.getRetryCount() == null ? 0 : batch.getRetryCount()) + 1);
+            dispatch(batch, failed, channel);
+            return batch;
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
     }
 
     /**

@@ -45,6 +45,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     private final ProfileIdentityService identityService;
     private final ProfileRecalcTrigger recalcTrigger;
     private final AnalyticsRollupTrigger analyticsRollupTrigger;
+    private final com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper;
     private final TransactionTemplate requiresNew;
 
     public ProfileEventServiceImpl(ProfileEventMapper eventMapper,
@@ -52,32 +53,25 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
                                    ProfileIdentityService identityService,
                                    ProfileRecalcTrigger recalcTrigger,
                                    AnalyticsRollupTrigger analyticsRollupTrigger,
+                                   com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper,
                                    PlatformTransactionManager transactionManager) {
         this.eventMapper = eventMapper;
         this.schemaService = schemaService;
         this.identityService = identityService;
         this.recalcTrigger = recalcTrigger;
         this.analyticsRollupTrigger = analyticsRollupTrigger;
+        this.firstSeenMapper = firstSeenMapper;
         this.requiresNew = new TransactionTemplate(transactionManager);
         this.requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     @Override
     public boolean publish(ProfileEventBo bo) {
-        ProfileEvent written = requiresNew.execute(status -> doPublish(bo));
+        ProfileEvent written = publishIsolated(bo);
         if (written == null) {
             return false;
         }
-        // 事务提交后再异步重算, 避免异步线程读到未提交事件
-        try {
-            recalcTrigger.onEvent(written.getTenantId(), written.getSource(),
-                written.getSubjectType(), written.getSubjectId());
-            analyticsRollupTrigger.onEvent(written.getTenantId(), written.getSource());
-        } catch (Exception e) {
-            // 自动重算/汇总调度失败不影响事件账本
-            log.warn("[Profile] auto recalc schedule failed subject={} err={}",
-                written.getSubjectId(), e.getMessage());
-        }
+        afterWritten(written);
         return true;
     }
 
@@ -111,20 +105,13 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         if (events != null) {
             for (ProfileEventBo bo : events) {
                 try {
-                    ProfileEvent event = requiresNew.execute(status -> doPublish(bo));
+                    ProfileEvent event = publishIsolated(bo);
                     if (event == null) {
                         duplicated++;
                         continue;
                     }
                     written++;
-                    try {
-                        recalcTrigger.onEvent(event.getTenantId(), event.getSource(),
-                            event.getSubjectType(), event.getSubjectId());
-                        analyticsRollupTrigger.onEvent(event.getTenantId(), event.getSource());
-                    } catch (Exception e) {
-                        log.warn("[Profile] auto recalc schedule failed subject={} err={}",
-                            event.getSubjectId(), e.getMessage());
-                    }
+                    afterWritten(event);
                 } catch (Exception e) {
                     Map<String, String> failure = new LinkedHashMap<>();
                     failure.put("eventUid", String.valueOf(bo.getEventUid()));
@@ -143,7 +130,15 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         return out;
     }
 
-    private ProfileEvent doPublish(ProfileEventBo bo) {
+    /**
+     * 单条事件隔离写入。
+     *
+     * <p>批10 顺手修(双连接收敛): schema 校验与身份解析在事件事务外执行——
+     * 身份解析自身是 REQUIRES_NEW, 嵌在事件事务里同一事件会同时占两条连接,
+     * 批量导入时连接池翻倍占用。现在身份链接与事件账本是先后两个独立短事务:
+     * 两步之间崩溃只丢索引不丢账本, 下一条事件会补链接。</p>
+     */
+    private ProfileEvent publishIsolated(ProfileEventBo bo) {
         ProfileEvent e = toEntity(bo);
 
         // 已注册 schema 才校验; 未注册/旧库/解析失败一律放行
@@ -156,12 +151,54 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         // 身份解析失败不阻断事件(链接表是索引, 事件是账本); 下一条事件会再补
         e.setSubjectId(resolveCanonicalSubject(e, bo));
 
-        int rows = eventMapper.insertIgnore(e);
-        if (rows == 0) {
-            return null;
+        return requiresNew.execute(status -> {
+            int rows = eventMapper.insertIgnore(e);
+            if (rows == 0) {
+                return null;
+            }
+            upsertSubject(e, bo);
+            upsertFirstSeen(e);
+            return e;
+        });
+    }
+
+    /**
+     * 批10 Q7: 访客首见物化增量维护——键口径与原全表聚合完全一致
+     * (COALESCE(NULLIF(anonymous_id,''), subject_id)), LEAST 只降不升。
+     * 失败不阻断事件账本, 重建侧有兜底(物化表缺行=按老访客处理, 下一条同访客事件会补)。
+     */
+    private void upsertFirstSeen(ProfileEvent e) {
+        try {
+            String visitorKey = visitorKeyOf(e.getAnonymousId(), e.getSubjectId());
+            if (StringUtils.isNotBlank(visitorKey)) {
+                firstSeenMapper.upsert(e.getTenantId(), e.getSource(), visitorKey, e.getOccurredTime());
+            }
+        } catch (Exception ex) {
+            log.warn("[Profile] visitor first-seen upsert failed (non-fatal) visitor={} err={}",
+                e.getSubjectId(), ex.getMessage());
         }
-        upsertSubject(e, bo);
-        return e;
+    }
+
+    /**
+     * 访客键口径(包内可见供单测锚定): 与 SQL 侧
+     * COALESCE(NULLIF(anonymous_id, ''), subject_id) 一字不差——两侧口径漂移会让
+     * 新访客判定在新旧实现间产生差异。
+     */
+    static String visitorKeyOf(String anonymousId, String subjectId) {
+        return StringUtils.isNotBlank(anonymousId) ? anonymousId : subjectId;
+    }
+
+    /** 事务提交后再异步重算(带事件发生时间, 迟到事件会把重建窗口拉宽到所在自然日), 避免异步线程读到未提交事件。 */
+    private void afterWritten(ProfileEvent written) {
+        try {
+            recalcTrigger.onEvent(written.getTenantId(), written.getSource(),
+                written.getSubjectType(), written.getSubjectId());
+            analyticsRollupTrigger.onEvent(written.getTenantId(), written.getSource(), written.getOccurredTime());
+        } catch (Exception e) {
+            // 自动重算/汇总调度失败不影响事件账本
+            log.warn("[Profile] auto recalc schedule failed subject={} err={}",
+                written.getSubjectId(), e.getMessage());
+        }
     }
 
     private String resolveCanonicalSubject(ProfileEvent e, ProfileEventBo bo) {
@@ -215,7 +252,12 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         checkLen("eventUid", bo.getEventUid(), 128);
         checkLen("subjectType", subjectType, 32);
         checkLen("subjectId", bo.getSubjectId(), 64);
-        checkLen("anonymousId", bo.getAnonymousId(), 128);
+        // 纯空白归一为 null: 访客键 SQL 口径是 NULLIF(anonymous_id,'') 不认空格, 写入侧先归一防两侧分叉
+        String anonymousId = bo.getAnonymousId() == null ? null : bo.getAnonymousId().trim();
+        if (anonymousId != null && anonymousId.isEmpty()) {
+            anonymousId = null;
+        }
+        checkLen("anonymousId", anonymousId, 128);
         checkLen("sessionId", bo.getSessionId(), 128);
         checkLen("schemaVersion", schemaVersion, 32);
 
@@ -228,10 +270,13 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         e.setEventUid(bo.getEventUid());
         e.setSubjectType(subjectType);
         e.setSubjectId(bo.getSubjectId());
-        e.setAnonymousId(bo.getAnonymousId());
+        e.setAnonymousId(anonymousId);
         e.setSessionId(bo.getSessionId());
         e.setSchemaVersion(schemaVersion);
         e.setOccurredTime(bo.getOccurredTime() != null ? bo.getOccurredTime() : new Date());
+        // 落库时钟统一走 JVM: create_time 若交 CURRENT_TIMESTAMP(DB 钟)会与会话重建的
+        // finished_at(JVM 钟)跨钟比较, 双实例去重/积压口径在两钟有偏差的环境里失真
+        e.setCreateTime(new Date());
         e.setProps(toJson(bo.getProps()));
         e.setContext(toJson(bo.getContext()));
         e.setTraits(toJson(bo.getTraits()));

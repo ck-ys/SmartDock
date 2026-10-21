@@ -35,17 +35,64 @@ public interface AnalyticsEventMapper {
                                          @Param("to") Date to);
 
     /**
-     * 每个访问者在业务源内的首次出现时间（判断新/老访客）。
+     * 批10 Q7: 只取指定事件名的行(漏斗/路径/归因输入收敛)。
+     * 与 Java 侧 names.contains(event.getEventName()) 过滤完全等价, 口径不变。
      */
     @Select("""
-        SELECT COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey",
-               min(occurred_time) AS "firstSeen"
+        <script>
+        SELECT event_id AS "eventId", event_name AS "eventName", subject_type AS "subjectType",
+               subject_id AS "subjectId", anonymous_id AS "anonymousId", session_id AS "sessionId",
+               COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey",
+               occurred_time AS "occurredTime", props::text AS props, context::text AS context
         FROM profile_event
-        WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
-        GROUP BY 1
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND occurred_time &gt;= #{from} AND occurred_time &lt; #{to}
+          AND del_flag = '0'
+          AND event_name IN
+          <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
+        ORDER BY occurred_time, event_id
+        </script>
         """)
-    List<Map<String, Object>> selectVisitorFirstSeen(@Param("tenantId") String tenantId,
-                                                     @Param("source") String source);
+    List<AnalyticsEventRow> selectEventsByNames(@Param("tenantId") String tenantId,
+                                                @Param("source") String source,
+                                                @Param("from") Date from,
+                                                @Param("to") Date to,
+                                                @Param("names") List<String> names);
+
+    /**
+     * 批10 Q7: 漏斗流失下钻的输入收敛——只取"碰过第一步事件"的访客的全部事件。
+     * 没碰过第一步的访客原本也不进入任何步进统计(与全量载入口径等价)。
+     */
+    @Select("""
+        SELECT pe.event_id AS "eventId", pe.event_name AS "eventName", pe.subject_type AS "subjectType",
+               pe.subject_id AS "subjectId", pe.anonymous_id AS "anonymousId", pe.session_id AS "sessionId",
+               COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) AS "visitorKey",
+               pe.occurred_time AS "occurredTime", pe.props::text AS props, pe.context::text AS context
+        FROM profile_event pe
+        WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source}
+          AND pe.occurred_time >= #{from} AND pe.occurred_time < #{to}
+          AND pe.del_flag = '0'
+          AND COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) IN (
+              SELECT COALESCE(NULLIF(a.anonymous_id, ''), a.subject_id)
+              FROM profile_event a
+              WHERE a.tenant_id = #{tenantId} AND a.source = #{source}
+                AND a.occurred_time >= #{from} AND a.occurred_time < #{to}
+                AND a.del_flag = '0'
+                AND a.event_name = #{anchorEvent})
+        ORDER BY pe.occurred_time, pe.event_id
+        """)
+    List<AnalyticsEventRow> selectEventsForVisitors(@Param("tenantId") String tenantId,
+                                                    @Param("source") String source,
+                                                    @Param("from") Date from,
+                                                    @Param("to") Date to,
+                                                    @Param("anchorEvent") String anchorEvent);
+
+    /** 该源最新落库时间(双实例去重: 上次重建已晚于它则本次触发无需重建)。 */
+    @Select("""
+        SELECT max(create_time) FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+        """)
+    Date selectMaxCreateTime(@Param("tenantId") String tenantId, @Param("source") String source);
 
     @Select("""
         <script>

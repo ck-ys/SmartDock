@@ -19,6 +19,13 @@ import java.util.Map;
 @Mapper
 public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelSnapshot, ProfileModelSnapshot> {
 
+    /**
+     * 批10 Q2: 快照链事务级库锁。必须在事务内调用; 事务提交/回滚时自动释放,
+     * 崩溃不留死锁。语义=「取前链+写快照」在数据库层面不可分割, 链分叉结构上不可能。
+     */
+    @Select("SELECT pg_advisory_xact_lock(hashtext(#{key}))")
+    void advisoryXactLock(@Param("key") String key);
+
     @Insert("""
         INSERT INTO profile_model_snapshot
             (model_snapshot_id, tenant_id, source, model_id, model_code, model_version,
@@ -173,14 +180,19 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
 
     /**
      * 指定 run 的全部快照(版本对比用, 批9 Q1-A)。
+     * 批10 R5: 联 profile_subject 取显示名——版本对比 Top 变化主体不再匿名。
      */
     @Select("""
-        SELECT subject_type AS "subjectType", subject_id AS "subjectId",
-               model_score AS "modelScore", normalized_score AS "normalizedScore",
-               level, detail, model_version AS "modelVersion", calc_time AS "calcTime"
-        FROM profile_model_snapshot
-        WHERE tenant_id = #{tenantId} AND run_id = #{runId} AND del_flag = '0'
-        ORDER BY subject_type, subject_id
+        SELECT s.subject_type AS "subjectType", s.subject_id AS "subjectId",
+               sub.display_name AS "displayName",
+               s.model_score AS "modelScore", s.normalized_score AS "normalizedScore",
+               s.level, s.detail, s.model_version AS "modelVersion", s.calc_time AS "calcTime"
+        FROM profile_model_snapshot s
+        LEFT JOIN profile_subject sub
+          ON sub.tenant_id = s.tenant_id AND sub.source = s.source
+         AND sub.subject_type = s.subject_type AND sub.subject_id = s.subject_id
+        WHERE s.tenant_id = #{tenantId} AND s.run_id = #{runId} AND s.del_flag = '0'
+        ORDER BY s.subject_type, s.subject_id
         """)
     List<Map<String, Object>> selectByRun(@Param("tenantId") String tenantId,
                                            @Param("runId") Long runId);

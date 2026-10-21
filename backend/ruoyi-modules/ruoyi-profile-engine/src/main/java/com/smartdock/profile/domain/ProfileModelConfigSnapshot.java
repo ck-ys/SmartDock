@@ -34,6 +34,9 @@ public class ProfileModelConfigSnapshot implements Serializable {
 
     private String modelVersion;
 
+    /** 批10 R5: 模型类型(RFM/GENERIC)随档保存, 回滚时恢复——否则回滚后类型跟当前态走 */
+    private String modelType;
+
     /** jsonb 字符串, 写入走 ::jsonb */
     private String config;
 

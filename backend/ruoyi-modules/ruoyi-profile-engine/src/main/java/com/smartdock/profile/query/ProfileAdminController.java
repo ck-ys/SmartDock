@@ -8,6 +8,9 @@ import com.smartdock.profile.event.ProfileEventServiceImpl;
 import com.smartdock.profile.mapper.ProfileRecalcBatchMapper;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,5 +64,17 @@ public class ProfileAdminController {
     @GetMapping("/recalc/{batchId}")
     public R<ProfileRecalcBatch> batch(@PathVariable Long batchId) {
         return R.ok(batchMapper.selectById(batchId));
+    }
+
+    /**
+     * 重算批次断点续跑(批10 Q3: 方法早已有, 这里补受权限保护的 HTTP 入口)。
+     * RUNNING 中拒绝并发续跑; 进程崩溃遗留的 FAILED/PARTIAL 可从 last_subject_id 续。
+     */
+    @SaCheckPermission("profile:recalc:run")
+    @Log(title = "画像重算", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
+    @PostMapping("/recalc/{batchId}/resume")
+    public R<ProfileRecalcBatch> resume(@PathVariable Long batchId) {
+        return R.ok(recalcService.resume(batchId));
     }
 }

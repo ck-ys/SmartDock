@@ -49,4 +49,10 @@ public class ProfileIdentityMerge extends BaseEntity {
     private Date occurredAt;
 
     private Date reversibleUntil;
+
+    /** 拆分时间(批10 Q6): 非空=已执行过 unmerge, 不可重复拆 */
+    private Date reversedAt;
+
+    /** 执行拆分的人(userId 字符串 / system) */
+    private String reversedBy;
 }

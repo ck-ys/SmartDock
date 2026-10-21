@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -47,9 +48,12 @@ public class ProfileOpsJob {
     private final ProfileEngineConfigMapper configMapper;
     private final ProfileReviewQueueMapper reviewMapper;
     private final ProfileReachService reachService;
+    private final com.smartdock.profile.mapper.ProfileEventMapper eventMapper;
+    private final com.smartdock.analytics.engine.AnalyticsHealthService healthService;
 
     private final AtomicBoolean refreshing = new AtomicBoolean(false);
     private final AtomicBoolean slaScanning = new AtomicBoolean(false);
+    private final AtomicBoolean healthScanning = new AtomicBoolean(false);
 
     @Scheduled(cron = "0 5 * * * ?")
     public void refreshSegments() {
@@ -138,6 +142,50 @@ public class ProfileOpsJob {
             log.error("[Profile] review SLA scan failed", e);
         } finally {
             slaScanning.set(false);
+        }
+    }
+
+    /**
+     * 引擎健康巡检(批10 Q5): 每小时 :15, 对近 24h 活跃源算四指标,
+     * 越线给租户管理员发站内告警(dedupKey=health:{source}:{day}:{metric}, 每源每天每指标一次)。
+     */
+    @Scheduled(cron = "0 15 * * * ?")
+    public void scanHealth() {
+        if (!healthScanning.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            Date since = new Date(System.currentTimeMillis() - 24 * 3600_000L);
+            List<Map<String, Object>> sources = TenantHelper.ignore(() ->
+                eventMapper.selectActiveSources(since));
+            String day = LocalDate.now(ZoneId.of("GMT+8")).toString().replace("-", "");
+            for (Map<String, Object> pair : sources) {
+                String tenantId = String.valueOf(pair.get("tenantId"));
+                String source = String.valueOf(pair.get("source"));
+                try {
+                    Map<String, Object> health = healthService.health(tenantId, source);
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> alerts = (List<Map<String, Object>>) health.get("alerts");
+                    if (alerts == null || alerts.isEmpty()) {
+                        continue;
+                    }
+                    for (Map<String, Object> alert : alerts) {
+                        String metric = String.valueOf(alert.get("metric"));
+                        TenantHelper.dynamic(tenantId, () ->
+                            reachService.sendToUser(1L, "引擎健康告警",
+                                "业务源 " + source + " " + alert.get("message"),
+                                "health:" + source + ":" + day + ":" + metric));
+                    }
+                    log.warn("[Profile] health alerts source={} count={}", source, alerts.size());
+                } catch (Exception e) {
+                    log.warn("[Profile] health scan failed tenant={} source={} err={}",
+                        tenantId, source, e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("[Profile] health scan failed", e);
+        } finally {
+            healthScanning.set(false);
         }
     }
 }

@@ -114,16 +114,13 @@ public class ProfileReviewService {
     public IPage<ProfileReviewQueue> page(String source, String status, String riskLevel,
                                           String keyword, int pageNum, int pageSize) {
         Page<ProfileReviewQueue> page = new Page<>(Math.max(1, pageNum), Math.min(Math.max(1, pageSize), 200));
-        LambdaQueryWrapper<ProfileReviewQueue> wrapper = new LambdaQueryWrapper<ProfileReviewQueue>()
-            .eq(StringUtils.isNotBlank(source), ProfileReviewQueue::getSource, source)
-            .eq(StringUtils.isNotBlank(status), ProfileReviewQueue::getStatus, status)
-            .eq(StringUtils.isNotBlank(riskLevel), ProfileReviewQueue::getRiskLevel, riskLevel)
-            .and(StringUtils.isNotBlank(keyword), w -> w
-                .like(ProfileReviewQueue::getSubjectId, keyword)
-                .or()
-                .like(ProfileReviewQueue::getDisplayName, keyword))
-            .orderByDesc(ProfileReviewQueue::getCreateTime);
-        reviewMapper.selectPage(page, wrapper);
+        page.setOptimizeCountSql(false);
+        // 批10 R5: 超时置顶在 SQL 层全局排序(此前只排当前页, 跨页顺序不保证)
+        reviewMapper.selectPageOverdueFirst(page, currentTenant(),
+            StringUtils.isBlank(source) ? null : source,
+            StringUtils.isBlank(status) ? null : status,
+            StringUtils.isBlank(riskLevel) ? null : riskLevel,
+            StringUtils.isBlank(keyword) ? null : keyword);
         attachOverdue(page.getRecords());
         return page;
     }

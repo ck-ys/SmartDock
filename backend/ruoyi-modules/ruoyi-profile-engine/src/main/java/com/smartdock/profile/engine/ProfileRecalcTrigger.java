@@ -4,18 +4,24 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.tenant.helper.TenantHelper;
+import org.redisson.api.RLock;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 事件驱动自动重算: 同一主体的事件在合并窗口内只跑一次。
  *
- * <p>用 @Async + 内存合并标记, 不依赖 MQ; 单 JVM 内生效。
- * 多实例部署时每个实例都会算一次(结果幂等, 只是重复算力), 二期可换分布式锁/MQ。</p>
+ * <p>合并窗口(按 debounceMs)仍是 JVM 内标记(少干活的优化); 正确性边界换成
+ * 分布式锁(批10 Q1): 双实例同时收到同主体事件时, 只有一个实例真正执行
+ * recalcSubject + 模型增量, 另一个直接跳过——消除"结果幂等但算力翻倍"。</p>
+ *
+ * <p>批10 顺手修: dirty/running 按"租户|源|类型|主体"为键, 主体数无界,
+ * 空闲退出时移除条目防长期运行内存涨。</p>
  *
  * @author smartdock
  */
@@ -27,6 +33,7 @@ public class ProfileRecalcTrigger {
     private final ProfileEngineConfigService configService;
     private final ProfileScoreEngine scoreEngine;
     private final ProfileScoreModelService modelService;
+    private final org.redisson.api.RedissonClient redisson;
 
     private final Map<String, AtomicBoolean> dirty = new ConcurrentHashMap<>();
     private final Map<String, Boolean> running = new ConcurrentHashMap<>();
@@ -54,14 +61,7 @@ public class ProfileRecalcTrigger {
             }
             while (true) {
                 flag.set(false);
-                try {
-                    TenantHelper.dynamic(tenantId, () -> scoreEngine.recalcSubject(source, subjectType, subjectId));
-                    TenantHelper.dynamic(tenantId, () ->
-                        modelService.evaluateSubjectIfActive(tenantId, source, subjectType, subjectId));
-                } catch (Exception e) {
-                    log.warn("[Profile] auto recalc failed tenant={} source={} subject={} err={}",
-                        tenantId, source, subjectId, e.getMessage());
-                }
+                recalcOnce(tenantId, source, subjectType, subjectId);
                 if (!flag.getAndSet(false)) {
                     break;
                 }
@@ -71,9 +71,42 @@ public class ProfileRecalcTrigger {
             interrupted = true;
         } finally {
             running.remove(key);
-            // 被中断时不再就地递归补触发: 中断标志未清会立刻再抛 InterruptedException 直到栈溢出
+            // 空闲时清掉去抖条目, 修复无界增长; 仍有新事件则递归补一轮
             if (!interrupted && flag.getAndSet(false)) {
                 onEvent(tenantId, source, subjectType, subjectId);
+            } else {
+                dirty.remove(key);
+            }
+        }
+    }
+
+    private void recalcOnce(String tenantId, String source, String subjectType, String subjectId) {
+        RLock lock = redisson.getLock(ProfileLocks.recalcSubject(tenantId, source, subjectType, subjectId));
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(0, ProfileLocks.RECALC_LEASE_MINUTES, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        if (!acquired) {
+            // 另一实例正在算同一主体: 结果幂等, 跳过省算力
+            return;
+        }
+        try {
+            TenantHelper.dynamic(tenantId, () -> scoreEngine.recalcSubject(source, subjectType, subjectId));
+            TenantHelper.dynamic(tenantId, () ->
+                modelService.evaluateSubjectIfActive(tenantId, source, subjectType, subjectId));
+        } catch (Exception e) {
+            log.warn("[Profile] auto recalc failed tenant={} source={} subject={} err={}",
+                tenantId, source, subjectId, e.getMessage());
+        } finally {
+            try {
+                if (lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            } catch (Exception e) {
+                log.warn("[Profile] recalc lock unlock failed subject={} : {}", subjectId, e.getMessage());
             }
         }
     }

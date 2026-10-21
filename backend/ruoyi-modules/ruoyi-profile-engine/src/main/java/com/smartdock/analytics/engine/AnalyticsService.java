@@ -45,8 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 分析中心：会话重建、日汇总、趋势/下钻/留存/漏斗/自定义分析与 CSV 导入。
@@ -73,6 +72,9 @@ public class AnalyticsService {
     private final AnalyticsFunnelMapper funnelMapper;
     private final AnalyticsSiteMapper siteMapper;
     private final com.smartdock.analytics.mapper.AnalyticsCollectLogMapper collectLogMapper;
+    private final com.smartdock.analytics.mapper.AnalyticsRebuildLogMapper rebuildLogMapper;
+    private final com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper;
+    private final org.redisson.api.RedissonClient redisson;
     private final AnalyticsSessionizer sessionizer;
     /** ObjectProvider 打破 AnalyticsService → 事件发布器 → 自动汇总触发器 的构造环 */
     private final ObjectProvider<ProfileEventPublisher> eventPublisherProvider;
@@ -85,13 +87,10 @@ public class AnalyticsService {
 
     /**
      * 同一 (租户,业务源) 的重建互斥: 手动重建与自动汇总并发时会互相删插对方的会话。
-     * 单 JVM 锁; 多实例分布式锁在二期批 10。
+     * 批10 Q1: ReentrantLock(单 JVM) 换 Redisson 分布式锁——两实例部署时
+     * 同一源同一时间只有一个重建者(单实例行为不变)。显式租期不用 watchdog,
+     * 持锁进程崩溃后锁最迟在租期内自动过期, 另一实例可接管。
      */
-    private final Map<String, ReentrantLock> rebuildLocks = new ConcurrentHashMap<>();
-
-    private ReentrantLock rebuildLock(String tenantId, String source) {
-        return rebuildLocks.computeIfAbsent(tenantId + "|" + source, k -> new ReentrantLock());
-    }
 
     // ---------------------------------------------------------------- 重建 / 汇总
 
@@ -99,50 +98,149 @@ public class AnalyticsService {
         requireSource(source);
         int clampedDays = Math.min(Math.max(days, 1), 365);
         String tenantId = currentTenant();
-        ReentrantLock lock = rebuildLock(tenantId, source);
-        lock.lock();
+        Map<String, Object> out = rebuildRange(tenantId, source,
+            startOfDaysAgo(clampedDays), startOfTomorrow(), true, "MANUAL");
+        out.put("source", source);
+        out.put("days", clampedDays);
+        return out;
+    }
+
+    /**
+     * 窗口重建(批10 Q3): 回放/身份拆分与手动重建共用的执行入口——持分布式锁,
+     * 会话(可选)+日汇总一个事务, 完成后留一行耗时(健康页原料, 失败不阻断)。
+     */
+    public Map<String, Object> rebuildRange(String tenantId, String source, Date from, Date to,
+                                            boolean rebuildSessions, String kind) {
+        org.redisson.api.RLock lock = redisson.getLock(
+            com.smartdock.profile.engine.ProfileLocks.rebuild(tenantId, source));
+        lock.lock(com.smartdock.profile.engine.ProfileLocks.REBUILD_LEASE_MINUTES, TimeUnit.MINUTES);
         try {
-            return txTemplate.execute(status -> doRebuild(tenantId, source, clampedDays));
+            long startedAt = System.currentTimeMillis();
+            int[] sessionsHolder = new int[1];
+            int[] dailyHolder = new int[1];
+            txTemplate.execute(status -> {
+                if (rebuildSessions) {
+                    sessionsHolder[0] = sessionizer.rebuild(tenantId, source, from, to);
+                }
+                dailyHolder[0] = rollup(tenantId, source, from, to);
+                return null;
+            });
+            int sessions = sessionsHolder[0];
+            int dailyRows = dailyHolder[0];
+            writeRebuildLog(tenantId, source, kind, System.currentTimeMillis() - startedAt, sessions, null);
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("from", from);
+            out.put("to", to);
+            out.put("sessions", sessions);
+            out.put("dailyRows", dailyRows);
+            return out;
         } finally {
-            lock.unlock();
+            unlockQuietly(lock);
         }
     }
 
-    private Map<String, Object> doRebuild(String tenantId, String source, int days) {
-        Date from = startOfDaysAgo(days);
-        Date to = startOfTomorrow();
-        int sessions = sessionizer.rebuild(tenantId, source, from, to);
-        int dailyRows = rollup(tenantId, source, from, to);
+    /** 回放对账口径: 窗口内会话数/浏览量/跳出数 + 日汇总行数(fromDay/toDay 均为自然日零点)。 */
+    public Map<String, Object> replayWindowStats(String tenantId, String source, Date fromDay, Date toDay) {
+        Date from = fromDay;
+        Date to = new Date(toDay.getTime() + 24L * 3600_000L);
+        Map<String, Object> sessions = sessionMapper.selectReplayStats(tenantId, source, from, to);
+        Long dailyRows = dailyMapper.selectCount(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AnalyticsDaily>()
+                .eq(AnalyticsDaily::getTenantId, tenantId)
+                .eq(AnalyticsDaily::getSource, source)
+                .ge(AnalyticsDaily::getStatDate, new java.sql.Date(fromDay.getTime()))
+                .le(AnalyticsDaily::getStatDate, new java.sql.Date(toDay.getTime())));
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("source", source);
-        out.put("days", days);
-        out.put("sessions", sessions);
-        out.put("dailyRows", dailyRows);
-        out.put("from", from);
-        out.put("to", to);
+        out.put("sessions", sessions == null ? 0L : sessions.get("sessions"));
+        out.put("pageViews", sessions == null ? 0L : sessions.get("pageViews"));
+        out.put("bounces", sessions == null ? 0L : sessions.get("bounces"));
+        out.put("dailyRows", dailyRows == null ? 0L : dailyRows);
         return out;
+    }
+
+    private void writeRebuildLog(String tenantId, String source, String kind, long durationMs, int sessions,
+                                 Date readWatermark) {
+        try {
+            com.smartdock.analytics.domain.AnalyticsRebuildLog logRow = new com.smartdock.analytics.domain.AnalyticsRebuildLog();
+            logRow.setTenantId(tenantId);
+            logRow.setSource(source);
+            logRow.setKind(kind);
+            logRow.setDurationMs(durationMs);
+            logRow.setSessions(sessions);
+            logRow.setFinishedAt(new Date());
+            logRow.setReadWatermark(readWatermark);
+            rebuildLogMapper.insert(logRow);
+        } catch (Exception e) {
+            log.warn("[Analytics] rebuild log persist failed (non-fatal) source={} : {}", source, e.getMessage());
+        }
     }
 
     /**
      * 事件写入后重建最近两天：会话与日汇总一起刷新。
      *
+     * <p>批10 顺手修(遗留清零表): 窗口起点改事件时间驱动——迟到事件(occurredAt 落在
+     * 更早的天)会把窗口拉宽到它所在的自然日, 不再因固定"最近两天"而漏建。</p>
+     *
      * @return 是否真正执行; false = 手动重建持锁中被跳过, 调用方应保留脏标记等下一个事件补
      */
-    public boolean rebuildRecent(String tenantId, String source) {
-        ReentrantLock lock = rebuildLock(tenantId, source);
-        if (!lock.tryLock()) {
+    public boolean rebuildRecent(String tenantId, String source, Date occurredAt) {
+        org.redisson.api.RLock lock = redisson.getLock(
+            com.smartdock.profile.engine.ProfileLocks.rebuild(tenantId, source));
+        boolean acquired;
+        try {
+            acquired = lock.tryLock(0, com.smartdock.profile.engine.ProfileLocks.REBUILD_LEASE_MINUTES,
+                TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        if (!acquired) {
             return false;
         }
         try {
-            txTemplate.executeWithoutResult(status -> {
+            // 双实例去重: 比较"读取水位"而非完成时刻——上一轮重建已读到全部现存事件时才跳过,
+            // 重建执行期间写入的事件不会被误判为已覆盖(它们仍在账本, 但会话贡献要等下一轮)
+            Date watermark = rebuildLogMapper.selectLastReadWatermark(tenantId, source);
+            Date latestEvent = eventMapper.selectMaxCreateTime(tenantId, source);
+            if (watermark != null && (latestEvent == null || !latestEvent.after(watermark))) {
+                return true;
+            }
+            long startedAt = System.currentTimeMillis();
+            Date[] readThrough = new Date[1];
+            int sessions = txTemplate.execute(status -> {
                 Date from = startOfDaysAgo(2);
+                if (occurredAt != null) {
+                    Date occurredDay = startOfDay(occurredAt);
+                    if (occurredDay.before(from)) {
+                        from = occurredDay;
+                    }
+                }
                 Date to = startOfTomorrow();
-                sessionizer.rebuild(tenantId, source, from, to);
+                int rebuilt = sessionizer.rebuild(tenantId, source, from, to);
                 rollup(tenantId, source, from, to);
+                // 水位=本次重建实际读到的最大落库时间, 不再留安全边际——边际会让紧接着的
+                // 顺序触发(双实例去重)永远判不覆盖; 残余风险仅剩"insert 事务滞留超过水位差"的毫秒级竞态
+                readThrough[0] = eventMapper.selectMaxCreateTime(tenantId, source);
+                return rebuilt;
             });
+            writeRebuildLog(tenantId, source, "RECENT", System.currentTimeMillis() - startedAt,
+                sessions, readThrough[0]);
             return true;
         } finally {
-            lock.unlock();
+            unlockQuietly(lock);
+        }
+    }
+
+    /** 租期已过被别人持有时 unlock 会抛 IllegalMonitorStateException, 降级为日志。 */
+    private void unlockQuietly(org.redisson.api.RLock lock) {
+        try {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            } else {
+                log.warn("[Analytics] rebuild lock lease expired before unlock, another holder may have taken over");
+            }
+        } catch (Exception e) {
+            log.warn("[Analytics] rebuild lock unlock failed: {}", e.getMessage());
         }
     }
 
@@ -414,16 +512,15 @@ public class AnalyticsService {
         int days = bo == null || bo.getDays() == null ? 30 : Math.min(Math.max(bo.getDays(), 1), 365);
         Date from = startOfDaysAgo(days);
         Date to = startOfTomorrow();
-        List<AnalyticsEventRow> events = eventMapper.selectEvents(currentTenant(), source, from, to);
         List<String> names = new ArrayList<>();
         for (Map<String, Object> step : steps) {
             names.add(String.valueOf(step.get("eventName")));
         }
+        // 批10 Q7: 事件名过滤下推——只拉步进相关行, 口径与全量载入后 Java 过滤完全等价
+        List<AnalyticsEventRow> events = eventMapper.selectEventsByNames(currentTenant(), source, from, to, names);
         Map<String, List<AnalyticsEventRow>> byVisitor = new LinkedHashMap<>();
         for (AnalyticsEventRow event : events) {
-            if (names.contains(event.getEventName())) {
-                byVisitor.computeIfAbsent(event.getVisitorKey(), key -> new ArrayList<>()).add(event);
-            }
+            byVisitor.computeIfAbsent(event.getVisitorKey(), key -> new ArrayList<>()).add(event);
         }
         long[] counts = new long[names.size()];
         double[] seconds = new double[names.size()];
@@ -715,7 +812,9 @@ public class AnalyticsService {
         int clampedDays = Math.min(Math.max(days, 1), 90);
         Date from = startOfDaysAgo(clampedDays);
         Date to = startOfTomorrow();
-        List<AnalyticsEventRow> events = eventMapper.selectEvents(currentTenant(), source, from, to);
+        // 批10 Q7: 只拉页面浏览事件(路径只用得上它们), 口径不变
+        List<AnalyticsEventRow> events = eventMapper.selectEventsByNames(
+            currentTenant(), source, from, to, List.of("page_view", "pageview", "pv"));
         List<AnalyticsPathBuilder.PathEvent> pageEvents = new ArrayList<>();
         for (AnalyticsEventRow event : events) {
             if (!isPageView(event.getEventName())) {
@@ -761,11 +860,14 @@ public class AnalyticsService {
         int days = bo == null || bo.getDays() == null ? 30 : Math.min(Math.max(bo.getDays(), 1), 365);
         Date from = startOfDaysAgo(days);
         Date to = startOfTomorrow();
-        List<AnalyticsEventRow> events = eventMapper.selectEvents(currentTenant(), source, from, to);
         List<String> names = new ArrayList<>();
         for (Map<String, Object> step : steps) {
             names.add(String.valueOf(step.get("eventName")));
         }
+        // 批10 Q7: 下钻只需要"碰过第一步"的访客(没碰过的本就不进任何步进统计),
+        // 半连接收敛后大窗口不再全量载入内存
+        List<AnalyticsEventRow> events = eventMapper.selectEventsForVisitors(
+            currentTenant(), source, from, to, names.get(0));
         Map<String, List<AnalyticsEventRow>> all = new LinkedHashMap<>();
         for (AnalyticsEventRow event : events) {
             all.computeIfAbsent(event.getVisitorKey(), k -> new ArrayList<>()).add(event);
@@ -868,7 +970,9 @@ public class AnalyticsService {
                 String.valueOf(row.get("channel"))));
         }
         Map<String, Long> firstConversion = new LinkedHashMap<>();
-        for (AnalyticsEventRow event : eventMapper.selectEvents(tenantId, source, from, to)) {
+        // 批10 Q7: 归因只消费转化事件, 事件名下推后不再全量载入
+        for (AnalyticsEventRow event : eventMapper.selectEventsByNames(
+            tenantId, source, from, to, List.of(conversion))) {
             if (conversion.equals(event.getEventName()) && event.getVisitorKey() != null
                 && !firstConversion.containsKey(event.getVisitorKey())) {
                 firstConversion.put(event.getVisitorKey(), event.getOccurredTime().getTime());
@@ -929,13 +1033,8 @@ public class AnalyticsService {
             pv += longValue(bucket.get("pv"));
         }
         int visitors = eventMapper.selectWindowVisitors(tenantId, source, from, now).size();
-        long newVisitors = 0;
-        for (Map<String, Object> row : eventMapper.selectVisitorFirstSeen(tenantId, source)) {
-            Object firstSeen = row.get("firstSeen");
-            if (firstSeen instanceof Date d && !d.before(from)) {
-                newVisitors++;
-            }
-        }
+        // 批10 Q7: 新访客直查首见物化表(只数窗口内首见的行), 不再全表行进 Java 过滤
+        long newVisitors = firstSeenMapper.countSince(tenantId, source, from);
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("visitors", visitors);
         summary.put("pv", pv);
@@ -1108,6 +1207,12 @@ public class AnalyticsService {
 
     private Date startOfTomorrow() {
         return Date.from(LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+    }
+
+    /** 迟到事件窗口起点: 落到事件发生的自然日零点(rebuildRecent 拉宽窗口用)。 */
+    private Date startOfDay(Date time) {
+        return Date.from(time.toInstant().atZone(ZoneId.systemDefault())
+            .toLocalDate().atStartOfDay(ZoneId.systemDefault()).toInstant());
     }
 
     private List<LocalDate> datesBetween(Date from, Date to) {

@@ -5,18 +5,24 @@ import com.smartdock.profile.mapper.ProfileIdentityLinkMapper;
 import com.smartdock.profile.mapper.ProfileIdentityMergeMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -46,6 +52,11 @@ public class ProfileIdentityService {
 
     private final ProfileIdentityLinkMapper linkMapper;
     private final ProfileIdentityMergeMapper mergeMapper;
+    /** 批10 Q6: 拆分状态变更用短事务模板 */
+    private final TransactionTemplate txTemplate;
+    private final com.smartdock.analytics.engine.AnalyticsService analyticsService;
+    private final com.smartdock.profile.engine.ProfileScoreEngine scoreEngine;
+    private final com.smartdock.profile.engine.ProfileScoreModelService modelService;
 
     /**
      * 解析规范主体并写入/更新标识链接。
@@ -155,9 +166,96 @@ public class ProfileIdentityService {
         return canonical;
     }
 
+    // ---------------------------------------------------------------- 批10 Q6: unmerge
+
+    /** 合并记录列表(图谱管理页; 可按业务源/任一侧主体过滤)。 */
+    public List<ProfileIdentityMerge> merges(String source, String subject) {
+        String tenantId = currentTenant();
+        return mergeMapper.selectRecent(tenantId,
+            StringUtils.isBlank(source) ? null : source.trim(),
+            StringUtils.isBlank(subject) ? null : subject.trim());
+    }
+
+    /**
+     * 拆分误合并(拍板 Q6-A): ①匿名来源事件归属回改(identifiers 无 user_id 的行才是
+     * 被误并的匿名行为, 登录主体自己的事件不动) ②匿名链接回挂 ③乐观标记已拆分
+     * ——三步一个事务; 事务外按合并时间线回放派生数据(拍板原文"只回放身份链"):
+     * 会话/日汇总走 {@code rebuildRange}(持批10 Q1 重建锁), 双方主体各重算一次分数。
+     *
+     * <p>注意: 拆掉的是"误并"的匿名标识。若该匿名 ID 之后真的以登录身份回来,
+     * resolveAndLink 会按共享设备规则重新挂链接——那是新事实, 不是误并复发。</p>
+     */
+    public Map<String, Object> unmerge(Long mergeId) {
+        if (mergeId == null) {
+            throw new ServiceException("mergeId 不能为空");
+        }
+        ProfileIdentityMerge merge = mergeMapper.selectById(mergeId);
+        if (merge == null) {
+            throw new ServiceException("合并记录不存在: " + mergeId);
+        }
+        if (merge.getReversedAt() != null) {
+            throw new ServiceException("该合并已拆分过(拆分人=" + merge.getReversedBy() + ")");
+        }
+        String actor = currentActor();
+        Integer reassigned = txTemplate.execute(status -> {
+            int events = mergeMapper.reassignEvents(merge);
+            mergeMapper.repointLink(merge);
+            if (mergeMapper.markReversed(mergeId, actor) == 0) {
+                throw new ServiceException("拆分竞争失败: 该合并刚被其他人拆过, 请刷新重试");
+            }
+            return events;
+        });
+        boolean replayed = replayDerived(merge);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("mergeId", mergeId);
+        out.put("fromSubjectId", merge.getFromSubjectId());
+        out.put("toSubjectId", merge.getToSubjectId());
+        out.put("eventsReassigned", reassigned == null ? 0 : reassigned);
+        out.put("derivedReplayed", replayed);
+        return out;
+    }
+
+    /** 派生数据回放: 失败不回滚拆分本身(状态已拆), 只打日志等下一条事件/人工重算补。 */
+    private boolean replayDerived(ProfileIdentityMerge merge) {
+        try {
+            Date from = dayFloor(merge.getOccurredAt());
+            Date to = tomorrow();
+            analyticsService.rebuildRange(merge.getTenantId(), merge.getSource(), from, to, true, "UNMERGE");
+            recalcOne(merge, merge.getFromSubjectId());
+            recalcOne(merge, merge.getToSubjectId());
+            return true;
+        } catch (Exception e) {
+            log.warn("[Profile] unmerge replay failed (split done, derived pending) merge={} err={}",
+                merge.getMergeId(), e.getMessage());
+            return false;
+        }
+    }
+
+    private void recalcOne(ProfileIdentityMerge merge, String subjectId) {
+        if (StringUtils.isBlank(subjectId)) {
+            return;
+        }
+        TenantHelper.dynamic(merge.getTenantId(), () ->
+            scoreEngine.recalcSubject(merge.getSource(), merge.getSubjectType(), subjectId));
+        TenantHelper.dynamic(merge.getTenantId(), () ->
+            modelService.evaluateSubjectIfActive(merge.getTenantId(), merge.getSource(),
+                merge.getSubjectType(), subjectId));
+    }
+
+    private Date dayFloor(Date time) {
+        if (time == null) {
+            return new Date(0);
+        }
+        LocalDate day = time.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        return Date.from(day.atStartOfDay(ZoneId.systemDefault()).toInstant());
+    }
+
+    private Date tomorrow() {
+        return Date.from(LocalDate.now().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+    }
+
     private void mergeSubject(String tenantId, String source, String subjectType,
-                              String fromSubjectId, String toSubjectId, String reason, String actor) {
-        if (StringUtils.isBlank(fromSubjectId) || StringUtils.isBlank(toSubjectId)
+                              String fromSubjectId, String toSubjectId, String reason, String actor) {        if (StringUtils.isBlank(fromSubjectId) || StringUtils.isBlank(toSubjectId)
             || fromSubjectId.equals(toSubjectId)) {
             return;
         }
@@ -231,6 +329,26 @@ public class ProfileIdentityService {
         } catch (Exception e) {
             return "system";
         }
+    }
+
+    private String currentTenant() {
+        try {
+            String t = TenantHelper.getTenantId();
+            if (StringUtils.isNotBlank(t)) {
+                return t;
+            }
+        } catch (Exception ignored) {
+            // 无租户上下文
+        }
+        try {
+            String t = LoginHelper.getTenantId();
+            if (StringUtils.isNotBlank(t)) {
+                return t;
+            }
+        } catch (Exception ignored) {
+            // 非登录上下文
+        }
+        return "000000";
     }
 
     private String sha256(String value) {
