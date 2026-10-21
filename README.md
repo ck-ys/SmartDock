@@ -27,6 +27,7 @@ SmartDock 是一套**通用智能体（Agent）引擎**与**用户画像引擎**
 - [核心模块](#核心模块)
 - [使用说明](#使用说明)
 - [扩展指南](#扩展指南)
+- [AI 辅助开发](#ai-辅助开发)
 - [技术栈](#技术栈)
 - [安全与上线前检查](#安全与上线前检查)
 - [测试与质量](#测试与质量)
@@ -264,6 +265,15 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 }
 ```
 
+## AI 辅助开发（可选）
+
+用 Claude Code / ZCode / Cursor 等 AI 客户端开发时，推荐配这几样（不装也能正常开发）：
+
+- **MCP**：PostgreSQL（只读查库与对账）、Playwright（浏览器 E2E 与双视角验证）、Context7（框架文档）
+- **Skills**：`brainstorming`（方案发散）、`writing-plans` / `executing-plans`（计划与执行）、`grill-me`（动手前质询）、`test-driven-development`（先写失败测试）、`verification-before-completion`（收口前证据核验）
+
+完整清单、配置方式与安全边界见 [docs/ai-development.md](docs/ai-development.md)。
+
 ## 技术栈
 
 | 类别 | 组件 |
@@ -312,6 +322,7 @@ cd frontend && npm test && npm run build:prod
 - [架构设计](docs/architecture.md)
 - [使用说明（按角色走读）](docs/usage.md)
 - [部署指南](docs/deploy.md)
+- [AI 辅助开发环境建议](docs/ai-development.md)
 - [基线 SQL 说明](backend/script/sql/baseline/README.md)
 - [前端开发说明](frontend/README.md)
 - [NOTICE（上游版权与署名）](NOTICE)
