@@ -16,6 +16,7 @@ import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.ratelimiter.annotation.RateLimiter;
 import org.dromara.common.ratelimiter.enums.LimitType;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.common.web.core.BaseController;
@@ -40,6 +41,9 @@ import java.util.Map;
 @RequestMapping("/dcs/assistant")
 @RequiredArgsConstructor
 public class AssistantConversationController extends BaseController {
+    /** G1 乙类#5：停止生成走框架 ThreadSessionManager 定向 interrupt */
+    private final io.agentscope.spring.boot.agui.common.ThreadSessionManager threadSessionManager;
+
 
     private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
         new com.fasterxml.jackson.databind.ObjectMapper();
@@ -51,6 +55,7 @@ public class AssistantConversationController extends BaseController {
     /** 080/ISSUE-R13-3 修：清人后按 thread 清悬挂缓存/步骤缓冲（控制器收口避
      *  ConversationService↔RunRecorder 循环依赖） */
     private final org.dromara.assistant.persist.AssistantRunRecorder runRecorder;
+    private final org.dromara.assistant.mapper.AssistantRunMapper runMapper;
     /** 批17 Q2：手动压缩（/压缩 与环卡「打包前文」） */
     private final AssistantCompactionService compactionService;
 
@@ -150,6 +155,39 @@ public class AssistantConversationController extends BaseController {
     public R<AssistantCompactionService.CompactResult> compact(@RequestBody Map<String, String> body) {
         return R.ok(compactionService.compact(TenantHelper.getTenantId(),
             LoginHelper.getUserId(), body == null ? null : body.get("threadId")));
+    }
+
+    /**
+     * G1 乙类#5（Q4=A 查证成立即接）：停止生成=服务端真取消。框架 interrupt(userId, threadId)
+     * 定向打断在跑 run（sessionId 维度，AGUI threadId 即 sessionId），终态秒级落 INTERRUPTED
+     * 而非等 60s stall 收割。注意：断连仍不打断（interrupt-on-disconnect=false 是 HITL
+     * 恢复链前提，P0 T4 实证）——只有用户显式点停止才走本端点。幂等：会话不在=无事发生。
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @RepeatSubmit(interval = 1000)
+    @Log(title = "AI助手-停止生成", businessType = BusinessType.OTHER)
+    @PostMapping("/conversation/stop")
+    public R<Void> stop(@RequestParam String threadId) {
+        // 三审回修（dsflash/dspro）：租户口径与本文件其它端点同源（TenantHelper 动态优先），
+        // 原用 LoginHelper 登录快照租户，超管切租户后 getSession 恒 miss=停止静默失效
+        String tenantId = TenantHelper.getTenantId();
+        Long userId = LoginHelper.getUserId();
+        String rcUserId = "t:" + tenantId + ":" + userId;
+        // 三审回修（三席共识 P1）：只对该 thread 最新 run 仍在 RUNNING 时打标+打断——
+        // 盲打会把标记留给一个已终局的 run（残留=同 thread 下一轮被误判 user-stop）
+        java.util.List<org.dromara.assistant.domain.DcsAssistantRun> latest =
+            runMapper.selectByThread(tenantId, threadId, userId, 1);
+        boolean running = !latest.isEmpty() && "RUNNING".equals(latest.get(0).getStatus());
+        threadSessionManager.getSession(rcUserId, threadId).ifPresent(session -> {
+            if (running && session.getAgent() instanceof io.agentscope.core.ReActAgent agent) {
+                // 先打 run 级停止标记再 interrupt——优雅收尾事件流与自然完成无异，终局分类靠标记覆写
+                org.dromara.assistant.persist.AssistantRunRecorder.markUserStop(latest.get(0).getRunId());
+                agent.interrupt(rcUserId, threadId);
+                log.info("[AssistantStop] 服务端打断在跑 run thread={} run={} user={}",
+                    threadId, latest.get(0).getRunId(), rcUserId);
+            }
+        });
+        return R.ok();
     }
 
     /** 当前会话 TODO 清单（ZCode 对齐 Q2，批A：前端打开会话时恢复状态面板分区） */

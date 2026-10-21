@@ -232,7 +232,12 @@ const genericBodyText = computed(() => {
   if (tn.startsWith('act_')) {
     return '这个操作会修改真实数据，确认后才会执行；取消不会产生任何变更。';
   }
-  return props.ask.message || '这个操作会影响真实数据，请确认。';
+  // 三审回修（dspro P2-4）：未登记工具的框架默认英文句按通用写类口径兜底，不透出原文
+  const raw = props.ask.message || '';
+  if (raw.includes('requires user confirmation')) {
+    return '这个操作会修改真实数据，确认后才会执行；取消不会产生任何变更。';
+  }
+  return raw || '这个操作会影响真实数据，请确认。';
 });
 
 /** SPEC §3.1'：act_ 前缀=动作类——免确认通道（remember 勾选/autoApproved）整条关闭 */

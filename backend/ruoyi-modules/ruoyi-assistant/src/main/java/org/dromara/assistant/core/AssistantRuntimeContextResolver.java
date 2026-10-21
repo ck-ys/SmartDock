@@ -53,6 +53,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     private final io.agentscope.spring.boot.agui.common.ThreadSessionManager threadSessionManager;
     /** 业务批4 Q1-A：白名单范围指纹比对——管理员改 switch_scope 后缓存会话下一请求即失效重建 */
     private final org.dromara.assistant.service.AssistantModelSettingService modelSettingService;
+    private final org.dromara.assistant.service.AssistantConfigService assistantConfigService;
 
     @Override
     public RuntimeContext resolve(AguiRuntimeContextRequest<?> request) {
@@ -157,7 +158,12 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         boolean rebuildNeeded = AssistantModelChoiceHolder.needsRebuild(aguiThreadId)
             || AssistantWebSearchHolder.needsRebuild(aguiThreadId)
             || AssistantModelChoiceHolder.needsScopeRebuild(aguiThreadId,
-                AssistantModelChoiceHolder.defaultAwareFingerprint(sd.scopeIds(), sd.defaultConfigId()));
+                AssistantModelChoiceHolder.defaultAwareFingerprint(sd.scopeIds(), sd.defaultConfigId()))
+            // G1 遗留#3：工具闸/记忆/压缩配置变化同样失效重建（与 Factory 建侧同源指纹）。
+            // 三审回修（dspro P1-5）：比对侧必须用 Factory 落标同款租户源（user 登录快照）——
+            // 原用 resolveTenantId 的动态租户，超管切租户且两租户配置有差时每请求恒失配=空转重建
+            || AssistantModelChoiceHolder.needsConfigRebuild(aguiThreadId,
+                AssistantModelChoiceHolder.assemblyFingerprint(assistantConfigService.effective(user.getTenantId())));
         if (aguiThreadId != null && rebuildNeeded) {
             boolean removed = threadSessionManager.removeSession("t:" + tenantId + ":" + userId, aguiThreadId);
             if (removed) {

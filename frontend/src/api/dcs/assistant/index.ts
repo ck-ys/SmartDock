@@ -403,6 +403,11 @@ export function removeAssistantFavorite(content: string) {
   return request<string[]>({ url: '/dcs/assistant/favorite/remove', method: 'post', data: { content } });
 }
 
+/** G1 乙类#5：停止生成=服务端真取消（定向 interrupt 在跑 run；断连不打断不受影响） */
+export function stopAssistantRun(threadId: string) {
+  return request({ url: '/dcs/assistant/conversation/stop', method: 'post', params: { threadId } });
+}
+
 /** 二站-B 悬挂确认卡视图（换设备/刷新后重建 turn.hitl；空数组=无悬挂不重建） */
 export interface PendingHitlItem {
   interruptId: string;

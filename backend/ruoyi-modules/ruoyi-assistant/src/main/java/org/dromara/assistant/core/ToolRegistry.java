@@ -154,10 +154,14 @@ public final class ToolRegistry {
      * 批1 Q1=B（2026-10-21）：租户级工具档位单点判定——注册面/目录/全景三面共用。
      * 覆盖值 off=-1（彻底关闭，模型不可见）；member/admin=门槛只升不降
      * （内置门槛高的工具如管理员专用项，租户配 member 也不能降到全员）；
-     * 未配置/非法值/空表=内置门槛不变。任一 toolName 命中即生效（多工具 spec 取先命中）。
+     * 未配置/非法值/空表=内置门槛不变。多工具 spec 全量聚合取最严（G1 遗留#1）：
+     * 任一 off→整组关；否则取命中档位最高者——不再依赖 Set 迭代序的"先命中"。
      */
     public static int effectiveMinRole(ToolSpec spec, java.util.Map<String, String> toolGate) {
         if (toolGate != null) {
+            boolean anyOff = false;
+            boolean anyHit = false;
+            int strictest = spec.minRoleLevel();
             for (String name : spec.toolNames()) {
                 String v = toolGate.get(name);
                 if (v == null) {
@@ -165,14 +169,25 @@ public final class ToolRegistry {
                 }
                 switch (v) {
                     case "off":
-                        return -1;
+                        anyOff = true;
+                        break;
                     case "member":
-                        return Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_MEMBER);
+                        anyHit = true;
+                        strictest = Math.max(strictest, Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_MEMBER));
+                        break;
                     case "admin":
-                        return Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_ADMIN);
+                        anyHit = true;
+                        strictest = Math.max(strictest, Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_ADMIN));
+                        break;
                     default:
                         // 非法值忽略——配置面已限下拉，此处兜底不炸链
                 }
+            }
+            if (anyOff) {
+                return -1;
+            }
+            if (anyHit) {
+                return strictest;
             }
         }
         return spec.minRoleLevel();

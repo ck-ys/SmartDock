@@ -134,6 +134,36 @@ public final class AssistantModelChoiceHolder {
         return !(picked == null ? NO_PICK : picked).equals(last);
     }
 
+    // ===== G1 遗留#3：租户装配面指纹（toolGate/memoryEnabled/compaction） =====
+    // 此前三者均不参与任何指纹——管理员改工具开关后旧 agent 会话缓存不失效，最长
+    // 60 分钟才随会话超时重建。指纹入链后：改完下一请求即 removeSession 重建。
+    private static final java.util.Map<String, String> CONFIG_FINGERPRINTS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 装配面指纹：只取影响 agent 装配的租户配置段（TreeMap 序稳定防误判） */
+    public static String assemblyFingerprint(org.dromara.assistant.service.AssistantConfigService.EffectiveConfig cfg) {
+        return (cfg.toolGate() == null ? "" : new java.util.TreeMap<>(cfg.toolGate()).toString())
+            + "|" + cfg.memoryEnabled() + "|" + cfg.compactionTriggerTokens();
+    }
+
+    public static void markConfigBuilt(String threadId, String fingerprint) {
+        // 三审回修（P2）：与同文件既有三表同款 CAP 整体清空纪律（防无界增长）
+        if (CONFIG_FINGERPRINTS.size() > CAP) {
+            CONFIG_FINGERPRINTS.clear();
+        }
+        if (threadId != null) {
+            CONFIG_FINGERPRINTS.put(threadId, fingerprint);
+        }
+    }
+
+    /** null=未建（首建不算失效）；非等=租户装配面变了，需失效重建 */
+    public static boolean needsConfigRebuild(String threadId, String fingerprint) {
+        if (threadId == null) {
+            return false;
+        }
+        String built = CONFIG_FINGERPRINTS.get(threadId);
+        return built != null && !built.equals(fingerprint);
+    }
+
     private static Long parse(Object raw) {
         if (raw == null) {
             return null;

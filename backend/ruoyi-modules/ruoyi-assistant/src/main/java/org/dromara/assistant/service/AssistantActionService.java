@@ -26,8 +26,12 @@ public class AssistantActionService {
     public static final String STATUS_EXECUTING = "EXECUTING";
     public static final String STATUS_DONE = "DONE";
     public static final String STATUS_FAILED = "FAILED";
+    /** G1 乙类#2（框架 #3104 事件源）：用户在确认卡点了拒绝/取消——域枚举此前悬空
+     *  （javadoc 登记的 P1），现补写入方；行=拒绝时刻留痕（非执行后回写） */
+    public static final String STATUS_REJECTED = "REJECTED";
 
     private final AssistantActionMapper actionMapper;
+    private final org.dromara.assistant.mapper.AssistantRunMapper runMapper;
 
     /**
      * 账本落行（EXECUTING 起步）返回原行与是否本次新建：
@@ -65,6 +69,28 @@ public class AssistantActionService {
         actionMapper.mark(id, STATUS_FAILED, truncate(summary));
     }
 
+    /**
+     * G1 乙类#2：拒绝留痕（新行，幂等键=rej 前缀+toolCallId 防事件双发）。
+     * 归属由调用方从会话反解传入（enricher 框架流线程无登录上下文）。
+     */
+    public void recordRejected(String tenantId, Long userId, String runId, String threadId,
+                               String toolName, String toolCallId, String reason) {
+        DcsAssistantAction row = new DcsAssistantAction();
+        row.setId(IdWorker.getId());
+        row.setTenantId(tenantId);
+        row.setUserId(userId);
+        row.setRunId(runId);
+        row.setThreadId(threadId);
+        row.setToolName(toolName);
+        row.setStatus(STATUS_REJECTED);
+        row.setResultSummary(truncate(reason));
+        // 三审回修（P2）：键列宽 128，runId（客户端可控，最长 128）+toolCallId 拼接过长会
+        // 插入报错被 enricher 吞成 warn=审计静默丢失——超长截断（实际 UUID 形态恒不触发）
+        String key = "assistant:" + tenantId + ":" + runId + ":rej:" + toolCallId;
+        row.setIdempotencyKey(key.length() > 128 ? key.substring(0, 128) : key);
+        actionMapper.insertRejected(row);
+    }
+
     /** 按 run/thread 查账本（断线重连恢复数据源，spec §18） */
     public List<DcsAssistantAction> listForUser(String tenantId, Long userId, String runId, String threadId) {
         return actionMapper.selectForUser(tenantId, userId, runId, threadId);
@@ -82,6 +108,12 @@ public class AssistantActionService {
     public long countLogForTenant(String tenantId, String keyword, String status, String beginTime, String endTime) {
         return actionMapper.countForTenant(tenantId,
             blankToNull(keyword), blankToNull(status), blankToNull(beginTime), blankToNull(endTime));
+    }
+
+    /** 按 runId 反解归属（三审回修：G1 拒绝审计锚点——run 登记行全局唯一且首绑校验过归属；
+     *  按 thread 裸查会话行在跨租户同 threadId 时会错挂租户） */
+    public org.dromara.assistant.domain.DcsAssistantRun findRun(String runId) {
+        return runMapper.selectByRunId(runId);
     }
 
     private static String blankToNull(String s) {

@@ -720,6 +720,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           toast('继续等待中——若仍无进展可随时点「停止」结束本轮', 'info');
           return 'keep-waiting';
         } catch {
+          // 三审回修（dsflash P2-5）：看门狗停止与手动停止同口径——走 stop() 才会发服务端
+          // 真取消（只 return 'stop' 是本地断流，后端还要吃满 60s 收割窗）
+          stop();
           return 'stop';
         }
       },
@@ -1117,6 +1120,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       state.queuePaused = true;
     }
     handle?.stop();
+    // G1 乙类#5：服务端真取消（fire-and-forget——本地断流照旧先行，后端秒级落终态
+    // 而非等 60s 收割；失败静默：会话已不在/已停=幂等无事发生）
+    if (state.threadId) {
+      import('@/api/dcs/assistant').then((m) => m.stopAssistantRun(state.threadId)).catch(() => {});
+    }
   }
 
   /** 「▶ 继续说完」：按原问题重新请求（SSE 停止=流中断，服务端无续帧协议） */

@@ -50,10 +50,38 @@ public class AssistantEventEnricher implements AguiEventEnricher {
     private final AssistantPlanSignal planSignal;
     /** TODO 清单信号仓(ZCode 对齐 Q2, 批A): todo_write 工具落清单, 本件取走转发 todo CUSTOM 帧 */
     private final AssistantTodoSignal todoSignal;
+    /** G1 乙类#2（#3104 事件源落地）：用户拒绝工具确认→动作账本 REJECTED 留痕 */
+    private final org.dromara.assistant.service.AssistantActionService actionService;
 
     @Override
     public List<AguiEvent> enrich(AgentEvent rawEvent, List<AguiEvent> events,
                                   io.agentscope.core.agui.adapter.strategy.AguiStreamContext context) {
+        // G1 乙类#2：拒绝留痕（UserConfirmResultEvent=框架 #3104 官方事件源，含被拒
+        // toolCall 与用户 reason；断连/超时不发此事件，天然区分拒绝与掉线）。
+        // E2E 实证（2026-10-21）：本事件无 AGUI 转换器→events 恒空，必须放在
+        // isEmpty 早退之前，否则拒绝轮永远静默跳过（audit 只依赖 rawEvent，不依赖出网帧）
+        if (actionService != null
+            && rawEvent instanceof io.agentscope.core.event.UserConfirmResultEvent ucr
+            && context != null && context.getRunId() != null) {
+            try {
+                // 三审回修（三席共识）：归属锚从 thread 反查会话行改为 runId 反查 run 登记行
+                // ——runId 全局唯一且登记时已做归属校验；thread 裸查在跨租户同 threadId
+                // （超管切租户复用前端持久化 threadId）时会错挂租户，且无 thread 单列索引
+                org.dromara.assistant.domain.DcsAssistantRun run = actionService.findRun(context.getRunId());
+                if (run != null) {
+                    for (io.agentscope.core.event.ConfirmResult cr : ucr.getConfirmResults()) {
+                        if (cr.isConfirmed() || cr.getToolCall() == null) {
+                            continue;
+                        }
+                        actionService.recordRejected(run.getTenantId(), run.getUserId(),
+                            run.getRunId(), run.getThreadId(),
+                            cr.getToolCall().getName(), cr.getToolCall().getId(), cr.getReason());
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("[AssistantHitlAudit] 拒绝留痕失败（不连坐事件流）：{}", e.getMessage());
+            }
+        }
         if (events == null || events.isEmpty()) {
             return events;
         }

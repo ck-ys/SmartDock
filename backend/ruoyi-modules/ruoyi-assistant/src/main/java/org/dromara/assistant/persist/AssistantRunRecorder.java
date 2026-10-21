@@ -118,6 +118,19 @@ public class AssistantRunRecorder {
     // ===== 批6-#2 五张追踪表（005 测试接缝：包内可见供单测直取播种，见 thinkBuffers 先例） =====
     /** 每 run 末次事件时刻（收割判据：停滞超 STALL_MS=失联） */
     final Map<String, Long> lastEventAt = new ConcurrentHashMap<>();
+
+    /** G1 乙类#5（三审回修 P1：键由 threadId 改 runId）：用户显式停止标记（stopAt 毫秒）。
+     * thread 级键在「停止晚到/终态走收割或 RUN_ERROR」时永不消费→残留标记把同 thread
+     * 下一轮正常完成误判 user-stop；runId 键天然自限（下一轮是新 runId），clearRunTracking
+     * +收割终局再兜底清理。interrupt() 优雅收尾事件流与自然完成无异，靠本标记覆写终态 */
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> USER_STOP_MARKS =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void markUserStop(String runId) {
+        if (runId != null) {
+            USER_STOP_MARKS.put(runId, System.currentTimeMillis());
+        }
+    }
     /** 每 run 的步骤缓冲键（冲刷/收割线程无 context，建侧在此登记） */
     final Map<String, String> runStepKeys = new ConcurrentHashMap<>();
     /** 每 run 的 partial 行引用（首插时锚定，终道/收割时清理；防重复插入） */
@@ -466,7 +479,18 @@ public class AssistantRunRecorder {
                                 evictStepBuffers(List.of(stepKey));
                             }
                         } else {
-                            finishRun(runId, "COMPLETED", "normal", stepKey);
+                            // G1 乙类#5：用户显式停止（interrupt 优雅收尾事件流=normal）——
+                            // 按 run 级停止标记覆写终态，秒级真终局可追溯（end_reason=user-stop）；
+                            // remove 取值即消费，跨 run 残留不可能（键=runId）
+                            Long stopMark = USER_STOP_MARKS.remove(runId);
+                            if (stopMark != null) {
+                                finishRun(runId, "INTERRUPTED", "user-stop", stepKey);
+                                // 三审回修（dspro P1-2）：user-stop 无 resume 轮，步骤/思考
+                                // 缓冲按终态清（INTERRUPTED 留缓冲是给 HITL resume 续用的）
+                                evictStepBuffers(List.of(stepKey));
+                            } else {
+                                finishRun(runId, "COMPLETED", "normal", stepKey);
+                            }
                             // 二站 T1 清除①：resume 轮终态（用户确认/取消/入口自动解锁三路同口）
                             // =框架已消费全部悬挂，清缓存
                             pendingInterrupts.clear(threadId);
@@ -679,6 +703,8 @@ public class AssistantRunRecorder {
         runStepKeys.remove(runId);
         lastPartialFlushAt.remove(runId);
         lastPartialLen.remove(runId);
+        // 三审回修：run 终局一律清停止标记（RUN_ERROR/interrupt 轮等非 else 分支的兜底）
+        USER_STOP_MARKS.remove(runId);
     }
 
     /**
@@ -943,6 +969,7 @@ public class AssistantRunRecorder {
             java.util.List<DcsAssistantRun> closed = conversationService.finalizeStalledRun(tenantId, runId);
             if (!closed.isEmpty()) {
                 DcsAssistantRun r = closed.get(0);
+                USER_STOP_MARKS.remove(runId);
                 refundIfWallet(r.getTenantId(), r.getUserId());
                 log.warn("[AssistantRecorder] 失联收割 runId={}（事件停滞≥{}s=客户端断连拆链）："
                     + "INTERRUPTED/client-disconnect，回合已退", runId, STALL_MS / 1000);

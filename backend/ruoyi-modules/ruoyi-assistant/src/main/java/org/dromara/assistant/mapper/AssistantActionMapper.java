@@ -22,6 +22,13 @@ public interface AssistantActionMapper extends BaseMapper<DcsAssistantAction> {
         + " ON CONFLICT (idempotency_key) DO NOTHING")
     int insertIgnoreKey(@Param("a") DcsAssistantAction action);
 
+    /** 拒绝留痕行（G1 乙类#2）：多带 result_summary（拒绝原因）；幂等键=双发防线 */
+    @Insert("INSERT INTO dcs_assistant_action (id, tenant_id, user_id, run_id, thread_id, tool_name,"
+        + " status, result_summary, idempotency_key, create_time) VALUES (#{a.id}, #{a.tenantId}, #{a.userId},"
+        + " #{a.runId}, #{a.threadId}, #{a.toolName}, #{a.status}, #{a.resultSummary}, #{a.idempotencyKey}, CURRENT_TIMESTAMP)"
+        + " ON CONFLICT (idempotency_key) DO NOTHING")
+    int insertRejected(@Param("a") DcsAssistantAction action);
+
     /** 幂等键读回（重试判定：DONE=回执复述；EXECUTING=拒绝重复触发） */
     @Select("SELECT * FROM dcs_assistant_action WHERE idempotency_key=#{key}")
     DcsAssistantAction selectByKey(@Param("key") String key);

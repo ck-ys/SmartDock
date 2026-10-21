@@ -236,6 +236,43 @@ public final class PromptAssets {
         return sysPromptText.substring(0, head) + filtered + sysPromptText.substring(tail);
     }
 
+    /**
+     * 纪律段工具引用行裁剪（G1 遗留#4）：行为纪律散文里引用了平台工具
+     * （read_attachment/submit_plan/todo_write/save_memory），工具被闸关闭后注册面
+     * 即时消失，但散文行残留会让模型照词幻觉调用死工具。行含未注册工具名→整行删
+     * （速查卡段已由 filterCheatsheet 先处理，此处扫全文只会命中纪律行）。
+     */
+    public static String filterDiscipline(String sysPromptText, java.util.Set<String> registeredTools) {
+        // 三审回修（dspro P2-5）：空注册集=权威结果（工具全被闸关）而非「不确定」——纪律行
+        // 全裁；null 才是「不确定不裁」（调用方没给注册面）
+        if (sysPromptText == null || registeredTools == null) {
+            return sysPromptText;
+        }
+        String[] lines = sysPromptText.split("\n", -1);
+        StringBuilder kept = new StringBuilder();
+        for (String line : lines) {
+            boolean drop = false;
+            for (String tool : DISCIPLINE_LINE_TOOLS) {
+                if (line.contains(tool) && !registeredTools.contains(tool)) {
+                    drop = true;
+                    break;
+                }
+            }
+            if (!drop) {
+                kept.append(line).append('\n');
+            }
+        }
+        String filtered = kept.toString();
+        if (filtered.endsWith("\n")) {
+            filtered = filtered.substring(0, filtered.length() - 1);
+        }
+        return filtered;
+    }
+
+    /** 纪律散文里出现过的平台工具名（filterDiscipline 名单；业务工具纪律段已随注册面装配） */
+    private static final java.util.List<String> DISCIPLINE_LINE_TOOLS =
+        java.util.List.of("read_attachment", "submit_plan", "todo_write", "save_memory");
+
     /** 速查卡段首标记（filterCheatsheet 定位锚） */
     private static final String CHEATSHEET_HEADER = "【工具速查卡】";
 

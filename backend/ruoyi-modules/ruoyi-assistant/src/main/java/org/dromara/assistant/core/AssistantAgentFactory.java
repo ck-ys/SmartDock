@@ -134,6 +134,10 @@ public class AssistantAgentFactory {
         // 三次快照有半新半旧窗口）——toolGate 在下方注册面消费，compaction 在压缩中间件消费
         org.dromara.assistant.service.AssistantConfigService.EffectiveConfig tenantCfg =
             assistantConfigService.effective(user.getTenantId());
+        // G1 遗留#3：租户装配面指纹（toolGate/memory/compaction）入链——改工具开关后
+        // 该租户全部缓存会话下一请求即失效重建，不再吃 60 分钟会话超时
+        org.dromara.assistant.core.AssistantModelChoiceHolder.markConfigBuilt(aguiThreadId,
+            org.dromara.assistant.core.AssistantModelChoiceHolder.assemblyFingerprint(tenantCfg));
         boolean memoryOn = "1".equals(tenantCfg.memoryEnabled());
         // AU-03(Q3=C)→批2 双层档位: 最内层套思考档装饰器——按会话读 thinkTier 经能力目录
         // 翻译原生参数(TIERS→reasoning_effort / SWITCH→thinking.type)；装配期解析能力一次注入。
@@ -191,8 +195,10 @@ public class AssistantAgentFactory {
             // Q5（2026-10-15 拍板A）：催办纪律段同机制——注册面含催办工具才装配。批3 微核心化
             // 后平台工具无催办类，运行口径恒不装配（展示口径 sysPrompt(memoryOn) 仍全量）；
             // 业务侧催办工具若回归，走 SPI 注册名判断恢复装配
-            .sysPrompt(PromptAssets.filterCheatsheet(
-                PromptAssets.sysPrompt(memoryOn, false),
+            .sysPrompt(PromptAssets.filterDiscipline(
+                PromptAssets.filterCheatsheet(
+                    PromptAssets.sysPrompt(memoryOn, false),
+                    registered),
                 registered) + SkillAssets.catalog(identity.getRoleLevel()))
             .model(model)
             .stateStore(stateStore)

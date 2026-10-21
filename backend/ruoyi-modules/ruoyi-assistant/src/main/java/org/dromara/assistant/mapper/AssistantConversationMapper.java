@@ -25,6 +25,7 @@ public interface AssistantConversationMapper extends BaseMapper<DcsAssistantConv
     @Select("SELECT * FROM dcs_assistant_conversation WHERE tenant_id=#{tenantId} AND thread_id=#{threadId} AND del_flag='0'")
     DcsAssistantConversation selectByThread(@Param("tenantId") String tenantId, @Param("threadId") String threadId);
 
+
     /** 归属校验取会话（本人可见才返回行） */
     @Select("SELECT * FROM dcs_assistant_conversation WHERE tenant_id=#{tenantId} AND id=#{id} AND user_id=#{userId} AND del_flag='0'")
     DcsAssistantConversation selectOwned(@Param("tenantId") String tenantId, @Param("id") Long id, @Param("userId") Long userId);
