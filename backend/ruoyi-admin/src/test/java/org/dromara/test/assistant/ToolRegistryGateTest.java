@@ -38,6 +38,15 @@ class ToolRegistryGateTest {
         assertEquals(-1, ToolRegistry.effectiveMinRole(webSearch, gate));
     }
 
+    /** D-1#6 闭环：清空哨兵序列化不依赖全局 updateStrategy（空表→""、非空→JSON） */
+    @Test
+    void serializeGateEmptyMeansSentinelClear() {
+        assertEquals("", AssistantConfigService.serializeGate(null));
+        assertEquals("", AssistantConfigService.serializeGate(Map.of()));
+        org.junit.jupiter.api.Assertions.assertTrue(
+            AssistantConfigService.serializeGate(Map.of("web_search", "off")).contains("\"web_search\":\"off\""));
+    }
+
     /** 空/空白=空表（未配置，走内置门槛）——与坏 JSON 的全关兜底区分 */
     @Test
     void blankJsonMeansNoOverride() {

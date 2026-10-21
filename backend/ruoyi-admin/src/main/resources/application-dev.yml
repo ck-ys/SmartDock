@@ -293,3 +293,9 @@ justauth:
       client-id: 10**********6
       client-secret: 1f7d08**********5b7**********29e
       redirect-uri: ${justauth.address}/social-callback?source=gitea
+
+# 批2 Q2=A（MCP 试点）：STDIO 脚本允许目录（绝对路径，逗号分隔；空=禁用 STDIO 注册）
+# HTTP 传输 host 白名单默认 localhost/127.0.0.1，追加用 smartdock.mcp.allowed-http-hosts
+smartdock:
+  mcp:
+    allowed-dirs: D:/Git/git-gitee/smart-dock/backend/mcp-demo

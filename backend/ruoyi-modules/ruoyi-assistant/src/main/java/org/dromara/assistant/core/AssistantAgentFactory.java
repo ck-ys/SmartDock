@@ -91,6 +91,8 @@ public class AssistantAgentFactory {
     private final org.dromara.assistant.service.AssistantUserQuotaService quotaService;
     /** 批2 SPI 化: BizToolProvider 注册器(零 provider 时为空表, 助手无业务模块也能起) */
     private final ProviderToolRegistry providerToolRegistry;
+
+    private final org.dromara.assistant.service.McpPilotService mcpPilotService;
     /** 压缩工作区(批17 Q2: 中间件卸载归档用, AssistantWorkspaceConfig 装配) */
     private final io.agentscope.harness.agent.workspace.WorkspaceManager workspaceManager;
 
@@ -180,6 +182,8 @@ public class AssistantAgentFactory {
         // 批2 SPI 化: BizToolProvider 通道(内置优先, 撞名让位)——注册与权限规则同循环;
         // 批3 起业务工具唯一来路（微核心 DcsToolProvider 在此挂载）
         registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb));
+        // 批2 Q2=A：MCP 外部工具试点挂载（平台级启用行；单服务失败=审计+warn 跳过，绝不连坐会话）
+        registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(), pb));
         ReActAgent agent = ReActAgent.builder()
             .name(AGENT_ID)
             // 批F2：速查卡按注册面裁剪——无权工具名留在提示词里，模型照词幻觉调用也会

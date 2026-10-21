@@ -111,6 +111,19 @@ public class AssistantConfigService {
         }
     }
 
+    /** 序列化单点（D-1#6 测试锚点）：空/null → "" 哨兵（=清空覆盖），非空 → JSON */
+    public static String serializeGate(java.util.Map<String, String> gate) {
+        if (gate == null || gate.isEmpty()) {
+            return "";
+        }
+        try {
+            return GATE_MAPPER.writeValueAsString(gate);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Map<String,String> 结构固定，序列化失败理论不可达；兜底让调用方人话感知
+            throw new ServiceException("工具开关序列化失败，请重试");
+        }
+    }
+
     /** 坏配置兜底：全工具 off（与 ToolRegistry.allToolNames 单点同源，防解析失败时 fail-open） */
     private static java.util.Map<String, String> allOffGate() {
         java.util.Map<String, String> closed = new java.util.LinkedHashMap<>();
@@ -179,9 +192,9 @@ public class AssistantConfigService {
         if (tenantId == null || tenantId.isBlank()) {
             throw new ServiceException("tenantId 不能为空");
         }
-        // 清空用 "" 哨兵（SQL 直写 EXCLUDED 不 COALESCE；读侧 blank=空表）
-        String json = (gate == null || gate.isEmpty()) ? ""
-            : org.dromara.common.json.utils.JsonUtils.toJsonString(gate);
+        // 清空用 "" 哨兵（upsertToolGate SQL 直写 EXCLUDED 不 COALESCE，不依赖全局
+        // updateStrategy=NOT_NULL——D-1#6 加固：即使全局策略改 NOT_EMPTY 清空也不失效）
+        String json = serializeGate(gate);
         DcsAssistantConfig patch = new DcsAssistantConfig();
         patch.setTenantId(tenantId);
         patch.setToolGate(json);
