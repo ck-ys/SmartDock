@@ -50,4 +50,7 @@ public class DcsAssistantConfig implements Serializable {
 
     /** 助手对外称呼（快刀批 Q6，2026-10-20）：空=用平台默认「SmartDock 小助手」；写侧空白串=清除回落默认 */
     private String assistantName;
+
+    /** 批1 Q1=B（2026-10-21）：工具开关矩阵 JSON（工具名→off/member/admin），空=全部按内置门槛 */
+    private String toolGate;
 }

@@ -53,7 +53,8 @@ public class AssistantConfigService {
      *  digestEnabled 五需求批 R4b 起每日摘要开关；assistantName 快刀批 Q6 起助手称呼） */
     public record EffectiveConfig(boolean rowPresent, boolean enabled, int dailyRoundLimitPerUser,
                                   BigDecimal dailyBudgetAmount, String memoryEnabled, int compactionTriggerTokens,
-                                  int websearchLimitPerUser, String digestEnabled, String assistantName) {
+                                  int websearchLimitPerUser, String digestEnabled, String assistantName,
+                                  java.util.Map<String, String> toolGate) {
     }
 
     /** 读租户生效配置：无行=平台默认（默认关闭） */
@@ -62,7 +63,8 @@ public class AssistantConfigService {
         if (row == null) {
             return new EffectiveConfig(false, false, PLATFORM_DAILY_ROUNDS,
                 PLATFORM_DAILY_BUDGET, PLATFORM_MEMORY_ENABLED, PLATFORM_COMPACTION_TOKENS,
-                PLATFORM_WEBSEARCH_LIMIT, PLATFORM_DIGEST_ENABLED, PLATFORM_ASSISTANT_NAME);
+                PLATFORM_WEBSEARCH_LIMIT, PLATFORM_DIGEST_ENABLED, PLATFORM_ASSISTANT_NAME,
+                java.util.Map.of());
         }
         return new EffectiveConfig(true, "1".equals(row.getEnabled()),
             row.getDailyRoundLimitPerUser() == null ? PLATFORM_DAILY_ROUNDS : row.getDailyRoundLimitPerUser(),
@@ -71,7 +73,27 @@ public class AssistantConfigService {
             row.getCompactionTriggerTokens() == null ? PLATFORM_COMPACTION_TOKENS : row.getCompactionTriggerTokens(),
             row.getWebsearchLimitPerUser() == null ? PLATFORM_WEBSEARCH_LIMIT : row.getWebsearchLimitPerUser(),
             row.getDigestEnabled() == null ? PLATFORM_DIGEST_ENABLED : row.getDigestEnabled(),
-            normalizeName(row.getAssistantName()));
+            normalizeName(row.getAssistantName()),
+            parseToolGate(row.getToolGate()));
+    }
+
+    /** 批1 Q1=B：tool_gate JSON 解析（工具名→off/member/admin）；空/坏 JSON=空表不覆盖 */
+    private static java.util.Map<String, String> parseToolGate(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return java.util.Map.of();
+        }
+        try {
+            java.util.Map<String, Object> parsed = org.dromara.common.json.utils.JsonUtils.parseMap(raw);
+            java.util.Map<String, String> gate = new java.util.LinkedHashMap<>();
+            parsed.forEach((k, v) -> {
+                if (k != null && v != null) {
+                    gate.put(k, String.valueOf(v).trim());
+                }
+            });
+            return gate;
+        } catch (Exception e) {
+            return java.util.Map.of();
+        }
     }
 
     /** 称呼归一（读侧）：空白一律=平台默认，非空 trim 后直出（写侧已限长） */

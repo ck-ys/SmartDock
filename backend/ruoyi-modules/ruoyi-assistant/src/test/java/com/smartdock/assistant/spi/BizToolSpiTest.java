@@ -151,7 +151,7 @@ class BizToolSpiTest {
                 null, null, null, null, null, Boolean.FALSE, "t", null, null, null, null);
         Toolkit toolkit = new Toolkit();
         Set<String> registered = org.dromara.assistant.core.ToolRegistry.registerAll(toolkit,
-            identity(2, Set.of("*:*:*")), emptyDeps, PermissionContextState.builder());
+            identity(2, Set.of("*:*:*")), emptyDeps, PermissionContextState.builder(), null);
 
         assertThat(registered).doesNotContain("query_my_todos", "query_my_missions", "act_remind",
             "act_forward", "act_audit", "act_create_mission", "act_create_template",

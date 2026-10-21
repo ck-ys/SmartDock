@@ -120,13 +120,16 @@ public final class ToolRegistry {
     /**
      * 按角色注册全部达标工具并同步生成权限规则（注册与规则同循环=零第二真相）。
      *
+     * @param toolGate 批1 Q1=B：租户级工具档位覆盖（工具名→off/member/admin；null/空=内置门槛）
      * @return 实际注册成功的工具名集合（守卫断言用）
      */
     public static Set<String> registerAll(Toolkit toolkit, ToolIdentity identity, ToolDeps deps,
-                                          PermissionContextState.Builder pb) {
+                                          PermissionContextState.Builder pb,
+                                          java.util.Map<String, String> toolGate) {
         Set<String> registered = new LinkedHashSet<>();
         for (ToolSpec spec : SPECS) {
-            if (identity.getRoleLevel() < spec.minRoleLevel()) {
+            int minRole = effectiveMinRole(spec, toolGate);
+            if (minRole < 0 || identity.getRoleLevel() < minRole) {
                 continue;
             }
             if (spec.gate() != null && !spec.gate().test(deps)) {
@@ -147,9 +150,36 @@ public final class ToolRegistry {
         return registered;
     }
 
+    /**
+     * 批1 Q1=B（2026-10-21）：租户级工具档位单点判定——注册面/目录/全景三面共用。
+     * 覆盖值 off=-1（彻底关闭，模型不可见）；member/admin=门槛只升不降
+     * （内置门槛高的工具如管理员专用项，租户配 member 也不能降到全员）；
+     * 未配置/非法值/空表=内置门槛不变。任一 toolName 命中即生效（多工具 spec 取先命中）。
+     */
+    public static int effectiveMinRole(ToolSpec spec, java.util.Map<String, String> toolGate) {
+        if (toolGate != null) {
+            for (String name : spec.toolNames()) {
+                String v = toolGate.get(name);
+                if (v == null) {
+                    continue;
+                }
+                switch (v) {
+                    case "off":
+                        return -1;
+                    case "member":
+                        return Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_MEMBER);
+                    case "admin":
+                        return Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_ADMIN);
+                    default:
+                        // 非法值忽略——配置面已限下拉，此处兜底不炸链
+                }
+            }
+        }
+        return spec.minRoleLevel();
+    }
+
     /** 全量工具名（不分角色，守卫测试比对用）。 */
-    public static Set<String> allToolNames() {
-        Set<String> names = new LinkedHashSet<>();
+    public static Set<String> allToolNames() {        Set<String> names = new LinkedHashSet<>();
         for (ToolSpec spec : SPECS) {
             names.addAll(spec.toolNames());
         }

@@ -169,7 +169,10 @@ public class AssistantAgentFactory {
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
                 planSignal, memoryService, memoryOn, aguiThreadId, todoSignal, conversationService,
-                webSearchQuota, quotaService), pb);
+                webSearchQuota, quotaService), pb,
+            // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
+            // 管理员改完下一轮建会话即生效（注册面即时消失）
+            assistantConfigService.effective(user.getTenantId()).toolGate());
         // 批2 SPI 化: BizToolProvider 通道(内置优先, 撞名让位)——注册与权限规则同循环;
         // 批3 起业务工具唯一来路（微核心 DcsToolProvider 在此挂载）
         registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb));

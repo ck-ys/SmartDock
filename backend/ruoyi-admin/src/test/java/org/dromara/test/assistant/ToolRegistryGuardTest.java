@@ -82,7 +82,7 @@ class ToolRegistryGuardTest {
     @Test
     void memberSeesAllPlatformTools() {
         Set<String> studentNames = ToolRegistry.registerAll(new Toolkit(), identity(ToolIdentity.LEVEL_MEMBER),
-            readyDeps(true), PermissionContextState.builder());
+            readyDeps(true), PermissionContextState.builder(), null);
         assertEquals(EXPECTED_ALL, studentNames, "成员=平台全量 6 工具（无角色裁剪）");
     }
 
@@ -91,7 +91,7 @@ class ToolRegistryGuardTest {
     void memoryGateCutsSaveMemoryWhenDisabled() {
         for (Boolean mem : new Boolean[] {null, false}) {
             Set<String> names = ToolRegistry.registerAll(new Toolkit(), identity(ToolIdentity.LEVEL_ADMIN),
-                readyDeps(mem), PermissionContextState.builder());
+                readyDeps(mem), PermissionContextState.builder(), null);
             assertFalse(names.contains("save_memory"), "记忆关(" + mem + ")时 save_memory 不可见");
             assertEquals(EXPECTED_ALL.size() - 1, names.size());
         }
@@ -102,7 +102,7 @@ class ToolRegistryGuardTest {
     @Test
     void webSearchGateCutsWhenThreadWebOff() {
         Set<String> names = ToolRegistry.registerAll(new Toolkit(), identity(ToolIdentity.LEVEL_ADMIN),
-            readyDeps(true, "thread-off"), PermissionContextState.builder());
+            readyDeps(true, "thread-off"), PermissionContextState.builder(), null);
         assertFalse(names.contains("web_search"), "联网关的线程不可见 web_search");
         assertEquals(EXPECTED_ALL.size() - 1, names.size(), "仅少 web_search 一枚，其余不受联网门控影响");
     }
