@@ -146,6 +146,39 @@ public class AssistantConfigService {
     }
 
     /**
+     * 批1 Q1=B（2026-10-21）：工具开关矩阵整列写入（PUT /dcs/assistant/toolgate）。
+     * 只动 tool_gate 列——不走 update() 整行合并，避免与联网/称呼校验互相牵连。
+     * 无行租户：按平台默认+enabled='0' 首插（保持"未配置=助手关闭"语义不翻车），仅落开关。
+     */
+    public void updateToolGate(String tenantId, java.util.Map<String, String> gate) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new ServiceException("tenantId 不能为空");
+        }
+        // 清空用 "" 哨兵（MyBatis-Plus updateById 跳过 null 字段写不进；读侧 blank=空表）
+        String json = (gate == null || gate.isEmpty()) ? ""
+            : org.dromara.common.json.utils.JsonUtils.toJsonString(gate);
+        DcsAssistantConfig row = TenantHelper.ignore(() -> configMapper.selectById(tenantId));
+        if (row == null) {
+            DcsAssistantConfig insert = new DcsAssistantConfig();
+            insert.setTenantId(tenantId);
+            insert.setEnabled("0");
+            insert.setDailyRoundLimitPerUser(PLATFORM_DAILY_ROUNDS);
+            insert.setDailyBudgetAmount(PLATFORM_DAILY_BUDGET);
+            insert.setMemoryEnabled(PLATFORM_MEMORY_ENABLED);
+            insert.setCompactionTriggerTokens(PLATFORM_COMPACTION_TOKENS);
+            insert.setWebsearchLimitPerUser(PLATFORM_WEBSEARCH_LIMIT);
+            insert.setDigestEnabled(PLATFORM_DIGEST_ENABLED);
+            insert.setToolGate(json);
+            TenantHelper.ignore(() -> configMapper.insert(insert));
+            return;
+        }
+        DcsAssistantConfig patch = new DcsAssistantConfig();
+        patch.setTenantId(tenantId);
+        patch.setToolGate(json);
+        TenantHelper.ignore(() -> configMapper.updateById(patch));
+    }
+
+    /**
      * 管理端写租户覆盖行（upsert）。部分提交语义（dsflash P2-5 修）：null 字段
      * =保持原值（首插则落 DB 默认）——SQL 侧 EXCLUDED 已被 INSERT COALESCE 污染
      * 分不出"传的默认"与"没传"，故 service 层先读在位行合并非空字段再整行 upsert。

@@ -31,9 +31,11 @@ public class AssistantCapabilityPanoramaController extends BaseController {
 
     private final AssistantConfigService assistantConfigService;
 
-    /** 一条工具的全景行（SPECS 注册信息 + TOOL_META 中文元数据合成） */
+    /** 一条工具的全景行（SPECS 注册信息 + TOOL_META 中文元数据合成）；
+     *  批1 Q1=B：+toolGate 覆盖档位与 effective 生效档（-1=本租户已关闭） */
     public record PanoramaTool(String name, String displayName, String category, int station,
-                               String behavior, int minRoleLevel, String gateDesc) {
+                               String behavior, int minRoleLevel, String gateDesc,
+                               String toolGate, int effective) {
     }
 
     /** 业务批7 Q9：技能库全景行（正文折叠展示；注入方式口径与 SkillAssets 三级兜底一致） */
@@ -61,8 +63,11 @@ public class AssistantCapabilityPanoramaController extends BaseController {
     @GetMapping("/panorama")
     public R<PanoramaVo> panorama() {
         String tenantId = LoginHelper.getTenantId();
+        // 批1 Q1=B：先取生效配置——工具行带出 tool_gate 覆盖与 effective 生效档
+        java.util.Map<String, String> gate = assistantConfigService.effective(tenantId).toolGate();
         List<PanoramaTool> tools = new ArrayList<>();
         for (ToolRegistry.ToolSpec spec : ToolRegistry.SPECS) {
+            int effective = ToolRegistry.effectiveMinRole(spec, gate);
             for (String name : spec.toolNames()) {
                 ToolRegistry.ToolMeta meta = ToolRegistry.TOOL_META.get(name);
                 tools.add(new PanoramaTool(
@@ -72,7 +77,9 @@ public class AssistantCapabilityPanoramaController extends BaseController {
                     meta == null ? 1 : meta.station(),
                     spec.behavior() == io.agentscope.core.permission.PermissionBehavior.ASK ? "需确认" : "自动执行",
                     spec.minRoleLevel(),
-                    meta == null ? "" : meta.gateDesc()));
+                    meta == null ? "" : meta.gateDesc(),
+                    gate.get(name),
+                    effective));
             }
         }
         tools.sort(java.util.Comparator.comparing(PanoramaTool::category).thenComparing(PanoramaTool::displayName));

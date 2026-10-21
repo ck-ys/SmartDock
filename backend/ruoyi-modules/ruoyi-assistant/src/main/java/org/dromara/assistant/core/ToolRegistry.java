@@ -186,6 +186,11 @@ public final class ToolRegistry {
         return names;
     }
 
+    /** 批1 Q1=B：spec 清单只读视图（toolgate 管理端合并视图用——不暴露可变 SPECS）。 */
+    public static List<ToolSpec> SPECS_VIEW() {
+        return List.copyOf(SPECS);
+    }
+
     /** 工具展示元数据（能力全景/管理页，批A Q4）：与 SPECS 同文件=单点注册不破。 */
     public record ToolMeta(String displayName, String category, int station, String gateDesc) {
     }
