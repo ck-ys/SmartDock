@@ -35,7 +35,7 @@ class J2AssistantModelChainTest {
 
     private final IDcsAiConfigService aiConfigService = mock(IDcsAiConfigService.class);
     private final AssistantModelSettingService settingService = mock(AssistantModelSettingService.class);
-    private final AssistantModelFactory factory = new AssistantModelFactory(aiConfigService, settingService);
+    private final AssistantModelFactory factory = new AssistantModelFactory(aiConfigService, null, settingService);
 
     /** 链段1: 助手默认槽有指向且行可用 → 用它, 不查接口默认 */
     @Test

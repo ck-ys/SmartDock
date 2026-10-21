@@ -108,6 +108,24 @@ class AssistantRunRecorderReapFlushUnitTest {
         assertThat(recorder.buffers).doesNotContainKey("run-1");
     }
 
+    /** 稳流① Q1 收口复核（2026-10-20 E2E 活体）：收割成功分支持久化前退款、计数一个不落——
+     * 活体共享环境里收割计数缺失时，用本用例隔离定责（计数机制 vs 环境伪象） */
+    @Test
+    void 失联收割成功_终态计数入桶_按租户隔离() {
+        seedRun("run-c", "th-c", "已生成部分", 9005L);
+        recorder.lastEventAt.put("run-c", NOW - STALL - 1);
+        when(costLedger.isInFlight("th-c")).thenReturn(false);
+        when(conversationService.runByRunId("run-c")).thenReturn(run("000000", 42L));
+        when(conversationService.finalizeStalledRun("000000", "run-c")).thenReturn(List.of(run("000000", 42L)));
+
+        recorder.flushAndReap(NOW);
+
+        assertThat(recorder.terminalOutcomeSnapshot("000000"))
+            .containsEntry("INTERRUPTED|client-disconnect", 1L);
+        // 多租户隔离：别的租户读不到 000000 的收割计数
+        assertThat(recorder.terminalOutcomeSnapshot("999999")).isEmpty();
+    }
+
     @Test
     void 模型调用在飞_停滞也不收割() {
         seedRun("run-2", "th-2", "生成中", null);
