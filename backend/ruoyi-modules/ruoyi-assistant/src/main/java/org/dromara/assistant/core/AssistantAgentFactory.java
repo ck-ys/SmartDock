@@ -183,7 +183,7 @@ public class AssistantAgentFactory {
         // 批3 起业务工具唯一来路（微核心 DcsToolProvider 在此挂载）
         registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb));
         // 批2 Q2=A：MCP 外部工具试点挂载（平台级启用行；单服务失败=审计+warn 跳过，绝不连坐会话）
-        registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(), pb));
+        registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(), aguiThreadId, pb));
         ReActAgent agent = ReActAgent.builder()
             .name(AGENT_ID)
             // 批F2：速查卡按注册面裁剪——无权工具名留在提示词里，模型照词幻觉调用也会

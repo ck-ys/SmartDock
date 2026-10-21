@@ -15,6 +15,7 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -51,8 +52,6 @@ public class McpPilotService {
     static final int RATE_LIMIT_PER_MIN = 30;
 
     private static final Set<String> ALLOWED_COMMANDS = Set.of("node", "node.exe");
-    private static final Set<String> DANGEROUS_HEADER_KEYS = Set.of(
-        "authorization", "x-api-key", "api-key", "token", "access-token", "secret");
     private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{2,29}$");
 
     /** 独立 mapper（纯函数单测可调——JsonUtils 静态块依赖 Spring 容器，批1 旧坑） */
@@ -61,6 +60,38 @@ public class McpPilotService {
 
     private final DcsMcpServerMapper serverMapper;
     private final DcsMcpCallLogMapper callLogMapper;
+    private final io.agentscope.spring.boot.agui.common.ThreadSessionManager threadSessionManager;
+
+    /**
+     * 三审回修（三席共识 P0/进程泄漏）：(rcUserId, threadId) → 本会话 attach 的 MCP 客户端。
+     * 框架的会话淘汰（容量/失效重建）只删 map 不 close，子进程会无限累积；
+     * 清扫任务（60s）对已不在 SessionManager 的 key 统一 close——不动框架代码。
+     * 键必须与 AssistantRuntimeContextResolver 同款复合（rcUserId="t:租户:用户" + aguiThreadId）：
+     * 单参 getSession(String) 语义是 (null, threadId)，永远查空——E2E 实证会误杀活客户端。
+     */
+    private final java.util.concurrent.ConcurrentHashMap<AttachKey, java.util.Map<String, McpClientWrapper>> attachedBySession =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private record AttachKey(String rcUserId, String threadId) {}
+
+    /** 清扫：会话已淘汰（不在管理器里）→ close 其全部 MCP 客户端（node 子进程/HTTP 连接） */
+    @Scheduled(fixedDelay = 60_000, initialDelay = 90_000)
+    void sweepOrphanMcpClients() {
+        attachedBySession.forEach((key, perServer) -> {
+            if (threadSessionManager.getSession(key.rcUserId(), key.threadId()).isEmpty()) {
+                attachedBySession.remove(key);
+                for (McpClientWrapper c : perServer.values()) {
+                    try {
+                        c.close();
+                    } catch (Exception e) {
+                        log.warn("[McpPilot] 清扫关闭 {} 失败（忽略）：{}", key, e.getMessage());
+                    }
+                }
+                log.info("[McpPilot] 会话 {}|{} 已淘汰，回收其 {} 个 MCP 客户端",
+                    key.rcUserId(), key.threadId(), perServer.size());
+            }
+        });
+    }
 
     /** STDIO 脚本允许目录（绝对路径，逗号分隔；空=禁用 STDIO 注册） */
     @Value("${smartdock.mcp.allowed-dirs:}")
@@ -88,13 +119,21 @@ public class McpPilotService {
             throw new ServiceException("服务名限 3-30 位小写字母/数字/下划线，且以字母开头");
         }
         normalizeAndValidate(row);
+        java.util.Date now = new java.util.Date();
         if (row.getId() == null) {
             row.setTenantId(PLATFORM_TENANT);
             row.setReadOnly("1");
-            serverMapper.insert(row);
+            row.setCreateTime(now);
+            row.setUpdateTime(now);
+            try {
+                serverMapper.insert(row);
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                throw new ServiceException("服务名已存在：" + row.getServerName());
+            }
         } else {
             row.setTenantId(null);
             row.setReadOnly(null);
+            row.setUpdateTime(now);
             serverMapper.updateById(row);
         }
     }
@@ -106,7 +145,10 @@ public class McpPilotService {
         DcsMcpServer patch = new DcsMcpServer();
         patch.setId(id);
         patch.setEnabled(enabled);
-        serverMapper.updateById(patch);
+        patch.setUpdateTime(new java.util.Date());
+        if (serverMapper.updateById(patch) == 0) {
+            throw new ServiceException("记录不存在或已删除");
+        }
     }
 
     /** 试点物理删（审计表留痕），无外键依赖 */
@@ -127,21 +169,28 @@ public class McpPilotService {
                 throw new ServiceException("STDIO 未配置脚本允许目录（smartdock.mcp.allowed-dirs），暂不可注册");
             }
             for (String a : args) {
-                String canonical;
+                if (a == null || a.isBlank()) {
+                    throw new ServiceException("args 须是非空字符串数组（元素 " + a + "）");
+                }
+                java.nio.file.Path canonical;
                 try {
-                    canonical = Path.of(a).toRealPath().toString();
+                    canonical = Path.of(a).toRealPath();
                 } catch (java.io.IOException e) {
                     throw new ServiceException("脚本路径不存在：" + a);
+                } catch (java.nio.file.InvalidPathException e) {
+                    throw new ServiceException("脚本路径非法：" + a);
                 }
                 boolean inside = false;
                 for (String d : dirs) {
                     try {
-                        if (canonical.startsWith(Path.of(d).toRealPath().toString())) {
+                        // 三审回修（三席共识 P1）：Path.startsWith 按路径段比对——
+                        // 字符串前缀会让同级兄弟目录 mcp-demo-evil 绕过白名单
+                        if (canonical.startsWith(Path.of(d).toRealPath())) {
                             inside = true;
                             break;
                         }
                     } catch (java.io.IOException e) {
-                        // 白名单目录本身不存在：跳过该目录（配置错误在保存时会人话报错）
+                        // 白名单目录本身不存在：跳过该目录
                     }
                 }
                 if (!inside) {
@@ -155,6 +204,13 @@ public class McpPilotService {
                 uri = URI.create(row.getUrl() == null ? "" : row.getUrl());
             } catch (IllegalArgumentException e) {
                 throw new ServiceException("服务地址格式不正确");
+            }
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                throw new ServiceException("服务地址只支持 http/https");
+            }
+            if (uri.getRawUserInfo() != null || (uri.getRawQuery() != null && uri.getRawQuery().toLowerCase().matches(".*(token|key|secret|password)=.*"))) {
+                throw new ServiceException("服务地址不得携带账号信息或密钥参数（试点免密钥）");
             }
             Set<String> hosts = new LinkedHashSet<>(Arrays.asList("localhost", "127.0.0.1"));
             hosts.addAll(splitCsv(allowedHttpHosts));
@@ -172,23 +228,11 @@ public class McpPilotService {
         }
     }
 
-    /** 试点免密钥：带鉴权语义的头一律拒存（真密钥接入+加密存储留给 B+1） */
+    /** 三审回修（dsflash P1/glm53 P2）：试点一律不接收请求头——免密钥定位下无用途，
+     * 精确键名黑名单可被 X-Auth-Token/Cookie 绕过且值明文入库；真密钥接入+加密存储留给 B+1 */
     public static void validateHeaders(String headersJson) {
-        if (headersJson == null || headersJson.isBlank()) {
-            return;
-        }
-        Map<String, Object> headers;
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> parsed = JSON_MAPPER.readValue(headersJson, Map.class);
-            headers = parsed;
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new ServiceException("请求头须是 JSON 对象");
-        }
-        for (String k : headers.keySet()) {
-            if (DANGEROUS_HEADER_KEYS.contains(k.toLowerCase())) {
-                throw new ServiceException("试点不接收鉴权类请求头（" + k + "）——密钥接入与加密存储排在下一批");
-            }
+        if (headersJson != null && !headersJson.isBlank() && !headersJson.trim().equals("{}")) {
+            throw new ServiceException("试点不接收请求头（免密钥定位；密钥接入与加密存储排在 B+1）");
         }
     }
 
@@ -196,11 +240,16 @@ public class McpPilotService {
         if (argsJson == null || argsJson.isBlank()) {
             return List.of();
         }
+        String[] arr;
         try {
-            return Arrays.asList(JSON_MAPPER.readValue(argsJson, String[].class));
+            arr = JSON_MAPPER.readValue(argsJson, String[].class);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             throw new ServiceException("args 须是字符串数组 JSON");
         }
+        if (arr == null || Arrays.stream(arr).anyMatch(x -> x == null || x.isBlank())) {
+            throw new ServiceException("args 须是非空字符串数组");
+        }
+        return Arrays.asList(arr);
     }
 
     public static List<String> splitCsv(String csv) {
@@ -218,7 +267,7 @@ public class McpPilotService {
      *
      * @return 本次实际新增的工具名（并入注册面返回值，供调用方统计/日志）
      */
-    public Set<String> attachEnabled(Toolkit toolkit, String tenantId, Long userId,
+    public Set<String> attachEnabled(Toolkit toolkit, String tenantId, Long userId, String aguiThreadId,
                                      io.agentscope.core.permission.PermissionContextState.Builder pb) {
         Set<String> added = new LinkedHashSet<>();
         List<DcsMcpServer> rows;
@@ -228,8 +277,20 @@ public class McpPilotService {
             log.warn("[McpPilot] 查询启用服务失败（跳过挂载不连坐）：{}", e.getMessage());
             return added;
         }
+        // 三审回修（dsflash/dspro P1）：装配热路径总预算 5s——N 个慢/下线服务不再
+        // 串行叠加 20s×N（60s 收割线会误杀建会话中的 run）；超预算跳过记审计
+        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
+        AttachKey sessionKey = new AttachKey("t:" + tenantId + ":" + userId, aguiThreadId);
         for (DcsMcpServer row : rows) {
+            long remainMs = (deadline - System.nanoTime()) / 1_000_000;
+            if (remainMs <= 0) {
+                audit(row.getServerName(), tenantId, userId, null, "MOUNT_ERROR", "0",
+                    "挂载预算（5s）耗尽，本轮跳过", null);
+                log.warn("[McpPilot] 挂载 {} 跳过：预算耗尽", row.getServerName());
+                continue;
+            }
             Set<String> before = new LinkedHashSet<>(toolkit.getToolNames());
+            McpClientWrapper raw = null;
             try {
                 McpClientBuilder builder = McpClientBuilder.create(row.getServerName())
                     .timeout(Duration.ofSeconds(10))
@@ -241,22 +302,63 @@ public class McpPilotService {
                 } else {
                     builder.sseTransport(row.getUrl());
                 }
-                McpClientWrapper raw = builder.buildSync();
+                raw = builder.buildSync();
+                // 预检前置 initialize：listTools 在未初始化时直接抛 IllegalStateException；
+                // initialize() 有标志位幂等，后续 registerMcpClient 内部的重复 initialize 会 no-op
+                raw.initialize().block(Duration.ofMillis(remainMs));
+                long remainAfterInit = (deadline - System.nanoTime()) / 1_000_000;
+                if (remainAfterInit <= 0) {
+                    throw new ServiceException("挂载预算（5s）耗尽（initialize 后）");
+                }
+                // 三审回修（dspro P1-5）：撞名预检——框架同名 Map.put 静默覆盖内置/业务
+                // 工具；试点直接拒绝整服务（与 ProviderToolRegistry"撞名让位"策略对齐）
+                List<io.modelcontextprotocol.spec.McpSchema.Tool> tools =
+                    raw.listTools().block(Duration.ofMillis(remainAfterInit));
+                for (io.modelcontextprotocol.spec.McpSchema.Tool t : tools == null ? List.<io.modelcontextprotocol.spec.McpSchema.Tool>of() : tools) {
+                    if (before.contains(t.name())) {
+                        throw new ServiceException("MCP 工具名与现有工具冲突（" + t.name() + "），已拒绝挂载避免静默覆盖");
+                    }
+                }
+                GatedMcpClient gated = new GatedMcpClient(raw, tenantId, userId, row.getServerName(), callLogMapper);
                 // 装饰层：调用级限频 + 双态审计（工具列表/初始化直接委托）
-                toolkit.registerMcpClient(new GatedMcpClient(raw, tenantId, userId, row.getServerName(), callLogMapper))
-                    .block(Duration.ofSeconds(20));
+                toolkit.registerMcpClient(gated).block(Duration.ofMillis(Math.max(remainMs, 1_000)));
+                int mounted = 0;
                 for (String name : toolkit.getToolNames()) {
                     if (!before.contains(name)) {
                         pb.addAllowRule(name, new PermissionRule(name, "", PermissionBehavior.ALLOW, "dcs-assistant-mcp"));
                         added.add(name);
+                        mounted++;
+                    }
+                }
+                // 同会话同服务重挂（会话失效重建）先关旧客户端——旧 toolkit 已随上轮 run 丢弃，
+                // 不关就是同 key 下越积越多的泄漏；等清扫兜底会多活一轮（60s）
+                McpClientWrapper stale = attachedBySession
+                    .computeIfAbsent(sessionKey, k -> new java.util.concurrent.ConcurrentHashMap<>())
+                    .put(row.getServerName(), gated);
+                if (stale != null && stale != gated) {
+                    try {
+                        stale.close();
+                    } catch (Exception ignore) {
+                        // 旧客户端关闭失败：进程随 JVM 生命周期，不连坐本次挂载
                     }
                 }
                 audit(row.getServerName(), tenantId, userId, null, "MOUNT_OK", "1",
-                    null, added.size() + " 个工具");
+                    null, mounted + " 个工具 " + added);
+                raw = null;
             } catch (Exception e) {
                 audit(row.getServerName(), tenantId, userId, null, "MOUNT_ERROR", "0",
                     truncate(e.getMessage()), null);
                 log.warn("[McpPilot] 挂载 {} 失败（跳过不连坐）：{}", row.getServerName(), e.getMessage());
+            } finally {
+                // 三审回修（三席共识）：失败/超时路径必须 close——block 取消不会触发框架
+                // 内部的 doOnError close，不关=子进程泄漏
+                if (raw != null) {
+                    try {
+                        raw.close();
+                    } catch (Exception ignore) {
+                        // 关闭失败只能放弃：进程随 JVM 生命周期
+                    }
+                }
             }
         }
         return added;
@@ -336,10 +438,9 @@ public class McpPilotService {
             String key = "mcp:rl:" + tenantId + ":" + serverName;
             long n;
             try {
-                n = RedisUtils.incrAtomicValue(key);
-                if (n == 1) {
-                    RedisUtils.expire(key, Duration.ofSeconds(60));
-                }
+                // 三审回修（dspro P1-6）：INCR+EXPIRE 原子版（Lua）——两步法在 incr 后
+                // 崩溃会留下永生 key，30 次后该租户永久限频；原子版每刷 TTL=滑动窗口更严
+                n = RedisUtils.incrAtomicValue(key, Duration.ofSeconds(60).toMillis());
             } catch (Exception e) {
                 log.warn("[McpPilot] 限频计数不可用（放行本次调用）：{}", e.getMessage());
                 n = 0;
@@ -351,8 +452,16 @@ public class McpPilotService {
             }
             long t0 = System.currentTimeMillis();
             return call.get()
-                .doOnSuccess(r -> audit(callLogMapper, serverName, tenantId, userId, toolName, "CALL_OK", "1", null,
-                    (System.currentTimeMillis() - t0) + "ms"))
+                // 三审回修（dsflash/dspro P2）：MCP 侧 isError=true 也算失败（工具级报错不再记成功）
+                .doOnSuccess(r -> {
+                    if (r != null && Boolean.TRUE.equals(r.isError())) {
+                        audit(callLogMapper, serverName, tenantId, userId, toolName, "CALL_ERROR", "0",
+                            truncate(String.valueOf(r.content())), null);
+                    } else {
+                        audit(callLogMapper, serverName, tenantId, userId, toolName, "CALL_OK", "1", null,
+                            (System.currentTimeMillis() - t0) + "ms");
+                    }
+                })
                 .doOnError(e -> audit(callLogMapper, serverName, tenantId, userId, toolName, "CALL_ERROR", "0",
                     truncate(e.getMessage()), null));
         }
@@ -383,12 +492,5 @@ public class McpPilotService {
     }
 
     /* 供 controller 分页审计用 */
-    public List<DcsMcpCallLog> pageCallLog(String serverName, int limit) {
-        return callLogMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsMcpCallLog>()
-            .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName)
-            .orderByDesc(DcsMcpCallLog::getCreateTime)
-            .last("LIMIT " + Math.min(Math.max(limit, 1), 200)));
-    }
-
 }
 

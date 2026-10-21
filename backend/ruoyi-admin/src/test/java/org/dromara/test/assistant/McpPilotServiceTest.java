@@ -13,14 +13,15 @@ import static org.junit.jupiter.api.Assertions.*;
 @Tag("local")
 class McpPilotServiceTest {
 
+    /** 三审回修后口径：试点一律不接收请求头（黑名单可被 X-Auth-Token/Cookie 绕过→全拒） */
     @Test
-    void dangerousHeadersRejected() {
-        for (String bad : new String[]{"{\"Authorization\":\"x\"}", "{\"x-api-key\":\"1\"}", "{\"TOKEN\":\"t\"}"}) {
-            assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.validateHeaders(bad), "危险头须拒存: " + bad);
+    void anyHeadersRejected() {
+        for (String bad : new String[]{"{\"Authorization\":\"x\"}", "{\"x-api-key\":\"1\"}", "{\"TOKEN\":\"t\"}", "{\"X-Custom\":\"ok\"}"}) {
+            assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.validateHeaders(bad), "试点任何请求头须拒存: " + bad);
         }
         assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders(null));
         assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders(" "));
-        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders("{\"X-Custom\":\"ok\"}"));
+        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders("{}"));
     }
 
     @Test

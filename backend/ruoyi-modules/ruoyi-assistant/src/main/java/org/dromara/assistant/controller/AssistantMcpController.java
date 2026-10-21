@@ -10,6 +10,7 @@ import org.dromara.assistant.service.McpPilotService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,10 +52,18 @@ public class AssistantMcpController extends BaseController {
         return R.ok(rows);
     }
 
+    /** 三审回修（dspro P1-3）：平台级配置仅超管可管理（当前权限本就只授超管，此处补结构性闸） */
+    private void requireSuperAdmin() {
+        if (!LoginHelper.isSuperAdmin()) {
+            throw new org.dromara.common.core.exception.ServiceException("外部工具为平台级配置，仅超级管理员可管理");
+        }
+    }
+
     @SaCheckPermission("dcs:assistant:config")
-    @Log(title = "AI助手-外部工具", businessType = BusinessType.INSERT)
+    @Log(title = "AI助手-外部工具", businessType = BusinessType.INSERT, isSaveRequestData = false)
     @PostMapping("/save")
     public R<Void> save(@RequestBody DcsMcpServer row) {
+        requireSuperAdmin();
         mcpPilotService.save(row);
         return R.ok();
     }
@@ -63,6 +72,7 @@ public class AssistantMcpController extends BaseController {
     @Log(title = "AI助手-外部工具", businessType = BusinessType.UPDATE)
     @PostMapping("/toggle")
     public R<Void> toggle(@RequestParam Long id, @RequestParam String enabled) {
+        requireSuperAdmin();
         mcpPilotService.toggle(id, enabled);
         return R.ok();
     }
@@ -71,6 +81,7 @@ public class AssistantMcpController extends BaseController {
     @Log(title = "AI助手-外部工具", businessType = BusinessType.DELETE)
     @PostMapping("/delete")
     public R<Void> delete(@RequestParam Long id) {
+        requireSuperAdmin();
         mcpPilotService.delete(id);
         return R.ok();
     }
@@ -78,7 +89,12 @@ public class AssistantMcpController extends BaseController {
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/calllog")
     public R<java.util.Map<String, Object>> callLog(@RequestParam(required = false) String serverName, PageQuery pageQuery) {
+        // 三审回修（dspro P1-4）：非超管只看本租户审计（超管全量）；pageSize 兜 cap 防
+        // PageQuery 缺省 MAX_VALUE 全表扫（dsflash P2）
+        boolean superAdmin = LoginHelper.isSuperAdmin();
+        pageQuery.setPageSize(Math.min(pageQuery.getPageSize() == null || pageQuery.getPageSize() > 200 ? 20 : pageQuery.getPageSize(), 200));
         LambdaQueryWrapper<DcsMcpCallLog> q = new LambdaQueryWrapper<DcsMcpCallLog>()
+            .eq(!superAdmin, DcsMcpCallLog::getTenantId, LoginHelper.getTenantId())
             .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName)
             .orderByDesc(DcsMcpCallLog::getCreateTime);
         var page = callLogMapper.selectPage(pageQuery.build(), q);

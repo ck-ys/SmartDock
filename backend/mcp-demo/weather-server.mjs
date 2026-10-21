@@ -19,8 +19,8 @@ const WEATHER = {
 rl.on('line', (line) => {
   let msg;
   try { msg = JSON.parse(line); } catch { return; }
+  if (!msg || typeof msg !== 'object' || typeof msg.method !== 'string') return; // 畸形输入守卫
   const { id, method, params } = msg;
-  if (method === undefined) return; // 无方法不处理
   if (method === 'initialize') {
     send({ jsonrpc: '2.0', id, result: {
       protocolVersion: params?.protocolVersion || '2024-11-05',
@@ -35,6 +35,9 @@ rl.on('line', (line) => {
     send({ jsonrpc: '2.0', id, result: { tools: [{
       name: 'get_weather',
       description: '查询指定城市的天气（试点模拟数据源，只读）',
+      // readOnlyHint 让 AgentScope 的 McpTool.checkPermissions 直接放行（写类工具才会走确认）；
+      // 权限规则注入随会话状态持久化存在新旧态差异，注解是声明式的、每轮挂载都自带
+      annotations: { readOnlyHint: true, title: '查天气' },
       inputSchema: {
         type: 'object',
         properties: { city: { type: 'string', description: '城市名，如 北京' } },
