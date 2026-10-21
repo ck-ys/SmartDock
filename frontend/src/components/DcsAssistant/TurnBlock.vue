@@ -140,6 +140,16 @@
       @cancel-plan="emit('plan-cancel')"
     />
 
+    <!-- G3-A1：MCP 外部工具反问卡（server 在飞挂起，run 保持 RUNNING）——作答走独立端点，
+         不进 HITL resume 体系；done 后本地移除（后端超时 CANCEL 兜底） -->
+    <elicit-card
+      v-for="ec in turn.elicitations"
+      :key="ec.id"
+      :card="ec"
+      :thread-id="sessionThreadId ?? ''"
+      @done="(id) => (turn.elicitations = turn.elicitations.filter((c) => c.id !== id))"
+    />
+
     <!-- 正文气泡：流式=纯文本+光标（S-23 仅末段增量）；完成=全量 md；
          UI 专项批1：卡内「已完成」章删除——与顶部状态胶囊重复报状态（视觉评审 7.4 轮实锤），成功语义只留胶囊+浅绿描边 -->
     <div v-if="turn.bufText || turn.answerHtml" class="bub" :class="{ 'g-ok': turn.phase === 'done' && turn.toolCalls > 0 }">
@@ -373,6 +383,7 @@ import DataCard from './DataCard.vue';
 import FormCard from './FormCard.vue';
 import TemplateCard from './TemplateCard.vue';
 import PlanCard from './PlanCard.vue';
+import ElicitCard from './ElicitationCard.vue';
 // 批4回修 P2（两席共识）：异步组件——echarts（gzip ~300KB）只在回答真出现图占位时才下载，
 // 不随抽屉 chunk 人人必载；createVNode 支持异步组件，加载完成自动填充 host
 const ChartBlock = defineAsyncComponent(() => import('./ChartBlock.vue'));

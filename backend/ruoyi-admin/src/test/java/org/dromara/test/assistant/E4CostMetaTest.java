@@ -48,7 +48,7 @@ class E4CostMetaTest {
         ledger.accumulate("run-9", 456, new BigDecimal("0.0042"));
         // 闸开（gate isEnabled=true 才不进过滤分支）——直构 gate 不行（依赖 Spring 配置），
         // 用 null gate + isEnabled 语义不可控 → 改为验证 enrich 在 recorder/gate 均 null 时仍注入
-        AssistantEventEnricher enricher = new AssistantEventEnricher(null, null, ledger, null, null, null);
+        AssistantEventEnricher enricher = new AssistantEventEnricher(null, null, ledger, null, null, null, null);
         List<AguiEvent> events = new ArrayList<>(List.of(
             new AguiEvent.TextMessageContent("t", "run-9", "m1", "你好"),
             new AguiEvent.RunFinished("t", "run-9")));

@@ -192,6 +192,9 @@ export interface AssistantTurn {
   hitl: HitlAsk | null;
   /** 计划卡（P1-3）：CUSTOM plan 事件驱动；后端无触发源时恒 null 不渲染 */
   plan: { title?: string; steps: Array<{ label: string; state: 'pending' | 'run' | 'done' | 'edit' }> } | null;
+  /** G3-A1：MCP elicitation 反问卡（CUSTOM 'elicitation' 帧，run 内挂起随本回合走）；
+   *  作答走独立端点不走 resolveHitl；过期前端本地收卡（后端超时 CANCEL 兜底闭环） */
+  elicitations: import('@/api/dcs/assistant').AssistantElicitationCard[];
   /** 批5 Q7-3：LLM 生成的贴题追问（侧车异步回写消息行）；空=前端回退角色静态池 */
   followups?: string[];
   /** 自查回修：追问侧车三次拉取全部落空才置 true——「本轮未生成贴题追问」灰字只在这之后显示，
@@ -358,7 +361,8 @@ function emptyTurn(question: string): AssistantTurn {
     durMs: 0,
     toolCalls: 0,
     hitl: null,
-    plan: null
+    plan: null,
+    elicitations: []
   };
 }
 
@@ -685,6 +689,19 @@ export function useAssistant(options: UseAssistantOptions = {}) {
             }));
           if (steps.length > 0) {
             turn.plan = { title: typeof v.title === 'string' ? v.title : undefined, steps };
+          }
+        } else if (name === 'elicitation' && value && typeof value === 'object') {
+          // G3-A1：MCP 外部工具执行中反问（server 侧在飞挂起，run 保持 RUNNING）——
+          // 卡随本回合渲染，作答走独立端点（不走 resolveHitl/resume）；多 server 可同时反问
+          const v = value as { id?: unknown; serverName?: unknown; message?: unknown; requestedSchema?: unknown; expiresAt?: unknown };
+          if (typeof v.id === 'string' && v.id) {
+            turn.elicitations.push({
+              id: v.id,
+              serverName: typeof v.serverName === 'string' ? v.serverName : '',
+              message: typeof v.message === 'string' ? v.message : '',
+              requestedSchema: (v.requestedSchema && typeof v.requestedSchema === 'object' ? v.requestedSchema : {}) as Record<string, unknown>,
+              expiresAt: typeof v.expiresAt === 'number' ? v.expiresAt : Date.now() + 300_000
+            });
           }
         } else if (name === 'todo' && value && typeof value === 'object') {
           // ZCode 对齐 Q2（批B）：todo_write 整表替换清单——enricher 转发帧，

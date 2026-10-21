@@ -52,6 +52,8 @@ public class AssistantEventEnricher implements AguiEventEnricher {
     private final AssistantTodoSignal todoSignal;
     /** G1 乙类#2（#3104 事件源落地）：用户拒绝工具确认→动作账本 REJECTED 留痕 */
     private final org.dromara.assistant.service.AssistantActionService actionService;
+    /** G3-A1：MCP elicitation 反问卡——桥里挂起的卡信号在本批事件前转发 CUSTOM 帧 */
+    private final AssistantElicitationBridge elicitationBridge;
 
     @Override
     public List<AguiEvent> enrich(AgentEvent rawEvent, List<AguiEvent> events,
@@ -125,6 +127,19 @@ public class AssistantEventEnricher implements AguiEventEnricher {
                 out = new java.util.ArrayList<>(out);
                 out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(), "todo",
                     java.util.Map.of("items", items)));
+            }
+        }
+        // G3-A1：MCP elicitation 反问卡转发——server 反问时桥里挂起（tools/call 在飞），
+        // 卡信号搭本批事件出网（工具静默期=心跳批 ≤20s 到卡，E2E 断言按此口径）。
+        // 可能多张（多 server 同时反问），逐卡一帧；answer 走独立端点不走 resume
+        if (elicitationBridge != null && context != null && context.getThreadId() != null) {
+            java.util.List<java.util.Map<String, Object>> cards = elicitationBridge.take(context.getThreadId());
+            if (cards != null && !cards.isEmpty()) {
+                out = new java.util.ArrayList<>(out);
+                for (java.util.Map<String, Object> card : cards) {
+                    out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
+                        "elicitation", card));
+                }
             }
         }
         // CF-1（批I/J 补件，2026-10-06）：interrupt outcome 里每个 Interrupt 的 metadata 补

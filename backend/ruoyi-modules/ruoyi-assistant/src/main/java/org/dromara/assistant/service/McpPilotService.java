@@ -101,6 +101,9 @@ public class McpPilotService {
     @Value("${smartdock.mcp.allowed-http-hosts:localhost,127.0.0.1}")
     private String allowedHttpHosts;
 
+    /** G3-A1：elicitation 反问桥——STDIO 行注册 handler（挂起等用户作答），HTTP 行暂不开（sync handler 阻塞入站线程的滞留风险待真机观察） */
+    private final org.dromara.assistant.core.AssistantElicitationBridge elicitationBridge;
+
     /* ============================ 管理面 ============================ */
 
     public List<DcsMcpServer> listEnabledForPlatform() {
@@ -292,11 +295,18 @@ public class McpPilotService {
             Set<String> before = new LinkedHashSet<>(toolkit.getToolNames());
             McpClientWrapper raw = null;
             try {
+                // G3-A1：STDIO 行开 elicitation 反问桥。坑（调研实证）：requestTimeout
+                // 覆盖 tools/call 全程含等用户答题的时长——10s 不调大则用户答得再快也常超时。
+                // 注册 handler 才会向 server 声明 ClientCapabilities.elicitation（天然 opt-in，
+                // 不注册的行行为零变化）；timeout=答题上限+30s 往返余量
+                boolean stdio = "STDIO".equals(row.getTransportType());
                 McpClientBuilder builder = McpClientBuilder.create(row.getServerName())
-                    .timeout(Duration.ofSeconds(10))
+                    .timeout(Duration.ofSeconds(stdio ? elicitationBridge.elicitTimeoutSeconds() + 30L : 10))
                     .initializationTimeout(Duration.ofSeconds(10));
-                if ("STDIO".equals(row.getTransportType())) {
-                    builder.stdioTransport(row.getCommand(), parseArgs(row.getArgs()), Map.of());
+                if (stdio) {
+                    builder.stdioTransport(row.getCommand(), parseArgs(row.getArgs()), Map.of())
+                        .syncElicitation(req -> elicitationBridge.handle(
+                            row.getServerName(), tenantId, userId, aguiThreadId, req));
                 } else if ("STREAMABLE_HTTP".equals(row.getTransportType())) {
                     builder.streamableHttpTransport(row.getUrl());
                 } else {

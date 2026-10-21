@@ -253,6 +253,22 @@ export function getConversationTodo(threadId: string) {
   return request<AssistantTodoItem[]>({ url: '/dcs/assistant/conversation/todo', method: 'get', params: { threadId } });
 }
 
+/** G3-A1：MCP elicitation 反问卡（CUSTOM 'elicitation' 帧载荷，bridge cardPayload 同构） */
+export interface AssistantElicitationCard {
+  id: string;
+  serverName: string;
+  message: string;
+  requestedSchema: Record<string, unknown>;
+  expiresAt: number;
+}
+
+/** G3-A1：反问作答——与权限 HITL 的 resume 分轨，独立端点回填三态
+ *  （accept=提交表单 / decline=拒绝提供 / cancel=关闭） */
+export function answerElicitation(threadId: string, id: string, action: 'accept' | 'decline' | 'cancel', content?: Record<string, unknown>) {
+  return request({ url: '/dcs/assistant/elicitation/answer', method: 'post',
+    data: { threadId, id, action, content: content ?? {} } });
+}
+
 /** 批5 Q7-3：本会话最新回答的 LLM 追问建议（回答完成后延时拉一次；空=回退静态池）。
  *  泛型=整个 body（request 层不脱壳，getConversationTodo 同款）；messageId 是字符串——
  *  雪花 19 位超 JS 安全整数，后端 BigNumberSerializer 序列化为 string */
@@ -422,7 +438,8 @@ export function getPendingHitl(threadId: string) {
 }
 
 /** 批7 Q5/Q12-④：用户侧模型自选视图（dcs:assistant:use 普通用户权限）
- *  开关关时 options 空（防探测）；开时=本租户可用 CHAT 行（★排最前+单价，key 已掩码） */
+ *  开关关时 options 空（防探测）；开时=本租户可用 CHAT 行（★排最前+单价，key 全清空不下发——
+ *  批8-3 口径，管理端 /options 才有掩码） */
 export interface AssistantModelChoice {
   allowUserSwitch: string;
   assistantDefaultConfigId: number | string | null;
