@@ -701,6 +701,11 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         if (!ENABLED.equals(config.getEnabled())) {
             throw new ServiceException("指定的 AI 模型配置已停用");
         }
+        // G2 三审回修（dspro P2-4）：用途闸——当前调用方（助手对话/后台任务）全按 CHAT 槽
+        // 消费；管理员把默认行 useType 改成 EMBEDDING 后若仍放行，对话会跑嵌入模型且徽标不自洽
+        if (!"CHAT".equals(config.getUseType())) {
+            throw new ServiceException("指定的 AI 模型配置不是对话模型");
+        }
         enforceCnyGate(config);
         hydrate(config);
         return config;

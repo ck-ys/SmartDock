@@ -73,9 +73,14 @@ public final class AssistantModelChoiceHolder {
      * 业务批5 Q4-A（2026-10-13 拍板）：默认感知指纹 = 自选白名单 + 助手默认指向。
      * 管理员换助手默认模型后，该租户所有缓存会话下一次请求指纹失配 → 失效重建，
      * 不再吃满 60 分钟会话超时才生效（scopeFingerprint 同机制扩一段；建/比两侧必须同用本方法）。
+     * G2 三审回修（dspro P1-2）：usableSignature（可用 CHAT 行 configId:星标 签名）拼第三段
+     * ——scope/默认 ID 都不变但星标切换/默认行停用时，实际生效模型已变，旧指纹抓不住
+     * （缓存 agent 继续跑旧模型最长 60 分钟、徽标却显示新名字的"看 A 跑 B"）。
      */
-    public static String defaultAwareFingerprint(java.util.Set<Long> scopeIds, Long assistantDefaultConfigId) {
-        return scopeFingerprint(scopeIds) + "|def:" + (assistantDefaultConfigId == null ? "" : assistantDefaultConfigId);
+    public static String defaultAwareFingerprint(java.util.Set<Long> scopeIds, Long assistantDefaultConfigId,
+                                                 String usableSignature) {
+        return scopeFingerprint(scopeIds) + "|def:" + (assistantDefaultConfigId == null ? "" : assistantDefaultConfigId)
+            + "|sig:" + (usableSignature == null ? "" : usableSignature);
     }
 
     /** AgentFactory 建 agent 后回写本次基准（picked 原值；null=本次按默认链建，记哨兵 0） */

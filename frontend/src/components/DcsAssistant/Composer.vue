@@ -312,14 +312,15 @@
             </template>
           </div>
         </div>
-        <!-- G2 问题②（拍板 Q2=A）：自选关时的只读徽标——管理员不开「允许用户自选」时，
-             原先输入条上没有任何模型指示（用户不知道在跟哪个模型说话）。纯展示无交互：
-             名字来自后端 defaultModelName（options 恒空防探测口径不变），无弹层无 chevron -->
+        <!-- G2 问题②（拍板 Q2=A）：只读徽标——自选关（或自选开但白名单圈光无选项，
+             三审回修 P2-⑥：双空档也要有模型指示）时展示当前生效默认模型。纯展示无交互：
+             名字来自后端 defaultModelName，无弹层无 chevron；title 三态（三审回修 P2-④：
+             默认行不可用/无设置行/管理员设置 分别成话，不再一律归因管理员） -->
         <div
           v-else-if="defaultBadgeOn"
           class="btool bpill mpill mlock"
-          :title="`当前使用管理员设置的默认模型（${defaultBadgeLabel}），更换请联系管理员`"
-          aria-label="当前默认模型"
+          :title="defaultBadgeTitle"
+          :aria-label="`当前默认模型：${defaultBadgeLabel}`"
         >
           <IconSpan name="package" :size="14" />
           <span class="tlabel">{{ defaultBadgeLabel }}</span>
@@ -1515,11 +1516,22 @@ function pickThink(i: number) {
 const modelChoice = ref<AssistantModelChoice | null>(null);
 const modelPopOpen = ref(false);
 const choiceOn = computed(() => modelChoice.value?.allowUserSwitch === '1' && (modelChoice.value?.options?.length ?? 0) > 0);
-/** G2 问题②：自选关+后端下发默认模型名 → 只读徽标（防探测口径下 options 空，名字走独立字段） */
-const defaultBadgeOn = computed(
-  () => modelChoice.value?.allowUserSwitch !== '1' && !!modelChoice.value?.defaultModelName
-);
+/** G2 问题②：自选关（或自选开但白名单圈光无选项——三审回修 P2-⑥ 双空档）+
+ *  后端下发默认模型名 → 只读徽标（防探测口径下 options 空，名字走独立字段） */
+const defaultBadgeOn = computed(() => !choiceOn.value && !!modelChoice.value?.defaultModelName);
 const defaultBadgeLabel = computed(() => modelChoice.value?.defaultModelName ?? '');
+/** 三审回修（dspro P2-④）：title 三态——默认行不可用 / 无设置行（平台默认兜底）/
+ *  管理员真设置过，各自成话，不再一律归因「管理员设置」误导排障 */
+const defaultBadgeTitle = computed(() => {
+  const name = defaultBadgeLabel.value;
+  if (modelChoice.value?.defaultSelectable === false) {
+    return `管理员设置的默认模型当前不可用，实际使用 ${name}，请联系管理员处理`;
+  }
+  if (!modelChoice.value?.assistantDefaultConfigId) {
+    return `当前跟随平台默认模型（${name}），如需更换请联系管理员设置默认模型`;
+  }
+  return `当前使用管理员设置的默认模型（${name}），更换请联系管理员`;
+});
 const modelOptions = computed(() => modelChoice.value?.options ?? []);
 /**
  * 批B 三审 P1：模型选项按厂商 find-or-create 累积分组（同 admin 页算法）。
@@ -1636,12 +1648,19 @@ async function refreshCapability() {
     thinkSupported.value = true;
   }
 }
+/** 三审回修（dspro P2-1）：请求序号——切线程/答完/重开抽屉可能并发拉取，旧响应后到
+ *  不得覆盖新响应（否则徽标/药丸回退到更旧的配置快照） */
+let choiceSeq = 0;
 async function refreshChoice() {
   if (!amActive()) {
     return;
   }
+  const seq = ++choiceSeq;
   try {
     const d = unwrap<AssistantModelChoice>((await getAssistantModelChoice()) as any);
+    if (seq !== choiceSeq) {
+      return; // 过期响应丢弃
+    }
     modelChoice.value = {
       allowUserSwitch: d?.allowUserSwitch ?? '0',
       assistantDefaultConfigId: d?.assistantDefaultConfigId ?? null,
@@ -1668,7 +1687,8 @@ async function refreshChoice() {
     readPin();
     void refreshCapability();
   } catch {
-    /* 拉不到=不显示选择器，维持现状（思考档保显示） */
+    /* 拉不到=不显示选择器，维持现状（思考档保显示）；失败不清旧值但也不新写——
+       下次触发（重开抽屉/答完/切线程）自愈，避免无限期把过期名字当事实展示 */
   }
 }
 watch(
@@ -1706,10 +1726,14 @@ const modelBtnLabel = computed(() => {
   }
   return effectiveRow.value ? `默认·${effectiveRow.value.modelName}` : '默认模型';
 });
-const defaultModelLabel = computed(
-  // G2：默认行被裁出自选白名单时 effectiveRow 兜不中——用后端下发的默认名再兜一层
-  () => effectiveRow.value?.modelName ?? modelChoice.value?.defaultModelName ?? '管理员设置的默认模型'
-);
+const defaultModelLabel = computed(() => {
+  // 三审回修（三席共识死兜底）：优先按默认 ID 在 options 里命中真名——旧实现恒走
+  // effectiveRow（pin 行或 opts[0]），pin 场景显示 pin 模型、默认行不在白名单时拿
+  // opts[0] 顶包，defaultModelName 兜底层永远不可达
+  const defId = modelChoice.value?.assistantDefaultConfigId;
+  const hit = defId != null ? modelOptions.value.find((o) => String(o.configId) === String(defId)) : null;
+  return hit?.modelName ?? modelChoice.value?.defaultModelName ?? effectiveRow.value?.modelName ?? '管理员设置的默认模型';
+});
 /** 弹层行单价副句（FIXED=元/次；TOKEN=输入单价/百万；未配置=空串） */
 function modelPriceLine(o: {
   billingMode?: string;
@@ -2541,14 +2565,19 @@ defineExpose({
     border-color: #f3d19e;
     color: #b88230;
   }
-  /* G2 问题②：默认模型只读徽标——非交互态：去 hover 上浮、灰字弱化但可见 */
+  /* G2 问题②：默认模型只读徽标——非交互态：去 hover 上浮、灰字弱化但可见。
+     三审回修（dspro P1-1）：可收缩让位——带技能胶囊时窄屏行宽超内容盒，flex:none
+     会把发送键挤出视口；徽标优先让位（文字收缩到 ellipsis），title 保底全名 */
   .bpill.mpill.mlock {
     cursor: default;
     color: var(--dcs-text-secondary, #909399);
+    flex: 0 1 auto;
+    min-width: 0;
   }
   .bpill.mpill.mlock:hover {
     transform: none;
     background: transparent;
+    color: var(--dcs-text-secondary, #909399);
   }
   /* ---- R1（2026-10-13）：联网一步钮（用户提议放 ➕ 旁）——开态蓝底即状态显示，
          原「联网 ✕」状态签(.wpill)同批撤并；未开放时维持灰态不给蓝（禁用语义不点亮） ---- */
@@ -3261,6 +3290,9 @@ defineExpose({
   .brow .bpill.mpill.mlock .tlabel {
     display: inline;
     max-width: 64px;
+    /* 三审回修（dspro P1-1）：允许收缩——窄屏+技能胶囊组合下行满时文字让位
+       到 ellipsis 乃至 0（回到图标态），发送键永不被挤出去 */
+    min-width: 0;
   }
 }
 /* 业务批3-④ #17：➕面板联网行 + 迷你开关（原型 v1.6 简单版开关=纯 CSS 滑块）。

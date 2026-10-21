@@ -80,13 +80,30 @@ public class AssistantModelSettingService {
      * 业务批5 回修（glm53 P2-2/dspro P2-2）：一次 raw() 同取白名单+默认指向——AGUI 热路径
      * 建侧（AgentFactory）与比侧（Resolver）原来各查两次同表 selectOne，且两次独立读间改值
      * 会产生"半新半旧指纹"（至多多一次重建，自愈但可消除）；组合读天然同帧一致。
+     * G2 三审回修（dspro P1-2）：usableSignature=可用 CHAT 行 (configId,星标) 签名——星标切换/
+     * 行停用/新增/删除/价格目录变化都会改签名，拼进指纹后缓存 agent 不再"看 A 跑 B"60 分钟。
      */
-    public record ScopeAndDefault(java.util.Set<Long> scopeIds, Long defaultConfigId) {
+    public record ScopeAndDefault(java.util.Set<Long> scopeIds, Long defaultConfigId, String usableSignature) {
     }
 
     public ScopeAndDefault scopeAndDefault(String tenantId) {
         SettingView v = view(tenantId);
-        return new ScopeAndDefault(parseScopeIds(tenantId, v.switchScope()), v.assistantDefaultConfigId());
+        return new ScopeAndDefault(parseScopeIds(tenantId, v.switchScope()), v.assistantDefaultConfigId(),
+            usableChatSignature(tenantId));
+    }
+
+    /** 可用 CHAT 行签名：稳定排序后 (configId:星标) 拼接。查询失败兜底空串（比侧失配至多
+     * 多一次重建，自愈；不阻塞会话链路） */
+    private String usableChatSignature(String tenantId) {
+        try {
+            return aiConfigService.listAssistantSelectableWithPrice(tenantId, "CHAT").stream()
+                .map(vo -> vo.getConfigId() + ":" + (vo.getIsDefault() == null ? "" : vo.getIsDefault()))
+                .sorted()
+                .collect(java.util.stream.Collectors.joining(";"));
+        } catch (Exception e) {
+            log.warn("[ModelSetting] 可用模型签名查询失败（指纹兜底空串，至多多一次重建）：{}", e.getMessage());
+            return "";
+        }
     }
 
     /** 白名单集合便捷读（既有 API 保持；内部走组合读不重复查库） */

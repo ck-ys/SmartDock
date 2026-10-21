@@ -115,4 +115,24 @@ class G1DisciplineAndFingerprintTest {
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild("g1-other-thread", f1), "未建线程不算失效");
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild(null, f1), "null 线程安全返回 false");
     }
+
+    /** G2 三审回修（dspro P1-2）：可用行签名段——星标切换/行停用必须令指纹失配（看 A 跑 B 修复） */
+    @Test
+    void defaultAwareFingerprintIncludesUsableSignature() {
+        java.util.Set<Long> scope = java.util.Set.of(1L, 2L);
+        // 同 scope 同默认：签名一致=同指纹；星标从 1 号换到 2 号=签名变=指纹变
+        String sigA = "1:Y;2:N";
+        String sigB = "1:N;2:Y";
+        assertEquals(AssistantModelChoiceHolder.defaultAwareFingerprint(scope, null, sigA),
+            AssistantModelChoiceHolder.defaultAwareFingerprint(scope, null, sigA),
+            "同签名同指纹");
+        org.junit.jupiter.api.Assertions.assertNotEquals(
+            AssistantModelChoiceHolder.defaultAwareFingerprint(scope, null, sigA),
+            AssistantModelChoiceHolder.defaultAwareFingerprint(scope, null, sigB),
+            "星标切换（默认 ID 未变）必须令指纹失配——缓存 agent 失效重建");
+        org.junit.jupiter.api.Assertions.assertNotEquals(
+            AssistantModelChoiceHolder.defaultAwareFingerprint(scope, null, sigA),
+            AssistantModelChoiceHolder.defaultAwareFingerprint(scope, null, ""),
+            "行停用（可用集缩水=签名变）必须令指纹失配");
+    }
 }

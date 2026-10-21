@@ -125,7 +125,7 @@ public class AssistantAgentFactory {
             modelSettingService.scopeAndDefault(user.getTenantId());
         org.dromara.assistant.core.AssistantModelChoiceHolder.markScopeBuilt(aguiThreadId,
             org.dromara.assistant.core.AssistantModelChoiceHolder.defaultAwareFingerprint(
-                sd.scopeIds(), sd.defaultConfigId()));
+                sd.scopeIds(), sd.defaultConfigId(), sd.usableSignature()));
         // 业务批3-④: 联网开关同款回写——工具集随开关增删, resolver 对比判缓存失效
         org.dromara.assistant.core.AssistantWebSearchHolder.markBuilt(aguiThreadId,
             org.dromara.assistant.core.AssistantWebSearchHolder.isOn(aguiThreadId));

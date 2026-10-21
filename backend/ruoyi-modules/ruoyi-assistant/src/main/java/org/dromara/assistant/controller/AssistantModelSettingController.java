@@ -48,7 +48,7 @@ public class AssistantModelSettingController extends BaseController {
     /**
      * 批7 Q5 消费端：用户侧模型自选视图（普通用户权限 dcs:assistant:use，输入条模型选择器数据源）。
      * 开关关时 options 恒空（不暴露模型清单防探测）；开时=本租户可用 CHAT 行（★排最前+单价，
-     * apiKey 已掩码），assistantDefaultConfigId 供前端标注「跟随默认」的指向。
+     * apiKey 全清空不下发——批8-3 口径，管理端 /options 才有掩码），assistantDefaultConfigId 供前端标注「跟随默认」的指向。
      */
     @SaCheckPermission("dcs:assistant:use")
     @GetMapping("/model-choice")

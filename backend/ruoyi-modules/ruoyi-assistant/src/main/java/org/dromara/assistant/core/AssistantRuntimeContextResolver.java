@@ -158,7 +158,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         boolean rebuildNeeded = AssistantModelChoiceHolder.needsRebuild(aguiThreadId)
             || AssistantWebSearchHolder.needsRebuild(aguiThreadId)
             || AssistantModelChoiceHolder.needsScopeRebuild(aguiThreadId,
-                AssistantModelChoiceHolder.defaultAwareFingerprint(sd.scopeIds(), sd.defaultConfigId()))
+                AssistantModelChoiceHolder.defaultAwareFingerprint(sd.scopeIds(), sd.defaultConfigId(), sd.usableSignature()))
             // G1 遗留#3：工具闸/记忆/压缩配置变化同样失效重建（与 Factory 建侧同源指纹）。
             // 三审回修（dspro P1-5）：比对侧必须用 Factory 落标同款租户源（user 登录快照）——
             // 原用 resolveTenantId 的动态租户，超管切租户且两租户配置有差时每请求恒失配=空转重建
