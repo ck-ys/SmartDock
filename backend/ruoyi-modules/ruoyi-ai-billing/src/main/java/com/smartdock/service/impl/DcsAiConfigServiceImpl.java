@@ -282,7 +282,12 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
                 return;
             }
             if (StrUtil.isBlank(bo.getBaseUrl())) {
-                throw new ServiceException("该厂商首次配置，必须填写接口地址");
+                // 批1：标准厂商空地址=按官方默认接入（模型表单首配路径同口径）；自定义厂商须手填
+                String preset = DcsAiProvider.defaultBaseUrl(bo.getProvider());
+                if (preset == null) {
+                    throw new ServiceException("自定义厂商首次配置，必须填写接口地址");
+                }
+                bo.setBaseUrl(preset);
             }
             DcsAiProviderAccess entity = new DcsAiProviderAccess();
             entity.setTenantId(bo.getTenantId());

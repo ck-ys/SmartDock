@@ -103,7 +103,12 @@ public class DcsAiProviderAccessServiceImpl implements IDcsAiProviderAccessServi
             throw new ServiceException("暂不支持该模型厂商");
         }
         if (StrUtil.isBlank(bo.getBaseUrl())) {
-            throw new ServiceException("接口地址不能为空");
+            // 批1：标准厂商空地址=按官方默认接入（选了厂商不该让人手填 URL）；自定义厂商仍须手填
+            String preset = DcsAiProvider.defaultBaseUrl(bo.getProvider());
+            if (preset == null) {
+                throw new ServiceException("自定义厂商必须填写接口地址");
+            }
+            bo.setBaseUrl(preset);
         }
         if (StrUtil.isBlank(bo.getTenantId())) {
             throw new ServiceException("租户编号不能为空");
@@ -191,7 +196,12 @@ public class DcsAiProviderAccessServiceImpl implements IDcsAiProviderAccessServi
             throw new ServiceException("暂不支持该模型厂商");
         }
         if (StrUtil.isBlank(bo.getBaseUrl())) {
-            throw new ServiceException("接口地址不能为空");
+            // 批1：标准厂商空地址=按官方默认接入；自定义厂商仍须手填（同 updateAccess）
+            String preset = DcsAiProvider.defaultBaseUrl(bo.getProvider());
+            if (preset == null) {
+                throw new ServiceException("自定义厂商必须填写接口地址");
+            }
+            bo.setBaseUrl(preset);
         }
         if (StrUtil.isBlank(bo.getTenantId())) {
             throw new ServiceException("租户编号不能为空");

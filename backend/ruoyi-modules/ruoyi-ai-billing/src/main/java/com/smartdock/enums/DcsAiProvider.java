@@ -58,4 +58,17 @@ public enum DcsAiProvider {
     public static boolean supported(String value) {
         return Arrays.stream(values()).anyMatch(p -> p.name().equals(value));
     }
+
+    /**
+     * 批1（2026-10-21 钥匙管理需求）：标准厂商地址自动接入——选了厂商就不该让人手填 URL。
+     * 标准厂商返回官方默认地址（供空地址保存时自动补齐）；自定义/未知厂商返回 null（必须手填）。
+     */
+    public static String defaultBaseUrl(String provider) {
+        try {
+            DcsAiProvider p = valueOf(provider);
+            return p == CUSTOM ? null : p.getBaseUrl();
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return null;
+        }
+    }
 }
