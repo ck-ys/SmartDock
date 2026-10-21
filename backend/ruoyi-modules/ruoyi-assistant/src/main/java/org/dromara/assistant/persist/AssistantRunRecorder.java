@@ -954,6 +954,12 @@ public class AssistantRunRecorder {
 
     /** 收割路径取 run 租户（步骤掩码用；查不到返回 null 由掩码侧跳过） */
     private String tenantOfRun(String runId) {
+        // 纯函数单测装配 service 为 null：诊断/计数跳过即可，不得连坐吞掉 finishRun
+        // 的缓冲清除（60bb33e 起本方法被 finishRun 首行同步调用，无守卫时 NPE 先于
+        // stepBuffers/thinkBuffers 清除抛出，终态缓冲滞留=Q5 单测实锤回归）
+        if (conversationService == null) {
+            return null;
+        }
         DcsAssistantRun run = conversationService.runByRunId(runId);
         return run == null ? null : run.getTenantId();
     }
