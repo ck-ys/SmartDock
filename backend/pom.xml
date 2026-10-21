@@ -126,7 +126,7 @@
             <dependency>
                 <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-bom</artifactId>
-                <version>2.0.3</version>
+                <version>2.0.4</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -503,7 +503,7 @@
                     <!-- JDK21 上 Mockito 的 inline mock maker 无法可靠 self-attach，
                          预挂 byte-buddy-agent 让其在测试 fork JVM 里直接以 agent 方式工作（DCS 单测唯一用到 Mockito 的是 DcsScheduleNoticePublisherUnitTest）。
                          版本须与 mockito 拉入的 byte-buddy-agent 一致（当前 1.17.8）。 -->
-                    <argLine>-Dfile.encoding=UTF-8 -Duser.timezone=GMT+8 -javaagent:${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.17.8/byte-buddy-agent-1.17.8.jar</argLine>
+                    <argLine>-Dfile.encoding=UTF-8 -Duser.timezone=GMT+8 -javaagent:"${settings.localRepository}/net/bytebuddy/byte-buddy-agent/1.17.8/byte-buddy-agent-1.17.8.jar"</argLine>
                     <!-- 根据打包环境执行对应的@Tag测试方法；P0 批0 起抽成独立属性，命令行 -Dsurefire.groups=p0probe 可覆盖（原 ${profiles.active} 被 XML 显式引用，-Dgroups 盖不动=探针静默 0 跑，R-05 实锤） -->
                     <groups>${surefire.groups}</groups>
                     <!-- 排除标签 -->
