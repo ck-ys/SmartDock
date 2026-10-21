@@ -269,11 +269,13 @@ public class ProfileScoreEngine {
         } catch (Exception ignored) {
             // 无租户上下文
         }
-        try {
-            return LoginHelper.getTenantId();
-        } catch (Exception e) {
-            return "000000";
+        String login = LoginHelper.getTenantId();
+        // 批11 回修(终审 P1): LoginHelper 不抛异常只回 null——死 catch 导致静默 null,
+        // 必须判空后再 fail-fast
+        if (StringUtils.isNotBlank(login)) {
+            return login;
         }
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 
     /**

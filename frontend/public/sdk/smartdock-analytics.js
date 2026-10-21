@@ -41,6 +41,8 @@
   var config = {
     siteKey: '',
     endpoint: '/analytics/collect',
+    // 批11 Q3: 站点开了强制验签时配 secret——每批上报带 HMAC-SHA256 签名(时间戳+nonce+整包)
+    secret: '',
     autoPageView: true,
     sessionGapMs: SESSION_GAP_MS,
     debug: false
@@ -330,30 +332,52 @@
    * 发送一批。done(outcome)：'ok'=已入账 / 'rejected'=确定性拒绝不重试 / 'failed'=可重试。
    * R 信封语义：HTTP 200 但业务 code 可能非 200——必须看 body.code，不能只看 res.ok。
    */
-  function sendBatch(batch, useBeacon, done) {
-    var payload = { siteKey: config.siteKey, events: batch };
-    var body = JSON.stringify(payload);
-    if (useBeacon && navigator.sendBeacon) {
-      try {
-        var blob = new Blob([body], { type: 'application/json' });
-        if (navigator.sendBeacon(config.endpoint, blob)) {
-          // 页面即将卸载，beacon 无法读响应：乐观视为成功；万一实际失败由 eventUid 幂等兜底
-          done('ok');
-          return;
-        }
-      } catch (e) {
-        /* sendBeacon 抛错继续走 fetch */
-      }
-      /* sendBeacon 返回 false（队列满/限制）→ keepalive fetch 兜底 */
+  /**
+   * 批11 Q3: 配置了 secret 时对整包做 HMAC-SHA256 签名, 返回三头。
+   * 签名串与服务端一致: timestamp + "\n" + nonce + "\n" + siteKey + "\n" + 原始报文体。
+   * 无 WebCrypto(老浏览器/非安全上下文)或签名异常时返回 null 降级明文——
+   * 站点若强制验签, 降级批会被服务端确定性拒收(dropped=signature_*), 不进离线重试。
+   */
+  function signBody(body) {
+    var subtle = window.crypto && window.crypto.subtle;
+    if (!subtle) {
+      log('当前环境无 WebCrypto, 无法签名, 降级明文上报');
+      return Promise.resolve(null);
     }
+    var ts = String(Date.now());
+    var nonce = uuid();
+    var data = ts + '\n' + nonce + '\n' + config.siteKey + '\n' + body;
+    var enc = new TextEncoder();
+    return subtle
+      .importKey('raw', enc.encode(config.secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+      .then(function (key) {
+        return subtle.sign('HMAC', key, enc.encode(data));
+      })
+      .then(function (sig) {
+        var hex = Array.prototype.map.call(new Uint8Array(sig), function (b) {
+          return (b < 16 ? '0' : '') + b.toString(16);
+        }).join('');
+        return { 'X-SD-Timestamp': ts, 'X-SD-Nonce': nonce, 'X-SD-Signature': hex };
+      })
+      .catch(function (err) {
+        log('签名失败, 降级明文上报', err);
+        return null;
+      });
+  }
+
+  function sendViaFetch(body, extraHeaders, done) {
     if (!window.fetch) {
       done('failed');
       return;
     }
+    var headers = { 'Content-Type': 'application/json' };
+    if (extraHeaders) {
+      for (var h in extraHeaders) headers[h] = extraHeaders[h];
+    }
     window
       .fetch(config.endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         body: body,
         credentials: 'omit',
         keepalive: true
@@ -368,7 +392,7 @@
             if (envelope && envelope.code === 200) {
               done('ok');
             } else if (envelope && envelope.data && envelope.data.dropped) {
-              // 服务端明确拒收（机器人/跨域等），重试只会循环，丢弃
+              // 服务端明确拒收（机器人/跨域/签名等），重试只会循环，丢弃
               log('服务端拒收本批（dropped=' + envelope.data.dropped + '），不重试');
               done('rejected');
             } else {
@@ -384,6 +408,37 @@
         log('send failed', err);
         done('failed');
       });
+  }
+
+  function sendBatch(batch, useBeacon, done) {
+    var payload = { siteKey: config.siteKey, events: batch };
+    var body = JSON.stringify(payload);
+    // 配置了 secret: 一律签名 fetch(sendBeacon 带不了自定义头, 直接跳过 beacon 路径)
+    if (config.secret) {
+      signBody(body).then(
+        function (headers) {
+          sendViaFetch(body, headers, done);
+        },
+        function () {
+          sendViaFetch(body, null, done);
+        }
+      );
+      return;
+    }
+    if (useBeacon && navigator.sendBeacon) {
+      try {
+        var blob = new Blob([body], { type: 'application/json' });
+        if (navigator.sendBeacon(config.endpoint, blob)) {
+          // 页面即将卸载，beacon 无法读响应：乐观视为成功；万一实际失败由 eventUid 幂等兜底
+          done('ok');
+          return;
+        }
+      } catch (e) {
+        /* sendBeacon 抛错继续走 fetch */
+      }
+      /* sendBeacon 返回 false（队列满/限制）→ keepalive fetch 兜底 */
+    }
+    sendViaFetch(body, null, done);
   }
 
   function flush(useBeacon) {
@@ -484,6 +539,8 @@
       options = options || {};
       config.siteKey = options.siteKey || config.siteKey;
       config.endpoint = options.endpoint || config.endpoint;
+      // 批11 回修(终审 P1): secret 没接线签名功能不可达——init 必须可配
+      config.secret = options.secret || config.secret || '';
       config.autoPageView = options.autoPageView !== false;
       config.debug = options.debug === true;
       if (options.sessionGapMinutes !== undefined && options.sessionGapMinutes !== null) {
@@ -524,7 +581,7 @@
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') flush(true);
       });
-      log('started', config);
+      log('started', { siteKey: config.siteKey, endpoint: config.endpoint, secret: config.secret ? '***' : '', autoPageView: config.autoPageView });
       return api;
     },
 
@@ -601,6 +658,8 @@
         debug: script.getAttribute('data-debug') === 'true'
       };
       if (script.getAttribute('data-consent') === 'false') autoOptions.consent = false;
+      var autoSecret = script.getAttribute('data-secret');
+      if (autoSecret) autoOptions.secret = autoSecret;
       api.init(autoOptions);
     }
   }

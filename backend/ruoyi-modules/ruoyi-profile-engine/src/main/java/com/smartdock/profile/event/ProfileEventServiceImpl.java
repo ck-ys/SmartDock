@@ -370,11 +370,11 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         } catch (Exception ignored) {
             // 无租户上下文
         }
-        try {
-            return LoginHelper.getTenantId();
-        } catch (Exception e) {
-            // 非登录上下文(定时任务/系统灌数)缺省默认租户
-            return "000000";
+        String login = LoginHelper.getTenantId();
+        // 批11 回修(终审 P1): LoginHelper 不抛异常只回 null——死 catch 导致静默 null
+        if (login != null && !login.isBlank()) {
+            return login;
         }
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 }

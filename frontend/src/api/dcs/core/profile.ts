@@ -887,3 +887,78 @@ export const listIdentityMerges = (source?: string, subject?: string): Promise<P
 
 export const unmergeIdentity = (mergeId: string): Promise<{ eventsReassigned: number; derivedReplayed: boolean }> =>
   r<{ eventsReassigned: number; derivedReplayed: boolean }>({ url: `${BASE}/identity/unmerge/${mergeId}`, method: 'post' });
+
+// ==================== 批11 合规中心：PII 清单 / 主体删除向导 / 导出审计 ====================
+
+export interface ProfilePiiField {
+  fieldKey: string;
+  maskRule: string;
+  remark?: string;
+  enabled: string;
+}
+
+export interface ProfileDeletionPreview {
+  events: number;
+  archives: number;
+  sessions: number;
+  links: number;
+  snapshots: number;
+  members: number;
+  reviews: number;
+  subjects: number;
+  visitorKeys: string[];
+  minOccurred: string | null;
+  maxOccurred: string | null;
+  rebuildDays: number;
+  deletable: boolean;
+  warning?: string;
+}
+
+export interface ProfileDeletionLogRow {
+  logId: string;
+  source: string;
+  subjectType: string;
+  subjectId: string;
+  status: string;
+  eventsDeleted: number;
+  archivesDeleted: number;
+  sessionsDeleted: number;
+  daysRebuilt: number;
+  errorMsg?: string;
+  executedAt: string;
+  createBy?: number;
+  preview?: string;
+}
+
+export interface ProfileExportLogRow {
+  logId: string;
+  source: string;
+  segmentId: string;
+  segmentName?: string;
+  rowCount: number;
+  masked: string;
+  fileHash?: string;
+  exportBy?: number;
+  exportAt: string;
+}
+
+export const listPiiFields = (): Promise<ProfilePiiField[]> =>
+  r<ProfilePiiField[]>({ url: `${BASE}/pii/fields`, method: 'get' });
+
+export const savePiiField = (data: ProfilePiiField): Promise<ProfilePiiField> =>
+  r<ProfilePiiField>({ url: `${BASE}/pii/fields`, method: 'post', data });
+
+export const deletePiiField = (fieldKey: string): Promise<void> =>
+  r<void>({ url: `${BASE}/pii/fields/${encodeURIComponent(fieldKey)}`, method: 'delete' });
+
+export const previewDeletion = (source: string, subjectType: string, subjectId: string): Promise<ProfileDeletionPreview> =>
+  r<ProfileDeletionPreview>({ url: `${BASE}/deletion/preview`, method: 'get', params: { source, subjectType, subjectId } });
+
+export const executeDeletion = (data: { source: string; subjectType: string; subjectId: string; confirmText: string }): Promise<Record<string, any>> =>
+  r<Record<string, any>>({ url: `${BASE}/deletion/execute`, method: 'post', data });
+
+export const listDeletionLogs = (): Promise<ProfileDeletionLogRow[]> =>
+  r<ProfileDeletionLogRow[]>({ url: `${BASE}/deletion/logs`, method: 'get' });
+
+export const listExportLogs = (): Promise<ProfileExportLogRow[]> =>
+  r<ProfileExportLogRow[]>({ url: `${BASE}/export/logs`, method: 'get' });

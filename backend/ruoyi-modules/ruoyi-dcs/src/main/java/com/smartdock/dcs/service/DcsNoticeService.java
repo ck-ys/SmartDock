@@ -104,10 +104,11 @@ public class DcsNoticeService {
         } catch (Exception ignored) {
             // 无租户上下文
         }
-        try {
-            return LoginHelper.getTenantId();
-        } catch (Exception e) {
-            return "000000";
+        String login = LoginHelper.getTenantId();
+        // 批11 回修(终审 P1): LoginHelper 不抛异常只回 null——判空后 fail-fast, 不再静默默认租户
+        if (login != null && !login.isBlank()) {
+            return login;
         }
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 }

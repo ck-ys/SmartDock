@@ -90,8 +90,23 @@ public class ProfileRecalcTrigger {
             return;
         }
         if (!acquired) {
-            // 另一实例正在算同一主体: 结果幂等, 跳过省算力
-            return;
+            // 另一实例正在算同一主体: 结果幂等, 跳过省算力——但持锁者读取点可能早于刚提交的事件,
+            // 短等一轮再试一次(批11 Q7), 仍拿不到才放弃(下个事件自愈)
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            try {
+                acquired = lock.tryLock(0, ProfileLocks.RECALC_LEASE_MINUTES, TimeUnit.MINUTES);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            if (!acquired) {
+                return;
+            }
         }
         try {
             TenantHelper.dynamic(tenantId, () -> scoreEngine.recalcSubject(source, subjectType, subjectId));

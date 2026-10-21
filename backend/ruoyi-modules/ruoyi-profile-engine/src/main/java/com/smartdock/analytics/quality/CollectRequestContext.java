@@ -7,11 +7,15 @@ package com.smartdock.analytics.quality;
  * @param origin Origin 头（跨域上报才有）
  * @param referer Referer 头
  * @param clientIp 客户端 IP（限流/哈希/地域用，明文不落库）
+ * @param signTimestamp 签名时间戳头 X-SD-Timestamp（epoch 毫秒，批11 Q3）
+ * @param signNonce 签名一次性随机数头 X-SD-Nonce
+ * @param signSignature HMAC-SHA256 签名头 X-SD-Signature（hex 小写）
  * @author smartdock
  */
-public record CollectRequestContext(String userAgent, String origin, String referer, String clientIp) {
+public record CollectRequestContext(String userAgent, String origin, String referer, String clientIp,
+                                    String signTimestamp, String signNonce, String signSignature) {
 
     public static CollectRequestContext empty() {
-        return new CollectRequestContext(null, null, null, null);
+        return new CollectRequestContext(null, null, null, null, null, null, null);
     }
 }

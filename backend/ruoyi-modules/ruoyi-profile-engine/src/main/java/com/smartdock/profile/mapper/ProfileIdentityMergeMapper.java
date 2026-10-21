@@ -38,6 +38,8 @@ public interface ProfileIdentityMergeMapper extends BaseMapperPlus<ProfileIdenti
 
     /**
      * 拆分-事件回改: 合并后错误归并到 to 的"匿名来源"事件改回 from。
+     * 时间边界批11 Q7 实测定案: 归并发生在入库时刻——补录事件(occurred 早于合并但
+     * create_time 晚于合并)同样是被误并的, 按 create_time 判定; occurred_time 兜底兼容旧行。
      * 匿名来源的判据=identifiers 无 user_id(登录事件的 user_id 是登录主体自己的,
      * 不能跟着拆走), 且匿名 ID 正是被并入的 from 主体。
      */
@@ -49,7 +51,7 @@ public interface ProfileIdentityMergeMapper extends BaseMapperPlus<ProfileIdenti
           AND subject_id = #{m.toSubjectId}
           AND anonymous_id = #{m.fromSubjectId}
           AND identifiers ->> 'user_id' IS NULL
-          AND occurred_time >= #{m.occurredAt}
+          AND (create_time >= #{m.createTime} OR occurred_time >= #{m.occurredAt})
         """)
     int reassignEvents(@Param("m") ProfileIdentityMerge m);
 

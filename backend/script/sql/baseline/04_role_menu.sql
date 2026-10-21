@@ -220,3 +220,8 @@ INSERT INTO sys_role_menu (role_id, menu_id) VALUES
 INSERT INTO sys_role_menu (role_id, menu_id) VALUES
   (1, 12000),
   (6, 12000);
+
+-- 2026-10-20 批11 安全合规：合规中心 + 列级权限按钮（只授超管；列级三权限不授普通角色=默认打码视图）
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 12010), (1, 12011), (1, 12012), (1, 12013), (1, 12014),
+  (1, 12015), (1, 12016), (1, 12017);

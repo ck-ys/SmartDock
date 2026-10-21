@@ -677,7 +677,16 @@
         </el-descriptions>
 
         <div class="drawer-section-title">事件时间线</div>
-        <el-timeline>
+        <el-alert
+          v-if="sessionDetail.behaviorBlocked"
+          type="info"
+          :closable="false"
+          show-icon
+          title="无行为明细查看权限"
+          description="需要「画像-看行为明细」权限才可见逐事件轨迹（含上下文与属性）。"
+          style="margin-bottom: 10px"
+        />
+        <el-timeline v-if="!sessionDetail.behaviorBlocked">
           <el-timeline-item v-for="item in sessionDetail.timeline" :key="item.eventId" :timestamp="item.occurredTime" placement="top">
             <div class="timeline-item">
               <div class="timeline-head">
@@ -688,7 +697,7 @@
             </div>
           </el-timeline-item>
         </el-timeline>
-        <el-empty v-if="!sessionDetail.timeline.length" :image-size="50" description="没有匹配到事件" />
+        <el-empty v-if="!sessionDetail.behaviorBlocked && !sessionDetail.timeline.length" :image-size="50" description="没有匹配到事件" />
       </template>
     </el-drawer>
 

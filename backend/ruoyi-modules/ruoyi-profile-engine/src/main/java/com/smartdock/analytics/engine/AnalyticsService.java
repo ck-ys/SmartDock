@@ -74,6 +74,7 @@ public class AnalyticsService {
     private final com.smartdock.analytics.mapper.AnalyticsCollectLogMapper collectLogMapper;
     private final com.smartdock.analytics.mapper.AnalyticsRebuildLogMapper rebuildLogMapper;
     private final com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper;
+    private final com.smartdock.profile.engine.ProfilePiiService piiService;
     private final org.redisson.api.RedissonClient redisson;
     private final AnalyticsSessionizer sessionizer;
     /** ObjectProvider 打破 AnalyticsService → 事件发布器 → 自动汇总触发器 的构造环 */
@@ -212,7 +213,15 @@ public class AnalyticsService {
                 if (occurredAt != null) {
                     Date occurredDay = startOfDay(occurredAt);
                     if (occurredDay.before(from)) {
-                        from = occurredDay;
+                        // 批11 Q7: 迟到事件拉宽窗口设 7 天上限——更久远的离线缓存回传
+                        // 会触发锁内全量重建, 性能放大; 超限只修最近 7 天, 历史缺口走回放
+                        Date oldest = startOfDaysAgo(7);
+                        if (occurredDay.before(oldest)) {
+                            log.warn("[Analytics] late event beyond 7d cap, use replay for history: occurredAt={}", occurredAt);
+                            from = oldest;
+                        } else {
+                            from = occurredDay;
+                        }
                     }
                 }
                 Date to = startOfTomorrow();
@@ -353,6 +362,10 @@ public class AnalyticsService {
             shareBase = rows.stream().mapToLong(row -> longValue(row.getPv())).sum();
         } else if ("search".equals(dim)) {
             rows = eventMapper.selectSearchBreakdown(tenantId, source, from, to, size);
+            // 批11 回修(终审 P1): 搜索词聚合口与会话行同权——无 contact 权限按 TERM 规则打码
+            for (AnalyticsBreakdownRow row : rows) {
+                row.setLabel(piiService.maskValueForKey("search_term", row.getLabel()));
+            }
             shareBase = rows.stream().mapToLong(row -> longValue(row.getPv())).sum();
         } else if ("event".equals(dim)) {
             rows = eventMapper.selectEventBreakdown(tenantId, source, from, to, size);
@@ -383,8 +396,11 @@ public class AnalyticsService {
         int pageSize = query.getPageSize() == null ? 20 : Math.min(Math.max(1, query.getPageSize()), 200);
         Page<AnalyticsSession> page = new Page<>(pageNum, pageSize);
         page.setOptimizeCountSql(false);
-        return sessionMapper.selectSessionPage(page, currentTenant(), query.getSource(),
+        IPage<AnalyticsSession> rows = sessionMapper.selectSessionPage(page, currentTenant(), query.getSource(),
             range[0], range[1], query);
+        // 批11 Q1: 会话行的搜索词按清单打码
+        rows.getRecords().forEach(r -> r.setSearchTerm(piiService.maskValueForKey("search_term", r.getSearchTerm())));
+        return rows;
     }
 
     public Map<String, Object> sessionDetail(Long sessionId) {
@@ -413,8 +429,8 @@ public class AnalyticsService {
             item.put("eventId", event.getEventId());
             item.put("eventName", event.getEventName());
             item.put("occurredTime", event.getOccurredTime());
-            Map<String, Object> context = parse(event.getContext());
-            Map<String, Object> props = parse(event.getProps());
+            Map<String, Object> context = piiService.maskOut(parse(event.getContext()));
+            Map<String, Object> props = piiService.maskOut(parse(event.getProps()));
             item.put("pageUrl", firstString(context, "pageUrl", "url"));
             item.put("title", firstString(context, "title", "pageTitle"));
             item.put("referrer", firstString(context, "referrer", "referer"));
@@ -423,6 +439,15 @@ public class AnalyticsService {
             timeline.add(item);
         }
         Map<String, Object> out = new LinkedHashMap<>();
+        // 批11 Q1: 无行为明细权限的角色只给会话元信息, 时间线不给(页面提示无权)
+        if (!piiService.canViewBehavior()) {
+            session.setSearchTerm(piiService.maskValueForKey("search_term", session.getSearchTerm()));
+            out.put("session", session);
+            out.put("timeline", List.of());
+            out.put("pages", List.of());
+            out.put("behaviorBlocked", true);
+            return out;
+        }
         out.put("session", session);
         out.put("timeline", timeline);
         out.put("pages", distinctPages(timeline));
@@ -759,10 +784,13 @@ public class AnalyticsService {
     }
 
     public List<AnalyticsSite> sites() {
-        return siteMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AnalyticsSite>()
-            .eq(AnalyticsSite::getTenantId, currentTenant())
-            .eq(AnalyticsSite::getEnabled, "1")
-            .orderByAsc(AnalyticsSite::getSiteName));
+        List<AnalyticsSite> rows = siteMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AnalyticsSite>()
+            .eq(AnalyticsSite::getEnabled, "1").orderByAsc(AnalyticsSite::getSiteId));
+        // 批11 回修(终审 P1): HMAC 密钥不出参——只回是否已配置, 持有密钥即可伪造签名
+        for (AnalyticsSite row : rows) {
+            row.setSignSecret(StringUtils.isNotBlank(row.getSignSecret()) ? "******" : null);
+        }
+        return rows;
     }
 
     /**
@@ -1417,6 +1445,6 @@ public class AnalyticsService {
         } catch (Exception ignored) {
             // 非登录上下文
         }
-        return "000000";
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 }

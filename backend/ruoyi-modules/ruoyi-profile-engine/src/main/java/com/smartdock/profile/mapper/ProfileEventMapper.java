@@ -179,18 +179,6 @@ public interface ProfileEventMapper extends BaseMapperPlus<ProfileEvent, Profile
                                       @Param("subjectId") String subjectId, @Param("eventType") String eventType,
                                       @Param("windowStart") Date windowStart, @Param("limit") int limit);
 
-    /**
-     * 保留期清理(跨租户, 调用方须 TenantHelper.ignore), 单轮限量。
-     *
-     * @return 删除行数
-     */
-    @Delete("""
-        DELETE FROM profile_event WHERE event_id IN (
-            SELECT event_id FROM profile_event WHERE occurred_time < #{before} LIMIT #{limit}
-        )
-        """)
-    int deleteBefore(@Param("before") Date before, @Param("limit") int limit);
-
     // ------------------------------------------------------------ 批10 Q4: 按源保留期与冷热归档
 
     /**

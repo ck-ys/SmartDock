@@ -73,7 +73,18 @@ public class ProfileIdentityService {
         if (ids.isEmpty()) {
             return subjectId;
         }
+        // 批11 Q4-A: 归并焦点(匿名 ID 优先, 否则首个标识)上事务级 advisory 锁——
+        // 同一匿名 ID 两处并发登录归并时不再写出双链/双份 merge 审计(TOCTOU)
+        String anchor = ids.get("anonymous_id") != null ? ids.get("anonymous_id")
+            : ids.entrySet().iterator().next().getValue();
+        return txTemplate.execute(status -> {
+            linkMapper.advisoryXactLock("identity:" + tenantId + ":" + source + ":" + anchor);
+            return resolveAndLinkLocked(tenantId, source, subjectType, subjectId, ids);
+        });
+    }
 
+    private String resolveAndLinkLocked(String tenantId, String source, String subjectType, String subjectId,
+                                        Map<String, String> ids) {
         String canonical = subjectId;
         boolean strongConflict = false;
         boolean canonicalFixed = false;
@@ -195,6 +206,11 @@ public class ProfileIdentityService {
         }
         if (merge.getReversedAt() != null) {
             throw new ServiceException("该合并已拆分过(拆分人=" + merge.getReversedBy() + ")");
+        }
+        // 批11 Q7: 30 天可逆窗口补硬校验——超窗的合并已是长期既成事实, 拆它比留着更伤画像连续性
+        if (merge.getReversibleUntil() != null && new Date().after(merge.getReversibleUntil())) {
+            throw new ServiceException("该合并已超过可逆窗口(截至 " + merge.getReversibleUntil()
+                + "), 不可再拆; 如确需调整请重新触发合并条件");
         }
         String actor = currentActor();
         Integer reassigned = txTemplate.execute(status -> {
@@ -348,7 +364,7 @@ public class ProfileIdentityService {
         } catch (Exception ignored) {
             // 非登录上下文
         }
-        return "000000";
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 
     private String sha256(String value) {

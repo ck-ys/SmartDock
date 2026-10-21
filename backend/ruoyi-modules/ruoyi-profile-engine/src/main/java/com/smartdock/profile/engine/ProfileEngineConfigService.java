@@ -43,7 +43,7 @@ public class ProfileEngineConfigService {
     }
 
     public ProfileEngineConfig getOrCreate(String tenantId, String source) {
-        String tenant = StringUtils.isBlank(tenantId) ? "000000" : tenantId;
+        String tenant = StringUtils.isBlank(tenantId) ? com.smartdock.profile.engine.ProfileTenantContext.require() : tenantId;
         ProfileEngineConfig config = select(tenant, source);
         if (config != null) {
             return config;
@@ -159,7 +159,7 @@ public class ProfileEngineConfigService {
     }
 
     private String key(String tenantId, String source) {
-        return (StringUtils.isBlank(tenantId) ? "000000" : tenantId) + "|" + source;
+        return (StringUtils.isBlank(tenantId) ? com.smartdock.profile.engine.ProfileTenantContext.require() : tenantId) + "|" + source;
     }
 
     private Long currentUser() {
@@ -187,7 +187,7 @@ public class ProfileEngineConfigService {
         } catch (Exception ignored) {
             // 非登录上下文
         }
-        return "000000";
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 
     private record Cached(ProfileEngineConfig config, long loadedAt) {

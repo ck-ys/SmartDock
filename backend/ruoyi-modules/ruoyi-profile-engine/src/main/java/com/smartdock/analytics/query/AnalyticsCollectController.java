@@ -6,6 +6,7 @@ import com.smartdock.analytics.quality.CollectRequestContext;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.core.utils.ServletUtils;
 import org.dromara.common.ratelimiter.annotation.RateLimiter;
 import org.dromara.common.ratelimiter.enums.LimitType;
@@ -40,12 +41,23 @@ public class AnalyticsCollectController {
      */
     @RateLimiter(time = 60, count = 300, limitType = LimitType.IP)
     @PostMapping("/collect")
-    public R<Map<String, Object>> collect(@RequestBody AnalyticsCollectBo bo, HttpServletRequest request) {
+    public R<Map<String, Object>> collect(@RequestBody String rawBody, HttpServletRequest request) {
+        AnalyticsCollectBo bo;
+        try {
+            bo = JsonUtils.parseObject(rawBody, AnalyticsCollectBo.class);
+        } catch (Exception e) {
+            // 批11 回修(终审 P2): 公开口畸形报文回 400 语义, 不刷 500
+            return R.fail(400, "报文格式非法");
+        }
+        // 批11 Q3: 签名三头 + 原始报文体一起进上下文, 验签覆盖整包(改动报文即失效)
         CollectRequestContext ctx = new CollectRequestContext(
             ServletUtils.getHeader(request, "User-Agent"),
             ServletUtils.getHeader(request, "Origin"),
             ServletUtils.getHeader(request, "Referer"),
-            ServletUtils.getClientIP());
-        return R.ok(collectorService.collect(bo, ctx));
+            ServletUtils.getClientIP(),
+            ServletUtils.getHeader(request, "X-SD-Timestamp"),
+            ServletUtils.getHeader(request, "X-SD-Nonce"),
+            ServletUtils.getHeader(request, "X-SD-Signature"));
+        return R.ok(collectorService.collect(bo, ctx, rawBody));
     }
 }

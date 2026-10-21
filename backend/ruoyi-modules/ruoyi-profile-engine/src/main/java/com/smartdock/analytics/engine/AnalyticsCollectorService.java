@@ -9,6 +9,7 @@ import com.smartdock.analytics.mapper.AnalyticsSiteMapper;
 import com.smartdock.analytics.query.AnalyticsCollectBo;
 import com.smartdock.analytics.quality.BotDetector;
 import com.smartdock.analytics.quality.CollectRequestContext;
+import com.smartdock.analytics.quality.CollectSignatureVerifier;
 import com.smartdock.analytics.quality.IpGeoResolver;
 import com.smartdock.analytics.quality.OriginDomainMatcher;
 import com.smartdock.analytics.quality.UserAgentParser;
@@ -49,8 +50,9 @@ public class AnalyticsCollectorService {
     private final AnalyticsSiteMapper siteMapper;
     private final AnalyticsCollectLogMapper collectLogMapper;
     private final ProfileEventPublisher eventPublisher;
+    private final CollectSignatureVerifier signatureVerifier;
 
-    public Map<String, Object> collect(AnalyticsCollectBo bo, CollectRequestContext ctx) {
+    public Map<String, Object> collect(AnalyticsCollectBo bo, CollectRequestContext ctx, String rawBody) {
         CollectRequestContext req = ctx == null ? CollectRequestContext.empty() : ctx;
         if (bo == null || StringUtils.isBlank(bo.getSiteKey())) {
             throw new ServiceException("siteKey 不能为空");
@@ -68,6 +70,13 @@ public class AnalyticsCollectorService {
                 .last("LIMIT 1")));
         if (site == null) {
             throw new ServiceException("siteKey 无效或站点已停用");
+        }
+
+        // 批11 Q3: 站点开验签时, 无签名/过期/重放/伪造整批拒绝 + 留痕(不开则放行兼容存量)
+        String signReject = signatureVerifier.verify(site, req, rawBody);
+        if (signReject != null) {
+            recordDrop(site, signReject, bo.getEvents().size(), req, null);
+            return dropped(bo, signReject);
         }
 
         // 机器人: 整批拒绝 + 留痕(拍板 Q1-A/Q2-A)

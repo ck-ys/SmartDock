@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.smartdock.profile.domain.ProfileExportLog;
 import com.smartdock.profile.domain.ProfileReachBatch;
 import com.smartdock.profile.domain.ProfileReachItem;
 import com.smartdock.profile.domain.ProfileSegment;
@@ -54,6 +55,9 @@ public class ProfileReachService {
     private final ProfileSegmentMapper segmentMapper;
     private final ProfileSegmentMemberMapper memberMapper;
     private final ObjectProvider<ProfileReachChannel> channelProvider;
+    /** 批11 Q5: 导出审计 + 管理员通知 SPI */
+    private final com.smartdock.profile.mapper.ProfileExportLogMapper exportLogMapper;
+    private final ObjectProvider<ProfileExportNotifier> exportNotifier;
     /** 批10 R1: 冻结收件人用短事务模板(不再整个发送横跨逐人投递一个大事务) */
     private final org.springframework.transaction.support.TransactionTemplate txTemplate;
     /** 批10 R1: 重试互斥(并发重试不双发、计数不互相覆盖) */
@@ -218,7 +222,49 @@ public class ProfileReachService {
         batch.setStatus("DONE");
         batch.setCreateBy(currentUser());
         reachMapper.insert(batch);
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = csv.toString().getBytes(StandardCharsets.UTF_8);
+        // 批11 Q5: 独立导出审计行(行数/是否明文/文件哈希), 通知走 SPI 宿主侧实现
+        ProfileExportLog logRow = new ProfileExportLog();
+        logRow.setTenantId(segment.getTenantId());
+        logRow.setSource(segment.getSource());
+        logRow.setSegmentId(segment.getSegmentId());
+        logRow.setSegmentName(segment.getSegmentName());
+        logRow.setRowCount((long) members.size());
+        logRow.setMasked(masked ? "1" : "0");
+        logRow.setFileHash(cn.hutool.crypto.digest.DigestUtil.sha256Hex(bytes).substring(0, 16));
+        logRow.setReachId(batch.getReachId());
+        logRow.setExportBy(currentUser());
+        logRow.setExportAt(new Date());
+        exportLogMapper.insert(logRow);
+        notifyAdminsAfterCommit(logRow);
+        return bytes;
+    }
+
+    /** 批11 Q5: 最近 50 条导出审计(合规页)。 */
+    public java.util.List<ProfileExportLog> exportLogs() {
+        return exportLogMapper.selectRecent(ProfileTenantContext.require());
+    }
+
+    /** 事务提交后再通知, 通知失败只记日志不影响导出。 */
+    private void notifyAdminsAfterCommit(ProfileExportLog logRow) {
+        Runnable notify = () -> exportNotifier.stream().forEach(n -> {
+            try {
+                n.onExport(logRow);
+            } catch (Exception e) {
+                log.warn("[Profile] export notify failed logId={} err={}", logRow.getLogId(), e.getMessage());
+            }
+        });
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        notify.run();
+                    }
+                });
+        } else {
+            notify.run();
+        }
     }
 
     public IPage<ProfileReachBatch> records(Long segmentId, String channel, int pageNum, int pageSize) {
@@ -316,6 +362,10 @@ public class ProfileReachService {
 
     private String csvCell(String value) {
         String v = value == null ? "" : value;
+        // 批11 Q5: CSV 公式注入防御——=/+/-/@/TAB/CR 开头的单元格前置单引号, Excel 打开不执行公式
+        if (!v.isEmpty() && "=+-@\t\r".indexOf(v.charAt(0)) >= 0) {
+            v = "'" + v;
+        }
         if (v.contains(",") || v.contains("\"") || v.contains("\n")) {
             return '"' + v.replace("\"", "\"\"") + '"';
         }

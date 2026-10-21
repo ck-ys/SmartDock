@@ -3829,3 +3829,75 @@ CREATE INDEX agentscope_store_namespace_idx ON agentscope.agentscope_store USING
 --
 
 
+-- ============================================================ 批11 安全合规（2026-10-20）
+
+-- PII 字段清单：键名→打码规则，出参 map 命中即打码（全局表，键名为主键）
+CREATE TABLE IF NOT EXISTS public.profile_pii_field (
+    field_key character varying(64) NOT NULL,
+    mask_rule character varying(16) NOT NULL,
+    remark character varying(200),
+    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    CONSTRAINT pk_profile_pii_field PRIMARY KEY (field_key),
+    CONSTRAINT ck_profile_pii_field_rule CHECK (mask_rule IN ('MOBILE', 'EMAIL', 'IP', 'TERM', 'EDGE', 'FULL')),
+    CONSTRAINT ck_profile_pii_field_enabled CHECK (enabled IN ('0', '1'))
+);
+
+INSERT INTO public.profile_pii_field (field_key, mask_rule, remark, enabled) VALUES
+  ('phone', 'MOBILE', '手机号：保留前3后4', '1'),
+  ('mobile', 'MOBILE', '手机号别名键', '1'),
+  ('email', 'EMAIL', '邮箱：保留首字符与域名', '1'),
+  ('ip', 'IP', 'IP 地址：末两段打码', '1'),
+  ('search_term', 'TERM', '搜索词：整段打码', '1'),
+  ('keyword', 'TERM', '搜索词别名键', '1'),
+  ('address', 'EDGE', '地址：保留首尾各一字符', '1'),
+  ('name', 'EDGE', '姓名：保留首尾各一字符', '1'),
+  ('id_card', 'FULL', '证件号：整串打码', '1'),
+  ('idcard', 'FULL', '证件号别名键', '1')
+ON CONFLICT (field_key) DO NOTHING;
+
+-- 主体级删除向导审计：预览快照+实际清理行数+重算天数
+CREATE TABLE IF NOT EXISTS public.profile_deletion_log (
+    log_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    subject_type character varying(32) NOT NULL,
+    subject_id character varying(64) NOT NULL,
+    preview text,
+    status character varying(16) NOT NULL,
+    events_deleted bigint DEFAULT 0,
+    archives_deleted bigint DEFAULT 0,
+    sessions_deleted bigint DEFAULT 0,
+    links_deleted bigint DEFAULT 0,
+    snapshots_deleted bigint DEFAULT 0,
+    members_deleted bigint DEFAULT 0,
+    days_rebuilt integer DEFAULT 0,
+    error_msg character varying(1000),
+    executed_at timestamp without time zone,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_profile_deletion_log PRIMARY KEY (log_id),
+    CONSTRAINT ck_profile_deletion_status CHECK (status IN ('EXECUTED', 'FAILED'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_profile_deletion_time
+    ON public.profile_deletion_log (tenant_id, create_time DESC);
+
+-- 分群成员 CSV 导出审计：行数/是否明文/文件哈希
+CREATE TABLE IF NOT EXISTS public.profile_export_log (
+    log_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(32) NOT NULL,
+    segment_id bigint NOT NULL,
+    segment_name character varying(128),
+    row_count bigint NOT NULL DEFAULT 0,
+    masked character(1) DEFAULT '1'::bpchar NOT NULL,
+    file_hash character varying(16),
+    reach_id bigint,
+    export_by bigint,
+    export_at timestamp without time zone,
+    CONSTRAINT pk_profile_export_log PRIMARY KEY (log_id),
+    CONSTRAINT ck_profile_export_masked CHECK (masked IN ('0', '1'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_profile_export_time
+    ON public.profile_export_log (tenant_id, export_at DESC);

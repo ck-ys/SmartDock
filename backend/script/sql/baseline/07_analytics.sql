@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS public.analytics_site (
     site_name character varying(128) NOT NULL,
     allowed_domains character varying(512),
     enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    sign_secret character varying(128),
+    sign_enabled character(1) DEFAULT '0'::bpchar NOT NULL,
     remark character varying(500),
     create_dept bigint,
     create_by bigint,
@@ -106,7 +108,8 @@ CREATE TABLE IF NOT EXISTS public.analytics_site (
     update_time timestamp without time zone,
     del_flag character(1) DEFAULT '0'::bpchar,
     CONSTRAINT pk_analytics_site PRIMARY KEY (site_id),
-    CONSTRAINT uk_analytics_site_key UNIQUE (site_key)
+    CONSTRAINT uk_analytics_site_key UNIQUE (site_key),
+    CONSTRAINT ck_analytics_site_sign_enabled CHECK (sign_enabled IN ('0', '1'))
 );
 
 -- 批7 采集质量：丢弃留痕（按批次×原因聚合；明文 IP 不落库，只存 SHA-256 前 16 位）
@@ -241,7 +244,7 @@ CREATE TABLE IF NOT EXISTS public.analytics_rebuild_log (
     finished_at timestamp   NOT NULL,
     read_watermark timestamp,
     CONSTRAINT pk_analytics_rebuild_log PRIMARY KEY (log_id),
-    CONSTRAINT ck_analytics_rebuild_kind CHECK (kind IN ('RECENT', 'MANUAL', 'REPLAY', 'UNMERGE'))
+    CONSTRAINT ck_analytics_rebuild_kind CHECK (kind IN ('RECENT', 'MANUAL', 'REPLAY', 'UNMERGE', 'DELETION'))
 );
 CREATE INDEX IF NOT EXISTS idx_analytics_rebuild_log_source
     ON public.analytics_rebuild_log USING btree (tenant_id, source, finished_at DESC);

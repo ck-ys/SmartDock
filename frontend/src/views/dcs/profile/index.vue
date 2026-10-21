@@ -83,7 +83,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="总分" width="170">
+            <el-table-column v-if="canSeeScore" label="总分" width="170">
               <template #default="{ row }">
                 <div v-if="row.totalScore != null" class="score-cell">
                   <el-progress
@@ -97,7 +97,7 @@
                 <span v-else class="muted">未算分</span>
               </template>
             </el-table-column>
-            <el-table-column v-for="dim in dimensions" :key="dim.dimCode" :label="dim.dimName" width="120">
+            <el-table-column v-if="canSeeScore" v-for="dim in dimensions" :key="dim.dimCode" :label="dim.dimName" width="120">
               <template #default="{ row }">
                 <span :class="dimScoreClass(row, dim.dimCode)">{{ dimScore(row, dim.dimCode) }}</span>
               </template>
@@ -106,7 +106,7 @@
             <el-table-column label="最近事件" width="170">
               <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
             </el-table-column>
-            <el-table-column label="风险" width="100">
+            <el-table-column v-if="canSeeScore" label="风险" width="100">
               <template #default="{ row }">
                 <el-tag v-if="row.totalScore != null" :type="riskOf(row.totalScore).color" effect="light">
                   {{ riskOf(row.totalScore).label }}
@@ -240,8 +240,11 @@ import {
   type ProfileSubjectRow,
   type ProfileSubjectSummary
 } from '@/api/dcs/core/profile';
+import { checkPermi } from '@/utils/permission';
 
 const router = useRouter();
+// 批11 列级权限: 无 profile:pii:score 权限者不渲染分数/维度/风险三族列(后端同步置空)
+const canSeeScore = checkPermi(['profile:pii:score']);
 
 const source = ref('dcs');
 const activeTab = ref('list');

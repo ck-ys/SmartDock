@@ -95,4 +95,12 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
     int countStrongLinks(@Param("tenantId") String tenantId,
                          @Param("source") String source,
                          @Param("subjectId") String subjectId);
+
+    /**
+     * 归并焦点上的事务级互斥(批11 Q4): 与快照链同款 pg advisory 手法。
+     * 返回值必须非 void——MyBatis 对 @Select 无法把结果行映射到 void, 会炸
+     * "No constructor found in void"并把整个身份解析打挂(E2E 实证)。
+     */
+    @org.apache.ibatis.annotations.Select("SELECT pg_advisory_xact_lock(hashtext(#{key}))")
+    String advisoryXactLock(@org.apache.ibatis.annotations.Param("key") String key);
 }

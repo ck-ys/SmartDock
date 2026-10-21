@@ -1071,7 +1071,7 @@ public class ProfileScoreModelService {
         } catch (Exception ignored) {
             // 非登录上下文
         }
-        return "000000";
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 
     private record CachedModelData(Map<String, Map<String, BigDecimal>> values,

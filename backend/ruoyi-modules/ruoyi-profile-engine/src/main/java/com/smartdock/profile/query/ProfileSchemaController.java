@@ -78,6 +78,6 @@ public class ProfileSchemaController {
         } catch (Exception ignored) {
             // 无租户上下文
         }
-        return "000000";
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 }

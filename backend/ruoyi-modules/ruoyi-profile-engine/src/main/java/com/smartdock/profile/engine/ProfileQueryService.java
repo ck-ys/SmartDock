@@ -51,6 +51,7 @@ public class ProfileQueryService {
     private final ProfileScoreEngine scoreEngine;
     private final ProfileDimensionService dimensionService;
     private final ProfileRuleService ruleService;
+    private final ProfilePiiService piiService;
 
     public TableDataInfo<ProfileSubjectRow> subjectPage(ProfileSubjectQuery query, PageQuery pageQuery) {
         if (query == null) {
@@ -66,6 +67,16 @@ public class ProfileQueryService {
         // 自定义 SQL 带 LATERAL + 计算列过滤, 关闭 count 优化, 用子查询包裹最稳
         page.setOptimizeCountSql(false);
         IPage<ProfileSubjectRow> result = subjectMapper.selectSubjectPage(page, currentTenant(), query);
+        // 批11 Q1: 联系方式类属性打码; 无看分权限的角色分数列不返回
+        boolean scoreVisible = piiService.canViewScore();
+        result.getRecords().forEach(row -> {
+            row.setProperties(piiService.maskJsonOut(row.getProperties()));
+            if (!scoreVisible) {
+                row.setTotalScore(null);
+                row.setDimensionDetail(null);
+                row.setRuleVersion(null);
+            }
+        });
         return TableDataInfo.build(result);
     }
 
@@ -98,9 +109,15 @@ public class ProfileQueryService {
         }
         List<ProfileRankingRow> rows = subjectMapper.selectRanking(currentTenant(), source,
             StringUtils.isBlank(subjectType) ? null : subjectType.trim(), dim, capped);
+        // 批11 回修(终审 P1): 排行分数列与列表同闸——无列级分数权限置空, 只留主体与名次
+        boolean canScore = piiService.canViewScore();
         int rank = 1;
         for (ProfileRankingRow row : rows) {
             row.setRank(rank++);
+            if (!canScore) {
+                row.setTotalScore(null);
+                row.setDimensionScore(null);
+            }
         }
         return rows;
     }
@@ -127,17 +144,23 @@ public class ProfileQueryService {
         Map<String, Object> detailMap = parseObject(latest == null ? null : latest.getDimensionDetail());
         List<Map<String, Object>> dimensions = buildDimensionRows(source, detailMap);
 
+        // 批11 回修(终审 P1): 详情口与列表口同权——属性打码 + 无列级分数权限置空
+        boolean canScore = piiService.canViewScore();
+        if (subject != null) {
+            subject.setProperties(piiService.maskJsonOut(subject.getProperties()));
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("subject", subject);
-        out.put("subjectProperties", parseObject(subject == null ? null : subject.getProperties()));
-        out.put("latest", latest);
-        out.put("history", history);
-        out.put("dimensions", dimensions);
+        out.put("subjectProperties", piiService.maskOut(parseObject(subject == null ? null : subject.getProperties())));
+        out.put("latest", canScore ? latest : null);
+        out.put("history", canScore ? history : List.of());
+        out.put("dimensions", canScore ? dimensions : List.of());
         out.put("rule", ruleService.current(source));
-        out.put("rank", rankOf(source, type, latest));
-        out.put("risk", riskOf(latest == null ? null : latest.getTotalScore()));
-        out.put("trend", trend(history));
-        out.put("dataQuality", dataQuality(dimensions));
+        out.put("rank", canScore ? rankOf(source, type, latest) : null);
+        out.put("risk", canScore ? riskOf(latest == null ? null : latest.getTotalScore()) : null);
+        out.put("trend", canScore ? trend(history) : List.of());
+        out.put("dataQuality", canScore ? dataQuality(dimensions) : null);
+        out.put("scoreHidden", !canScore);
         return out;
     }
 
@@ -319,7 +342,10 @@ public class ProfileQueryService {
                 .orderByDesc(com.smartdock.profile.engine.ProfileScoreSnapshot::getCalcTime)
                 .orderByDesc(com.smartdock.profile.engine.ProfileScoreSnapshot::getSnapshotId)
                 .last("LIMIT 1"));
-        if (latest.isEmpty()) {
+        if (!piiService.canViewScore()) {
+            out.put("scored", false);
+            out.put("scoreHidden", true);
+        } else if (latest.isEmpty()) {
             out.put("scored", false);
         } else {
             com.smartdock.profile.engine.ProfileScoreSnapshot snap = latest.get(0);
@@ -411,6 +437,6 @@ public class ProfileQueryService {
         } catch (Exception ignored) {
             // 非登录上下文
         }
-        return "000000";
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 }

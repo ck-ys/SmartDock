@@ -25,4 +25,13 @@ public interface DcsUserLookupMapper {
         </script>
         """)
     List<Map<String, Object>> selectBriefsByIds(@org.apache.ibatis.annotations.Param("ids") List<Long> ids);
+
+    /** 在职管理员用户 id(superadmin/tenant_admin)(批11 Q5: 导出审计站内通知收件人)。租户条件由插件追加。 */
+    @Select("""
+        SELECT DISTINCT u.user_id FROM sys_user u
+        JOIN sys_user_role ur ON ur.user_id = u.user_id
+        JOIN sys_role r ON r.role_id = ur.role_id
+        WHERE u.del_flag = '0' AND u.status = '0' AND r.status = '0' AND r.role_key IN ('superadmin', 'tenant_admin')
+        """)
+    List<Long> selectAdminUserIds();
 }

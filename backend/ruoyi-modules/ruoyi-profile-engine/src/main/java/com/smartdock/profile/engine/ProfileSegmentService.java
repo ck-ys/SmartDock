@@ -506,7 +506,7 @@ public class ProfileSegmentService {
         } catch (Exception ignored) {
             // 非登录上下文
         }
-        return "000000";
+        return com.smartdock.profile.engine.ProfileTenantContext.require();
     }
 
     private record MemberDraft(String subjectType, String subjectId, String displayName, String reason) {

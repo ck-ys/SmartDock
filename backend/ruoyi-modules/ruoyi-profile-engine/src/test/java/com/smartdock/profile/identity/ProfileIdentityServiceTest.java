@@ -38,6 +38,17 @@ class ProfileIdentityServiceTest {
     private final ProfileIdentityService service = new ProfileIdentityService(
         linkMapper, mergeMapper, txTemplate, analyticsService, scoreEngine, modelService);
 
+    static {
+        // 批11 Q4: resolveAndLink 已包进事务模板+advisory lock——mock 模板直通执行回调
+    }
+
+    ProfileIdentityServiceTest() {
+        Mockito.doAnswer(inv ->
+                ((org.springframework.transaction.support.TransactionCallback<?>) inv.getArgument(0))
+                    .doInTransaction(null))
+            .when(txTemplate).execute(any());
+    }
+
     private ProfileIdentityLink link(String subjectId) {
         ProfileIdentityLink link = new ProfileIdentityLink();
         link.setSubjectId(subjectId);

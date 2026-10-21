@@ -37,5 +37,11 @@ public class AnalyticsSite extends BaseEntity {
 
     private String enabled;
 
+    /** 批11 Q3: 签名密钥(HMAC-SHA256), 只在服务端与站点管理员可见, SDK 嵌入端持有 */
+    private String signSecret;
+
+    /** 批11 Q3: 签名开关 1=强制验签(无签名/过期/重放整批拒绝) 0=兼容存量明文上报 */
+    private String signEnabled;
+
     private String remark;
 }
