@@ -242,6 +242,15 @@ public class AssistantModelFactory {
         if (cfg.getMaxTokens() != null) {
             options.maxTokens(cfg.getMaxTokens());
         }
+        // 批0 实证（2026-10-21，netstat SYN_SENT 31.13.96.195 + DNS 污染交叉坐实）：
+        // 框架 OpenAIClient 对 null/blank baseUrl 静默回退 https://api.openai.com——
+        // 空 base_url 的★默认行（健康探测自 10-18 起 FAIL）会把全部对话流量暗改道到
+        // OpenAI 官方域名（本网络被污染=30s 建连超时）。宁可快速失败给人话，不静默改道
+        if (cfg.getBaseUrl() == null || cfg.getBaseUrl().isBlank()) {
+            throw AiNotConfiguredException.of(
+                "模型配置 base_url 为空（config=" + cfg.getConfigId() + " " + cfg.getProvider()
+                    + "），请在 AI 配置页补全接口地址——系统不会回退框架默认地址");
+        }
         io.agentscope.extensions.model.openai.OpenAIChatModel.Builder builder = OpenAIChatModel.builder()
             .baseUrl(cfg.getBaseUrl())
             .apiKey(cfg.getApiKey())
