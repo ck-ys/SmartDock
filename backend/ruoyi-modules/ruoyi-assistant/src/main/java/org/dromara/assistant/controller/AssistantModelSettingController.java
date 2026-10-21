@@ -96,6 +96,9 @@ public class AssistantModelSettingController extends BaseController {
             "assistantDefaultConfigId", defId == null ? "" : defId,
             "defaultSelectable", defaultSelectable,
             "defaultContextWindow", defaultContextWindow == null ? -1 : defaultContextWindow,
+            // G2 问题②：自选关时 options 恒空（防探测），用户侧只剩纯 id 拿不到名字——
+            // 默认行名字一并下发（只读徽标展示用；defRow 已解析零额外查询，非敏感字段）
+            "defaultModelName", defRow == null || defRow.getModelName() == null ? "" : defRow.getModelName(),
             "options", options
         ));
     }

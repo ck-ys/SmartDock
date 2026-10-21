@@ -429,6 +429,10 @@ export interface AssistantModelChoice {
   /** 批B step5 P1-1：默认模型 context_window（自选关时 options 空仍下发，环分母不悬空；
    *  后端 Map.of 不收 null，-1=未知哨兵，<=0 视作 null） */
   defaultContextWindow?: number;
+  /** G2 问题②：默认模型名（自选关时 options 恒空仍下发——只读徽标展示用，空串=未配置） */
+  defaultModelName?: string;
+  /** 默认行真不可用标记（批B 回修语义：默认行被裁出自选白名单仍可调用，非告警态） */
+  defaultSelectable?: boolean;
   options: import('@/api/dcs/ai/types').DcsAiConfigVO[];
 }
 

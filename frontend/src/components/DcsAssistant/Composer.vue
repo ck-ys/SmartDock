@@ -312,6 +312,18 @@
             </template>
           </div>
         </div>
+        <!-- G2 问题②（拍板 Q2=A）：自选关时的只读徽标——管理员不开「允许用户自选」时，
+             原先输入条上没有任何模型指示（用户不知道在跟哪个模型说话）。纯展示无交互：
+             名字来自后端 defaultModelName（options 恒空防探测口径不变），无弹层无 chevron -->
+        <div
+          v-else-if="defaultBadgeOn"
+          class="btool bpill mpill mlock"
+          :title="`当前使用管理员设置的默认模型（${defaultBadgeLabel}），更换请联系管理员`"
+          aria-label="当前默认模型"
+        >
+          <IconSpan name="package" :size="14" />
+          <span class="tlabel">{{ defaultBadgeLabel }}</span>
+        </div>
 
         <!-- 思考档位（v3.18.1 → 批I-3 BN-8：主钮恒 🧠+tprog 充能条，点开三选弹层原型 thinkPop）；
              批7 按能力显隐：当前生效模型能力目录 tierKind=NONE（不支持思考）时隐藏 -->
@@ -1503,6 +1515,11 @@ function pickThink(i: number) {
 const modelChoice = ref<AssistantModelChoice | null>(null);
 const modelPopOpen = ref(false);
 const choiceOn = computed(() => modelChoice.value?.allowUserSwitch === '1' && (modelChoice.value?.options?.length ?? 0) > 0);
+/** G2 问题②：自选关+后端下发默认模型名 → 只读徽标（防探测口径下 options 空，名字走独立字段） */
+const defaultBadgeOn = computed(
+  () => modelChoice.value?.allowUserSwitch !== '1' && !!modelChoice.value?.defaultModelName
+);
+const defaultBadgeLabel = computed(() => modelChoice.value?.defaultModelName ?? '');
 const modelOptions = computed(() => modelChoice.value?.options ?? []);
 /**
  * 批B 三审 P1：模型选项按厂商 find-or-create 累积分组（同 admin 页算法）。
@@ -1630,6 +1647,9 @@ async function refreshChoice() {
       assistantDefaultConfigId: d?.assistantDefaultConfigId ?? null,
       // step5 P1-1：默认模型窗口一并存（后端 -1 哨兵折回 null）
       defaultContextWindow: typeof d?.defaultContextWindow === 'number' && d.defaultContextWindow > 0 ? d.defaultContextWindow : undefined,
+      // G2 问题②：默认模型名（自选关时徽标展示用；旧后端无此字段=不显示徽标，向后兼容）
+      defaultModelName: typeof d?.defaultModelName === 'string' && d.defaultModelName ? d.defaultModelName : undefined,
+      defaultSelectable: d?.defaultSelectable,
       options: Array.isArray(d?.options) ? d.options : []
     };
     // P2 修复（2026-10-09 Q7）：管理员关掉「允许自选」→ 本会话 pin 即刻清除——
@@ -1686,7 +1706,10 @@ const modelBtnLabel = computed(() => {
   }
   return effectiveRow.value ? `默认·${effectiveRow.value.modelName}` : '默认模型';
 });
-const defaultModelLabel = computed(() => effectiveRow.value?.modelName ?? '管理员设置的默认模型');
+const defaultModelLabel = computed(
+  // G2：默认行被裁出自选白名单时 effectiveRow 兜不中——用后端下发的默认名再兜一层
+  () => effectiveRow.value?.modelName ?? modelChoice.value?.defaultModelName ?? '管理员设置的默认模型'
+);
 /** 弹层行单价副句（FIXED=元/次；TOKEN=输入单价/百万；未配置=空串） */
 function modelPriceLine(o: {
   billingMode?: string;
@@ -2518,6 +2541,15 @@ defineExpose({
     border-color: #f3d19e;
     color: #b88230;
   }
+  /* G2 问题②：默认模型只读徽标——非交互态：去 hover 上浮、灰字弱化但可见 */
+  .bpill.mpill.mlock {
+    cursor: default;
+    color: var(--dcs-text-secondary, #909399);
+  }
+  .bpill.mpill.mlock:hover {
+    transform: none;
+    background: transparent;
+  }
   /* ---- R1（2026-10-13）：联网一步钮（用户提议放 ➕ 旁）——开态蓝底即状态显示，
          原「联网 ✕」状态签(.wpill)同批撤并；未开放时维持灰态不给蓝（禁用语义不点亮） ---- */
   .btool.bicon.wbtn.on {
@@ -3219,6 +3251,16 @@ defineExpose({
   .brow .bpill.mpill .tlabel,
   .brow .bpill.mpill .bchev {
     display: none;
+  }
+}
+/* G2 问题②：mlock 徽标豁免批4 Q7 折叠——锁定的模型名是徽标唯一信息，收成图标
+   则用户无从得知在用哪个模型；64px 截断 + title 全名，宽度靠 spacer 吸收（实测
+   行 259px 可放、桌面内容盒 280px 尚有 21px 余量）。注意容器查询量的是内容盒：
+   阈值 265px 放行桌面 280px/手机≥375px，真窄手机（≤360px→256px）仍图标态防溢出 */
+@container (min-width: 265px) {
+  .brow .bpill.mpill.mlock .tlabel {
+    display: inline;
+    max-width: 64px;
   }
 }
 /* 业务批3-④ #17：➕面板联网行 + 迷你开关（原型 v1.6 简单版开关=纯 CSS 滑块）。

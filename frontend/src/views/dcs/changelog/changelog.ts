@@ -19,6 +19,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.8.7',
+    date: '2026-10-21',
+    title: '不挑模型也能知道在跟谁说话了',
+    items: [
+      '管理员没开「允许用户自选模型」时，助手输入框上会显示一个只读的小标签，标明当前用的是管理员设置的哪个默认模型；想换模型找管理员即可。',
+    ],
+  },
+  {
     version: 'v1.8.6',
     date: '2026-10-21',
     title: '停止按钮真的停了，危险操作必过确认',
