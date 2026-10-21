@@ -393,7 +393,7 @@ public class AssistantConversationService {
      */
     public void purgeAgentscopeSessions(String tenantId, Long userId) {
         try {
-            jdbcTemplate.update("DELETE FROM agentscope_sessions WHERE session_id LIKE ?",
+            jdbcTemplate.update("DELETE FROM agentscope.agentscope_sessions WHERE session_id LIKE ?",
                 "t:" + tenantId + ":" + userId + ":%");
         } catch (Exception e) {
             log.warn("[AssistantPersist] agentscope 会话清理失败(表缺失或仅剩框架表残留), 已入补偿队列: {}", e.getMessage());
@@ -426,7 +426,7 @@ public class AssistantConversationService {
      */
     public boolean retryPurgeAgentscopeSessions(String tenantId, Long userId) {
         try {
-            jdbcTemplate.update("DELETE FROM agentscope_sessions WHERE session_id LIKE ?",
+            jdbcTemplate.update("DELETE FROM agentscope.agentscope_sessions WHERE session_id LIKE ?",
                 "t:" + tenantId + ":" + userId + ":%");
             return true;
         } catch (Exception e) {
