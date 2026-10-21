@@ -130,8 +130,15 @@ public class AssistantRunRecorder {
     final Map<String, java.util.concurrent.atomic.AtomicLong> runMaxGapMs = new ConcurrentHashMap<>();
     /** 每 run 心跳帧数（0=该 run 心跳未生效——流链路排障第一指标） */
     final Map<String, java.util.concurrent.atomic.AtomicInteger> runHeartbeats = new ConcurrentHashMap<>();
-    /** 终态计数（status|reason → 次数；进程内累计，稳流②管理报表数据源） */
-    private final Map<String, java.util.concurrent.atomic.LongAdder> terminalOutcomeCounts = new ConcurrentHashMap<>();
+    /** 每 run 末次业务事件时刻（glm53 审查 P2-1：心跳帧不计——「纯心跳零业务」持续超限
+     *  = 服务端真挂起（工具/模型死锁但 interval 独立跳），须按停滞收割，不能被心跳无限喂养） */
+    final Map<String, Long> lastBusinessEventAt = new ConcurrentHashMap<>();
+    /** 纯心跳收割阈值：10 分钟零业务事件（合法静默=搜索 10-25s/压缩摘要分钟级，10min 只剩挂死） */
+    private static final long PURE_HEARTBEAT_MS = 600_000L;
+    /** 终态计数（租户 → status|reason → 次数；进程内累计，稳流②管理报表数据源。
+     *  glm53 审查 P2-2：按租户分桶——原进程级聚合会把全平台流量下发给租户管理员，破多租户信息隔离口径 */
+    private final Map<String, Map<String, java.util.concurrent.atomic.LongAdder>> terminalOutcomeCounts =
+        new ConcurrentHashMap<>();
 
     /** 失联判定阈值：须覆盖合法事件静默——dspro P1-1 回修 40s→60s：联网搜索等长工具
      *  实测静默 10-25s（WebSearchTools 不走 withTimeout），40s 余量仅 1.6×，多连发搜索
@@ -290,10 +297,18 @@ public class AssistantRunRecorder {
         // 步骤缓冲键：thread 优先（HITL 中断→resume 跨 run 续接），退化 runId
         String stepKey = threadId != null ? threadId : runId;
         // 批6-#2：冲刷/收割线程无 context——run 侧键与时刻在建侧（流线程）登记；
-        // 稳流① Q1：首事件时刻+事件间最大静默同刻埋点（终局诊断行数据源）
+        // 稳流① Q1：首事件时刻+事件间最大静默同刻埋点（终局诊断行数据源）。
+        // glm53 审查 P2-1：本批含任何业务帧（非心跳）才刷 lastBusinessEventAt——
+        // 纯心跳批只喂 lastEventAt（看门狗/合法静默豁免），喂不了「真挂起」判据
+        boolean anyBusiness = events.stream().anyMatch(e ->
+            !(e instanceof AguiEvent.Custom c
+                && org.dromara.assistant.core.DcsHeartbeatMiddleware.HEARTBEAT_NAME.equals(c.name())));
         long nowMs = System.currentTimeMillis();
         Long prevEventAt = lastEventAt.put(runId, nowMs);
         runFirstEventAt.putIfAbsent(runId, nowMs);
+        if (anyBusiness) {
+            lastBusinessEventAt.put(runId, nowMs);
+        }
         if (prevEventAt != null) {
             runMaxGapMs.computeIfAbsent(runId, k -> new java.util.concurrent.atomic.AtomicLong())
                 .accumulateAndGet(nowMs - prevEventAt, Math::max);
@@ -526,8 +541,10 @@ public class AssistantRunRecorder {
     }
 
     private void finishRun(String runId, String status, String reason, String stepKey) {
-        // 稳流① Q1：终局诊断（时长/最大静默/心跳数+终态计数）
-        logRunDiagnostics(runId, status + "|" + (reason == null ? "-" : reason));
+        // 稳流① Q1：终局诊断（时长/最大静默/心跳数；终态计数改在 DB 写成功分支——
+        // glm53 审查 P2-5：迟到终态（rows=0 被条件丢弃）不得与收割终态双计）
+        final String outcome = status + "|" + (reason == null ? "-" : reason);
+        logRunDiagnostics(runId, tenantOfRun(runId), outcome);
         // 批B B1 修：这里不再 clearLastUsage——RUN_FINISHED 与 TEXT_MESSAGE_END 仅差毫秒级，
         // 提前清会与异步落库线程的 awaitLastUsageChanged 轮询竞态（清完轮询恒 null=永远写不进 tokens）。
         // 清除移至落库任务 finally；未走落库的 run（中断/无终答文本）靠账本环形截断(512)兜底回收
@@ -572,11 +589,13 @@ public class AssistantRunRecorder {
                 if (rows == 0) {
                     log.warn("[AssistantRecorder] 迟到终态 {} 被丢弃（run 已被收割器/兜底终局化）runId={}",
                         status, runId);
+                } else {
+                    // 稳流① Q1 + P2-5 回修：真终态写成功才计数（收割侧已计过的不重复）
+                    countOutcome(tenantOfRun(runId), outcome);
                 }
             } catch (Exception e) {
                 log.warn("[AssistantRecorder] run 终态回写失败 runId={}: {}", runId, e.getMessage());
-            }
-            // refund 独立 try（终态写失败不得连坐吞补偿）；仅 FAILED 退——INTERRUPTED
+            }            // refund 独立 try（终态写失败不得连坐吞补偿）；仅 FAILED 退——INTERRUPTED
             // 等确认续跑属正常流转（dspro P1-1 附带：按 run 登记行的租户/人退当日键）。
             // 批6-#2 守卫升级：按「回读实际状态」退——finish 条件化(仅 RUNNING→X)后，
             // 被收割器已迁 INTERRUPTED 的 run 收到迟到 FAILED 终态时 UPDATE 落空，
@@ -643,25 +662,40 @@ public class AssistantRunRecorder {
      * 稳流① Q1（2026-10-20）：run 终局诊断——一行 INFO（时长/最大事件静默/心跳数）
      * + 终态计数。心跳=0 且 maxGap 大的 run 即「看门狗误判高危样本」；正常 run 心跳
      * 只在合法静默段出现。计数为进程内口径（重启归零），报表化归稳流②。
+     *
+     * <p><b>glm53 审查回修</b>：P2-2 计数按租户分桶（进程级聚合=把全平台流量下发给
+     * 租户管理员，破多租户信息隔离口径——tenantId 由调用方传入，收割路径手头有、
+     * 终道路径异步块现查）；P2-5 countOutcome 独立方法——迟到终态（DB 条件写 0 行）
+     * 不得计数，由调用方在写成功分支单独调。</p>
      */
-    private void logRunDiagnostics(String runId, String outcome) {
+    private void logRunDiagnostics(String runId, String tenantId, String outcome) {
         Long first = runFirstEventAt.remove(runId);
         java.util.concurrent.atomic.AtomicLong gap = runMaxGapMs.remove(runId);
         java.util.concurrent.atomic.AtomicInteger hb = runHeartbeats.remove(runId);
-        terminalOutcomeCounts.computeIfAbsent(outcome, k -> new java.util.concurrent.atomic.LongAdder()).increment();
+        lastBusinessEventAt.remove(runId);
         if (first == null) {
-            // 零事件 run（建侧失败路径）——建侧失败/兜底收割已有专门 WARN，此处只进计数
+            // 零事件 run（建侧失败路径）——建侧失败/兜底收割已有专门 WARN，无诊断行
             return;
         }
-        log.info("[AssistantRecorder] run 终局诊断 runId={} outcome={} durationMs={} maxEventGapMs={} heartbeats={}",
-            runId, outcome, clock.millis() - first,
+        log.info("[AssistantRecorder] run 终局诊断 runId={} tenant={} outcome={} durationMs={} maxEventGapMs={} heartbeats={}",
+            runId, tenantId, outcome, clock.millis() - first,
             gap == null ? 0 : gap.get(), hb == null ? 0 : hb.get());
     }
 
-    /** 终态分布快照（稳流②管理报表数据源；进程内累计） */
-    public Map<String, Long> terminalOutcomeSnapshot() {
+    /** 终态计数（写成功分支才调——防迟到终态与收割终态双计，glm53 审查 P2-5） */
+    private void countOutcome(String tenantId, String outcome) {
+        String tenant = tenantId != null ? tenantId : "-";
+        terminalOutcomeCounts.computeIfAbsent(tenant, k -> new ConcurrentHashMap<>())
+            .computeIfAbsent(outcome, k -> new java.util.concurrent.atomic.LongAdder()).increment();
+    }
+
+    /** 终态分布快照（稳流②管理报表数据源；进程内累计；按登录租户过滤——P2-2） */
+    public Map<String, Long> terminalOutcomeSnapshot(String tenantId) {
         Map<String, Long> out = new LinkedHashMap<>();
-        terminalOutcomeCounts.forEach((k, v) -> out.put(k, v.sum()));
+        Map<String, java.util.concurrent.atomic.LongAdder> bucket = terminalOutcomeCounts.get(tenantId);
+        if (bucket != null) {
+            bucket.forEach((k, v) -> out.put(k, v.sum()));
+        }
         return out;
     }
 
@@ -706,6 +740,14 @@ public class AssistantRunRecorder {
             String runId = entry.getKey();
             try {
                 boolean stalled = now - entry.getValue() >= STALL_MS;
+                // glm53 审查 P2-1（纯心跳收割）：lastEventAt 被心跳无限喂养永不 stalled，
+                // 服务端真挂起（工具/模型死锁）会被拖到 15min RetentionJob 兜底——
+                // 「末次业务事件 ≥10min」即按停滞收割（在飞豁免照旧兜住模型合法静默）
+                if (!stalled) {
+                    Long lastBiz = lastBusinessEventAt.get(runId);
+                    long bizRef = lastBiz != null ? lastBiz : runFirstEventAt.getOrDefault(runId, entry.getValue());
+                    stalled = now - bizRef >= PURE_HEARTBEAT_MS;
+                }
                 Map<String, StringBuilder> runBuffers = buffers.get(runId);
                 String merged = runBuffers == null ? "" : runBuffers.values().stream()
                     .reduce(new StringBuilder(), StringBuilder::append).toString();
@@ -770,7 +812,8 @@ public class AssistantRunRecorder {
                     log.warn("[AssistantRecorder] 零事件兜底收割 runId={}（建行≥{}s 无任何事件=建/流侧同步失败路径）："
                         + "INTERRUPTED/client-disconnect，回合已退", runId, STALL_MS / 1000);
                     // 稳流① Q1：零事件路径也进终态计数（首事件恒缺，诊断行跳过）
-                    logRunDiagnostics(runId, "INTERRUPTED|zero-event");
+                    logRunDiagnostics(runId, run.getTenantId(), "INTERRUPTED|zero-event");
+                    countOutcome(run.getTenantId(), "INTERRUPTED|zero-event");
                 }
             }
         } catch (Exception ex) {
@@ -880,8 +923,10 @@ public class AssistantRunRecorder {
                 dailyQuota.refundTurn(r.getTenantId(), r.getUserId());
                 log.warn("[AssistantRecorder] 失联收割 runId={}（事件停滞≥{}s=客户端断连拆链）："
                     + "INTERRUPTED/client-disconnect，回合已退", runId, STALL_MS / 1000);
-                // 稳流① Q1：收割终局也进诊断（对比真终态 run 的 maxGap/心跳分布）
-                logRunDiagnostics(runId, "INTERRUPTED|client-disconnect");
+                // 稳流① Q1：收割终局也进诊断+计数（P2-2 租户分桶；P2-6 诊断行只在收割
+                // 成功分支出——run 行已被别人终局化的迟到诊断无观测价值且三表已被对方清）
+                logRunDiagnostics(runId, r.getTenantId(), "INTERRUPTED|client-disconnect");
+                countOutcome(r.getTenantId(), "INTERRUPTED|client-disconnect");
             }
         } catch (Exception ex) {
             // dspro P1-2回修：失败保留追踪，下一 tick 重试（updatePartial/finalizeStalled

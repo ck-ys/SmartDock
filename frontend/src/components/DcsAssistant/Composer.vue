@@ -1067,8 +1067,10 @@ watch(
     pushToast(`检测到你想${hit.name}，已自动挂载「${hit.name}」技能——点胶囊 × 可移除`, 'info');
   }
 );
-/** 撤销自动挂载：清键+记忆（手动点胶囊也算 touched，此后不再自动） */
+/** 撤销自动挂载（兼手动选中态的 ×）：无条件置 touched——glm53 审查 P2-3，漏置会让
+ *  手动挂载的技能被移除后又被触发词“自动”挂回，违背用户刚表达的意愿 */
 function revokeAutoSkill() {
+  skillUserTouched.value = true;
   const id = autoSkillApplied.value;
   if (id) {
     revokedAutoSkills.add(id);
@@ -1089,13 +1091,6 @@ function toggleSkill(id: string) {
   writeSkillId(userStore.userId, props.state.threadId, next, localStorage);
   const label = skillCatalog.value.find((s) => s.id === id)?.name ?? id;
   pushToast(next ? `已启用技能「${label}」：本会话每轮按它的指引执行，点输入条上的胶囊 × 可停用` : `已停用技能「${label}」`, 'ok');
-}
-function clearSkill() {
-  skillUserTouched.value = true;
-  autoSkillApplied.value = null;
-  if (skillId.value) {
-    toggleSkill(skillId.value);
-  }
 }
 
 /* 业务批7 Q2：积分并入会话状态卡（独立胶囊下线）——订阅租户状态卡首行切「本周积分」 */
@@ -1313,6 +1308,9 @@ watch(
     ctxTokens.value = null;
     readWebOnSync();
     readSkillSync();
+    // 能力① Q7（glm53 审查 P2-4）：「自动」角标状态随会话切换复位——新会话里从 storage
+    // 恢复的技能（含用户手动选的）不得错挂上一会话的自动角标（touched/撤销记忆跨会话保留=用户偏好）
+    autoSkillApplied.value = null;
     // 业务批7 Q10：切会话/新会话重拉模型选择——新开对话显示的默认模型不再停留旧快照
     void refreshChoice();
     if (amActive()) {

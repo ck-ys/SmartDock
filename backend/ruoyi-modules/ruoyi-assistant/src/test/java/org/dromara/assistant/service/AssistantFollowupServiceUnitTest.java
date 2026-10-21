@@ -153,13 +153,13 @@ class AssistantFollowupServiceUnitTest {
     void outcomeAccountingEmptyRaw() {
         AssistantFollowupService svc = newService();
         svc.runGenerationForTest("000000", 9L, "input", emptyModel(), java.time.Duration.ofSeconds(1));
-        assertThat(svc.followupOutcomeSnapshot()).containsEntry("empty-raw", 1L);
+        assertThat(svc.followupOutcomeSnapshot("000000")).containsEntry("empty-raw", 1L);
     }
 
     @Test
     void outcomeAccountingTimeout() {
         AssistantFollowupService svc = newService();
         svc.runGenerationForTest("000000", 9L, "input", neverModel(), java.time.Duration.ofMillis(50));
-        assertThat(svc.followupOutcomeSnapshot()).containsEntry("timeout", 1L);
+        assertThat(svc.followupOutcomeSnapshot("000000")).containsEntry("timeout", 1L);
     }
 }

@@ -1955,17 +1955,21 @@ async function loadHealth() {
     healthLoading.value = false;
   }
 }
-/** run 终态 → 人话标签（key=status|reason） */
+/** run 终态 → 人话标签（key=status|reason；后端实值=COMPLETED/INTERRUPTED/FAILED——
+ *  glm53 审查 P1-1 实证：旧版按 FINISHED 匹配永不命中，主桶全废） */
 function runLabel(k: string): string {
   const [status, reason] = k.split('|');
-  if (status === 'FINISHED') return '正常完成';
-  if (status === 'INTERRUPTED') return `中断（${reason === 'client-disconnect' ? '连接断开' : reason === 'zero-event' ? '无响应' : reason ?? '-'}）`;
+  if (status === 'COMPLETED') return '正常完成';
+  if (status === 'INTERRUPTED') {
+    const why = reason === 'client-disconnect' ? '连接断开' : reason === 'zero-event' ? '无响应' : reason === 'interrupt' ? '等用户确认' : reason ?? '-';
+    return `中断（${why}）`;
+  }
   if (status === 'FAILED') return `失败（${reason ?? '-'}）`;
   return k;
 }
 function runTone(k: string): string {
   const s = k.split('|')[0];
-  return s === 'FINISHED' ? 'ok' : s === 'FAILED' ? 'bad' : 'mid';
+  return s === 'COMPLETED' ? 'ok' : s === 'FAILED' ? 'bad' : 'mid';
 }
 /** 追问分类 → 人话标签 */
 const FU_LABELS: Record<string, string> = {

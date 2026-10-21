@@ -89,17 +89,27 @@ public class AssistantFollowupService {
     // ===== 稳流② Q8②（2026-10-20）：追问失败分类记账（进程内累计，重启归零）——
     // 管理端报表数据源；口径：kind 见 recordOutcome 调用点（succeeded/answer-too-short/
     // pool-rejected/budget-gated/empty-raw/parse-failed/timeout/other）
-    private final java.util.Map<String, java.util.concurrent.atomic.LongAdder> outcomeCounts =
+    private final java.util.Map<String, java.util.Map<String, java.util.concurrent.atomic.LongAdder>> outcomeCounts =
         new java.util.concurrent.ConcurrentHashMap<>();
 
-    void recordOutcome(String kind) {
-        outcomeCounts.computeIfAbsent(kind, k -> new java.util.concurrent.atomic.LongAdder()).increment();
+    /** 池满丢弃的全局桶键（拒绝处理器拿不到租户——任务级上下文在 Runnable 里，glm53 审查 P2-2 折衷） */
+    private static final String GLOBAL_BUCKET = "_global";
+
+    void recordOutcome(String tenantId, String kind) {
+        String bucket = tenantId != null ? tenantId : GLOBAL_BUCKET;
+        outcomeCounts.computeIfAbsent(bucket, k -> new java.util.concurrent.ConcurrentHashMap<>())
+            .computeIfAbsent(kind, k -> new java.util.concurrent.atomic.LongAdder()).increment();
     }
 
-    /** 失败分布快照（管理端 /admin/health 数据源；进程内口径） */
-    public java.util.Map<String, Long> followupOutcomeSnapshot() {
+    /** 失败分布快照（管理端 /admin/health 数据源；进程内口径；本租户+全局桶——P2-2 租户隔离） */
+    public java.util.Map<String, Long> followupOutcomeSnapshot(String tenantId) {
         java.util.Map<String, Long> out = new java.util.LinkedHashMap<>();
-        outcomeCounts.forEach((k, v) -> out.put(k, v.sum()));
+        for (String bucket : new String[]{tenantId, GLOBAL_BUCKET}) {
+            java.util.Map<String, java.util.concurrent.atomic.LongAdder> m = outcomeCounts.get(bucket);
+            if (m != null) {
+                m.forEach((k, v) -> out.merge(k, v.sum(), Long::sum));
+            }
+        }
         return out;
     }
 
@@ -152,7 +162,7 @@ public class AssistantFollowupService {
             // 锦上添花仍丢弃不阻塞，但运维至少能在日志看到丢了多少）
             (r, exec) -> {
                 discardedCount.incrementAndGet();
-                recordOutcome("pool-rejected");
+                recordOutcome(null, "pool-rejected");
                 if (discardedCount.get() == 1) {
                     log.warn("[AssistantFollowup] 侧车池满开始丢弃任务(后续静默计数), 累计丢弃={}", discardedCount.get());
                 } else if (discardedCount.get() % 50 == 0) {
@@ -176,7 +186,7 @@ public class AssistantFollowupService {
     public void tryStart(String tenantId, Long userId, Long messageId, String threadId,
                          String threadTitle, String question, String answer) {
         if (messageId == null || answer == null || answer.strip().length() < 20) {
-            recordOutcome("answer-too-short");
+            recordOutcome(tenantId, "answer-too-short");
             return;
         }
         try {
@@ -200,7 +210,7 @@ public class AssistantFollowupService {
                             dailyQuota.checkBudget(tenantId, configService.effective(tenantId).dailyBudgetAmount());
                         }
                     } catch (org.dromara.common.core.exception.ServiceException be) {
-                        recordOutcome("budget-gated");
+                        recordOutcome(tenantId, "budget-gated");
                         log.info("[AssistantFollowup] 预算闸拦下侧车(不生成追问) message={} : {}", messageId, be.getMessage());
                         return;
                     }
@@ -270,17 +280,17 @@ public class AssistantFollowupService {
             }
             if (followups == null) {
                 // 稳流② Q8②：空卷与解析失败分开记（前者=模型零输出，后者=输出无法解析/条数不足）
-                recordOutcome(raw == null || raw.isBlank() ? "empty-raw" : "parse-failed");
+                recordOutcome(tenantId, raw == null || raw.isBlank() ? "empty-raw" : "parse-failed");
                 log.info("[AssistantFollowup] 响应无有效追问(前端回退静态池) message={} raw={}", messageId,
                     raw != null && raw.length() > 200 ? raw.substring(0, 200) : raw);
                 return;
             }
-            recordOutcome("succeeded");
+            recordOutcome(tenantId, "succeeded");
             conversationService.writeFollowupSuggestions(tenantId, messageId, MAPPER.writeValueAsString(followups));
             log.info("[AssistantFollowup] 追问建议已生成 message={} {}", messageId, followups);
         } catch (Exception e) {
             // 稳流② Q8②：reactor blockLast 超时=IllegalStateException("Timeout on blocking read…")
-            recordOutcome(e.getMessage() != null && e.getMessage().contains("Timeout") ? "timeout" : "other");
+            recordOutcome(tenantId, e.getMessage() != null && e.getMessage().contains("Timeout") ? "timeout" : "other");
             log.warn("[AssistantFollowup] 生成失败(放弃, 前端回退静态池) message={}", messageId, e);
         }
     }

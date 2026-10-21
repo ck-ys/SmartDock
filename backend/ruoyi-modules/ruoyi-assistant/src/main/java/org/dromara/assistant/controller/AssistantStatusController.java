@@ -84,12 +84,14 @@ public class AssistantStatusController extends BaseController {
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/admin/health")
     public R<Map<String, Object>> assistantHealth() {
+        String tenantId = LoginHelper.getTenantId();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("since", java.time.LocalDateTime.ofInstant(
             java.time.Instant.ofEpochMilli(java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime()),
             java.time.ZoneId.of("Asia/Shanghai")).toString());
-        out.put("runOutcomes", runRecorder.terminalOutcomeSnapshot());
-        out.put("followupOutcomes", followupService.followupOutcomeSnapshot());
+        // glm53 审查 P2-2：两张分布按登录租户过滤（池满丢弃类全局桶随 followup 侧合并下发）
+        out.put("runOutcomes", runRecorder.terminalOutcomeSnapshot(tenantId));
+        out.put("followupOutcomes", followupService.followupOutcomeSnapshot(tenantId));
         return R.ok(out);
     }
 

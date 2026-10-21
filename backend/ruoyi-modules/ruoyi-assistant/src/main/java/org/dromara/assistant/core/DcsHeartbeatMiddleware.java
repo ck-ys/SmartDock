@@ -70,6 +70,10 @@ public class DcsHeartbeatMiddleware implements MiddlewareBase {
      * 会话级去重：外层阶段（如 onAgent）已起心跳则内层钩（onReasoning/onActing）直通。
      * 键=RuntimeContext.getSessionId()（agent 会话粒度）；值=完成信号（null=占位无义）。
      * 会话结束 doFinally 移除键，异常路径由 remove 兜底。
+     * <p><b>已知取舍</b>（glm53 审查 P2-7，实测不修）：注册发生在装配期（merge 决策需要），
+     * 若装配后流从未被订阅（请求断在订阅前），键滞留=该会话后续阶段直通缺心跳——
+     * 窗口极窄且前端 600s 看门狗+onStall 弹窗兜底用户可感知；换订阅期注册需重构
+     * merge 决策时机，不值。</p>
      */
     private final Map<String, CompletableFuture<Void>> activeHeartbeats = new ConcurrentHashMap<>();
 
