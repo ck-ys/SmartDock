@@ -2379,7 +2379,13 @@ const MCP_ACTION_TXT: Record<string, string> = {
   MOUNT_ERROR: '挂载失败',
   CALL_OK: '调用成功',
   CALL_ERROR: '调用失败',
-  RATE_LIMITED: '触发限频'
+  RATE_LIMITED: '触发限频',
+  // G3-A1：elicitation 反问全生命周期（ask=挂起提问；终态=用户三态作答或超时关闭）
+  ELICIT_ASK: '反问用户',
+  ELICIT_ACCEPT: '反问已作答',
+  ELICIT_DECLINE: '反问被拒绝',
+  ELICIT_CANCEL: '反问被关闭',
+  ELICIT_TIMEOUT: '反问超时关闭'
 };
 async function loadMcpServers() {
   mcpLoading.value = true;

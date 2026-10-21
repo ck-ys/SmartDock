@@ -147,7 +147,7 @@
       :key="ec.id"
       :card="ec"
       :thread-id="sessionThreadId ?? ''"
-      @done="(id) => (turn.elicitations = turn.elicitations.filter((c) => c.id !== id))"
+      @done="(id) => emit('elicit-done', id)"
     />
 
     <!-- 正文气泡：流式=纯文本+光标（S-23 仅末段增量）；完成=全量 md；
@@ -436,6 +436,9 @@ const emit = defineEmits<{
   resume: [];
   /** Q12-② 停止思考：思考进行中胶囊旁中断入口——上浮到宿主 onStop（复用整轮停止通道） */
   stop: [];
+  /** G3 反问卡收卡（作答/超时）上浮宿主 store 移除——不在子组件里改 prop（eslint
+   *  vue/no-mutating-props，三审回修） */
+  'elicit-done': [id: string];
   'resolve-hitl': [approved: boolean, remember?: boolean, edits?: HitlEdits];
   'new-session': [];
   /** AU-35：错误卡「恢复挂起的确认」——上浮到状态机 recoverInterrupt（peek 悬挂缓存重建卡） */

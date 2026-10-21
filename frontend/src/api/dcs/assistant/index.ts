@@ -259,7 +259,8 @@ export interface AssistantElicitationCard {
   serverName: string;
   message: string;
   requestedSchema: Record<string, unknown>;
-  expiresAt: number;
+  /** 服务端下发的剩余可答时长（毫秒）——相对时长免疫两端时钟偏差，前端以 Date.now()+remainingMs 定本地到期时刻 */
+  remainingMs: number;
 }
 
 /** G3-A1：反问作答——与权限 HITL 的 resume 分轨，独立端点回填三态

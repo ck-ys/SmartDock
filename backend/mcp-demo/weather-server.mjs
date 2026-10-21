@@ -26,14 +26,16 @@ const WEATHER = {
 const pendingElicits = new Map();
 let elicitSeq = 0;
 
-/** 发 elicitation/create 并等待客户端作答（超时随请求方 requestTimeout，这里 280s 兜底防悬挂） */
+/** 发 elicitation/create 并等待客户端作答（超时随请求方 requestTimeout，这里 320s 兜底
+ *  防悬挂——须 > 后端默认 300s 答题窗：让后端桥的超时清扫先到（CANCEL 回填闭环），
+ *  本地兜底只作后端桥失效时的最后防线，避免「后端还挂着、server 先自尽」的答题死区） */
 function elicit(message, requestedSchema) {
   return new Promise((resolve) => {
     const id = `elicit-${++elicitSeq}`;
     const timer = setTimeout(() => {
       pendingElicits.delete(id);
       resolve({ action: 'cancel', content: {} });
-    }, 280_000);
+    }, 320_000);
     pendingElicits.set(id, {
       resolve: (result) => {
         clearTimeout(timer);

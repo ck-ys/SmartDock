@@ -157,6 +157,7 @@
         @mdnav="(u) => router.push(u)"
         @draft-set="onDraftSet"
         @plan-cancel="onPlanCancel"
+        @elicit-done="removeElicitationCard"
       />
 
       <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留） -->
@@ -488,6 +489,7 @@ const {
   cur,
   send,
   stop,
+  removeElicitationCard,
   resumeSay,
   resolveHitl,
   setAutoLevel,

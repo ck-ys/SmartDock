@@ -72,6 +72,7 @@
         :show-think="state.showThink"
         @resume="emit('resume')"
         @stop="emit('stop')"
+        @elicit-done="(id) => emit('elicit-done', id)"
         @resolve-hitl="(a, r, e) => emit('resolve-hitl', a, r, e)"
         @new-session="emit('new-session')"
         @recover-interrupt="emit('recover-interrupt')"
@@ -147,6 +148,8 @@ const emit = defineEmits<{
   resume: [];
   /** Q12-② 停止思考（TurnBlock 思考胶囊旁中断入口，转发宿主 onStop） */
   stop: [];
+  /** G3 反问卡收卡（TurnBlock 转发宿主 store 移除） */
+  'elicit-done': [id: string];
   resend: [text: string];
   /** BN-7：重试直发（TurnBlock 转发） */
   'resend-run': [text: string];

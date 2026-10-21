@@ -553,6 +553,18 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         t.hitl.cardState = 'done';
         t.hitl.cancelled = true;
       }
+      // G3 三审回修（dsflash P2-13）：反问卡是 run 内挂起（tools/call 在飞）——run
+      // 终态/契约失效即死卡（作答必得「已失效」），与 HITL 不同没有 resume 续命，全清
+      t.elicitations = [];
+    }
+  }
+
+  /** 反问卡作答/超时收卡（TurnBlock @done 上浮；id 全局唯一跨回合安全移除） */
+  function removeElicitationCard(id: string) {
+    for (const t of state.turns) {
+      if (t.elicitations.length > 0) {
+        t.elicitations = t.elicitations.filter((c) => c.id !== id);
+      }
     }
   }
 
@@ -693,14 +705,14 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         } else if (name === 'elicitation' && value && typeof value === 'object') {
           // G3-A1：MCP 外部工具执行中反问（server 侧在飞挂起，run 保持 RUNNING）——
           // 卡随本回合渲染，作答走独立端点（不走 resolveHitl/resume）；多 server 可同时反问
-          const v = value as { id?: unknown; serverName?: unknown; message?: unknown; requestedSchema?: unknown; expiresAt?: unknown };
+          const v = value as { id?: unknown; serverName?: unknown; message?: unknown; requestedSchema?: unknown; remainingMs?: unknown };
           if (typeof v.id === 'string' && v.id) {
             turn.elicitations.push({
               id: v.id,
               serverName: typeof v.serverName === 'string' ? v.serverName : '',
               message: typeof v.message === 'string' ? v.message : '',
               requestedSchema: (v.requestedSchema && typeof v.requestedSchema === 'object' ? v.requestedSchema : {}) as Record<string, unknown>,
-              expiresAt: typeof v.expiresAt === 'number' ? v.expiresAt : Date.now() + 300_000
+              remainingMs: typeof v.remainingMs === 'number' ? v.remainingMs : 300_000
             });
           }
         } else if (name === 'todo' && value && typeof value === 'object') {
@@ -1820,6 +1832,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     cur,
     send,
     stop,
+    removeElicitationCard,
     resumeSay,
     resolveHitl,
     setAutoLevel,

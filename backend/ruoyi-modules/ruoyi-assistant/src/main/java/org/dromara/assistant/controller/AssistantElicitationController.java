@@ -12,7 +12,6 @@ import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.ratelimiter.annotation.RateLimiter;
 import org.dromara.common.ratelimiter.enums.LimitType;
 import org.dromara.common.satoken.utils.LoginHelper;
-import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,8 +42,8 @@ public class AssistantElicitationController extends BaseController {
      */
     @SaCheckPermission("dcs:assistant:use")
     @RepeatSubmit(interval = 1000)
-    @RateLimiter(key = "elicitation:answer", count = 30, time = 60, limitType = LimitType.DEFAULT)
-    @Log(title = "AI助手-外部工具反问作答", businessType = BusinessType.OTHER)
+    @RateLimiter(key = "elicitation:answer", count = 30, time = 60, limitType = LimitType.IP)
+    @Log(title = "AI助手-外部工具反问作答", businessType = BusinessType.OTHER, isSaveRequestData = false)
     @PostMapping("/elicitation/answer")
     public R<Void> answer(@RequestBody ElicitAnswerBody body) {
         if (body == null || isBlank(body.getId()) || isBlank(body.getAction())) {
@@ -61,8 +60,12 @@ public class AssistantElicitationController extends BaseController {
                 return R.fail("回答内容过长（上限 4KB）");
             }
         }
+        // 三审回修（dsflash P1）：归属租户与挂起快照同源——挂起闭包来自 AgentFactory 的
+        // LoginUser.getTenantId()（登录快照）；原用 TenantHelper 动态租户在超管切租户场景
+        // 与快照恒不等=作答必被拒。stop 端点用动态是因 run 登记行按动态租户落库——两侧各与
+        // 自己的数据存储同源，勿互改
         String err = elicitationBridge.answer(
-            TenantHelper.getTenantId(), LoginHelper.getUserId(),
+            LoginHelper.getTenantId(), LoginHelper.getUserId(),
             body.getThreadId(), body.getId(), body.getAction(), body.getContent());
         return err == null ? R.ok() : R.fail(err);
     }

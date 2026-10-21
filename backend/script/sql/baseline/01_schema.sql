@@ -3950,7 +3950,8 @@ CREATE TABLE IF NOT EXISTS public.dcs_mcp_call_log (
     error_msg character varying(500),
     create_time timestamp without time zone,
     CONSTRAINT pk_dcs_mcp_call_log PRIMARY KEY (id),
-    CONSTRAINT ck_dcs_mcp_call_action CHECK (action IN ('MOUNT_OK', 'MOUNT_ERROR', 'CALL_OK', 'CALL_ERROR', 'RATE_LIMITED')),
+    -- G3 三审回修（双席共识 P0）：原五值约束拒收全部 ELICIT_* 审计（elicitation 反问五态）
+    CONSTRAINT ck_dcs_mcp_call_action CHECK (action IN ('MOUNT_OK', 'MOUNT_ERROR', 'CALL_OK', 'CALL_ERROR', 'RATE_LIMITED', 'ELICIT_ASK', 'ELICIT_ACCEPT', 'ELICIT_DECLINE', 'ELICIT_CANCEL', 'ELICIT_TIMEOUT')),
     CONSTRAINT ck_dcs_mcp_call_status CHECK (status IN ('0', '1'))
 );
 CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_tenant_time ON public.dcs_mcp_call_log (tenant_id, create_time DESC);

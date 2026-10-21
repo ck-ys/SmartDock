@@ -104,6 +104,10 @@ public class McpPilotService {
     /** G3-A1：elicitation 反问桥——STDIO 行注册 handler（挂起等用户作答），HTTP 行暂不开（sync handler 阻塞入站线程的滞留风险待真机观察） */
     private final org.dromara.assistant.core.AssistantElicitationBridge elicitationBridge;
 
+    /** G3-A1 三审回修：STDIO 工具调用自身预算（不含答题）——反问前后处理+收尾的余量 */
+    @Value("${smartdock.mcp.tool-budget-seconds:120}")
+    private int toolBudgetSeconds;
+
     /* ============================ 管理面 ============================ */
 
     public List<DcsMcpServer> listEnabledForPlatform() {
@@ -298,10 +302,17 @@ public class McpPilotService {
                 // G3-A1：STDIO 行开 elicitation 反问桥。坑（调研实证）：requestTimeout
                 // 覆盖 tools/call 全程含等用户答题的时长——10s 不调大则用户答得再快也常超时。
                 // 注册 handler 才会向 server 声明 ClientCapabilities.elicitation（天然 opt-in，
-                // 不注册的行行为零变化）；timeout=答题上限+30s 往返余量
+                // 不注册的行行为零变化）。
+                // 三审回修（dspro P1-3）：预算显式拆分——requestTimeout=答题上限+工具预算
+                // （反问前后处理/收尾），固定 30s 余量在"server 先干活再反问/答完还要收尾/
+                // 单调用多轮反问"时必超；工具预算可配，默认 120s。总额钳 595s 保恒等式
+                // （答题+handler 余量+工具预算 < 600s 纯心跳收割线——elicit 顶配 540 时
+                // 120s 预算会被压到 55s，宁可工具预算缩水也不能让 run 被收割）。注：单次
+                // 调用多轮反问仍共享同一预算（框架 requestTimeout 单值），v1 已知边界
                 boolean stdio = "STDIO".equals(row.getTransportType());
                 McpClientBuilder builder = McpClientBuilder.create(row.getServerName())
-                    .timeout(Duration.ofSeconds(stdio ? elicitationBridge.elicitTimeoutSeconds() + 30L : 10))
+                    .timeout(Duration.ofSeconds(stdio
+                        ? Math.min(595L, elicitationBridge.elicitTimeoutSeconds() + 5L + toolBudgetSeconds) : 10))
                     .initializationTimeout(Duration.ofSeconds(10));
                 if (stdio) {
                     builder.stdioTransport(row.getCommand(), parseArgs(row.getArgs()), Map.of())

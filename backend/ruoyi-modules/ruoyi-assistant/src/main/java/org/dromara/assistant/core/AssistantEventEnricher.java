@@ -136,9 +136,10 @@ public class AssistantEventEnricher implements AguiEventEnricher {
             java.util.List<java.util.Map<String, Object>> cards = elicitationBridge.take(context.getThreadId());
             if (cards != null && !cards.isEmpty()) {
                 out = new java.util.ArrayList<>(out);
-                for (java.util.Map<String, Object> card : cards) {
+                // 逆序插头=保持桥的提交顺序（三审回修 P2：正序逐个 add(0) 会把多卡倒放）
+                for (int i = cards.size() - 1; i >= 0; i--) {
                     out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
-                        "elicitation", card));
+                        "elicitation", cards.get(i)));
                 }
             }
         }
