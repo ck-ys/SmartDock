@@ -112,28 +112,60 @@ npm run dev
 
 访问 http://localhost:5188，使用 `admin / admin123` 登录。端口冲突时，前端改 `frontend/.env.development` 的 `VITE_APP_PORT`，后端用 `--server.port=` 覆盖。
 
-### 方式二：Docker Compose
+### 方式二：Docker Compose（Linux 服务器推荐）
+
+编排文件在 **`deploy/docker-compose.yml`**，包含 postgres / redis / minio / backend / frontend 五个服务。
+Dockerfile 的构建上下文是**仓库根目录**，镜像会直接拷 `backend/ruoyi-admin/target/ruoyi-admin.jar`
+与 `frontend/dist/`——所以**必须先构建产物**，再启动编排。
+
+**1. 准备环境**
+
+- Docker Engine 24+ 与 Docker Compose v2（按官方文档安装：<https://docs.docker.com/engine/install/>）
+- 构建工具：JDK 21、Maven 3.8+、Node.js ≥ 20.19
+- 也可以在本地构建好 `ruoyi-admin.jar` 与 `dist/` 后上传到服务器，只装 Docker
+
+**2. 构建产物**
 
 ```bash
-# 构建后端
-cd backend && mvn clean package -DskipTests
+git clone https://gitee.com/rickie182/smart-dock.git
+cd smart-dock
 
-# 构建前端
-cd ../frontend && npm ci && npm run build:prod
-
-# 启动服务（口令必须替换为强口令）
-cd ../deploy
-POSTGRES_PASSWORD='replace-with-strong-password' \
-REDIS_PASSWORD='replace-with-strong-password' \
-MINIO_PASSWORD='replace-with-strong-password' \
-  docker compose up -d --build
+cd backend && mvn clean package -DskipTests && cd ..
+cd frontend && npm ci && npm run build:prod && cd ..
 ```
 
-访问 http://localhost（可用 `HTTP_PORT` 改端口）。
+**3. 配置口令并启动**
 
-- 默认值仅用于本地演示：不覆盖时 PostgreSQL/Redis 为 `changeit`，MinIO 为 `minioadmin`，**生产环境必须全部替换**。
-- compose 将 `backend/script/sql/baseline/` 挂载为初始化目录，首次启动会执行 **01→07 全部 SQL（含 05 演示数据）**。不需要演示数据时，在首次启动前把 `05_demo_data.optional.sql` 移出该目录。
-- `deploy/data/postgres` 是持久化数据卷；修改基线 SQL 后重启不会重放，需清空数据卷后重新初始化。
+在 `deploy/` 下新建 `.env`（compose 会自动读取，勿提交）：
+
+```bash
+POSTGRES_PASSWORD=换成强口令
+REDIS_PASSWORD=换成强口令
+MINIO_PASSWORD=换成强口令
+HTTP_PORT=80
+```
+
+```bash
+cd deploy
+docker compose up -d --build
+docker compose ps        # 五个服务应为 running / healthy
+```
+
+**4. 访问与首启配置**
+
+浏览器打开 `http://<服务器IP>/`，用 `admin / admin123` 登录并**立即改密**；
+再到「AI 模型配置」录入供应商 Key 与 CNY 价格行，在「AI 助手管理」设为默认模型
+（基线不含任何 Key，未配置时助手会明确提示）。
+
+**5. Linux 运维要点**
+
+- **端口**：`HTTP_PORT`（默认 80）对外；MinIO API `9000` 对外供附件直链；管理台 `9001` 只绑 `127.0.0.1`，远程用 `ssh -L 9001:127.0.0.1:9001 user@host` 访问。
+- **防火墙**：只放行 80/443 与 9000；不要暴露 9001 与数据库/Redis 端口。
+- **数据**：持久化在 `deploy/data/{postgres,redis,minio}`，日志在 `deploy/logs/`；备份直接打包 `deploy/data`。
+- **升级/回滚**：重新构建产物后 `docker compose up -d --build`；`docker compose down`（不加 `-v`）保留数据，可回退镜像。
+- **初始化 SQL**：首次启动自动执行 `backend/script/sql/baseline/` 的 01→07（含 05 演示数据）；不需要演示数据时，在**首次启动前**把 `05_demo_data.optional.sql` 移出该目录。修改 SQL 后需清空 `deploy/data/postgres` 才会重放。
+- **HTTPS**：compose 只监听 80，生产建议在前面加 Nginx/Caddy 终止 TLS，再反代到 `HTTP_PORT`。
+- 裸机部署、健康检查与更多细节见 [docs/deploy.md](docs/deploy.md)。
 
 ## 技术架构
 
