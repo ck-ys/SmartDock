@@ -246,9 +246,13 @@ export function createAguiClient(options: AguiClientOptions = {}) {
           }
           return 'stopped';
         }
-        const rr = r as ReadableStreamReadResult<Uint8Array>;
-        value = rr.value;
-        done = rr.done;
+        if (!r || typeof r !== 'object' || !('done' in r)) {
+          // G5 三审回修（dspro P2）：race 只应产出读结果/哨兵——哨兵路径已在上方全部
+          // return/continue/throw，落到这里=未来新增哨兵的静默空转，显式抛错暴露
+          throw new DOMException('unexpected race result', 'AbortError');
+        }
+        value = r.value;
+        done = r.done;
         pendingRead = null;
       } catch (e) {
         stallCancel?.();

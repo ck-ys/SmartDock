@@ -314,6 +314,7 @@ const addDialog = reactive({
 const openAdd = () => {
   addDialog.form = {
     eventType: '',
+    ruleScope: 'EVENT',
     description: '',
     weight: 5,
     windowMinutes: 60,

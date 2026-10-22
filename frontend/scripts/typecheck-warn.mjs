@@ -21,7 +21,13 @@ const r = spawnSync(process.execPath, [vueTscBin, "--noEmit"], {
   stdio: ["ignore", "pipe", "pipe"],
   encoding: "utf8",
   cwd: process.cwd(),
+  timeout: 10 * 60_000,
+  maxBuffer: 16 * 1024 * 1024,
 });
+if (r.error?.code === "ETIMEDOUT") {
+  console.error("[type-check] vue-tsc 超时（10 分钟）——fail-closed 中断构建");
+  process.exit(1);
+}
 
 if (r.error) {
   console.error(`[type-check] 无法启动 vue-tsc（${r.error.message}）——fail-closed 中断构建，请排查依赖`);

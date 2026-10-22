@@ -1425,7 +1425,7 @@ onMounted(() => {
   colHostEl = host;
   colHostObserver = new ResizeObserver((entries) => {
     // borderBox 口径（同 StatPanel：宿主 padding 变化不算宽变，防让位反馈环）
-    const b = (entries[0] as { borderBoxWidth?: ResizeObserverSize | readonly ResizeObserverSize[] }).borderBoxWidth ?? entries[0]?.borderBoxSize;
+    const b = entries[0]?.borderBoxSize;
     const single = Array.isArray(b) ? b[0] : b;
     const w = single?.inlineSize ?? entries[0]?.contentRect.width ?? 0;
     if (w >= COL_STEP_HOST_W) {

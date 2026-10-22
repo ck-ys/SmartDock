@@ -157,13 +157,16 @@ const isDark = useDark({
   valueLight: 'light'
 });
 // 匹配菜单颜色
-watch(isDark, () => {
-  if (isDark.value) {
-    settingsStore.sideTheme = SideThemeEnum.DARK;
-  } else {
-    settingsStore.sideTheme = sideTheme.value;
-  }
-});
+// G5 三审回修（dspro+dsflash 双席 P1）：settingsStore.dark 此前无任何写入点——
+// 暗色 Logo 分支恒为死代码。此处为唯一状态源，immediate 让刷新后立即按持久化暗色态纠正。
+watch(
+  isDark,
+  (v) => {
+    settingsStore.dark = v;
+    settingsStore.sideTheme = v ? SideThemeEnum.DARK : sideTheme.value;
+  },
+  { immediate: true }
+);
 const toggleDark = () => useToggle(isDark);
 
 /** 菜单导航设置 */

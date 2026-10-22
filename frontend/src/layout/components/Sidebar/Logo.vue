@@ -38,18 +38,18 @@ const sideTheme = computed(() => settingsStore.sideTheme);
 // 获取Logo背景色
 const getLogoBackground = computed(() => {
   if (settingsStore.dark) {
-    return 'var(--sidebar-bg)';
+    return variables.menuBackground;
   }
   if (settingsStore.navType == NavTypeEnum.TOP) {
     return variables.menuLightBackground;
   }
-  return sideTheme.value === 'theme-dark' ? variables.menuBg : variables.menuLightBackground;
+  return sideTheme.value === 'theme-dark' ? variables.menuBackground : variables.menuLightBackground;
 });
 
 // 获取Logo文字颜色
 const getLogoTextColor = computed(() => {
   if (settingsStore.dark) {
-    return 'var(--sidebar-text)';
+    return variables.menuColor;
   }
   if (settingsStore.navType == NavTypeEnum.TOP) {
     return variables.logoLightTitleColor;

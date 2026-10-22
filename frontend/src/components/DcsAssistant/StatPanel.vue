@@ -156,7 +156,7 @@ let cleanupHost: HTMLElement | null = null;
  *  规范坑：ResizeObserverSize 的字段是 inlineSize/blockSize，没有 .width——写 .width 恒
  *  undefined 会静默回退 contentRect（selfW 恒初始值的实锤根因） */
 function borderBoxW(entry: ResizeObserverEntry | undefined | null): number {
-  const b = (entry as { borderBoxWidth?: ResizeObserverSize | readonly ResizeObserverSize[] } | undefined | null)?.borderBoxWidth ?? entry?.borderBoxSize;
+  const b = entry?.borderBoxSize;
   const single = Array.isArray(b) ? b[0] : b;
   return single?.inlineSize ?? entry?.contentRect.width ?? 0;
 }

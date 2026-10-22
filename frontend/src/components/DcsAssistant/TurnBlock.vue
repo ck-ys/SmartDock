@@ -384,8 +384,6 @@ import FormCard from './FormCard.vue';
 import TemplateCard from './TemplateCard.vue';
 import PlanCard from './PlanCard.vue';
 import ElicitCard from './ElicitationCard.vue';
-// 批4回修 P2（两席共识）：异步组件——echarts（gzip ~300KB）只在回答真出现图占位时才下载，
-// 不随抽屉 chunk 人人必载；createVNode 支持异步组件，加载完成自动填充 host
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
 import { turnStateWord } from './assistantCtx';
@@ -395,6 +393,8 @@ import { submitFeedback, listConversations, listMessages, exportAssistantReport 
 import { pushToast } from './toastStore';
 import { useFavs } from './favStore';
 import { findVisibleHitlDock } from './util';
+// 批4回修 P2（两席共识）：异步组件——echarts（gzip ~300KB）只在回答真出现图占位时才下载，
+// 不随抽屉 chunk 人人必载；createVNode 支持异步组件，加载完成自动填充 host
 const ChartBlock = defineAsyncComponent(() => import('./ChartBlock.vue'));
 
 const props = defineProps<{
