@@ -1,5 +1,6 @@
 package com.smartdock.analytics.mapper;
 
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -51,4 +52,14 @@ public interface AnalyticsVisitorFirstSeenMapper {
     long countSince(@Param("tenantId") String tenantId,
                     @Param("source") String source,
                     @Param("since") Date since);
+
+    /** 数据接入页「清掉模拟数据」: 按前缀删模拟访客首见行, 与事件一起清不留幽灵新访客。 */
+    @Delete("""
+        DELETE FROM analytics_visitor_first_seen
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND visitor_key LIKE #{prefix} || '%'
+        """)
+    int deleteByVisitorKeyPrefix(@Param("tenantId") String tenantId,
+                                 @Param("source") String source,
+                                 @Param("prefix") String prefix);
 }

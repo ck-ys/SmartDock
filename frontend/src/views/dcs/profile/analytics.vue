@@ -30,6 +30,184 @@
     </el-card>
 
     <el-tabs v-model="tab" class="analytics-tabs" @tab-change="onTabChange">
+      <!-- ---------------------------------------------------------- 数据接入（2026-10-22 拍板·全按推荐：一页三块） -->
+      <el-tab-pane label="数据接入" name="collect" lazy>
+        <el-card shadow="never" class="panel-card">
+          <template #header>
+            <div class="panel-head"><span>① 先看看</span><span class="muted">不用有自己的网站，点一下就知道链路通不通</span></div>
+          </template>
+          <div class="intake-row">
+            <el-button v-hasPermi="['analytics:center:edit']" type="success" :loading="intakeSimulating" @click="runSimulate">
+              模拟 3 个访客访问
+            </el-button>
+            <el-button v-hasPermi="['analytics:center:edit']" link type="danger" :loading="intakeClearing" @click="clearSim">清掉模拟数据</el-button>
+            <el-button link type="primary" @click="gotoRealtime">看实时看板 →</el-button>
+          </div>
+          <el-alert
+            v-if="intakeSimResult"
+            type="success"
+            :closable="false"
+            class="intake-gap"
+            :title="`已入库 ${intakeSimResult.written} 条模拟事件（${intakeSimResult.visitors} 个访客）——切到「实时看板」能看到数字在跳`"
+          />
+          <p class="muted small">模拟数据带独立标记，随时一键清掉，不影响演示库自带数据的统计口径。</p>
+        </el-card>
+
+        <el-card shadow="never" class="panel-card">
+          <template #header>
+            <div class="panel-head"><span>② 接我的网站</span><span class="muted">起个名字 → 复制接入代码贴进网页 → 点检测</span></div>
+          </template>
+          <div class="intake-row">
+            <el-input v-model="intakeSiteName" class="intake-name" maxlength="64" placeholder="站点名，如：公司官网" />
+            <el-button v-hasPermi="['analytics:center:edit']" type="primary" :loading="intakeCreating" @click="createSite">
+              创建并生成代码
+            </el-button>
+          </div>
+          <template v-if="intakeSite">
+            <pre class="code-block">{{ intakeSnippet }}</pre>
+            <div class="intake-row">
+              <el-button type="primary" @click="copyIntakeSnippet">复制接入代码</el-button>
+              <span class="muted small">地址已自动写死为本系统地址——贴到任何网页都能用（不依赖你网页自己的域名）</span>
+            </div>
+            <div class="intake-row">
+              <el-button v-hasPermi="['analytics:center:edit']" :loading="intakeDetecting" @click="detectSite">检测接入</el-button>
+              <template v-if="intakeDetect">
+                <el-tag :type="intakeDetect.keyValid ? 'success' : 'danger'">钥匙{{ intakeDetect.keyValid ? '有效' : '无效' }}</el-tag>
+                <el-tag :type="intakeDetect.testReceived ? 'success' : 'warning'">
+                  测试事件{{ intakeDetect.testReceived ? '已收到' : '未收到' }}
+                </el-tag>
+                <el-tag :type="intakeDetect.hasData ? 'success' : 'info'">看板{{ intakeDetect.hasData ? '已有数据' : '暂无数据' }}</el-tag>
+              </template>
+            </div>
+            <el-alert
+              v-if="intakeDetectAllGreen"
+              type="success"
+              :closable="false"
+              class="intake-gap"
+              title="服务端链路已通（钥匙有效、测试事件已收到）——把上面的代码贴进你的网站后，真实访问会自动出现在「流量概览」"
+            />
+          </template>
+          <p v-else class="muted small">还没有自己的站点：点上面按钮起个名字即可，钥匙由系统自动签发，全程不用抄写。</p>
+        </el-card>
+
+        <el-card shadow="never" class="panel-card">
+          <template #header>
+            <div class="panel-head"><span>③ 导入历史数据</span><span class="muted">离线事件补录 · 最多 5000 行</span></div>
+          </template>
+          <p class="muted small">
+            表头需包含
+            <code>eventName</code
+            >，可选列：eventUid、subjectType、subjectId、anonymousId、sessionId、occurredTime、pageUrl、keyword、referrer、channel、deviceType、os、browser、country、province、city、props。
+          </p>
+          <el-input
+            v-model="csvText"
+            type="textarea"
+            :rows="5"
+            placeholder="eventName,anonymousId,sessionId,occurredTime,pageUrl&#10;page_view,demo-visitor,demo-session,2026-10-19 10:00:00,/home"
+          />
+          <div class="import-actions">
+            <el-button @click="fillCsvSample">填入示例</el-button>
+            <el-button @click="csvText = ''">清空</el-button>
+            <el-button v-hasPermi="['analytics:center:edit']" type="primary" :loading="importing" @click="submitCsv">导入</el-button>
+          </div>
+        </el-card>
+
+        <el-collapse class="intake-adv">
+          <el-collapse-item name="adv" title="高级（站点清单 · 采集质量 · 全域总览）">
+          <el-card shadow="never" class="panel-card" v-loading="crossLoading">
+            <template #header>
+              <div class="panel-head">
+                <span>全域总览</span>
+                <span class="muted">近 {{ crossData?.days ?? 30 }} 天 · 跨业务源直读事件账本</span>
+              </div>
+            </template>
+            <div class="stat-grid" v-if="crossData?.sources?.length">
+              <div class="stat" v-for="s in crossData.sources" :key="s.source">
+                <span class="stat-label">{{ s.source }} 事件</span>
+                <strong>{{ formatNumber(s.events) }}</strong>
+                <span class="muted small">访客 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
+              </div>
+            </div>
+            <el-empty v-else :image-size="50" description="还没有任何业务源写入事件" />
+            <p class="muted small">画像引擎按统一事件协议接收任意业务源（网站 / 订单 / 供应链…）；每个源独立统计互不混算。</p>
+          </el-card>
+
+          <el-card shadow="never" class="panel-card" v-loading="qualityLoading">
+            <template #header>
+              <div class="panel-head">
+                <span>采集质量</span>
+                <span class="muted">近 {{ quality?.days ?? 7 }} 天 · 拒收与跳过留痕，不进统计口径</span>
+              </div>
+            </template>
+            <div class="stat-grid">
+              <div class="stat">
+                <span class="stat-label">机器人拦截（事件）</span>
+                <strong>{{ formatNumber(reasonEvents('robot')) }}</strong>
+              </div>
+              <div class="stat">
+                <span class="stat-label">跨域拒绝（事件）</span>
+                <strong>{{ formatNumber(reasonEvents('domain_mismatch')) }}</strong>
+              </div>
+              <div class="stat">
+                <span class="stat-label">重复投递（事件）</span>
+                <strong>{{ formatNumber(reasonEvents('duplicate')) }}</strong>
+              </div>
+              <div class="stat">
+                <span class="stat-label">丢弃率</span>
+                <strong>{{ formatPercent(quality?.discardRate) }}</strong>
+              </div>
+            </div>
+            <el-empty v-if="quality && !quality.byReason?.length" :image-size="60" description="窗口期内没有丢弃记录，采集很干净" />
+            <el-row v-else :gutter="14">
+              <el-col :xs="24" :md="12">
+                <el-table :data="quality?.byReason || []" size="small">
+                  <el-table-column prop="reason" label="丢弃原因" width="140">
+                    <template #default="{ row }">
+                      <el-tag size="small" :type="reasonMeta(row.reason).tag">{{ reasonMeta(row.reason).label }}</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="batches" label="批次数" width="80" />
+                  <el-table-column prop="events" label="事件数" width="80" />
+                </el-table>
+              </el-col>
+              <el-col :xs="24" :md="12">
+                <p v-if="quality?.topRobots?.length" class="muted small">
+                  Top 机器人：{{ quality.topRobots.slice(0, 3).map((x) => shortUa(x.userAgent)).join(' · ') }}
+                </p>
+                <p v-if="quality?.topMismatches?.length" class="muted small">
+                  Top 被拒来源：{{ quality.topMismatches.slice(0, 3).map((x) => x.originHost || '(未知来源)').join(' · ') }}
+                </p>
+                <p class="muted small">丢弃原因：robot=机器人整批拒 · domain_mismatch=非白名单来源 · duplicate=重复 eventUid · schema_invalid=校验失败</p>
+              </el-col>
+            </el-row>
+          </el-card>
+
+          <el-row :gutter="14">
+            <el-col :xs="24" :lg="12">
+              <el-card shadow="never" class="panel-card" v-loading="siteLoading">
+                <template #header>
+                  <div class="panel-head">
+                    <span>采集站点</span>
+                    <span class="muted">公开采集接口 /analytics/collect</span>
+                  </div>
+                </template>
+                <el-table :data="sites" size="small">
+                  <el-table-column prop="siteName" label="站点" min-width="120" />
+                  <el-table-column prop="siteKey" label="siteKey" min-width="130">
+                    <template #default="{ row }"
+                      ><code class="mono">{{ row.siteKey }}</code></template
+                    >
+                  </el-table-column>
+                  <el-table-column prop="source" label="业务源" width="90" />
+                  <el-table-column prop="allowedDomains" label="允许域名" min-width="140" show-overflow-tooltip />
+                  <template #empty><el-empty :image-size="50" description="还没有采集站点" /></template>
+                </el-table>
+              </el-card>
+            </el-col>
+          </el-row>
+        </el-collapse-item>
+      </el-collapse>
+    </el-tab-pane>
       <!-- ---------------------------------------------------------- 流量概览 -->
       <el-tab-pane label="流量概览" name="overview">
         <div v-loading="overviewLoading" class="stat-grid">
@@ -525,139 +703,7 @@
         </el-card>
       </el-tab-pane>
 
-      <!-- ---------------------------------------------------------- 数据采集 -->
-      <el-tab-pane label="数据采集" name="collect" lazy>
-        <el-card shadow="never" class="panel-card" v-loading="crossLoading">
-          <template #header>
-            <div class="panel-head">
-              <span>全域总览</span>
-              <span class="muted">近 {{ crossData?.days ?? 30 }} 天 · 跨业务源直读事件账本</span>
-            </div>
-          </template>
-          <div class="stat-grid" v-if="crossData?.sources?.length">
-            <div class="stat" v-for="s in crossData.sources" :key="s.source">
-              <span class="stat-label">{{ s.source }} 事件</span>
-              <strong>{{ formatNumber(s.events) }}</strong>
-              <span class="muted small">访客 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
-            </div>
-          </div>
-          <el-empty v-else :image-size="50" description="还没有任何业务源写入事件" />
-          <p class="muted small">画像引擎按统一事件协议接收任意业务源（网站 / 订单 / 供应链…）；每个源独立统计互不混算。</p>
-        </el-card>
 
-        <el-card shadow="never" class="panel-card" v-loading="qualityLoading">
-          <template #header>
-            <div class="panel-head">
-              <span>采集质量</span>
-              <span class="muted">近 {{ quality?.days ?? 7 }} 天 · 拒收与跳过留痕，不进统计口径</span>
-            </div>
-          </template>
-          <div class="stat-grid">
-            <div class="stat">
-              <span class="stat-label">机器人拦截（事件）</span>
-              <strong>{{ formatNumber(reasonEvents('robot')) }}</strong>
-            </div>
-            <div class="stat">
-              <span class="stat-label">跨域拒绝（事件）</span>
-              <strong>{{ formatNumber(reasonEvents('domain_mismatch')) }}</strong>
-            </div>
-            <div class="stat">
-              <span class="stat-label">重复投递（事件）</span>
-              <strong>{{ formatNumber(reasonEvents('duplicate')) }}</strong>
-            </div>
-            <div class="stat">
-              <span class="stat-label">丢弃率</span>
-              <strong>{{ formatPercent(quality?.discardRate) }}</strong>
-            </div>
-          </div>
-          <el-empty v-if="quality && !quality.byReason?.length" :image-size="60" description="窗口期内没有丢弃记录，采集很干净" />
-          <el-row v-else :gutter="14">
-            <el-col :xs="24" :md="12">
-              <el-table :data="quality?.byReason || []" size="small">
-                <el-table-column prop="reason" label="丢弃原因" width="140">
-                  <template #default="{ row }">
-                    <el-tag size="small" :type="reasonMeta(row.reason).tag">{{ reasonMeta(row.reason).label }}</el-tag>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="batches" label="批次数" width="80" />
-                <el-table-column prop="events" label="事件数" width="80" />
-              </el-table>
-            </el-col>
-            <el-col :xs="24" :md="12">
-              <p v-if="quality?.topRobots?.length" class="muted small">
-                Top 机器人：{{ quality.topRobots.slice(0, 3).map((x) => shortUa(x.userAgent)).join(' · ') }}
-              </p>
-              <p v-if="quality?.topMismatches?.length" class="muted small">
-                Top 被拒来源：{{ quality.topMismatches.slice(0, 3).map((x) => x.originHost || '(未知来源)').join(' · ') }}
-              </p>
-              <p class="muted small">丢弃原因：robot=机器人整批拒 · domain_mismatch=非白名单来源 · duplicate=重复 eventUid · schema_invalid=校验失败</p>
-            </el-col>
-          </el-row>
-        </el-card>
-
-        <el-row :gutter="14">
-          <el-col :xs="24" :lg="12">
-            <el-card shadow="never" class="panel-card" v-loading="siteLoading">
-              <template #header>
-                <div class="panel-head">
-                  <span>采集站点</span>
-                  <span class="muted">公开采集接口 /analytics/collect</span>
-                </div>
-              </template>
-              <el-table :data="sites" size="small">
-                <el-table-column prop="siteName" label="站点" min-width="120" />
-                <el-table-column prop="siteKey" label="siteKey" min-width="130">
-                  <template #default="{ row }"
-                    ><code class="mono">{{ row.siteKey }}</code></template
-                  >
-                </el-table-column>
-                <el-table-column prop="source" label="业务源" width="90" />
-                <el-table-column prop="allowedDomains" label="允许域名" min-width="140" show-overflow-tooltip />
-                <template #empty><el-empty :image-size="50" description="还没有采集站点" /></template>
-              </el-table>
-            </el-card>
-          </el-col>
-          <el-col :xs="24" :lg="12">
-            <el-card shadow="never" class="panel-card">
-              <template #header>
-                <div class="panel-head">
-                  <span>一行接入</span>
-                  <el-button link type="primary" @click="copySnippet">复制片段</el-button>
-                </div>
-              </template>
-              <pre class="code-block">{{ snippet }}</pre>
-              <p class="muted small">
-                SDK 自动完成：访客 ID、30 分钟会话、page_view、SPA 路由变化、批量上报与 sendBeacon 兜底；断网自动补传，setConsent(false) 可随时关闭采集。
-              </p>
-            </el-card>
-          </el-col>
-        </el-row>
-
-        <el-card shadow="never" class="panel-card">
-          <template #header>
-            <div class="panel-head">
-              <span>CSV 导入</span>
-              <span class="muted">离线事件补录 · 最多 5000 行</span>
-            </div>
-          </template>
-          <p class="muted small">
-            表头需包含
-            <code>eventName</code
-            >，可选列：eventUid、subjectType、subjectId、anonymousId、sessionId、occurredTime、pageUrl、keyword、referrer、channel、deviceType、os、browser、country、province、city、props。
-          </p>
-          <el-input
-            v-model="csvText"
-            type="textarea"
-            :rows="5"
-            placeholder="eventName,anonymousId,sessionId,occurredTime,pageUrl&#10;page_view,demo-visitor,demo-session,2026-10-19 10:00:00,/home"
-          />
-          <div class="import-actions">
-            <el-button @click="fillCsvSample">填入示例</el-button>
-            <el-button @click="csvText = ''">清空</el-button>
-            <el-button v-hasPermi="['analytics:center:edit']" type="primary" :loading="importing" @click="submitCsv">导入</el-button>
-          </div>
-        </el-card>
-      </el-tab-pane>
     </el-tabs>
 
     <!-- 会话详情抽屉 -->
@@ -761,6 +807,9 @@ import {
   getAnalyticsRealtime,
   getAnalyticsRetention,
   getAnalyticsSession,
+  clearAnalyticsSimulate,
+  createAnalyticsSite,
+  detectAnalyticsSite,
   getAnalyticsTrend,
   importAnalyticsCsv,
   listAnalyticsFunnels,
@@ -769,6 +818,7 @@ import {
   previewAnalyticsFunnel,
   rebuildAnalytics,
   runAnalyticsCustom,
+  simulateAnalyticsVisitors,
   saveAnalyticsFunnel,
   type AnalyticsBreakdown,
   type AnalyticsBreakdownRow,
@@ -795,7 +845,7 @@ use([CanvasRenderer, LineChart, BarChart, SankeyChart, GridComponent, LegendComp
 
 const source = ref('web');
 const days = ref(30);
-const tab = ref('overview');
+const tab = ref('collect');
 const loading = ref(false);
 const rebuilding = ref(false);
 
@@ -902,21 +952,101 @@ const channelOptions = computed(() => {
   return Array.from(set);
 });
 
-const snippet = computed(() => {
-  const siteKey = sites.value[0]?.siteKey || 'sd_demo_site';
+// ---------------------------------------------------------------- 数据接入（一页三块）
+const intakeSiteName = ref('');
+const intakeCreating = ref(false);
+const intakeSite = ref<AnalyticsSite | null>(null);
+const intakeSimulating = ref(false);
+const intakeClearing = ref(false);
+const intakeSimResult = ref<{ visitors: number; events: number; written: number } | null>(null);
+const intakeDetecting = ref(false);
+const intakeDetect = ref<{ keyValid: boolean; testReceived: boolean; hasData: boolean } | null>(null);
+
+/** 接入代码：地址在生成时固化为当前系统绝对地址（修「贴到用户自己网页后发错域名」bug） */
+const intakeSnippet = computed(() => {
+  const key = intakeSite.value?.siteKey || sites.value[0]?.siteKey || 'sd_demo_site';
+  const origin = window.location.origin;
   // 不能在 SFC 里直接写结束标签，否则会被 Vue 解析器当成脚本块结束
   const open = '<' + 'script';
   const close = '</' + 'script>';
   return [
-    `${open} src="/sdk/smartdock-analytics.js">${close}`,
+    `${open} src="${origin}/sdk/smartdock-analytics.js">${close}`,
     `${open}>`,
     '  SmartdockAnalytics.init({',
-    `    siteKey: '${siteKey}',`,
-    "    endpoint: location.origin + '/analytics/collect'",
+    `    siteKey: '${key}',`,
+    `    endpoint: '${origin}/analytics/collect'`,
     '  });',
     close
   ].join('\n');
 });
+const intakeDetectAllGreen = computed(
+  () => !!intakeDetect.value && intakeDetect.value.keyValid && intakeDetect.value.testReceived
+);
+
+const createSite = async () => {
+  const name = intakeSiteName.value.trim();
+  if (!name) {
+    ElMessage.warning('先给站点起个名字');
+    return;
+  }
+  intakeCreating.value = true;
+  try {
+    intakeSite.value = await createAnalyticsSite({ siteName: name });
+    intakeDetect.value = null;
+    ElMessage.success('站点已创建，接入代码已生成');
+    await loadSites();
+  } finally {
+    intakeCreating.value = false;
+  }
+};
+
+const runSimulate = async () => {
+  intakeSimulating.value = true;
+  try {
+    intakeSimResult.value = await simulateAnalyticsVisitors(3);
+  } finally {
+    intakeSimulating.value = false;
+  }
+};
+
+const clearSim = async () => {
+  intakeClearing.value = true;
+  try {
+    await clearAnalyticsSimulate();
+    intakeSimResult.value = null;
+    // 探针/模拟事件已删，检测三绿的旧结论不再成立，一并撤下
+    intakeDetect.value = null;
+    ElMessage.success('模拟数据已清掉，统计口径已复原');
+  } finally {
+    intakeClearing.value = false;
+  }
+};
+
+const detectSite = async () => {
+  const key = intakeSite.value?.siteKey || sites.value[0]?.siteKey;
+  if (!key) {
+    ElMessage.warning('还没有可用站点');
+    return;
+  }
+  intakeDetecting.value = true;
+  try {
+    intakeDetect.value = await detectAnalyticsSite(key);
+  } finally {
+    intakeDetecting.value = false;
+  }
+};
+
+const gotoRealtime = async () => {
+  // 模拟数据固定写 web 源：跳转前把数据源切回 web，避免带着其它源看不到刚灌的数字
+  if (source.value !== 'web') {
+    source.value = 'web';
+    sessionQuery.source = 'web';
+    funnelId.value = '';
+    funnelResult.value = null;
+  }
+  tab.value = 'realtime';
+  await onTabChange();
+};
 
 // ---------------------------------------------------------------- 概览
 const trendOption = computed<any>(() => ({
@@ -1210,6 +1340,10 @@ const loadSites = async () => {
   siteLoading.value = true;
   try {
     sites.value = await listAnalyticsSites();
+    // 刷新页面后回访：已有站点就直接亮出接入代码，不逼用户重复建站
+    if (!intakeSite.value && sites.value.length) {
+      intakeSite.value = sites.value[0];
+    }
   } finally {
     siteLoading.value = false;
   }
@@ -1361,10 +1495,10 @@ onUnmounted(() => {
   stopRealtime();
 });
 
-const copySnippet = async () => {
+const copyIntakeSnippet = async () => {
   try {
-    await navigator.clipboard.writeText(snippet.value);
-    ElMessage.success('已复制接入片段');
+    await navigator.clipboard.writeText(intakeSnippet.value);
+    ElMessage.success('已复制接入代码');
   } catch {
     ElMessage.warning('浏览器不允许剪贴板写入，请手动复制');
   }
@@ -1496,11 +1630,18 @@ const deltaTone = (key: string) => {
 };
 
 onMounted(async () => {
-  await Promise.all([loadOverview(), loadBreakdowns(), loadSites()]);
+  // 默认页签就是「数据接入」：折叠进「高级」的全域总览/采集质量也要首屏拉好，否则第一次展开是假空态
+  await Promise.all([loadOverview(), loadBreakdowns(), loadSites(), loadQuality(), loadCross()]);
 });
 </script>
 
 <style scoped>
+/* 数据接入（一页三块）：动作行/站名输入宽度/提示间距/高级折叠 */
+.intake-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.intake-name { max-width: 280px; }
+.intake-gap { margin-top: 8px; }
+.intake-adv { margin-top: 14px; border-top: 1px dashed var(--el-border-color); }
+
 .analytics-page {
   display: flex;
   flex-direction: column;
