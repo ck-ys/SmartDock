@@ -47,7 +47,8 @@ public class AssistantMcpController extends BaseController {
         List<McpServerRow> rows = mcpPilotService.listAll().stream().map(s -> new McpServerRow(
             s.getId(), s.getServerName(), s.getDisplayName(), s.getTransportType(),
             s.getCommand(), s.getArgs(), s.getUrl(),
-            headerKeysOnly(s.getHeaders()), s.getEnabled(), s.getRemark(),
+            // G4-#1：落库是 ENC_ 密文——先解密再取键名（service 内同款显式解密，与挂载链路一致）
+            mcpPilotService.headerKeysOf(s), s.getEnabled(), s.getRemark(),
             s.getUpdateTime() == null ? null : String.valueOf(s.getUpdateTime().getTime()))).toList();
         return R.ok(rows);
     }
@@ -100,17 +101,5 @@ public class AssistantMcpController extends BaseController {
         var page = callLogMapper.selectPage(pageQuery.build(), q);
         // R.ok 统一包装（同 /list 口径）——TableDataInfo 顶层 rows 结构与前端 request 层解析不符（老坑）
         return R.ok(java.util.Map.of("rows", page.getRecords(), "total", page.getTotal()));
-    }
-
-    private static String headerKeysOnly(String headersJson) {
-        if (headersJson == null || headersJson.isBlank()) {
-            return "";
-        }
-        try {
-            var map = org.dromara.common.json.utils.JsonUtils.parseMap(headersJson);
-            return map == null ? "" : String.join(",", map.keySet());
-        } catch (Exception e) {
-            return "(解析失败)";
-        }
     }
 }

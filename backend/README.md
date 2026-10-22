@@ -24,6 +24,9 @@ mvn test -DskipTests=false   # 全量单测
 数据库初始化见 [script/sql/baseline/README.md](script/sql/baseline/README.md)，
 默认运行配置见 [ruoyi-admin/src/main/resources/application.yml](ruoyi-admin/src/main/resources/application.yml)。
 
+MCP 外部工具演示服务（`mcp-demo/weather-server.mjs`，零依赖 node ≥ 18）的接入、
+配置项与安全边界见仓库根 [docs/usage.md](../docs/usage.md) §5.1。
+
 ## 许可
 
 基于 [RuoYi-Vue-Plus](https://github.com/dromara/RuoYi-Vue-Plus)（MIT）裁剪重整，

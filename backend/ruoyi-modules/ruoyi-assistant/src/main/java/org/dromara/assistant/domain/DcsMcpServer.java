@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.dromara.common.encrypt.annotation.EncryptField;
+import org.dromara.common.encrypt.enumd.AlgorithmType;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -43,6 +45,12 @@ public class DcsMcpServer implements Serializable {
     private String url;
 
     /** 额外请求头 JSON 字符串（含密钥的值加密存储） */
+    /** HTTP 行请求头 JSON（键值对）。G4-#1：可存鉴权头——值经 MyBatis 加密插件
+     *  AES+专用密钥落库（照抄 DcsAiConfig 先例，显式算法+密钥不依赖全局默认 BASE64；
+     *  坑：AES 密钥必须 16/24/32 位，首版 "DcsMcpEncKey16" 是 14 位——拦截器把
+     *  IllegalArgument 吞掉后明文落库，服务层同款显式路径会如实报错，双保险），
+     *  回显只出键名不出值（headerKeysOnly），save 端点不落请求体日志 */
+    @EncryptField(algorithm = AlgorithmType.AES, password = "DcsMcpHeadersK16")
     private String headers;
 
     private String readOnly;

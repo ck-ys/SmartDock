@@ -3955,3 +3955,5 @@ CREATE TABLE IF NOT EXISTS public.dcs_mcp_call_log (
     CONSTRAINT ck_dcs_mcp_call_status CHECK (status IN ('0', '1'))
 );
 CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_tenant_time ON public.dcs_mcp_call_log (tenant_id, create_time DESC);
+-- G4-#5：服务维度过滤（管理页审计按 server_name 查询）+ 超管全量路径（无 tenant 条件）
+CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_server_time ON public.dcs_mcp_call_log (server_name, create_time DESC);

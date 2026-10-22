@@ -54,6 +54,19 @@ public class McpPilotService {
     private static final Set<String> ALLOWED_COMMANDS = Set.of("node", "node.exe");
     private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{2,29}$");
 
+    /** G4-#1 headers 显式加密密钥（16 位——AES 硬性要求 16/24/32；与实体注解同值，
+     *  ENC_ 前缀幂等互认不会双重加密）。首版 "DcsMcpEncKey16" 是 14 位：拦截器路径
+     *  抛 IllegalArgument 被其 catch 吞掉→明文落库（活库 g4htest 行实锤） */
+    static final String HEADERS_ENC_KEY = "DcsMcpHeadersK16";
+
+    /**
+     * G4-#1 实测坑（2026-10-22 活库 g4htest 行实锤）：@EncryptField 注解在、启动扫描
+     * 单测过（G4EncryptScanTest），但运行时插入仍明文——拦截器链为何没吃到本实体留给
+     * 三审深挖。安全字段不赌隐式装配：服务层显式加解密（EncryptorManager 同款算法与
+     * 密钥），对 ENC_ 前缀幂等——无论拦截器将来是否生效，双轨都安全不重不漏。
+     */
+    private final org.springframework.beans.factory.ObjectProvider<org.dromara.common.encrypt.core.EncryptorManager> encryptorManagerProvider;
+
     /** 独立 mapper（纯函数单测可调——JsonUtils 静态块依赖 Spring 容器，批1 旧坑） */
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON_MAPPER =
         new com.fasterxml.jackson.databind.ObjectMapper();
@@ -97,6 +110,23 @@ public class McpPilotService {
     @Value("${smartdock.mcp.allowed-dirs:}")
     private String allowedDirs;
 
+    /** G4-#5：审计保留期清理（90 天）——每日 03:40 低峰跑，分批 5000 行防长事务锁表。
+     *  调研实证：此前全仓零清理路径，反问上线后每次问答固定 ≥2 行，表只增不减 */
+    @Scheduled(cron = "0 40 3 * * ?")
+    void sweepExpiredCallLogs() {
+        java.util.Date cutoff = new java.util.Date(
+            System.currentTimeMillis() - 90L * 24 * 3600 * 1000);
+        int total = 0;
+        int n;
+        do {
+            n = callLogMapper.deleteBatchBefore(cutoff);
+            total += n;
+        } while (n >= 5000);
+        if (total > 0) {
+            log.info("[McpPilot] 审计保留期清理：删除 {} 行（>90 天）", total);
+        }
+    }
+
     /** HTTP 传输 host 白名单（逗号分隔；默认只放行本机） */
     @Value("${smartdock.mcp.allowed-http-hosts:localhost,127.0.0.1}")
     private String allowedHttpHosts;
@@ -120,6 +150,14 @@ public class McpPilotService {
             .orderByDesc(DcsMcpServer::getUpdateTime));
     }
 
+    /** G4-#4：全部服务名（工具闸 mcp: 键校验用；平台级表，跨租户读） */
+    public java.util.Set<String> allServerNames() {
+        return TenantHelper.ignore(() -> serverMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsMcpServer>()
+                    .select(DcsMcpServer::getServerName))
+            .stream().map(DcsMcpServer::getServerName).collect(java.util.stream.Collectors.toSet()));
+    }
+
     /** 新增/编辑：白名单校验（命令/脚本目录/host/危险头）全在这——controller 只管鉴权与审计 */
     public void save(DcsMcpServer row) {
         if (row.getServerName() == null || !NAME_PATTERN.matcher(row.getServerName()).matches()) {
@@ -132,6 +170,8 @@ public class McpPilotService {
             row.setReadOnly("1");
             row.setCreateTime(now);
             row.setUpdateTime(now);
+            // G4-#1：headers 明文 → ENC_ 密文落库（显式加密，不赌拦截器装配）
+            row.setHeaders(encryptHeaders(row.getHeaders()));
             try {
                 serverMapper.insert(row);
             } catch (org.springframework.dao.DuplicateKeyException e) {
@@ -141,6 +181,13 @@ public class McpPilotService {
             row.setTenantId(null);
             row.setReadOnly(null);
             row.setUpdateTime(now);
+            // G4-#1：编辑面只见键名不见值——headers 留空=保持原值（null 不参与 updateById）；
+            // 传 "{}"=清空；传 JSON=替换（加密落库）
+            if (row.getHeaders() != null && row.getHeaders().isBlank()) {
+                row.setHeaders(null);
+            } else {
+                row.setHeaders(encryptHeaders(row.getHeaders()));
+            }
             serverMapper.updateById(row);
         }
     }
@@ -235,12 +282,95 @@ public class McpPilotService {
         }
     }
 
-    /** 三审回修（dsflash P1/glm53 P2）：试点一律不接收请求头——免密钥定位下无用途，
-     * 精确键名黑名单可被 X-Auth-Token/Cookie 绕过且值明文入库；真密钥接入+加密存储留给 B+1 */
+    /**
+     * G4-#1（2026-10-22）：放开请求头接收（原试点一律拒收）。三面封死明文风险后黑名单
+     * 不再必要——值显式 AES 落库（见 encryptHeaders）+ 回显只出键名 + save 端点不落请求
+     * 体日志；键名黑名单方案被否：鉴权头（Authorization/X-Api-Key 等）正是本功能要接的
+     * 目标。只做形状与尺寸校验。
+     */
     public static void validateHeaders(String headersJson) {
-        if (headersJson != null && !headersJson.isBlank() && !headersJson.trim().equals("{}")) {
-            throw new ServiceException("试点不接收请求头（免密钥定位；密钥接入与加密存储排在 B+1）");
+        parseHeaders(headersJson);
+    }
+
+    /** headers 显式加密（G4-#1）：明文 JSON → ENC_ 密文；空/{} 直通（无敏感面） */
+    String encryptHeaders(String plainJson) {
+        if (plainJson == null || plainJson.isBlank() || plainJson.trim().equals("{}")
+            || plainJson.startsWith("ENC_")) {
+            return plainJson;
         }
+        org.dromara.common.encrypt.core.EncryptorManager m = encryptorManagerProvider.getIfAvailable();
+        if (m == null) {
+            // 加密组件未启用（mybatis-encryptor.enable=false）——安全字段拒绝明文落库，fail-loud
+            throw new ServiceException("加密组件未启用（mybatis-encryptor.enable），无法保存请求头");
+        }
+        return m.encrypt(plainJson, headersEncryptContext());
+    }
+
+    /** headers 显式解密：ENC_ 密文 → 明文 JSON；历史明文/空原样返回（幂等兼容） */
+    String decryptHeaders(String storedJson) {
+        if (storedJson == null || !storedJson.startsWith("ENC_")) {
+            return storedJson;
+        }
+        org.dromara.common.encrypt.core.EncryptorManager m = encryptorManagerProvider.getIfAvailable();
+        return m == null ? storedJson : m.decrypt(storedJson, headersEncryptContext());
+    }
+
+    /** G4-#1：回显键名（逗连）——解密后取；管理面列表唯一出口（值永不出库到前端） */
+    public String headerKeysOf(DcsMcpServer row) {
+        String json = decryptHeaders(row.getHeaders());
+        if (json == null || json.isBlank()) {
+            return "";
+        }
+        try {
+            java.util.Map<String, Object> map = JSON_MAPPER.readValue(json, java.util.Map.class);
+            return map == null ? "" : String.join(",", map.keySet());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return "(解析失败)";
+        }
+    }
+
+    private static org.dromara.common.encrypt.core.EncryptContext headersEncryptContext() {
+        org.dromara.common.encrypt.core.EncryptContext c = new org.dromara.common.encrypt.core.EncryptContext();
+        c.setAlgorithm(org.dromara.common.encrypt.enumd.AlgorithmType.AES);
+        c.setPassword(HEADERS_ENC_KEY);
+        c.setEncode(org.dromara.common.encrypt.enumd.EncodeType.BASE64);
+        return c;
+    }
+
+    /** headers JSON → 不可变 Map（HTTP 行挂载时喂 McpClientBuilder.headers）；
+     *  校验：JSON 对象、≤10 键、键 1-64 位字母数字-_、值非空字符串 ≤1024 字符 */    @SuppressWarnings("unchecked")
+    public static java.util.Map<String, String> parseHeaders(String headersJson) {
+        if (headersJson == null || headersJson.isBlank() || headersJson.trim().equals("{}")) {
+            return java.util.Map.of();
+        }
+        java.util.Map<String, Object> raw;
+        try {
+            raw = JSON_MAPPER.readValue(headersJson, java.util.Map.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new ServiceException("headers 须是 {\"键\":\"值\"} 形式的 JSON 对象");
+        }
+        if (raw == null || raw.isEmpty()) {
+            return java.util.Map.of();
+        }
+        if (raw.size() > 10) {
+            throw new ServiceException("headers 最多 10 个键");
+        }
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
+        for (java.util.Map.Entry<String, Object> e : raw.entrySet()) {
+            String k = e.getKey();
+            if (k == null || k.isBlank() || k.length() > 64 || !k.matches("[A-Za-z0-9_-]+")) {
+                throw new ServiceException("header 键名须为 1-64 位字母数字-_（收到：" + k + "）");
+            }
+            Object v = e.getValue();
+            if (!(v instanceof String s) || s.isBlank()) {
+                throw new ServiceException("header 值须为非空字符串（键：" + k + "）");
+            }
+            if (s.length() > 1024) {
+                throw new ServiceException("header 值过长（≤1024 字符，键：" + k + "）");
+            }
+            out.put(k, s);
+        }
+        return java.util.Collections.unmodifiableMap(out);
     }
 
     public static List<String> parseArgs(String argsJson) {
@@ -275,7 +405,8 @@ public class McpPilotService {
      * @return 本次实际新增的工具名（并入注册面返回值，供调用方统计/日志）
      */
     public Set<String> attachEnabled(Toolkit toolkit, String tenantId, Long userId, String aguiThreadId,
-                                     io.agentscope.core.permission.PermissionContextState.Builder pb) {
+                                     io.agentscope.core.permission.PermissionContextState.Builder pb,
+                                     java.util.Map<String, String> toolGate, int roleLevel) {
         Set<String> added = new LinkedHashSet<>();
         List<DcsMcpServer> rows;
         try {
@@ -289,6 +420,19 @@ public class McpPilotService {
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         AttachKey sessionKey = new AttachKey("t:" + tenantId + ":" + userId, aguiThreadId);
         for (DcsMcpServer row : rows) {
+            // G4-#4：MCP 纳入工具闸（server 粒度键 mcp:<server>，与平台工具同份 tool_gate JSON，
+            // 生效时机同款=下一轮建会话）。off=整租户关闭（跳过挂载）；admin=仅管理员角色；
+            // member/未配=全员（MCP 内置档=member）。工具级粒度需挂载后才知工具名，本期不做
+            String g = toolGate == null ? null : toolGate.get("mcp:" + row.getServerName());
+            if ("off".equals(g)) {
+                log.info("[McpPilot] {} 被租户 {} 工具闸关闭，跳过挂载", row.getServerName(), tenantId);
+                continue;
+            }
+            if ("admin".equals(g) && roleLevel < org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN) {
+                log.info("[McpPilot] {} 对租户 {} 配置为仅管理员，当前用户角色不足，跳过挂载",
+                    row.getServerName(), tenantId);
+                continue;
+            }
             long remainMs = (deadline - System.nanoTime()) / 1_000_000;
             if (remainMs <= 0) {
                 audit(row.getServerName(), tenantId, userId, null, "MOUNT_ERROR", "0",
@@ -319,8 +463,11 @@ public class McpPilotService {
                         .syncElicitation(req -> elicitationBridge.handle(
                             row.getServerName(), tenantId, userId, aguiThreadId, req));
                 } else if ("STREAMABLE_HTTP".equals(row.getTransportType())) {
+                    // G4-#1：HTTP 行带鉴权头——落库密文先解密再喂 builder（2.0.4 javap 实证 headers(Map)）
+                    builder.headers(parseHeaders(decryptHeaders(row.getHeaders())));
                     builder.streamableHttpTransport(row.getUrl());
                 } else {
+                    builder.headers(parseHeaders(decryptHeaders(row.getHeaders())));
                     builder.sseTransport(row.getUrl());
                 }
                 raw = builder.buildSync();
@@ -331,22 +478,40 @@ public class McpPilotService {
                 if (remainAfterInit <= 0) {
                     throw new ServiceException("挂载预算（5s）耗尽（initialize 后）");
                 }
-                // 三审回修（dspro P1-5）：撞名预检——框架同名 Map.put 静默覆盖内置/业务
-                // 工具；试点直接拒绝整服务（与 ProviderToolRegistry"撞名让位"策略对齐）
+                // 撞名预检（三审回修 dspro P1-5）+ 工具级只读注解收集（G4-#3）：
+                // 撞名直接拒绝整服务（框架同名 Map.put 静默覆盖，与 ProviderToolRegistry 对齐）；
+                // 写类判定=注解显式优先，无注解兜底跟服务级 read_only（试点恒 '1' 行为零变化）：
+                // readOnlyHint=TRUE→只读放行；=FALSE→写类进确认闸（与 G1 平台写类同款 ASK）；
+                // =null→服务 read_only='1' 视为只读，'0'（放开前 ASK 兜底，fail-safe）
                 List<io.modelcontextprotocol.spec.McpSchema.Tool> tools =
                     raw.listTools().block(Duration.ofMillis(remainAfterInit));
+                java.util.Set<String> writeTools = new java.util.HashSet<>();
+                boolean serverReadOnly = !"0".equals(row.getReadOnly());
                 for (io.modelcontextprotocol.spec.McpSchema.Tool t : tools == null ? List.<io.modelcontextprotocol.spec.McpSchema.Tool>of() : tools) {
                     if (before.contains(t.name())) {
                         throw new ServiceException("MCP 工具名与现有工具冲突（" + t.name() + "），已拒绝挂载避免静默覆盖");
                     }
+                    Boolean hint = t.annotations() == null ? null : t.annotations().readOnlyHint();
+                    boolean write = Boolean.FALSE.equals(hint) || (hint == null && !serverReadOnly);
+                    if (write) {
+                        writeTools.add(t.name());
+                    }
                 }
-                GatedMcpClient gated = new GatedMcpClient(raw, tenantId, userId, row.getServerName(), callLogMapper);
+                GatedMcpClient gated = new GatedMcpClient(raw, tenantId, userId, row.getServerName(),
+                    callLogMapper, writeTools);
                 // 装饰层：调用级限频 + 双态审计（工具列表/初始化直接委托）
                 toolkit.registerMcpClient(gated).block(Duration.ofMillis(Math.max(remainMs, 1_000)));
                 int mounted = 0;
                 for (String name : toolkit.getToolNames()) {
                     if (!before.contains(name)) {
-                        pb.addAllowRule(name, new PermissionRule(name, "", PermissionBehavior.ALLOW, "dcs-assistant-mcp"));
+                        // G4-#3：MCP 工具不再无条件 ALLOW——写类（注解 FALSE 或写类服务无注解）
+                        // 进 ASK 确认卡，堵「放开 read_only 后写类 MCP 绕确认闸」的 G1 同款事故面
+                        boolean write = writeTools.contains(name);
+                        if (write) {
+                            pb.addAskRule(name, new PermissionRule(name, "", PermissionBehavior.ASK, "dcs-assistant-mcp"));
+                        } else {
+                            pb.addAllowRule(name, new PermissionRule(name, "", PermissionBehavior.ALLOW, "dcs-assistant-mcp"));
+                        }
                         added.add(name);
                         mounted++;
                     }
@@ -421,15 +586,19 @@ public class McpPilotService {
         private final Long userId;
         private final String serverName;
         private final DcsMcpCallLogMapper callLogMapper;
+        /** G4-#3：写类工具名集合（挂载时按 readOnlyHint 注解/服务级判定）——审计 remark 标 write */
+        private final java.util.Set<String> writeTools;
 
         GatedMcpClient(McpClientWrapper delegate, String tenantId, Long userId,
-                       String serverName, DcsMcpCallLogMapper callLogMapper) {
+                       String serverName, DcsMcpCallLogMapper callLogMapper,
+                       java.util.Set<String> writeTools) {
             super(delegate.getName());
             this.delegate = delegate;
             this.tenantId = tenantId;
             this.userId = userId;
             this.serverName = serverName;
             this.callLogMapper = callLogMapper;
+            this.writeTools = writeTools == null ? java.util.Set.of() : writeTools;
         }
 
         @Override
@@ -472,19 +641,21 @@ public class McpPilotService {
                     "外部工具调用触发限频（" + RATE_LIMIT_PER_MIN + " 次/分/租户），请稍后再试"));
             }
             long t0 = System.currentTimeMillis();
+            // G4-#3：写类调用 remark 前缀 write——闸矩阵/审计侧可区分读写（防注解注册后被换的观测兜底）
+            String wmark = writeTools.contains(toolName) ? "write " : "";
             return call.get()
                 // 三审回修（dsflash/dspro P2）：MCP 侧 isError=true 也算失败（工具级报错不再记成功）
                 .doOnSuccess(r -> {
                     if (r != null && Boolean.TRUE.equals(r.isError())) {
                         audit(callLogMapper, serverName, tenantId, userId, toolName, "CALL_ERROR", "0",
-                            truncate(String.valueOf(r.content())), null);
+                            wmark + truncate(String.valueOf(r.content())), null);
                     } else {
                         audit(callLogMapper, serverName, tenantId, userId, toolName, "CALL_OK", "1", null,
-                            (System.currentTimeMillis() - t0) + "ms");
+                            wmark + (System.currentTimeMillis() - t0) + "ms");
                     }
                 })
                 .doOnError(e -> audit(callLogMapper, serverName, tenantId, userId, toolName, "CALL_ERROR", "0",
-                    truncate(e.getMessage()), null));
+                    wmark + truncate(e.getMessage()), null));
         }
 
         @Override

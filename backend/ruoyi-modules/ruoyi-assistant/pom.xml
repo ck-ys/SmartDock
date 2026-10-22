@@ -106,6 +106,12 @@
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-ai-billing</artifactId>
         </dependency>
+        <!-- G4-#1：DcsMcpServer.headers @EncryptField 加解密（ai-billing 传递可达，
+             显式声明防未来 ai-billing 裁撤本依赖时静默断链） -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-encrypt</artifactId>
+        </dependency>
         <!-- 单测: 与 ruoyi-admin/ai-billing 同款 test 域依赖(批2 Q8 提示词护栏单测) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

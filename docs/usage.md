@@ -86,7 +86,46 @@
   再维护模型价格与积分套餐；
 - **文件安全**：OSS 上传自动过守卫（宏/伪装/敏感词），待审件进「文件审核」队列；
   白名单/类目豁免在风控中心配置；
-- **通知幂等**：业务通知带 dedup_key，重复事件不会给用户刷屏。
+- **通知幂等**：业务通知带 dedup_key，重复事件不会给用户刷屏；
+- **MCP 外部工具**：见 §5.1。
+
+### 5.1 MCP 外部工具（接入与演示）
+
+**是什么**：助手对话里可以调用外部 MCP（Model Context Protocol）服务的工具；
+`backend/mcp-demo/weather-server.mjs` 是内置演示服务（查天气 + 反问补城市），零 npm 依赖，
+需 node ≥ 18，STDIO 传输。
+
+**服务端配置项**（application.yml，均有默认值）：
+
+| 配置 | 默认 | 说明 |
+|------|------|------|
+| `smartdock.mcp.allowed-dirs` | 空（禁用 STDIO 注册） | STDIO 脚本允许目录（绝对路径，逗号分隔，防目录穿越） |
+| `smartdock.mcp.allowed-http-hosts` | `localhost,127.0.0.1` | HTTP 传输 host 白名单 |
+| `smartdock.mcp.elicit-timeout-seconds` | 300 | 工具反问的答题等待上限（60–540 钳位） |
+| `smartdock.mcp.tool-budget-seconds` | 120 | 单次工具调用自身预算（不含答题） |
+
+**注册步骤**（管理台 → AI 助手 → AI 助手管理 → 外部工具页签）：
+
+- STDIO 示例：传输类型选 STDIO，命令 `node`，脚本路径
+  `["<仓根>/backend/mcp-demo/weather-server.mjs"]`（JSON 数组；脚本须在 allowed-dirs 内）；
+- HTTP 示例：传输类型选 STREAMABLE_HTTP，服务地址 `http://127.0.0.1:3000/mcp`
+  （host 须在白名单）；鉴权头填在「请求头」JSON 对象（值加密存储，列表只显示键名）；
+- 保存后打开「立即启用」；同名工具冲突整服务拒收。
+
+**演示验证**：对话问「北京今天天气怎么样」→ 助手调 weather 工具 → 外部工具页签审计表
+出现 CALL_OK；`ask_weather` 工具缺城市时会弹「反问卡」（选城市/补充备注），提交后工具
+继续执行不中断对话；超时未答自动关闭并记 ELICIT_TIMEOUT。
+
+**下线演练**：外部工具页签关掉「启用」开关（或直接停掉 server 进程）= 下一轮新会话
+不再挂载，进行中的对话不受影响；工具开关矩阵里 `mcp:<服务名>` 行配 off 可只对本租户关闭。
+
+**安全边界**：STDIO 仅允许 node + 目录白名单；HTTP host 白名单；请求头值 AES 加密落库、
+回显只出键名、管理日志不落请求体；试点只收只读服务（read_only 恒 1），写类工具注解
+（readOnlyHint=false 或写类服务）自动进确认卡；调用限频 30 次/分/租户；全部动作留审计
+（挂载/调用/限频/反问五类），审计保留 90 天自动清理。
+
+**已知限制**：STDIO 运行时仅 node；单次调用多轮反问共享同一预算；反问卡刷新后丢失
+（超时自动关闭兜底）；工具开关矩阵管到服务粒度（mcp:服务名），未到单个工具粒度。
 
 ## 6. 常见问题
 

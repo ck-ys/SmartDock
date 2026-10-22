@@ -13,15 +13,38 @@ import static org.junit.jupiter.api.Assertions.*;
 @Tag("local")
 class McpPilotServiceTest {
 
-    /** 三审回修后口径：试点一律不接收请求头（黑名单可被 X-Auth-Token/Cookie 绕过→全拒） */
+    /**
+     * G4-#1（2026-10-22）新口径：请求头放开接收（值 @EncryptField AES 落库 + 回显只出键名 +
+     * save 端点不落请求体日志），鉴权头（Authorization/X-Api-Key）正是目标——黑名单不再存在；
+     * 校验收窄为形状与尺寸。旧「试点一律拒收」断言随口径作废。
+     */
     @Test
-    void anyHeadersRejected() {
-        for (String bad : new String[]{"{\"Authorization\":\"x\"}", "{\"x-api-key\":\"1\"}", "{\"TOKEN\":\"t\"}", "{\"X-Custom\":\"ok\"}"}) {
-            assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.validateHeaders(bad), "试点任何请求头须拒存: " + bad);
+    void headersShapeAndSizeValidated() {
+        // 鉴权头合法接收（这是本功能的目标场景）
+        assertEquals(java.util.Map.of("Authorization", "Bearer abc"),
+            org.dromara.assistant.service.McpPilotService.parseHeaders("{\"Authorization\":\"Bearer abc\"}"));
+        // 空/空白/空对象=空 map
+        assertTrue(org.dromara.assistant.service.McpPilotService.parseHeaders(null).isEmpty());
+        assertTrue(org.dromara.assistant.service.McpPilotService.parseHeaders(" ").isEmpty());
+        assertTrue(org.dromara.assistant.service.McpPilotService.parseHeaders("{}").isEmpty());
+        // 畸形：非 JSON / 非对象值 / 非法键名字符 / 超键数 / 值非字符串 / 值过长
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{bad"));
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{\"a b\":\"1\"}"));
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{\"a\":1}"));
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{\"a\":\"\"}"));
+        StringBuilder many = new StringBuilder("{");
+        for (int i = 0; i < 11; i++) {
+            many.append("\"h").append(i).append("\":\"v\",");
         }
-        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders(null));
-        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders(" "));
-        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders("{}"));
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+            many.substring(0, many.length() - 1) + "}"));
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+            "{\"a\":\"" + "x".repeat(1025) + "\"}"));
+        // 边界内合法：10 键、1024 值、字母数字-_ 键名
+        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+            "{\"X_Api-Key-1\":\"" + "x".repeat(1024) + "\"}"));
+        // validateHeaders 与 parseHeaders 同口径（委托）
+        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders("{\"Authorization\":\"t\"}"));
     }
 
     @Test

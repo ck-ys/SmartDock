@@ -31,8 +31,11 @@ import java.util.Set;
 public class AssistantToolGateController extends BaseController {
 
     private final AssistantConfigService configService;
+    private final org.dromara.assistant.service.McpPilotService mcpPilotService;
 
-    /** 工具行（合并视图）：spec 粒度一行，toolNames 逗连便于前端展示与批量操作 */
+    /** 工具行（合并视图）：spec 粒度一行，toolNames 逗连便于前端展示与批量操作。
+     *  G4-#4：MCP 服务以 server 粒度并入同一视图（键 mcp:<server>，内置档=member，
+     *  off=跳过挂载、admin=仅管理员角色；askConfirm=服务含写类工具（read_only='0'）） */
     public record ToolGateRow(List<String> toolNames, String displayName, String category,
                               String gateDesc, int builtinLevel, String override, int effective,
                               boolean locked, boolean askConfirm) {
@@ -58,6 +61,21 @@ public class AssistantToolGateController extends BaseController {
                 spec.minRoleLevel() >= org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN,
                 spec.behavior() == io.agentscope.core.permission.PermissionBehavior.ASK));
         }
+        // G4-#4：MCP 外部服务并入闸矩阵视图（每服务一行；effective：off=-1/其余取覆盖或 member）。
+        // 平台级表（tenant 恒 000000）——ignore 跨租户读，非 000000 租户管理员同样看得到全名单
+        for (org.dromara.assistant.domain.DcsMcpServer s :
+            org.dromara.common.tenant.helper.TenantHelper.ignore(mcpPilotService::listAll)) {
+            String key = "mcp:" + s.getServerName();
+            String override = gate.get(key);
+            int effective = "off".equals(override) ? -1
+                : "admin".equals(override) ? org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN
+                : org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER;
+            rows.add(new ToolGateRow(
+                List.of(key), s.getServerName(), "外部工具",
+                "MCP 外部服务（" + s.getTransportType() + "）；off=本租户不挂载，admin=仅管理员可用",
+                org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER,
+                override, effective, false, "0".equals(s.getReadOnly())));
+        }
         return R.ok(rows);
     }
 
@@ -66,14 +84,22 @@ public class AssistantToolGateController extends BaseController {
     @PostMapping
     public R<Void> save(@RequestBody Map<String, String> gate) {
         Set<String> known = ToolRegistry.allToolNames();
+        Set<String> mcpServers;
+        try {
+            mcpServers = mcpPilotService.allServerNames();
+        } catch (Exception e) {
+            throw new org.dromara.common.core.exception.ServiceException("外部服务名单查询失败，稍后再试");
+        }
         for (Map.Entry<String, String> e : gate.entrySet()) {
-            if (!known.contains(e.getKey())) {
-                throw new org.dromara.common.core.exception.ServiceException("未知工具：" + e.getKey());
+            String k = e.getKey();
+            boolean isMcp = k != null && k.startsWith("mcp:");
+            if (isMcp ? !mcpServers.contains(k.substring(4)) : !known.contains(k)) {
+                throw new org.dromara.common.core.exception.ServiceException("未知工具：" + k);
             }
             String v = e.getValue();
             if (!"off".equals(v) && !"member".equals(v) && !"admin".equals(v)) {
                 throw new org.dromara.common.core.exception.ServiceException(
-                    "工具「" + e.getKey() + "」档位只支持 off/member/admin");
+                    "工具「" + k + "」档位只支持 off/member/admin");
             }
         }
         configService.updateToolGate(org.dromara.common.satoken.utils.LoginHelper.getTenantId(), gate);

@@ -506,9 +506,9 @@
         <el-card shadow="never" class="adm-card" v-loading="tgLoading">
           <template #header>
             <div class="card-head">
-              <b>工具开关矩阵（平台工具）</b>
+              <b>工具开关矩阵（平台 + 外部工具）</b>
               <span class="head-note">
-                平台内置工具的租户级开关；业务工具（任务/画像查询等）走角色权限另管。关闭=成员和管理员的助手都彻底不可见；仅管理员=普通成员不可见、管理员可用（门槛只升不降）。改动对下一轮新会话生效，进行中的对话不受影响，仅本租户。
+                平台内置工具与 MCP 外部服务（mcp: 开头行）的租户级开关；业务工具（任务/画像查询等）走角色权限另管。关闭=成员和管理员的助手都彻底不可见；仅管理员=普通成员不可见、管理员可用（门槛只升不降）。改动对下一轮新会话生效，进行中的对话不受影响，仅本租户。
               </span>
             </div>
           </template>
@@ -671,7 +671,7 @@
               </el-form-item>
             </template>
             <el-form-item label="请求头">
-              <el-input v-model="mcpForm.headers" placeholder="可选 JSON 对象；试点不接收鉴权类头" />
+              <el-input v-model="mcpForm.headers" placeholder='可选 JSON 对象，如 {"Authorization":"Bearer ..."}；值加密存储、仅 HTTP 行生效、列表只显示键名' />
             </el-form-item>
             <el-form-item label="备注">
               <el-input v-model="mcpForm.remark" type="textarea" :rows="2" maxlength="255" />
