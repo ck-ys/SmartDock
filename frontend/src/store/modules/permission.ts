@@ -90,6 +90,16 @@ export const usePermissionStore = defineStore('permission', () => {
       }
       if (route.children != null && route.children && route.children.length) {
         route.children = filterAsyncRouter(route.children, route, type);
+        // 目录直链兜底：后台目录菜单默认 redirect='noRedirect'，直接访问 /support 这类目录 URL
+        // 会跳到字面量 /noRedirect 变空白页。改写为跳第一个子菜单，父级面包屑同时变为可点。
+        if (route.redirect === 'noRedirect') {
+          const first = route.children[0];
+          const base = String(route.path || '').replace(/\/+$/, '');
+          const childPath = String(first?.path || '');
+          if (childPath) {
+            route.redirect = childPath.startsWith('/') ? childPath : `${base}/${childPath}`;
+          }
+        }
       } else {
         delete route.children;
         delete route.redirect;
