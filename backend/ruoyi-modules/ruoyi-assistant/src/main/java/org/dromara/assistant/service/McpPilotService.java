@@ -34,9 +34,9 @@ import java.util.regex.Pattern;
  *
  * <p>安全闸（dcs biz22 A4 对照吸收，数字照抄）：①STDIO 命令白名单只允许 node，
  * 脚本路径必须落在配置允许目录内（canonical 前缀比对防穿越）；②HTTP 传输 host
- * 必须在白名单（默认仅 localhost/127.0.0.1，可配置追加）；③试点只收只读服务且
- * <b>免密钥</b>（headers 含 Authorization/token/secret 的直接拒存——真要密钥时
- * B+1 做加密存储）；④挂载失败/服务下线只记审计+warn，绝不连坐助手会话；
+ * 必须在白名单（默认仅 localhost/127.0.0.1，可配置追加）；③试点只收只读服务（DDL
+ * 钉死 read_only='1'；G4-#1 起 HTTP 行可配鉴权头——值 AES 加密落库+键名回显，
+ * 见 validateHeaders/encryptHeaders）；④挂载失败/服务下线只记审计+warn，绝不连坐助手会话；
  * ⑤调用级限频 30 次/分/租户（GatedMcpClient 装饰层，超限调用报错给模型人话）；
  * ⑥挂载与每次真实调用双态审计落 dcs_mcp_call_log。</p>
  */
@@ -87,13 +87,18 @@ public class McpPilotService {
 
     private record AttachKey(String rcUserId, String threadId) {}
 
-    /** 清扫：会话已淘汰（不在管理器里）→ close 其全部 MCP 客户端（node 子进程/HTTP 连接） */
+    /** 清扫：会话已淘汰（不在管理器里）→ close 其全部 MCP 客户端（node 子进程/HTTP 连接）。
+     *  G4 三审回修（dspro P2-6）：先 remove 再 close——原 isEmpty 判空与 remove 之间
+     *  会话若被重建，会把新会话刚挂的客户端误关/失跟踪 */
     @Scheduled(fixedDelay = 60_000, initialDelay = 90_000)
     void sweepOrphanMcpClients() {
         attachedBySession.forEach((key, perServer) -> {
             if (threadSessionManager.getSession(key.rcUserId(), key.threadId()).isEmpty()) {
-                attachedBySession.remove(key);
-                for (McpClientWrapper c : perServer.values()) {
+                java.util.Map<String, McpClientWrapper> cur = attachedBySession.remove(key);
+                if (cur == null) {
+                    return;
+                }
+                for (McpClientWrapper c : cur.values()) {
                     try {
                         c.close();
                     } catch (Exception e) {
@@ -101,7 +106,7 @@ public class McpPilotService {
                     }
                 }
                 log.info("[McpPilot] 会话 {}|{} 已淘汰，回收其 {} 个 MCP 客户端",
-                    key.rcUserId(), key.threadId(), perServer.size());
+                    key.rcUserId(), key.threadId(), cur.size());
             }
         });
     }
@@ -110,20 +115,27 @@ public class McpPilotService {
     @Value("${smartdock.mcp.allowed-dirs:}")
     private String allowedDirs;
 
-    /** G4-#5：审计保留期清理（90 天）——每日 03:40 低峰跑，分批 5000 行防长事务锁表。
-     *  调研实证：此前全仓零清理路径，反问上线后每次问答固定 ≥2 行，表只增不减 */
-    @Scheduled(cron = "0 40 3 * * ?")
+    /** G4-#5：审计保留期清理（90 天）——分批 5000 行防长事务锁表。cron 03:55：
+     *  G4 三审回修（dspro P2）错峰——03:40 已被 AssistantRetentionJob/ProfileRetentionJob
+     *  占用；单实例口径（多节点部署时再引分布式锁，登记池） */
+    @Scheduled(cron = "0 55 3 * * ?")
     void sweepExpiredCallLogs() {
-        java.util.Date cutoff = new java.util.Date(
-            System.currentTimeMillis() - 90L * 24 * 3600 * 1000);
-        int total = 0;
-        int n;
-        do {
-            n = callLogMapper.deleteBatchBefore(cutoff);
-            total += n;
-        } while (n >= 5000);
-        if (total > 0) {
-            log.info("[McpPilot] 审计保留期清理：删除 {} 行（>90 天）", total);
+        try {
+            java.util.Date cutoff = new java.util.Date(
+                System.currentTimeMillis() - 90L * 24 * 3600 * 1000);
+            int total = 0;
+            int n;
+            do {
+                n = callLogMapper.deleteBatchBefore(cutoff);
+                total += n;
+            } while (n >= 5000);
+            if (total > 0) {
+                log.info("[McpPilot] 审计保留期清理：删除 {} 行（>90 天）", total);
+            }
+        } catch (Exception e) {
+            // glm53 终审 P2：定时任务必须兜底（对照 AssistantRetentionJob 风格）——
+            // 清理失败不连坐调度线程，明早重试
+            log.error("[McpPilot] 审计保留期清理失败（明日重试）：{}", e.getMessage(), e);
         }
     }
 
@@ -277,6 +289,13 @@ public class McpPilotService {
             throw new ServiceException("传输类型只支持 STDIO / STREAMABLE_HTTP / SSE");
         }
         validateHeaders(row.getHeaders());
+        // G4 三审回修（dsflash P2-6）：STDIO 行不支持请求头（MCP STDIO 传输无 HTTP 头语义，
+        // 挂载侧只会静默丢弃）——保存面显式拒绝，防"配了却不生效"的错觉
+        if ("STDIO".equals(row.getTransportType())
+            && row.getHeaders() != null && !row.getHeaders().isBlank()
+            && !row.getHeaders().trim().equals("{}")) {
+            throw new ServiceException("STDIO 行不支持请求头（仅 HTTP 行生效）");
+        }
         if (row.getEnabled() == null) {
             row.setEnabled("0");
         }
@@ -315,9 +334,18 @@ public class McpPilotService {
         return m == null ? storedJson : m.decrypt(storedJson, headersEncryptContext());
     }
 
-    /** G4-#1：回显键名（逗连）——解密后取；管理面列表唯一出口（值永不出库到前端） */
+    /** G4-#1：回显键名（逗连）——解密后取；管理面列表唯一出口（值永不出库到前端）。
+     *  G4 三审回修（dsflash P2-5）：单行坏密文不得 500 整个列表——解密失败降级
+     *  "(解析失败)"，管理面仍可看到该行并修复 */
     public String headerKeysOf(DcsMcpServer row) {
-        String json = decryptHeaders(row.getHeaders());
+        String json;
+        try {
+            json = decryptHeaders(row.getHeaders());
+        } catch (Exception e) {
+            log.warn("[McpPilot] headers 解密失败（键名降级）：server={}, err={}",
+                row.getServerName(), e.getMessage());
+            return "(解析失败)";
+        }
         if (json == null || json.isBlank()) {
             return "";
         }
@@ -338,16 +366,26 @@ public class McpPilotService {
     }
 
     /** headers JSON → 不可变 Map（HTTP 行挂载时喂 McpClientBuilder.headers）；
-     *  校验：JSON 对象、≤10 键、键 1-64 位字母数字-_、值非空字符串 ≤1024 字符 */    @SuppressWarnings("unchecked")
+     *  校验：整体 ≤4KB、JSON 对象、无重复键、≤10 键、键 1-64 位字母数字-_、
+     *  值非空字符串 ≤1024 字符（G4 三审回修：补整体上限防 Jackson 全量解析面、
+     *  重复键显式拒绝防"后值静默覆盖"歧义） */
+    @SuppressWarnings("unchecked")
     public static java.util.Map<String, String> parseHeaders(String headersJson) {
         if (headersJson == null || headersJson.isBlank() || headersJson.trim().equals("{}")) {
             return java.util.Map.of();
         }
+        if (headersJson.length() > 4096) {
+            throw new ServiceException("headers JSON 整体过长（≤4KB）");
+        }
         java.util.Map<String, Object> raw;
         try {
+            // 重复键显式拒绝：默认 Jackson 后值静默覆盖——管理员改配置看不出哪个键被吞
+            JSON_MAPPER.reader()
+                .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY)
+                .readTree(headersJson);
             raw = JSON_MAPPER.readValue(headersJson, java.util.Map.class);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new ServiceException("headers 须是 {\"键\":\"值\"} 形式的 JSON 对象");
+            throw new ServiceException("headers 须是无重复键的 {\"键\":\"值\"} JSON 对象");
         }
         if (raw == null || raw.isEmpty()) {
             return java.util.Map.of();
@@ -399,6 +437,23 @@ public class McpPilotService {
     /* ============================ 挂载（建会话链路） ============================ */
 
     /**
+     * G4-#3 写类判定（纯函数，单测直测；glm53 终审 P2 抽出）：
+     * 注解显式优先——readOnlyHint=FALSE 一律写类（ASK 确认卡）；TRUE 一律只读放行；
+     * null（未声明）兜底跟服务级 read_only：'1' 视为只读（试点零行为变化——服务
+     * DDL 钉死只读，信任服务声明），'0' fail-safe 视为写类。已知边界（登记池）：
+     * 注解是服务自声明，写工具谎标 TRUE 即绕闸——read_only 放开前加"不信注解"总闸。
+     */
+    public static boolean isWriteTool(Boolean readOnlyHint, boolean serverReadOnly) {
+        if (Boolean.FALSE.equals(readOnlyHint)) {
+            return true;
+        }
+        if (Boolean.TRUE.equals(readOnlyHint)) {
+            return false;
+        }
+        return !serverReadOnly;
+    }
+
+    /**
      * 把平台级启用的 MCP 服务挂进助手工具面（AgentFactory 在平台/业务工具之后调用）。
      * 单服务失败=审计 MOUNT_ERROR + warn 后继续——服务下线绝不连坐助手会话。
      *
@@ -422,8 +477,14 @@ public class McpPilotService {
         for (DcsMcpServer row : rows) {
             // G4-#4：MCP 纳入工具闸（server 粒度键 mcp:<server>，与平台工具同份 tool_gate JSON，
             // 生效时机同款=下一轮建会话）。off=整租户关闭（跳过挂载）；admin=仅管理员角色；
-            // member/未配=全员（MCP 内置档=member）。工具级粒度需挂载后才知工具名，本期不做
+            // member/未配=全员（MCP 内置档=member）。工具级粒度需挂载后才知工具名，本期不做。
+            // G4 三审回修（dsflash P2-4）：tool_gate JSON 被污染时 fail-closed——哨兵键在即
+            // 全部跳过（否则 mcp: 键不在坏配置兜底表里，已关服务会静默复活）
             String g = toolGate == null ? null : toolGate.get("mcp:" + row.getServerName());
+            if (toolGate != null && toolGate.containsKey(AssistantConfigService.POISONED_GATE_SENTINEL)) {
+                log.warn("[McpPilot] 租户 {} tool_gate 配置损坏，本轮跳过全部 MCP 挂载（fail-closed）", tenantId);
+                return added;
+            }
             if ("off".equals(g)) {
                 log.info("[McpPilot] {} 被租户 {} 工具闸关闭，跳过挂载", row.getServerName(), tenantId);
                 continue;
@@ -492,8 +553,7 @@ public class McpPilotService {
                         throw new ServiceException("MCP 工具名与现有工具冲突（" + t.name() + "），已拒绝挂载避免静默覆盖");
                     }
                     Boolean hint = t.annotations() == null ? null : t.annotations().readOnlyHint();
-                    boolean write = Boolean.FALSE.equals(hint) || (hint == null && !serverReadOnly);
-                    if (write) {
+                    if (isWriteTool(hint, serverReadOnly)) {
                         writeTools.add(t.name());
                     }
                 }
@@ -674,7 +734,12 @@ public class McpPilotService {
                 l.setAction(action);
                 l.setStatus(status);
                 l.setErrorMsg(errorMsg != null ? errorMsg : remark);
-                l.setDurationMs(remark != null && remark.endsWith("ms") ? Integer.valueOf(remark.replace("ms", "")) : null);
+                // G4 三审回修（双席共识 P1）：remark 可能带 write 前缀（"write 123ms"）——
+                // 原 endsWith("ms")+replace 解析必抛 NumberFormatException 且被吞 →
+                // 写类成功调用审计行 100% 丢失；改尾部数字提取，前缀天然兼容
+                java.util.regex.Matcher dm = java.util.regex.Pattern.compile("(\\d+)ms$")
+                    .matcher(remark == null ? "" : remark);
+                l.setDurationMs(dm.find() ? Integer.valueOf(dm.group(1)) : null);
                 l.setCreateTime(new java.util.Date());
                 mapper.insert(l);
             } catch (Exception e) {

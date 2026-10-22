@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 批1 Q1=B（2026-10-21 开关矩阵）纯函数单测：租户级工具档位单点判定 effectiveMinRole。
@@ -23,11 +24,14 @@ class ToolRegistryGateTest {
     private static final ToolRegistry.ToolSpec ADMIN_TOOL = new ToolRegistry.ToolSpec(
         java.util.Set.of("gate_admin_tool"), null, ToolIdentity.LEVEL_ADMIN, null, null);
 
-    /** 三审回修（dspro P1-2）：坏 JSON fail-closed——按全工具关闭处理，已关工具不复活 */
+    /** 三审回修（dspro P1-2）：坏 JSON fail-closed——按全工具关闭处理，已关工具不复活。
+     *  G4 三审回修：兜底表 +1 条 __poisoned__ 哨兵（MCP 挂载侧 fail-closed 信号，
+     *  防坏 JSON 下 mcp: 键缺位使已关外部服务静默复活） */
     @Test
     void corruptedJsonFailsClosedToAllOff() {
         Map<String, String> gate = AssistantConfigService.parseToolGate("{\"web_search\": \"of");
-        assertEquals(ToolRegistry.allToolNames().size(), gate.size(), "坏 JSON=全工具兜底条目");
+        assertEquals(ToolRegistry.allToolNames().size() + 1, gate.size(), "坏 JSON=全工具兜底+哨兵");
+        assertTrue(gate.containsKey(AssistantConfigService.POISONED_GATE_SENTINEL), "兜底表必含 __poisoned__ 哨兵");
         for (String v : gate.values()) {
             assertEquals("off", v, "兜底值一律 off（fail-closed）");
         }

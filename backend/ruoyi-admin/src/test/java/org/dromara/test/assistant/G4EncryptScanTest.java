@@ -9,6 +9,7 @@ import java.lang.reflect.Field;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,5 +57,31 @@ class G4EncryptScanTest {
         constField.setAccessible(true);
         assertEquals(anno.password(), constField.get(null),
             "实体注解与服务层显式加密必须同密钥（否则双轨互解不开）");
+    }
+
+    /** 事故盲区正面试锁（G4 三审回修 dsflash P2）：扫描过≠加解密真的跑得通——
+     *  首版 14 位密钥时扫描测试全绿但运行时加密必抛。用注解同款参数（AES+密钥+BASE64）
+     *  真实 roundtrip 一遍，算法/密钥/编码任一漂移此处立刻红 */
+    @Test
+    void headersAesRoundtripWithAnnotationParams() throws Exception {
+        org.dromara.common.encrypt.annotation.EncryptField anno =
+            DcsMcpServer.class.getDeclaredField("headers")
+                .getAnnotation(org.dromara.common.encrypt.annotation.EncryptField.class);
+        org.dromara.common.encrypt.core.EncryptContext ctx = new org.dromara.common.encrypt.core.EncryptContext();
+        ctx.setAlgorithm(anno.algorithm());
+        ctx.setPassword(anno.password());
+        ctx.setEncode(anno.encode() == org.dromara.common.encrypt.enumd.EncodeType.DEFAULT
+            ? org.dromara.common.encrypt.enumd.EncodeType.BASE64 : anno.encode());
+        // 传不存在包跳过扫描（encrypt/decrypt 不依赖扫描缓存）
+        org.dromara.common.encrypt.core.EncryptorManager m =
+            new org.dromara.common.encrypt.core.EncryptorManager("com.no.such.pkg");
+
+        String plain = "{\"Authorization\":\"Bearer rt-test\"}";
+        String enc = m.encrypt(plain, ctx);
+        assertTrue(enc.startsWith("ENC_"), "密文应带 ENC_ 前缀（幂等判据）");
+        assertNotEquals(plain, enc);
+        assertEquals(plain, m.decrypt(enc, ctx), "同参数解密应还原明文");
+        // 幂等：已带前缀的密文再 encrypt 不二次加密（双轨互认判据）
+        assertEquals(enc, m.encrypt(enc, ctx));
     }
 }

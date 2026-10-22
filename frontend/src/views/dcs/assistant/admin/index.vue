@@ -590,6 +590,11 @@
             <el-table-column label="命令 / 地址" min-width="240">
               <template #default="{ row }">{{ row.transportType === 'STDIO' ? row.command + ' ' + (row.args || '') : row.url }}</template>
             </el-table-column>
+            <el-table-column label="请求头键名" width="130">
+              <!-- G4 三审回修：后端早回了 headerKeys 但表里没有列——管理员看不到已有键，
+                   补一个头会静默丢掉其它鉴权头（值永不回显，只显示键名） -->
+              <template #default="{ row }">{{ row.headerKeys || '—' }}</template>
+            </el-table-column>
             <el-table-column label="状态" width="90">
               <template #default="{ row }">
                 <el-switch :model-value="row.enabled === '1'" @change="(v: any) => onToggleMcp(row, v)" />
@@ -670,8 +675,8 @@
                 <el-input v-model="mcpForm.url" placeholder="http://127.0.0.1:3000/mcp（host 须在白名单）" />
               </el-form-item>
             </template>
-            <el-form-item label="请求头">
-              <el-input v-model="mcpForm.headers" placeholder='可选 JSON 对象，如 {"Authorization":"Bearer ..."}；值加密存储、仅 HTTP 行生效、列表只显示键名' />
+            <el-form-item v-if="mcpForm.transportType !== 'STDIO'" label="请求头">
+              <el-input v-model="mcpForm.headers" :placeholder="mcpHeadersPlaceholder" />
             </el-form-item>
             <el-form-item label="备注">
               <el-input v-model="mcpForm.remark" type="textarea" :rows="2" maxlength="255" />
@@ -2367,9 +2372,17 @@ const mcpForm = reactive({
   argsJson: '[""]',
   url: '',
   headers: '',
+  /** 编辑时已有的请求头键名（提示用——值永不回显；改 headers 须整份重填） */
+  headerKeysHint: '',
   remark: '',
   enabledBool: true
 });
+/** G4 三审回修：请求头占位提示——编辑时展示已有键名（值永不回显），改须整份重填。
+ *  放 computed（含双引号示例 JSON，进模板属性会截断——用户实测 vite 报错教训） */
+const mcpHeadersPlaceholder = computed(() =>
+  mcpForm.id && mcpForm.headerKeysHint
+    ? `已有键：${mcpForm.headerKeysHint}。留空保持不变；要改须整份重填（含未变的键）`
+    : '可选 JSON 对象，如 {"Authorization":"Bearer ..."}；值加密存储、列表只显示键名');
 const mcpLogRows = ref<AssistantMcpCallLog[]>([]);
 const mcpLogTotal = ref(0);
 const mcpLogPage = ref(1);
@@ -2418,10 +2431,11 @@ function openMcpForm(row?: AssistantMcpServerRow) {
     mcpForm.argsJson = row.args ?? '[""]';
     mcpForm.url = row.url ?? '';
     mcpForm.headers = '';
+    mcpForm.headerKeysHint = row.headerKeys ?? '';
     mcpForm.remark = row.remark ?? '';
     mcpForm.enabledBool = row.enabled === '1';
   } else {
-    Object.assign(mcpForm, { id: '', serverName: '', displayName: '', transportType: 'STDIO', argsJson: '[""]', url: '', headers: '', remark: '', enabledBool: true });
+    Object.assign(mcpForm, { id: '', serverName: '', displayName: '', transportType: 'STDIO', argsJson: '[""]', url: '', headers: '', headerKeysHint: '', remark: '', enabledBool: true });
   }
   mcpFormVisible.value = true;
 }

@@ -40,11 +40,33 @@ class McpPilotServiceTest {
             many.substring(0, many.length() - 1) + "}"));
         assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
             "{\"a\":\"" + "x".repeat(1025) + "\"}"));
-        // 边界内合法：10 键、1024 值、字母数字-_ 键名
+        // 边界内合法：1024 值上限实测 + 10 键上限实测（三审回修：注释曾声称覆盖未测）
         assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.parseHeaders(
             "{\"X_Api-Key-1\":\"" + "x".repeat(1024) + "\"}"));
+        StringBuilder ten = new StringBuilder("{");
+        for (int i = 0; i < 10; i++) {
+            ten.append("\"H_").append(i).append("\":\"v\",");
+        }
+        assertEquals(10, org.dromara.assistant.service.McpPilotService.parseHeaders(
+            ten.substring(0, ten.length() - 1) + "}").size());
+        // G4 三审回修（dsflash P2）：整体 4KB 上限 + 重复键显式拒绝（Jackson 默认后值静默覆盖）
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+            "{\"a\":\"" + "x".repeat(4200) + "\"}"));
+        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+            "{\"a\":\"1\",\"a\":\"2\"}"));
         // validateHeaders 与 parseHeaders 同口径（委托）
         assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders("{\"Authorization\":\"t\"}"));
+    }
+
+    /** G4-#3 写类判定纯函数（glm53 终审 P2 抽出后锁行为）：注解显式优先，null 兜底服务级 */
+    @Test
+    void writeToolDecisionByAnnotationThenServerFlag() {
+        assertTrue(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.FALSE, true), "注解 FALSE 一律写类（即便服务自称只读）");
+        assertTrue(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.FALSE, false), "注解 FALSE ×写类服务=写");
+        assertFalse(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.TRUE, true), "注解 TRUE 放行");
+        assertFalse(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.TRUE, false), "注解 TRUE 即便写类服务也放行（工具自声明只读）");
+        assertFalse(org.dromara.assistant.service.McpPilotService.isWriteTool(null, true), "无注解+只读服务（试点恒 '1'）=只读，行为零变化");
+        assertTrue(org.dromara.assistant.service.McpPilotService.isWriteTool(null, false), "无注解+写类服务=fail-safe 视为写（放开 read_only 前置保护）");
     }
 
     @Test

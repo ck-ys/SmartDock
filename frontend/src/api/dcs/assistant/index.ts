@@ -541,7 +541,7 @@ export function saveAssistantToolGate(gate: Record<string, string>) {
 
 /* ============ 批2 Q2=A：MCP 外部工具试点（管理台「外部工具」页签） ============ */
 
-/** 服务行（headers 只回键名——免密钥试点仍防误回显） */
+/** 服务行（headers 只回键名——G4-#1 起值 AES 加密落库，键名是管理面唯一可见信息） */
 export interface AssistantMcpServerRow {
   id: string;
   serverName: string;

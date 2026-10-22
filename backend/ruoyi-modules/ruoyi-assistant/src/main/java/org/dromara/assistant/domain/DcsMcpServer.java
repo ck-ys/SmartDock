@@ -46,11 +46,11 @@ public class DcsMcpServer implements Serializable {
 
     /** 额外请求头 JSON 字符串（含密钥的值加密存储） */
     /** HTTP 行请求头 JSON（键值对）。G4-#1：可存鉴权头——值经 MyBatis 加密插件
-     *  AES+专用密钥落库（照抄 DcsAiConfig 先例，显式算法+密钥不依赖全局默认 BASE64；
-     *  坑：AES 密钥必须 16/24/32 位，首版 "DcsMcpEncKey16" 是 14 位——拦截器把
-     *  IllegalArgument 吞掉后明文落库，服务层同款显式路径会如实报错，双保险），
-     *  回显只出键名不出值（headerKeysOnly），save 端点不落请求体日志 */
-    @EncryptField(algorithm = AlgorithmType.AES, password = "DcsMcpHeadersK16")
+     *  AES+专用密钥落库（与服务层显式加密同款参数双轨，ENC_ 前缀幂等互认；
+     *  坑：AES 密钥必须 16/24/32 位，首版 14 位被拦截器吞错后明文落库，见
+     *  McpPilotService.HEADERS_ENC_KEY 注释），回显只出键名（McpPilotService.headerKeysOf），
+     *  save 端点不落请求体日志；STDIO 行不支持（保存面显式拒绝） */
+    @EncryptField(algorithm = AlgorithmType.AES, password = "DcsMcpHeadersK16", encode = org.dromara.common.encrypt.enumd.EncodeType.BASE64)
     private String headers;
 
     private String readOnly;

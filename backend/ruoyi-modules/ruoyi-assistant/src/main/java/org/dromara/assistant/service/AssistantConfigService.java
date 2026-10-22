@@ -124,14 +124,21 @@ public class AssistantConfigService {
         }
     }
 
-    /** 坏配置兜底：全工具 off（与 ToolRegistry.allToolNames 单点同源，防解析失败时 fail-open） */
+    /** 坏配置兜底：全工具 off（与 ToolRegistry.allToolNames 单点同源，防解析失败时 fail-open）。
+     *  G4 三审回修（dsflash P2-4）：加 __poisoned__ 哨兵——MCP 挂载侧（McpPilotService）
+     *  看到哨兵即跳过全部外部服务挂载，否则坏 JSON 下 mcp: 键不在本表，已关闭的
+     *  外部服务会静默复活（fail-open）；平台工具读不到键=默认档不受影响 */
     private static java.util.Map<String, String> allOffGate() {
         java.util.Map<String, String> closed = new java.util.LinkedHashMap<>();
         for (String name : org.dromara.assistant.core.ToolRegistry.allToolNames()) {
             closed.put(name, "off");
         }
+        closed.put(POISONED_GATE_SENTINEL, "off");
         return closed;
     }
+
+    /** 坏 tool_gate JSON 的哨兵键（不进管理面保存校验白名单，仅作挂载侧 fail-closed 信号） */
+    public static final String POISONED_GATE_SENTINEL = "__poisoned__";
 
     /** 称呼归一（读侧）：空白一律=平台默认，非空 trim 后直出（写侧已限长） */
     private static String normalizeName(String raw) {
