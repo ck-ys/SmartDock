@@ -105,9 +105,9 @@ const cannotSubmitReason = computed(() => {
 });
 
 const statusLabel = (s?: string) => ({ DRAFT: '草稿', COLLECTING: '收集中', CLOSED: '已关闭' })[s || ''] || s;
-const statusTag = (s?: string) => ({ DRAFT: 'info', COLLECTING: 'primary', CLOSED: 'info' })[s || ''] || 'info';
+const statusTag = (s?: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => (({ DRAFT: 'info', COLLECTING: 'primary', CLOSED: 'info' }) as Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'>)[s || ''] || 'info';
 const subLabel = (s?: string) => ({ PENDING_AUDIT: '待审核', APPROVED: '已通过', REJECTED: '已退回' })[s || ''] || s;
-const subTag = (s?: string) => ({ PENDING_AUDIT: 'warning', APPROVED: 'success', REJECTED: 'danger' })[s || ''] || 'info';
+const subTag = (s?: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => (({ PENDING_AUDIT: 'warning', APPROVED: 'success', REJECTED: 'danger' }) as Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'>)[s || ''] || 'info';
 const optionList = (f: DcsTaskFieldDef) => (Array.isArray(f.options) ? f.options : []).map((s) => String(s).trim()).filter(Boolean);
 // data 可能是对象也可能是 JSON 字符串——字符串按字符 entries 会散架, 先归一
 const safeParse = (s: string): unknown => { try { return JSON.parse(s); } catch { return null; } };

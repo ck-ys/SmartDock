@@ -173,7 +173,18 @@
  * aria-label 逐人命名、Esc 链前置 pending 卡分支（AssistantDrawer）。
  */
 import type { HitlAsk, HitlEdits } from './useAssistant';
-type TopicUrgeTargetVO = { userId: number; userName?: string; nickName?: string };
+/** 批5 催办名单端点退役后 targets 恒空——富字段展示机道按退役前口径保留（全可选） */
+type TopicUrgeTargetVO = {
+  userId: number;
+  userName?: string;
+  nickName?: string;
+  subjectUserId?: string | number;
+  subjectName?: string;
+  detailStatus?: string;
+  publishDeptPath?: string;
+  recentUrgeCount?: number;
+  nextAllowedAt?: string;
+};
 import IconSpan from './IconSpan.vue';
 
 const props = defineProps<{ ask: HitlAsk }>();

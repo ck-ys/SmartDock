@@ -197,8 +197,8 @@ const shortId = (id: string) => (id ? 'RP-' + id.slice(-4) : '');
 const day = (v?: string) => (v ? String(v).slice(0, 10) : '—');
 const fmt = (v?: string) => (v ? String(v).replace('T', ' ').slice(0, 19) : '—');
 
-const statusType = (s: string) =>
-  ({ RUNNING: 'primary', PAUSED: 'warning', DONE: 'success', FAILED: 'danger' })[s] || 'info';
+const statusType = (s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' =>
+  (({ RUNNING: 'primary', PAUSED: 'warning', DONE: 'success', FAILED: 'danger' }) as Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'>)[s] || 'info';
 const statusLabel = (s: string) =>
   ({ RUNNING: '执行中', PAUSED: '已暂停', DONE: '完成', FAILED: '失败' })[s] || s;
 

@@ -150,7 +150,7 @@ const query = reactive<any>({ pageNum: 1, pageSize: 10, title: '', status: '' })
 const dialog = reactive({ visible: false, id: '' });
 const saving = ref(false);
 const formRef = ref();
-const form = reactive<{ id?: string; title: string; description: string; deadline: string; fields: DcsTaskFieldDef[] }>({
+const form = reactive<{ id?: string; title: string; description: string; deadline: string; fields: Array<Omit<DcsTaskFieldDef, 'options'> & { options?: string }> }>({
   title: '',
   description: '',
   deadline: '',
@@ -177,7 +177,7 @@ const reset = () => {
 };
 const goDetail = (id: string) => router.push(`/dcs/mission/detail/${id}`);
 const statusLabel = (s: string) => ({ DRAFT: '草稿', COLLECTING: '收集中', CLOSED: '已关闭' })[s] || s;
-const statusTag = (s: string) => ({ DRAFT: 'info', COLLECTING: 'primary', CLOSED: 'info' })[s] || 'info';
+const statusTag = (s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => (({ DRAFT: 'info', COLLECTING: 'primary', CLOSED: 'info' }) as Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'>)[s] || 'info';
 
 const addField = () => form.fields.push({ fieldCode: '', fieldName: '', fieldType: 'text', required: '1', options: '' });
 const openCreate = () => {

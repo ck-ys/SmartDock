@@ -1089,6 +1089,7 @@ import {
   getAiModelHealthLatest,
   type AiModelHealthRow
 } from '@/api/dcs/ai';
+import type { DcsAiProvider } from '@/api/dcs/ai';
 import {
   DcsAiBalanceVO,
   DcsAiBalanceMap,
@@ -1377,8 +1378,8 @@ const openAccessDialog = async (row?: DcsAiConfigVO) => {
 
 /** 页签：厂商切换 → 租户下拉换成该厂有配置的租户；多租户默认「全部租户」（与角标同口径），单租户落"我的租户" */
 const onKeysProviderChange = async () => {
-  const tenants = keysTenantOptions.value.map((t) => t.tenantId);
-  keysTenantId.value = tenants.length > 1 ? KEYS_ALL_TENANTS : tenants.includes(myTenantId.value) ? myTenantId.value : (tenants[0] ?? '');
+  const tenants = keysTenantOptions.value.map((t) => String(t.tenantId));
+  keysTenantId.value = tenants.length > 1 ? KEYS_ALL_TENANTS : tenants.includes(String(myTenantId.value)) ? String(myTenantId.value) : (tenants[0] ?? '');
   await onKeysFilterChange();
 };
 /** 页签：厂商/租户任一变化 → 重拉钥匙列表（按当前筛选模式） */
@@ -1392,7 +1393,7 @@ const reloadKeysView = async () => {
     return;
   }
   if (keysTenantId.value === KEYS_ALL_TENANTS) {
-    const tenants = keysTenantOptions.value.map((t) => t.tenantId).filter(Boolean);
+    const tenants = keysTenantOptions.value.map((t) => String(t.tenantId)).filter(Boolean);
     keysLoading.value = true;
     try {
       const lists = await Promise.all(
@@ -1748,7 +1749,7 @@ const syncInlinePriceForm = async () => {
   if (form.value.provider && form.value.modelName) {
     try {
       const res = await getDcsAiEffectivePrice({
-        tenantId: form.value.tenantId || currentTenantId(),
+        tenantId: String(form.value.tenantId || currentTenantId()),
         provider: form.value.provider,
         modelName: form.value.modelName
       });
@@ -2677,6 +2678,7 @@ const handleDelete = async (row?: DcsAiConfigVO) => {
   // 批3-1 U1（拍板 2026-10-10「都按推荐」）：删除确认分级——★默认行与批量含★改警示文案
   // 并说清「助手回退」后果，编号不再怼脸；普通行/无★批量维持原文案
   const configIds = row?.configId || ids.value;
+  const cnt = Array.isArray(configIds) ? configIds.length : 1;
   const starCount = row
     ? row.isDefault === '1'
       ? 1
@@ -2685,7 +2687,7 @@ const handleDelete = async (row?: DcsAiConfigVO) => {
   if (row && starCount === 1) {
     await proxy?.$modal.confirm(`「${row.modelName}」是当前默认模型（★），删除后助手调用将回退到下一个可用模型。确认删除？`);
   } else if (starCount > 0) {
-    await proxy?.$modal.confirm(`所选 ${configIds.length} 行中有 ${starCount} 行是默认模型（★），删除后助手调用将回退到下一个可用模型。确认删除？`);
+    await proxy?.$modal.confirm(`所选 ${cnt} 行中有 ${starCount} 行是默认模型（★），删除后助手调用将回退到下一个可用模型。确认删除？`);
   } else {
     await proxy?.$modal.confirm(`是否确认删除AI模型配置「${configIds}」？`);
   }
@@ -2693,7 +2695,7 @@ const handleDelete = async (row?: DcsAiConfigVO) => {
   if (row && starCount === 1) {
     proxy?.$modal.msgSuccess('已删除默认模型（★）——助手将回退到下一个可用模型');
   } else if (starCount > 0) {
-    proxy?.$modal.msgSuccess(`已删除 ${configIds.length} 行（含默认模型★）——助手将回退到下一个可用模型`);
+    proxy?.$modal.msgSuccess(`已删除 ${cnt} 行（含默认模型★）——助手将回退到下一个可用模型`);
   } else {
     proxy?.$modal.msgSuccess('删除成功');
   }

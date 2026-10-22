@@ -19,6 +19,7 @@ import { readWebOn } from './webOnState';
 import { readSkillId } from './skillState';
 import { createAguiClient, type AguiClientOptions, type AguiTurnHandle } from '@/api/dcs/assistant/aguiClient';
 import { getPendingHitl, getConversationTodo, getFollowups, type PendingHitlItem } from '@/api/dcs/assistant';
+import type { AguiResume } from '@/api/dcs/assistant/types';
 import { humanizeAiError } from '@/utils/aiErrorText';
 import type { AguiHandlers, AguiMessage, AguiRunInput } from '@/api/dcs/assistant/types';
 import { renderMd } from './md';
@@ -1348,7 +1349,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     if (approved && editedArgs) {
       turn.hitl.toolInput = { ...(turn.hitl.toolInput ?? {}), ...editedArgs };
     }
-    const resumePayload = (hitlIds.length > 0 ? hitlIds : [turn.hitl.interruptId]).map((id) =>
+    const resumePayload = (hitlIds.length > 0 ? hitlIds : [turn.hitl.interruptId]).map((id): AguiResume =>
       id === turn.hitl!.interruptId
         ? {
             interruptId: id,

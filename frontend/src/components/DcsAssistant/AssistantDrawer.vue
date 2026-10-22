@@ -1136,7 +1136,7 @@ watch(modelValue, async (open) => {
     };
     const d = unwrap<Record<string, unknown>>(res);
     if (d?.dailyRoundLimitPerUser) {
-      quotaLimit.value = d.dailyRoundLimitPerUser;
+      quotaLimit.value = Number(d.dailyRoundLimitPerUser);
     }
     // R1：用户级禁用闸最高优先（批③ /status.quotaDisabled 此前零消费）——admin 在
     // 用户额度页签停用后，被禁者打开抽屉即见红横幅+输入置灰，不再无提示无反馈；
@@ -1145,7 +1145,7 @@ watch(modelValue, async (open) => {
       state.banner = 'disabled';
     } else if (d?.degraded) {
       state.banner = 'degraded';
-    } else if ((d?.turnsUsedToday ?? 0) >= quotaLimit.value) {
+    } else if (Number(d?.turnsUsedToday ?? 0) >= quotaLimit.value) {
       state.banner = 'quota';
     } else if (state.banner === 'disabled') {
       state.banner = '';
@@ -1436,7 +1436,7 @@ onBeforeUnmount(() => {
   mounted.value = false;
 });
 
-defineExpose({ state, ask: (q: string) => onSend(q) });
+defineExpose({ state, ask: (q: string) => onSend(q, '') });
 </script>
 
 <style lang="scss" scoped>

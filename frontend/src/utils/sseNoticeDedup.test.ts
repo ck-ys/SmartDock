@@ -11,8 +11,8 @@ describe('DCS SSE notice deduplication', () => {
   });
 
   it('keeps legacy events without a stable delivery id compatible', () => {
-    expect(shouldDisplayDcsNotice({ title: 'legacy' }, 1_000)).toBe(true);
-    expect(shouldDisplayDcsNotice({ title: 'legacy' }, 1_001)).toBe(true);
+    expect(shouldDisplayDcsNotice({ title: 'legacy' } as Parameters<typeof shouldDisplayDcsNotice>[0], 1_000)).toBe(true);
+    expect(shouldDisplayDcsNotice({ title: 'legacy' } as Parameters<typeof shouldDisplayDcsNotice>[0], 1_001)).toBe(true);
   });
 
   it('allows a delivery again after the bounded ttl', () => {

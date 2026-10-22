@@ -134,7 +134,7 @@ async function probeProactive() {
     }
     // 批5 契约迁移: 旧 todo REVISE 端点退役; 回修A后 my 已回填 mySubmissionStatus, 不再逐任务 getTask
     const res = await myTasks({ pageNum: 1, pageSize: 5 });
-    for (const t of (res as { rows?: Array<{ id: string; title: string; status?: string; mySubmissionStatus?: string }> }).rows ?? []) {
+    for (const t of res.rows ?? []) {
       if (t.status && t.status !== 'COLLECTING') continue;
       if (t.mySubmissionStatus === 'REJECTED') {
         proactive.value = { missionName: t.title, missionId: t.id };
@@ -153,7 +153,7 @@ async function probeStatus() {
   }
   try {
     const res = await getAssistantStatus();
-    const d = (res?.data ?? res) as Record<string, unknown>;
+    const d = (res?.data ?? res) as unknown as Record<string, unknown>;
     // 快刀批 Q6：称呼随首探下发（此处是全站唯一兜底喂点——layout 挂悬浮球=每页必过）
     applyAssistantName(d?.name);
     if (d?.enabled && d?.modelConfigured) {

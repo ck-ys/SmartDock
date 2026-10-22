@@ -11,7 +11,7 @@
       <div class="side-hd">
         <span class="side-t">我的助手会话</span>
         <div class="side-ops">
-          <el-button link type="primary" :loading="loading" title="刷新" @click="loadConversations"><IconSpan name="refresh" /></el-button>
+          <el-button link type="primary" :loading="loading" title="刷新" @click="loadConversations()"><IconSpan name="refresh" /></el-button>
           <el-button link type="primary" title="新会话" @click="onNewSession"><IconSpan name="plus" /> 新会话</el-button>
         </div>
         <button class="side-close" type="button" aria-label="关闭会话列表" @click="sideOpen = false"><IconSpan name="x" /></button>

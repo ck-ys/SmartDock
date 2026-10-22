@@ -1,6 +1,8 @@
 /** 风险事件 */
 export interface RiskEventVO {
   eventId: number | string;
+  userName?: string;
+  nickName?: string;
   userId?: number | string;
   ip?: string;
   userAgent?: string;
@@ -218,7 +220,7 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 /** 事件类型颜色 */
-export const EVENT_TYPE_COLORS: Record<string, string> = {
+export const EVENT_TYPE_COLORS: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
   SENSITIVE_WORD: 'warning',
   REPORTED: 'danger',
   LOGIN_FAIL: 'warning',

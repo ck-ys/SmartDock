@@ -201,7 +201,7 @@
                 </div>
 
                 <div class="draft-actions wrap">
-                  <el-button v-hasPermi="['profile:rule:edit']" type="primary" size="small" :loading="ruleActionLoading" @click="saveDraft">保存草稿</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" type="primary" size="small" :loading="ruleActionLoading" @click="saveDraft()">保存草稿</el-button>
                   <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="validateDraft">校验</el-button>
                   <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="showDiff">对比当前</el-button>
                   <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="showImpact">影响评估</el-button>

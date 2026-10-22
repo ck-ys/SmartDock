@@ -246,8 +246,9 @@ export function createAguiClient(options: AguiClientOptions = {}) {
           }
           return 'stopped';
         }
-        value = r.value;
-        done = r.done;
+        const rr = r as ReadableStreamReadResult<Uint8Array>;
+        value = rr.value;
+        done = rr.done;
         pendingRead = null;
       } catch (e) {
         stallCancel?.();

@@ -1188,7 +1188,7 @@ async function refreshStatus() {
     // Q11：今日平均（样本<3 后端 null → 显示层退本会话值）
     cacheHitRateToday.value = typeof d?.cacheHitRateToday === 'number' ? d.cacheHitRateToday : null;
     if (d?.dailyRoundLimitPerUser) {
-      limit.value = d.dailyRoundLimitPerUser;
+      limit.value = Number(d.dailyRoundLimitPerUser);
     }
     if (typeof d?.turnsUsedToday === 'number') {
       used.value = d.turnsUsedToday;
@@ -1425,7 +1425,7 @@ onMounted(() => {
   colHostEl = host;
   colHostObserver = new ResizeObserver((entries) => {
     // borderBox 口径（同 StatPanel：宿主 padding 变化不算宽变，防让位反馈环）
-    const b = entries[0]?.borderBoxWidth ?? entries[0]?.borderBoxSize;
+    const b = (entries[0] as { borderBoxWidth?: ResizeObserverSize | readonly ResizeObserverSize[] }).borderBoxWidth ?? entries[0]?.borderBoxSize;
     const single = Array.isArray(b) ? b[0] : b;
     const w = single?.inlineSize ?? entries[0]?.contentRect.width ?? 0;
     if (w >= COL_STEP_HOST_W) {
@@ -1785,7 +1785,7 @@ function onSend() {
 const cmd = reactive({
   open: false,
   mode: 'slash' as 'slash' | 'at',
-  items: [] as Array<{ icon: string; label: string; sub: string; text: string }>,
+  items: [] as Array<{ icon: string; label: string; sub: string; text: string; grp?: 'fn' | 'ask' }>,
   active: 0
 });
 /** @ 引用任务数据（业务批4 Q1：切 mention-tasks 专用端点——七路可见+relation 标注，

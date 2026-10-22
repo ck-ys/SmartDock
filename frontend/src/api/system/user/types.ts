@@ -14,6 +14,7 @@ export interface UserInfo {
 export interface AvatarUploadVO {
   imgUrl: string;
   ossId?: string | number;
+  reviewStatus?: string;
 }
 
 /**

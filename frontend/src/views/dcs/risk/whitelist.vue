@@ -123,7 +123,7 @@ const valuePlaceholder = computed(() => {
 const loadList = async () => {
   loading.value = true;
   try {
-    const r: any = await listWhitelist({ ...query, listType: query.listType || undefined });
+    const r: any = await listWhitelist({ ...query, listType: (query.listType || undefined) as 'USER' | 'IP' | 'DOMAIN' });
     if (r.code === 200) {
       list.value = (r.rows || []).map((x: RiskWhitelistVO) => ({ ...x, _toggling: false }));
       total.value = r.total || 0;

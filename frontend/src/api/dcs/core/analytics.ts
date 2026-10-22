@@ -137,9 +137,9 @@ export interface AnalyticsTimelineItem {
 export interface AnalyticsSessionDetail {
   session: AnalyticsSession;
   timeline: AnalyticsTimelineItem[];
-  pages: { pageUrl: string; count: number   /** 批11: 无 profile:pii:behavior 权限时为 true, 时间线被拦 */
+  pages: { pageUrl: string; count: number }[];
+  /** 批11: 无 profile:pii:behavior 权限时为 true, 时间线被拦 */
   behaviorBlocked?: boolean;
-}[];
 }
 
 export interface AnalyticsFunnelStepDef {

@@ -17,7 +17,7 @@ export interface ConfigForm {
 }
 
 export interface ConfigQuery extends PageQuery {
-  configName: string;
-  configKey: string;
-  configType: string;
+  configName?: string;
+  configKey?: string;
+  configType?: string;
 }

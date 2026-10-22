@@ -332,7 +332,7 @@ const submitAdd = async () => {
   }
   addDialog.submitting = true;
   try {
-    const r: any = await addRule(addDialog.form);
+    const r: any = await addRule(addDialog.form as Parameters<typeof addRule>[0]);
     if (r.code === 200) {
       ElMessage.success('规则已新增');
       addDialog.visible = false;

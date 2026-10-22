@@ -11,7 +11,7 @@ import { useTagsViewStore } from '@/store/modules/tagsView';
 const tagAndTagSpacing = ref(4);
 
 const scrollContainerRef = ref<ElScrollbarInstance>();
-const scrollWrapper = computed(() => scrollContainerRef.value?.$refs.wrapRef);
+const scrollWrapper = computed<HTMLElement | undefined>(() => scrollContainerRef.value?.$refs.wrapRef as HTMLElement | undefined);
 
 onMounted(() => {
   scrollWrapper.value?.addEventListener('scroll', emitScroll, true);

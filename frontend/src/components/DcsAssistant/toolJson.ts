@@ -18,6 +18,8 @@ export interface ToolRowsShape {
   total?: number;
   rows?: unknown[];
   truncated?: boolean;
+  userTotal?: number | null;
+  caliberWarning?: string;
 }
 
 /** 值位置 15 位以上整数加引号（工具结果里计数类字段不可能达 15 位，安全） */

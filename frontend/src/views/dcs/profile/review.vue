@@ -56,7 +56,7 @@
         </div>
         <div class="config-item">
           <span class="config-label">复核阈值</span>
-          <el-input-number v-model="config.reviewThreshold" :min="0" :max="100" :precision="2" controls-position="right" style="width: 130px" />
+          <el-input-number :model-value="Number(config.reviewThreshold)" :min="0" :max="100" :precision="2" controls-position="right" style="width: 130px" @update:model-value="(v: number) => (config.reviewThreshold = v)" />
           <span class="muted small">低于该总分入队</span>
         </div>
         <div class="config-item">

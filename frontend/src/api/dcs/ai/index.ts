@@ -18,6 +18,10 @@ import {
   DcsAiModelPriceVO
 } from './types';
 
+/** 类型再导出——页面按名导入（DcsAiProvider=厂商字典键别名） */
+export type { DcsAiConfigVO, DcsAiProviderPresetVO } from './types';
+export type { DcsAiProvider } from './types';
+
 const CONFIG_BASE = '/dcs/ai-config';
 
 /** 能力目录匹配(批1/批5): 输入模型名自动解析思考档位/上下文窗口, 永不 404 */
@@ -48,6 +52,8 @@ export const saveAssistantModelSettingPost = (data: {
   backendDefaultConfigId?: number | string;
   backendThinkingTier?: string;
   backendMaxTokens?: number;
+  allowUserSwitch?: string;
+  switchScope?: string | null;
 }) => request({ url: '/dcs/assistant/model-setting', method: 'post', data });
 
 /** 能力覆盖(批6/Q13): 管理端✎弹窗保存 MANUAL 行, 只影响本租户, 重复保存=更新

@@ -291,7 +291,7 @@ const typeIds = ref<Array<number | string>>([]);
 const typeSingle = ref(true);
 const typeMultiple = ref(true);
 const typeTotal = ref(0);
-const dateRange = ref<[DateModelType, DateModelType]>(['', '']);
+const dateRange = ref<[string, string]>(['', '']);
 
 const typeFormRef = ref<ElFormInstance>();
 const typeQueryFormRef = ref<ElFormInstance>();

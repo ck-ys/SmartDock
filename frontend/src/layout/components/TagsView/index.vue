@@ -6,7 +6,7 @@
         :key="tag.path"
         :data-path="tag.path"
         :class="{ 'active': isActive(tag), 'has-icon': tagsIcon }"
-        :to="{ path: tag.path ? tag.path : '', query: tag.query, fullPath: tag.fullPath ? tag.fullPath : '' }"
+        :to="{ path: tag.path ? tag.path : '', query: tag.query }"
         class="tags-view-item"
         :style="activeStyle(tag)"
         @click.middle="!isAffix(tag) ? closeSelectedTag(tag) : ''"
@@ -180,7 +180,7 @@ const closeLeftTags = () => {
   });
 };
 const closeOthersTags = () => {
-  router.push(selectedTag.value).catch(() => {});
+  router.push(selectedTag.value.fullPath).catch(() => {});
   proxy?.$tab.closeOtherPage(selectedTag.value).then(() => {
     moveToCurrentTag();
   });

@@ -122,7 +122,7 @@ const multiple = ref(true);
 const selectName = ref<Array<string>>([]);
 const selectTenantId = ref<Array<string>>([]);
 const total = ref(0);
-const dateRange = ref<[DateModelType, DateModelType]>(['', '']);
+const dateRange = ref<[string, string]>(['', '']);
 const defaultSort = ref<any>({ prop: 'loginTime', order: 'descending' });
 
 const queryFormRef = ref<ElFormInstance>();
@@ -165,7 +165,7 @@ const handleSelectionChange = (selection: LoginInfoVO[]) => {
   single.value = selection.length != 1;
   selectName.value = selection.map((item) => item.userName);
   // 解锁按日志行所属租户拼锁定 key（key 带租户前缀），须随选择同步记录
-  selectTenantId.value = selection.map((item) => item.tenantId);
+  selectTenantId.value = selection.map((item) => String(item.tenantId));
 };
 /** 排序触发事件 */
 const handleSortChange = (column: any) => {

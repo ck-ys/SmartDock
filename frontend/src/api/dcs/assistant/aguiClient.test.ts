@@ -254,9 +254,9 @@ describe('createAguiClient', () => {
     });
     const handle = client.startTurn({ runId: 'r1', threadId: 't1', messages: [] }, recorder());
     await expect(handle.done).resolves.toBe('finished');
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2, '停滞那次作废，重连成功');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     expect(retries.length).toBe(1);
-    expect(retries[0][2]).toBe('stall', '停滞与断网分开话术');
+    expect(retries[0][2]).toBe('stall');
   });
 
   it('断网重试 reason=network（与停滞区分的回归锚）', async () => {
@@ -284,6 +284,6 @@ describe('createAguiClient', () => {
     });
     const handle = client.startTurn({ runId: 'r1', threadId: 't1', messages: [] }, recorder());
     await expect(handle.done).resolves.toBe('finished');
-    expect(armed).toBeGreaterThanOrEqual(2, '多帧流=看门狗多次武装多次重置');
+    expect(armed).toBeGreaterThanOrEqual(2);
   });
 });

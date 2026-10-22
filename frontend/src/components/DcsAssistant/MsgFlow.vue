@@ -242,7 +242,7 @@ watch(
 const selbarStyle = computed(() => {
   const s = selBar.value;
   if (!s || !selbarSize.value) {
-    return { visibility: 'hidden' };
+    return { visibility: 'hidden' as const, left: '0px', top: '0px' };
   }
   const { w, h } = selbarSize.value;
   let top = s.anchorTop - h - 8;
@@ -251,7 +251,7 @@ const selbarStyle = computed(() => {
   }
   const minX = s.flowLeft + 8;
   const left = Math.min(Math.max(s.anchorX - w / 2, minX), Math.max(minX, s.flowRight - w - 8));
-  return { left: left + 'px', top: top + 'px' };
+  return { visibility: 'visible' as const, left: left + 'px', top: top + 'px' };
 });
 function onSelChange() {
   const sel = document.getSelection();

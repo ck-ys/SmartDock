@@ -383,7 +383,7 @@ export interface AssistantAttachmentItem {
   threadId: string;
   fileName: string;
   suffix: string;
-  parseStatus: 'PENDING' | 'PARSED' | 'TRUNCATED' | 'FAILED';
+  parseStatus: 'PENDING' | 'PARSING' | 'PARSED' | 'TRUNCATED' | 'FAILED';
   parseError?: string | null;
   lineCount?: number | null;
   createTime?: string;

@@ -59,7 +59,7 @@
 import { RoleVO } from '@/api/system/role/types';
 import { getAuthRole, updateAuthRole } from '@/api/system/user';
 import { UserForm } from '@/api/system/user/types';
-import { RouteLocationNormalized } from 'vue-router';
+import { RouteLocationRaw } from 'vue-router';
 import { parseTime } from '@/utils/ruoyi';
 
 const route = useRoute();
@@ -100,7 +100,7 @@ const checkSelectable = (row: RoleVO): boolean => {
 };
 /** 关闭按钮 */
 const close = () => {
-  const obj: RouteLocationNormalized = {
+  const obj = {
     fullPath: '',
     hash: '',
     matched: [],
@@ -111,7 +111,7 @@ const close = () => {
     redirectedFrom: undefined,
     path: '/system/user'
   };
-  proxy?.$tab.closeOpenPage(obj);
+  proxy?.$tab.closeOpenPage(obj as RouteLocationRaw);
 };
 /** 提交按钮 */
 const submitForm = async () => {

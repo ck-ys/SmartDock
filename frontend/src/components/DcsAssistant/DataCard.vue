@@ -149,9 +149,9 @@ import type { AssistantStep } from './useAssistant';
 import { parseToolJson } from './toolJson';
 import { fmtIsoTime } from './util';
 // 批5: 旧任务树 statusColor 退役, 微核心 3 态本地化
-type StatusTagType = 'info' | 'success' | 'danger';
+type StatusTagType = 'primary' | 'info' | 'success' | 'warning' | 'danger';
 const STATUS_LABEL_MAP: Record<string, string> = { DRAFT: '草稿', COLLECTING: '收集中', CLOSED: '已关闭' };
-const statusTagType = (s?: string): StatusTagType => ({ DRAFT: 'info', COLLECTING: 'primary', CLOSED: 'info' })[s || ''] || 'info';
+const statusTagType = (s?: string): StatusTagType => (({ DRAFT: 'info', COLLECTING: 'primary', CLOSED: 'info' }) as Record<string, StatusTagType>)[s || ''] || 'info';
 import IconSpan from './IconSpan.vue';
 
 const props = defineProps<{ step: AssistantStep }>();

@@ -166,7 +166,7 @@ const fallbackPolicyOptions = [
 
 const fallbackPolicyLabel = (p: string) => fallbackPolicyOptions.find((o) => o.value === p)?.label || p || '--';
 const fallbackPolicyType = (p: string) => {
-  const map: Record<string, string> = { BLOCK: 'danger', ALGORITHM_FALLBACK: 'warning', ALLOW_FREE: 'success', ADMIN_OVERRIDE: 'primary' };
+  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = { BLOCK: 'danger', ALGORITHM_FALLBACK: 'warning', ALLOW_FREE: 'success', ADMIN_OVERRIDE: 'primary' };
   return map[p] || 'info';
 };
 

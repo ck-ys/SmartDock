@@ -310,7 +310,7 @@ watch(SUGGESTIONS, () => {
 });
 
 const greet = computed(() => {
-  const name = useUserStore().nickName || useUserStore().name || '';
+  const name = useUserStore().nickname || useUserStore().name || '';
   // 有 lastAsk 召回=老朋友回访（原型：back 存在时不用首访问候）
   const first = props.newbieUse < 1 && !lastAsk.value;
   // 成员面彻底无催办词（v12:76 断言守护口径）；平台未注册催办工具，非成员侧也只能起草话术

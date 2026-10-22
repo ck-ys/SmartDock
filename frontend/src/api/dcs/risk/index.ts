@@ -35,7 +35,7 @@ export function getDashboard(timeRange?: string): AxiosPromise<DashboardVO> {
 }
 
 /** 事件流水(分页) */
-export function listEvents(params: RiskEventQuery): AxiosPromise<TableDataInfo<RiskEventVO>> {
+export function listEvents(params: RiskEventQuery): AxiosPromise<RiskEventVO[]> {
   return request({
     url: '/dcs/risk/events',
     method: 'get',
@@ -78,7 +78,7 @@ export function deleteRule(ruleId: number | string) {
 }
 
 /** 白名单分页 */
-export function listWhitelist(params: RiskWhitelistQuery): AxiosPromise<TableDataInfo<RiskWhitelistVO>> {
+export function listWhitelist(params: RiskWhitelistQuery): AxiosPromise<RiskWhitelistVO[]> {
   return request({
     url: '/dcs/risk/whitelist',
     method: 'get',
@@ -171,7 +171,7 @@ export function batchReviewRiskActions(
   });
 }
 
-export function listRiskActions(params: RiskActionQuery): AxiosPromise<TableDataInfo<RiskActionVO>> {
+export function listRiskActions(params: RiskActionQuery): AxiosPromise<RiskActionVO[]> {
   return request({ url: '/dcs/risk/actions', method: 'get', params });
 }
 
@@ -187,7 +187,7 @@ export function reviewRiskAction(actionId: number | string, data: RiskReviewComm
   return request({ url: `/dcs/risk/actions/${actionId}/review`, method: 'post', data });
 }
 
-export function listProfileReviews(params: ProfileReviewQuery): AxiosPromise<TableDataInfo<ProfileReviewVO>> {
+export function listProfileReviews(params: ProfileReviewQuery): AxiosPromise<ProfileReviewVO[]> {
   return request({ url: '/dcs/risk/profile-reviews', method: 'get', params });
 }
 
@@ -196,7 +196,7 @@ export function reviewProfileRisk(reviewId: number | string, data: RiskReviewCom
 }
 
 /** 聚合分页: 每用户一行待复核画像(同人最新快照+积压数), 复核页主视图数据源(2026-08-23) */
-export function listProfileReviewAggregate(params?: PageQuery & { userId?: number | string }): AxiosPromise<TableDataInfo<ProfileReviewAggregateVO>> {
+export function listProfileReviewAggregate(params?: PageQuery & { userId?: number | string }): AxiosPromise<ProfileReviewAggregateVO[]> {
   return request({ url: '/dcs/risk/profile-reviews/aggregate', method: 'get', params });
 }
 

@@ -97,6 +97,7 @@ export interface CreditPlanSaveBO {
   durationWeeks?: number;
   websearchLimitPerUserDaily?: number;
   description?: string;
+  totalCredits?: number | null;
 }
 
 export const getCreditPlans = (): AxiosPromise<CreditPlansData> => request({ url: `${BASE}/plans`, method: 'get' });

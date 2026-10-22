@@ -273,7 +273,7 @@ const boxStyle = computed(() => {
 onMounted(() => {
   const r = parseSpec(props.spec);
   if (!r.ok) {
-    err.value = r.msg;
+    err.value = (r as { msg?: string }).msg ?? '图表数据解析失败';
     return;
   }
   if (!el.value) {

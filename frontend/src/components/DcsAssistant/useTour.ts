@@ -57,7 +57,7 @@ export function startTour() {
     prevBtnText: '上一步',
     doneBtnText: '完成',
     allowClose: true,
-    overlayClickClose: true,
+    overlayClickBehavior: 'close',
     steps
   }).drive();
 }

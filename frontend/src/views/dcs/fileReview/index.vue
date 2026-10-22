@@ -430,10 +430,9 @@
                   <el-checkbox
                     v-for="opt in guardCatOptions"
                     :key="opt.value"
-                    v-model="guardCats"
-                    :value="opt.value"
+                    :model-value="guardCats.includes(opt.value)"
+                    @change="toggleGuardCat(opt.value)"
                     class="file-review-cat-item"
-                    @change="onGuardCatsChange(guardCats)"
                   >
                     <span class="file-review-cat-item__name">{{ opt.label }}</span>
                     <span class="file-review-cat-item__fmt">{{ categoryExtHint(opt.value) }}</span>
@@ -517,7 +516,7 @@ const queryFormRef = ref<ElFormInstance>();
 const activeTab = ref<'pending' | 'reviewed' | 'guardLogs'>('pending');
 const reviewedStatus = ref<'APPROVED' | 'REJECTED'>('APPROVED');
 const showSearch = ref(true);
-const dateRange = ref<[DateModelType, DateModelType]>(['', '']);
+const dateRange = ref<[string, string]>(['', '']);
 const filters = reactive({ category: '', bizSource: '', uploaderName: '' });
 
 const loading = ref(false);
@@ -556,6 +555,13 @@ const configForm = reactive({
 
 /** 允许上传大类勾选（Q1=A：与 guardWhitelist 串互转，界面上不出现"扩展名"） */
 const guardCats = ref<string[]>(Object.keys(FILE_REVIEW_CATEGORY_EXTS));
+/** 行勾选（el-checkbox 单挂数组 model 不在组内属未文档用法——显式维护，行为等价） */
+function toggleGuardCat(v: string) {
+  const i = guardCats.value.indexOf(v);
+  if (i >= 0) guardCats.value.splice(i, 1);
+  else guardCats.value.push(v);
+  onGuardCatsChange(guardCats.value);
+}
 /** 存量白名单串对不上任何大类组合时为 true（显示"自定义配置"提示+恢复默认） */
 const guardCustomWhitelist = ref(false);
 /** 近 7 天命中概览（Q4=A：观察期运营抓手） */

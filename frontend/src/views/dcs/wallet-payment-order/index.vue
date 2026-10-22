@@ -144,7 +144,7 @@ const statusLabel = (s: string) => {
 };
 
 const statusType = (s: string) => {
-  const map: Record<string, string> = { PENDING: 'warning', PAID: 'success', CLOSED: 'info' };
+  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = { PENDING: 'warning', PAID: 'success', CLOSED: 'info' };
   return map[s] || 'info';
 };
 

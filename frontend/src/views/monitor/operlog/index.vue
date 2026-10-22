@@ -142,7 +142,7 @@ const showSearch = ref(true);
 const ids = ref<Array<number | string>>([]);
 const multiple = ref(true);
 const total = ref(0);
-const dateRange = ref<[DateModelType, DateModelType]>(['', '']);
+const dateRange = ref<[string, string]>(['', '']);
 const defaultSort = ref<any>({ prop: 'operTime', order: 'descending' });
 
 const operLogTableRef = ref<ElTableInstance>();

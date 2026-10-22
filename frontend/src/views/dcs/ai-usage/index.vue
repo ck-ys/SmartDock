@@ -20,7 +20,7 @@
             <el-row :gutter="12">
               <el-col v-for="(cost, caller) in summary.costByCaller" :key="caller" :span="6">
                 <div class="caller-stat">
-                  <span class="caller-name">{{ callerLabel(caller) }}</span>
+                  <span class="caller-name">{{ callerLabel(String(caller)) }}</span>
                   <span class="caller-cost">¥{{ Number(cost).toFixed(4) }}</span>
                   <span class="caller-count">{{ summary.byCaller[caller] || 0 }} 次</span>
                 </div>

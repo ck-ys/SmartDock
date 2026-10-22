@@ -37,7 +37,7 @@ const sideTheme = computed(() => settingsStore.sideTheme);
 
 // 获取Logo背景色
 const getLogoBackground = computed(() => {
-  if (settingsStore.isDark) {
+  if (settingsStore.dark) {
     return 'var(--sidebar-bg)';
   }
   if (settingsStore.navType == NavTypeEnum.TOP) {
@@ -48,7 +48,7 @@ const getLogoBackground = computed(() => {
 
 // 获取Logo文字颜色
 const getLogoTextColor = computed(() => {
-  if (settingsStore.isDark) {
+  if (settingsStore.dark) {
     return 'var(--sidebar-text)';
   }
   if (settingsStore.navType == NavTypeEnum.TOP) {

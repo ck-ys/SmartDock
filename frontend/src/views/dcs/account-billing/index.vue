@@ -47,7 +47,7 @@ const permOrders = checkPermi(['dcs:payment-order:list']);
 const TAB_NAMES = ['overview', 'ledger', 'orders'] as const;
 const firstAllowed = TAB_NAMES.find((t) => (t === 'overview' ? permOverview : t === 'ledger' ? permLedger : permOrders)) || 'overview';
 const validTab = (t: unknown): t is (typeof TAB_NAMES)[number] =>
-  TAB_NAMES.includes(t) && (t === 'overview' ? permOverview : t === 'ledger' ? permLedger : permOrders);
+  (TAB_NAMES as readonly unknown[]).includes(t) && (t === 'overview' ? permOverview : t === 'ledger' ? permLedger : permOrders);
 
 const activeTab = ref(validTab(route.query.tab) ? route.query.tab : firstAllowed);
 

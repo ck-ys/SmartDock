@@ -19,7 +19,7 @@ export interface DcsSubmissionRow {
 export const submitData = (taskId: string | number, data: Record<string, unknown>) =>
   request({ url: '/dcs/submission/submit', method: 'post', data: { taskId, data } });
 
-export const mySubmissions = (params?: { taskId?: string | number } & Record<string, unknown>): AxiosPromise<TableDataInfo<DcsSubmissionRow>> =>
+export const mySubmissions = (params?: { taskId?: string | number } & Record<string, unknown>): AxiosPromise<DcsSubmissionRow[]> =>
   request({ url: '/dcs/submission/my', method: 'get', params });
 
 export interface DcsAuditTrailRow {
@@ -31,7 +31,7 @@ export interface DcsAuditTrailRow {
   createTime?: string;
 }
 
-export const pendingAudits = (params?: Record<string, unknown>): AxiosPromise<TableDataInfo<DcsSubmissionRow>> =>
+export const pendingAudits = (params?: Record<string, unknown>): AxiosPromise<DcsSubmissionRow[]> =>
   request({ url: '/dcs/audit/pending', method: 'get', params });
 
 export const decideAudit = (submissionId: string | number, decision: 'PASS' | 'REJECT', comment?: string) =>

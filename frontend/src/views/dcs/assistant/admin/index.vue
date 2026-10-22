@@ -524,7 +524,7 @@
                 >{{ g.category }}（{{ g.rows.length }}）</el-checkbox>
               </div>
               <div v-for="row in g.rows" :key="row.key" class="tg-row" :class="{ 'tg-row-locked': row.locked }">
-                <el-checkbox v-model="tgChecked" :value="row.key" :disabled="row.locked" />
+                <el-checkbox :model-value="tgChecked.includes(row.key)" :disabled="row.locked" @change="toggleRowCheck(row.key)" />
                 <span class="tool-name">{{ row.displayName }}</span>
                 <el-tag size="small" effect="plain" :type="row.askConfirm ? 'warning' : 'success'">
                   {{ row.askConfirm ? '需确认' : '自动执行' }}
@@ -2258,6 +2258,12 @@ const tgSaved = ref<Record<string, string>>({});
 /** 草稿覆盖——保存时整份提交（后端全量覆盖语义，空表=全恢复默认） */
 const tgDraft = ref<Record<string, string>>({});
 const tgChecked = ref<string[]>([]);
+/** 行勾选（el-checkbox 单挂数组 model 不在组内属未文档用法——显式维护，行为等价） */
+function toggleRowCheck(key: string) {
+  const i = tgChecked.value.indexOf(key);
+  if (i >= 0) tgChecked.value.splice(i, 1);
+  else tgChecked.value.push(key);
+}
 const tgGroups = computed<TgGroup[]>(() => {
   const map = new Map<string, TgRowUi[]>();
   for (const r of tgRows.value) {

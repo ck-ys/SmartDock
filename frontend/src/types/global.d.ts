@@ -89,6 +89,15 @@ declare global {
     pageNum: number;
     pageSize: number;
   }
+  /**
+   * 分页表格数据（后端 TableDataInfo 顶层返回形态）
+   */
+  declare interface TableDataInfo<T = any> {
+    total: number;
+    rows: T[];
+    code?: number;
+    msg?: string;
+  }
   declare interface LayoutSetting {
     /**
      * 默认布局

@@ -41,10 +41,10 @@ export interface DcsTaskDetail {
   } | null;
 }
 
-export const pageTasks = (params?: Record<string, unknown>): AxiosPromise<TableDataInfo<DcsTaskRow>> =>
+export const pageTasks = (params?: Record<string, unknown>): AxiosPromise<DcsTaskRow[]> =>
   request({ url: `${BASE}/page`, method: 'get', params });
 
-export const myTasks = (params?: Record<string, unknown>): AxiosPromise<TableDataInfo<DcsTaskRow>> =>
+export const myTasks = (params?: Record<string, unknown>): AxiosPromise<DcsTaskRow[]> =>
   request({ url: `${BASE}/my`, method: 'get', params });
 
 // 后端 DcsTaskField.options 是 JSON 文本列, 出参是字符串('["a","b"]')——统一在 API 层

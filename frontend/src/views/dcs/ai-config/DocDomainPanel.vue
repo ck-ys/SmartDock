@@ -121,7 +121,7 @@ const providerOptions = [
 
 const providerLabel = (p: string) => providerOptions.find((o) => o.value === p)?.label || p || '--';
 const providerTagType = (p: string) => {
-  const map: Record<string, string> = {
+  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     DEEPSEEK: 'success',
     QWEN: 'warning',
     ZHIPU: 'primary',

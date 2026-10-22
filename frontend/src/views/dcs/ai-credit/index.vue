@@ -450,7 +450,11 @@ const summary = ref<CreditSummaryVO>({
   windowCap: 0,
   windowHours: 5,
   tankBalance: 0,
-  weekStart: ''
+  weekStart: '',
+  weekSpent: 0,
+  monthSpent: 0,
+  totalQuota: 0,
+  termUsed: 0
 });
 /** 五审回修（step5 P2-1）：下单按钮防连点（确认弹窗取消会抛 rejection，须 finally 复位） */
 const busy = ref<string | null>(null);

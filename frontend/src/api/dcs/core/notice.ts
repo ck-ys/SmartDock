@@ -16,7 +16,7 @@ export interface DcsNoticeRow {
   createTime?: string;
 }
 
-export const myNotices = (params?: { readFlag?: string } & Record<string, unknown>): AxiosPromise<TableDataInfo<DcsNoticeRow>> =>
+export const myNotices = (params?: { readFlag?: string } & Record<string, unknown>): AxiosPromise<DcsNoticeRow[]> =>
   request({ url: `${BASE}/my`, method: 'get', params });
 
 export const markNoticeRead = (id: string | number) =>

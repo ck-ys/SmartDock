@@ -150,7 +150,7 @@ const multiple = ref(true);
 const total = ref(0);
 const type = ref(0);
 const previewListResource = ref(true);
-const dateRangeCreateTime = ref<[DateModelType, DateModelType]>(['', '']);
+const dateRangeCreateTime = ref<[string, string]>(['', '']);
 
 const dialog = reactive<DialogOption>({
   visible: false,

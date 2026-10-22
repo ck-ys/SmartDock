@@ -69,7 +69,7 @@ import { allocatedUserList, authUserCancel, authUserCancelAll } from '@/api/syst
 import { UserQuery } from '@/api/system/user/types';
 import { UserVO } from '@/api/system/user/types';
 import SelectUser from './selectUser.vue';
-import { RouteLocationNormalized } from 'vue-router';
+import { RouteLocationRaw } from 'vue-router';
 
 const route = useRoute();
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
@@ -103,7 +103,7 @@ const getList = async () => {
 };
 // 返回按钮
 const handleClose = () => {
-  const obj: RouteLocationNormalized = {
+  const obj = {
     path: '/system/role',
     fullPath: '',
     hash: '',
@@ -114,7 +114,7 @@ const handleClose = () => {
     query: undefined,
     redirectedFrom: undefined
   };
-  proxy?.$tab.closeOpenPage(obj);
+  proxy?.$tab.closeOpenPage(obj as RouteLocationRaw);
 };
 /** 搜索按钮操作 */
 const handleQuery = () => {
