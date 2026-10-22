@@ -22,6 +22,14 @@ public interface AssistantMessageMapper extends BaseMapper<DcsAssistantMessage> 
         @Param("conversationId") Long conversationId, @Param("userId") Long userId,
         @Param("limit") int limit, @Param("offset") int offset);
 
+    /** 尾页读取（本人会话；id 降序取最新 N 条）。批A 二审 P1 回修：ASC 首页在
+     *  >100 条长会话上会把「最新回答+压缩分隔条」截掉——压缩后的历史重载必须取尾部 */
+    @Select("SELECT * FROM dcs_assistant_message WHERE tenant_id=#{tenantId} AND conversation_id=#{conversationId}"
+        + " AND user_id=#{userId} ORDER BY id DESC LIMIT #{limit}")
+    java.util.List<DcsAssistantMessage> selectPageOwnedDesc(@Param("tenantId") String tenantId,
+        @Param("conversationId") Long conversationId, @Param("userId") Long userId,
+        @Param("limit") int limit);
+
     /** 保留期清理：message>90 天分批物理删（X-04：副本同批删由 job 编排） */
     @Delete("DELETE FROM dcs_assistant_message WHERE id IN (SELECT id FROM dcs_assistant_message"
         + " WHERE create_time < (CURRENT_TIMESTAMP - INTERVAL '90 days') LIMIT #{batch})")

@@ -37,34 +37,27 @@ public final class AssistantCompactionAssets {
         只输出摘要本身，不要寒暄、不要复述本指令。对话全文如下：
         {messages}""";
 
-    /** 保留尾巴的最低 token 预算（trigger 的 1/10，下限 2000——近几轮原文不进摘要，保最新语义） */
-    static int keepTokensFor(int triggerTokens) {
-        return Math.max(2000, triggerTokens / 10);
-    }
-
     /**
-     * 生效配置（dspro 深审回修 2026-10-16）：
+     * 生效配置（批A-1 2026-10-22 重写；旧口径见 git 历史）：
      * <ul>
-     *   <li>triggerTokens/keepTokens 双显式——P14 Step5 实证模型接口不上报窗口
-     *       （deepseek 族 getContextWindowSize()=0），且 keepTokens 不设（默认 -1）时
-     *       中间件路径压缩静默跳过（middlewareE2e 配对实证）；</li>
-     *   <li>triggerMessages(0)——框架默认 50 条会先于 token 阈值触发，把租户阈值架空
-     *       （探针实测 builder 不设时 effective=50）；关掉后阈值语义=纯 token，与管理页
-     *       文案、手动通道 below_threshold 判定三处同口径；</li>
+     *   <li>triggerTokens 由 {@link AssistantCompactionPolicy#deriveTriggerTokens} 按模型窗口派生，
+     *       不再读租户固定阈值（Q1-A 拍板：窗口 − 输出预留 − 1.3 万）；</li>
+     *   <li>triggerMessages(0)——框架默认 50 条会先于 token 阈值触发，把触发线架空；</li>
+     *   <li>尾窗=按轮保留最后 1 轮原文（Q5-A）：keepTokens=0 让框架走消息切点
+     *       （determineCutoffIndex 字节码：keepTokens&gt;0 走 token 切点，否则 keepMessages），
+     *       keepMessages=2 即 user+assistant 一轮；切点落在工具结果上时框架会前移避让；</li>
      *   <li>flushBeforeCompact/offloadBeforeCompact 双关——框架默认开：flush 会额外发一次
      *       记忆抽取调用并写全局 MEMORY.md（跨租户共享，读进他人提示词）；offload 会把
-     *       被压段落全量原文落共享 workspace（无租户命名空间、清理链不覆盖）。摘要压缩
-     *       本身不依赖这两条，关闭止血；</li>
-     *   <li>尾窗=keepTokens=trigger 的 1/10（下限 2000）——keepTokens>0 时框架走 token
-     *       切点，keepMessages 不参与（determineCutoffIndex 字节码），不再传。</li>
+     *       被压段落全量原文落共享 workspace（无租户命名空间、清理链不覆盖）。</li>
      * </ul>
      */
     public static CompactionConfig buildConfig(int triggerTokens) {
-        int trigger = Math.max(4000, triggerTokens);
+        int trigger = Math.max(AssistantCompactionPolicy.MIN_TRIGGER_TOKENS, triggerTokens);
         return CompactionConfig.builder()
             .triggerMessages(0)
             .triggerTokens(trigger)
-            .keepTokens(keepTokensFor(trigger))
+            .keepTokens(0)
+            .keepMessages(AssistantCompactionPolicy.KEEP_MESSAGES)
             .summaryPrompt(SUMMARY_PROMPT)
             .flushBeforeCompact(false)
             .offloadBeforeCompact(false)

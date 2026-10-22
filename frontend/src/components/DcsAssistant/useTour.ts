@@ -13,7 +13,7 @@ export function startTour() {
       element: `[aria-label="向 ${assistantName.value} 提问"]`,
       popover: {
         title: '直接开口问',
-        description: '这里就是提问框。输入 / 有命令菜单（待办、压缩、切模型），输入 @ 能引用具体任务，↓↑ 挑、Tab 补全。'
+        description: '这里就是提问框。输入 / 有命令菜单（待办、切模型、看用量），输入 @ 能引用具体任务，↓↑ 挑、Tab 补全。'
       }
     },
     {
@@ -34,7 +34,7 @@ export function startTour() {
       element: '.brow .ring-btn',
       popover: {
         title: '会话状态环',
-        description: '环色显示这段对话占用的空间：橙=快满了，红=建议处理。点开有「打包前文」按钮，把前面对话压成摘要腾出空间。'
+        description: '环色显示这段对话占用离自动压缩线还有多远：橙=快了，红=马上自动打包前文。点开可看「已用 / 窗口 / 自动触发线」三个数。'
       }
     },
     {

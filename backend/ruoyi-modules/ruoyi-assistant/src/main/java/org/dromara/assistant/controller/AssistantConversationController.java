@@ -8,14 +8,11 @@ import org.dromara.assistant.domain.DcsAssistantAction;
 import org.dromara.assistant.domain.DcsAssistantConversation;
 import org.dromara.assistant.domain.DcsAssistantMessage;
 import org.dromara.assistant.service.AssistantActionService;
-import org.dromara.assistant.service.AssistantCompactionService;
 import org.dromara.assistant.service.AssistantConversationService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
-import org.dromara.common.ratelimiter.annotation.RateLimiter;
-import org.dromara.common.ratelimiter.enums.LimitType;
 import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
@@ -56,8 +53,6 @@ public class AssistantConversationController extends BaseController {
      *  ConversationService↔RunRecorder 循环依赖） */
     private final org.dromara.assistant.persist.AssistantRunRecorder runRecorder;
     private final org.dromara.assistant.mapper.AssistantRunMapper runMapper;
-    /** 批17 Q2：手动压缩（/压缩 与环卡「打包前文」） */
-    private final AssistantCompactionService compactionService;
 
     /** 会话列表（180 天语义=清理 job 保证；perm=use；status=ACTIVE/ARCHIVED/ALL，默认 ACTIVE） */
     @SaCheckPermission("dcs:assistant:use")
@@ -126,13 +121,17 @@ public class AssistantConversationController extends BaseController {
     @GetMapping("/conversation/{id}/messages")
     public R<List<DcsAssistantMessage>> messages(@PathVariable Long id,
                                                   @RequestParam(defaultValue = "50") int limit,
-                                                  @RequestParam(defaultValue = "1") int pageNum) {
+                                                  @RequestParam(defaultValue = "1") int pageNum,
+                                                  @RequestParam(defaultValue = "false") boolean tail) {
         // AU-39(1008)：limit/pageNum 夹紧同 list 端点口径——0/负数直传会让 offset 为负，
         // PG LIMIT..OFFSET 语法错 500（用户看不出原因）
         int safeLimit = Math.min(Math.max(1, limit), 100);
         int safePage = Math.max(1, pageNum);
-        return R.ok(conversationService.listMessages(TenantHelper.getTenantId(),
-            LoginHelper.getUserId(), id, safeLimit, (safePage - 1) * safeLimit));
+        // 批A 二审 P1：tail=true 取最新 N 条（压缩重载/长会话打开——ASC 首页会截掉最新回答）
+        return R.ok(tail
+            ? conversationService.listMessagesTail(TenantHelper.getTenantId(), LoginHelper.getUserId(), id, safeLimit)
+            : conversationService.listMessages(TenantHelper.getTenantId(),
+                LoginHelper.getUserId(), id, safeLimit, (safePage - 1) * safeLimit));
     }
 
     /** 本人归档会话（软通道 status=ARCHIVED）；铁律#21：DELETE→POST 保持路径（2026-10-16 批17 Q4，前端已同步） */
@@ -142,19 +141,6 @@ public class AssistantConversationController extends BaseController {
     public R<Void> archive(@PathVariable Long id) {
         conversationService.archiveConversation(TenantHelper.getTenantId(), LoginHelper.getUserId(), id);
         return R.ok();
-    }
-
-    /**
-     * 手动压缩当前会话上下文（批17 Q2）：/压缩 与环卡「打包前文」的数据面。
-     * compacted=false 时 reason 人话映射在前端（too_short=对话还太短…）。
-     * IP 限流 6 次/分——压缩含一次模型摘要调用（有成本），防连点堆积。
-     */
-    @SaCheckPermission("dcs:assistant:use")
-    @RateLimiter(time = 60, count = 6, limitType = LimitType.IP)
-    @PostMapping("/conversation/compact")
-    public R<AssistantCompactionService.CompactResult> compact(@RequestBody Map<String, String> body) {
-        return R.ok(compactionService.compact(TenantHelper.getTenantId(),
-            LoginHelper.getUserId(), body == null ? null : body.get("threadId")));
     }
 
     /**

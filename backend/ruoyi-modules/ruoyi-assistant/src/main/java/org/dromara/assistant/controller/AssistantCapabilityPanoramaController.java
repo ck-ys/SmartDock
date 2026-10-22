@@ -30,6 +30,8 @@ import java.util.Map;
 public class AssistantCapabilityPanoramaController extends BaseController {
 
     private final AssistantConfigService assistantConfigService;
+    /** 批A 回修：租户默认模型读取（压缩派生值与 /config 同源） */
+    private final org.dromara.assistant.factory.AssistantModelFactory modelFactory;
 
     /** 一条工具的全景行（SPECS 注册信息 + TOOL_META 中文元数据合成）；
      *  批1 Q1=B：+toolGate 覆盖档位与 effective 生效档（-1=本租户已关闭） */
@@ -94,6 +96,17 @@ public class AssistantCapabilityPanoramaController extends BaseController {
         boolean memoryOn = "1".equals(cfg.memoryEnabled());
         // 批2 Q8：snapshot 单次读盘，拼装串与分段视图同源同刻（审查 P2-3）
         PromptAssets.Snapshot snap = PromptAssets.snapshot(memoryOn);
+        // 批A 回修（三审 P2）：租户旧固定阈值已废弃——同 /config 口径按默认模型窗口派生，
+        // 防管理端两处展示互相矛盾（旧值 60000 vs 派生值 9 万+）
+        Integer window = null;
+        Integer maxOutput = null;
+        try {
+            com.smartdock.domain.DcsAiConfig def = modelFactory.resolveConfig(tenantId);
+            window = def.getContextWindow();
+            maxOutput = def.getMaxTokens();
+        } catch (Exception e) {
+            // 未配置模型：按兜底窗口派生（与 /config 同口径）
+        }
         return R.ok(new PanoramaVo(
             tools,
             snap.sysPrompt(),
@@ -104,6 +117,7 @@ public class AssistantCapabilityPanoramaController extends BaseController {
                 "memoryEnabled", memoryOn,
                 "dailyRoundLimitPerUser", cfg.dailyRoundLimitPerUser(),
                 "dailyBudgetAmount", cfg.dailyBudgetAmount(),
-                "compactionTriggerTokens", cfg.compactionTriggerTokens())));
+                "compactionTriggerTokens", org.dromara.assistant.core.AssistantCompactionPolicy
+                    .deriveTriggerTokens(window, maxOutput))));
     }
 }

@@ -790,7 +790,7 @@ async function onFpOpen(c: { id: number | string; threadId: string; status?: str
   // resetForNewSession 会清位——必须在 rebuild 之后再置，否则闸永远失效（E2E 实锤）
   const archived = c.status === 'ARCHIVED';
   try {
-    const msgs = (await listMessages(c.id, { limit: 100 })) as unknown as {
+    const msgs = (await listMessages(c.id, { limit: 100, tail: true })) as unknown as {
       data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
     };
     if (mySeq !== fpOpenSeq) {
@@ -905,7 +905,7 @@ function watchRemoteRun(c: { id: number | string; threadId: string; status?: str
         ) {
           return;
         }
-        const msgs = (await listMessages(c.id, { limit: 100 })) as unknown as {
+        const msgs = (await listMessages(c.id, { limit: 100, tail: true })) as unknown as {
           data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
         };
         // await 之后环境可能又变，二次复核后才允许重建
@@ -1339,7 +1339,7 @@ async function rebuildSession() {
     if (!conv) {
       return;
     }
-    const msgs = (await listMessages(conv.id, { limit: 100 })) as unknown as {
+    const msgs = (await listMessages(conv.id, { limit: 100, tail: true })) as unknown as {
       data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
     };
     const list = msgs?.data ?? [];
@@ -1375,7 +1375,7 @@ onMounted(() => {
   rebuildSession();
 });
 
-/** 批17 Q2：手动压缩完成后重拉当前会话消息——「已压缩」分隔条随历史重建出现。
+/** 批A-1：检测到自动压缩（上下文大幅回落）后重拉当前会话消息——「已自动压缩」分隔条随历史重建出现。
  *  排队队列非空时跳过（rebuild 会清队，压缩不该吞掉还没发的问题）。 */
 async function reloadCurrentConv() {
   if (state.queue.length > 0 || state.sending) {
@@ -1389,7 +1389,7 @@ async function reloadCurrentConv() {
     if (!conv) {
       return;
     }
-    const msgs = (await listMessages(conv.id, { limit: 100 })) as unknown as {
+    const msgs = (await listMessages(conv.id, { limit: 100, tail: true })) as unknown as {
       data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
     };
     rebuildFromHistory((msgs?.data ?? []) as Parameters<typeof rebuildFromHistory>[0], state.threadId);

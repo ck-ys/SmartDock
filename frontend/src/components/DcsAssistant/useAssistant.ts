@@ -210,6 +210,9 @@ export interface AssistantTurn {
   /** 批17 Q2：本回合之前发生过上下文压缩（role=system 行驱动）——回合上方渲染
    *  「已压缩」分隔条；beforeTokens/afterTokens 供"省下约 X%"人话 */
   compactedBefore?: { beforeTokens?: number | null; afterTokens?: number | null } | null;
+  /** 批A 回修（三审 P1）：本回合之前自动压缩已熔断（连续失败/压完立刻又满）——
+   *  回合上方渲染橙色警示条；reason 供人话文案 */
+  compactionBlockedBefore?: { reason?: string } | null;
 }
 
 export interface AssistantState {
@@ -240,6 +243,8 @@ export interface AssistantState {
   /** 批17 Q2：尾部悬挂的压缩标记（system 行是最后一条消息、其后还没有新回合时，
    *  MsgFlow 在消息流末尾渲染分隔条；一旦有新回合即转为该回合的 compactedBefore） */
   lastCompaction?: { beforeTokens?: number | null; afterTokens?: number | null } | null;
+  /** 批A 回修（三审 P1）：尾部悬挂的「自动压缩已暂停」标记（同 lastCompaction 机制） */
+  lastCompactionBlocked?: { reason?: string } | null;
 }
 
 export interface UseAssistantOptions extends AguiClientOptions {
@@ -919,6 +924,15 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
     const turn = reactive<AssistantTurn>(emptyTurn(q));
     turn.stamp = stamp;
+    // 二审 P1：尾部悬挂的压缩/熔断标记由新回合接管（否则横幅永远漂在最新回答下面）
+    if (state.lastCompaction) {
+      turn.compactedBefore = state.lastCompaction;
+      state.lastCompaction = null;
+    }
+    if (state.lastCompactionBlocked) {
+      turn.compactionBlockedBefore = state.lastCompactionBlocked;
+      state.lastCompactionBlocked = null;
+    }
     state.turns.push(turn);
     // glm53 P2-4：新回合开始=此前回合的 pending 卡已不可能再被 resume（服务端只认最新轮
     // must-cover 全等）——入口即扫，防「弃卡改问后新回合又挂 interrupt」双待确认卡同屏
@@ -1427,6 +1441,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     state.newbieUse = 0;
     state.autoApproved = []; // 工具级免确认积累随会话重置
     state.todoItems = []; // ZCode 对齐 Q2：新会话不带旧清单
+    // 二审 P1：压缩/熔断标记绝不带进新会话（新会话=新 agent，未熔断）
+    state.lastCompaction = null;
+    state.lastCompactionBlocked = null;
     // autoLevel 是跨会话的全局偏好（原型口径），新会话不重置
     history.length = 0; // 历史镜像同步清空——旧会话指令带入新 thread 会幽灵重放（E2E 实证）
     state.threadId = uuid();
@@ -1665,16 +1682,24 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     let cur: AssistantTurn | null = null;
     // 批17 Q2：role=system 的压缩标记行——挂到下一个回合（compactedBefore 上方渲染分隔条）；
     // 若其后暂无新回合则挂在 state.lastCompaction（尾部悬挂分隔条）。content 形如
-    // {"type":"compaction","beforeTokens":N,"afterTokens":N}；解析失败静默忽略（非压缩 system 行）
+    // {"type":"compaction","beforeTokens":N,"afterTokens":N}；解析失败静默忽略（非压缩 system 行）。
+    // 批A 回修（三审 P1）：{"type":"compaction_blocked","reason":…} 同机制挂警示条——
+    // 熔断后用户必须能看到「自动压缩已暂停」，否则上下文悄悄失控只剩莫名报错
     let pendingCompaction: { beforeTokens?: number | null; afterTokens?: number | null } | null = null;
+    let pendingBlocked: { reason?: string } | null = null;
     state.lastCompaction = null;
+    state.lastCompactionBlocked = null;
     for (const m of messages) {
       const content = m.content ?? '';
       if (m.role === 'system') {
         try {
-          const parsed = JSON.parse(content) as { type?: string; beforeTokens?: number | null; afterTokens?: number | null };
+          const parsed = JSON.parse(content) as
+            { type?: string; beforeTokens?: number | null; afterTokens?: number | null; reason?: string };
           if (parsed?.type === 'compaction') {
             pendingCompaction = { beforeTokens: parsed.beforeTokens ?? null, afterTokens: parsed.afterTokens ?? null };
+          } else if (parsed?.type === 'compaction_blocked' || parsed?.type === 'compaction_failed') {
+            // 二审 P2：compaction_failed=单次没压成（未熔断）；compaction_blocked=已熔断停手
+            pendingBlocked = { reason: parsed.type === 'compaction_failed' ? 'summary_failed_once' : parsed.reason };
           }
         } catch {
           /* 非压缩标记的 system 行忽略 */
@@ -1686,6 +1711,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         if (pendingCompaction) {
           cur.compactedBefore = pendingCompaction;
           pendingCompaction = null;
+        }
+        if (pendingBlocked) {
+          cur.compactionBlockedBefore = pendingBlocked;
+          pendingBlocked = null;
         }
         state.turns.push(cur);
         history.push({ id: 'hu' + history.length, role: 'user', content });
@@ -1728,6 +1757,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // 批17 Q2：循环结束时仍挂着的压缩标记=system 行之后还没有新回合——尾部悬挂渲染
     if (pendingCompaction) {
       state.lastCompaction = pendingCompaction;
+    }
+    if (pendingBlocked) {
+      state.lastCompactionBlocked = pendingBlocked;
     }
     state.newbieUse = state.turns.length;
     // 须知同意是粘性的（AU-16）：空会话重建（保 threadId 首发落原行）不得把已同意用户打回首见门

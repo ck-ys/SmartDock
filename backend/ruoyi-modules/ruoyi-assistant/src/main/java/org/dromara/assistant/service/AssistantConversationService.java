@@ -40,6 +40,8 @@ public class AssistantConversationService {
     private final AssistantMessageMapper messageMapper;
     private final AssistantRunMapper runMapper;
     private final AssistantActionMapper actionMapper;
+    /** 批A-2：自动压缩记录（链式审计） */
+    private final org.dromara.assistant.mapper.AssistantCompactionMapper compactionMapper;
     /** 083/ISSUE-F14-02 修：retentionSweep 补附件回收 + purgeUser 补附件行 */
     private final org.dromara.assistant.mapper.AssistantAttachmentMapper attachmentMapper;
     private final AssistantPiiFilter piiFilter;
@@ -217,7 +219,69 @@ public class AssistantConversationService {
         insertMessage(tenantId, conversationId, userId, "system", content, null, null);
     }
 
-    /** 该会话当前是否有在途轮（批17 Q2：手动压缩须避开正在生成的会话） */
+    /**
+     * 自动压缩记录（批A-2 Q9-A）：一行一次压缩，prev_id 串起同会话边界链。
+     * 失败只 WARN 不上抛——压缩本身已完成，审计行是锦上添花。
+     *
+     * <p>摘要正文落库前过 PII 脱敏（与 assistant 消息同口径）并截断
+     * {@value #COMPACTION_SUMMARY_MAX_CHARS} 字——够审计「它忘了什么」，又不把整段
+     * 原文在库里再存一份。</p>
+     */
+    public void appendCompactionRecord(String tenantId, Long conversationId, Long userId, String threadId,
+                                       int beforeTokens, int afterTokens,
+                                       int beforeMessages, int afterMessages,
+                                       String status, String reason, String summary) {
+        try {
+            org.dromara.assistant.domain.DcsAssistantCompaction rec =
+                new org.dromara.assistant.domain.DcsAssistantCompaction();
+            rec.setId(IdWorker.getId());
+            rec.setTenantId(tenantId);
+            rec.setConversationId(conversationId);
+            rec.setUserId(userId);
+            rec.setThreadId(threadId);
+            rec.setTriggerType("AUTO");
+            rec.setStatus(status);
+            rec.setReason(reason);
+            rec.setBeforeTokens(beforeTokens);
+            rec.setAfterTokens(afterTokens);
+            rec.setBeforeMessages(beforeMessages);
+            rec.setAfterMessages(afterMessages);
+            rec.setSummary(truncateMaskedSummary(summary, tenantId));
+            rec.setPrevId(compactionMapper.selectPrevId(tenantId, conversationId));
+            rec.setCreateTime(new java.util.Date());
+            compactionMapper.insert(rec);
+        } catch (Exception e) {
+            log.warn("[Compaction] 压缩记录落库失败(不影响对话) tenant={} thread={}: {}",
+                tenantId, threadId, e.getMessage());
+        }
+    }
+
+    /** 摘要审计正文上限（字符） */
+    private static final int COMPACTION_SUMMARY_MAX_CHARS = 6000;
+
+    private String truncateMaskedSummary(String summary, String tenantId) {
+        if (summary == null || summary.isBlank()) {
+            return null;
+        }
+        String masked;
+        try {
+            masked = piiFilter.mask(summary, tenantId);
+        } catch (Exception e) {
+            // 脱敏器异常时宁可不存摘要，也不把原始正文落库
+            log.warn("[Compaction] 摘要脱敏失败, 本次不存摘要: {}", e.getMessage());
+            return null;
+        }
+        if (masked.length() <= COMPACTION_SUMMARY_MAX_CHARS) {
+            return masked;
+        }
+        // 按码点截断（三审 P2）：substring 按 UTF-16 单元切可能劈开代理对（emoji 落库变 ?）
+        int cut = masked.offsetByCodePoints(0,
+            Math.min(COMPACTION_SUMMARY_MAX_CHARS, masked.codePointCount(0, masked.length())));
+        return masked.substring(0, cut) + "…";
+    }
+
+    /** 该会话当前是否有在途轮（批17 Q2 手动压缩配套；批A 手动通道删除后暂无调用方，
+     *  保留是因 runMapper.selectRunningThreadIds 还有别处使用且本方法语义独立可复用） */
     public boolean hasRunningRound(String tenantId, Long userId, String threadId) {
         return runMapper.selectRunningThreadIds(tenantId, userId).contains(threadId);
     }
@@ -318,6 +382,20 @@ public class AssistantConversationService {
         return messageMapper.selectPageOwned(tenantId, conversationId, userId, limit, offset);
     }
 
+    /** 尾页消息（最新 N 条，返回前反转回时间序）。批A 二审 P1：压缩后的历史重载/长会话
+     *  打开必须取尾部——ASC 首页在 >100 条会话上会把最新回答与压缩分隔条截掉 */
+    public List<DcsAssistantMessage> listMessagesTail(String tenantId, Long userId, Long conversationId,
+                                                       int limit) {
+        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
+        if (conv == null) {
+            throw new ServiceException("会话不存在或无权访问", 403);
+        }
+        List<DcsAssistantMessage> rows =
+            new java.util.ArrayList<>(messageMapper.selectPageOwnedDesc(tenantId, conversationId, userId, limit));
+        java.util.Collections.reverse(rows);
+        return rows;
+    }
+
     /** 本人归档会话（软通道：status=ARCHIVED） */
     public void archiveConversation(String tenantId, Long userId, Long conversationId) {
         DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
@@ -377,9 +455,24 @@ public class AssistantConversationService {
         // 083/ISSUE-F14-02 修：清人补附件行（原四表缺附件=GDPR 半清除态；OSS 对象
         // 物理删除涉及文件中心全局行为，另立登记不并入本刀）
         int atts = attachmentMapper.purgeUser(tenantId, userId);
-        log.info("[AssistantPersist] 租户清除 tenant={} user={}: message={} conversation={} run={} action={} attachment={}",
-            tenantId, userId, msgs, convs, runs, acts, atts);
-        return msgs + convs + runs + acts + atts;
+        // 批A 回修（三审 P1）：压缩记录同批清除——summary 列含对话派生内容，清人不得残留。
+        // 二审 P1 回修：先探表再删——「先部署后跑 migration」的窗口里表不存在时，
+        // BadSqlGrammar 会把整个清人事务打回滚（五表一条不删、接口 500），必须防御
+        int compacts = compactionTableExists() ? compactionMapper.purgeUser(tenantId, userId) : 0;
+        log.info("[AssistantPersist] 租户清除 tenant={} user={}: message={} conversation={} run={} action={} attachment={} compaction={}",
+            tenantId, userId, msgs, convs, runs, acts, atts, compacts);
+        return msgs + convs + runs + acts + atts + compacts;
+    }
+
+    /** dcs_assistant_compaction 是否已建表（同事务只读探测，异常按不存在处理） */
+    private boolean compactionTableExists() {
+        try {
+            Boolean ok = jdbcTemplate.queryForObject(
+                "SELECT to_regclass('public.dcs_assistant_compaction') IS NOT NULL", Boolean.class);
+            return Boolean.TRUE.equals(ok);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
@@ -526,7 +619,17 @@ public class AssistantConversationService {
             n = attachmentMapper.deleteExpired(batch);
             atts += n;
         } while (n >= batch);
-        log.info("[AssistantPersist] 保留期清理 conversation={} run={} action={} attachment={} 行(180 天)", convs, runs, acts, atts);
+        // 批A 回修（三审 P1）：压缩记录纳入保留期清理（180 天口径，防审计行无界增长）。
+        // 二审 P1 回修：表缺失环境（先部署后迁移）不让每日 job 整体报错
+        int compacts = 0;
+        if (compactionTableExists()) {
+            do {
+                n = compactionMapper.deleteExpired(batch);
+                compacts += n;
+            } while (n >= batch);
+        }
+        log.info("[AssistantPersist] 保留期清理 conversation={} run={} action={} attachment={} compaction={} 行(180 天)",
+            convs, runs, acts, atts, compacts);
     }
 
     /** 080/ISSUE-R13-3 修配套：清人前的该用户 thread 清单（悬挂缓存/步骤缓冲按 thread

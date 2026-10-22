@@ -171,19 +171,22 @@
             <span
               class="ctxrow"
               :title="
-                (ctxKnown ? `本会话上下文占用 ${fmtK(ctxTokens)} / ${fmtK(ctxWindow)} tokens` : ctxEmptyHint) + ' · 超 75% 变橙 · 超 90% 建议新开会话'
+                (ctxKnown ? `本会话上下文占用 ${fmtK(ctxTokens)} / ${fmtK(ctxWindowDisplay)} tokens` : ctxEmptyHint) +
+                (ctxTrigger ? ` · 到 ${fmtK(ctxTrigger)} 自动压缩` : '') +
+                ' · 环变橙=接近自动压缩线 · 变红=即将压缩'
               "
             >
               <span class="cl">上下文</span>
-              <span class="cbar"><i :style="ctxBarStyle" /></span>
-              <span>{{ ctxKnown ? Math.round(ctxPct * 100) + '%' : '待测' }}</span>
+              <span class="cbar ctxbar-tick">
+                <i :style="ctxBarStyle" />
+                <b v-if="ctxTriggerPct !== null" :style="{ left: ctxTriggerPct * 100 + '%' }" />
+              </span>
+              <!-- 批A-1 回修：数字与环色同分母=离自动压缩线进度（条上竖线即触发线位置） -->
+              <span>{{ ctxKnown ? Math.round(ctxNearPct * 100) + '%' : '待测' }}</span>
             </span>
-            <!-- 批17 Q2：手动压缩入口（环变红时的自救手段；超阈值后端也会自动压） -->
-            <span class="ctxrow" title="把前面的对话打包成摘要，腾出上下文空间（超过租户阈值时也会自动压缩）">
-              <span class="cl">压缩</span>
-              <button class="ctx-act" :disabled="compacting || !ctxKnown" @click="onCompactContext()">
-                {{ compacting ? '压缩中…' : '打包前文' }}
-              </button>
+            <!-- 批A-1：全自动压缩——用户只读水位三值（已用 / 窗口 / 自动触发线），没有任何手动入口 -->
+            <span class="ctxsub">
+              已用 {{ fmtK(ctxTokens) }} / 窗口 {{ fmtK(ctxWindowDisplay) }}{{ ctxWindowUnknown ? '（未配置，按 20 万算）' : '' }} · 自动触发线 {{ fmtK(ctxTrigger) }}
             </span>
             <span class="ctxdiv" />
             <template v-if="billingMode === 'credits'">
@@ -493,7 +496,7 @@
  * +思考三档（forwardedProps 透传）+发送键状态机（dim/橙+角标/title 三态）+占位轮换（身份词典 5s）
  * +/命令与@引用 cmdPop（↑↓EnterEsc）+ArrowUp 召回上一问+IME 守卫+拖文件虚线高亮。
  */
-import { getAssistantStatus, getAssistantModelChoice, compactAssistantContext, getAssistantSkillCatalog, type AssistantModelChoice } from '@/api/dcs/assistant';
+import { getAssistantStatus, getAssistantModelChoice, getAssistantSkillCatalog, type AssistantModelChoice } from '@/api/dcs/assistant';
 import { getMyCreditSummary, type CreditSummaryVO } from '@/api/dcs/ai-credit';
 import { checkPermi } from '@/utils/permission';
 import { readWebOn, writeWebOn, webOnKey } from './webOnState';
@@ -504,7 +507,6 @@ import { useUserStore } from '@/store/modules/user';
 import { roleOf } from './assistantCtx';
 import { pushToast } from './toastStore';
 import { assistantName } from './nameState';
-import { ElMessageBox } from 'element-plus';
 import { useFavs } from './favStore';
 import IconSpan from './IconSpan.vue';
 import type { AssistantState } from './useAssistant';
@@ -532,7 +534,8 @@ const emit = defineEmits<{
   'think-show': [v: boolean];
   'open-help': [];
   'new-session': [];
-  /** 批17 Q2：手动压缩完成（宿主收到后重拉会话消息，「已压缩」分隔条随历史重建出现） */
+  /** 自动压缩被检测到（上下文占用大幅回落）——宿主重拉会话消息，
+   *  「已压缩」分隔条随历史重建出现 */
   compacted: [];
 }>();
 
@@ -768,7 +771,6 @@ const CMD_PINYIN: Record<string, string> = {
   '/退修': 'tx',
   '/说明': 'sm',
   '/新会话': 'xhh',
-  '/压缩': 'ys',
   '/模型': 'mx',
   '/用量': 'yl'
 };
@@ -776,7 +778,6 @@ const matchCmd = (label: string, kw: string) =>
   !kw || label.slice(1).startsWith(kw) || label.slice(1).includes(kw) || (CMD_PINYIN[label] ?? '').startsWith(kw);
 const SLASH_CMDS = computed(() => {
   const fn = [
-    { icon: 'inbox', label: '/压缩', sub: '前面对话打包成摘要，腾出空间', text: '__COMPACT__' },
     { icon: 'sparkles', label: '/新会话', sub: '清空重开一段对话', text: '__NEW__' },
     { icon: 'package', label: '/模型', sub: '切换本次对话用的模型', text: '__MODEL__' },
     { icon: 'receipt', label: '/用量', sub: '额度·次数·缓存明细', text: '__USAGE__' },
@@ -909,9 +910,40 @@ const ctxWindow = computed(() => {
 /** 空态守卫（Review Focus ②）：分子分母任一缺失/非正 → 环不画弧、卡内解释待测 */
 const ctxKnown = computed(() => (ctxTokens.value ?? 0) > 0 && (ctxWindow.value ?? 0) > 0);
 const ctxPct = computed(() => (ctxKnown.value ? Math.min(1, (ctxTokens.value as number) / (ctxWindow.value as number)) : 0));
+/** 自动压缩触发线（批A-1 水位三值）：与后端 AssistantCompactionPolicy 同公式——
+ *  窗口 − min(模型输出额度, 21000) − 13000，下限 4000。后端按会话生效模型实算并随
+ *  /status 下发（compactionTriggerTokens），前端优先采信后端实算值；拿不到时才按
+ *  当前生效行本地复算兜底；窗口未配置时与后端同口径按 20 万兜底。 */
+const serverTriggerTokens = ref<number | null>(null);
+const CTX_FALLBACK_WINDOW = 200_000;
+const ctxWindowUnknown = computed(() => !(ctxWindow.value && ctxWindow.value > 0));
+const ctxWindowDisplay = computed(() => (ctxWindowUnknown.value ? CTX_FALLBACK_WINDOW : (ctxWindow.value as number)));
+const ctxTrigger = computed(() => {
+  if (serverTriggerTokens.value && serverTriggerTokens.value > 0) {
+    return serverTriggerTokens.value;
+  }
+  const win = ctxWindowDisplay.value;
+  const maxOut = Number(effectiveRow.value?.maxTokens ?? 0);
+  const reserve = Math.min(maxOut > 0 ? maxOut : 32000, 21000);
+  return Math.max(4000, win - reserve - 13000);
+});
+/** 触发线在窗口里的大致位置（进度条刻度） */
+const ctxTriggerPct = computed(() => {
+  const w = ctxWindowDisplay.value;
+  return w > 0 ? Math.min(1, ctxTrigger.value / w) : null;
+});
+/** 离自动压缩还有多远（环色只用它：>75% 橙 / >90% 红） */
+const ctxNearPct = computed(() => {
+  if (!ctxKnown.value) {
+    return 0;
+  }
+  const t = ctxTrigger.value;
+  const used = ctxTokens.value as number;
+  return t && t > 0 ? Math.min(1, used / t) : ctxPct.value;
+});
 /** 阈值变色（LibreChat 严格同档 >75 黄/>90 红；step5 P2-2：等号边界对齐不含） */
 const ringColor = computed(() =>
-  ctxPct.value > 0.9 ? 'var(--el-color-danger)' : ctxPct.value > 0.75 ? 'var(--el-color-warning)' : 'var(--el-color-primary)'
+  ctxNearPct.value > 0.9 ? 'var(--el-color-danger)' : ctxNearPct.value > 0.75 ? 'var(--el-color-warning)' : 'var(--el-color-primary)'
 );
 /** SVG 铁律：样式一律 :style CSS 对象（stroke 数值不被错误缩放）；空态弧透明只留底环 */
 const ringFgStyle = computed(() => ({
@@ -947,9 +979,10 @@ const quotaBadge = computed(() => {
   }
   return null;
 });
-/** 业务批7 Q2：环钮 aria 精简分叉（积分制/次数制各一句话） */
+/** 业务批7 Q2：环钮 aria 精简分叉（积分制/次数制各一句话）；
+ *  批A-1 回修：百分比与环色同分母（离自动压缩线的进度，ctxNearPct），不再一个看窗口一个看触发线 */
 const ringAria = computed(() => {
-  const ctx = ctxKnown.value ? `上下文已用${Math.round(ctxPct.value * 100)}%` : '上下文待测';
+  const ctx = ctxKnown.value ? `上下文已用到自动压缩线的${Math.round(ctxNearPct.value * 100)}%` : '上下文待测';
   if (billingMode.value === 'credits') {
     return `会话状态：${ctx}，本周积分剩 ${fmtCredit(creditWeeklyLeft.value)}${quotaBadge.value === 'red' ? '（积分已用完）' : quotaBadge.value === 'orange' ? '（积分将尽）' : ''}`;
   }
@@ -1161,11 +1194,16 @@ function scheduleCreditRefetch() {
   }, 5500);
 }
 
+let statusSeq = 0;
 async function refreshStatus() {
+  // 批A-1 回修：请求序号 + 会话守卫——慢响应回来时若已切会话或被更新一轮覆盖，
+  // 整包丢弃（环读数/触发线不得挂到别的会话头上，与 refreshChoice 的 choiceSeq 同款）
+  const seq = ++statusSeq;
+  const threadAtCall = props.state.threadId;
   try {
     // R5：积分快照与状态同轮拉取（未订阅静默隐藏 pill；失败不影响环）
     if (amActive()) void refreshCredit();
-    const res = (await getAssistantStatus(props.state.threadId || undefined)) as unknown as {
+    const res = (await getAssistantStatus(threadAtCall || undefined)) as unknown as {
       data?: {
         dailyRoundLimitPerUser?: number;
         turnsUsedToday?: number;
@@ -1173,6 +1211,7 @@ async function refreshStatus() {
         websearchUsedToday?: number;
         websearchLimit?: number;
         contextTokens?: number | null;
+        compactionTriggerTokens?: number | null;
         quotaDisabled?: boolean;
         billingMode?: 'credits' | 'wallet';
         sessionCacheHitRate?: number | null;
@@ -1180,6 +1219,9 @@ async function refreshStatus() {
         cacheHitRateToday?: number | null;
       };
     };
+    if (seq !== statusSeq || props.state.threadId !== threadAtCall) {
+      return;
+    }
     const d = unwrap<Record<string, unknown>>(res);
     // 业务批7 Q1：计费模式；Q9：缓存命中只显本会话（今日口径字段后端仍下发，仅排错参考不进 UI）
     billingMode.value = d?.billingMode === 'credits' ? 'credits' : 'wallet';
@@ -1195,7 +1237,16 @@ async function refreshStatus() {
     } else if (typeof d?.remainingTurnsToday === 'number') {
       used.value = Math.max(0, limit.value - d.remainingTurnsToday);
     }
+    const prevCtx = ctxTokens.value;
     ctxTokens.value = typeof d?.contextTokens === 'number' ? d.contextTokens : null;
+    // 批A-1 回修：后端实算触发线优先（本地公式仅兜底；旧后端未下发时字段缺省）
+    serverTriggerTokens.value = typeof d?.compactionTriggerTokens === 'number' ? d.compactionTriggerTokens : null;
+    // 批A-1：自动压缩检测——同一会话上下文占用大幅回落（>4000 且不足原值 7 成）
+    // 几乎只可能是压缩发生。通知宿主重拉历史，「已压缩」分隔条随历史重建出现。
+    if (prevCtx !== null && ctxTokens.value !== null
+        && prevCtx - ctxTokens.value > 4000 && ctxTokens.value < prevCtx * 0.7) {
+      emit('compacted');
+    }
     // 业务批3-④：联网配额展示（限值缺失保守 20 平台默认；0=租户整体关停，如实显示不能当缺失回退 20——dspro P2-2）
     if (typeof d?.websearchLimit === 'number') {
       webLimit.value = d.websearchLimit;
@@ -1217,54 +1268,9 @@ async function refreshStatus() {
   }
 }
 
-/* ===== 批17 Q2：手动压缩（/压缩 命令与会话状态卡「打包前文」按钮共用）。
- * 四态人话=open-webui 同款（生成中先等/太短不用压/压缩中/完成）；确认一步防误触=cline 同款。
- * 压缩在服务端做（agentscope CompactionMiddleware 同一套逻辑），完成后环回落、
- * 宿主经 compacted 事件重拉历史，「已压缩」分隔条出现。 ===== */
-const compacting = ref(false);
-async function onCompactContext() {
-  if (compacting.value) {
-    return;
-  }
-  if (props.sending) {
-    pushToast('等当前回答结束再压缩');
-    return;
-  }
-  try {
-    await ElMessageBox.confirm(
-      '把前面的对话打包成一条摘要，上下文占用会明显回落。关键结论、涉及的任务、你给过的反馈都会保留在摘要里。',
-      '压缩上下文？',
-      { type: 'info', confirmButtonText: '压缩', cancelButtonText: '先不' }
-    );
-  } catch {
-    return; // 用户取消
-  }
-  compacting.value = true;
-  pushToast('正在压缩前文…');
-  try {
-    const res = (await compactAssistantContext(props.state.threadId || undefined)) as unknown as {
-      data?: { compacted?: boolean; reason?: string; beforeTokens?: number | null; afterTokens?: number | null };
-    };
-    const d = unwrap<Record<string, unknown>>(res) as
-      | { compacted?: boolean; reason?: string; beforeTokens?: number | null; afterTokens?: number | null }
-      | undefined;
-    if (d?.compacted) {
-      const saved =
-        typeof d.beforeTokens === 'number' && typeof d.afterTokens === 'number' && d.beforeTokens > 0
-          ? `，占用 ${fmtK(d.beforeTokens)} → ${fmtK(d.afterTokens)}`
-          : '';
-      pushToast(`已压缩：前文打包成摘要${saved}`);
-      void refreshStatus();
-      emit('compacted');
-    } else {
-      pushToast(d?.reason === 'too_short' ? '对话还太短，不需要压缩' : '当前没有可压缩的内容');
-    }
-  } catch {
-    pushToast('压缩没成功，稍后再试（已有对话不受影响）');
-  } finally {
-    compacting.value = false;
-  }
-}
+/* ===== 批A-1（2026-10-22 拍板 Q2-A）：手动压缩通道整体删除 =====
+ * 原「打包前文」按钮与 /压缩 命令已下线——压缩只由后端中间件按模型窗口派生阈值自动触发。
+ * 前端只读展示水位三值（已用 / 窗口 / 自动触发线），压缩后由上下文回落自动感知。 */
 onMounted(() => {
   readWebOnSync();
   readSkillSync();
@@ -1319,6 +1325,7 @@ watch(
   () => props.state.threadId,
   () => {
     ctxTokens.value = null;
+    serverTriggerTokens.value = null; // 批A-1 回修：旧会话的后端触发线不带入新会话（响应回来前的窗口也不闪旧线）
     readWebOnSync();
     readSkillSync();
     // 能力① Q7（glm53 审查 P2-4）：「自动」角标状态随会话切换复位——新会话里从 storage
@@ -1947,12 +1954,6 @@ function cmdPick(i?: number) {
     return;
   }
   // 批17 Q3 功能命令（动作型，不回填输入框）
-  if (it.text === '__COMPACT__') {
-    draft.value = '';
-    closeCmd();
-    void onCompactContext();
-    return;
-  }
   if (it.text === '__MODEL__') {
     draft.value = '';
     closeCmd();
@@ -2693,21 +2694,6 @@ defineExpose({
           flex: none;
           width: 52px;
         }
-        /* 批17 Q2：手动压缩小按钮 */
-        .ctx-act {
-          border: 1px solid var(--el-color-primary-light-5, #a0cfff);
-          background: var(--el-color-primary-light-9, #ecf5ff);
-          color: var(--el-color-primary, #409eff);
-          border-radius: 6px;
-          font-size: 10.5px;
-          line-height: 1.5;
-          padding: 1px 8px;
-          cursor: pointer;
-          &:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-          }
-        }
         /* 业务批(1015) Q8：消费方式徽标（积分订阅/钱包按量）——与积分套餐页同色系 */
         .ctx-tag {
           flex: none;
@@ -2729,6 +2715,7 @@ defineExpose({
         }
         .cbar {
           flex: 1;
+          position: relative;
           height: 6px;
           border-radius: 3px;
           background: var(--el-fill-color-light);
@@ -2738,6 +2725,16 @@ defineExpose({
             display: block;
             height: 100%;
             background: var(--el-color-primary);
+          }
+          /* 批A-1 水位三值：自动压缩线刻度（深色细竖线，压到即自动打包） */
+          &.ctxbar-tick b {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            margin-left: -1px;
+            background: var(--dcs-text-secondary, #909399);
+            opacity: 0.85;
           }
         }
       }

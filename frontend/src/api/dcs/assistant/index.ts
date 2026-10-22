@@ -110,6 +110,7 @@ export interface AssistantEffectiveConfig {
   dailyRoundLimitPerUser: number;
   dailyBudgetAmount: string;
   memoryEnabled: string;
+  /** @deprecated 批A-1 起压缩触发线按模型窗口自动派生（见 compaction 块），本字段仅兼容旧库 */
   compactionTriggerTokens: number;
   /** 每人每日联网搜索次数上限（业务批3-④；后端 effective 记录序列化，缺省平台 20） */
   websearchLimitPerUser?: number;
@@ -119,8 +120,20 @@ export interface AssistantEffectiveConfig {
   assistantName?: string;
 }
 
+/** 压缩策略派生值（批A-1：按当前默认模型上下文窗口自动算，管理页只读展示） */
+export interface AssistantCompactionPolicyView {
+  /** true=按模型表 context_window 实算；false=窗口未知走 20 万兜底 */
+  derived: boolean;
+  contextWindow: number;
+  triggerTokens: number;
+  keepMessages: number;
+}
+
 export function getAssistantConfig() {
-  return request<{ effective?: AssistantEffectiveConfig }>({ url: '/dcs/assistant/config', method: 'get' });
+  return request<{ effective?: AssistantEffectiveConfig; compaction?: AssistantCompactionPolicyView }>({
+    url: '/dcs/assistant/config',
+    method: 'get'
+  });
 }
 
 /**
@@ -135,6 +148,7 @@ export interface AssistantConfigUpdate {
   websearchLimitPerUser?: number;
   dailyBudgetAmount?: string;
   memoryEnabled?: string;
+  /** @deprecated 批A-1 起不再生效（触发线按模型窗口自动派生）；保留字段仅为兼容旧客户端 */
   compactionTriggerTokens?: number;
   /** 五需求批 R4b：每日摘要开关（'1'=每日 08:00 发布人未交摘要通知） */
   digestEnabled?: '1' | '0';
@@ -149,19 +163,8 @@ export function updateAssistantConfig(data: AssistantConfigUpdate) {
   return request({ url: '/dcs/assistant/config/edit', method: 'post', data });
 }
 
-/* ===== 上下文压缩（批17 Q2-A：手动通道；自动通道在后端中间件按阈值触发）===== */
-/** 手动压缩结果：compacted=false 时 reason 给人话（too_short=对话太短不用压） */
-export interface AssistantCompactResult {
-  compacted: boolean;
-  reason?: 'too_short' | 'empty' | 'skipped';
-  beforeTokens?: number | null;
-  afterTokens?: number | null;
-  summarizedTurns?: number | null;
-}
-/** 手动压缩当前会话上下文（前文打包成结构化摘要，圆环回落） */
-export function compactAssistantContext(threadId?: string) {
-  return request<AssistantCompactResult>({ url: '/dcs/assistant/conversation/compact', method: 'post', data: { threadId }, timeout: 180000 });
-}
+/* ===== 上下文压缩：批A-1 起只剩自动通道（后端中间件按模型窗口派生阈值触发），
+ * 手动「打包前文」入口与 /conversation/compact 端点已删除 ===== */
 
 /* ===== 一键汇报导出（五需求批 R4b / Q7-A）：Word=结论+表格 / Excel=表格明细 ===== */
 export function exportAssistantReport(data: { format: 'docx' | 'xlsx'; question: string; content: string }) {
@@ -209,7 +212,7 @@ export function listConversations(params: { pageNum?: number; pageSize?: number;
   return request({ url: '/dcs/assistant/conversation/list', method: 'get', params });
 }
 
-export function listMessages(conversationId: number | string, params?: { limit?: number; pageNum?: number }) {
+export function listMessages(conversationId: number | string, params?: { limit?: number; pageNum?: number; tail?: boolean }) {
   return request<AssistantMessage[]>({
     url: `/dcs/assistant/conversation/${conversationId}/messages`,
     method: 'get',

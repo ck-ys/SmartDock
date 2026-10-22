@@ -49,6 +49,8 @@ public class AssistantStatusController extends BaseController {
     private final org.dromara.assistant.persist.AssistantRunRecorder runRecorder;
     /** 稳流② Q8②：追问失败分类分布（进程内累计） */
     private final org.dromara.assistant.service.AssistantFollowupService followupService;
+    /** 批A-1：/config 下发压缩策略派生值（按当前默认模型窗口算，只读展示） */
+    private final org.dromara.assistant.factory.AssistantModelFactory modelFactory;
 
     /**
      * 能力① Q4 轻量（2026-10-20）：用户视角技能目录（perm=use——panorama 是管理端点，
@@ -130,6 +132,15 @@ public class AssistantStatusController extends BaseController {
         out.put("websearchUsedToday", webSearchQuota.searchesUsed(tenantId, userId));
         out.put("websearchLimit", limits.websearchLimit());
         out.put("contextTokens", contextTokensOf(tenantId, userId, threadId));
+        // 批A 二审回修：本会话生效模型（用户 pin > 助手默认）的自动压缩触发线——
+        // 前端水位三值以后端真值为准（自选关/默认行被裁出白名单时本地复算会偏差）
+        try {
+            com.smartdock.domain.DcsAiConfig eff = modelFactory.resolveConfigWithUserChoice(tenantId, threadId);
+            out.put("compactionTriggerTokens", org.dromara.assistant.core.AssistantCompactionPolicy
+                .deriveTriggerTokens(eff.getContextWindow(), eff.getMaxTokens()));
+        } catch (Exception e) {
+            // 模型未配置/解析失败：不下发，前端按 20 万兜底本地复算
+        }
         // Q9（2026-10-15 拍板A·ZCode 同构）：本会话缓存命中（运行时逐回合累计，只含主链
         // 真实回传；换会话即重置、重启重新累计）。前端状态卡显示口径=本会话；
         // cacheHitRateToday 保留为管理/排错参考（含 Q1 脏数据护栏）。
@@ -181,7 +192,8 @@ public class AssistantStatusController extends BaseController {
         return R.ok(configService.adminStats(LoginHelper.getTenantId()));
     }
 
-    /** 租户配置读（perm=dcs:assistant:config；effective=两级默认合并结果，row=覆盖行原文） */
+    /** 租户配置读（perm=dcs:assistant:config；effective=两级默认合并结果，row=覆盖行原文；
+     *  compaction=批A-1 压缩策略派生值——触发线按当前默认模型窗口自动算，管理页只读展示） */
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/config")
     public R<Map<String, Object>> config() {
@@ -189,6 +201,28 @@ public class AssistantStatusController extends BaseController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("effective", configService.effective(tenantId));
         out.put("row", configService.raw(tenantId));
+        Map<String, Object> compaction = new LinkedHashMap<>();
+        Integer window = null;
+        Integer maxOutput = null;
+        try {
+            com.smartdock.domain.DcsAiConfig def = modelFactory.resolveConfig(tenantId);
+            window = def.getContextWindow();
+            maxOutput = def.getMaxTokens();
+        } catch (Exception e) {
+            // 未配置模型/解析失败：派生值按兜底窗口给出，derived=false 供前端提示
+            org.slf4j.LoggerFactory.getLogger(AssistantStatusController.class)
+                .debug("[Compaction] 默认模型解析失败, 压缩策略按兜底窗口展示 tenant={}: {}", tenantId, e.getMessage());
+        }
+        // 二审 P2：derived=true 必须意味着「按模型表实算」——窗口缺失时走了 20 万兜底，
+        // 前端按 false 提示「未解析到模型」，不能谎报实算
+        boolean derived = window != null && window > 0;
+        compaction.put("derived", derived);
+        compaction.put("contextWindow",
+            org.dromara.assistant.core.AssistantCompactionPolicy.effectiveContextWindow(window));
+        compaction.put("triggerTokens",
+            org.dromara.assistant.core.AssistantCompactionPolicy.deriveTriggerTokens(window, maxOutput));
+        compaction.put("keepMessages", org.dromara.assistant.core.AssistantCompactionPolicy.KEEP_MESSAGES);
+        out.put("compaction", compaction);
         return R.ok(out);
     }
 

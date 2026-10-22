@@ -144,10 +144,12 @@ public final class AssistantModelChoiceHolder {
     // 60 分钟才随会话超时重建。指纹入链后：改完下一请求即 removeSession 重建。
     private static final java.util.Map<String, String> CONFIG_FINGERPRINTS = new java.util.concurrent.ConcurrentHashMap<>();
 
-    /** 装配面指纹：只取影响 agent 装配的租户配置段（TreeMap 序稳定防误判） */
-    public static String assemblyFingerprint(org.dromara.assistant.service.AssistantConfigService.EffectiveConfig cfg) {
+    /** 装配面指纹：只取影响 agent 装配的租户配置段（TreeMap 序稳定防误判）；
+     *  批A-1：压缩触发线改为按模型窗口派生，纳入指纹——改窗口/输出额度后下一请求即重建 */
+    public static String assemblyFingerprint(org.dromara.assistant.service.AssistantConfigService.EffectiveConfig cfg,
+                                             int compactionTriggerTokens) {
         return (cfg.toolGate() == null ? "" : new java.util.TreeMap<>(cfg.toolGate()).toString())
-            + "|" + cfg.memoryEnabled() + "|" + cfg.compactionTriggerTokens();
+            + "|" + cfg.memoryEnabled() + "|" + compactionTriggerTokens;
     }
 
     public static void markConfigBuilt(String threadId, String fingerprint) {

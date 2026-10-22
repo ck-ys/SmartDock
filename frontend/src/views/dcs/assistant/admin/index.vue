@@ -116,25 +116,19 @@
               每人 {{ cfg.websearchLimitPerUser ?? 20 }} 次<template v-if="(cfg.websearchLimitPerUser ?? 20) === 0"> · 已关停</template>
             </el-descriptions-item>
             <el-descriptions-item label="租户日预算">¥ {{ Number(cfg.dailyBudgetAmount).toFixed(2) }} / 天</el-descriptions-item>
-            <!-- 批17 Q2：上下文压缩阈值——会话占用超过该值时自动把前文打包成摘要（用户也可 /压缩 手动打包） -->
-            <el-descriptions-item label="自动压缩阈值">
+            <!-- 批A-1（2026-10-22 拍板 Q1/Q3）：自动压缩阈值改为只读派生值——按默认模型
+                 上下文窗口自动算（窗口 − 输出预留 − 缓冲），管理页不再手改；用户侧也无手动入口 -->
+            <el-descriptions-item label="自动压缩">
               <div class="cell-flex">
-                <el-input-number
-                  v-model="compactionTokens"
-                  :min="4000"
-                  :max="500000"
-                  :step="10000"
-                  :loading="saving"
-                  size="small"
-                  controls-position="right"
-                  style="width: 150px"
-                  @change="onCompactionSave"
-                />
-                <span class="cell-note">tokens · 到线自动打包前文</span>
+                <span class="cell-note">
+                  到 {{ fmtK(compactionPolicy.triggerTokens) }} tokens 自动打包前文（按默认模型窗口
+                  {{ fmtK(compactionPolicy.contextWindow) }} 自动算<template v-if="!compactionPolicy.derived">
+                    · 未解析到模型，按 20 万兜底</template>）
+                </span>
                 <span class="sp" />
                 <el-tooltip
                   placement="top"
-                  content="一段对话的上下文占用超过这个数时，助手会自动把前面的对话打包成摘要，腾出空间继续聊（界面里会出现「已压缩」分隔条，关键结论都在摘要里）。调小=更早压缩更省额度；调大=保留更多原文。修改后对新建的会话生效。"
+                  content="触发线 = 模型上下文窗口 − 模型输出额度（最多留 2.1 万）− 1.3 万缓冲。换个上下文更大的模型，触发线自动跟着变；对用户完全自动，无需手动操作。"
                 >
                   <span class="hint-dot">ⓘ</span>
                 </el-tooltip>
@@ -1220,6 +1214,7 @@ import {
   type AssistantActionLogRow,
   type AssistantAnnouncementRow,
   type AssistantEffectiveConfig,
+  type AssistantCompactionPolicyView,
   type AssistantPanoramaTool,
   type AssistantPanoramaSkill,
   type AssistantToolGateRow,
@@ -1328,12 +1323,18 @@ async function saveTenantDefaults() {
 async function loadConfig() {
   loading.value = true;
   try {
-    const res = (await getAssistantConfig()) as unknown as { data?: { effective?: AssistantEffectiveConfig } };
+    const res = (await getAssistantConfig()) as unknown as {
+      data?: { effective?: AssistantEffectiveConfig; compaction?: AssistantCompactionPolicyView };
+    };
     const e = res?.data?.effective ?? (res as { effective?: AssistantEffectiveConfig })?.effective;
     if (e) {
       cfg.value = e;
       // 快刀批 Q6：称呼同步喂全局态（本页保存后悬浮球/抽屉即时换名，无需整页刷新）
       applyAssistantName(e.assistantName);
+    }
+    const p = res?.data?.compaction ?? (res as { compaction?: AssistantCompactionPolicyView })?.compaction;
+    if (p) {
+      compactionPolicy.value = p;
     }
   } catch {
     ElMessage.error('配置加载失败，请稍后再试');
@@ -1422,24 +1423,18 @@ async function onMemoryToggle() {
   }
 }
 
-/* ===== 批17 Q2：自动压缩阈值（change 即存；失败回滚旧值） ===== */
-const compactionTokens = computed({
-  get: () => cfg.value.compactionTriggerTokens ?? 60000,
-  set: (v: number | undefined) => {
-    cfg.value.compactionTriggerTokens = v ?? 60000;
-  }
+/* ===== 批A-1：压缩策略=只读派生（后端 /config 下发 compaction 块；本页不提供写入口） ===== */
+const compactionPolicy = ref<AssistantCompactionPolicyView>({
+  derived: false,
+  contextWindow: 200000,
+  triggerTokens: 166000,
+  keepMessages: 2
 });
-async function onCompactionSave(_v: number | undefined, oldVal: number | undefined) {
-  saving.value = true;
-  try {
-    await updateAssistantConfig({ compactionTriggerTokens: cfg.value.compactionTriggerTokens });
-    ElMessage.success('压缩阈值已保存——新会话起按新阈值自动打包');
-  } catch {
-    ElMessage.error('保存失败，请稍后再试');
-    cfg.value.compactionTriggerTokens = oldVal ?? 60000;
-  } finally {
-    saving.value = false;
+function fmtK(n?: number | null): string {
+  if (!n || n <= 0) {
+    return '—';
   }
+  return n >= 1000 ? Math.round(n / 1000) + 'K' : String(n);
 }
 
 /* ===== 每日摘要开关（五需求批 R4b / Q7-C）：码值串 '1'/'0' 同 enabled 口径 ===== */

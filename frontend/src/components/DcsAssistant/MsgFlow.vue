@@ -43,10 +43,15 @@
       @open-help="emit('open-help')"
     />
     <template v-for="(turn, ti) in state.turns" :key="turn.id">
-      <!-- 批17 Q2：压缩分隔条——本回合之前发生过上下文压缩（前文已打包成摘要） -->
+      <!-- 批17 Q2：压缩分隔条——本回合之前发生过自动压缩（前文已打包成摘要） -->
       <div v-if="turn.compactedBefore" class="compact-mark" role="separator">
         <IconSpan name="inbox" :size="13" />
-        已压缩 · 前面的对话打包成摘要{{ compactSavedText(turn.compactedBefore) }} · 关键结论与任务都在摘要里
+        已自动压缩 · 前面的对话打包成摘要{{ compactSavedText(turn.compactedBefore) }} · 关键结论与任务都在摘要里
+      </div>
+      <!-- 批A 回修（三审 P1）：自动压缩已熔断警示条——用户必须知道「压不动了」，否则只剩莫名报错 -->
+      <div v-if="turn.compactionBlockedBefore" class="compact-mark blocked" role="separator">
+        <IconSpan name="warn" :size="13" />
+        {{ blockedText(turn.compactionBlockedBefore) }}
       </div>
       <!-- 用户气泡（Q4A 纯文本；Q5A >270px 折叠 260px；Q3A hover 时间戳；BN-16 对齐原型=纯气泡无 hover 操作键；
            批J-2 补原型 .avatar：行右端 30px 首字圆标（row-reverse 下 DOM 首位=视觉最右） -->
@@ -96,10 +101,14 @@
       </button>
       <span class="p-tag">排队中</span>
     </div>
-    <!-- 批17 Q2：尾部悬挂压缩标记——system 行之后暂无新回合（刚压缩完重拉的形态） -->
+    <!-- 批A-1：尾部悬挂压缩标记——system 行之后暂无新回合（刚压缩完重拉的形态） -->
     <div v-if="state.turns.length > 0 && state.lastCompaction" class="compact-mark" role="separator">
       <IconSpan name="inbox" :size="13" />
-      已压缩 · 前面的对话打包成摘要{{ compactSavedText(state.lastCompaction) }} · 关键结论与任务都在摘要里
+      已自动压缩 · 前面的对话打包成摘要{{ compactSavedText(state.lastCompaction) }} · 关键结论与任务都在摘要里
+    </div>
+    <div v-if="state.turns.length > 0 && state.lastCompactionBlocked" class="compact-mark blocked" role="separator">
+      <IconSpan name="warn" :size="13" />
+      {{ blockedText(state.lastCompactionBlocked) }}
     </div>
     <div class="flow-pad" />
 
@@ -307,13 +316,31 @@ function fmtTime(ts: number): string {
   return `今天 ${hh}:${mm}`;
 }
 
-/** 批17 Q2：压缩分隔条的省量人话（前后 token 齐才有；缺数静默不显示） */
+/* 批A 回修（三审 P1）+ 二审 P2：压缩警示条人话——三种形态各一句白话 + 兜底 */
+function blockedText(m: { reason?: string }): string {
+  if (m?.reason === 'summary_failed_once') {
+    return '本次自动压缩没成功：模型可能暂时忘记较早的内容。重问一下关键信息即可；连续失败会自动停手并再次提示。';
+  }
+  if (m?.reason === 'rapid_refill') {
+    return '自动压缩已暂停：每次压完马上又满，可能是某次查询结果太大。建议缩小查询范围，或新建会话继续。';
+  }
+  if (m?.reason === 'summary_failed') {
+    return '自动压缩已暂停：连续几次都没能把前文打包成摘要。已有对话不受影响；建议新建会话继续。';
+  }
+  return '自动压缩已暂停：本会话上下文接近上限，建议新建会话继续。';
+}
+
+/** 批A-1：压缩分隔条的省量人话——优先给前后字数（"82,400 → 11,300 tokens，省下约 86%"），
+ *  只有百分比也能看；缺数静默不显示。 */
 function compactSavedText(m: { beforeTokens?: number | null; afterTokens?: number | null }): string {
   if (typeof m.beforeTokens === 'number' && typeof m.afterTokens === 'number' && m.beforeTokens > m.afterTokens && m.beforeTokens > 0) {
     const pct = Math.round(((m.beforeTokens - m.afterTokens) / m.beforeTokens) * 100);
+    const from = m.beforeTokens.toLocaleString('zh-CN');
+    const to = m.afterTokens.toLocaleString('zh-CN');
     if (pct >= 5) {
-      return `（省下约 ${pct}% 空间）`;
+      return `（${from} → ${to} tokens，省下约 ${pct}%）`;
     }
+    return `（${from} → ${to} tokens）`;
   }
   return '';
 }
@@ -845,6 +872,14 @@ defineExpose({ jumpToStep, jumpToConfirm });
     content: '';
     flex: 1;
     border-top: 1px dashed var(--el-color-success-light-5, #b3e19d);
+  }
+  /* 批A 回修：熔断警示=橙色系（区别于绿色"已压缩"），role=separator */
+  &.blocked {
+    color: var(--el-color-warning, #e6a23c);
+    &::before,
+    &::after {
+      border-top-color: var(--el-color-warning-light-5, #f3d19e);
+    }
   }
 }
 

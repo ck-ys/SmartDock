@@ -100,18 +100,23 @@ class G1DisciplineAndFingerprintTest {
         Map<String, String> b = new HashMap<>();
         b.put("y", "member");
         b.put("x", "off");
-        assertEquals(AssistantModelChoiceHolder.assemblyFingerprint(cfg(a, "1", 60000)),
-            AssistantModelChoiceHolder.assemblyFingerprint(cfg(b, "1", 60000)),
+        int trigger = org.dromara.assistant.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
+        assertEquals(AssistantModelChoiceHolder.assemblyFingerprint(cfg(a, "1", 60000), trigger),
+            AssistantModelChoiceHolder.assemblyFingerprint(cfg(b, "1", 60000), trigger),
             "toolGate 键序不得影响指纹（HashMap 序不定）");
     }
 
     @Test
     void configRebuildTriggersOnlyOnChange() {
-        String f1 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000));
+        int trigger = org.dromara.assistant.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
+        String f1 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), trigger);
         AssistantModelChoiceHolder.markConfigBuilt("g1-test-thread", f1);
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f1), "同指纹不重建");
-        String f2 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "member"), "1", 60000));
+        String f2 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "member"), "1", 60000), trigger);
         assertTrue(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f2), "改档位即重建");
+        // 批A-1：压缩触发线改按模型窗口派生——换模型导致触发线变，同样必须重建
+        String f3 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), 90_000);
+        assertTrue(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f3), "触发线变化即重建");
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild("g1-other-thread", f1), "未建线程不算失效");
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild(null, f1), "null 线程安全返回 false");
     }

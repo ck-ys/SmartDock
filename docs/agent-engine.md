@@ -63,9 +63,10 @@ ReActAgent agent = ReActAgent.builder()
     .toolkit(toolkit)
     .permissionContext(pb.build())
     .middleware(new DcsCompactionMiddleware(
-        workspaceManager, model,
+        workspaceManager, new CompactionSummaryModel(model),
         AssistantCompactionAssets.buildConfig(
-            assistantConfigService.effective(tenantId).compactionTriggerTokens()),
+            AssistantCompactionPolicy.deriveTriggerTokens(
+                cfg.getContextWindow(), cfg.getMaxTokens())),
         conversationService))
     .enablePendingToolRecovery(true)
     .build();
@@ -160,7 +161,7 @@ AgentScope 2.0.3 的 `AguiEventType` 共 **28 类**：
 
 | 面 | 内容 |
 |---|---|
-| 会话管理页 | 会话列表、消息回放、重命名、导出、手动压缩、恢复、治理（管理端可清理） |
+| 会话管理页 | 会话列表、消息回放、重命名、导出、恢复、治理（管理端可清理） |
 | 记忆管理页 | 租户长期记忆条目的查看与维护 |
 | 助手管理页（管理端） | 使用统计、会话治理、联网搜索配置与连通测试、公告发布/撤回、反馈列表与统计、配额覆盖（单用户日配额覆盖或禁用） |
 | 能力全景 | `AssistantCapabilityPanoramaController` 输出当前租户可用的模型/工具/开关面，供诊断「为什么我的智能体没有某能力」 |

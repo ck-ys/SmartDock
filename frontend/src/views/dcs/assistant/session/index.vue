@@ -759,7 +759,7 @@ async function openConversation(c: AssistantConversation) {
   const archived = c.status === 'ARCHIVED';
   try {
     // request 层返回整个 body（{code,msg,data}，与 TurnBlock resolveMessageId 同款取法）
-    const [msgs, acts] = (await Promise.all([listMessages(c.id, { limit: 100 }), listActions({ threadId: c.threadId })])) as unknown as [
+    const [msgs, acts] = (await Promise.all([listMessages(c.id, { limit: 100, tail: true }), listActions({ threadId: c.threadId })])) as unknown as [
       { data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }> },
       { data?: AssistantAction[] }
     ];
@@ -790,7 +790,7 @@ async function openConversation(c: AssistantConversation) {
   }
 }
 
-/** 批17 Q2：手动压缩完成后重拉当前会话消息——「已压缩」分隔条随历史重建出现。
+/** 批A：检测到自动压缩（上下文大幅回落）后重开当前会话——「已自动压缩」分隔条随历史重建出现。
  *  排队/生成中跳过（rebuild 会清队掐流），临时行无 DB 消息可拉。 */
 function onCompacted() {
   if (state.queue.length > 0 || state.sending || !selected.value || selected.value.id === 'tmp') {

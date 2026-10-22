@@ -54,6 +54,8 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     /** 业务批4 Q1-A：白名单范围指纹比对——管理员改 switch_scope 后缓存会话下一请求即失效重建 */
     private final org.dromara.assistant.service.AssistantModelSettingService modelSettingService;
     private final org.dromara.assistant.service.AssistantConfigService assistantConfigService;
+    /** 批A-1：压缩触发线指纹需要按当前模型窗口派生（与建侧同源解析） */
+    private final org.dromara.assistant.factory.AssistantModelFactory modelFactory;
 
     @Override
     public RuntimeContext resolve(AguiRuntimeContextRequest<?> request) {
@@ -163,7 +165,8 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
             // 三审回修（dspro P1-5）：比对侧必须用 Factory 落标同款租户源（user 登录快照）——
             // 原用 resolveTenantId 的动态租户，超管切租户且两租户配置有差时每请求恒失配=空转重建
             || AssistantModelChoiceHolder.needsConfigRebuild(aguiThreadId,
-                AssistantModelChoiceHolder.assemblyFingerprint(assistantConfigService.effective(user.getTenantId())));
+                AssistantModelChoiceHolder.assemblyFingerprint(assistantConfigService.effective(user.getTenantId()),
+                    derivedTriggerTokens(user.getTenantId(), aguiThreadId)));
         if (aguiThreadId != null && rebuildNeeded) {
             boolean removed = threadSessionManager.removeSession("t:" + tenantId + ":" + userId, aguiThreadId);
             if (removed) {
@@ -175,6 +178,16 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         return RuntimeContext.builder()
             .userId("t:" + tenantId + ":" + userId)
             .build();
+    }
+
+    /** 与 AssistantAgentFactory 建侧同源的压缩触发线（解析失败按兜底窗口，不阻断会话） */
+    private int derivedTriggerTokens(String tenantId, String aguiThreadId) {
+        try {
+            com.smartdock.domain.DcsAiConfig cfg = modelFactory.resolveConfigWithUserChoice(tenantId, aguiThreadId);
+            return AssistantCompactionPolicy.deriveTriggerTokens(cfg.getContextWindow(), cfg.getMaxTokens());
+        } catch (Exception e) {
+            return AssistantCompactionPolicy.deriveTriggerTokens(null, null);
+        }
     }
 
     /**

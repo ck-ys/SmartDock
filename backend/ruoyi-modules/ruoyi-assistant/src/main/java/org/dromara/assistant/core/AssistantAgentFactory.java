@@ -137,7 +137,8 @@ public class AssistantAgentFactory {
         // G1 遗留#3：租户装配面指纹（toolGate/memory/compaction）入链——改工具开关后
         // 该租户全部缓存会话下一请求即失效重建，不再吃 60 分钟会话超时
         org.dromara.assistant.core.AssistantModelChoiceHolder.markConfigBuilt(aguiThreadId,
-            org.dromara.assistant.core.AssistantModelChoiceHolder.assemblyFingerprint(tenantCfg));
+            org.dromara.assistant.core.AssistantModelChoiceHolder.assemblyFingerprint(tenantCfg,
+                AssistantCompactionPolicy.deriveTriggerTokens(cfg.getContextWindow(), cfg.getMaxTokens())));
         boolean memoryOn = "1".equals(tenantCfg.memoryEnabled());
         // AU-03(Q3=C)→批2 双层档位: 最内层套思考档装饰器——按会话读 thinkTier 经能力目录
         // 翻译原生参数(TIERS→reasoning_effort / SWITCH→thinking.type)；装配期解析能力一次注入。
@@ -211,12 +212,15 @@ public class AssistantAgentFactory {
             // 600s 看门狗+刷新 Recorder lastEventAt（工具/压缩段豁免的事件层实现）。
             // order=0 链位最外层，包住压缩中间件的 onReasoning
             .middleware(new DcsHeartbeatMiddleware())
-            // 批17 Q2：自动压缩通道——上下文越过租户阈值（默认 60000 token）时
-            // 每轮推理前自动打包成摘要（九段中文模板），并落 system 分隔条行让前端
-            // 渲染「已压缩」标记；配置双显式（trigger+keep），不依赖模型自报窗口（P14 Step5）
-            .middleware(new DcsCompactionMiddleware(workspaceManager, model,
+            // 批A-1（2026-10-22 拍板 Q1/Q5）：自动压缩通道——触发线按当前模型窗口派生
+            // （窗口 − 输出预留 2.1 万 − 缓冲 1.3 万），不再读租户固定阈值；尾窗按轮保留
+            // 最后 1 轮原文。配置双显式（trigger+keep），不依赖模型自报窗口（P14 Step5
+            // 实证 deepseek 族自报 0）。
+            // 批A-2：摘要调用走 CompactionSummaryModel 包装（输出封顶 2 万、工具恒禁）
+            .middleware(new DcsCompactionMiddleware(workspaceManager,
+                new CompactionSummaryModel(model),
                 AssistantCompactionAssets.buildConfig(
-                    tenantCfg.compactionTriggerTokens()),
+                    AssistantCompactionPolicy.deriveTriggerTokens(cfg.getContextWindow(), cfg.getMaxTokens())),
                 conversationService))
             // 业务批7 Q16-①：恢复态 pending（无结果的 tool_use）官方恢复分支——合成工具
             // 失败结果后会话继续；配合 AssistantStaleAskingRecovery 启动翻转 asking→allowed，
@@ -226,23 +230,6 @@ public class AssistantAgentFactory {
         log.debug("[dcs-assistant] 为租户 {} 用户 {} 创建会话 agent（含 {} 个工具, 长期记忆={})",
             user.getTenantId(), user.getUserId(), registered.size(), memoryOn ? "开" : "关");
         return agent;
-    }
-
-    /**
-     * 压缩摘要专用模型（批17 Q2，dspro P0-1 回修）：与主对话链同源的装饰层——
-     * PII 先脱敏再出网、Billing 照实计费入账（含积分/钥匙池上报），与自动压缩通道
-     * （中间件持装饰后 model）口径一致。不挂思考档/记忆/技能注入（会话级装饰，
-     * 摘要侧车无关，且省一层上下文污染）。
-     */
-    public Model buildCompactionModel(String tenantId, Long userId, String threadId) {
-        DcsAiConfig cfg = modelFactory.resolveConfigWithUserChoice(tenantId, threadId);
-        Model innermost = modelFactory.buildModel(cfg, threadId);
-        return new BillingModelDecorator(
-            new org.dromara.assistant.security.AssistantPiiModelDecorator(innermost, piiFilter, tenantId),
-            cfg, userId, aiBillingService, tenantWalletService,
-            modelPriceService, costLedger, threadId)
-            .creditService(creditService)
-            .keyPool(providerKeyPool);
     }
 
     /**

@@ -480,6 +480,53 @@ CREATE TABLE public.dcs_assistant_message (
 
 
 --
+-- Name: dcs_assistant_compaction; Type: TABLE; Schema: public; Owner: -
+-- 批A-2（2026-10-22 拍板 Q9-A）：自动压缩记录（链式审计，prev_id 指向上一条同会话记录）
+--
+
+CREATE TABLE public.dcs_assistant_compaction (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    conversation_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    thread_id character varying(128),
+    trigger_type character varying(16) DEFAULT 'AUTO'::character varying NOT NULL,
+    status character varying(16) DEFAULT 'SUCCESS'::character varying NOT NULL,
+    before_tokens integer NOT NULL,
+    after_tokens integer NOT NULL,
+    before_messages integer NOT NULL,
+    after_messages integer NOT NULL,
+    summary text,
+    reason character varying(64),
+    prev_id bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: dcs_assistant_compaction_pk; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dcs_assistant_compaction
+    ADD CONSTRAINT dcs_assistant_compaction_pk PRIMARY KEY (id);
+
+
+--
+-- Name: idx_dcs_asst_comp_conv; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_asst_comp_conv ON public.dcs_assistant_compaction (tenant_id, conversation_id, id);
+
+
+--
+-- Name: idx_dcs_asst_comp_time; Type: INDEX; Schema: public; Owner: -
+-- 二审 P2：保留期清理按 create_time 过滤分批删——缺索引则每日 job 全表顺序扫描
+--
+
+CREATE INDEX idx_dcs_asst_comp_time ON public.dcs_assistant_compaction (create_time);
+
+
+--
 -- Name: dcs_assistant_model_setting; Type: TABLE; Schema: public; Owner: -
 --
 
