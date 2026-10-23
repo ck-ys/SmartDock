@@ -19,6 +19,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.9.6',
+    date: '2026-10-23',
+    title: '升级脚本可安全重复执行',
+    items: [
+      '修复一个升级脚本的问题：在全新安装的库上按顺序重放全部升级脚本时，会在事件归档表这一步因主键已存在而中断；现在重复执行会自动跳过，不再报错。',
+      '经真实数据库全链路实测：全新安装（基线 7 个脚本）和「全新安装 + 重放全部 21 个升级脚本」两条路径均可一次跑通。',
+    ],
+  },
+  {
     version: 'v1.9.5',
     date: '2026-10-23',
     title: '移除外部网站接入：系统专注内部数据源',

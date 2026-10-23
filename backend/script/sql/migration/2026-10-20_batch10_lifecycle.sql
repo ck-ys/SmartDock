@@ -72,7 +72,11 @@ DO UPDATE SET first_seen = LEAST(analytics_visitor_first_seen.first_seen, EXCLUD
 CREATE TABLE IF NOT EXISTS profile_event_archive (LIKE profile_event INCLUDING DEFAULTS);
 DO $$ BEGIN
     ALTER TABLE profile_event_archive ADD CONSTRAINT pk_profile_event_archive PRIMARY KEY (event_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    -- 基线已建同表时 PG17 先抛 42P16 multiple primary keys 而非 42710, 同样视为已就绪
+    WHEN invalid_table_definition THEN NULL;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_profile_event_archive_source
     ON profile_event_archive (tenant_id, source, occurred_time DESC);
 
