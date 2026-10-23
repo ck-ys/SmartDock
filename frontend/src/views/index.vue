@@ -141,7 +141,7 @@
 </template>
 
 <script setup name="Index" lang="ts">
-import { getAnalyticsOverview, getAnalyticsTrend, listAnalyticsSites, type AnalyticsOverview } from '@/api/dcs/core/analytics';
+import { getAnalyticsOverview, getAnalyticsTrend, type AnalyticsOverview } from '@/api/dcs/core/analytics';
 import { getOverview, type ProfileOverview } from '@/api/dcs/core/profile';
 import { statsOverview, type DcsStatsOverview } from '@/api/dcs/core/task';
 import { getAssistantStatus } from '@/api/dcs/assistant';
@@ -268,9 +268,7 @@ async function loadPulse() {
     return;
   }
   try {
-    const sites = await listAnalyticsSites();
-    const first = (sites || []).find((s) => s.enabled === '1') || sites?.[0];
-    pulseSource.value = first?.source || 'web';
+    pulseSource.value = 'web';
     const [overview, trendData] = await Promise.all([
       getAnalyticsOverview(pulseSource.value, 7).catch(() => null),
       getAnalyticsTrend(pulseSource.value, 7).catch(() => [])

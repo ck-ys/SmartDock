@@ -90,59 +90,9 @@ CREATE TABLE IF NOT EXISTS public.analytics_funnel (
     CONSTRAINT uk_analytics_funnel UNIQUE (tenant_id, source, funnel_code)
 );
 
-CREATE TABLE IF NOT EXISTS public.analytics_site (
-    site_id bigint NOT NULL,
-    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
-    source character varying(32) NOT NULL,
-    site_key character varying(64) NOT NULL,
-    site_name character varying(128) NOT NULL,
-    allowed_domains character varying(512),
-    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
-    sign_secret character varying(128),
-    sign_enabled character(1) DEFAULT '0'::bpchar NOT NULL,
-    remark character varying(500),
-    create_dept bigint,
-    create_by bigint,
-    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    update_by bigint,
-    update_time timestamp without time zone,
-    del_flag character(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_analytics_site PRIMARY KEY (site_id),
-    CONSTRAINT uk_analytics_site_key UNIQUE (site_key),
-    CONSTRAINT ck_analytics_site_sign_enabled CHECK (sign_enabled IN ('0', '1'))
-);
-
--- 批7 采集质量：丢弃留痕（按批次×原因聚合；明文 IP 不落库，只存 SHA-256 前 16 位）
-CREATE TABLE IF NOT EXISTS public.analytics_collect_log (
-    log_id bigint NOT NULL,
-    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
-    source character varying(32) NOT NULL,
-    site_key character varying(64) NOT NULL,
-    drop_reason character varying(32) NOT NULL,
-    event_count integer DEFAULT 1 NOT NULL,
-    ip_hash character varying(64),
-    user_agent character varying(512),
-    origin_host character varying(255),
-    detail character varying(500),
-    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT pk_analytics_collect_log PRIMARY KEY (log_id)
-);
-CREATE INDEX IF NOT EXISTS idx_analytics_collect_log_time
-    ON public.analytics_collect_log USING btree (tenant_id, source, create_time DESC);
-CREATE INDEX IF NOT EXISTS idx_analytics_collect_log_reason
-    ON public.analytics_collect_log USING btree (tenant_id, source, drop_reason);
-
 CREATE INDEX IF NOT EXISTS idx_profile_event_visitor
     ON public.profile_event USING btree (tenant_id, source, anonymous_id, occurred_time)
     WHERE anonymous_id IS NOT NULL;
-
--- 采集站点：siteKey 是公开标识，不是密钥；域名白名单用于后台提示与人工排查
-INSERT INTO public.analytics_site
-    (site_id, tenant_id, source, site_key, site_name, allowed_domains, enabled, remark, create_by, create_time)
-VALUES
-    (9800, '000000', 'web', 'sd_demo_site', '演示网站', 'localhost,127.0.0.1', '1',
-     '内置演示站点，可在采集代码页复制 SDK 片段', 1, '2026-10-19 00:00:00')
-ON CONFLICT DO NOTHING;
 
 -- 采集源默认只做分析，不触发画像重算/复核；需要画像时再单独打开
 INSERT INTO public.profile_engine_config
@@ -169,7 +119,7 @@ ON CONFLICT DO NOTHING;
 
 -- 菜单与权限
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES
-(11986, '数据分析', 12000, 6, 'profile-analytics', 'dcs/profile/analytics', '', '1', '0', 'C', '0', '0', 'analytics:center:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '流量/页面/漏斗/留存/访问明细/数据接入'),
+(11986, '数据分析', 12000, 6, 'profile-analytics', 'dcs/profile/analytics', '', '1', '0', 'C', '0', '0', 'analytics:center:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '流量/页面/漏斗/留存/访问明细/数据导入'),
 (11987, '数据分析编辑', 11986, 14, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:center:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '重建汇总/导入/漏斗维护')
 ON CONFLICT DO NOTHING;
 

@@ -215,22 +215,6 @@ docker compose ps        # 五个服务应为 running / healthy
 
 [![画像详情](docs/images/screenshots/profile-detail.png)](docs/images/screenshots/profile-detail.png)
 
-### 网站数据接入（5 分钟）
-
-想让你的网站变成「看得见访客」的报表？不用写代码，三步：
-
-1. 登录管理台 → 「画像与分析 → 数据分析」，第一个页签就是**「数据接入」**；
-2. 想先看效果：点**「模拟 3 个访客访问」**，切到实时看板看数字跳动（模拟数据可一键清掉）；
-3. 接自己的网站：在「接我的网站」块里**起个名字 → 创建并生成代码 → 复制整段代码贴进你的网页**，点「检测接入」——「钥匙有效 + 测试事件已收到」两个绿灯亮起即链路打通，第三盏「看板已有数据」在你网站的真实访问到达后自动点亮。
-
-```html
-<!-- 示例：地址在页面里生成时自动写死为你的系统地址，贴到任何网页都能用 -->
-<script src="https://你的系统地址/sdk/smartdock-analytics.js"></script>
-<script>SmartdockAnalytics.init({ siteKey: '（创建站点时自动生成）', endpoint: 'https://你的系统地址/analytics/collect' });</script>
-```
-
-SDK 零依赖（约 668 行），自动完成访客识别、30 分钟会话、单页应用路由跟踪、断网补传；贴完代码回到「流量概览 / 页面 / 漏斗 / 留存」页签看数据。Docker 部署时 `deploy/frontend/nginx.conf` 已内置 `/analytics/` 转发，无需额外配置。
-
 ### 内置 Demo
 
 任务采集系统演示了两个引擎的接入方式：

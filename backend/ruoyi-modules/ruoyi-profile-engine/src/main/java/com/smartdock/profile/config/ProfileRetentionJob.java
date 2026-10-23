@@ -42,7 +42,6 @@ public class ProfileRetentionJob {
     private static final int REBUILD_LOG_RETENTION_DAYS = 30;
 
     private final ProfileEventMapper eventMapper;
-    private final com.smartdock.analytics.mapper.AnalyticsCollectLogMapper collectLogMapper;
     private final AnalyticsRebuildLogMapper rebuildLogMapper;
     private final ProfileEngineConfigMapper configMapper;
 
@@ -50,13 +49,8 @@ public class ProfileRetentionJob {
     @Value("${profile.event.retention-days:730}")
     private int retentionDays;
 
-    /** 采集丢弃留痕保留天数(批7, 只做质量排查用, 短于事件账本) */
-    @Value("${analytics.collect.log-retention-days:90}")
-    private int collectLogRetentionDays;
-
     private final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(false);
     /** 采集留痕清理与事件保留期清理互不阻塞——共用一个标志会因前一个跑久而整日跳过后一个 */
-    private final java.util.concurrent.atomic.AtomicBoolean collectLogRunning = new java.util.concurrent.atomic.AtomicBoolean(false);
 
     /**
      * cron 按容器时区(GMT+8 铁律)。
@@ -120,31 +114,4 @@ public class ProfileRetentionJob {
         return deleted;
     }
 
-    /**
-     * 采集丢弃留痕清理(批7): 每日 03:40, 默认 90 天。
-     * 留痕只是质量报表原料, 爬虫灌水场景下比事件账本更易膨胀, 保留期刻意更短。
-     */
-    @Scheduled(cron = "0 40 3 * * ?")
-    public void cleanupCollectLogs() {
-        if (collectLogRetentionDays <= 0) {
-            return;
-        }
-        if (!collectLogRunning.compareAndSet(false, true)) {
-            return;
-        }
-        try {
-            Date before = new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(collectLogRetentionDays));
-            TenantHelper.ignore(() -> {
-                int rows;
-                int rounds = 0;
-                do {
-                    rows = collectLogMapper.deleteBefore(before, BATCH_LIMIT);
-                } while (rows >= BATCH_LIMIT && ++rounds < MAX_ROUNDS);
-            });
-        } catch (Exception e) {
-            log.error("[Analytics] collect log cleanup failed", e);
-        } finally {
-            collectLogRunning.set(false);
-        }
-    }
 }

@@ -6,12 +6,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.smartdock.analytics.domain.AnalyticsDaily;
 import com.smartdock.analytics.domain.AnalyticsFunnel;
 import com.smartdock.analytics.domain.AnalyticsSession;
-import com.smartdock.analytics.domain.AnalyticsSite;
 import com.smartdock.analytics.mapper.AnalyticsDailyMapper;
 import com.smartdock.analytics.mapper.AnalyticsEventMapper;
 import com.smartdock.analytics.mapper.AnalyticsFunnelMapper;
 import com.smartdock.analytics.mapper.AnalyticsSessionMapper;
-import com.smartdock.analytics.mapper.AnalyticsSiteMapper;
 import com.smartdock.analytics.query.AnalyticsBreakdownRow;
 import com.smartdock.analytics.query.AnalyticsCustomBo;
 import com.smartdock.analytics.query.AnalyticsEventRow;
@@ -70,8 +68,6 @@ public class AnalyticsService {
     private final AnalyticsSessionMapper sessionMapper;
     private final AnalyticsDailyMapper dailyMapper;
     private final AnalyticsFunnelMapper funnelMapper;
-    private final AnalyticsSiteMapper siteMapper;
-    private final com.smartdock.analytics.mapper.AnalyticsCollectLogMapper collectLogMapper;
     private final com.smartdock.analytics.mapper.AnalyticsRebuildLogMapper rebuildLogMapper;
     private final com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper;
     private final com.smartdock.profile.engine.ProfilePiiService piiService;
@@ -780,53 +776,6 @@ public class AnalyticsService {
         out.put("skipped", events.size() - written);
         out.put("dropped", Math.max(0, rows.size() - 1 - limit));
         out.put("invalidTime", invalidTime);
-        return out;
-    }
-
-    public List<AnalyticsSite> sites() {
-        List<AnalyticsSite> rows = siteMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AnalyticsSite>()
-            .eq(AnalyticsSite::getEnabled, "1").orderByAsc(AnalyticsSite::getSiteId));
-        // 批11 回修(终审 P1): HMAC 密钥不出参——只回是否已配置, 持有密钥即可伪造签名
-        for (AnalyticsSite row : rows) {
-            row.setSignSecret(StringUtils.isNotBlank(row.getSignSecret()) ? "******" : null);
-        }
-        return rows;
-    }
-
-    /**
-     * 批7 采集质量报表: 丢弃原因分布 / Top 机器人 UA / Top 跨域来源 / 最近留痕 / 丢弃率。
-     * 丢弃率分母 = 窗口内已入账事件数 + 丢弃事件数(来自日汇总, 与口径六数字同源)。
-     */
-    public Map<String, Object> quality(String source, int days) {
-        requireSource(source);
-        int clampedDays = Math.min(Math.max(days, 1), 90);
-        String tenantId = currentTenant();
-        Date from = startOfDaysAgo(clampedDays);
-        Date to = startOfTomorrow();
-
-        List<Map<String, Object>> byReason = collectLogMapper.summaryByReason(tenantId, source, from);
-        long droppedEvents = 0;
-        for (Map<String, Object> row : byReason) {
-            droppedEvents += longValue(row.get("events"));
-        }
-        // 已入账事件数直接从日汇总行求和(≤90 行, 无需新 SQL)
-        long acceptedEvents = 0;
-        for (Map<String, Object> row : dailyMapper.selectTrend(tenantId, source,
-            new java.sql.Date(from.getTime()), new java.sql.Date(to.getTime()))) {
-            acceptedEvents += longValue(row.get("events"));
-        }
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("source", source);
-        out.put("days", clampedDays);
-        out.put("from", from);
-        out.put("to", to);
-        out.put("byReason", byReason);
-        out.put("topRobots", collectLogMapper.topRobots(tenantId, source, from, 10));
-        out.put("topMismatches", collectLogMapper.topMismatches(tenantId, source, from, 10));
-        out.put("latestLogs", collectLogMapper.latestLogs(tenantId, source, from, 10));
-        out.put("acceptedEvents", acceptedEvents);
-        out.put("droppedEvents", droppedEvents);
-        out.put("discardRate", rate(droppedEvents, acceptedEvents + droppedEvents));
         return out;
     }
 

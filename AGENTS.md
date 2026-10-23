@@ -77,7 +77,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 核心子系统：
 - **画像引擎**（`ruoyi-profile-engine` 的 `com.smartdock.profile`）：通用事件协议 v1 → 身份图谱 → 评分模型/RFM/分群/低分复核，快照链可追溯
-- **行为分析中心**（`com.smartdock.analytics`）：会话重建、日汇总、流量/页面/漏斗/留存/自定义分析、CSV 补录、公开采集口 + 零依赖 SDK
+- **行为分析中心**（`com.smartdock.analytics`）：会话重建、日汇总、流量/页面/漏斗/留存/自定义分析、CSV 补录（外部网站公开采集口与 SDK 已于 2026-10-23 移除）
 - **AI 助手**（`ruoyi-assistant` + `ruoyi-assistant-spi`）：AgentScope 管主链，Spring AI 只管后台任务
 - **多任务采集 demo**（内置 demo 模块）：保留任务/待办/审计最小闭环
 
@@ -96,7 +96,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 评分模型 | 指标→分箱→权重→等级，整份 JSON 配置；每次计算进快照，`prev_snapshot_id` 串趋势链；RFM 只是内置预设 |
 | 分群 | 规则分群（条件树+预览）与静态名单（CSV/逐行）两种；成员快照可追溯 |
 | 低分复核 | 低于阈值进队列；确认/忽略后除非分数继续下降，不重复打扰 |
-| 采集口 | `POST /analytics/collect` 公开免登；siteKey→租户/业务源；单批 ≤200；限流 300/分/IP；siteKey 不授予管理权限 |
+| 数据导入 | 外部网站接入（公开采集口/SDK/siteKey）已于 2026-10-23 移除；数据进系统只有两条路：业务系统走 `ProfileEventPublisher`，离线数据走 CSV 补录 |
 | 自动汇总 | 事件写入 → 2s 去抖 → 会话重建（锁+事务、读取窗口左移 30 分钟）→ 日汇总 |
 | 演示基线 | 合成演示库固定口径：531 事件 / 135 会话 / 316 PV / 40 UV / 跳出 29.63% / 2.34 页每次——**测试后必须复原到这六个数** |
 
@@ -132,7 +132,6 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 后端 | 前端 |
 |------|------|
 | `analytics/query/AnalyticsController.java` | `profile/analytics.vue` + `core/analytics.ts` |
-| `analytics/query/AnalyticsCollectController.java` | `public/sdk/smartdock-analytics.js`（采集 SDK） |
 | `profile/query/ProfileQueryController / ProfileDimensionController` | `profile/{index,studio,detail}.vue` + `core/profile.ts` |
 | `profile/query/ProfileScoreModelController` | `profile/rfm.vue` |
 | `profile/query/ProfileSegmentController` | `profile/segments.vue` |

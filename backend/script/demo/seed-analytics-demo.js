@@ -1,22 +1,26 @@
 #!/usr/bin/env node
 /*
- * 分析中心合成演示数据（可重复执行，事件按 eventUid 幂等）
+ * 分析中心合成演示数据
  *
- * 只通过公开采集口写入，不直连数据库；生成 30 天左右、多访客/多会话/
- * 多渠道/多设备的访问数据，便于演示流量趋势、漏斗与留存。
+ * 2026-10-23 起：外部网站公开采集口已下线，本脚本改走管理员登录 +
+ * CSV 导入端点写入（事件内容/口径与旧版完全一致）。注意：eventUid 含
+ * 时间戳且锚定当天——同一天内重复执行幂等；跨天重播会按新日期生成
+ * 一批新事件，演示库请勿随意重跑。
  *
  * 用法：
  *   node backend/script/demo/seed-analytics-demo.js \
- *     --endpoint http://localhost:8090/analytics/collect \
- *     --siteKey sd_demo_site --days 30 --visitors 40
+ *     --base http://localhost:8090 --days 30 --visitors 40
+ *   （账号默认 admin/admin123，可用 --username/--password 覆盖）
  *
- * 可选环境变量：ANALYTICS_ENDPOINT / ANALYTICS_SITE_KEY
+ * 可选环境变量：ANALYTICS_BASE / SEED_ADMIN_USER / SEED_ADMIN_PASS
  */
 'use strict';
 
+const CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e';
 const DEFAULTS = {
-  endpoint: process.env.ANALYTICS_ENDPOINT || 'http://localhost:8090/analytics/collect',
-  siteKey: process.env.ANALYTICS_SITE_KEY || 'sd_demo_site',
+  base: process.env.ANALYTICS_BASE || 'http://localhost:8090',
+  username: process.env.SEED_ADMIN_USER || 'admin',
+  password: process.env.SEED_ADMIN_PASS || 'admin123',
   days: 30,
   visitors: 40
 };
@@ -91,8 +95,9 @@ function parseArgs(argv) {
   for (let i = 2; i < argv.length; i += 2) {
     const key = argv[i];
     const value = argv[i + 1];
-    if (key === '--endpoint') out.endpoint = value;
-    else if (key === '--siteKey') out.siteKey = value;
+    if (key === '--base') out.base = String(value || '').replace(/\/$/, '');
+    else if (key === '--username') out.username = value;
+    else if (key === '--password') out.password = value;
     else if (key === '--days') out.days = Math.max(1, Number(value) || 1); // days=0 曾在 intBetween(0,-1) 上死循环(批10 顺手修)
     else if (key === '--visitors') out.visitors = Number(value);
   }
@@ -128,6 +133,13 @@ function isoAt(daysAgo, hour, minute) {
     minute
   );
   return new Date(utcMs).toISOString();
+}
+
+/** ISO 时刻 → CSV 导入端点认的 "yyyy-MM-dd HH:mm:ss"（同为 UTC+8 墙上时间，指同一瞬间） */
+function wallAt(iso) {
+  const d = new Date(new Date(iso).getTime() + 8 * 3600 * 1000);
+  const p = (n, l = 2) => String(n).padStart(l, '0');
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 }
 
 function event(name, visitor, session, occurredTime, props, context) {
@@ -263,22 +275,62 @@ function buildEvents(options) {
   return events;
 }
 
-// ---------------------------------------------------------------- 上报
-async function sendBatch(endpoint, siteKey, batch) {
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ siteKey, events: batch })
-  });
-  const text = await res.text();
-  let body;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    throw new Error(`collect 返回非 JSON（HTTP ${res.status}）：${text.slice(0, 200)}`);
+// ---------------------------------------------------------------- 上报（管理员登录 + CSV 导入端点）
+const csvCell = (value) => {
+  const text = value === undefined || value === null ? '' : String(value);
+  return /[" ,]/.test(text) || text.includes('\n') ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+function toCsv(events) {
+  const lines = ['eventName,eventUid,subjectType,subjectId,anonymousId,sessionId,occurredTime,props,context'];
+  for (const e of events) {
+    lines.push([
+      csvCell(e.eventName),
+      csvCell(e.eventUid),
+      csvCell('visitor'),
+      csvCell(e.anonymousId),
+      csvCell(e.anonymousId),
+      csvCell(e.sessionId),
+      csvCell(wallAt(e.occurredTime)),
+      csvCell(JSON.stringify(e.props)),
+      csvCell(JSON.stringify(e.context))
+    ].join(','));
   }
+  return lines.join(String.fromCharCode(10));
+}
+
+async function login(options) {
+  const res = await fetch(`${options.base}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', clientid: CLIENT_ID },
+    body: JSON.stringify({
+      tenantId: '000000',
+      username: options.username,
+      password: options.password,
+      clientId: CLIENT_ID,
+      grantType: 'password'
+    })
+  });
+  const body = await res.json().catch(() => ({}));
+  if (body.code !== 200 || !body.data?.access_token) {
+    throw new Error(`登录失败：HTTP ${res.status} ${body.msg || ''}`);
+  }
+  return body.data.access_token;
+}
+
+async function importBatch(options, token, events) {
+  const res = await fetch(`${options.base}/analytics/import`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      clientid: CLIENT_ID
+    },
+    body: JSON.stringify({ source: 'web', csv: toCsv(events) })
+  });
+  const body = await res.json().catch(() => ({}));
   if (body.code !== 200) {
-    throw new Error(`collect 失败：${body.code} ${body.msg || ''}`);
+    throw new Error(`导入失败：HTTP ${res.status} ${body.code || ''} ${body.msg || ''}`);
   }
   return body.data;
 }
@@ -287,19 +339,21 @@ async function sendBatch(endpoint, siteKey, batch) {
   const options = parseArgs(process.argv);
   const events = buildEvents(options);
   console.log(
-    `[seed] endpoint=${options.endpoint} siteKey=${options.siteKey} visitors=${options.visitors} events=${events.length}`
+    `[seed] base=${options.base} user=${options.username} visitors=${options.visitors} events=${events.length}`
   );
 
-  let accepted = 0;
+  const token = await login(options);
+  let written = 0;
   let skipped = 0;
-  for (let i = 0; i < events.length; i += 200) {
-    const batch = events.slice(i, i + 200);
-    const result = await sendBatch(options.endpoint, options.siteKey, batch);
-    accepted += Number(result.accepted || 0);
+  for (let i = 0; i < events.length; i += 500) {
+    const batch = events.slice(i, i + 500);
+    const result = await importBatch(options, token, batch);
+    written += Number(result.written || 0);
     skipped += Number(result.skipped || 0);
-    process.stdout.write(`\r[seed] ${Math.min(i + 200, events.length)}/${events.length}`);
+    process.stdout.write(`[seed] ${Math.min(i + 500, events.length)}/${events.length}`);
   }
-  console.log(`\n[seed] done accepted=${accepted} skipped=${skipped}`);
+  console.log('');
+  console.log(`[seed] done written=${written} skipped=${skipped}`);
   console.log('[seed] 提示：到 数据分析 → 重建汇总 刷新会话/日汇总');
 })().catch((error) => {
   console.error('[seed] failed:', error.message);

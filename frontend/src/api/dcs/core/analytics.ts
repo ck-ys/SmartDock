@@ -244,46 +244,6 @@ export interface AnalyticsRebuildResult {
   to: string;
 }
 
-export interface AnalyticsSite {
-  siteId: string;
-  tenantId: string;
-  source: string;
-  siteKey: string;
-  siteName: string;
-  allowedDomains?: string;
-  enabled: string;
-  remark?: string;
-}
-
-export interface AnalyticsQualityReasonRow {
-  reason: string;
-  batches: number;
-  events: number;
-}
-
-export interface AnalyticsQualityTopRow {
-  userAgent?: string;
-  originHost?: string;
-  batches?: number;
-  events?: number;
-  lastSeen?: string;
-}
-
-/** 批7 采集质量报表：丢弃原因分布 / Top 机器人 / Top 跨域来源 / 丢弃率 */
-export interface AnalyticsQuality {
-  source: string;
-  days: number;
-  from: string;
-  to: string;
-  byReason: AnalyticsQualityReasonRow[];
-  topRobots: AnalyticsQualityTopRow[];
-  topMismatches: AnalyticsQualityTopRow[];
-  latestLogs: Array<Record<string, any>>;
-  acceptedEvents: number;
-  droppedEvents: number;
-  discardRate: number | string;
-}
-
 export const getAnalyticsOverview = (source: string, days = 30) =>
   r<AnalyticsOverview>({ url: `${BASE}/overview`, method: 'get', params: { source, days } });
 
@@ -317,28 +277,6 @@ export const importAnalyticsCsv = (source: string, csv: string) =>
 
 export const rebuildAnalytics = (source: string, days = 30) =>
   r<AnalyticsRebuildResult>({ url: `${BASE}/rebuild`, method: 'post', params: { source, days } });
-
-export const listAnalyticsSites = () => r<AnalyticsSite[]>({ url: `${BASE}/sites`, method: 'get' });
-
-// ---------------------------------------------------------------- 数据接入页（2026-10-22 拍板·全按推荐）
-
-export const createAnalyticsSite = (data: { siteName: string; allowedDomains?: string }) =>
-  r<AnalyticsSite>({ url: `${BASE}/site/create`, method: 'post', data });
-
-export const simulateAnalyticsVisitors = (visitors = 3) =>
-  r<{ visitors: number; events: number; written: number }>({ url: `${BASE}/simulate`, method: 'post', params: { visitors } });
-
-export const clearAnalyticsSimulate = () =>
-  r<{ deleted: number; links: number; subjects: number; firstSeen: number; rebuild: Record<string, unknown> }>({
-    url: `${BASE}/simulate/clear`,
-    method: 'post'
-  });
-
-export const detectAnalyticsSite = (siteKey: string) =>
-  r<{ keyValid: boolean; testReceived: boolean; hasData: boolean }>({ url: `${BASE}/site/detect`, method: 'post', params: { siteKey } });
-
-export const getAnalyticsQuality = (source: string, days = 7) =>
-  r<AnalyticsQuality>({ url: `${BASE}/quality`, method: 'get', params: { source, days } });
 
 // ---------------------------------------------------------------- 批8 分析深度
 
