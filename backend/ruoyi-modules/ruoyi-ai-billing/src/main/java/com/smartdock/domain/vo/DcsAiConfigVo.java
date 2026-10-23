@@ -37,6 +37,9 @@ public class DcsAiConfigVo implements Serializable {
     /** OpenAI 兼容 API 的 base URL */
     private String baseUrl;
 
+    /** Q5-A：接口格式（三选一，空=Chat Completions） */
+    private String apiFormat;
+
     /** 永远返回掩码, 不返回明文 API Key */
     private String apiKey;
 

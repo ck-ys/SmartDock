@@ -15,11 +15,13 @@ import {
   DcsAiProviderPresetVO,
   DcsAiTestResultVO,
   DcsAiModelPriceForm,
-  DcsAiModelPriceVO
+  DcsAiModelPriceVO,
+  DcsAiApiFormatVO,
+  DcsAiProviderTemplateVO
 } from './types';
 
 /** 类型再导出——页面按名导入（DcsAiProvider=厂商字典键别名） */
-export type { DcsAiConfigVO, DcsAiProviderPresetVO } from './types';
+export type { DcsAiConfigVO, DcsAiProviderPresetVO, DcsAiApiFormatVO, DcsAiProviderTemplateVO } from './types';
 export type { DcsAiProvider } from './types';
 
 const CONFIG_BASE = '/dcs/ai-config';
@@ -82,6 +84,14 @@ export const getDcsAiConfig = (configId: number | string): AxiosPromise<DcsAiCon
   request({ url: `${CONFIG_BASE}/${configId}`, method: 'get' });
 
 export const listDcsAiProviderPresets = (): AxiosPromise<DcsAiProviderPresetVO[]> => request({ url: `${CONFIG_BASE}/presets`, method: 'get' });
+
+/** Q5(2026-10-23) 厂商模板：选中即带出接口地址/格式/候选模型/控制台入口 */
+export const listDcsAiProviderTemplates = (): AxiosPromise<DcsAiProviderTemplateVO[]> =>
+  request({ url: `${CONFIG_BASE}/templates`, method: 'get' });
+
+/** Q5(2026-10-23) 接口格式字典（含官方路径，用于表单只读预览） */
+export const listDcsAiApiFormats = (): AxiosPromise<DcsAiApiFormatVO[]> =>
+  request({ url: `${CONFIG_BASE}/api-formats`, method: 'get' });
 
 /** AI 模型厂商字典(从 dcs_ai_provider 字典加载, 供厂商下拉) */
 export const listDcsAiProviderDicts = (): AxiosPromise<any[]> => request({ url: `${CONFIG_BASE}/provider-dicts`, method: 'get' });
@@ -213,3 +223,20 @@ export const updateDcsAiModelPrice = (data: DcsAiModelPriceForm) => request({ ur
 
 export const delDcsAiModelPrice = (priceIds: number | string | Array<number | string>) =>
   request({ url: `${PRICE_BASE}/${priceIds}`, method: 'post' });
+
+/** Q6(2026-10-23) 从 models.dev 同步价格：手工覆盖行(manualOverride='1')跳过不覆盖 */
+export const syncDcsAiModelPricesFromModelsDev = (): AxiosPromise<{
+  source: string;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  total: number;
+}> => request({ url: `${PRICE_BASE}/sync-models-dev`, method: 'post' });
+
+/** Q6(2026-10-23) JSON 导入价格：{ prices: [{provider,modelName,input,output,currency,manualOverride}] } */
+export const importDcsAiModelPrices = (payload: { prices: Array<Record<string, any>> }): AxiosPromise<{
+  inserted: number;
+  updated: number;
+  skipped: number;
+  total: number;
+}> => request({ url: `${PRICE_BASE}/import`, method: 'post', data: payload });

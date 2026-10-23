@@ -52,6 +52,9 @@ public class AiPriceAutoDetectService {
     /** pricetoken.ai 聚合价格 API(免费, 无 Key 30次/小时, 每日更新) */
     private static final String PRICETOKEN_API = "https://pricetoken.ai/api/v1/text";
     private static final String PRICETOKEN_SOURCE = "pricetoken.ai (聚合数据)";
+    /** Q4-A：OpenRouter 官方 models 接口（公开、无需鉴权，pricing 字段为 USD/token） */
+    private static final String OPENROUTER_MODELS_API = "https://openrouter.ai/api/v1/models";
+    private static final BigDecimal ONE_MILLION = BigDecimal.valueOf(1_000_000);
 
     /** AI 聊天客户端工厂(正则失败时 AI 回退提取价格) */
     private final DcsAiChatClientFactory chatClientFactory;
@@ -68,6 +71,14 @@ public class AiPriceAutoDetectService {
      * <p>优先查聚合 API(覆盖海外主流模型), 未覆盖时降级到文档抓取。</p>
      */
     public AiPriceDetectResult detect(String provider, String modelName, String sourceUrl) {
+        // Q4-A（2026-10-23 拍板）：OpenRouter 走官方 models 接口——一条请求拿全量价格，
+        // 不再抓动态渲染的定价页（free 转发页抓不到有效文本）。
+        if ("OPENROUTER".equalsIgnoreCase(StrUtil.trim(provider))) {
+            AiPriceDetectResult orResult = tryOpenRouterApi(modelName);
+            if (orResult != null) {
+                return orResult;
+            }
+        }
         // 0. 聚合 API 优先(海外模型直接拿结构化 JSON, 无需抓页面)
         AiPriceDetectResult apiResult = tryPricetokenApi(provider, modelName);
         if (apiResult != null) {
@@ -160,8 +171,106 @@ public class AiPriceAutoDetectService {
             case "ANTHROPIC" -> "anthropic";
             case "GOOGLE", "GEMINI" -> "google";
             case "XAI", "GROK" -> "xai";
+            // Q4-A：补齐国内常见厂商映射；pricetoken 未收录时 findModel 返回 null，自动降级
+            case "ZHIPU" -> "zhipu";
+            case "KIMI" -> "moonshot";
+            case "MINIMAX" -> "minimax";
+            case "SILICONFLOW" -> "siliconflow";
+            case "STEPFUN" -> "stepfun";
             default -> null;
         };
+    }
+
+    // ========== Q4-A：OpenRouter 官方 models 接口 ==========
+
+    /**
+     * 查 OpenRouter 官方模型目录价格。
+     *
+     * <p>响应 {@code data[].pricing.prompt/completion} 单位是 USD/token，
+     * 本平台价格表按「每百万 token」存储，此处乘 1e6。free 模型两项均为 0，
+     * 币种归一为 CNY(0)，否则保留 USD（与价格来源一致，不做汇率臆算）。</p>
+     */
+    AiPriceDetectResult tryOpenRouterApi(String modelName) {
+        if (StrUtil.isBlank(modelName)) {
+            return null;
+        }
+        try (HttpResponse response = HttpRequest.get(OPENROUTER_MODELS_API)
+            .timeout(FETCH_TIMEOUT_MS)
+            .setMaxRedirectCount(3)
+            .header("User-Agent", "Mozilla/5.0 (compatible; SmartDock-PriceBot/1.0)")
+            .header("Accept", "application/json")
+            .execute()) {
+            if (!response.isOk()) {
+                log.warn("[PriceDetect] OpenRouter models API HTTP {}", response.getStatus());
+                return null;
+            }
+            return extractOpenRouterPrice(JsonUtils.parseMap(response.body()), modelName);
+        } catch (Exception e) {
+            log.warn("[PriceDetect] OpenRouter 官方接口查询失败, 降级到文档抓取: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 纯函数：从 OpenRouter /models 响应中提取指定模型价格。
+     * 精确 id 优先，其次 {@code 厂商/模型} 后缀匹配（用户常只填模型名）。
+     */
+    @SuppressWarnings("unchecked")
+    static AiPriceDetectResult extractOpenRouterPrice(Map<String, Object> root, String modelName) {
+        if (root == null || StrUtil.isBlank(modelName)) {
+            return null;
+        }
+        Object dataObj = root.get("data");
+        if (!(dataObj instanceof List<?> data)) {
+            return null;
+        }
+        String target = modelName.trim().toLowerCase();
+        Map<String, Object> hit = null;
+        for (Object item : data) {
+            if (!(item instanceof Map<?, ?> m)) {
+                continue;
+            }
+            Object idObj = m.get("id");
+            String id = idObj == null ? "" : String.valueOf(idObj).toLowerCase();
+            if (id.equals(target)) {
+                hit = (Map<String, Object>) m;
+                break;
+            }
+            // 只认「厂商/模型名」后缀：contains 会把 gpt-4 命中 gpt-4o/gpt-4-turbo 等同厂不同型号的价
+            if (hit == null && !id.isEmpty() && id.endsWith("/" + target)) {
+                hit = (Map<String, Object>) m;
+            }
+        }
+        if (hit == null || !(hit.get("pricing") instanceof Map<?, ?> pricing)) {
+            return null;
+        }
+        BigDecimal prompt = toDecimal(pricing.get("prompt"));
+        BigDecimal completion = toDecimal(pricing.get("completion"));
+        if (prompt == null || completion == null) {
+            return null;
+        }
+        BigDecimal input = prompt.multiply(ONE_MILLION).stripTrailingZeros();
+        BigDecimal output = completion.multiply(ONE_MILLION).stripTrailingZeros();
+        BigDecimal cached = toDecimal(pricing.get("input_cache_read"));
+        BigDecimal cachedInput = cached == null ? null : cached.multiply(ONE_MILLION).stripTrailingZeros();
+        boolean free = input.compareTo(BigDecimal.ZERO) == 0 && output.compareTo(BigDecimal.ZERO) == 0;
+        AiPriceDetectResult r = AiPriceDetectResult.success(
+            input, cachedInput, output, free ? "CNY" : "USD",
+            OPENROUTER_MODELS_API, "high");
+        r.setMethod("OPENROUTER");
+        r.setMessage(free ? "OpenRouter 免费模型（价格 0）" : "来源 OpenRouter 官方 models 接口（USD）");
+        return r;
+    }
+
+    private static BigDecimal toDecimal(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(String.valueOf(value).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**

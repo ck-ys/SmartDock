@@ -70,4 +70,10 @@ public class DcsAiModelPriceBo extends BaseEntity {
     private String billingFormula;
     /** 原始结构化价格元数据(复杂计费规则厂商用) */
     private String pricingSchemaJson;
+
+    /** Q6-A：来源类型 MANUAL / MODELS_DEV / IMPORT（手工新增/编辑默认 MANUAL） */
+    private String priceSource;
+
+    /** Q6-A：1=人工价，models.dev 同步不覆盖（手工新增/编辑默认 1） */
+    private String manualOverride;
 }

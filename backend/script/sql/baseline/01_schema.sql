@@ -35,6 +35,7 @@ CREATE TABLE public.dcs_ai_config (
     tenant_id character varying(20) NOT NULL,
     provider character varying(32) NOT NULL,
     base_url character varying(255),
+    api_format character varying(24) DEFAULT 'CHAT_COMPLETIONS'::character varying NOT NULL,
     api_key text,
     model_name character varying(128) NOT NULL,
     temperature numeric(4,2) DEFAULT 0.20,
@@ -57,6 +58,7 @@ CREATE TABLE public.dcs_ai_config (
     use_type character varying(16) DEFAULT 'CHAT'::character varying NOT NULL,
     is_default character(1),
     credit_multiplier numeric(6,2) DEFAULT 1 NOT NULL,
+    CONSTRAINT ck_dcs_ai_config_api_format CHECK (((api_format)::text = ANY (ARRAY[('CHAT_COMPLETIONS'::character varying)::text, ('ANTHROPIC_MESSAGES'::character varying)::text, ('RESPONSES'::character varying)::text]))),
     CONSTRAINT ck_dcs_ai_config_use_type CHECK (((use_type)::text = ANY (ARRAY[('CHAT'::character varying)::text, ('EMBEDDING'::character varying)::text])))
 );
 
@@ -215,7 +217,12 @@ CREATE TABLE public.dcs_ai_model_price (
     input_token_max integer,
     billing_formula character varying(64) DEFAULT 'INPUT_OUTPUT_PER_MILLION'::character varying,
     pricing_schema_json text,
-    source_updated_at timestamp without time zone
+    source_updated_at timestamp without time zone,
+    price_source character varying(16) DEFAULT 'MANUAL'::character varying NOT NULL,
+    manual_override character(1) DEFAULT '0'::bpchar NOT NULL,
+    last_synced_at timestamp without time zone,
+    CONSTRAINT ck_dcs_ai_model_price_manual_override CHECK ((manual_override = ANY (ARRAY['0'::bpchar, '1'::bpchar]))),
+    CONSTRAINT ck_dcs_ai_model_price_source CHECK (((price_source)::text = ANY (ARRAY[('MANUAL'::character varying)::text, ('MODELS_DEV'::character varying)::text, ('IMPORT'::character varying)::text])))
 );
 
 
@@ -228,6 +235,7 @@ CREATE TABLE public.dcs_ai_provider_access (
     tenant_id character varying(20) NOT NULL,
     provider character varying(32) NOT NULL,
     base_url character varying(255) NOT NULL,
+    api_format character varying(24) DEFAULT 'CHAT_COMPLETIONS'::character varying NOT NULL,
     api_key text NOT NULL,
     console_url character varying(255),
     remark character varying(500),
@@ -242,7 +250,8 @@ CREATE TABLE public.dcs_ai_provider_access (
     balance_amount numeric(14,4),
     balance_currency character varying(8),
     balance_checked_at timestamp without time zone,
-    balance_status character varying(16)
+    balance_status character varying(16),
+    CONSTRAINT ck_dcs_ai_provider_access_api_format CHECK (((api_format)::text = ANY (ARRAY[('CHAT_COMPLETIONS'::character varying)::text, ('ANTHROPIC_MESSAGES'::character varying)::text, ('RESPONSES'::character varying)::text])))
 );
 
 
@@ -2911,6 +2920,13 @@ CREATE INDEX idx_dcs_ai_model_health_check_time ON public.dcs_ai_model_health US
 --
 
 CREATE INDEX idx_dcs_ai_model_price_lookup ON public.dcs_ai_model_price USING btree (tenant_id, provider, model_name, enabled) WHERE (del_flag = '0'::bpchar);
+
+
+--
+-- Name: idx_dcs_ai_model_price_source; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_ai_model_price_source ON public.dcs_ai_model_price USING btree (tenant_id, price_source) WHERE (del_flag = '0'::bpchar);
 
 
 --

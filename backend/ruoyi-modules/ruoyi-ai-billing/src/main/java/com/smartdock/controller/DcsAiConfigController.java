@@ -24,7 +24,10 @@ import com.smartdock.domain.vo.DcsAiConfigVo;
 import com.smartdock.domain.vo.DcsAiModelVo;
 import com.smartdock.domain.vo.DcsAiProviderAccessVo;
 import com.smartdock.domain.vo.DcsAiProviderPresetVo;
+import com.smartdock.domain.vo.DcsAiProviderTemplateVo;
 import com.smartdock.domain.vo.DcsAiTestResultVo;
+import com.smartdock.enums.DcsAiApiFormat;
+import com.smartdock.enums.DcsAiProviderTemplates;
 import com.smartdock.mapper.DcsAiModelHealthMapper;
 import com.smartdock.service.IDcsAiConfigService;
 import com.smartdock.service.IDcsAiProviderAccessService;
@@ -43,6 +46,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,6 +105,26 @@ public class DcsAiConfigController extends BaseController {
     @GetMapping("/presets")
     public R<List<DcsAiProviderPresetVo>> presets() {
         return R.ok(aiConfigService.presets());
+    }
+
+    /**
+     * Q5-A（2026-10-23 拍板）：20 家厂商模板库——选厂商自动预填地址/格式/模型清单。
+     */
+    @SaCheckPermission(value = {"dcs:ai:list", "dcs:ai-config:query"}, mode = SaMode.OR)
+    @GetMapping("/templates")
+    public R<List<DcsAiProviderTemplateVo>> templates() {
+        return R.ok(DcsAiProviderTemplates.list());
+    }
+
+    /**
+     * Q5-A：三种接口格式（value/label/path），前端下拉与请求体预览共用一份口径。
+     */
+    @SaCheckPermission(value = {"dcs:ai:list", "dcs:ai-config:query"}, mode = SaMode.OR)
+    @GetMapping("/api-formats")
+    public R<List<Map<String, String>>> apiFormats() {
+        return R.ok(Arrays.stream(DcsAiApiFormat.values())
+            .map(f -> Map.of("value", f.name(), "label", f.getLabel(), "path", f.getPath()))
+            .toList());
     }
 
     /**

@@ -41,6 +41,9 @@ public class DcsAiConfigBo extends BaseEntity {
     @NotBlank(message = "接口地址不能为空", groups = {AddGroup.class, EditGroup.class})
     private String baseUrl;
 
+    /** Q5-A：接口格式（三选一，空=Chat Completions） */
+    private String apiFormat;
+
     /** API Key(批B 多模型改造:是否必填由服务端按「该厂商是否已有接入行」判定——同厂加模型免填,首次配置必填;真钥匙保存时路由到接入层) */
     private String apiKey;
 

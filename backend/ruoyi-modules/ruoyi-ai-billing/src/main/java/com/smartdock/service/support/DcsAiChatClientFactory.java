@@ -91,6 +91,14 @@ public class DcsAiChatClientFactory {
      */
     public String call(DcsAiConfig config, String promptText, boolean forceJson, String caller,
                        CallOverrides overrides) {
+        // Q5-A：对话主链只有 Chat Completions 一种协议；别的格式只支持连通测试/请求预览，
+        // 这里明确拒绝而不是把 Anthropic/Responses 请求体错拼成 chat/completions。
+        if (com.smartdock.enums.DcsAiApiFormat.of(config.getApiFormat())
+            != com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS) {
+            throw new ServiceException("当前接口格式为 "
+                + com.smartdock.enums.DcsAiApiFormat.of(config.getApiFormat()).getLabel()
+                + "，对话主链仅支持 Chat Completions；请改用兼容端点，或仅用该格式做连通测试");
+        }
         // 钱包余额预检: 管理探测类调用跳过(不应被钱包阻塞)
         if (!isWalletExempt(caller)) {
             String serviceCode = mapCallerToServiceCode(caller);

@@ -442,18 +442,20 @@ export function getPendingHitl(threadId: string) {
 }
 
 /** 批7 Q5/Q12-④：用户侧模型自选视图（dcs:assistant:use 普通用户权限）
- *  开关关时 options 空（防探测）；开时=本租户可用 CHAT 行（★排最前+单价，key 全清空不下发——
- *  批8-3 口径，管理端 /options 才有掩码） */
+ *  Q3-A（2026-10-23）：options 与「允许用户自选」开关解耦，恒下发可编排清单；
+ *  allowUserSwitch 只决定选择器是否可交互。key 全清空不下发（批8-3 口径）。 */
 export interface AssistantModelChoice {
   allowUserSwitch: string;
   assistantDefaultConfigId: number | string | null;
-  /** 批B step5 P1-1：默认模型 context_window（自选关时 options 空仍下发，环分母不悬空；
-   *  后端 Map.of 不收 null，-1=未知哨兵，<=0 视作 null） */
+  /** 批B step5 P1-1：默认模型 context_window（环分母不悬空；-1=未知哨兵，<=0 视作 null） */
   defaultContextWindow?: number;
-  /** G2 问题②：默认模型名（自选关时 options 恒空仍下发——只读徽标展示用，空串=未配置） */
+  /** G2 问题②：默认模型名（只读徽标展示用，空串=未配置） */
   defaultModelName?: string;
-  /** 默认行真不可用标记（批B 回修语义：默认行被裁出自选白名单仍可调用，非告警态） */
+  /** 默认行真不可用标记（默认行被裁出自选白名单仍可调用，非告警态） */
   defaultSelectable?: boolean;
+  /** Q3-A：上次成功调用过的模型（默认缺失/关闭时沿用；空串/null=从未用过） */
+  lastUsedConfigId?: number | string | null;
+  lastUsedModelName?: string;
   options: import('@/api/dcs/ai/types').DcsAiConfigVO[];
 }
 

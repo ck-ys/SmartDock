@@ -51,7 +51,8 @@ public enum DcsAiProvider {
 
     public static List<DcsAiProviderPresetVo> presets() {
         return Arrays.stream(values())
-            .map(p -> new DcsAiProviderPresetVo(p.name(), p.getLabel(), p.getBaseUrl(), p.getModelName()))
+            .map(p -> new DcsAiProviderPresetVo(p.name(), p.getLabel(), p.getBaseUrl(), p.getModelName(),
+                DcsAiApiFormat.CHAT_COMPLETIONS.name(), null))
             .toList();
     }
 

@@ -36,6 +36,9 @@ public class DcsAiProviderAccessBo extends BaseEntity {
     @NotBlank(message = "接口地址不能为空", groups = {EditGroup.class})
     private String baseUrl;
 
+    /** Q5-A：接口格式（三选一，空=Chat Completions） */
+    private String apiFormat;
+
     /** API Key（编辑留空/****=沿用原密钥；新建必填由服务端校验——首个厂商接入必须给钥匙） */
     private String apiKey;
 

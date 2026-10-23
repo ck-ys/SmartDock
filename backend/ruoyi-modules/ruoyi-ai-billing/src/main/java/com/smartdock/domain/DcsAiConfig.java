@@ -43,6 +43,9 @@ public class DcsAiConfig extends BaseEntity {
     /** OpenAI-compatible API base URL */
     private String baseUrl;
 
+    /** Q5-A：接口格式（CHAT_COMPLETIONS/ANTHROPIC_MESSAGES/RESPONSES，空=兼容存量按 Chat Completions） */
+    private String apiFormat;
+
     /** API Key, 由 MyBatis 加密插件落库加密(显式 AES + 专用密钥, 不依赖全局默认算法) */
     @EncryptField(algorithm = AlgorithmType.AES, password = "DcsAiCfgEncKey16")
     private String apiKey;

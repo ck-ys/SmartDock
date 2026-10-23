@@ -106,4 +106,25 @@ public class DcsAiModelPriceController extends BaseController {
     public R<Void> remove(@NotEmpty @PathVariable Long[] priceIds) {
         return toAjax(priceService.deleteByIds(List.of(priceIds)));
     }
+
+    /**
+     * Q6-A（2026-10-23 拍板）：从 models.dev 同步价格。
+     * 人工价（manual_override='1'）跳过，不被覆盖；返回 inserted/updated/skipped 计数。
+     */
+    @SaCheckPermission("dcs:ai:edit")
+    @Log(title = "DCS AI模型价格同步", businessType = BusinessType.UPDATE)
+    @PostMapping("/sync-models-dev")
+    public R<java.util.Map<String, Object>> syncModelsDev() {
+        return R.ok(priceService.syncFromModelsDev(org.dromara.common.satoken.utils.LoginHelper.getTenantId()));
+    }
+
+    /**
+     * Q6-A：JSON 幂等导入价格（{"prices":[...]}），可重复执行。
+     */
+    @SaCheckPermission("dcs:ai:edit")
+    @Log(title = "DCS AI模型价格导入", businessType = BusinessType.IMPORT)
+    @PostMapping("/import")
+    public R<java.util.Map<String, Object>> importJson(@RequestBody java.util.Map<String, Object> payload) {
+        return R.ok(priceService.importJson(org.dromara.common.satoken.utils.LoginHelper.getTenantId(), payload));
+    }
 }

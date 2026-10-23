@@ -122,6 +122,18 @@ public class AssistantModelFactory {
                     tenantId, settingConfigId, e.getMessage());
             }
         }
+        // Q3-A（2026-10-23 拍板）：助手默认槽未设 → 沿用租户最近一次成功调用的行，
+        // 与 Composer 顶部「上次·X」同源（前端 effectiveRow 顺序=自选 > 助手默认 > 上次 > ★）。
+        // 审查 P1-2：此前该值只喂 model-choice 显示、路由仍走 ★，出现「显示上次、实际调默认」两本账。
+        Long lastUsed = aiConfigService.latestUsedConfigId(tenantId);
+        if (lastUsed != null) {
+            try {
+                return aiConfigService.resolveConfigById(tenantId, lastUsed);
+            } catch (org.dromara.common.core.exception.ServiceException e) {
+                log.warn("[ModelFactory] 上次使用行已失效, 回退接口默认 tenant={} configId={}: {}",
+                    tenantId, lastUsed, e.getMessage());
+            }
+        }
         try {
             return aiConfigService.resolveEnabledConfig(tenantId, "CHAT");
         } catch (org.dromara.common.core.exception.ServiceException e) {
@@ -235,6 +247,15 @@ public class AssistantModelFactory {
      *                 利于服务端路由与 prompt 缓存；其它厂商忽略该参数）
      */
     public Model buildModel(DcsAiConfig cfg, String threadId) {
+        // Q5 防线：Anthropic/Responses 格式尚未接入对话主链，用明确人话拒绝——
+        // 否则 OpenAI 客户端会把请求发到 Anthropic 地址, 用户只看到厂商 404
+        if (cfg.getApiFormat() != null
+            && !"CHAT_COMPLETIONS".equalsIgnoreCase(cfg.getApiFormat())) {
+            throw AiNotConfiguredException.of(
+                "模型配置 " + cfg.getProvider() + "/" + cfg.getModelName()
+                    + " 使用 " + cfg.getApiFormat() + " 格式，仅支持连通测试；"
+                    + "对话请改用 Chat Completions 兼容端点");
+        }
         GenerateOptions.Builder options = GenerateOptions.builder();
         if (cfg.getTemperature() != null) {
             options.temperature(cfg.getTemperature());

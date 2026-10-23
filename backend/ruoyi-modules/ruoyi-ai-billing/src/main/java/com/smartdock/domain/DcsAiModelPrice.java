@@ -81,6 +81,15 @@ public class DcsAiModelPrice extends BaseEntity {
     /** 来源更新时间 */
     private Date sourceUpdatedAt;
 
+    /** Q6-A：来源类型 MANUAL / MODELS_DEV / IMPORT */
+    private String priceSource;
+
+    /** Q6-A：1=人工价，models.dev 同步不覆盖 */
+    private String manualOverride;
+
+    /** Q6-A：最近同步时间 */
+    private Date lastSyncedAt;
+
     /** 删除标志 */
     @TableLogic
     private String delFlag;

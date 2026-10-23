@@ -19,6 +19,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    version: 'v1.10.0',
+    date: '2026-10-23',
+    title: '钥匙与模型：三种接口格式、20 家厂商模板、价格来源看得见',
+    items: [
+      '新增模型时可以从 20 家厂商模板一键带出接口地址、格式和推荐模型名；接口格式支持 Chat Completions / Anthropic Messages / Responses 三种，表单下方直接显示最终会请求的地址，非对话格式会标明「仅供连通测试」。',
+      '价格目录新增「从 models.dev 同步」和「JSON 导入」，每行标出价格来源（手工 / 同步 / 导入 / 已锁定），同步不会覆盖手工价；「价格来源」列移到模型旁边，窄屏也不用横向滚动才能看到。',
+      '余额与额度查询扩到 7 家厂商（Kimi / MiniMax 的订阅额度按「剩余百分比」显示）；手动「测试」与每日巡检写进同一张表，测完徽标立刻刷新；默认模型不可用时会自动沿用上次成功使用的模型。',
+    ],
+  },
+  {
     version: 'v1.9.7',
     date: '2026-10-23',
     title: '细节修缮：卡片样式与说明文案对齐内部口径',

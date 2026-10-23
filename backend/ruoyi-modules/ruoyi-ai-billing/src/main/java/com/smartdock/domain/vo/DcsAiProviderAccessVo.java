@@ -35,6 +35,9 @@ public class DcsAiProviderAccessVo implements Serializable {
     /** OpenAI 兼容接口地址 */
     private String baseUrl;
 
+    /** Q5-A：接口格式（三选一） */
+    private String apiFormat;
+
     /** API Key 掩码串（已配置状态展示） */
     private String apiKeyMask;
 

@@ -6,6 +6,30 @@ export type DcsAiProvider = 'OPENAI' | 'DEEPSEEK' | 'QWEN' | 'ZHIPU' | 'KIMI' | 
 /** 配置用途: CHAT=AI 调用(诊断/字段/评分/规则), EMBEDDING=向量化(Phase 4 相似检索) */
 export type DcsAiUseType = 'CHAT' | 'EMBEDDING';
 
+/** 接口格式(与后端 DcsAiApiFormat 同值): CHAT_COMPLETIONS=/chat/completions,
+ *  ANTHROPIC_MESSAGES=/v1/messages, RESPONSES=/responses */
+export type DcsAiApiFormat = 'CHAT_COMPLETIONS' | 'ANTHROPIC_MESSAGES' | 'RESPONSES' | string;
+
+/** 接口格式字典行(GET /dcs/ai-config/api-formats) */
+export interface DcsAiApiFormatVO {
+  value: DcsAiApiFormat;
+  label: string;
+  path: string;
+}
+
+/** 厂商模板行(GET /dcs/ai-config/templates): 选中即带出地址/格式/候选模型/控制台入口 */
+export interface DcsAiProviderTemplateVO {
+  templateId: string;
+  label: string;
+  provider: DcsAiProvider;
+  apiFormat: DcsAiApiFormat;
+  baseUrl: string;
+  defaultModel?: string;
+  consoleUrl?: string;
+  models?: string[];
+  note?: string;
+}
+
 export interface DcsAiConfigVO extends BaseEntity {
   configId: number | string;
   tenantId: number | string;
@@ -16,6 +40,8 @@ export interface DcsAiConfigVO extends BaseEntity {
   baseUrl: string;
   apiKey?: string;
   apiKeyMask?: string;
+  /** 接口格式(Q5)：默认 CHAT_COMPLETIONS，非该格式仅支持连通测试不进对话主链 */
+  apiFormat?: DcsAiApiFormat;
   /** 批B 厂商接入标记：true=钥匙由接入层统一提供（列表接入✓/表单免填 Key 用） */
   accessConfigured?: boolean;
   modelName: string;
@@ -54,6 +80,8 @@ export interface DcsAiConfigForm {
   baseUrl?: string;
   apiKey?: string;
   apiKeyMask?: string;
+  /** 接口格式(Q5) */
+  apiFormat?: DcsAiApiFormat;
   modelName?: string;
   contextWindow?: number;
   /** 单次回答最大输出 tokens（批C C1） */
@@ -87,6 +115,10 @@ export interface DcsAiProviderPresetVO {
   providerName: string;
   baseUrl: string;
   modelName: string;
+  /** 接口格式(Q5) */
+  apiFormat?: DcsAiApiFormat;
+  /** 厂商控制台/密钥页入口(Q5) */
+  consoleUrl?: string;
 }
 
 /** 批B 厂商接入(钥匙单一真源): 每租户每厂商一行, 一处改全厂生效 */
@@ -98,6 +130,8 @@ export interface DcsAiProviderAccessVO {
   baseUrl: string;
   apiKeyMask?: string;
   consoleUrl?: string;
+  /** 接口格式(Q5)：钥匙按接入行配置，模型行可覆盖 */
+  apiFormat?: DcsAiApiFormat;
   remark?: string;
   /** 本次钥匙变更已生效的模型行数(仅保存接口回填) */
   affectedModelCount?: number;
@@ -122,6 +156,8 @@ export interface DcsAiProviderAccessForm {
   baseUrl: string;
   /** 留空/****=沿用原密钥 */
   apiKey?: string;
+  /** 接口格式(Q5)，留空=CHAT_COMPLETIONS */
+  apiFormat?: DcsAiApiFormat;
   consoleUrl?: string;
   remark?: string;
   /** Q8 钥匙池：标签与启停（编辑时传） */
@@ -141,6 +177,8 @@ export interface DcsAiProbeForm {
   provider?: DcsAiProvider;
   baseUrl?: string;
   apiKey?: string;
+  /** 接口格式(Q5)：非 Chat Completions 走 1-token 连通性探测 */
+  apiFormat?: DcsAiApiFormat;
   /** 批B: 钥匙留空时按 (tenantId,provider) 从厂商接入行补钥 */
   tenantId?: string;
   modelName?: string;
@@ -229,6 +267,12 @@ export interface DcsAiModelPriceVO extends BaseEntity {
   sourceUrl?: string;
   enabled?: '0' | '1';
   remark?: string;
+  /** 价格来源(Q6)：MODELS_DEV=从 models.dev 同步，IMPORT=JSON 导入，MANUAL=手工录入 */
+  priceSource?: 'MANUAL' | 'MODELS_DEV' | 'IMPORT' | string;
+  /** 手工覆盖标记：'1' 时同步任务不覆盖该行 */
+  manualOverride?: '0' | '1' | string;
+  /** 最近一次同步时间(MODELS_DEV 来源行) */
+  lastSyncedAt?: string;
 }
 
 export interface DcsAiModelPriceForm {
@@ -242,5 +286,7 @@ export interface DcsAiModelPriceForm {
   outputPricePerMillion?: number;
   sourceUrl?: string;
   enabled?: '0' | '1';
+  /** '1'=手工覆盖，同步不覆盖（手工新增/编辑默认置 1） */
+  manualOverride?: '0' | '1' | string;
   remark?: string;
 }

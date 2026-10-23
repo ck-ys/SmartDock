@@ -1523,18 +1523,27 @@ function pickThink(i: number) {
 const modelChoice = ref<AssistantModelChoice | null>(null);
 const modelPopOpen = ref(false);
 const choiceOn = computed(() => modelChoice.value?.allowUserSwitch === '1' && (modelChoice.value?.options?.length ?? 0) > 0);
-/** G2 问题②：自选关（或自选开但白名单圈光无选项——三审回修 P2-⑥ 双空档）+
- *  后端下发默认模型名 → 只读徽标（防探测口径下 options 空，名字走独立字段） */
-const defaultBadgeOn = computed(() => !choiceOn.value && !!modelChoice.value?.defaultModelName);
-const defaultBadgeLabel = computed(() => modelChoice.value?.defaultModelName ?? '');
-/** 三审回修（dspro P2-④）：title 三态——默认行不可用 / 无设置行（平台默认兜底）/
- *  管理员真设置过，各自成话，不再一律归因「管理员设置」误导排障 */
+/** G2 问题② + Q3-A：自选关时只读徽标；默认缺失但用过模型 → 显示「上次使用」。 */
+const lastUsedConfigId = computed(() => {
+  const v = modelChoice.value?.lastUsedConfigId;
+  return v == null || v === '' ? null : String(v);
+});
+const lastUsedModelName = computed(() => modelChoice.value?.lastUsedModelName ?? '');
+const defaultBadgeOn = computed(
+  () => !choiceOn.value && !!(modelChoice.value?.defaultModelName || lastUsedModelName.value)
+);
+const defaultBadgeLabel = computed(() => modelChoice.value?.defaultModelName || lastUsedModelName.value || '');
+/** 三审回修（dspro P2-④）+ Q3-A：title 四态——默认行不可用 / 未设置默认沿用上次 /
+ *  无设置行（平台默认兜底）/ 管理员真设置过，各自成话，不再一律归因「管理员设置」误导排障 */
 const defaultBadgeTitle = computed(() => {
   const name = defaultBadgeLabel.value;
   if (modelChoice.value?.defaultSelectable === false) {
     return `管理员设置的默认模型当前不可用，实际使用 ${name}，请联系管理员处理`;
   }
   if (!modelChoice.value?.assistantDefaultConfigId) {
+    if (lastUsedModelName.value) {
+      return `未设置默认模型，当前沿用上次使用的模型（${name}）；首次使用请先选择一个模型`;
+    }
     return `当前跟随平台默认模型（${name}），如需更换请联系管理员设置默认模型`;
   }
   return `当前使用管理员设置的默认模型（${name}），更换请联系管理员`;
@@ -1626,7 +1635,31 @@ const effectiveRow = computed(() => {
     }
   }
   const defId = modelChoice.value?.assistantDefaultConfigId;
-  return opts.find((o) => String(o.configId) === String(defId ?? '')) ?? opts[0];
+  const defHit = opts.find((o) => String(o.configId) === String(defId ?? ''));
+  if (defHit) {
+    return defHit;
+  }
+  // Q3-A：默认模型缺失/被关 → 沿用上次成功使用的模型（从未用过才回退首行）
+  const last = lastUsedConfigId.value;
+  if (last) {
+    const used = opts.find((o) => String(o.configId) === last);
+    if (used) {
+      return used;
+    }
+  }
+  return opts[0];
+});
+/** Q3-A：当前生效行是否来自「上次使用」兜底（标签与提示区分默认/上次） */
+const effectiveIsLastUsed = computed(() => {
+  if (modelPin.value || !modelOptions.value.length) {
+    return false;
+  }
+  const defId = modelChoice.value?.assistantDefaultConfigId;
+  if (defId != null && modelOptions.value.some((o) => String(o.configId) === String(defId))) {
+    return false;
+  }
+  const last = lastUsedConfigId.value;
+  return !!last && modelOptions.value.some((o) => String(o.configId) === last);
 });
 /** 业务批5 Q3-A ③：默认行诚实化——管理员默认指向的行真的不可用（没配人民币价格被 CNY 闸
  *  滤掉/被停用）时明示。回修（dspro P1-1）：判定改读后端下发的 defaultSelectable（按未过滤
@@ -1676,6 +1709,8 @@ async function refreshChoice() {
       // G2 问题②：默认模型名（自选关时徽标展示用；旧后端无此字段=不显示徽标，向后兼容）
       defaultModelName: typeof d?.defaultModelName === 'string' && d.defaultModelName ? d.defaultModelName : undefined,
       defaultSelectable: d?.defaultSelectable,
+      lastUsedConfigId: d?.lastUsedConfigId ?? null,
+      lastUsedModelName: typeof d?.lastUsedModelName === 'string' && d.lastUsedModelName ? d.lastUsedModelName : undefined,
       options: Array.isArray(d?.options) ? d.options : []
     };
     // P2 修复（2026-10-09 Q7）：管理员关掉「允许自选」→ 本会话 pin 即刻清除——
@@ -1731,7 +1766,10 @@ const modelBtnLabel = computed(() => {
   if (defaultMissing.value) {
     return '默认模型不可用';
   }
-  return effectiveRow.value ? `默认·${effectiveRow.value.modelName}` : '默认模型';
+  if (effectiveIsLastUsed.value && effectiveRow.value) {
+    return `上次·${effectiveRow.value.modelName}`;
+  }
+  return effectiveRow.value ? `默认·${effectiveRow.value.modelName}` : '请先选一个模型';
 });
 const defaultModelLabel = computed(() => {
   // 三审回修（三席共识死兜底）：优先按默认 ID 在 options 里命中真名——旧实现恒走

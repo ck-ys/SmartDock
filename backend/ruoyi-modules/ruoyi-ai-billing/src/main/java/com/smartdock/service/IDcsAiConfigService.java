@@ -162,4 +162,13 @@ public interface IDcsAiConfigService {
      * @return 每个配置的检测结果
      */
     List<DcsAiTestResultVo> batchHealthCheck(String tenantId, List<Long> configIds);
+
+    /**
+     * Q3-A（2026-10-23 拍板）：租户最近一次成功调用过的配置 ID。
+     * 默认模型缺失/被关时，用户侧据此沿用上次选择；从未用过返回 null。
+     *
+     * @param tenantId 租户ID(null=当前租户)
+     * @return 最近使用的 configId；无记录返回 null
+     */
+    Long latestUsedConfigId(String tenantId);
 }

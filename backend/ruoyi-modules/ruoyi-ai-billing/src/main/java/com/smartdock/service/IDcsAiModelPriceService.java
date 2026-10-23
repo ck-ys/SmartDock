@@ -43,4 +43,15 @@ public interface IDcsAiModelPriceService {
      * 直接更新实体(绕过 BO 转换, 供 upsert API 使用)。
      */
     void directUpdate(DcsAiModelPrice entity);
+
+    /**
+     * Q6-A（2026-10-23 拍板）：从 models.dev 同步价格。
+     * 只覆盖非人工价（manual_override='0'）；返回 inserted/updated/skipped/total。
+     */
+    java.util.Map<String, Object> syncFromModelsDev(String tenantId);
+
+    /**
+     * Q6-A：JSON 幂等导入价格（{\"prices\":[...]}）。
+     */
+    java.util.Map<String, Object> importJson(String tenantId, java.util.Map<String, Object> payload);
 }

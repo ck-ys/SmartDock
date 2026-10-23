@@ -55,6 +55,12 @@ public class DcsAiModelPriceVo implements Serializable {
     private String pricingSchemaJson;
     /** 价格来源的更新时间 */
     private Date sourceUpdatedAt;
+    /** Q6-A：来源类型 MANUAL / MODELS_DEV / IMPORT */
+    private String priceSource;
+    /** Q6-A：1=人工价（同步不覆盖） */
+    private String manualOverride;
+    /** Q6-A：最近同步时间 */
+    private Date lastSyncedAt;
     private Date createTime;
     private Date updateTime;
 }

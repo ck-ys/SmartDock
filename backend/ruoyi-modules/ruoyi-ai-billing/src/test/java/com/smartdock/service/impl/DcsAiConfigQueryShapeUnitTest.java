@@ -60,11 +60,16 @@ class DcsAiConfigQueryShapeUnitTest {
     private com.smartdock.service.support.ProviderKeyPool keyPool;
     @Mock
     private com.smartdock.mapper.AssistantBackendDefaultMapper backendDefaultMapper;
+    @Mock
+    private com.smartdock.mapper.DcsAiModelHealthMapper healthMapper;
+    @Mock
+    private com.smartdock.mapper.DcsAiUsageMapper usageMapper;
 
     private DcsAiConfigServiceImpl service() {
         // Q8：ServiceImpl 新增钥匙池依赖（hydrate 轮询取钥）——单测注入 mock
         // 批1015c Q1：新增后台默认槽只读 mapper（resolveBackendConfig 用；形状锁用例不触及，注入 mock 防构造缺失）
-        return new DcsAiConfigServiceImpl(aiConfigMapper, accessMapper, chatClientFactory, providerProbeClient, modelPriceService, keyPool, backendDefaultMapper);
+        // N1 Q2/Q3：新增巡检表与用量台账依赖（形状锁用例不触及，注入 mock 防构造缺失）
+        return new DcsAiConfigServiceImpl(aiConfigMapper, accessMapper, chatClientFactory, providerProbeClient, modelPriceService, keyPool, backendDefaultMapper, healthMapper, usageMapper);
     }
 
     @BeforeAll

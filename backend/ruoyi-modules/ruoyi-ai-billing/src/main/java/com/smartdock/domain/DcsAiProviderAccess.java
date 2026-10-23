@@ -43,6 +43,9 @@ public class DcsAiProviderAccess extends BaseEntity {
     /** OpenAI 兼容接口地址（整厂一份，换地址一处生效） */
     private String baseUrl;
 
+    /** Q5-A：接口格式（空=兼容存量按 Chat Completions） */
+    private String apiFormat;
+
     /** API Key，加密链与 dcs_ai_config.api_key 同源（显式 AES + 同一专用密钥，存量密文可直接迁移） */
     @EncryptField(algorithm = AlgorithmType.AES, password = "DcsAiCfgEncKey16")
     private String apiKey;

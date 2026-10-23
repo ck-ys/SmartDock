@@ -13,6 +13,7 @@ import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
 import com.smartdock.domain.DcsAiConfig;
+import com.smartdock.domain.DcsAiModelHealth;
 import com.smartdock.domain.DcsAiProviderAccess;
 import com.smartdock.domain.bo.DcsAiConfigBo;
 import org.springframework.dao.DuplicateKeyException;
@@ -25,7 +26,9 @@ import com.smartdock.domain.vo.DcsAiTestResultVo;
 import com.smartdock.enums.DcsAiProvider;
 import com.smartdock.mapper.AssistantBackendDefaultMapper;
 import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.mapper.DcsAiModelHealthMapper;
 import com.smartdock.mapper.DcsAiProviderAccessMapper;
+import com.smartdock.mapper.DcsAiUsageMapper;
 import com.smartdock.service.IDcsAiConfigService;
 import com.smartdock.service.IDcsAiModelPriceService;
 import com.smartdock.domain.DcsAiModelPrice;
@@ -76,6 +79,10 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
 
     /** 后台默认槽只读（dcs_assistant_model_setting 跨模块直查表，批1015c Q1） */
     private final AssistantBackendDefaultMapper backendDefaultMapper;
+    /** 模型巡检表（Q2-A：手动体检与 04:00 定时巡检同源落库） */
+    private final DcsAiModelHealthMapper healthMapper;
+    /** 用量台账（Q3-A：解析「上次使用」的模型，供默认缺失时兜底） */
+    private final DcsAiUsageMapper usageMapper;
 
     /** 分页查询 AI 配置(忽略租户隔离, 列表自动 mask API Key) */
     @Override
@@ -115,6 +122,9 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
                 .eq(DcsAiConfig::getTenantId, tenantId)
                 .eq(DcsAiConfig::getEnabled, ENABLED)
                 .eq(DcsAiConfig::getUseType, useType)
+                // Q5：对话主链只认 Chat Completions；Anthropic/Responses 行仅做连通测试，不进可选项
+                .and(w -> w.isNull(DcsAiConfig::getApiFormat)
+                    .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
                 // 批8-3 回修（glm53 P1-2）：PG 的 ORDER BY col DESC 默认 NULLS FIRST，而普通行
                 // is_default=NULL——orderByDesc 会把★沉底，与「默认行排最前」语义相反；普通行不进
                 // 索引取 NULL，须显式 NULLS LAST（常量串无注入面）
@@ -179,7 +189,20 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long insertByBo(DcsAiConfigBo bo) {
+        // 新增未选格式时继承该厂商接入行的格式（钥匙抽屉一处设定，同厂新模型默认跟随）
+        boolean apiFormatAbsent = StrUtil.isBlank(bo.getApiFormat());
         normalize(bo, true);
+        if (apiFormatAbsent) {
+            DcsAiProviderAccess access = TenantHelper.ignore(() -> accessMapper.selectOne(
+                new LambdaQueryWrapper<DcsAiProviderAccess>()
+                    .eq(DcsAiProviderAccess::getTenantId, bo.getTenantId())
+                    .eq(DcsAiProviderAccess::getProvider, bo.getProvider())
+                    .orderByAsc(DcsAiProviderAccess::getId)
+                    .last("limit 1")));
+            if (access != null && com.smartdock.enums.DcsAiApiFormat.supported(access.getApiFormat())) {
+                bo.setApiFormat(com.smartdock.enums.DcsAiApiFormat.of(access.getApiFormat()).name());
+            }
+        }
         // 批B 三审 P0：新增入口补租户守卫（同 updateByBo 口径），防非超管携带他人 tenantId 建行
         ensureCanAccessAiConfig(LoginHelper.getTenantId(), bo.getTenantId(), LoginHelper.isSuperAdmin());
         TenantHelper.ignore(() -> {
@@ -409,14 +432,23 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         // F9: 校验当前用户能否访问该 config(testConnection 会消耗他人 quota)
         ensureCanAccessAiConfig(LoginHelper.getTenantId(), config.getTenantId(), LoginHelper.isSuperAdmin());
         hydrate(config);
+        DcsAiTestResultVo result;
         try {
-            long begin = System.nanoTime();
-            String content = chatClientFactory.call(config, "请只回复 JSON: {\"ok\":true}", true, "TEST_CONNECTION");
-            long latencyMs = (System.nanoTime() - begin) / 1_000_000;
-            return new DcsAiTestResultVo(true, StrUtil.blankToDefault(content, "连接成功"), latencyMs);
+            if (isNonChatFormat(config)) {
+                result = probeByFormat(config);
+            } else {
+                long begin = System.nanoTime();
+                String content = chatClientFactory.call(config, "请只回复 JSON: {\"ok\":true}", true, "TEST_CONNECTION");
+                long latencyMs = (System.nanoTime() - begin) / 1_000_000;
+                result = new DcsAiTestResultVo(true, StrUtil.blankToDefault(content, "连接成功"), latencyMs);
+            }
         } catch (Exception e) {
-            return new DcsAiTestResultVo(false, StrUtil.blankToDefault(e.getMessage(), "连接失败"));
+            result = new DcsAiTestResultVo(false, StrUtil.blankToDefault(e.getMessage(), "连接失败"));
         }
+        result.setConfigId(configId);
+        // Q2-A：单条「测试」与批量体检一样落巡检表（原来只有批量落，单测后徽标不翻新）
+        persistHealthRow(config, result);
+        return result;
     }
 
     /**
@@ -432,6 +464,9 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         }
         hydrate(config);
         try {
+            if (isNonChatFormat(config)) {
+                return probeByFormat(config);
+            }
             long begin = System.nanoTime();
             String content = chatClientFactory.call(config, "请只回复 JSON: {\"ok\":true}", true, "PATROL");
             long latencyMs = (System.nanoTime() - begin) / 1_000_000;
@@ -439,6 +474,23 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         } catch (Exception e) {
             return new DcsAiTestResultVo(false, StrUtil.blankToDefault(e.getMessage(), "连接失败"));
         }
+    }
+
+    /** Q5-A：非 Chat Completions 格式走专用 1-token 探测（对话主链暂不接入这两种协议）。 */
+    private boolean isNonChatFormat(DcsAiConfig config) {
+        return com.smartdock.enums.DcsAiApiFormat.of(config.getApiFormat())
+            != com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS;
+    }
+
+    private DcsAiTestResultVo probeByFormat(DcsAiConfig config) {
+        DcsAiProbeBo bo = new DcsAiProbeBo();
+        bo.setTenantId(config.getTenantId());
+        bo.setProvider(config.getProvider());
+        bo.setBaseUrl(config.getBaseUrl());
+        bo.setApiKey(config.getApiKey());
+        bo.setModelName(config.getModelName());
+        bo.setTimeoutSeconds(config.getTimeoutSeconds());
+        return providerProbeClient.probeFormat(bo, config.getApiFormat());
     }
 
     /** 用临时输入探测可用模型清单(SSRF 白名单校验; 批B: 钥匙留空可由接入行补齐) */
@@ -615,6 +667,9 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
                 .eq(DcsAiConfig::getIsDefault, "1")
                 // useType null=兼容旧 no-arg 语义（任意用途取一条）
                 .eq(useType != null, DcsAiConfig::getUseType, useType)
+                // Q5：非 Chat Completions 行只做连通测试，不能当对话默认
+                .and(w -> w.isNull(DcsAiConfig::getApiFormat)
+                    .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
                 .last("limit 1")));
         if (config == null) {
             // ② 星空缺回退：任意可用行按最近动过排序（Q11 优先级链的接口默认兜底段）
@@ -623,6 +678,8 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
                     .eq(DcsAiConfig::getTenantId, tenantId)
                     .eq(DcsAiConfig::getEnabled, ENABLED)
                     .eq(useType != null, DcsAiConfig::getUseType, useType)
+                    .and(w -> w.isNull(DcsAiConfig::getApiFormat)
+                        .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
                     .orderByDesc(DcsAiConfig::getUpdateTime)
                     .orderByDesc(DcsAiConfig::getConfigId)
                     .last("limit 1")));
@@ -672,6 +729,8 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
                 .eq(DcsAiConfig::getTenantId, tenantId)
                 .eq(DcsAiConfig::getEnabled, ENABLED)
                 .eq(useType != null, DcsAiConfig::getUseType, useType)
+                .and(w -> w.isNull(DcsAiConfig::getApiFormat)
+                    .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
                 // 倍率是项目自己的档位信号（免费×1/flash×2/旗舰×4~6）：倍率低=又轻又省，
                 // NULL 视同 1 且 PG ASC 默认 NULLS LAST 天然排后；同倍率比按次单价，再比最近动过
                 .orderByAsc(DcsAiConfig::getCreditMultiplier)
@@ -705,6 +764,13 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         // 消费；管理员把默认行 useType 改成 EMBEDDING 后若仍放行，对话会跑嵌入模型且徽标不自洽
         if (!"CHAT".equals(config.getUseType())) {
             throw new ServiceException("指定的 AI 模型配置不是对话模型");
+        }
+        // Q5：Anthropic/Responses 格式尚未接入对话主链，给明确人话而不是 404
+        if (com.smartdock.enums.DcsAiApiFormat.of(config.getApiFormat())
+            != com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS) {
+            throw new ServiceException("该配置使用「"
+                + com.smartdock.enums.DcsAiApiFormat.of(config.getApiFormat()).getLabel()
+                + "」格式，仅支持连通测试；对话请改用 Chat Completions 兼容端点");
         }
         enforceCnyGate(config);
         hydrate(config);
@@ -758,6 +824,13 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
                 if (!ENABLED.equals(target.getEnabled())) {
                     throw new ServiceException("该配置当前已停用，请先恢复可用再设为默认");
                 }
+                // Q5：非 Chat 格式只用于连通测试，设为默认会让助手全程 404
+                if (com.smartdock.enums.DcsAiApiFormat.of(target.getApiFormat())
+                    != com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS) {
+                    throw new ServiceException("该配置使用「"
+                        + com.smartdock.enums.DcsAiApiFormat.of(target.getApiFormat()).getLabel()
+                        + "」格式，仅支持连通测试，不能设为默认模型");
+                }
                 // 1. 同租户同 use_type 的其他配置全部摘星(按用途分组隔离, CHAT/EMBEDDING 互不影响)
                 enforceUniqueDefault(target.getTenantId(), target.getUseType(), configId);
                 // 2. 目标配置置星
@@ -799,18 +872,111 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         List<DcsAiTestResultVo> results = new java.util.ArrayList<>();
         for (DcsAiConfig c : configs) {
             try {
-                DcsAiTestResultVo r = testConnection(c.getConfigId());
-                r.setConfigId(c.getConfigId());
-                results.add(r);
+                // testConnection 内部已落巡检表（单条/批量同口径），这里只收集结果
+                results.add(testConnection(c.getConfigId()));
             } catch (Exception e) {
                 DcsAiTestResultVo fail = new DcsAiTestResultVo();
                 fail.setConfigId(c.getConfigId());
                 fail.setSuccess(false);
                 fail.setMessage(c.getModelName() + ": " + e.getMessage());
+                persistHealthRow(c, fail);
                 results.add(fail);
             }
         }
         return results;
+    }
+
+    /**
+     * Q2-A（2026-10-23 拍板）：手动体检结果与 04:00 定时巡检写同一张表，
+     * 徽标读库即时翻绿——原来只写页面内存，点完体检徽标仍显示上个周期。
+     * 成功归零连败、失败累加，与 {@code ModelHealthScheduler.nextStreak} 同口径。
+     */
+    private void persistHealthRow(DcsAiConfig config, DcsAiTestResultVo result) {
+        String tenantId = StrUtil.blankToDefault(config.getTenantId(), LoginHelper.getTenantId());
+        if (StrUtil.isBlank(tenantId) || config.getConfigId() == null) {
+            return;
+        }
+        // 巡检落库是探测的副作用，失败只留痕不连带把体检结果打成 500
+        try {
+            boolean ok = Boolean.TRUE.equals(result.getSuccess());
+            DcsAiModelHealth prev = firstHealthRow(tenantId, config.getConfigId());
+            java.util.Date now = new java.util.Date();
+            String detail = StrUtil.maxLength(StrUtil.blankToDefault(result.getMessage(), ok ? "连接成功" : "连接失败"), 500);
+            Integer latency = result.getLatencyMs() == null ? null : result.getLatencyMs().intValue();
+            if (prev == null) {
+                try {
+                    healthMapper.insert(newHealthRow(config, tenantId, ok, latency, detail, healthStreak(ok, null), now));
+                } catch (org.springframework.dao.DuplicateKeyException e) {
+                    // 与 04:00 巡检并发首插：对方已建行 → 改为更新那一行，别让重复键冒成探测失败
+                    DcsAiModelHealth raced = firstHealthRow(tenantId, config.getConfigId());
+                    if (raced == null) {
+                        throw e;
+                    }
+                    updateHealthRow(raced, config, ok, latency, detail, healthStreak(ok, raced.getFailStreak()), now);
+                }
+            } else {
+                updateHealthRow(prev, config, ok, latency, detail, healthStreak(ok, prev.getFailStreak()), now);
+            }
+        } catch (Exception e) {
+            log.warn("[AiConfig] 巡检结果落库失败, 不影响体检结果 configId={}: {}", config.getConfigId(), e.getMessage());
+        }
+    }
+
+    /** 取该配置唯一健康行（并发下可能短暂多行，取 id 最小的一行而不是让 selectOne 抛异常） */
+    private DcsAiModelHealth firstHealthRow(String tenantId, Long configId) {
+        List<DcsAiModelHealth> rows = healthMapper.selectList(new LambdaQueryWrapper<DcsAiModelHealth>()
+            .eq(DcsAiModelHealth::getTenantId, tenantId)
+            .eq(DcsAiModelHealth::getConfigId, configId)
+            .orderByAsc(DcsAiModelHealth::getId)
+            .last("LIMIT 1"));
+        return rows == null || rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private DcsAiModelHealth newHealthRow(DcsAiConfig config, String tenantId, boolean ok,
+                                         Integer latency, String detail, int streak, java.util.Date now) {
+        DcsAiModelHealth row = new DcsAiModelHealth();
+        row.setId(com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());
+        row.setTenantId(tenantId);
+        row.setConfigId(config.getConfigId());
+        row.setProvider(config.getProvider());
+        row.setModelName(config.getModelName());
+        row.setStatus(ok ? "OK" : "FAIL");
+        row.setLatencyMs(latency);
+        row.setDetail(detail);
+        row.setFailStreak(streak);
+        row.setCheckTime(now);
+        row.setCreateTime(now);
+        return row;
+    }
+
+    private void updateHealthRow(DcsAiModelHealth row, DcsAiConfig config, boolean ok,
+                                 Integer latency, String detail, int streak, java.util.Date now) {
+        row.setProvider(config.getProvider());
+        row.setModelName(config.getModelName());
+        row.setStatus(ok ? "OK" : "FAIL");
+        row.setLatencyMs(latency);
+        row.setDetail(detail);
+        row.setFailStreak(streak);
+        row.setCheckTime(now);
+        healthMapper.updateById(row);
+    }
+
+    /** Q2-A 纯函数：探活结果 × 上次连败数 → 新连败数（与 ModelHealthScheduler.nextStreak 同口径） */
+    static int healthStreak(boolean ok, Integer prevStreak) {
+        if (ok) {
+            return 0;
+        }
+        return prevStreak == null ? 1 : prevStreak + 1;
+    }
+
+    /** Q3-A：最近一次成功调用过的模型（默认缺失时用户侧沿用上次选择） */
+    @Override
+    public Long latestUsedConfigId(String tenantId) {
+        String tid = StrUtil.isBlank(tenantId) ? LoginHelper.getTenantId() : tenantId;
+        if (StrUtil.isBlank(tid)) {
+            return null;
+        }
+        return usageMapper.latestUsedConfigId(tid);
     }
 
     /** 构造分页查询条件(按租户/厂商/启用/模型名过滤) */
@@ -828,6 +994,17 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
     private void normalize(DcsAiConfigBo bo, boolean add) {
         if (!DcsAiProvider.supported(bo.getProvider())) {
             throw new ServiceException("暂不支持该模型厂商");
+        }
+        // Q5-A：接口格式三选一，非法值直接拒；新增缺省 Chat Completions，
+        // 编辑未带该字段时保持 null（updateById 忽略 null=部分更新语义，
+        // 防只改 enabled 的部分提交把 Anthropic 配置静默改回默认格式）
+        if (StrUtil.isNotBlank(bo.getApiFormat())) {
+            if (!com.smartdock.enums.DcsAiApiFormat.supported(bo.getApiFormat())) {
+                throw new ServiceException("不支持的接口格式，请选择 Chat Completions / Anthropic Messages / Responses");
+            }
+            bo.setApiFormat(com.smartdock.enums.DcsAiApiFormat.of(bo.getApiFormat()).name());
+        } else if (add) {
+            bo.setApiFormat(com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name());
         }
         bo.setBaseUrl(StrUtil.removeSuffix(StrUtil.trim(bo.getBaseUrl()), "/"));
         bo.setModelName(StrUtil.trim(bo.getModelName()));

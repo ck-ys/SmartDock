@@ -55,7 +55,6 @@ public class AssistantModelSettingController extends BaseController {
     public R<Map<String, Object>> modelChoice() {
         String tenantId = LoginHelper.getTenantId();
         AssistantModelSettingService.SettingView setting = settingService.view(tenantId);
-        boolean allow = "1".equals(setting.allowUserSwitch());
         // 超级 E2E 2026-10-10 修复：选项过 CNY 闸（与工厂裁决同源）——USD/无价行不进
         // 用户选择器，防「选了 deepseek-chat 实际静默跑默认模型」的 pill 与计费不符。
         // 批B step5 P1-1 回修：清单一律拉取——自选关时 options 仍恒空（防探测），
@@ -68,16 +67,19 @@ public class AssistantModelSettingController extends BaseController {
         java.util.Set<Long> scopeIds = settingService.switchScopeIds(tenantId);
         List<DcsAiConfigVo> scoped = scopeIds.isEmpty() ? usable
             : usable.stream().filter(vo -> scopeIds.contains(vo.getConfigId())).toList();
-        List<DcsAiConfigVo> options = List.of();
-        if (allow) {
-            // 批8-3 回修（glm53 P2-3）：普通用户不需要任何 key 材料——连掩码片段（前7+后3）也不下发；
-            // 管理端 /options 保留掩码用于辨识配置行，两侧口径刻意不同
-            options = scoped;
-            options.forEach(vo -> {
-                vo.setApiKey(null);
-                vo.setApiKeyMask(null);
-            });
-        }
+        // Q3-A（2026-10-23 拍板）：候选数据源与「允许用户自选」开关解耦——开关只决定选择器
+        // 是否可交互，不再把清单清空（原实现自选关时 options 恒空，用户侧只剩「请选择模型」）。
+        // 批8-3 P2-3 仍保留：普通用户不需要任何 key 材料，连掩码片段也不下发。
+        List<DcsAiConfigVo> options = scoped;
+        options.forEach(vo -> {
+            vo.setApiKey(null);
+            vo.setApiKeyMask(null);
+        });
+        // Q3-A：上次使用的模型——默认缺失/关闭时的兜底，回话「沿用上次选择」
+        Long lastUsedId = aiConfigService.latestUsedConfigId(tenantId);
+        DcsAiConfigVo lastUsedRow = lastUsedId == null ? null
+            : usable.stream().filter(vo -> lastUsedId.equals(vo.getConfigId())).findFirst().orElse(null);
+        String lastUsedModelName = lastUsedRow == null || lastUsedRow.getModelName() == null ? "" : lastUsedRow.getModelName();
         // 环分母（与前端 effectiveRow 回退序一致：assistantDefaultConfigId 指向行 ?? 清单首行）
         Long defId = setting.assistantDefaultConfigId();
         DcsAiConfigVo defRow = defId == null ? null
@@ -99,6 +101,9 @@ public class AssistantModelSettingController extends BaseController {
             // G2 问题②：自选关时 options 恒空（防探测），用户侧只剩纯 id 拿不到名字——
             // 默认行名字一并下发（只读徽标展示用；defRow 已解析零额外查询，非敏感字段）
             "defaultModelName", defRow == null || defRow.getModelName() == null ? "" : defRow.getModelName(),
+            // Q3-A：上次使用（默认缺失/关闭时前端沿用，首次从未用过为空串→前端提示先选一个）
+            "lastUsedConfigId", lastUsedId == null ? "" : lastUsedId,
+            "lastUsedModelName", lastUsedModelName,
             "options", options
         ));
     }

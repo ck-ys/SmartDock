@@ -248,6 +248,9 @@
                       <template v-if="row.accessConfigured">🔑 厂商钥匙</template>
                       <template v-else-if="row.apiKey === '****'">🔑 行内钥匙（存量）</template>
                       <template v-else>未设钥匙</template>
+                      <template v-if="row.apiFormat && row.apiFormat !== 'CHAT_COMPLETIONS'">
+                        · <el-tag size="small" type="warning" effect="plain">{{ apiFormatShort(row.apiFormat) }}</el-tag>
+                      </template>
                       · <span class="vc-updated">更新于 {{ row.updateTime || '-' }}</span>
                     </div>
                   </div>
@@ -317,34 +320,47 @@
       <el-tab-pane label="价格目录" name="prices" lazy>
         <div class="price-toolbar">
           <el-button v-hasPermi="['dcs:ai:add']" type="primary" plain icon="Plus" @click="openPriceDialog()">新增价格</el-button>
+          <el-button v-hasPermi="['dcs:ai:edit']" icon="Download" :loading="priceSyncing" @click="onSyncModelsDev">
+            从 models.dev 同步
+          </el-button>
+          <el-button v-hasPermi="['dcs:ai:edit']" icon="Upload" @click="openImportDialog">JSON 导入</el-button>
           <el-button icon="Refresh" @click="loadPriceList">刷新</el-button>
           <span class="price-toolbar-hint"
-            >按官方输入/缓存/输出 token 单价计费的成本依据；币种非 CNY 的模型会被全系统统一拒用（钱包仅支持人民币）</span
+            >官方价来自 models.dev（同步不覆盖手工行）；币种非 CNY 的模型会被全系统统一拒用（钱包仅支持人民币）</span
           >
         </div>
         <el-table v-loading="priceLoading" :data="priceList" border size="small">
-          <el-table-column label="租户" prop="tenantId" width="105" />
-          <el-table-column label="厂商" prop="provider" width="105">
+          <el-table-column label="租户" prop="tenantId" width="90" />
+          <el-table-column label="厂商" prop="provider" width="100">
             <template #default="{ row }">{{ getProviderName(row.provider) }}</template>
           </el-table-column>
-          <el-table-column label="模型" prop="modelName" min-width="160" show-overflow-tooltip />
-          <el-table-column label="币种" prop="currency" width="70" align="center" />
-          <el-table-column label="输入/1M" width="105" align="right">
+          <el-table-column label="模型" prop="modelName" min-width="150" show-overflow-tooltip />
+          <!-- N1 回修（视觉复核）：来源列前移到模型右边——表格横向超宽时，「这条价是哪来的」
+               是判断能不能被同步覆盖的关键信息，不能藏在滚动条后面 -->
+          <el-table-column label="价格来源" width="120" align="center">
+            <template #default="{ row }">
+              <el-tooltip :content="priceSourceTip(row)" placement="top">
+                <el-tag size="small" effect="plain" :type="priceSourceTagType(row)">{{ priceSourceLabel(row) }}</el-tag>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="币种" prop="currency" width="66" align="center" />
+          <el-table-column label="输入/1M" width="100" align="right">
             <template #default="{ row }">{{ Number(row.inputPricePerMillion || 0).toFixed(6) }}</template>
           </el-table-column>
-          <el-table-column label="缓存输入/1M" width="120" align="right">
+          <el-table-column label="缓存输入/1M" width="112" align="right">
             <template #default="{ row }">{{ Number(row.cachedInputPricePerMillion || 0).toFixed(6) }}</template>
           </el-table-column>
-          <el-table-column label="输出/1M" width="105" align="right">
+          <el-table-column label="输出/1M" width="100" align="right">
             <template #default="{ row }">{{ Number(row.outputPricePerMillion || 0).toFixed(6) }}</template>
           </el-table-column>
-          <el-table-column label="状态" width="80" align="center">
+          <el-table-column label="状态" width="70" align="center">
             <template #default="{ row }">
               <el-tag size="small" :type="row.enabled === '1' ? 'success' : 'info'">{{ row.enabled === '1' ? '启用' : '停用' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="来源" prop="sourceUrl" min-width="160" show-overflow-tooltip />
-          <el-table-column label="操作" width="110" align="center">
+          <el-table-column label="来源" prop="sourceUrl" min-width="130" show-overflow-tooltip />
+          <el-table-column label="操作" width="100" align="center">
             <template #default="{ row }">
               <el-button v-hasPermi="['dcs:ai:edit']" link type="primary" icon="Edit" @click="openPriceDialog(row)" />
               <el-button v-hasPermi="['dcs:ai:remove']" link type="danger" icon="Delete" @click="handleDeletePrice(row)" />
@@ -411,7 +427,11 @@
             <template #default="{ row }">
               <template v-if="row.balanceStatus === 'UNSUPPORTED'"><span class="keys-muted">--</span></template>
               <template v-else-if="row.balanceAmount != null">
-                <span :class="{ 'keys-zero': Number(row.balanceAmount) <= 0 }"
+                <!-- Q6：Kimi/MiniMax 是订阅额度，快照单位是「剩余百分比」而不是金额 -->
+                <span v-if="row.balanceCurrency === '%'" :class="{ 'keys-zero': Number(row.balanceAmount) <= 0 }"
+                  >剩余 {{ Number(row.balanceAmount).toFixed(1) }}%</span
+                >
+                <span v-else :class="{ 'keys-zero': Number(row.balanceAmount) <= 0 }"
                   >{{ row.balanceCurrency || 'CNY' }} {{ Number(row.balanceAmount).toFixed(2) }}</span
                 >
               </template>
@@ -488,6 +508,30 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="接入模板">
+              <!-- Q5(2026-10-23)：20 家模板=官方地址+接口格式+候选模型一次带出；
+                   国内站/国际站、opencode 网关等变体都在这里，选完仍可手改 -->
+              <el-select
+                v-model="selectedTemplateId"
+                filterable
+                clearable
+                placeholder="选模板一键带出地址/格式/模型（可选）"
+                style="width: 100%"
+                @change="applyTemplate"
+              >
+                <el-option v-for="t in filteredTemplates" :key="t.templateId" :label="t.label" :value="t.templateId">
+                  <span class="tpl-opt-row">
+                    <span class="tpl-opt-name">{{ t.label }}</span>
+                    <el-tag size="small" effect="plain" :type="t.apiFormat === 'CHAT_COMPLETIONS' ? 'info' : 'warning'">{{
+                      apiFormatShort(t.apiFormat)
+                    }}</el-tag>
+                  </span>
+                </el-option>
+              </el-select>
+              <div v-if="activeTemplate?.note" class="field-hint">{{ activeTemplate.note }}</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="使用类型" prop="useType">
               <el-radio-group v-model="form.useType">
                 <el-radio value="CHAT">AI 调用</el-radio>
@@ -497,18 +541,36 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="Base URL" prop="baseUrl">
-          <!-- 批1：标准厂商按官方地址自动接入（applyPreset 已随厂商切换预填），仅自定义厂商手填；
-               已有厂商接入时维持只读展示（地址由接入层统一管理） -->
-          <el-input
-            v-if="form.provider === 'CUSTOM' || accessInfo"
-            v-model="form.baseUrl"
-            :disabled="!!accessInfo"
-            placeholder="请输入 OpenAI 兼容接口地址"
-          />
-          <div v-else class="field-hint">{{ form.baseUrl || presetBaseUrl(form.provider) }} · 已按厂商官方地址自动接入，无需手填</div>
-          <div v-if="accessInfo" class="field-hint">接口地址由厂商接入统一管理，如需修改请点「管理钥匙」</div>
-        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="Base URL" prop="baseUrl">
+              <!-- 批1：标准厂商按官方地址自动接入（applyPreset 已随厂商切换预填），仅自定义厂商手填；
+                   已有厂商接入时维持只读展示（地址由接入层统一管理） -->
+              <el-input
+                v-if="form.provider === 'CUSTOM' || accessInfo"
+                v-model="form.baseUrl"
+                :disabled="!!accessInfo"
+                placeholder="请输入 OpenAI 兼容接口地址"
+              />
+              <div v-else class="field-hint">{{ form.baseUrl || presetBaseUrl(form.provider) }} · 已按厂商官方地址自动接入，无需手填</div>
+              <div v-if="accessInfo" class="field-hint">接口地址由厂商接入统一管理，如需修改请点「管理钥匙」</div>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="接口格式" prop="apiFormat">
+              <!-- Q5(2026-10-23)：三种格式与主流客户端一致；非 Chat Completions 只做连通测试 -->
+              <el-select v-model="form.apiFormat" style="width: 100%">
+                <el-option v-for="f in apiFormats" :key="f.value" :label="f.label" :value="f.value" />
+              </el-select>
+              <div class="field-hint">{{ apiFormatHint }}</div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <div v-if="apiPathPreview" class="api-path-preview">
+          <span class="api-path-label">实际请求</span>
+          <code>{{ apiPathPreview }}</code>
+          <el-tag v-if="isNonChatFormat" type="warning" size="small" effect="plain">仅连通测试</el-tag>
+        </div>
         <el-row :gutter="20">
           <el-col :span="12">
             <!-- 批B(多模型改造): 该厂商已有接入 → 钥匙由接入层统一提供, 表单不再出现 Key 输入框 -->
@@ -562,10 +624,12 @@
 
         <el-divider content-position="left" class="section-title">连通探测</el-divider>
         <div class="probe-actions">
-          <el-button icon="List" :loading="probeLoading.models" @click="handleProbeModels">获取模型</el-button>
+          <el-button icon="List" :loading="probeLoading.models" :disabled="isNonChatFormat" @click="handleProbeModels">获取模型</el-button>
           <el-button icon="Wallet" :loading="probeLoading.balance" @click="handleProbeBalance">查询余额</el-button>
-          <el-button icon="Connection" :loading="probeLoading.speed" @click="handleProbeSpeed">测速</el-button>
-          <span class="probe-tip">测速会发起一次极小模型调用</span>
+          <el-button icon="Connection" :loading="probeLoading.speed" :disabled="isNonChatFormat" @click="handleProbeSpeed">测速</el-button>
+          <span class="probe-tip">{{
+            isNonChatFormat ? '当前接口格式仅支持保存后的连通测试（模型列表/测速按 OpenAI 兼容协议实现）' : '测速会发起一次极小模型调用'
+          }}</span>
         </div>
         <el-descriptions v-if="balanceInfo || speedInfo" :column="2" border class="probe-result">
           <el-descriptions-item v-if="balanceInfo" label="余额状态">
@@ -908,8 +972,20 @@
                自动接入（提交时后端同口径兜底补齐），只有「自定义」厂商显示手填框 -->
           <el-input v-if="accessForm.provider === 'CUSTOM'" v-model="accessForm.baseUrl" placeholder="自定义厂商必须填写 OpenAI 兼容接口地址" />
           <div v-else class="field-hint">
-            {{ presetBaseUrl(accessForm.provider) || '选择厂商后按官方地址自动接入' }} ·
+            {{ accessForm.baseUrl || presetBaseUrl(accessForm.provider) || '选择厂商后按官方地址自动接入' }} ·
             已按厂商官方地址自动接入，无需手填；要走中转/代理地址请选「自定义」厂商
+          </div>
+        </el-form-item>
+        <el-form-item label="接口格式" prop="apiFormat">
+          <el-select v-model="accessForm.apiFormat" style="width: 100%">
+            <el-option v-for="f in apiFormats" :key="f.value" :label="f.label" :value="f.value" />
+          </el-select>
+          <div class="field-hint">
+            该厂端点的协议类型；对话主链需 Chat Completions，其它格式仅用于连通测试
+          </div>
+          <div v-if="keyPathPreview" class="api-path-preview api-path-preview--drawer">
+            <span class="api-path-label">实际请求</span>
+            <code>{{ keyPathPreview }}</code>
           </div>
         </el-form-item>
         <el-form-item label="API Key" prop="apiKey">
@@ -1017,6 +1093,12 @@
               <el-switch v-model="priceForm.enabled" active-value="1" inactive-value="0" active-text="启用" inactive-text="停用" />
             </el-form-item>
           </el-col>
+          <el-col :span="8">
+            <el-form-item label="手工覆盖">
+              <el-switch v-model="priceForm.manualOverride" active-value="1" inactive-value="0" active-text="锁定" inactive-text="跟随" />
+              <div class="field-hint">锁定后「从 models.dev 同步」不会覆盖本行</div>
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-form-item label="来源 URL">
           <el-input v-model="priceForm.sourceUrl" placeholder="官方价格页 URL" />
@@ -1028,6 +1110,27 @@
       <template #footer>
         <el-button @click="priceDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="priceSubmitting" @click="submitPriceForm">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Q6(2026-10-23)：JSON 导入——批量补价格（自建价目表/厂商对账表导出后直接粘贴） -->
+    <el-dialog v-model="importDialog.visible" title="JSON 导入价格" width="680px" append-to-body>
+      <el-alert type="info" :closable="false" show-icon class="mb-2">
+        <template #title>粘贴价格数组，按 租户+厂商+模型 有则更新无则新增；标记 manualOverride=true 的行不会被 models.dev 同步覆盖。</template>
+      </el-alert>
+      <el-form label-width="90px">
+        <el-form-item label="导入到">
+          <el-tag type="info" effect="plain">当前登录租户</el-tag>
+          <span class="import-foot-hint ml-2">全平台价格请用平台默认租户账号导入</span>
+        </el-form-item>
+        <el-form-item label="价格 JSON">
+          <el-input v-model="importForm.json" type="textarea" :rows="12" :placeholder="importJsonSample" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="import-foot-hint">字段：provider / modelName / input / output / cachedInput（每百万 token 单价）/ currency / manualOverride</span>
+        <el-button @click="importDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="importSubmitting" @click="submitImport">导入</el-button>
       </template>
     </el-dialog>
   </div>
@@ -1059,6 +1162,10 @@ import {
   listDcsAiConfig,
   listDcsAiProviderPresets,
   listDcsAiProviderDicts,
+  listDcsAiProviderTemplates,
+  listDcsAiApiFormats,
+  syncDcsAiModelPricesFromModelsDev,
+  importDcsAiModelPrices,
   detectDcsAiPrice,
   getDcsAiEffectivePrice,
   upsertDcsAiModelPrice,
@@ -1103,7 +1210,9 @@ import {
   DcsAiProviderAccessForm,
   DcsAiProviderAccessVO,
   DcsAiProviderPresetVO,
-  DcsAiTestResultVO
+  DcsAiTestResultVO,
+  DcsAiApiFormatVO,
+  DcsAiProviderTemplateVO
 } from '@/api/dcs/ai/types';
 import { listTenant } from '@/api/system/tenant';
 import { TenantVO } from '@/api/system/tenant/types';
@@ -1121,6 +1230,10 @@ const ids = ref<Array<string | number>>([]);
 const configList = ref<DcsAiConfigVO[]>([]);
 const providerOptions = ref<DcsAiProviderPresetVO[]>([]);
 const providerDictOptions = ref<any[]>([]);
+/** Q5(2026-10-23)：厂商模板（20 家）+ 接口格式字典（3 种），模板选中即带出地址/格式/模型 */
+const providerTemplates = ref<DcsAiProviderTemplateVO[]>([]);
+const apiFormats = ref<DcsAiApiFormatVO[]>([]);
+const selectedTemplateId = ref('');
 const priceDetecting = ref(false);
 const modelOptions = ref<DcsAiModelVO[]>([]);
 /** 业务批4 Q16-A：免费/付费两组派生视图（free=null 的厂商如实留在付费组，不标徽章） */
@@ -1205,7 +1318,15 @@ const accessSubmitting = ref(false);
 /** 弹窗自己的掩码快照（k3 P1：不再借用模型表单的 accessInfo——从列表打开别租户/别厂时掩码会错位） */
 const accessMaskInDialog = ref('');
 const accessHasKey = computed(() => !!accessMaskInDialog.value);
-const initAccessFormData: DcsAiProviderAccessForm = { tenantId: '', provider: '', baseUrl: '', apiKey: '', consoleUrl: '', remark: '' };
+const initAccessFormData: DcsAiProviderAccessForm = {
+  tenantId: '',
+  provider: '',
+  baseUrl: '',
+  apiKey: '',
+  apiFormat: 'CHAT_COMPLETIONS',
+  consoleUrl: '',
+  remark: ''
+};
 const accessForm = ref<DcsAiProviderAccessForm>({ ...initAccessFormData });
 /** 首建必须填 Key；已有接入留空沿用（占位符/校验与后端 upsert 口径一致）；
  *  批1：标准厂商地址自动接入，Base URL 仅「自定义」厂商必填 */
@@ -1330,6 +1451,7 @@ const onEditKey = (row: DcsAiProviderAccessVO) => {
     provider: row.provider,
     baseUrl: row.baseUrl || '',
     apiKey: '',
+    apiFormat: row.apiFormat || 'CHAT_COMPLETIONS',
     consoleUrl: row.consoleUrl || '',
     remark: row.remark || '',
     label: row.label || ''
@@ -1353,7 +1475,8 @@ const onAddKeyForm = (tenantId?: string, provider?: string) => {
     ...initAccessFormData,
     tenantId: nextTenant,
     provider: nextProvider,
-    baseUrl: keepBaseUrl || (nextProvider !== 'CUSTOM' ? presetBaseUrl(nextProvider) : '')
+    baseUrl: keepBaseUrl || (nextProvider !== 'CUSTOM' ? presetBaseUrl(nextProvider) : ''),
+    apiFormat: accessForm.value.provider === nextProvider ? accessForm.value.apiFormat || 'CHAT_COMPLETIONS' : 'CHAT_COMPLETIONS'
   };
   accessMaskInDialog.value = '';
   keyDrawer.title = `新增钥匙 · ${nextProvider ? getProviderName(nextProvider) : ''}（${nextTenant || '未选租户'}）`;
@@ -1488,7 +1611,9 @@ const onRefreshAllBalances = async () => {
 
 const submitAccess = async () => {
   // 批1：标准厂商地址自动接入（后端同口径兜底，这里先补齐让探测/校验链路都拿到值）
-  if (accessForm.value.provider !== 'CUSTOM') {
+  // N1 回修（dspro P1-4）：只补空值——模板选过国际站（api.z.ai / api.moonshot.cn /
+  // dashscope-intl / api.minimax.io / api.siliconflow.com）时不能再被国内预置地址覆盖
+  if (accessForm.value.provider !== 'CUSTOM' && !accessForm.value.baseUrl) {
     const preset = presetBaseUrl(accessForm.value.provider);
     if (preset) accessForm.value.baseUrl = preset;
   }
@@ -1600,6 +1725,7 @@ const initPriceFormData: DcsAiModelPriceForm = {
   outputPricePerMillion: 0,
   enabled: '1',
   sourceUrl: '',
+  manualOverride: '1',
   remark: ''
 };
 
@@ -1610,6 +1736,7 @@ const initFormData: DcsAiConfigForm = {
   useType: 'CHAT',
   baseUrl: '',
   apiKey: '',
+  apiFormat: 'CHAT_COMPLETIONS',
   modelName: '',
   contextWindow: 128000,
   maxTokens: undefined,
@@ -1682,6 +1809,42 @@ const priceQuery = reactive({
 const priceFormRef = ref<ElFormInstance>();
 
 const getProviderName = (provider: string) => providerOptions.value.find((item) => item.provider === provider)?.providerName || provider;
+/** Q5：厂商模板候选——已选厂商时只列该厂模板（国内站/国际站等变体），未选时列全部 */
+const filteredTemplates = computed(() => {
+  const p = String(form.value.provider || '');
+  if (!p) return providerTemplates.value;
+  const scoped = providerTemplates.value.filter((t) => t.provider === p);
+  return scoped.length ? scoped : providerTemplates.value;
+});
+const activeTemplate = computed(() => providerTemplates.value.find((t) => t.templateId === selectedTemplateId.value));
+const apiFormatPath = (value?: string) =>
+  apiFormats.value.find((f) => f.value === (value || 'CHAT_COMPLETIONS'))?.path || '/chat/completions';
+const apiFormatShort = (value?: string) =>
+  (({ CHAT_COMPLETIONS: 'Chat', ANTHROPIC_MESSAGES: 'Anthropic', RESPONSES: 'Responses' }) as Record<string, string>)[
+    value || 'CHAT_COMPLETIONS'
+  ] || value || 'Chat';
+const isNonChatFormat = computed(() => (form.value.apiFormat || 'CHAT_COMPLETIONS') !== 'CHAT_COMPLETIONS');
+const apiFormatHint = computed(() => {
+  const format = apiFormats.value.find((f) => f.value === (form.value.apiFormat || 'CHAT_COMPLETIONS'));
+  if (!format) return '默认 Chat Completions（OpenAI 兼容），可进对话主链';
+  if (format.value === 'CHAT_COMPLETIONS') return `${format.label} · OpenAI 兼容，可进对话主链`;
+  return `${format.label} · 仅支持保存后的连通测试，对话主链需 Chat Completions`;
+});
+/** 实际请求地址预览：与后端 DcsAiApiFormat.requestUrl 同口径（Anthropic 的 baseUrl 带 /v1 时不重复拼） */
+const apiPathPreview = computed(() => {
+  const base = String(form.value.baseUrl || '').replace(/\/+$/, '');
+  if (!base) return '';
+  const format = form.value.apiFormat || 'CHAT_COMPLETIONS';
+  if (format === 'ANTHROPIC_MESSAGES' && base.endsWith('/v1')) return `${base}/messages`;
+  return `${base}${apiFormatPath(format)}`;
+});
+const keyPathPreview = computed(() => {
+  const base = String(accessForm.value.baseUrl || '').replace(/\/+$/, '');
+  if (!base) return '';
+  const format = accessForm.value.apiFormat || 'CHAT_COMPLETIONS';
+  if (format === 'ANTHROPIC_MESSAGES' && base.endsWith('/v1')) return `${base}/messages`;
+  return `${base}${apiFormatPath(format)}`;
+});
 const tenantLabel = (item: TenantVO) => `${item.tenantId} / ${item.companyName || item.contactUserName || '-'}`;
 const modelLabel = (item: DcsAiModelVO) => (item.ownedBy ? `${item.modelId} (${item.ownedBy})` : item.modelId);
 const formatContext = (value?: number) => (value ? `${Math.round(value / 1000)}K` : '-');
@@ -1949,6 +2112,8 @@ const handleHealthCheck = async (configIds?: (number | string)[]) => {
       });
     }
     const okCount = results.filter((r) => r.success).length;
+    // Q2-A：手动体检已落巡检表，重新拉一次徽标数据源——点完马上翻绿，不再等 04:00 定时周期
+    await loadPatrolHealth();
     proxy?.$modal.msgSuccess(`健康检查完成: ${okCount}/${results.length} 正常`);
   } catch (e: any) {
     proxy?.$modal.msgError(e.message || '健康检查失败');
@@ -2094,8 +2259,22 @@ const reasoningEffortLabel = (v?: string) =>
   '关闭';
 
 const loadProviders = async () => {
-  const res = await listDcsAiProviderPresets();
-  providerOptions.value = res.data || [];
+  // Q5：模板/格式字典与厂商预设并行拉——任一失败不拖垮页面（下拉退化为手填）
+  const [presetRes, tplRes, fmtRes] = await Promise.allSettled([
+    listDcsAiProviderPresets(),
+    listDcsAiProviderTemplates(),
+    listDcsAiApiFormats()
+  ]);
+  providerOptions.value = presetRes.status === 'fulfilled' ? presetRes.value.data || [] : [];
+  providerTemplates.value = tplRes.status === 'fulfilled' ? tplRes.value.data || [] : [];
+  apiFormats.value =
+    fmtRes.status === 'fulfilled' && fmtRes.value.data?.length
+      ? fmtRes.value.data
+      : [
+          { value: 'CHAT_COMPLETIONS', label: 'Chat Completions（OpenAI 兼容）', path: '/chat/completions' },
+          { value: 'ANTHROPIC_MESSAGES', label: 'Anthropic Messages', path: '/v1/messages' },
+          { value: 'RESPONSES', label: 'OpenAI Responses', path: '/responses' }
+        ];
   // 同时加载厂商字典(供下拉显示)
   try {
     const dictRes = await listDcsAiProviderDicts();
@@ -2179,6 +2358,89 @@ const openPriceDialog = (row?: DcsAiModelPriceVO) => {
   normalizeCurrencyInput(priceForm.value);
   priceDialog.visible = true;
   priceDialog.title = row ? '修改价格参数' : '新增价格参数';
+};
+
+/** Q6：价格来源徽标——手工锁定优先展示，其次按同步/导入来源 */
+const priceSourceLabel = (row: DcsAiModelPriceVO) => {
+  if (row.manualOverride === '1') {
+    if (row.priceSource === 'IMPORT') return '导入锁定';
+    if (row.priceSource === 'MODELS_DEV') return '同步锁定';
+    return '手工';
+  }
+  if (row.priceSource === 'MODELS_DEV') return 'models.dev';
+  if (row.priceSource === 'IMPORT') return 'JSON 导入';
+  return '手工';
+};
+const priceSourceTagType = (row: DcsAiModelPriceVO) => {
+  if (row.manualOverride === '1') {
+    if (row.priceSource === 'IMPORT') return 'warning';
+    if (row.priceSource === 'MODELS_DEV') return 'success';
+    return 'primary';
+  }
+  if (row.priceSource === 'MODELS_DEV') return 'success';
+  if (row.priceSource === 'IMPORT') return 'warning';
+  return 'info';
+};
+const priceSourceTip = (row: DcsAiModelPriceVO) => {
+  const locked = row.manualOverride === '1';
+  if (row.priceSource === 'MODELS_DEV') {
+    const when = row.lastSyncedAt ? ` · ${String(row.lastSyncedAt).replace('T', ' ').slice(0, 16)}` : '';
+    return locked ? `models.dev 同步${when} · 已锁定，后续同步跳过本行` : `models.dev 同步${when} · 未锁定，下次同步会覆盖`;
+  }
+  if (row.priceSource === 'IMPORT') {
+    return locked ? 'JSON 导入 · 已锁定，同步/导入都不覆盖' : 'JSON 导入 · 未锁定，下次导入或同步会覆盖';
+  }
+  return locked ? '手工录入 · 已锁定，同步不覆盖' : '手工录入 · 未锁定，可被同步覆盖';
+};
+
+const priceSyncing = ref(false);
+const onSyncModelsDev = async () => {
+  priceSyncing.value = true;
+  try {
+    const res = await syncDcsAiModelPricesFromModelsDev();
+    const d = res.data;
+    proxy?.$modal.msgSuccess(
+      `同步完成：新增 ${d?.inserted ?? 0} 条、更新 ${d?.updated ?? 0} 条、跳过 ${d?.skipped ?? 0} 条（手工锁定 / 未匹配）。官方价按美元录入，人民币模型请用「JSON 导入」或手工改价`
+    );
+    await loadPriceList();
+  } finally {
+    priceSyncing.value = false;
+  }
+};
+
+const importDialog = reactive<DialogOption>({ visible: false, title: '' });
+const importSubmitting = ref(false);
+const importForm = reactive({ json: '' });
+const importJsonSample = `[
+  { "provider": "DEEPSEEK", "modelName": "deepseek-chat", "input": 2, "output": 8, "currency": "CNY", "manualOverride": true }
+]`;
+const openImportDialog = () => {
+  importDialog.visible = true;
+};
+const submitImport = async () => {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(importForm.json || '[]');
+  } catch {
+    proxy?.$modal.msgError('JSON 解析失败，请检查括号/引号是否完整');
+    return;
+  }
+  const list = Array.isArray(parsed) ? parsed : parsed?.prices;
+  if (!Array.isArray(list) || !list.length) {
+    proxy?.$modal.msgWarning('请粘贴价格数组，或 {"prices":[...]} 形式');
+    return;
+  }
+  importSubmitting.value = true;
+  try {
+    const res = await importDcsAiModelPrices({ prices: list });
+    const d = res.data;
+    proxy?.$modal.msgSuccess(`导入完成：新增 ${d?.inserted ?? 0} 条、更新 ${d?.updated ?? 0} 条、跳过 ${d?.skipped ?? 0} 条`);
+    importDialog.visible = false;
+    importForm.json = '';
+    await loadPriceList();
+  } finally {
+    importSubmitting.value = false;
+  }
 };
 
 const submitPriceForm = async () => {
@@ -2405,7 +2667,12 @@ function keyBadgeOf(g: VendorGroup): KeyBadgeInfo {
   const tip = keys
     .map((k) => {
       const state = k.enabled === '0' ? '已停用' : failedKeys.includes(k) ? '启用 · 余额查询失败' : '启用';
-      const bal = k.balanceStatus === 'OK' && k.balanceAmount != null ? ` · ${k.balanceCurrency || 'CNY'} ${Number(k.balanceAmount).toFixed(2)}` : '';
+      const bal =
+        k.balanceStatus === 'OK' && k.balanceAmount != null
+          ? k.balanceCurrency === '%'
+            ? ` · 剩余 ${Number(k.balanceAmount).toFixed(1)}%`
+            : ` · ${k.balanceCurrency || 'CNY'} ${Number(k.balanceAmount).toFixed(2)}`
+          : '';
       return `${k.label || '未命名'} ${k.apiKeyMask || ''}：${state}${bal}`;
     })
     .join('；');
@@ -2468,7 +2735,25 @@ const reset = () => {
   resetProbeState();
   advancedOpen.value = [];
   capabilityMatched.value = false;
+  // N1 回修：模板选择态跟着表单一起清，否则上次「国际站」模板残留会盖掉手动选的厂商/地址
+  selectedTemplateId.value = '';
   configFormRef.value?.resetFields();
+};
+
+// Q5(2026-10-23)：模板一键带出——厂商/地址/接口格式/默认模型一次到位，变体（国内站/国际站、
+// opencode 网关类型）不用手改地址；选完后清空模板态避免与手改值打架
+const applyTemplate = (templateId: string) => {
+  const tpl = providerTemplates.value.find((t) => t.templateId === templateId);
+  if (!tpl) return;
+  form.value.provider = tpl.provider;
+  form.value.baseUrl = tpl.baseUrl;
+  form.value.apiFormat = tpl.apiFormat;
+  if (tpl.defaultModel) {
+    form.value.modelName = tpl.defaultModel;
+  }
+  resetProbeState();
+  syncInlinePriceForm();
+  autoMatchCapability();
 };
 
 // 应用厂商预设: 选厂商后自动回填 Base URL + 默认模型名, 重置探测状态并同步官方价格表单
@@ -2477,6 +2762,8 @@ const applyPreset = () => {
   if (!preset) return;
   form.value.baseUrl = preset.baseUrl;
   form.value.modelName = preset.modelName;
+  form.value.apiFormat = preset.apiFormat || 'CHAT_COMPLETIONS';
+  selectedTemplateId.value = '';
   resetProbeState();
   syncInlinePriceForm();
   // 批C 回修：模型名是程序赋值不会触发 @change，能力目录匹配必须在这里补挂——
@@ -2710,6 +2997,8 @@ const handleTest = async (row: DcsAiConfigVO) => {
   } else {
     proxy?.$modal.msgError(res.data.message || '连通测试失败');
   }
+  // Q2-A：手动体检与 04:00 巡检写同一张表——测完立刻回刷徽标，不让页面停在旧结论
+  void loadPatrolHealth();
 };
 
 onMounted(() => {
@@ -3369,6 +3658,56 @@ onUnmounted(() => {
   line-height: 1.5;
   color: var(--el-text-color-secondary);
   margin-top: 4px;
+}
+
+/* Q5：接入模板下拉行（名称 + 格式徽标） */
+.tpl-opt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tpl-opt-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Q5：实际请求地址预览条——等宽字体、可横向滚动，窄屏不撑破弹窗 */
+.api-path-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: -4px 0 12px 110px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+  border: 1px dashed var(--el-border-color);
+
+  code {
+    font-family: var(--el-font-family-mono, monospace);
+    font-size: 12px;
+    color: var(--el-color-primary);
+    word-break: break-all;
+  }
+}
+.api-path-preview--drawer {
+  margin: 6px 0 0;
+}
+.api-path-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  flex: none;
+}
+.import-foot-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+@media (max-width: 640px) {
+  .api-path-preview {
+    margin-left: 0;
+  }
 }
 
 /* 业务批4 Q16-A：模型下拉免费行的「名称+FREE 徽章」行布局 */

@@ -52,7 +52,8 @@ public class DcsAiProviderAccessServiceImpl implements IDcsAiProviderAccessServi
     private static final String MASKED_KEY = "****";
 
     /** 支持厂商侧余额查询的厂商（与 DcsAiProviderProbeClient.balance 路由分支同口径） */
-    private static final List<String> BALANCE_SUPPORTED = List.of("SILICONFLOW", "OPENROUTER", "DEEPSEEK");
+    private static final List<String> BALANCE_SUPPORTED = List.of(
+        "SILICONFLOW", "OPENROUTER", "DEEPSEEK", "ZHIPU", "STEPFUN", "KIMI", "MINIMAX");
 
     /** 定时刷新的串行间隔（毫秒）——防厂商余额端点限流 */
     private static final long REFRESH_INTERVAL_MS = 500L;
@@ -101,6 +102,13 @@ public class DcsAiProviderAccessServiceImpl implements IDcsAiProviderAccessServi
     public DcsAiProviderAccessVo updateAccess(DcsAiProviderAccessBo bo) {
         if (!DcsAiProvider.supported(bo.getProvider())) {
             throw new ServiceException("暂不支持该模型厂商");
+        }
+        // Q5-A：接口格式三选一（空=不改，部分提交语义；存量行为仍由数据库默认值保证）
+        if (StrUtil.isNotBlank(bo.getApiFormat())) {
+            if (!com.smartdock.enums.DcsAiApiFormat.supported(bo.getApiFormat())) {
+                throw new ServiceException("不支持的接口格式，请选择 Chat Completions / Anthropic Messages / Responses");
+            }
+            bo.setApiFormat(com.smartdock.enums.DcsAiApiFormat.of(bo.getApiFormat()).name());
         }
         if (StrUtil.isBlank(bo.getBaseUrl())) {
             // 批1：标准厂商空地址=按官方默认接入（选了厂商不该让人手填 URL）；自定义厂商仍须手填
@@ -169,9 +177,24 @@ public class DcsAiProviderAccessServiceImpl implements IDcsAiProviderAccessServi
             return true;
         }
         boolean baseUrlChanged = !StrUtil.equals(existing.getBaseUrl(), bo.getBaseUrl());
+        boolean formatChanged = StrUtil.isNotBlank(bo.getApiFormat())
+            && !StrUtil.equals(com.smartdock.enums.DcsAiApiFormat.of(existing.getApiFormat()).name(),
+                              com.smartdock.enums.DcsAiApiFormat.of(bo.getApiFormat()).name());
+        if (formatChanged) {
+            // Q5：钥匙行的格式是「该厂默认格式」，改一处要同步到沿用旧格式的模型行
+            // （显式改过不同格式的模型行保持不动，避免一次厂商级操作抹掉单模型特例）
+            String oldFormat = com.smartdock.enums.DcsAiApiFormat.of(existing.getApiFormat()).name();
+            String newFormat = com.smartdock.enums.DcsAiApiFormat.of(bo.getApiFormat()).name();
+            aiConfigMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<DcsAiConfig>()
+                .set(DcsAiConfig::getApiFormat, newFormat)
+                .eq(DcsAiConfig::getTenantId, existing.getTenantId())
+                .eq(DcsAiConfig::getProvider, existing.getProvider())
+                .and(w -> w.isNull(DcsAiConfig::getApiFormat).or().eq(DcsAiConfig::getApiFormat, oldFormat)));
+        }
         DcsAiProviderAccess patch = new DcsAiProviderAccess();
         patch.setId(existing.getId());
         patch.setBaseUrl(bo.getBaseUrl());
+        patch.setApiFormat(bo.getApiFormat());
         patch.setConsoleUrl(StrUtil.trimToNull(bo.getConsoleUrl()));
         patch.setRemark(bo.getRemark());
         patch.setLabel(StrUtil.trimToNull(bo.getLabel()));
@@ -182,7 +205,7 @@ public class DcsAiProviderAccessServiceImpl implements IDcsAiProviderAccessServi
             patch.setApiKey(StrUtil.trim(bo.getApiKey()));
         }
         accessMapper.updateById(patch);
-        return realKey || baseUrlChanged;
+        return realKey || baseUrlChanged || formatChanged;
     }
 
     /**
@@ -195,6 +218,11 @@ public class DcsAiProviderAccessServiceImpl implements IDcsAiProviderAccessServi
         if (!DcsAiProvider.supported(bo.getProvider())) {
             throw new ServiceException("暂不支持该模型厂商");
         }
+        // Q5-A：接口格式三选一（空=存量兼容 Chat Completions，非法值拒）
+        if (StrUtil.isNotBlank(bo.getApiFormat()) && !com.smartdock.enums.DcsAiApiFormat.supported(bo.getApiFormat())) {
+            throw new ServiceException("不支持的接口格式，请选择 Chat Completions / Anthropic Messages / Responses");
+        }
+        bo.setApiFormat(com.smartdock.enums.DcsAiApiFormat.of(bo.getApiFormat()).name());
         if (StrUtil.isBlank(bo.getBaseUrl())) {
             // 批1：标准厂商空地址=按官方默认接入；自定义厂商仍须手填（同 updateAccess）
             String preset = DcsAiProvider.defaultBaseUrl(bo.getProvider());
