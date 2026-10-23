@@ -167,8 +167,8 @@ function buildEvents(options) {
     const geo = geoPlan[v - 1];
     const device = devicePlan[v - 1];
 
-    // 老访客更可能多次回访：访问次数 1~6 次
-    const sessions = intBetween(1, 6);
+    // 老访客更可能多次回访：访问次数 1~6 次（封顶到可选天数，防 days 小时去重死循环）
+    const sessions = Math.min(intBetween(1, 6), options.days);
     const sessionDays = new Set();
     for (let s = 0; s < sessions; s++) {
       let daysAgo = intBetween(0, options.days - 1);
@@ -300,6 +300,7 @@ function toCsv(events) {
 }
 
 async function login(options) {
+  // 注意：目标环境若开启验证码（生产档默认开启）会登录失败——请用关闭验证码的 dev 档
   const res = await fetch(`${options.base}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', clientid: CLIENT_ID },
@@ -350,7 +351,8 @@ async function importBatch(options, token, events) {
     const result = await importBatch(options, token, batch);
     written += Number(result.written || 0);
     skipped += Number(result.skipped || 0);
-    process.stdout.write(`[seed] ${Math.min(i + 500, events.length)}/${events.length}`);
+    process.stdout.write(`
+[seed] ${Math.min(i + 500, events.length)}/${events.length}`);
   }
   console.log('');
   console.log(`[seed] done written=${written} skipped=${skipped}`);

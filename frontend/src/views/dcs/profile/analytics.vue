@@ -1090,7 +1090,6 @@ const loadCustom = async () => {
   }
 };
 
-// ---------------------------------------------------------------- 采集
 // ---------------------------------------------------------------- 批8 分析深度
 const pathsData = ref<AnalyticsPaths | null>(null);
 const pathsLoading = ref(false);
@@ -1216,8 +1215,6 @@ const formatLastAt = (value: string | undefined) => {
 onUnmounted(() => {
   stopRealtime();
 });
-
-
 
 const fillCsvSample = () => {
   csvText.value = [
@@ -1350,7 +1347,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.panel-card { margin-top: 14px; border-top: 1px dashed var(--el-border-color); }
 
 .analytics-page {
   display: flex;

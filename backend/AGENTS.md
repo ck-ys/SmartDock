@@ -112,7 +112,7 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 
 ## Security Rules
 
-- 新接口必须 `@SaCheckPermission`（确需匿名白名单的接口才用 `@SaIgnore` + 服务层自查 + `@RateLimiter`，当前无此类接口）
+- 新接口必须 `@SaCheckPermission`（确需匿名白名单的接口才用 `@SaIgnore` + 服务层自查 + `@RateLimiter`；框架自带匿名端点仅登录/验证码/SSE 关闭等，业务模块当前无匿名接口）
 - 权限串**必须三段式**（`analytics:center:query`），两段式匹配不上超管 `*:*:*`
 - 永不 log token / 密码 / 明文 IP
 - 不信任客户端传的 `createBy`/`updateBy`/`tenantId`——框架自动填

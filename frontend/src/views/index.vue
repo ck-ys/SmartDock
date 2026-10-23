@@ -75,7 +75,7 @@
           <h2>
             数据脉搏 <span>近 7 天 · {{ pulseSource }}</span>
           </h2>
-          <p>来源：内置采集站点，实时汇总</p>
+          <p>来源：web 业务源事件账本，实时汇总</p>
         </div>
         <button type="button" class="ck-more" @click="go('/insight/profile-analytics')">打开分析中心 →</button>
       </header>

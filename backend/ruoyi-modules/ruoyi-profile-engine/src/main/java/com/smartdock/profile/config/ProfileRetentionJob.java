@@ -50,7 +50,7 @@ public class ProfileRetentionJob {
     private int retentionDays;
 
     private final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean(false);
-    /** 采集留痕清理与事件保留期清理互不阻塞——共用一个标志会因前一个跑久而整日跳过后一个 */
+    /** 保留期清理的互斥标志：上一轮未结束则跳过本轮，避免重入叠加 */
 
     /**
      * cron 按容器时区(GMT+8 铁律)。

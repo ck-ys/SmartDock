@@ -25,10 +25,10 @@ psql -d smartdock -f 07_analytics.sql            # 分析中心：会话/日汇�
 上次升级之后新增的那些即可（脚本幂等，全量重放也安全）：
 
 ```bash
-# 示例：从未执行过任何增量的老库，按顺序执行 migration/ 下全部脚本
-psql -d smartdock -f ../migration/2026-10-19_profile_protocol_v1.sql
-psql -d smartdock -f ../migration/2026-10-19_profile_studio.sql
-# ……依文件名顺序继续，直到目录内最后一个
+# 示例：从未执行过任何增量的老库，按文件名顺序执行 migration/ 下全部脚本
+for f in ../migration/*.sql; do
+  psql -v ON_ERROR_STOP=1 -d smartdock -f "$f" || break
+done
 ```
 
 升级脚本全部幂等，可重复执行；绝大多数只新增列/表/索引/权限。例外：
