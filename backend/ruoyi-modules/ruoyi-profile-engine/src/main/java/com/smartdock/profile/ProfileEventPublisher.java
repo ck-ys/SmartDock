@@ -30,7 +30,7 @@ public interface ProfileEventPublisher {
     int publishBatch(List<ProfileEventBo> events);
 
     /**
-     * 批量发布并区分「新写入 / 重复 / 逐条失败」——采集质量报表的口径来源。
+     * 批量发布并区分「新写入 / 重复 / 逐条失败」——批量造数与导入类功能的对账口径来源。
      * 默认实现退化为 publishBatch(重复数不可知); ProfileEventServiceImpl 提供精确分类。
      */
     default Map<String, Object> publishBatchDetailed(List<ProfileEventBo> events) {

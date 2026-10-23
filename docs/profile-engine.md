@@ -21,7 +21,7 @@
 | `profile_review_queue` | 低分复核队列 | 触发来源、分数、状态、确认/忽略人 |
 | `profile_engine_config` | 按业务源的引擎开关 | 自动重算、复核、去抖窗口 |
 | `analytics_session` / `analytics_daily` | 行为分析：会话与日汇总 | 访客、渠道、设备、地域、PV/UV/访问次数、跳出 |
-| `analytics_funnel` / `analytics_site` | 漏斗定义与采集站点 | 步骤 JSON、窗口天数、`siteKey`、允许域名 |
+| `analytics_funnel` | 漏斗定义 | 步骤 JSON、窗口天数 |
 
 设计要点：
 
@@ -118,20 +118,13 @@ profile_event
 - **新访客** = 该业务源内首次出现；回访 = 之前已有会话。
 - 漏斗步骤按访客「首次满足顺序」计数，跨会话超过窗口不累计。
 
-采集侧提供两种入口：
+数据进系统只有两条路（外部网站采集口与 SDK 已于 2026-10-23 移除）：
 
-- **公开采集口** `POST /analytics/collect`（`@SaIgnore`，按 `siteKey` 定位租户/业务源，
-  单批最多 200 条，事件按 `eventUid` 幂等）。
-- **零依赖 SDK** `frontend/public/sdk/smartdock-analytics.js`：访客 ID、30 分钟会话、
-  SPA 路由变化、`track/page/identify`、批量上报、`sendBeacon` 兜底。
+- **内部业务系统走事件协议**：服务端调用 `ProfileEventPublisher` 门面发布
+  `ProfileEventBo`（事件名/主体/会话/上下文/属性），事件按 `eventUid` 幂等，
+  单批建议 ≤200 条。
+- **离线数据走 CSV 导入**：管理台「数据分析 → 数据导入」粘贴 CSV（最多 5000 行），
+  事件同样走 Schema 校验与幂等写入。
 
-```html
-<script src="/sdk/smartdock-analytics.js"></script>
-<script>
-  SmartdockAnalytics.init({ siteKey: 'sd_demo_site', endpoint: '/analytics/collect' });
-</script>
-```
-
-离线数据可通过 CSV 导入（最多 5000 行），事件同样走 Schema 校验与幂等写入。
-分析页面在「任务中心 → 数据分析」，包含流量概览、页面与搜索、转化漏斗、留存、
-访问明细、自定义分析和数据采集七个页签。
+分析页面在「画像与分析 → 数据分析」，包含数据导入、流量概览、页面与搜索、
+转化漏斗、留存、访问明细和自定义分析七个页签。

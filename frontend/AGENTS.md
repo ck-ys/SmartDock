@@ -74,8 +74,7 @@ Pinia dict store 缓存；`<DictTag :options>` 渲染。
 | 评分模型(RFM) | `profile/rfm.vue` | 模型配置/快照 |
 | 分群 | `profile/segments.vue` | 规则分群+静态名单 |
 | 低分复核 | `profile/review.vue` | 复核队列 |
-| 分析中心 | `profile/analytics.vue` | 流量/页面/漏斗/留存/访问明细/自定义分析/数据采集（多 Tab 大页） |
-| 采集 SDK | `public/sdk/smartdock-analytics.js` | 零依赖、可异步加载；改它必须同步更新接入片段文案 |
+| 分析中心 | `profile/analytics.vue` | 流量/页面/漏斗/留存/访问明细/自定义分析/数据导入（多 Tab 大页） |
 | AI 助手 | AI 助手组件 + `assistant` 页 | 停靠抽屉 + 会话 |
 | 采集 demo | `mission/todo` 页 | 任务/待办最小闭环 |
 | 更新日志 | `changelog/changelog.ts` | 见下方铁律 |

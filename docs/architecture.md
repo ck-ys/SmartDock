@@ -76,10 +76,10 @@
 | 通用协议 | `profile_protocol`、`profile_schema_registry`、`profile_identity_link/merge` | `profile.protocol/v1` 登记；Schema 轻校验；匿名→登录身份归并 |
 | 评分模型 | `profile_score_model`、`profile_model_run/snapshot` | 分箱+权重的 JSON 模型；RFM 只是预设；快照链串趋势 |
 | 标签分群/复核 | `profile_segment*`、`profile_review_queue`、`profile_engine_config` | 规则/静态名单分群；低分复核抑制重复入队；按源开关自动重算 |
-| 分析中心 | `analytics_session/daily/funnel/site` | 会话化（显式 sessionId 或 30 分钟切分）→ 日汇总 → 趋势/漏斗/留存/自定义 |
+| 分析中心 | `analytics_session/daily/funnel` | 会话化（显式 sessionId 或 30 分钟切分）→ 日汇总 → 趋势/漏斗/留存/自定义 |
 
-分析中心不新增埋点：复用 `profile_event`，按 `source` 重建。公开采集口
-`POST /analytics/collect` 以 `siteKey` 定位租户与业务源，事件写入仍走幂等与 Schema 校验。
+分析中心不新增埋点：复用 `profile_event`，按 `source` 重建。数据进系统只有两条路：
+内部业务系统走事件协议（`ProfileEventPublisher`），离线数据走 CSV 导入；两条路都过幂等与 Schema 校验（外部网站采集口已于 2026-10-23 移除）。
 `web` 源在 `profile_engine_config` 中默认关闭自动重算与低分复核，避免流量事件污染画像队列。
 
 ## 4. 文件安全（ruoyi-file-security，包 com.smartdock）

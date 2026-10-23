@@ -15,20 +15,26 @@ psql -d smartdock -f 03_identity.sql    # 合成身份块（租户/部门/用户
 psql -d smartdock -f 04_role_menu.sql   # 角色菜单绑定
 psql -d smartdock -f 05_demo_data.optional.sql   # （可选）一条开箱演示任务；跳过即为干净空库
 psql -d smartdock -f 06_profile_protocol.sql     # 画像接入协议与内置事件 Schema（可重复执行）
-psql -d smartdock -f 07_analytics.sql            # 分析中心：会话/日汇总/漏斗/采集站点（可重复执行）
+psql -d smartdock -f 07_analytics.sql            # 分析中心：会话/日汇总/漏斗（可重复执行）
 ```
 
 ## 已有库升级
 
-基线只用于空库安装。已经在跑的库请在备份后执行增量脚本：
+基线只用于空库安装（本基线即完整安装来源，不依赖任何增量迁移）。已经在跑的库
+请在备份后，按**文件名日期顺序**执行 `../migration/` 目录下的增量脚本——只跑
+上次升级之后新增的那些即可（脚本幂等，全量重放也安全）：
 
 ```bash
+# 示例：从未执行过任何增量的老库，按顺序执行 migration/ 下全部脚本
 psql -d smartdock -f ../migration/2026-10-19_profile_protocol_v1.sql
 psql -d smartdock -f ../migration/2026-10-19_profile_studio.sql
-psql -d smartdock -f 06_profile_protocol.sql
+# ……依文件名顺序继续，直到目录内最后一个
 ```
 
-升级脚本全部幂等，可重复执行；只新增列/表/索引/权限，不删改历史数据。
+升级脚本全部幂等，可重复执行；绝大多数只新增列/表/索引/权限。例外：
+`2026-10-23_drop_external_collect.sql` 会删除外部网站接入的两张表
+（`analytics_site` / `analytics_collect_log`，对应功能已于 2026-10-23 下线，
+执行前请确认不再需要外部接入数据）。
 
 ## 内置账号（口令均为 `admin123`）
 

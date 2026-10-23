@@ -2,7 +2,7 @@ import request from '@/utils/request';
 
 /**
  * 分析中心 API：流量概览/趋势/下钻、访问明细、漏斗、留存、自定义分析、
- * CSV 导入、采集站点与重建汇总。
+ * CSV 导入与重建汇总。
  *
  * 约定同 profile.ts：R 信封由 request 拦截器返回，`r()` 解包业务体；
  * 分页接口的 rows/total 在顶层，`table()` 原样返回。

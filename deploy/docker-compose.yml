@@ -2,7 +2,7 @@ name: smartdock
 
 # SmartDock 一键部署（教科书口径）：postgres + redis + minio + backend + frontend
 # 首次启动前：先构建产物（backend: mvn package；frontend: npm run build:prod），
-# PostgreSQL 首次初始化会自动按序执行 ../backend/script/sql/baseline/ 的 5 个 SQL（含 05 演示数据；不需要时首次启动前移出该文件）。
+# PostgreSQL 首次初始化会自动按序执行 ../backend/script/sql/baseline/ 的 7 个 SQL（含 05 演示数据；不需要时首次启动前移出该文件）。
 
 services:
   postgres:

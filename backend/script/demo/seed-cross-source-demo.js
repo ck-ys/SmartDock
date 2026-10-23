@@ -3,7 +3,7 @@
  * 跨业务源合成演示数据（批8 全域总览）：order / supply 两个业务源的小撮事件。
  *
  * 直插 profile_event（幂等：event_uid 前缀 xsrc- + ON CONFLICT DO NOTHING），
- * 不经采集口（siteKey 只映射 web）；web 源口径六数字不受影响。
+ * 直插事件账本，不经任何采集入口；web 源口径六数字不受影响。
  * 固定种子 mulberry32(20261020)，可重复执行、结果一致。
  *
  * 用法（连接串必须显式传入，仓库不落任何内网地址）：

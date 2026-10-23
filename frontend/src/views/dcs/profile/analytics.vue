@@ -1629,18 +1629,6 @@ onMounted(async () => {
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
-.code-block {
-  margin: 0;
-  padding: 12px;
-  border-radius: 8px;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  font-size: 12px;
-  line-height: 1.55;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
 .import-actions {
   margin-top: 12px;
   display: flex;

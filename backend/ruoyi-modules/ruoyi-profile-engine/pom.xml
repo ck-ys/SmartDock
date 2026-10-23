@@ -54,11 +54,7 @@
             <artifactId>ruoyi-common-tenant</artifactId>
         </dependency>
         <!-- 公开采集口 IP 限流(@RateLimiter), 防灌水 -->
-        <dependency>
-            <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-common-ratelimiter</artifactId>
-        </dependency>
-        <!-- 批10 Q1: 多实例互斥的分布式锁(Redisson)。此前经 ratelimiter 传递可见, 显式声明防传递依赖变动后静默失效 -->
+        <!-- 批10 Q1: 多实例互斥的分布式锁(Redisson), 显式声明防传递依赖变动后静默失效 -->
         <dependency>
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-common-redis</artifactId>

@@ -62,7 +62,7 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 
 ## Profile Engine (`ruoyi-profile-engine`) — 本仓核心模块
 
-`com.smartdock.profile`（画像）+ `com.smartdock.analytics`（分析），构成"任意业务接入协议 → 模型/分群/复核 → 流量分析/采集"全链路。
+`com.smartdock.profile`（画像）+ `com.smartdock.analytics`（分析），构成"任意业务接入协议 → 模型/分群/复核 → 流量分析"全链路。
 
 ### 子域
 
@@ -72,7 +72,7 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 - **model/ + operator/** — 模型 JSON 配置、分箱/评分算子
 - **protocol/ + schema/** — 接入协议 manifest、Schema 注册表
 - **segment/ + review/** — 分群（规则+静态名单，成员快照）、低分复核（去重不重复打扰）
-- **analytics/** — 会话重建（显式 sessionId 优先/30 分钟切分/隐式键锚定首事件）、日汇总、漏斗/留存/自定义分析、CSV 补录、采集站点与公开采集口
+- **analytics/** — 会话重建（显式 sessionId 优先/30 分钟切分/隐式键锚定首事件）、日汇总、漏斗/留存/自定义分析、CSV 补录
 
 ### 本模块硬规则（连环 bug 换来的）
 
@@ -112,9 +112,9 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 
 ## Security Rules
 
-- 新接口必须 `@SaCheckPermission`（公开采集口等白名单用 `@SaIgnore` + 服务层自查 + `@RateLimiter`）
+- 新接口必须 `@SaCheckPermission`（确需匿名白名单的接口才用 `@SaIgnore` + 服务层自查 + `@RateLimiter`，当前无此类接口）
 - 权限串**必须三段式**（`analytics:center:query`），两段式匹配不上超管 `*:*:*`
-- 永不 log token / 密码 / 明文 IP（采集口只存哈希）
+- 永不 log token / 密码 / 明文 IP
 - 不信任客户端传的 `createBy`/`updateBy`/`tenantId`——框架自动填
 - 租户隔离是硬边界：不做跨租户数据合并
 
