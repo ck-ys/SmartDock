@@ -49,6 +49,22 @@ public class SysNoticeBo extends BaseEntity {
     private String status;
 
     /**
+     * 是否置顶（0否 1是）
+     */
+    @jakarta.validation.constraints.Pattern(regexp = "[01]", message = "置顶标记只能是 0 或 1")
+    private String isTop;
+
+    /**
+     * 发布时间（空=立即发布）
+     */
+    private java.util.Date publishTime;
+
+    /**
+     * 过期时间（空=长期有效）
+     */
+    private java.util.Date expireTime;
+
+    /**
      * 备注
      */
     private String remark;

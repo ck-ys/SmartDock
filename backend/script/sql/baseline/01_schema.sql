@@ -722,7 +722,8 @@ CREATE TABLE public.dcs_notice (
     task_id bigint,
     read_flag character(1) DEFAULT '0'::bpchar NOT NULL,
     create_time timestamp without time zone,
-    dedup_key character varying(128)
+    dedup_key character varying(128),
+    ref_url character varying(500)
 );
 
 
@@ -1901,6 +1902,9 @@ CREATE TABLE public.sys_notice (
     notice_title character varying(50) NOT NULL,
     notice_type character(1) NOT NULL,
     notice_content text,
+    is_top character(1) DEFAULT '0'::bpchar,
+    publish_time timestamp(6) without time zone,
+    expire_time timestamp(6) without time zone,
     status character(1) DEFAULT '0'::bpchar,
     create_dept bigint,
     create_by bigint,
@@ -4022,3 +4026,66 @@ CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_tenant_time ON public.dcs_mcp_call_l
 CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_server_time ON public.dcs_mcp_call_log (server_name, create_time DESC);
 -- G4 三审回修：保留期清理路径（WHERE create_time < cutoff）专用
 CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_create_time ON public.dcs_mcp_call_log (create_time);
+
+-- ===== 2026-10-23 N3：公告已读 / 反馈中心 / 更新日志 =====
+
+CREATE TABLE public.sys_notice_read (
+    notice_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying,
+    read_time timestamp(6) without time zone DEFAULT now(),
+    CONSTRAINT pk_sys_notice_read PRIMARY KEY (notice_id, user_id)
+);
+
+CREATE INDEX idx_sys_notice_portal ON public.sys_notice USING btree (tenant_id, status, is_top DESC, publish_time DESC);
+CREATE INDEX idx_sys_notice_read_user ON public.sys_notice_read USING btree (tenant_id, user_id);
+
+CREATE TABLE public.dcs_feedback (
+    feedback_id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL DEFAULT '000000'::character varying,
+    title character varying(200) NOT NULL,
+    content character varying(2000) NOT NULL,
+    feedback_type character varying(20) NOT NULL,
+    oss_ids character varying(500),
+    contact character varying(100),
+    context_json text,
+    status character varying(16) NOT NULL DEFAULT 'PENDING'::character varying,
+    handler_id bigint,
+    handler_name character varying(64),
+    handle_note character varying(1000),
+    handle_time timestamp(6) without time zone,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp(6) without time zone,
+    update_by bigint,
+    update_time timestamp(6) without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_dcs_feedback PRIMARY KEY (feedback_id),
+    CONSTRAINT ck_dcs_feedback_type CHECK (feedback_type::text = ANY (ARRAY['BUG','EXPERIENCE','SUGGEST','OTHER']::text[])),
+    CONSTRAINT ck_dcs_feedback_status CHECK (status::text = ANY (ARRAY['PENDING','PROCESSING','RESOLVED','CLOSED']::text[]))
+);
+
+CREATE INDEX idx_dcs_feedback_status ON public.dcs_feedback USING btree (status);
+CREATE INDEX idx_dcs_feedback_create_by ON public.dcs_feedback USING btree (create_by);
+CREATE INDEX idx_dcs_feedback_tenant_status ON public.dcs_feedback USING btree (tenant_id, status, create_time DESC);
+
+CREATE TABLE public.dcs_changelog (
+    log_id bigint NOT NULL,
+    version character varying(32) NOT NULL,
+    title character varying(200) NOT NULL,
+    items text NOT NULL DEFAULT '[]'::text,
+    target_tenants text NOT NULL DEFAULT '[]'::text,
+    status character(1) NOT NULL DEFAULT '0'::bpchar,
+    publish_time timestamp(6) without time zone,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp(6) without time zone,
+    update_by bigint,
+    update_time timestamp(6) without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_dcs_changelog PRIMARY KEY (log_id),
+    CONSTRAINT ck_dcs_changelog_status CHECK (status::text = ANY (ARRAY['0','1']::text[]))
+);
+
+CREATE UNIQUE INDEX uk_dcs_changelog_version ON public.dcs_changelog USING btree (version) WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_dcs_changelog_status_publish ON public.dcs_changelog USING btree (status, publish_time DESC);

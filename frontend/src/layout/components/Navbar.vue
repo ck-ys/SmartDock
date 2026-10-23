@@ -49,9 +49,12 @@
           </el-popover>
         </div>
       </el-tooltip>
+      <!-- 公告入口收进消息气泡（Q11 2026-10-23）：手机顶栏只保留搜索 + 消息，避免右侧溢出 -->
       <template v-if="appStore.device !== 'mobile'">
-        <!-- 反馈问题（三件套 2026-09-24：全员入口，弹窗内提交/追踪两页签） -->
-        <el-tooltip content="反馈问题" effect="dark" placement="bottom"></el-tooltip>
+        <!-- 反馈问题（N3 2026-10-23：全员入口，弹窗内提交 / 我的反馈两页签） -->
+        <el-tooltip content="反馈问题" effect="dark" placement="bottom">
+          <div class="right-menu-item hover-effect" @click="openFeedback('submit')"><svg-icon icon-class="chat" /></div>
+        </el-tooltip>
         <el-tooltip v-if="showRepositoryLink" content="Github" effect="dark" placement="bottom">
           <ruo-yi-git id="ruoyi-git" class="right-menu-item hover-effect" />
         </el-tooltip>
@@ -85,6 +88,7 @@
               <el-dropdown-item v-if="settingsStore.showSettings" command="setLayout">
                 <span>{{ proxy.$t('navbar.layoutSetting') }}</span>
               </el-dropdown-item>
+              <el-dropdown-item v-if="appStore.device === 'mobile'" command="feedback">反馈问题</el-dropdown-item>
               <el-dropdown-item divided command="logout">
                 <span>{{ proxy.$t('navbar.logout') }}</span>
               </el-dropdown-item>
@@ -93,6 +97,7 @@
         </el-dropdown>
       </div>
     </div>
+    <feedback-dialog v-model:visible="feedbackOpen" :initial-tab="feedbackTab" />
   </div>
 </template>
 
@@ -102,10 +107,12 @@ import { useAppStore } from '@/store/modules/app';
 import { useUserStore } from '@/store/modules/user';
 import { useSettingsStore } from '@/store/modules/settings';
 import { useNoticeStore } from '@/store/modules/notice';
+import { useAnnouncementStore } from '@/store/modules/announcement';
 import { getTenantList } from '@/api/login';
 import { dynamicClear, dynamicTenant } from '@/api/system/tenant';
 import { TenantVO } from '@/api/types';
 import notice from './notice/index.vue';
+import FeedbackDialog from '@/views/dcs/feedback/components/FeedbackDialog.vue';
 import { ElMessage } from 'element-plus';
 import { ElMessageBoxOptions } from 'element-plus/es/components/message-box/src/message-box.type';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
@@ -116,12 +123,36 @@ const appStore = useAppStore();
 const userStore = useUserStore();
 const settingsStore = useSettingsStore();
 const noticeStore = useNoticeStore();
+const announcementStore = useAnnouncementStore();
 const newNotice = computed(() => noticeStore.state.unreadCount);
 // 暂时隐藏框架源码仓库入口，保留组件与目标地址，便于后续恢复。
 const showRepositoryLink = false;
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
+const route = useRoute();
 /** 反馈弹窗开关（三件套 2026-09-24） */
+const feedbackOpen = ref(false);
+const feedbackTab = ref<'submit' | 'mine'>('submit');
+
+const openFeedback = (tab: 'submit' | 'mine') => {
+  feedbackTab.value = tab;
+  feedbackOpen.value = true;
+};
+
+// 「反馈已处理」通知的落地动作：/index?feedback=mine → 打开「我的反馈」，随后清掉参数
+watch(
+  () => route.query.feedback,
+  (value) => {
+    if (value !== 'mine') {
+      return;
+    }
+    openFeedback('mine');
+    const query = { ...route.query };
+    delete query.feedback;
+    proxy?.$router.replace({ path: route.path, query });
+  },
+  { immediate: true }
+);
 
 const userId = ref(userStore.userId);
 const navType = computed(() => settingsStore.navType);
@@ -220,7 +251,10 @@ const setLayout = () => {
 // 定义Command方法对象 通过key直接调用方法
 const commandMap: { [key: string]: any } = {
   setLayout,
-  logout
+  logout,
+  feedback: () => {
+    openFeedback('submit');
+  }
 };
 const handleCommand = (command: string) => {
   // 判断是否存在该方法
@@ -233,6 +267,8 @@ onMounted(() => {
   // PERF-HOME(2026-09-19): 只调 fetchRecent——其内部已并行刷未读数; 此处再单发一次会让
   // 冷启动 unread-count 翻倍(实测三路并发之一)
   noticeStore.fetchRecent();
+  // 公告角标独立口径（Q11）：失败静默，不拖慢顶栏
+  void announcementStore.refreshUnreadCount();
 });
 </script>
 
@@ -388,14 +424,15 @@ onMounted(() => {
       gap: 2px;
 
       .right-menu-item {
-        min-width: 44px;
+        /* 390px 顶栏只有约 137px：44px 会把头像顶出视口（实测 x=393 起点），收到 40px */
+        min-width: 40px;
         height: 44px;
-        padding: 0 6px;
+        padding: 0 4px;
       }
 
       .avatar-container {
-        /* 头像右侧 22px：给下拉箭头（right:-20px）留位，8px 会让箭头被 navbar overflow 裁掉 */
-        margin-right: 22px;
+        /* 头像右侧 12px：给下拉箭头（right:-20px）留位，同时保证 390px 下整个头像可见 */
+        margin-right: 12px;
       }
     }
   }

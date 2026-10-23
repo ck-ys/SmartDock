@@ -101,22 +101,25 @@ class G1DisciplineAndFingerprintTest {
         b.put("y", "member");
         b.put("x", "off");
         int trigger = org.dromara.assistant.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
-        assertEquals(AssistantModelChoiceHolder.assemblyFingerprint(cfg(a, "1", 60000), trigger),
-            AssistantModelChoiceHolder.assemblyFingerprint(cfg(b, "1", 60000), trigger),
+        assertEquals(AssistantModelChoiceHolder.assemblyFingerprint(cfg(a, "1", 60000), trigger, true),
+            AssistantModelChoiceHolder.assemblyFingerprint(cfg(b, "1", 60000), trigger, true),
             "toolGate 键序不得影响指纹（HashMap 序不定）");
     }
 
     @Test
     void configRebuildTriggersOnlyOnChange() {
         int trigger = org.dromara.assistant.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
-        String f1 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), trigger);
+        String f1 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), trigger, true);
         AssistantModelChoiceHolder.markConfigBuilt("g1-test-thread", f1);
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f1), "同指纹不重建");
-        String f2 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "member"), "1", 60000), trigger);
+        String f2 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "member"), "1", 60000), trigger, true);
         assertTrue(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f2), "改档位即重建");
         // 批A-1：压缩触发线改按模型窗口派生——换模型导致触发线变，同样必须重建
-        String f3 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), 90_000);
+        String f3 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), 90_000, true);
         assertTrue(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f3), "触发线变化即重建");
+        // N3：本租户搜索 Key 从无到有 → 装配面变化，缓存会话必须重建才能挂上 web_search
+        String f4 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), trigger, false);
+        assertTrue(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f4), "搜索 Key 可用性变化即重建");
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild("g1-other-thread", f1), "未建线程不算失效");
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild(null, f1), "null 线程安全返回 false");
     }

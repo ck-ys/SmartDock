@@ -127,8 +127,9 @@ public class AssistantAgentFactory {
             org.dromara.assistant.core.AssistantModelChoiceHolder.defaultAwareFingerprint(
                 sd.scopeIds(), sd.defaultConfigId(), sd.usableSignature()));
         // 业务批3-④: 联网开关同款回写——工具集随开关增删, resolver 对比判缓存失效
-        org.dromara.assistant.core.AssistantWebSearchHolder.markBuilt(aguiThreadId,
-            org.dromara.assistant.core.AssistantWebSearchHolder.isOn(aguiThreadId));
+        // N3 三审回修：租户从登录快照显式带下（异步 supplier 线程无 Sa-Token 上下文）
+        boolean webSearchOn = org.dromara.assistant.core.AssistantWebSearchHolder.isOn(aguiThreadId);
+        org.dromara.assistant.core.AssistantWebSearchHolder.markBuilt(aguiThreadId, webSearchOn);
         // 二站④ AU-53：租户开长期记忆才装配记忆链路（注入装饰器+save_memory 工具+§13 提示词）
         // 三审回修（dspro P2-6）：租户配置一次读全（此前 memoryOn/toolGate/compaction 各查一次，
         // 三次快照有半新半旧窗口）——toolGate 在下方注册面消费，compaction 在压缩中间件消费
@@ -138,7 +139,9 @@ public class AssistantAgentFactory {
         // 该租户全部缓存会话下一请求即失效重建，不再吃 60 分钟会话超时
         org.dromara.assistant.core.AssistantModelChoiceHolder.markConfigBuilt(aguiThreadId,
             org.dromara.assistant.core.AssistantModelChoiceHolder.assemblyFingerprint(tenantCfg,
-                AssistantCompactionPolicy.deriveTriggerTokens(cfg.getContextWindow(), cfg.getMaxTokens())));
+                AssistantCompactionPolicy.deriveTriggerTokens(cfg.getContextWindow(), cfg.getMaxTokens()),
+                webSearchOn && org.dromara.assistant.tools.WebSearchTools
+                    .hasUsableTenantKey(configService, user.getTenantId())));
         boolean memoryOn = "1".equals(tenantCfg.memoryEnabled());
         // AU-03(Q3=C)→批2 双层档位: 最内层套思考档装饰器——按会话读 thinkTier 经能力目录
         // 翻译原生参数(TIERS→reasoning_effort / SWITCH→thinking.type)；装配期解析能力一次注入。
@@ -179,8 +182,8 @@ public class AssistantAgentFactory {
         Set<String> registered = ToolRegistry.registerAll(toolkit, identity,
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
-                planSignal, memoryService, memoryOn, aguiThreadId, todoSignal, conversationService,
-                webSearchQuota, quotaService), pb,
+                planSignal, memoryService, memoryOn, aguiThreadId, user.getTenantId(),
+                todoSignal, conversationService, webSearchQuota, quotaService), pb,
             // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
             // 管理员改完下一轮建会话即生效（注册面即时消失）
             tenantCfg.toolGate());

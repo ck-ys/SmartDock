@@ -50,6 +50,21 @@ public class SysNoticeVo implements Serializable {
     private String status;
 
     /**
+     * 是否置顶（0否 1是）
+     */
+    private String isTop;
+
+    /**
+     * 发布时间
+     */
+    private Date publishTime;
+
+    /**
+     * 过期时间
+     */
+    private Date expireTime;
+
+    /**
      * 备注
      */
     private String remark;

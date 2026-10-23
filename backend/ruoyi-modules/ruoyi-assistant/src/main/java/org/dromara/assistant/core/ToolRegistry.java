@@ -44,6 +44,8 @@ public final class ToolRegistry {
         org.dromara.assistant.service.AssistantMemoryService memoryService,
         Boolean memoryEnabled,
         String aguiThreadId,
+        /** 建 agent 的生效租户（登录快照）；异步 supplier 线程无 Sa-Token，租户必须显式带进来 */
+        String tenantId,
         org.dromara.assistant.core.AssistantTodoSignal todoSignal,
         org.dromara.assistant.service.AssistantConversationService conversationService,
         org.dromara.assistant.limiter.AssistantWebSearchQuota webSearchQuota,
@@ -71,14 +73,16 @@ public final class ToolRegistry {
 
     /** 全部平台工具的唯一清单（顺序即注册顺序，新增工具只改这里；守卫测试直读）。 */
     public static final List<ToolSpec> SPECS = List.of(
-        // 联网搜索（业务批3-④ #17）：用户会话开关开着才注册 schema（关=模型看不见，
-        // 幻觉调用连发生的机会都没有）；key 未配=注册但工具内 DISABLED 优雅转告（现状行为）。
-        // 执行链再过日配额闸（单人覆盖>租户默认 20 次/天，上游失败补偿）
+        // 联网搜索（业务批3-④ #17 + N3 2026-10-23）：用户会话开关开着、且本租户已配置
+        // 可用搜索 key 才注册 schema（任一不满足=模型看不见）；工具内仍保留 DISABLED 兜底
+        // 处理会话期间 key 被清空。执行链再过日配额闸（单人覆盖>租户默认 20 次/天，上游失败补偿）
         new ToolSpec(Set.of("web_search"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
             (id, d) -> new org.dromara.assistant.tools.WebSearchTools(id, d.configService(), d.piiFilter(),
                 d.webSearchQuota(), d.quotaService()),
-            d -> AssistantWebSearchHolder.isOn(d.aguiThreadId())),
+            d -> org.dromara.assistant.tools.WebSearchTools.shouldRegisterWebSearch(
+                AssistantWebSearchHolder.isOn(d.aguiThreadId()), d.tenantId(),
+                () -> org.dromara.assistant.tools.WebSearchTools.readTenantKey(d.configService(), d.tenantId()))),
         // 会话附件：全角色可用（只读自己会话的文件；threadId 随 agent 会话绑定；
         // G5 批G：出口统一 secureJson（PII+注入打标），piiFilter 不再单独注入）
         new ToolSpec(Set.of("read_attachment"),

@@ -51,42 +51,83 @@ public class WebSearchTools {
     /** 系统参数 key：博查 API Key（空=未启用） */
     public static final String CONFIG_KEY = "dcs.assistant.websearch.key";
 
-    /**
-     * 系统参数 key（业务反馈批1015b Q14）：「作为全平台默认」显式开关——true 时，没配自己
-     * key 的租户借用平台（000000）的搜索 key（博查按次计费，费用记平台账，用户拍板知情）。
-     * 默认不配置=不共用，与 Q8「平台兜底必须显式勾选」同一口径；开关行放在平台租户宇宙。
-     */
-    public static final String PLATFORM_DEFAULT_SWITCH_KEY = "dcs.assistant.websearch.platform_default";
-
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    /** O-3 口径（原判定抽出复用）：空/off/disabled 占位与非 sk- 前缀一律视为不可用 */
-    private static boolean isUsableKey(String keyTrim) {
+    /** O-3 口径：空/off/disabled 占位与非 sk- 前缀一律视为不可用 */
+    public static boolean isUsableKey(String keyTrim) {
         return !keyTrim.isEmpty()
             && !keyTrim.equalsIgnoreCase("off")
             && !keyTrim.equalsIgnoreCase("disabled")
             && keyTrim.startsWith("sk-");
     }
 
-    /** Q14（业务反馈批1015b）：搜索 key 解析——本租户 key 不可用且非平台自身时，
-     * 查平台宇宙的「作为全平台默认」显式开关（true/1），开着借平台 key；否则维持本租户值 */
+    /**
+     * 搜索 key 解析（2026-10-23 N3 拍板）：只认本租户自己的 key。
+     *
+     * <p>平台兜底已删除——未配置的租户就是搜索不可用，不再借用默认租户（000000）的 key，
+     * 避免「没配也能搜」与账单串户。默认租户自身同样按本租户 key 解析。</p>
+     */
     private String resolveSearchKey(String tenantId) {
         String key = org.dromara.common.tenant.helper.TenantHelper.dynamic(
             tenantId, () -> configService.getConfigValue(CONFIG_KEY));
         String keyTrim = key == null ? "" : key.trim();
-        if (!isUsableKey(keyTrim) && !"000000".equals(tenantId)) {
-            String sw = org.dromara.common.tenant.helper.TenantHelper.dynamic(
-                "000000", () -> configService.getConfigValue(PLATFORM_DEFAULT_SWITCH_KEY));
-            String swTrim = sw == null ? "" : sw.trim();
-            if ("true".equalsIgnoreCase(swTrim) || "1".equals(swTrim)) {
-                String platformKey = org.dromara.common.tenant.helper.TenantHelper.dynamic(
-                    "000000", () -> configService.getConfigValue(CONFIG_KEY));
-                String pTrim = platformKey == null ? "" : platformKey.trim();
-                if (isUsableKey(pTrim)) {
-                    return pTrim;
-                }
-            }
+        return isUsableKey(keyTrim) ? keyTrim : "";
+    }
+
+    /**
+     * 注册闸用：指定租户是否已配置可用搜索 key（租户为空按未配置处理，失败即关闭）。
+     *
+     * <p>N3 三审回修（2026-10-23）：租户必须由调用方显式传入——建 agent 的 supplier 跑在
+     * 响应式线程池，没有 Sa-Token 上下文，{@code TenantHelper.getTenantId()} 恒为 null，
+     * 原实现会让联网搜索对所有人生效不了。</p>
+     */
+    public static boolean hasUsableTenantKey(ConfigService configService, String tenantId) {
+        return hasUsableKeyForTenant(tenantId, () -> readTenantKey(configService, tenantId));
+    }
+
+    /** 读指定租户的 key（失败返回空串；租户为空不读）。 */
+    public static String readTenantKey(ConfigService configService, String tenantId) {
+        if (configService == null || tenantId == null || tenantId.isBlank()) {
+            return "";
         }
-        return keyTrim;
+        // 租户开关的判定与取 key 分开 try：纯单测没有 Spring 上下文，isEnable 会抛异常，
+        // 此时按“租户功能未启用”直接读配置（生产环境恒启用，行为不受影响）
+        boolean tenantEnabled = false;
+        try {
+            tenantEnabled = org.dromara.common.tenant.helper.TenantHelper.isEnable();
+        } catch (Exception ignored) {
+            // 无 Spring 上下文
+        }
+        try {
+            String key = tenantEnabled
+                ? org.dromara.common.tenant.helper.TenantHelper.dynamic(
+                    tenantId, () -> configService.getConfigValue(CONFIG_KEY))
+                : configService.getConfigValue(CONFIG_KEY);
+            return key == null ? "" : key.trim();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /**
+     * 注册闸纯函数：开关开着、租户明确、且该租户 key 可用才注册。
+     * key 读取由调用方延迟提供（开关关/租户空时不碰数据库）。
+     */
+    public static boolean shouldRegisterWebSearch(boolean switchOn, String tenantId,
+                                                  java.util.function.Supplier<String> keyReader) {
+        return hasUsableKeyForTenant(tenantId, keyReader) && switchOn;
+    }
+
+    private static boolean hasUsableKeyForTenant(String tenantId,
+                                                 java.util.function.Supplier<String> keyReader) {
+        if (tenantId == null || tenantId.isBlank()) {
+            return false;
+        }
+        try {
+            String key = keyReader.get();
+            return isUsableKey(key == null ? "" : key.trim());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static final String ENDPOINT = "https://api.bocha.cn/v1/web-search";
@@ -152,14 +193,13 @@ public class WebSearchTools {
         try {
             // 读当前租户宇宙的 sys_config：参数设置界面 PUT 走 @CachePut 刷的也是该宇宙，
             // 改动即时生效。禁 ignore——那会落 global 宇宙缓存，界面改完助手仍读旧值（双宇宙实测踩坑）
-            // 业务反馈批1015b Q14：本租户没配/关停时，看平台「作为全平台默认」显式开关——
-            // 开着才借平台 key（费用记平台账）；开关没开=维持原"未启用"口径
+            // N3 2026-10-23 拍板 B 案：只认本租户 key，平台兜底已删除（未配置=不可用，不串户计费）
             String keyTrim = resolveSearchKey(tenantId);
             boolean disabled = !isUsableKey(keyTrim);
             if (disabled) {
                 out.put("status", "DISABLED");
-                out.put("message", "联网搜索未启用：管理员未配置搜索服务密钥（系统参数 "
-                    + CONFIG_KEY + "，博查 key 以 sk- 开头；填 off 可随时关停；或在平台侧开启「作为全平台默认」共用平台密钥）。请转告用户该功能暂不可用，不要重试。");
+                out.put("message", "联网搜索未启用：本租户还没有配置可用的搜索服务密钥（系统参数 "
+                    + CONFIG_KEY + "，博查 key 以 sk- 开头；填 off 可随时关停）。请转告用户该功能暂不可用，不要重试。");
                 return ToolSupport.secureJson(out, identity);
             }
             String q = query == null ? "" : query.trim();

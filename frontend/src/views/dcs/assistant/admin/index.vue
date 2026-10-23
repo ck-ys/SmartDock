@@ -160,27 +160,19 @@
               </div>
             </el-descriptions-item>
             <el-descriptions-item label="钱包余额">{{ walletTxt }}</el-descriptions-item>
-            <!-- 业务反馈批1015b Q14：联网搜索卡片行——密钥打码显示/一键测连通/替换密钥（先测后存）；
-                 平台默认开关=没配 key 的租户借平台 key（显式勾选，费用记平台账） -->
+            <!-- N3 2026-10-23：每租户只认自己的搜索密钥；未配置=本租户联网搜索不可用（平台兜底已删） -->
             <el-descriptions-item label="联网搜索">
               <div class="cell-flex">
                 <el-tag size="small" :type="wsState.configured ? 'success' : 'info'">
                   {{ wsState.configured ? '● 已启用' : '○ 未配置' }}
                 </el-tag>
-                <span class="cell-note ws-key">{{ wsState.configured ? wsState.maskedKey : '还没配置搜索密钥，联网搜索不可用' }}</span>
-                <el-button link type="primary" size="small" :loading="wsTesting" @click="onWsTest">测试连通</el-button>
+                <span class="cell-note ws-key">{{ wsState.configured ? wsState.maskedKey : '本租户未配置搜索密钥，联网搜索不可用' }}</span>
+                <el-button link type="primary" size="small" :loading="wsTesting" :disabled="!wsState.configured" @click="onWsTest">测试连通</el-button>
                 <el-button v-hasPermi="['system:config:edit']" link type="primary" size="small" @click="wsReplace.open = true">替换密钥</el-button>
                 <span v-if="wsTestMsg" class="cell-note" :class="{ 'ws-fail': !wsTestOk }">{{ wsTestMsg }}</span>
               </div>
               <div class="cell-flex" style="margin-top: 4px">
-                <el-switch
-                  v-model="wsState.platformDefault"
-                  :loading="wsSavingSwitch"
-                  :disabled="!wsCanEditConfig || userStore.tenantId !== '000000'"
-                  @change="(v: any) => onPlatformDefaultToggle(v)"
-                />
-                <span class="cell-note">作为全平台默认：开启后，没配自己密钥的租户共用这把（按次计费、费用记平台账）</span>
-                <span v-if="userStore.tenantId !== '000000'" class="cell-note">仅平台管理员（默认租户）可改</span>
+                <span class="cell-note">每个租户使用自己的博查密钥；未配置时该租户的联网搜索工具不可用，也不会计费。</span>
               </div>
             </el-descriptions-item>
             <el-descriptions-item label="消费方式">
@@ -2692,12 +2684,10 @@ async function onQuotaToggle(row: AssistantQuotaRow) {
 
 /* ===== 业务反馈批1015b Q14：联网搜索卡片（Q8 跟随平台默认模型开关已按用户要求撤销 2026-10-15） ===== */
 const WS_KEY = 'dcs.assistant.websearch.key';
-const WS_PLATFORM_KEY = 'dcs.assistant.websearch.platform_default';
-const wsState = reactive({ configured: false, maskedKey: '', platformDefault: false });
+const wsState = reactive({ configured: false, maskedKey: '' });
 const wsTesting = ref(false);
 const wsTestMsg = ref('');
 const wsTestOk = ref(false);
-const wsSavingSwitch = ref(false);
 /** 参数编辑权限（写走系统配置 API；无权限只读+提示） */
 const wsCanEditConfig = computed(() => checkPermi(['system:config:edit']));
 const wsReplace = reactive({ open: false, key: '', testing: false, saving: false, testMsg: '', testOk: false });
@@ -2709,7 +2699,6 @@ async function loadWsInfo() {
     if (d) {
       wsState.configured = !!d.configured;
       wsState.maskedKey = d.maskedKey || '';
-      wsState.platformDefault = !!d.platformDefault;
     }
   } catch {
     /* 读失败不阻塞页面，卡片按未配置显示 */
@@ -2781,18 +2770,6 @@ async function onWsSaveKey() {
     /* request.ts 已统一弹错 */
   } finally {
     wsReplace.saving = false;
-  }
-}
-
-async function onPlatformDefaultToggle(v: boolean | string | number) {
-  wsSavingSwitch.value = true;
-  try {
-    await upsertSysConfig(WS_PLATFORM_KEY, v ? 'true' : 'false', 'AI助手搜索密钥全平台共用开关');
-    ElMessage.success(v ? '已开启：没配密钥的租户将共用平台密钥（费用记平台账）' : '已关闭：各租户须自配搜索密钥');
-  } catch {
-    wsState.platformDefault = !v;
-  } finally {
-    wsSavingSwitch.value = false;
   }
 }
 

@@ -148,7 +148,7 @@ class BizToolSpiTest {
         // 批3 微核心化: ToolDeps 只剩平台依赖, 业务工具全走 SPI——全 null 依赖即可装配
         org.dromara.assistant.core.ToolRegistry.ToolDeps emptyDeps =
             new org.dromara.assistant.core.ToolRegistry.ToolDeps(
-                null, null, null, null, null, Boolean.FALSE, "t", null, null, null, null);
+                null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null);
         Toolkit toolkit = new Toolkit();
         Set<String> registered = org.dromara.assistant.core.ToolRegistry.registerAll(toolkit,
             identity(2, Set.of("*:*:*")), emptyDeps, PermissionContextState.builder(), null);

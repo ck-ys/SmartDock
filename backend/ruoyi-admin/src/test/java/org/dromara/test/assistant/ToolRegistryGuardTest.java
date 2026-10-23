@@ -49,15 +49,24 @@ class ToolRegistryGuardTest {
         return new ToolIdentity(1L, "000000", level, null);
     }
 
-    /** 平台工具无「缺依赖即缺席」gate——全 null 依赖即可构造（工具构造器只存引用）。 */
+    /** N3 起 web_search 还要求本租户已配 key：守卫测试喂一个可用 key 的假配置服务。 */
+    private static final org.dromara.common.core.service.ConfigService KEY_CONFIG =
+        org.mockito.Mockito.mock(org.dromara.common.core.service.ConfigService.class);
+
+    static {
+        org.mockito.Mockito.when(KEY_CONFIG.getConfigValue(org.dromara.assistant.tools.WebSearchTools.CONFIG_KEY))
+            .thenReturn("sk-guard-test");
+    }
+
+    /** 平台工具构造器只存依赖引用，其余依赖可全 null。 */
     private static ToolRegistry.ToolDeps readyDeps(Boolean memoryEnabled) {
         return readyDeps(memoryEnabled, "thread-t");
     }
 
     private static ToolRegistry.ToolDeps readyDeps(Boolean memoryEnabled, String threadId) {
         return new ToolRegistry.ToolDeps(
-            null, null, null,
-            null, null, memoryEnabled, threadId, null, null, null, null);
+            KEY_CONFIG, null, null,
+            null, null, memoryEnabled, threadId, "000000", null, null, null, null);
     }
 
     /** ①清单完整：全局名字无重复，与预期全集全等；每条 spec 字段齐。 */

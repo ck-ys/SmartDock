@@ -56,6 +56,8 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     private final org.dromara.assistant.service.AssistantConfigService assistantConfigService;
     /** 批A-1：压缩触发线指纹需要按当前模型窗口派生（与建侧同源解析） */
     private final org.dromara.assistant.factory.AssistantModelFactory modelFactory;
+    /** N3：搜索 Key 可用性进装配指纹（管理员刚配好 Key 时缓存会话下一请求即重建） */
+    private final org.dromara.common.core.service.ConfigService sysConfigService;
 
     @Override
     public RuntimeContext resolve(AguiRuntimeContextRequest<?> request) {
@@ -166,7 +168,10 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
             // 原用 resolveTenantId 的动态租户，超管切租户且两租户配置有差时每请求恒失配=空转重建
             || AssistantModelChoiceHolder.needsConfigRebuild(aguiThreadId,
                 AssistantModelChoiceHolder.assemblyFingerprint(assistantConfigService.effective(user.getTenantId()),
-                    derivedTriggerTokens(user.getTenantId(), aguiThreadId)));
+                    derivedTriggerTokens(user.getTenantId(), aguiThreadId),
+                    AssistantWebSearchHolder.isOn(aguiThreadId)
+                        && org.dromara.assistant.tools.WebSearchTools
+                            .hasUsableTenantKey(sysConfigService, user.getTenantId())));
         if (aguiThreadId != null && rebuildNeeded) {
             boolean removed = threadSessionManager.removeSession("t:" + tenantId + ":" + userId, aguiThreadId);
             if (removed) {

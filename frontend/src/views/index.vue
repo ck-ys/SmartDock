@@ -127,13 +127,14 @@
           <button type="button" class="ck-more" @click="go('/support/changelog')">全部日志 →</button>
         </header>
         <ul class="ck-log">
-          <li v-for="entry in recentLogs" :key="entry.version">
+          <li v-for="entry in recentLogs" :key="entry.logId">
             <span class="ck-log__ver">{{ entry.version }}</span>
             <div>
               <b>{{ entry.title }}</b>
-              <p>{{ entry.items[0] }}</p>
+              <p>{{ entry.itemList?.[0]?.text }}</p>
             </div>
           </li>
+          <li v-if="recentLogs.length === 0" class="ck-log__empty">暂无更新记录</li>
         </ul>
       </section>
     </div>
@@ -145,7 +146,8 @@ import { getAnalyticsOverview, getAnalyticsTrend, type AnalyticsOverview } from 
 import { getOverview, type ProfileOverview } from '@/api/dcs/core/profile';
 import { statsOverview, type DcsStatsOverview } from '@/api/dcs/core/task';
 import { getAssistantStatus } from '@/api/dcs/assistant';
-import { CHANGELOG_ENTRIES } from '@/views/dcs/changelog/changelog';
+import { listChangelog } from '@/api/dcs/changelog';
+import type { ChangelogRow } from '@/api/dcs/changelog/types';
 import { checkPermi } from '@/utils/permission';
 import { useUserStore } from '@/store/modules/user';
 
@@ -192,7 +194,7 @@ const avgDuration = computed(() => {
   return sec >= 60 ? `${Math.round(sec / 60)} 分钟` : `${Math.round(sec)} 秒`;
 });
 
-const recentLogs = computed(() => CHANGELOG_ENTRIES.slice(0, 2));
+const recentLogs = ref<ChangelogRow[]>([]);
 
 const go = (path: string) => router.push(path);
 
@@ -280,11 +282,21 @@ async function loadPulse() {
   }
 }
 
+async function loadLogs() {
+  try {
+    const res: any = await listChangelog({ pageNum: 1, pageSize: 2 });
+    recentLogs.value = res.rows || [];
+  } catch {
+    recentLogs.value = [];
+  }
+}
+
 function loadAll() {
   loadAssistant();
   loadStats();
   loadProfile();
   loadPulse();
+  loadLogs();
 }
 
 onMounted(loadAll);
@@ -679,6 +691,11 @@ onMounted(loadAll);
       line-height: 1.55;
     }
   }
+}
+.ck-log__empty {
+  display: block !important;
+  font-size: 12.5px;
+  color: var(--ck-sub);
 }
 .ck-log__ver {
   flex: none;

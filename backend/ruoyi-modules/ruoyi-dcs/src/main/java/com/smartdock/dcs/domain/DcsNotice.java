@@ -42,6 +42,9 @@ public class DcsNotice implements Serializable {
     /** 0=未读 1=已读 */
     private String readFlag;
 
+    /** 点击跳转的前端路由（可空） */
+    private String refUrl;
+
     private Date createTime;
 
     /**

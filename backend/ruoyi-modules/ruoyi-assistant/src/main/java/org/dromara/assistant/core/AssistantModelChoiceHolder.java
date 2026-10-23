@@ -145,11 +145,12 @@ public final class AssistantModelChoiceHolder {
     private static final java.util.Map<String, String> CONFIG_FINGERPRINTS = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** 装配面指纹：只取影响 agent 装配的租户配置段（TreeMap 序稳定防误判）；
-     *  批A-1：压缩触发线改为按模型窗口派生，纳入指纹——改窗口/输出额度后下一请求即重建 */
+     *  批A-1：压缩触发线改为按模型窗口派生，纳入指纹——改窗口/输出额度后下一请求即重建；
+     *  N3：本租户搜索 Key 可用性纳入——管理员刚配好 Key 时缓存会话下一请求即重建，立即生效 */
     public static String assemblyFingerprint(org.dromara.assistant.service.AssistantConfigService.EffectiveConfig cfg,
-                                             int compactionTriggerTokens) {
+                                             int compactionTriggerTokens, boolean webSearchKeyUsable) {
         return (cfg.toolGate() == null ? "" : new java.util.TreeMap<>(cfg.toolGate()).toString())
-            + "|" + cfg.memoryEnabled() + "|" + compactionTriggerTokens;
+            + "|" + cfg.memoryEnabled() + "|" + compactionTriggerTokens + "|" + webSearchKeyUsable;
     }
 
     public static void markConfigBuilt(String threadId, String fingerprint) {

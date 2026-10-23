@@ -27,7 +27,12 @@ public class DcsNoticeService {
 
     /** 发通知(业务事件内联调用; 失败不阻断由调用方 try 决定) */
     public void notify(Long userId, String noticeType, String title, String content, Long taskId) {
-        DcsNotice n = build(userId, noticeType, title, content, taskId);
+        notify(userId, noticeType, title, content, taskId, null);
+    }
+
+    /** 发通知（带点击跳转路由；N3 2026-10-23） */
+    public void notify(Long userId, String noticeType, String title, String content, Long taskId, String refUrl) {
+        DcsNotice n = build(userId, noticeType, title, content, taskId, refUrl);
         noticeMapper.insert(n);
     }
 
@@ -41,16 +46,22 @@ public class DcsNoticeService {
      */
     public boolean notifyIdem(Long userId, String noticeType, String title, String content,
                               Long taskId, String dedupKey) {
+        return notifyIdem(userId, noticeType, title, content, taskId, dedupKey, null);
+    }
+
+    /** 带幂等键 + 跳转路由的通知（N3 2026-10-23） */
+    public boolean notifyIdem(Long userId, String noticeType, String title, String content,
+                              Long taskId, String dedupKey, String refUrl) {
         if (dedupKey == null || dedupKey.isBlank()) {
-            notify(userId, noticeType, title, content, taskId);
+            notify(userId, noticeType, title, content, taskId, refUrl);
             return true;
         }
-        DcsNotice n = build(userId, noticeType, title, content, taskId);
+        DcsNotice n = build(userId, noticeType, title, content, taskId, refUrl);
         n.setDedupKey(dedupKey.length() > 128 ? dedupKey.substring(0, 128) : dedupKey);
         return noticeMapper.insertIgnoreDedup(n) > 0;
     }
 
-    private DcsNotice build(Long userId, String noticeType, String title, String content, Long taskId) {
+    private DcsNotice build(Long userId, String noticeType, String title, String content, Long taskId, String refUrl) {
         DcsNotice n = new DcsNotice();
         n.setId(IdWorker.getId());
         n.setTenantId(currentTenant());
@@ -60,6 +71,7 @@ public class DcsNoticeService {
         n.setContent(content != null && content.length() > 1000 ? content.substring(0, 1000) : content);
         n.setTaskId(taskId);
         n.setReadFlag("0");
+        n.setRefUrl(refUrl);
         n.setCreateTime(new Date());
         return n;
     }

@@ -12,6 +12,8 @@ export interface DcsNoticeRow {
   title: string;
   content?: string;
   taskId?: string;
+  /** 点击跳转的前端路由（可空；N3 2026-10-23 新增） */
+  refUrl?: string;
   readFlag: '0' | '1';
   createTime?: string;
 }

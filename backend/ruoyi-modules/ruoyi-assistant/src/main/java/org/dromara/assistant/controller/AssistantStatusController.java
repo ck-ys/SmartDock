@@ -237,59 +237,51 @@ public class AssistantStatusController extends BaseController {
     }
 
     /**
-     * 业务反馈批1015b Q14：联网搜索配置读（perm=config，管理页卡片数据源）。
-     * 安全口径：密钥只出掩码（前 4 后 4），明文永不出后端；平台开关状态一并返回供卡片展示。
+     * 联网搜索配置读（perm=config，管理页卡片数据源）。
+     *
+     * <p>N3 拍板（2026-10-23）：只认本租户自己的 key，平台兜底已删。安全口径不变：密钥只出
+     * 掩码（前 6 后 4），明文永不出后端。</p>
      */
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/admin/websearch")
     public R<Map<String, Object>> websearchInfo() {
-        String tenantId = LoginHelper.getTenantId();
-        String key = TenantHelper.dynamic(tenantId, () -> sysConfigService.getConfigValue(WebSearchTools.CONFIG_KEY));
+        // 超管切租户后读面也要看被切换到的租户（TenantHelper 动态优先）
+        String tenantId = TenantHelper.getTenantId();
+        String key = callInTenant(tenantId, () -> sysConfigService.getConfigValue(WebSearchTools.CONFIG_KEY));
         String trim = key == null ? "" : key.trim();
-        boolean usable = !trim.isEmpty() && !"off".equalsIgnoreCase(trim) && !"disabled".equalsIgnoreCase(trim) && trim.startsWith("sk-");
-        String mask = usable ? trim.substring(0, Math.min(6, trim.length())) + "****" + trim.substring(Math.max(0, trim.length() - 4)) : "";
-        String sw = TenantHelper.dynamic("000000", () -> sysConfigService.getConfigValue(WebSearchTools.PLATFORM_DEFAULT_SWITCH_KEY));
-        String swTrim = sw == null ? "" : sw.trim();
+        boolean usable = WebSearchTools.isUsableKey(trim);
+        // 短 key 前后段会重叠导致掩码形同虚设：不足 16 位只回 ****
+        String mask = usable
+            ? (trim.length() < 16 ? "****" : trim.substring(0, 6) + "****" + trim.substring(trim.length() - 4))
+            : "";
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("configured", usable);
         out.put("maskedKey", mask);
-        out.put("placeholderHint", trim.isEmpty() ? "未配置" : usable ? "" : "已配置但为占位/停用值（off/disabled 或非 sk- 前缀）");
-        out.put("platformDefault", "true".equalsIgnoreCase(swTrim) || "1".equals(swTrim));
+        out.put("placeholderHint", trim.isEmpty() ? "本租户未配置" : usable ? "" : "已配置但为占位/停用值（off/disabled 或非 sk- 前缀）");
         out.put("configKey", WebSearchTools.CONFIG_KEY);
         return R.ok(out);
     }
 
     /**
-     * 业务反馈批1015b Q14：搜索连通测试（perm=config）。body.key 可选——带值=先验新钥匙再替换
-     * （推荐流程），不带=用当前生效 key（含平台默认回退口径，与真实调用同解析）。
+     * 搜索连通测试（perm=config）。body.key 可选——带值=先验新钥匙再替换（推荐流程），
+     * 不带=用本租户当前生效 key（与真实调用同一解析，平台兜底已删）。
      * 打一次 count=1 的真请求量延迟；任何异常返回 ok=false + 人话原因，不抛 500。
      */
     @SaCheckPermission("dcs:assistant:config")
     @PostMapping("/admin/websearch/test")
     public R<Map<String, Object>> websearchTest(@RequestBody(required = false) Map<String, String> body) {
-        String tenantId = LoginHelper.getTenantId();
+        String tenantId = TenantHelper.getTenantId();
         String candidate = body == null ? null : body.get("key");
         String key = candidate != null && !candidate.isBlank() ? candidate.trim() : null;
         if (key == null) {
-            // 复用工具同一解析链（本租户 → 平台开关）——测试的就是真实调用会用的那把
-            String saved = TenantHelper.dynamic(tenantId, () -> sysConfigService.getConfigValue(WebSearchTools.CONFIG_KEY));
+            String saved = callInTenant(tenantId,
+                () -> sysConfigService.getConfigValue(WebSearchTools.CONFIG_KEY));
             key = saved == null ? "" : saved.trim();
-            if ((key.isEmpty() || "off".equalsIgnoreCase(key) || "disabled".equalsIgnoreCase(key) || !key.startsWith("sk-"))
-                && !"000000".equals(tenantId)) {
-                String sw = TenantHelper.dynamic("000000", () -> sysConfigService.getConfigValue(WebSearchTools.PLATFORM_DEFAULT_SWITCH_KEY));
-                String swTrim = sw == null ? "" : sw.trim();
-                if ("true".equalsIgnoreCase(swTrim) || "1".equals(swTrim)) {
-                    String platform = TenantHelper.dynamic("000000", () -> sysConfigService.getConfigValue(WebSearchTools.CONFIG_KEY));
-                    if (platform != null && platform.trim().startsWith("sk-")) {
-                        key = platform.trim();
-                    }
-                }
-            }
         }
         Map<String, Object> out = new LinkedHashMap<>();
-        if (key == null || key.isEmpty() || !key.startsWith("sk-")) {
+        if (!WebSearchTools.isUsableKey(key)) {
             out.put("ok", false);
-            out.put("message", "没有可测试的密钥（未配置或占位值）");
+            out.put("message", "本租户还没有可用的搜索密钥，请先配置");
             return R.ok(out);
         }
         long start = System.currentTimeMillis();
@@ -323,5 +315,25 @@ public class AssistantStatusController extends BaseController {
             out.put("message", "请求失败：" + e.getMessage());
         }
         return R.ok(out);
+    }
+
+    /**
+     * 在指定租户上下文内执行并恢复原动态租户。
+     *
+     * <p>不能直接套 {@link TenantHelper#dynamic}：其 finally 的 clearDynamic 在登录线程上会
+     * 连超管「切换单位」的持久态一起删（仓内 TenantScopes 同款口径）。</p>
+     */
+    private <T> T callInTenant(String tenantId, java.util.function.Supplier<T> body) {
+        if (org.dromara.common.core.utils.StringUtils.isBlank(tenantId)) {
+            return body.get();
+        }
+        String prevDynamic = TenantHelper.getDynamic();
+        try {
+            return TenantHelper.dynamic(tenantId, body);
+        } finally {
+            if (org.dromara.common.core.utils.StringUtils.isNotBlank(prevDynamic)) {
+                TenantHelper.setDynamic(prevDynamic, true);
+            }
+        }
     }
 }

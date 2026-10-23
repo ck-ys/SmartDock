@@ -4,6 +4,9 @@ export interface NoticeVO extends BaseEntity {
   noticeType: string;
   noticeContent: string;
   status: string;
+  isTop: string;
+  publishTime: string | null;
+  expireTime: string | null;
   remark: string;
   createByName: string;
 }
@@ -21,6 +24,9 @@ export interface NoticeForm {
   noticeType: string;
   noticeContent: string;
   status: string;
+  isTop: string;
+  publishTime: string | null;
+  expireTime: string | null;
   remark: string;
   createByName: string;
 }

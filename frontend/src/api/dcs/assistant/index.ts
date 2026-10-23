@@ -67,7 +67,7 @@ export function getAssistantStatus(threadId?: string) {
 
 /** 业务反馈批1015b Q14：联网搜索配置读（密钥只出掩码；含平台默认开关状态） */
 export function getWebsearchInfo() {
-  return request<{ configured: boolean; maskedKey: string; platformDefault: boolean; configKey: string }>({
+  return request<{ configured: boolean; maskedKey: string; configKey: string }>({
     url: '/dcs/assistant/admin/websearch',
     method: 'get'
   });

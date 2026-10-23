@@ -17,6 +17,7 @@ export interface PersistedNoticeItem {
   title?: string;
   content?: string;
   taskId?: string;
+  refUrl?: string;
   readStatus: string;
   createTime?: string;
 }
@@ -29,6 +30,7 @@ const toPersisted = (row: DcsNoticeRow): PersistedNoticeItem => ({
   title: row.title,
   content: row.content,
   taskId: row.taskId,
+  refUrl: row.refUrl,
   readStatus: row.readFlag,
   createTime: row.createTime
 });

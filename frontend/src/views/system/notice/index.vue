@@ -53,6 +53,12 @@
             <dict-tag :options="sys_notice_type" :value="scope.row.noticeType" />
           </template>
         </el-table-column>
+        <el-table-column label="置顶" align="center" width="80">
+          <template #default="scope">
+            <el-tag v-if="scope.row.isTop === '1'" type="danger" size="small">置顶</el-tag>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" align="center" prop="status" width="100">
           <template #default="scope">
             <dict-tag :options="sys_notice_status" :value="scope.row.status" />
@@ -101,6 +107,35 @@
               </el-radio-group>
             </el-form-item>
           </el-col>
+          <el-col :span="8">
+            <el-form-item label="是否置顶">
+              <el-switch v-model="form.isTop" active-value="1" inactive-value="0" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="发布时间">
+              <el-date-picker
+                v-model="form.publishTime"
+                type="datetime"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                placeholder="留空=立即发布"
+                clearable
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="过期时间">
+              <el-date-picker
+                v-model="form.expireTime"
+                type="datetime"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                placeholder="留空=长期有效"
+                clearable
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
           <el-col :span="24">
             <el-form-item label="内容">
               <editor v-model="form.noticeContent" :min-height="192" />
@@ -147,6 +182,9 @@ const initFormData: NoticeForm = {
   noticeType: '',
   noticeContent: '',
   status: '0',
+  isTop: '0',
+  publishTime: null,
+  expireTime: null,
   remark: '',
   createByName: ''
 };

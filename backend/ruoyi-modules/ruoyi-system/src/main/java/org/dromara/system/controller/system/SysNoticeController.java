@@ -9,7 +9,6 @@ import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
-import org.dromara.common.sse.utils.SseMessageUtils;
 import org.dromara.common.web.core.BaseController;
 import org.dromara.system.domain.bo.SysNoticeBo;
 import org.dromara.system.domain.vo.SysNoticeVo;
@@ -29,7 +28,6 @@ import org.springframework.web.bind.annotation.*;
 public class SysNoticeController extends BaseController {
 
     private final ISysNoticeService noticeService;
-    private final DictService dictService;
 
     /**
      * 获取通知公告列表
@@ -59,12 +57,13 @@ public class SysNoticeController extends BaseController {
     @RepeatSubmit()
     @PostMapping
     public R<Void> add(@Validated @RequestBody SysNoticeBo notice) {
+        fillPublishTime(notice);
         int rows = noticeService.insertNotice(notice);
         if (rows <= 0) {
             return R.fail();
         }
-        String type = dictService.getDictLabel("sys_notice_type", notice.getNoticeType());
-        SseMessageUtils.publishAll("[" + type + "] " + notice.getNoticeTitle());
+        // N3 2026-10-23：公告改为持久化 + 门户/铃铛拉取。原 publishAll 是全租户广播，
+        // 会把 A 租户的公告标题推给 B 租户在线用户；这里不再广播，避免跨租户泄露。
         return R.ok();
     }
 
@@ -76,7 +75,25 @@ public class SysNoticeController extends BaseController {
     @RepeatSubmit()
     @PutMapping
     public R<Void> edit(@Validated @RequestBody SysNoticeBo notice) {
+        fillPublishTime(notice);
         return toAjax(noticeService.updateNotice(notice));
+    }
+
+    /**
+     * 新增时补默认值：正常状态且未指定发布时间=立即发布；未指定置顶=否。
+     *
+     * <p>编辑时不再补默认——否则普通改错字会把公告刷成“最新”，也会顺手取消置顶。</p>
+     */
+    private void fillPublishTime(SysNoticeBo notice) {
+        if (notice.getNoticeId() != null) {
+            return;
+        }
+        if ("0".equals(notice.getStatus()) && notice.getPublishTime() == null) {
+            notice.setPublishTime(new java.util.Date());
+        }
+        if (notice.getIsTop() == null || notice.getIsTop().isBlank()) {
+            notice.setIsTop("0");
+        }
     }
 
     /**
