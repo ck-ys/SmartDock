@@ -33,6 +33,22 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:page', 'update:limit', 'pagination']);
+const { proxy } = getCurrentInstance() as ComponentInternalInstance;
+
+/** 翻页回顶：纸面改成内部滚动后 document 不再滚动，要找到最近的滚动祖先；
+ *  在抽屉/弹窗里分页时同样能命中（document 兜底留给无壳层场景） */
+function scrollToTop() {
+  let node = (proxy?.$el as HTMLElement | undefined)?.parentElement ?? null;
+  while (node && node !== document.body) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY) && node.scrollHeight > node.clientHeight) {
+      node.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    node = node.parentElement;
+  }
+  scrollTo(0, 800);
+}
+
 const currentPage = computed({
   get() {
     return props.page;
@@ -55,13 +71,13 @@ function handleSizeChange(val: number) {
   }
   emit('pagination', { page: currentPage.value, limit: val });
   if (props.autoScroll) {
-    scrollTo(0, 800);
+    scrollToTop();
   }
 }
 function handleCurrentChange(val: number) {
   emit('pagination', { page: val, limit: pageSize.value });
   if (props.autoScroll) {
-    scrollTo(0, 800);
+    scrollToTop();
   }
 }
 </script>

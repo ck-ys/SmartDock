@@ -6,7 +6,7 @@
         <div
           class="item left"
           @click="handleNavType(NavTypeEnum.LEFT)"
-          :style="{ '--theme': accent }"
+          :style="{ '--theme': 'var(--app-accent)' }"
           :class="{ activeItem: navType == NavTypeEnum.LEFT }"
         >
           <b></b><b></b>
@@ -17,7 +17,7 @@
         <div
           class="item mix"
           @click="handleNavType(NavTypeEnum.MIX)"
-          :style="{ '--theme': accent }"
+          :style="{ '--theme': 'var(--app-accent)' }"
           :class="{ activeItem: navType == NavTypeEnum.MIX }"
         >
           <b></b><b></b>
@@ -27,7 +27,7 @@
         <div
           class="item top"
           @click="handleNavType(NavTypeEnum.TOP)"
-          :style="{ '--theme': accent }"
+          :style="{ '--theme': 'var(--app-accent)' }"
           :class="{ activeItem: navType == NavTypeEnum.TOP }"
         >
           <b></b><b></b>
@@ -38,7 +38,19 @@
     <div class="drawer-item">
       <span>数据强调色</span>
       <span class="comp-style">
-        <el-color-picker v-model="accent" :predefine="predefineColors" @change="accentChange" />
+        <el-tooltip
+          :content="settingsStore.dark ? '纯黑夜固定使用青柠强调色，切回框架纸后再调整' : '图表与数据标记的强调色'"
+          placement="left"
+        >
+          <span>
+            <el-color-picker
+              v-model="accent"
+              :predefine="predefineColors"
+              :disabled="settingsStore.dark"
+              @change="accentChange"
+            />
+          </span>
+        </el-tooltip>
       </span>
     </div>
     <div class="drawer-item">
@@ -48,7 +60,7 @@
       </span>
     </div>
     <div class="drawer-item">
-      <span>页面圆角</span>
+      <span>控件圆角</span>
       <span class="comp-style">
         <el-slider v-model="radiusBase" :min="0" :max="32" :step="2" style="width: 120px" @change="radiusBaseChange" />
       </span>

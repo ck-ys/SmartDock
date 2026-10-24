@@ -914,7 +914,7 @@ onMounted(() => {
 }
 .ledger-title {
   font-size: 13px;
-  color: #606266;
+  color: var(--el-text-color-secondary);
   margin-bottom: 6px;
 }
 .ledger-num {
@@ -994,7 +994,7 @@ onMounted(() => {
 }
 .plan-features li {
   font-size: 12.5px;
-  color: #606266;
+  color: var(--el-text-color-secondary);
   line-height: 1.9;
 }
 .plan-features li::before {
@@ -1295,7 +1295,7 @@ onMounted(() => {
 }
 .boost-qty {
   font-size: 12px;
-  color: #606266;
+  color: var(--el-text-color-secondary);
 }
 .boost-desc {
   flex: 1;

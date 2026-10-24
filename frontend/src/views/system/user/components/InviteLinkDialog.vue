@@ -289,7 +289,7 @@ export default { name: 'InviteLinkDialog' };
     .code-text {
       font-family: monospace;
       font-size: 12px;
-      color: #606266;
+      color: var(--el-text-color-secondary);
     }
   }
 

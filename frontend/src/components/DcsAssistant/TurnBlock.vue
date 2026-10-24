@@ -1444,9 +1444,9 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: #fdf6ec;
+    background: var(--app-warm-bg);
     color: var(--dcs-color-warning, #e6a23c);
-    border: 1px solid #faecd8;
+    border: 1px solid var(--app-warm-border);
     border-radius: 999px;
     font-size: 10.5px;
     font-weight: 600;
@@ -1458,9 +1458,9 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    background: #fef0f0;
+    background: var(--dcs-color-danger-light-9);
     color: var(--dcs-color-danger);
-    border: 1px solid #fbc4c4;
+    border: 1px solid color-mix(in srgb, var(--dcs-color-danger) 34%, transparent);
     border-radius: 999px;
     font-size: 10.5px;
     padding: 0 7px;
@@ -2329,7 +2329,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     .fb-go {
       background: var(--el-color-primary);
       border-color: var(--el-color-primary);
-      color: #fff;
+      color: var(--app-primary-ink);
     }
   }
 }

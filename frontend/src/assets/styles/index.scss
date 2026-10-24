@@ -35,8 +35,9 @@ html {
   box-sizing: border-box;
 }
 
-html.dark .svg-icon,
-html.dark svg {
+/* 只兜底层内联 <svg>：SvgIcon 组件靠 .svg-icon{fill:currentColor} 跟随父级文字色，
+   这条 (0,2,1) 会把它钉成灰，导致选中菜单白字配灰图标 */
+html.dark svg:not(.svg-icon) {
   fill: var(--el-text-color-regular);
 }
 

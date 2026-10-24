@@ -373,11 +373,11 @@ function onRevise() {
   .k {
     flex: 0 0 64px;
     padding-top: 5px;
-    color: #6b5900;
+    color: var(--app-warm-ink);
     font-weight: 500;
   }
   .req {
-    color: #f56c6c;
+    color: var(--dcs-color-danger);
   }
   .ctrl {
     flex: 1;

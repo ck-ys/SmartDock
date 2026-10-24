@@ -40,6 +40,8 @@
   --app-warm-rule: #f7ecd4;
   --app-warm-done-bg: #f6fceb;
   --app-warm-done-border: #c2e7b0;
+  /* 暖卡里的字段名（深褐）：深色暖底上要换成亮砂色，不能沿用同一个褐 */
+  --app-warm-ink: #6b5900;
 
   /* 度量 */
   --app-sidebar-w: 228px;
@@ -107,7 +109,7 @@
 /* ============================ 常亮页：登录 / 注册 / 协议 / 助手抽屉 ============================ */
 /* 这几处自带一套品牌浅色外观（并覆盖了 --el-color-primary）。把 --app-* 也钉回浅色口径，
    否则深色主题残留时，全局规则会把它们的输入框/卡片刷成黑面 */
-:is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper) {
+:is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper, .tenant-picker) {
   color-scheme: light;
   --app-frame: #eef4f6;
   --app-sheet-bg: #ffffff;
@@ -137,12 +139,15 @@
   --app-warm-rule: #f7ecd4;
   --app-warm-done-bg: #f6fceb;
   --app-warm-done-border: #c2e7b0;
+  /* 暖卡里的字段名（深褐）：深色暖底上要换成亮砂色，不能沿用同一个褐 */
+  --app-warm-ink: #6b5900;
 }
 
 /* 助手抽屉复用的是 --dcs-* 派生变量：它们在 :root 已按当时的主题解析成具体色，
    只改 --el-* 传不进去，必须在这里整套重新声明，否则深色下白字压在灰画布上。
-   忘记密码弹窗是 append-to-body，脱离登录页作用域，同样要把 EP 变量钉回浅色 */
-:is(.dcs-dw, .forgot-pwd, .login-tenant-popper) {
+   忘记密码/多单位选择弹窗是 append-to-body，脱离登录页作用域，同样要把 EP 变量钉回浅色；
+   登录/注册/协议页本身也常亮，--el-color-white 必须钉回白，否则深色下勾选框对勾是黑色 */
+:is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper, .tenant-picker) {
   --el-text-color-primary: #131416;
   --el-text-color-regular: #5d5f60;
   --el-text-color-secondary: #6b6b6b;
@@ -175,6 +180,34 @@
   --dcs-color-warning-light-9: #fdf6ec;
   --dcs-color-danger-light-9: #fef0f0;
   --dcs-color-info-light-9: #f4f4f5;
+  /* 语义色基色也必须钉：抽屉里“确认催办/退回”按钮是彩色底 + 白字，
+     深色基色是亮琥珀/亮红，白字压上去只有 1.7:1；状态文字同理 */
+  --el-color-success: #1e7b4f;
+  --el-color-warning: #92400e;
+  --el-color-danger: #c4242a;
+  --el-color-info: #5d5f60;
+  --el-color-success-light-3: #4a9d74;
+  --el-color-warning-light-3: #b0632a;
+  --el-color-danger-light-3: #d45b60;
+  --el-color-success-light-9: #f0f9eb;
+  --el-color-warning-light-9: #fdf6ec;
+  --el-color-danger-light-9: #fef0f0;
+  --el-color-info-light-9: #f4f4f5;
+  --dcs-color-success: #1e7b4f;
+  --dcs-color-warning: #92400e;
+  --dcs-color-danger: #c4242a;
+  --dcs-color-info: #5d5f60;
+}
+
+/* 登录家族的弹窗会被 teleport 到 body，脱离 .login-page 的主色作用域，
+   必须单独把 EP 主色阶梯钉回产品藏青；否则深色下 --el-color-primary=白，
+   下拉选中行（白底 + 白字）和对勾整个隐形。助手抽屉由自身 scoped 样式钉近黑，不含在内 */
+:is(.forgot-pwd, .login-tenant-popper, .tenant-picker) {
+  --el-color-primary: #08184f;
+  --el-color-primary-light-3: #344474;
+  --el-color-primary-light-5: #737e9c;
+  --el-color-primary-light-9: #f0f2f7;
+  --el-color-primary-dark-2: #06123d;
 }
 
 html.dark {
@@ -188,8 +221,9 @@ html.dark {
   --app-raised: #1d1d1d;
   --app-active: transparent;
   --app-border: #1a1a1a;
-  --app-rule: #161616;
-  --app-control: #3a3a3e;
+  /* 表格行线/分隔线：原来的 #161616 压在 #111 卡面上对比只有 1.03:1，整张表糊成一块 */
+  --app-rule: #232323;
+  --app-control: #4a4a50;
   --app-text: #ffffff;
   --app-muted: #b4b4b4;
   --app-faint: #949494;
@@ -206,6 +240,7 @@ html.dark {
   --app-warm-rule: #3a2e19;
   --app-warm-done-bg: #121c11;
   --app-warm-done-border: #2c4a28;
+  --app-warm-ink: #f0d08a;
 
   --app-card-radius: 20px;
   --app-sheet-radius: 20px;
@@ -714,8 +749,31 @@ html.dark .el-slider__button {
 html.dark .el-slider {
   /* 刻度点默认取 --el-color-white，深色下取反成黑色，落在 #1a1a1a 轨道上等于消失 */
   --el-slider-stop-bg-color: #3a3a3e;
+  /* 未填充滑轨取 --el-border-color-light=#1a1a1a，与卡片 #111 只差一点点，看不出总行程 */
+  --el-slider-runway-bg-color: #2e2e33;
 }
 
-html.dark .el-alert {
+/* --- 以下几条是 --el-color-white 取反后、Element 仍拿它当“亮件”的连带修补 --- */
+html.dark .el-avatar {
+  --el-avatar-bg-color: var(--app-raised);
+  --el-avatar-text-color: var(--app-text);
+}
+
+/* 取色器面板是 EP 硬编码的 #fff，深色下白面板压在黑抽屉上非常突兀 */
+html.dark .el-color-picker__panel {
   background-color: var(--el-bg-color-overlay);
+  border-color: var(--el-border-color);
+}
+
+/* EP 暗色把 tooltip 底设成 --el-text-color-primary；本主题该值是纯白，
+   于是所有黑色 tooltip 变白底白边。改回抬升面 + 主文字 */
+html.dark .el-popper.is-dark {
+  background: var(--app-raised);
+  color: var(--app-text);
+  border-color: var(--app-border);
+
+  .el-popper__arrow::before {
+    background: var(--app-raised);
+    border-color: var(--app-border);
+  }
 }

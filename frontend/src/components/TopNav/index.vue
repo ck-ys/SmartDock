@@ -172,7 +172,9 @@ onMounted(() => {
 
 .topmenu-container.el-menu--horizontal > .el-menu-item.is-active,
 .el-menu--horizontal > .el-sub-menu.is-active .el-submenu__title {
-  border-bottom: 2px solid #{'var(--theme)'} !important;
+  /* 用强调色而不是 --theme：后者是菜单底色（浅 #1d1f20 / 深 #000 附近），
+     纯黑主题下等于在纯黑顶栏画一条黑线，选中态整个消失 */
+  border-bottom: 2px solid var(--app-accent) !important;
   color: var(--app-text);
 }
 

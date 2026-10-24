@@ -41,8 +41,8 @@ function back() {
   max-width: 100%;
   margin: 100px auto;
   .pan-back-btn {
-    background: #008489;
-    color: #fff;
+    background: var(--el-color-primary);
+    color: var(--app-primary-ink);
     border: none !important;
   }
   .pan-gif {
@@ -65,7 +65,7 @@ function back() {
       padding-bottom: 5px;
     }
     a {
-      color: #008489;
+      color: var(--app-accent);
       text-decoration: none;
       &:hover {
         text-decoration: underline;

@@ -516,7 +516,7 @@ watch(
   align-items: center;
   gap: 8px;
   padding: 9px 12px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   font-size: 13px;
   font-weight: 600;
   color: var(--dcs-text-primary);
@@ -547,7 +547,7 @@ watch(
   display: flex;
   gap: 6px;
   padding: 6px 10px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--el-border-color-lighter);
   flex-wrap: wrap;
   align-items: center;
 
@@ -618,7 +618,7 @@ th {
 }
 td {
   padding: 7px 10px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--el-border-color-lighter);
   color: var(--dcs-text-regular);
   white-space: nowrap;
 
@@ -682,7 +682,7 @@ tr.dr {
 .dfoot {
   padding: 7px 10px;
   text-align: center;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--el-border-color-lighter);
 
   .more {
     border: none;
@@ -706,7 +706,7 @@ tr.dr {
   color: var(--el-color-primary);
   cursor: pointer;
   padding: 6px 12px;
-  border-top: 1px solid #f0f2f5;
+  border-top: 1px solid var(--el-border-color-lighter);
   background: var(--el-color-primary-light-9);
   text-align: center;
 
@@ -769,7 +769,7 @@ tr.dr {
   margin-bottom: 10px;
 
   .acell {
-    border: 1px solid #f0f2f5;
+    border: 1px solid var(--el-border-color-lighter);
     border-radius: 8px;
     padding: 6px 8px;
     display: flex;
@@ -797,7 +797,7 @@ tr.dr {
   }
 }
 .chart {
-  border: 1px solid #f0f2f5;
+  border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
 
   .cbody {
