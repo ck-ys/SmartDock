@@ -1,16 +1,11 @@
 <template>
   <div class="app-container changelog-page">
-    <header class="cl-head">
-      <div class="cl-head-main">
-        <p class="cl-eyebrow">系统支持</p>
-        <h1 class="cl-h1">更新日志</h1>
-        <p class="cl-sub">每次改进都用大白话记在这里，方便你快速知道系统变了什么。</p>
-      </div>
-      <div class="cl-head-side">
+    <support-page-head title="更新日志" description="每次改进都用大白话记在这里，方便你快速知道系统变了什么。">
+      <template #aside>
         <span v-if="latest" class="cl-latest" aria-label="最新版本">最新 · {{ latest.version }}</span>
         <el-button v-if="canManage" type="primary" :icon="Plus" @click="openCreate">新建版本</el-button>
-      </div>
-    </header>
+      </template>
+    </support-page-head>
 
     <div v-if="canManage" class="cl-admin-bar">
       <el-radio-group v-model="query.status" size="small" @change="reload">
@@ -22,9 +17,13 @@
     </div>
 
     <section v-loading="loading" class="cl-list" aria-label="版本记录">
-      <article v-for="entry in entries" :key="entry.logId" class="cl-item">
-        <span class="cl-dot" :class="{ on: entry.logId === latestLogId }" aria-hidden="true" />
-        <div class="cl-card" :class="{ 'is-draft': entry.status === '0' }">
+      <article
+        v-for="(entry, index) in entries"
+        :key="entry.logId"
+        class="cl-item"
+        :class="{ 'is-featured': index === 0 && entry.logId === latestLogId, 'is-draft': entry.status === '0' }"
+      >
+        <div class="cl-card">
           <div class="cl-meta">
             <span class="cl-ver">{{ entry.version }}</span>
             <time class="cl-date" :datetime="entry.publishTime || entry.createTime">{{ formatDate(entry.publishTime || entry.createTime) }}</time>
@@ -37,17 +36,19 @@
               <el-button link type="danger" size="small" @click="remove(entry)">删除</el-button>
             </span>
           </div>
-          <h2 class="cl-title">{{ entry.title }}</h2>
-          <ul class="cl-points">
-            <li v-for="(item, idx) in entry.itemList" :key="idx">
-              <span class="cl-type" :class="`is-${item.type}`">{{ itemTypeLabel(item.type) }}</span>
-              <span class="cl-point-text">{{ item.text }}</span>
-            </li>
-          </ul>
+          <div class="cl-main">
+            <h2 class="cl-title">{{ entry.title }}</h2>
+            <ul class="cl-points">
+              <li v-for="(item, idx) in entry.itemList" :key="idx">
+                <span class="cl-type" :class="`is-${item.type}`">{{ itemTypeLabel(item.type) }}</span>
+                <span class="cl-point-text">{{ item.text }}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </article>
 
-      <el-empty v-if="!loading && entries.length === 0" description="还没有更新记录" :image-size="72" />
+      <el-empty v-if="!loading && entries.length === 0" class="cl-empty" :description="emptyText" :image-size="72" />
     </section>
 
     <pagination
@@ -91,7 +92,12 @@
               placeholder="选择能看到这条日志的单位"
               class="cl-tenants__select"
             >
-              <el-option v-for="tenant in tenantOptions" :key="tenant.tenantId" :label="tenant.companyName || tenant.tenantId" :value="tenant.tenantId" />
+              <el-option
+                v-for="tenant in tenantOptions"
+                :key="tenant.tenantId"
+                :label="tenant.companyName || tenant.tenantId"
+                :value="tenant.tenantId"
+              />
             </el-select>
             <el-button text @click="selectAllTenants">全选</el-button>
             <el-button text @click="form.targetTenantList = []">清空</el-button>
@@ -132,6 +138,7 @@ import type { ChangelogItem, ChangelogRow, ChangelogSaveBody } from '@/api/dcs/c
 import { getTenantList } from '@/api/login';
 import type { TenantVO } from '@/api/types';
 import { checkPermi } from '@/utils/permission';
+import SupportPageHead from '@/views/dcs/support/components/SupportPageHead.vue';
 
 const canManage = computed(() => checkPermi(['dcs:changelog:add']));
 
@@ -139,8 +146,15 @@ const loading = ref(false);
 const entries = ref<ChangelogRow[]>([]);
 const total = ref(0);
 const query = reactive({ pageNum: 1, pageSize: 50, status: '' });
-const latestLogId = computed(() => entries.value.find((entry) => entry.status === '1')?.logId);
-const latest = computed(() => entries.value.find((entry) => entry.status === '1') || null);
+/* 头部「最新 · vX」是系统级信息，翻页/切筛选后也要保留，不能跟着当前页丢 */
+const latest = ref<ChangelogRow | null>(null);
+const latestLogId = computed(() => latest.value?.logId);
+const emptyText = computed(() => {
+  if (query.status === '0') {
+    return '没有草稿';
+  }
+  return query.status === '1' ? '还没有已发布的记录' : '还没有更新记录';
+});
 
 const TYPE_LABELS: Record<ChangelogItem['type'], string> = { new: '新增', optimize: '优化', fix: '修复' };
 const itemTypeLabel = (type: ChangelogItem['type']) => TYPE_LABELS[type] || '改进';
@@ -154,7 +168,9 @@ const formatDate = (value?: string) => {
   return `${y}年${Number(m)}月${Number(d)}日`;
 };
 
+let loadSeq = 0;
 const load = async () => {
+  const currentSeq = ++loadSeq;
   loading.value = true;
   try {
     const res: any = await listChangelog({
@@ -162,10 +178,19 @@ const load = async () => {
       pageSize: query.pageSize,
       status: canManage.value && query.status ? query.status : undefined
     });
+    if (currentSeq !== loadSeq) {
+      return; // 快速切筛选时旧响应不得覆盖新结果
+    }
     entries.value = res.rows || [];
     total.value = Number(res.total || 0);
+    const published = entries.value.find((entry) => entry.status === '1');
+    if (published) {
+      latest.value = published;
+    }
   } finally {
-    loading.value = false;
+    if (currentSeq === loadSeq) {
+      loading.value = false;
+    }
   }
 };
 
@@ -304,66 +329,19 @@ onMounted(load);
 
 <style lang="scss" scoped>
 .changelog-page {
-  max-width: 880px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
-.cl-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 20px 22px;
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--el-color-primary-light-9) 0%, transparent 58%),
-    var(--el-bg-color);
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 14px;
-
-  .cl-head-main {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .cl-eyebrow {
-    margin: 0 0 4px;
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    color: var(--el-color-primary);
-  }
-
-  .cl-h1 {
-    margin: 0;
-    font-size: 24px;
-    line-height: 1.35;
-    font-weight: 650;
-    color: var(--dcs-text-primary);
-  }
-
-  .cl-sub {
-    margin: 8px 0 0;
-    font-size: 14px;
-    line-height: 1.7;
-    color: var(--dcs-text-secondary);
-  }
-
-  .cl-head-side {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .cl-latest {
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
-    border: 1px solid var(--el-color-primary-light-7);
-    font-size: 12px;
-    line-height: 20px;
-    white-space: nowrap;
-  }
+.cl-latest {
+  padding: 3px 10px;
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: 999px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
 }
 
 .cl-admin-bar {
@@ -373,8 +351,9 @@ onMounted(load);
   gap: 10px;
   margin-bottom: 16px;
   padding: 10px 12px;
-  border: 1px dashed var(--dcs-border-color-lighter);
-  border-radius: 10px;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-fill-color-lighter);
 
   .cl-admin-tip {
     font-size: 12px;
@@ -383,136 +362,190 @@ onMounted(load);
   }
 }
 
+/* ---------- 版本列表 ---------- */
 .cl-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
   min-height: 160px;
 }
 
 .cl-item {
-  position: relative;
+  min-width: 0;
+}
+
+.cl-card {
   display: flex;
-  gap: 14px;
-  padding-bottom: 16px;
+  flex-direction: column;
+  height: 100%;
+  padding: 18px 20px;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 16px;
+  background: var(--el-bg-color);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
 
-  /* 时间线竖线：最后一个条目不画 */
-  &:not(:last-child)::before {
-    content: '';
-    position: absolute;
-    left: 5px;
-    top: 18px;
-    bottom: 0;
-    width: 1px;
-    background: var(--dcs-border-color-lighter);
-  }
+.cl-item:hover .cl-card {
+  border-color: var(--el-color-primary-light-5);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 6%);
+}
 
-  .cl-dot {
-    flex: none;
-    width: 11px;
-    height: 11px;
-    margin-top: 20px;
-    border-radius: 50%;
-    background: var(--el-bg-color);
-    border: 2px solid var(--dcs-border-color);
-    box-sizing: border-box;
+.cl-item.is-draft .cl-card {
+  border-style: dashed;
+  background: var(--el-fill-color-lighter);
+}
 
-    &.on {
-      background: var(--el-color-primary);
-      border-color: var(--el-color-primary);
-    }
-  }
+/* 最新一版占满整行，左侧版本信息做视觉锚点 */
+.cl-item.is-featured {
+  grid-column: 1 / -1;
 
   .cl-card {
-    flex: 1;
-    min-width: 0;
-    padding: 16px 18px;
-    background: var(--el-bg-color);
-    border: 1px solid var(--dcs-border-color-lighter);
-    border-radius: 12px;
-
-    &.is-draft {
-      border-style: dashed;
-      background: var(--el-fill-color-lighter);
-    }
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    padding: 0;
+    overflow: hidden;
+    border-color: var(--el-color-primary-light-7);
   }
 
   .cl-meta {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
+    align-content: flex-start;
     gap: 8px;
-    margin-bottom: 8px;
+    margin: 0;
+    padding: 20px;
+    background: var(--el-color-primary-light-9);
+    border-right: 1px solid var(--el-color-primary-light-8);
+  }
+
+  .cl-main {
+    padding: 20px 24px;
   }
 
   .cl-ver {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--el-color-primary);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .cl-date {
-    font-size: 12.5px;
-    color: var(--dcs-text-placeholder);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .cl-badge {
-    padding: 1px 8px;
-    border-radius: 999px;
-    background: var(--el-color-success-light-9);
-    color: var(--el-color-success);
-    font-size: 11.5px;
-    line-height: 18px;
-  }
-
-  .cl-draft {
-    padding: 1px 8px;
-    border-radius: 999px;
-    background: var(--el-color-warning-light-9);
-    border: 1px solid var(--el-color-warning-light-7);
-    color: var(--el-color-warning);
-    font-size: 11.5px;
-    line-height: 18px;
-  }
-
-  .cl-targets {
-    font-size: 11.5px;
-    color: var(--dcs-text-placeholder);
-  }
-
-  .cl-actions {
-    margin-left: auto;
-    display: inline-flex;
-    align-items: center;
+    font-size: 22px;
+    letter-spacing: -0.02em;
   }
 
   .cl-title {
-    margin: 0 0 10px;
-    font-size: 16px;
-    line-height: 1.55;
-    font-weight: 600;
-    color: var(--dcs-text-primary);
+    max-width: 30em;
+    font-size: 19px;
+    line-height: 1.45;
+  }
+
+  .cl-actions {
+    width: 100%;
+    margin: auto 0 0;
+    padding-top: 14px;
+    justify-content: flex-start;
   }
 
   .cl-points {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 28px;
+  }
+
+  .cl-points li {
     margin: 0;
-    padding: 0;
-    list-style: none;
+  }
 
-    li {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      font-size: 14px;
-      line-height: 1.75;
-      color: var(--dcs-text-regular);
-      overflow-wrap: anywhere;
+  .cl-points li:only-child {
+    grid-column: 1 / -1;
+  }
+}
 
-      & + li {
-        margin-top: 7px;
-      }
+.cl-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.cl-ver {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--el-color-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cl-date {
+  font-size: 12.5px;
+  color: var(--dcs-text-placeholder);
+  font-variant-numeric: tabular-nums;
+}
+
+.cl-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--el-color-success-light-9);
+  color: var(--el-color-success);
+  font-size: 11.5px;
+  line-height: 18px;
+}
+
+.cl-draft {
+  padding: 1px 8px;
+  border: 1px solid var(--el-color-warning-light-7);
+  border-radius: 999px;
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning);
+  font-size: 11.5px;
+  line-height: 18px;
+}
+
+.cl-targets {
+  font-size: 11.5px;
+  color: var(--dcs-text-placeholder);
+}
+
+.cl-actions {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  transition: opacity 0.15s ease;
+}
+
+/* 仅在真正支持悬停的精确指针设备上收起操作栏；触屏/笔默认常显 */
+@media (hover: hover) and (pointer: fine) {
+  .cl-item:not(:hover):not(:focus-within) .cl-actions {
+    opacity: 0;
+  }
+}
+
+.cl-main {
+  min-width: 0;
+}
+
+.cl-title {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.55;
+  font-weight: 600;
+  color: var(--dcs-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.cl-points {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13.8px;
+    line-height: 1.72;
+    color: var(--dcs-text-regular);
+    overflow-wrap: anywhere;
+
+    & + li {
+      margin-top: 8px;
     }
   }
 }
@@ -546,9 +579,15 @@ onMounted(load);
   min-width: 0;
 }
 
+.cl-empty {
+  grid-column: 1 / -1;
+  padding: 40px 0;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 16px;
+}
+
 .cl-foot {
-  margin: 8px 0 0;
-  padding-left: 25px;
+  margin: 14px 0 0;
   font-size: 12.5px;
   line-height: 1.7;
   color: var(--dcs-text-placeholder);
@@ -617,57 +656,71 @@ onMounted(load);
   }
 }
 
+/* ---------- 响应式 ---------- */
+@media (max-width: 1199px) {
+  .cl-item.is-featured .cl-points {
+    display: block;
+  }
+
+  .cl-item.is-featured .cl-points li + li {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 992px) {
+  .cl-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .changelog-page {
     padding-left: 12px;
     padding-right: 12px;
   }
 
-  .cl-head {
+  .cl-item.is-featured .cl-card {
+    display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 14px;
-
-    .cl-h1 {
-      font-size: 21px;
-    }
-
-    .cl-head-side {
-      width: 100%;
-      justify-content: space-between;
-    }
   }
 
-  .cl-item {
-    gap: 10px;
-
-    .cl-dot {
-      margin-top: 16px;
-    }
-
-    .cl-card {
-      padding: 13px 14px;
-      border-radius: 10px;
-    }
-
-    .cl-title {
-      font-size: 15px;
-    }
-
-    .cl-points li {
-      font-size: 13.5px;
-      line-height: 1.7;
-    }
-
-    .cl-actions {
-      margin-left: 0;
-      width: 100%;
-      justify-content: flex-end;
-    }
+  .cl-item.is-featured .cl-meta {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--el-color-primary-light-8);
   }
 
-  .cl-foot {
-    padding-left: 0;
+  .cl-item.is-featured .cl-main {
+    padding: 16px;
+  }
+
+  .cl-item.is-featured .cl-ver {
+    font-size: 18px;
+  }
+
+  .cl-item.is-featured .cl-actions {
+    width: 100%;
+    margin: 0;
+    padding-top: 0;
+    justify-content: flex-end;
+  }
+
+  .cl-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .cl-title {
+    font-size: 15.5px;
+  }
+
+  .cl-points li {
+    font-size: 13.5px;
+    line-height: 1.7;
   }
 
   .cl-form__row {
@@ -677,6 +730,12 @@ onMounted(load);
 
   .cl-form__ver {
     flex: 1;
+  }
+}
+/* ---------- 超宽屏 ---------- */
+@media (min-width: 1600px) {
+  .cl-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 </style>

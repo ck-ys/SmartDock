@@ -1,16 +1,11 @@
 <template>
   <div class="app-container feedback-page">
-    <header class="fb-head">
-      <div class="fb-head__main">
-        <p class="fb-eyebrow">系统支持</p>
-        <h1 class="fb-title">反馈中心</h1>
-        <p class="fb-sub">用户提交的缺陷、体验与建议都在这里；处理结果会通知提交人。</p>
-      </div>
-      <div class="fb-head__actions">
+    <support-page-head title="反馈中心" description="用户提交的缺陷、体验与建议都在这里；处理结果会通知提交人。">
+      <template #aside>
         <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
         <el-button type="primary" :icon="EditPen" @click="dialogVisible = true">提交反馈</el-button>
-      </div>
-    </header>
+      </template>
+    </support-page-head>
 
     <section class="fb-stats" aria-label="反馈状态概览">
       <button
@@ -18,10 +13,13 @@
         :key="item.key"
         type="button"
         class="fb-stat"
-        :class="[`is-${item.key || 'all'}`, { 'is-active': query.status === item.key }]"
+        :class="[`is-${(item.key || 'all').toLowerCase()}`, { 'is-active': query.status === item.key }]"
         @click="pickStatus(item.key)"
       >
-        <span class="fb-stat__label">{{ item.label }}</span>
+        <span class="fb-stat__label">
+          <i class="fb-stat__dot" aria-hidden="true" />
+          {{ item.label }}
+        </span>
         <b class="fb-stat__value">{{ item.key ? (summary[item.key] ?? 0) : totalAll }}</b>
         <span class="fb-stat__hint">{{ item.hint }}</span>
       </button>
@@ -48,7 +46,7 @@
     </section>
 
     <el-card shadow="never" class="fb-card">
-      <el-table v-loading="loading" class="dcs-table-only" :data="rows" row-key="feedbackId" @row-click="openDetail">
+      <el-table v-loading="loading" class="dcs-table-only" :data="rows" row-key="feedbackId" @row-click="(row) => openDetail(row)">
         <el-table-column label="反馈" min-width="320">
           <template #default="{ row }">
             <div class="fb-cell">
@@ -79,11 +77,32 @@
             <el-button link type="primary" v-hasPermi="['dcs:feedback:handle']" @click.stop="openDetail(row, true)">处理</el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <div class="fb-empty">
+            <p class="fb-empty__title">{{ hasFilter ? '没有匹配的反馈' : '还没有反馈' }}</p>
+            <p class="fb-empty__desc">
+              {{
+                hasFilter ? '换个关键词或状态试试，也可以清空筛选查看全部反馈。' : '遇到问题或有改进建议，点右上角「提交反馈」；处理进度会回到这里。'
+              }}
+            </p>
+            <el-button v-if="hasFilter" @click="resetFilters">清空筛选</el-button>
+            <el-button v-else type="primary" plain @click="dialogVisible = true">提交第一条反馈</el-button>
+          </div>
+        </template>
       </el-table>
 
-      <!-- ≤992：表格改卡片（与其它业务页同一套全局类） -->
-      <div class="dcs-mobile-list">
-        <el-empty v-if="rows.length === 0" description="暂无反馈" :image-size="64" />
+      <!-- ≤992：表格改卡片（与其它业务页同一套全局类）；v-loading 挂在列表上，表格隐藏时仍可见 -->
+      <div v-loading="loading" class="dcs-mobile-list">
+        <div v-if="!loading && rows.length === 0" class="fb-empty fb-empty--mobile">
+          <p class="fb-empty__title">{{ hasFilter ? '没有匹配的反馈' : '还没有反馈' }}</p>
+          <p class="fb-empty__desc">
+            {{
+              hasFilter ? '换个关键词或状态试试，也可以清空筛选查看全部反馈。' : '遇到问题或有改进建议，点右上角「提交反馈」；处理进度会回到这里。'
+            }}
+          </p>
+          <el-button v-if="hasFilter" @click="resetFilters">清空筛选</el-button>
+          <el-button v-else type="primary" plain @click="dialogVisible = true">提交第一条反馈</el-button>
+        </div>
         <div
           v-for="row in rows"
           :key="row.feedbackId"
@@ -102,13 +121,7 @@
         </div>
       </div>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="query.pageNum"
-        v-model:limit="query.pageSize"
-        :total="total"
-        @pagination="load"
-      />
+      <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
     </el-card>
 
     <!-- 详情 / 处理抽屉 -->
@@ -203,6 +216,7 @@ import type { FeedbackRow, FeedbackStatus, FeedbackType } from '@/api/dcs/feedba
 import { listByIds } from '@/api/system/oss';
 import type { OssVO } from '@/api/system/oss/types';
 import { checkPermi } from '@/utils/permission';
+import SupportPageHead from '@/views/dcs/support/components/SupportPageHead.vue';
 import FeedbackDialog from './components/FeedbackDialog.vue';
 
 const loading = ref(false);
@@ -227,10 +241,10 @@ const statusOptions: { label: string; value: FeedbackStatus }[] = [
 ];
 const statCards: { key: '' | FeedbackStatus; label: string; hint: string }[] = [
   { key: '', label: '全部', hint: '本租户累计' },
-  { key: 'PENDING', label: '待处理', hint: '还没人接' },
-  { key: 'PROCESSING', label: '处理中', hint: '已接手' },
+  { key: 'PENDING', label: '待处理', hint: '等待处理' },
+  { key: 'PROCESSING', label: '处理中', hint: '正在处理' },
   { key: 'RESOLVED', label: '已解决', hint: '问题已修复' },
-  { key: 'CLOSED', label: '已关闭', hint: '无需再跟进' }
+  { key: 'CLOSED', label: '已关闭', hint: '无需跟进' }
 ];
 
 const TYPE_LABELS: Record<FeedbackType, string> = { BUG: '缺陷', EXPERIENCE: '体验', SUGGEST: '建议', OTHER: '其它' };
@@ -239,6 +253,7 @@ const typeLabel = (type?: string) => TYPE_LABELS[(type as FeedbackType) || 'OTHE
 const statusLabel = (status?: string) => STATUS_LABELS[(status as FeedbackStatus) || 'PENDING'] || '待处理';
 
 const totalAll = computed(() => Object.values(summary.value).reduce((sum, value) => sum + Number(value || 0), 0));
+const hasFilter = computed(() => Boolean(query.title || query.feedbackType || query.status));
 
 const drawerVisible = ref(false);
 const drawerSize = computed(() => (window.innerWidth < 768 ? '100%' : '560px'));
@@ -288,7 +303,9 @@ const contextEntries = computed(() => {
   }
 });
 
+let loadSeq = 0;
 const load = async () => {
+  const currentSeq = ++loadSeq;
   loading.value = true;
   try {
     const res: any = await listFeedback({
@@ -298,11 +315,16 @@ const load = async () => {
       feedbackType: query.feedbackType || undefined,
       status: query.status || undefined
     });
+    if (currentSeq !== loadSeq) {
+      return; // 快速切筛选时旧响应不得覆盖新结果
+    }
     rows.value = res.rows || [];
     total.value = Number(res.total || 0);
     void loadSummary();
   } finally {
-    loading.value = false;
+    if (currentSeq === loadSeq) {
+      loading.value = false;
+    }
   }
 };
 
@@ -311,7 +333,7 @@ const loadSummary = async () => {
     const res: any = await feedbackStatusSummary();
     summary.value = res.data || {};
   } catch {
-    summary.value = {};
+    // 概览拉取失败时保留上一次快照，避免五个数全变 0 与列表打架
   }
 };
 
@@ -332,7 +354,9 @@ const resetFilters = () => {
   reload();
 };
 
+let detailSeq = 0;
 const openDetail = async (row: FeedbackRow, startHandle = false) => {
+  const seq = ++detailSeq;
   drawerVisible.value = true;
   detailLoading.value = true;
   images.value = [];
@@ -344,6 +368,9 @@ const openDetail = async (row: FeedbackRow, startHandle = false) => {
   }
   try {
     const res: any = await getFeedback(row.feedbackId);
+    if (seq !== detailSeq) {
+      return; // 连点两行时，先发的慢响应不得覆盖后选中的一条
+    }
     if (res.data) {
       current.value = res.data;
       handleForm.status = res.data.status && res.data.status !== 'PENDING' ? res.data.status : 'PROCESSING';
@@ -351,10 +378,15 @@ const openDetail = async (row: FeedbackRow, startHandle = false) => {
     }
     if (current.value?.ossIdList?.length) {
       const oss: any = await listByIds(current.value.ossIdList.join(','));
+      if (seq !== detailSeq) {
+        return;
+      }
       images.value = oss.data || [];
     }
   } finally {
-    detailLoading.value = false;
+    if (seq === detailSeq) {
+      detailLoading.value = false;
+    }
   }
 };
 
@@ -384,86 +416,88 @@ onMounted(load);
 
 <style lang="scss" scoped>
 .feedback-page {
-  max-width: 1180px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
-.fb-head {
-  display: flex;
-  align-items: flex-end;
-  gap: 20px;
-  padding: 22px 24px;
-  margin-bottom: 14px;
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 14px;
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--el-color-primary-light-9) 0%, transparent 58%),
-    var(--el-bg-color);
-
-  &__main {
-    flex: 1;
-    min-width: 0;
-  }
-
-  &__actions {
-    flex: none;
-    display: flex;
-    gap: 8px;
-  }
-}
-
-.fb-eyebrow {
-  margin: 0 0 4px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: var(--el-color-primary);
-}
-
-.fb-title {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.35;
-  font-weight: 650;
-  color: var(--dcs-text-primary);
-}
-
-.fb-sub {
-  margin: 8px 0 0;
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--dcs-text-secondary);
-}
-
+/* ---------- 状态概览 ---------- */
 .fb-stats {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 16px;
+  background: var(--el-bg-color);
+  overflow: hidden;
 }
 
 .fb-stat {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
-  padding: 12px 14px;
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 11px;
-  background: var(--el-bg-color);
+  gap: 3px;
+  min-width: 0;
+  padding: 15px 18px 14px;
+  border: 0;
+  border-right: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 0;
+  background: transparent;
   text-align: left;
   cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease;
+  transition: background 0.15s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: transparent;
+    transition: background 0.15s ease;
+  }
+
+  &:last-child {
+    border-right: 0;
+  }
+
+  &:hover {
+    background: var(--el-fill-color-lighter);
+  }
+
+  &.is-active {
+    background: var(--el-color-primary-light-9);
+
+    &::after {
+      background: var(--el-color-primary);
+    }
+
+    .fb-stat__value {
+      color: var(--el-color-primary);
+    }
+  }
 
   &__label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12px;
-    color: var(--dcs-text-placeholder);
+    color: var(--dcs-text-secondary);
+  }
+
+  &__dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--dcs-text-placeholder);
   }
 
   &__value {
-    font-size: 22px;
-    line-height: 1.25;
+    font-size: 26px;
+    line-height: 1.15;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
     color: var(--dcs-text-primary);
   }
@@ -473,49 +507,90 @@ onMounted(load);
     color: var(--dcs-text-placeholder);
   }
 
-  &:hover {
-    border-color: var(--el-color-primary-light-5);
+  &.is-all .fb-stat__dot {
+    background: var(--el-color-primary);
   }
 
-  &.is-active {
-    border-color: var(--el-color-primary-light-3);
-    background: var(--el-color-primary-light-9);
+  &.is-pending {
+    .fb-stat__dot {
+      background: var(--el-color-warning);
+    }
 
     .fb-stat__value {
-      color: var(--el-color-primary);
+      color: var(--el-color-warning);
     }
   }
 
-  &.is-pending .fb-stat__value {
-    color: var(--el-color-warning);
+  &.is-processing .fb-stat__dot {
+    background: var(--el-color-primary);
   }
 
-  &.is-resolved .fb-stat__value {
-    color: var(--el-color-success);
+  &.is-resolved {
+    .fb-stat__dot {
+      background: var(--el-color-success);
+    }
+
+    .fb-stat__value {
+      color: var(--el-color-success);
+    }
+  }
+
+  &.is-closed .fb-stat__dot {
+    background: var(--dcs-text-placeholder);
   }
 }
 
+/* ---------- 筛选工具条 ---------- */
 .fb-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--el-fill-color-lighter);
 
   &__search {
-    width: 260px;
+    flex: 1 1 240px;
+    max-width: 380px;
   }
 
   &__select {
-    width: 132px;
+    width: 136px;
+  }
+
+  > .el-button:first-of-type {
+    margin-left: auto;
   }
 }
 
+/* ---------- 列表 ---------- */
 .fb-card {
-  border-radius: 12px;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 16px;
 
   :deep(.el-card__body) {
-    padding: 8px 14px 14px;
+    padding: 2px 16px 14px;
+  }
+
+  /* 表头底色/行高由全局 ruoyi.scss 的 !important 统一定义，这里只调字重与字色 */
+  :deep(.el-table th.el-table__cell) {
+    color: var(--dcs-text-secondary);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+
+  :deep(.el-table td.el-table__cell) {
+    padding: 13px 0;
+  }
+
+  :deep(.el-table__row) {
+    cursor: pointer;
+  }
+
+  :deep(.el-table__body tr:hover > td.el-table__cell) {
+    background: var(--el-color-primary-light-9);
   }
 }
 
@@ -525,34 +600,76 @@ onMounted(load);
   &__line {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
   }
 
   &__title {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
     font-weight: 600;
     color: var(--dcs-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__excerpt {
-    margin: 4px 0 0;
+    margin: 5px 0 0;
     font-size: 12.5px;
     line-height: 1.6;
     color: var(--dcs-text-placeholder);
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 520px;
+    white-space: nowrap;
   }
 }
 
 .fb-attach {
+  flex: none;
   padding: 0 6px;
   border-radius: 999px;
   background: var(--el-fill-color-light);
   font-size: 11px;
   line-height: 18px;
   color: var(--dcs-text-placeholder);
+}
+
+.fb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px 42px;
+  text-align: center;
+
+  &__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--dcs-text-primary);
+  }
+
+  &__desc {
+    margin: 0;
+    max-width: 440px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--dcs-text-secondary);
+  }
+
+  .el-button {
+    margin-top: 6px;
+    margin-left: 0;
+  }
+
+  &--mobile {
+    width: 100%;
+    /* 641–992 时全局列表是两列网格，空态必须整行占满 */
+    grid-column: 1 / -1;
+    padding: 32px 16px;
+  }
 }
 
 .fb-type,
@@ -746,49 +863,88 @@ onMounted(load);
   }
 }
 
+/* ---------- 响应式 ---------- */
 @media (max-width: 992px) {
   .fb-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .fb-stat {
+    border: 1px solid var(--dcs-border-color-lighter);
+    border-radius: 12px;
+
+    &:last-child {
+      border-right: 1px solid var(--dcs-border-color-lighter);
+    }
+
+    &::after {
+      display: none;
+    }
   }
 
   .fb-filters {
     &__search {
+      flex-basis: 100%;
       width: 100%;
+      max-width: none;
     }
 
     &__select {
       flex: 1;
       width: auto;
     }
+
+    > .el-button:first-of-type {
+      margin-left: 0;
+    }
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .feedback-page {
     padding-left: 12px;
     padding-right: 12px;
   }
+}
 
-  .fb-head {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-    padding: 16px;
-
-    .fb-title {
-      font-size: 21px;
-    }
-
-    &__actions {
-      justify-content: flex-end;
-    }
+@media (max-width: 640px) {
+  .fb-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .fb-stat {
-    padding: 10px 11px;
+    padding: 10px 12px;
+
+    &:last-child {
+      grid-column: auto;
+    }
 
     &__value {
-      font-size: 19px;
+      font-size: 20px;
+    }
+  }
+
+  .fb-filters {
+    padding: 8px;
+
+    &__select {
+      flex: 0 1 calc(50% - 4px);
+      width: auto;
+    }
+
+    > .el-button {
+      flex: 1;
+      margin-left: 0;
+    }
+  }
+
+  .fb-card {
+    :deep(.el-card__body) {
+      padding: 0 10px 10px;
     }
   }
 }

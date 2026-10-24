@@ -2,23 +2,20 @@
   <div class="app-container announcement-page">
     <!-- 列表 -->
     <template v-if="!active">
-      <header class="an-head">
-        <div class="an-head__main">
-          <p class="an-eyebrow">系统支持</p>
-          <h1 class="an-title">公告</h1>
-          <p class="an-sub">版本发布、维护安排与使用提醒都会在这里说明；点开卡片可查看全文。</p>
-        </div>
-        <div class="an-stats">
-          <div class="an-stat">
-            <b>{{ total }}</b>
-            <span>当前筛选</span>
+      <support-page-head title="公告" description="版本发布、维护安排与使用提醒都会在这里说明；点开卡片可查看全文。">
+        <template #aside>
+          <div class="an-stats">
+            <div class="an-stat">
+              <b>{{ total }}</b>
+              <span>{{ totalLabel }}</span>
+            </div>
+            <div v-if="query.readFlag !== '0'" class="an-stat an-stat--unread">
+              <b>{{ unreadCount }}</b>
+              <span>条未读</span>
+            </div>
           </div>
-          <div class="an-stat an-stat--unread">
-            <b>{{ unreadCount }}</b>
-            <span>未读</span>
-          </div>
-        </div>
-      </header>
+        </template>
+      </support-page-head>
 
       <div class="an-toolbar">
         <el-radio-group v-model="query.readFlag" size="small" @change="reload">
@@ -31,10 +28,13 @@
 
       <div v-loading="loading" class="an-grid">
         <article
-          v-for="item in rows"
+          v-for="(item, index) in rows"
           :key="item.noticeId"
           class="an-card"
-          :class="{ 'is-unread': isUnread(item), 'is-top': isTop(item) }"
+          :class="{
+            'is-lead': index === 0 && rows.length > 1,
+            'is-only': rows.length === 1
+          }"
           role="button"
           tabindex="0"
           @click="open(item)"
@@ -57,40 +57,52 @@
         <el-empty v-if="!loading && rows.length === 0" class="an-empty" :description="emptyText" :image-size="72" />
       </div>
 
-      <pagination
-        v-show="total > 0"
-        v-model:page="query.pageNum"
-        v-model:limit="query.pageSize"
-        :total="total"
-        @pagination="load"
-      />
+      <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
     </template>
 
     <!-- 文章页（同一路由内切换，返回不丢筛选与页码） -->
     <article v-else-if="active" class="an-article">
-      <button type="button" class="an-back" @click="closeArticle">
-        <span aria-hidden="true">←</span> 返回公告列表
-      </button>
+      <div class="an-article__main">
+        <button type="button" class="an-back" @click="closeArticle"><span aria-hidden="true">←</span> 返回公告列表</button>
 
-      <header class="an-article__head">
-        <div class="an-card__flags">
-          <span v-if="isTop(active)" class="an-pin">置顶</span>
-          <span class="an-kind">{{ typeLabel(active.noticeType) }}</span>
-        </div>
-        <h1 class="an-article__title">{{ active.noticeTitle }}</h1>
-        <p class="an-article__meta">
-          <span>发布于 {{ formatDate(active.publishTime || active.createTime) }}</span>
-          <span v-if="active.expireTime">· 有效期至 {{ formatDate(active.expireTime) }}</span>
-        </p>
-      </header>
+        <header class="an-article__head">
+          <div class="an-card__flags">
+            <span v-if="isTop(active)" class="an-pin">置顶</span>
+            <span class="an-kind">{{ typeLabel(active.noticeType) }}</span>
+          </div>
+          <h1 class="an-article__title">{{ active.noticeTitle }}</h1>
+        </header>
 
-      <!-- eslint-disable-next-line vue/no-v-html —— 正文为后台富文本，后端已过 HtmlUtil 白名单 -->
-      <div class="an-article__body" v-html="active.noticeContent"></div>
+        <!-- eslint-disable-next-line vue/no-v-html —— 正文为后台富文本，后端已过 HtmlUtil 白名单 -->
+        <div class="an-article__body" v-html="active.noticeContent"></div>
 
-      <footer class="an-article__foot">
-        <span>读完了</span>
-        <el-button size="small" @click="closeArticle">返回列表</el-button>
-      </footer>
+        <footer class="an-article__foot">
+          <span>读完了</span>
+          <el-button size="small" @click="closeArticle">返回列表</el-button>
+        </footer>
+      </div>
+
+      <aside class="an-article__side">
+        <p class="an-side__label">公告信息</p>
+        <dl class="an-side__list">
+          <div>
+            <dt>类型</dt>
+            <dd>{{ typeLabel(active.noticeType) }}</dd>
+          </div>
+          <div>
+            <dt>发布时间</dt>
+            <dd>{{ formatDate(active.publishTime || active.createTime) }}</dd>
+          </div>
+          <div>
+            <dt>阅读状态</dt>
+            <dd>{{ isUnread(active) ? '未读' : '已读' }}</dd>
+          </div>
+          <div v-if="active.expireTime">
+            <dt>有效期至</dt>
+            <dd>{{ formatDate(active.expireTime) }}</dd>
+          </div>
+        </dl>
+      </aside>
     </article>
   </div>
 </template>
@@ -99,6 +111,7 @@
 import { listAnnouncements, markAnnouncementRead } from '@/api/dcs/announcement';
 import type { AnnouncementRow } from '@/api/dcs/announcement/types';
 import { useAnnouncementStore } from '@/store/modules/announcement';
+import SupportPageHead from '@/views/dcs/support/components/SupportPageHead.vue';
 
 const announcementStore = useAnnouncementStore();
 
@@ -109,7 +122,13 @@ const active = ref<AnnouncementRow | null>(null);
 const query = reactive({ pageNum: 1, pageSize: 8, readFlag: '' });
 
 const unreadCount = computed(() => announcementStore.state.unreadCount);
-const emptyText = computed(() => (query.readFlag === '0' ? '没有未读公告' : '暂无公告'));
+const totalLabel = computed(() => {
+  if (query.readFlag === '0') {
+    return '条未读';
+  }
+  return query.readFlag === '1' ? '条已读' : '条公告';
+});
+const emptyText = computed(() => (query.readFlag === '0' ? '没有未读公告' : query.readFlag === '1' ? '还没有已读公告' : '暂无公告'));
 
 const isTop = (row: AnnouncementRow) => row.isTop === '1';
 const isUnread = (row: AnnouncementRow) => row.readFlag === '0';
@@ -128,7 +147,11 @@ const formatDate = (value?: string) => {
 };
 
 /** 后台是富文本，摘要按纯文本展示（正文在文章页按 HTML 渲染，后端已过白名单）。 */
-const stripHtml = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+const stripHtml = (html: string) =>
+  html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const excerpt = (content?: string) => {
   const text = stripHtml(content || '');
@@ -171,9 +194,8 @@ const open = async (row: AnnouncementRow) => {
     row.readFlag = '1';
     announcementStore.consumeOne();
     if (query.readFlag === '0') {
-      // 未读筛选下读掉的就地从列表移除，返回时不会看到已读项
-      rows.value = rows.value.filter((item) => item.noticeId !== row.noticeId);
-      total.value = Math.max(0, total.value - 1);
+      // 本地只删一行会让分页少一条（第 9 条永远翻不到），交服务端重算本页
+      await load();
     }
   } catch {
     // 标记失败不回滚阅读，下次进入列表会重新显示未读
@@ -190,76 +212,41 @@ onMounted(load);
 
 <style lang="scss" scoped>
 .announcement-page {
-  max-width: 1080px;
+  max-width: 1600px;
   margin: 0 auto;
 }
 
-/* ---------- 页头 ---------- */
-.an-head {
-  display: flex;
-  align-items: flex-end;
-  gap: 24px;
-  padding: 22px 24px;
-  margin-bottom: 16px;
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 14px;
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--el-color-primary-light-9) 0%, transparent 58%),
-    var(--el-bg-color);
-
-  &__main {
-    min-width: 0;
-    flex: 1;
-  }
-
-  .an-eyebrow {
-    margin: 0 0 4px;
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    color: var(--el-color-primary);
-  }
-
-  .an-title {
-    margin: 0;
-    font-size: 24px;
-    line-height: 1.35;
-    font-weight: 650;
-    color: var(--dcs-text-primary);
-  }
-
-  .an-sub {
-    margin: 8px 0 0;
-    max-width: 640px;
-    font-size: 14px;
-    line-height: 1.7;
-    color: var(--dcs-text-secondary);
-  }
-}
-
+/* ---------- 页头统计 ---------- */
 .an-stats {
   display: flex;
-  flex: none;
-  gap: 10px;
+  align-items: stretch;
 }
 
 .an-stat {
-  min-width: 88px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--el-fill-color-lighter);
-  text-align: center;
+  padding: 0 20px;
+  text-align: left;
+
+  &:first-child {
+    padding-left: 0;
+  }
+
+  & + & {
+    border-left: 1px solid var(--dcs-border-color-lighter);
+  }
 
   b {
     display: block;
-    font-size: 22px;
-    line-height: 1.2;
+    font-size: 26px;
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
     color: var(--dcs-text-primary);
   }
 
   span {
     display: block;
-    margin-top: 2px;
+    margin-top: 4px;
     font-size: 12px;
     color: var(--dcs-text-placeholder);
   }
@@ -275,29 +262,33 @@ onMounted(load);
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 /* ---------- 卡片流 ---------- */
 .an-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
   min-height: 160px;
 }
 
 .an-empty {
   grid-column: 1 / -1;
+  align-self: start;
+  padding: 32px 0;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 16px;
 }
 
 .an-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 176px;
-  padding: 18px 18px 14px 20px;
+  min-height: 196px;
+  padding: 18px 20px 16px;
   border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--el-bg-color);
   cursor: pointer;
   outline: none;
@@ -306,41 +297,51 @@ onMounted(load);
     box-shadow 0.18s ease,
     transform 0.18s ease;
 
-  /* 未读：左侧主色标识条 */
-  &::before {
-    content: '';
-    position: absolute;
-    left: -1px;
-    top: 14px;
-    bottom: 14px;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: transparent;
-  }
-
-  &.is-unread::before {
-    background: var(--el-color-primary);
-  }
-
   &:hover,
   &:focus-visible {
     border-color: var(--el-color-primary-light-5);
-    box-shadow: 0 8px 20px rgb(0 0 0 / 6%);
-    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgb(0 0 0 / 8%);
+    transform: translateY(-2px);
   }
 
   &:focus-visible {
     box-shadow:
       0 0 0 3px var(--el-color-primary-light-7),
-      0 8px 20px rgb(0 0 0 / 6%);
+      0 12px 28px rgb(0 0 0 / 8%);
+  }
+
+  /* 首条占据两列，作为本页视觉入口 */
+  &.is-lead {
+    grid-column: span 2;
+    min-height: 232px;
+    padding: 24px 26px 20px;
+    border-color: var(--el-color-primary-light-8);
+    background: var(--el-color-primary-light-9);
+
+    .an-card__title {
+      font-size: 22px;
+      line-height: 1.4;
+      letter-spacing: -0.015em;
+      -webkit-line-clamp: 3;
+    }
+
+    .an-card__excerpt {
+      max-width: 68ch;
+      font-size: 14.5px;
+      -webkit-line-clamp: 3;
+    }
+  }
+
+  &.is-only {
+    grid-column: 1 / -1;
   }
 
   &__flags {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
   &__title {
@@ -374,9 +375,7 @@ onMounted(load);
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-top: 14px;
-    padding-top: 10px;
-    border-top: 1px dashed var(--dcs-border-color-lighter);
+    margin-top: 16px;
     font-size: 12.5px;
     color: var(--dcs-text-placeholder);
 
@@ -387,15 +386,11 @@ onMounted(load);
 
   .an-more {
     display: inline-flex;
-    gap: 3px;
+    align-items: center;
+    gap: 4px;
     color: var(--el-color-primary);
-    opacity: 0;
-    transition: opacity 0.18s ease;
-  }
-
-  &:hover .an-more,
-  &:focus-visible .an-more {
-    opacity: 1;
+    font-weight: 500;
+    white-space: nowrap;
   }
 }
 
@@ -432,11 +427,17 @@ onMounted(load);
 
 /* ---------- 文章页 ---------- */
 .an-article {
-  max-width: 820px;
-  margin: 0 auto;
-  padding: 24px 28px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+.an-article__main {
+  min-width: 0;
+  padding: 26px 32px 22px;
   border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--el-bg-color);
 }
 
@@ -445,7 +446,7 @@ onMounted(load);
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  margin: -6px 0 16px -10px;
+  margin: 0 0 18px -8px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -460,31 +461,24 @@ onMounted(load);
 }
 
 .an-article__head {
-  padding-bottom: 16px;
+  padding-bottom: 18px;
   border-bottom: 1px solid var(--dcs-border-color-lighter);
 }
 
 .an-article__title {
-  margin: 4px 0 10px;
-  font-size: 24px;
-  line-height: 1.45;
-  font-weight: 650;
+  margin: 6px 0 0;
+  max-width: 30em;
+  font-size: 30px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--dcs-text-primary);
   overflow-wrap: anywhere;
 }
 
-.an-article__meta {
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 12.5px;
-  color: var(--dcs-text-placeholder);
-  font-variant-numeric: tabular-nums;
-}
-
 .an-article__body {
-  padding: 20px 0 8px;
+  max-width: 78ch;
+  padding: 22px 0 8px;
   font-size: 15px;
   line-height: 1.9;
   color: var(--dcs-text-regular);
@@ -493,6 +487,10 @@ onMounted(load);
 
   :deep(p) {
     margin: 0 0 12px;
+  }
+
+  :deep(p:last-child) {
+    margin-bottom: 0;
   }
 
   :deep(img) {
@@ -525,60 +523,136 @@ onMounted(load);
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 14px;
-  border-top: 1px dashed var(--dcs-border-color-lighter);
+  padding-top: 16px;
+  border-top: 1px solid var(--dcs-border-color-lighter);
   font-size: 12.5px;
   color: var(--dcs-text-placeholder);
 }
 
-/* ---------- 响应式 ---------- */
-@media (max-width: 992px) {
-  .an-grid {
-    grid-template-columns: minmax(0, 1fr);
+.an-article__side {
+  padding: 18px;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 14px;
+  background: var(--el-fill-color-lighter);
+}
+
+.an-side__label {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dcs-text-secondary);
+}
+
+.an-side__list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
   }
 
-  .an-card {
-    min-height: 0;
+  dt {
+    font-size: 12px;
+    color: var(--dcs-text-placeholder);
+  }
 
-    .an-more {
-      opacity: 1;
+  dd {
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.5;
+    color: var(--dcs-text-regular);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 1199px) {
+  .an-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .an-card.is-lead {
+    grid-column: span 1;
+    min-height: 196px;
+    padding: 18px 20px 16px;
+    border-color: var(--dcs-border-color-lighter);
+    background: var(--el-bg-color);
+
+    .an-card__title {
+      font-size: 16.5px;
+      line-height: 1.5;
+      letter-spacing: normal;
+      -webkit-line-clamp: 2;
+    }
+
+    .an-card__excerpt {
+      max-width: none;
+      font-size: 13.5px;
+      -webkit-line-clamp: 2;
     }
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 992px) {
+  .an-article {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .an-article__side {
+    position: static;
+  }
+
+  .an-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .an-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .an-card.is-only {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 768px) {
   .announcement-page {
     padding-left: 12px;
     padding-right: 12px;
   }
+}
 
-  .an-head {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 14px;
-    padding: 16px;
-
-    .an-title {
-      font-size: 21px;
-    }
-
-    .an-stats {
-      justify-content: flex-start;
-    }
-  }
-
+@media (max-width: 640px) {
   .an-stat {
-    flex: 1;
-    min-width: 0;
+    padding: 0 14px;
+
+    b {
+      font-size: 22px;
+    }
   }
 
-  .an-article {
-    padding: 16px 15px;
-    border-radius: 12px;
+  .an-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .an-card__foot {
+    margin-top: 14px;
+  }
+
+  .an-article__main {
+    padding: 18px 16px;
+    border-radius: 14px;
   }
 
   .an-article__title {
-    font-size: 20px;
+    font-size: 22px;
   }
 
   .an-article__body {
