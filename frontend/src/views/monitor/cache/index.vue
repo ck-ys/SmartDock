@@ -180,7 +180,10 @@ const renderCharts = () => {
           type: 'gauge',
           min: 0,
           max: 1000,
-          detail: { formatter: cache.value.info?.used_memory_human },
+          // 仪表盘的读数与标题不跟 textStyle 走，深色下默认 #333 会看不见
+          detail: { formatter: cache.value.info?.used_memory_human, color: ct.value.ink },
+          title: { color: ct.value.muted },
+          axisLabel: { color: ct.value.faint },
           data: [{ value: parseFloat(cache.value.info?.used_memory_human || '0'), name: '内存消耗' }]
         }
       ]
