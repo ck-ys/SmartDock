@@ -242,35 +242,30 @@ onMounted(() => {
 .tags-view-container {
   height: 34px;
   width: 100%;
-  background-color: var(--el-bg-color);
+  background-color: transparent;
   border-top: none;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--app-rule);
   box-shadow: none;
   .tags-view-wrapper {
     .tags-view-item {
       display: inline-block;
       position: relative;
       cursor: pointer;
-      height: 26px;
-      line-height: 25px;
-      background-color: var(--el-bg-color);
-      border: 1px solid var(--el-border-color-light);
-      color: #495060;
-      padding: 0 8px;
-      font-size: 12px;
-      margin-left: 5px;
-      margin-top: 4px;
-      border-radius: var(--app-radius-md);
-      transition:
-        box-shadow 0.2s ease,
-        transform 0.2s ease,
-        border-color 0.2s ease,
-        color 0.2s ease;
+      height: 33px;
+      line-height: 33px;
+      background-color: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      color: var(--app-muted);
+      padding: 0 10px;
+      font-size: 13px;
+      margin-left: 4px;
+      margin-top: 0;
+      border-radius: 0;
+      transition: color 0.15s ease;
       &:hover {
-        color: var(--el-color-primary);
-        border-color: var(--el-color-primary-light-5);
-        box-shadow: var(--app-shadow-sm);
-        transform: translateY(-1px);
+        color: var(--app-text);
+        background-color: var(--app-raised);
       }
       &:first-of-type {
         margin-left: 15px;
@@ -279,19 +274,10 @@ onMounted(() => {
         margin-right: 15px;
       }
       &.active {
-        background-color: var(--tags-view-active-bg);
-        color: #fff;
-        border-color: var(--tags-view-active-border-color);
-        &::before {
-          content: '';
-          background: rgba(255, 255, 255, 0.7);
-          display: inline-block;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          position: relative;
-          margin-right: 5px;
-        }
+        background-color: transparent;
+        color: var(--app-text);
+        border-bottom-color: var(--app-text);
+        font-weight: 500;
       }
     }
   }

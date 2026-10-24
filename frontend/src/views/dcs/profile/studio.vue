@@ -659,7 +659,8 @@ const coveragePercent = (code: string) => {
   const n = Number(coverageOf(code)?.coverageRate ?? 0);
   return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0;
 };
-const coverageColor = (value: number) => (value >= 80 ? '#67c23a' : value >= 50 ? '#e6a23c' : '#f56c6c');
+const coverageColor = (value: number) =>
+  value >= 80 ? 'var(--el-color-success)' : value >= 50 ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
 
 const formatNumber = (value: number | string | null | undefined, precision = 2) => {
   if (value === null || value === undefined || value === '') return '—';

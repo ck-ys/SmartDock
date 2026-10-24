@@ -3111,10 +3111,10 @@ onMounted(() => {
 
       /* 业务批4 Q15-B：组头 banner（logo+厂名+数量）与悬停压制（组头=分组标题非交互行） */
       :deep(.grp-row) td.el-table__cell {
-        background: #f8fafc;
+        background: var(--app-raised);
       }
       :deep(.grp-row:hover) td.el-table__cell {
-        background: #f8fafc;
+        background: var(--app-raised);
       }
       .scope-grp {
         display: inline-flex;

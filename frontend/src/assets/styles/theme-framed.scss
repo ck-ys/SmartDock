@@ -1,0 +1,721 @@
+/**
+ * 框架纸（A，浅色） / 纯黑夜（D，深色）
+ *
+ * 两个方向共用一套结构 token，只换值：
+ *   A：浅青灰 L 框 + 内缩白纸，唯一数据色墨青 #1b6c80，主按钮近黑。
+ *   D：纯黑地面 + 亮度分层的卡片，唯一数据色青柠 #c6f24e，主按钮反相白。
+ *
+ * 页面不再各自写色：这里把 --app-* 映射到 --el-*，旧页面自动继承。
+ * 覆盖顺序：本文件在 index.scss 最后 @use，晚于 ruoyi/element-ui/sidebar。
+ */
+
+/* ============================ A · 浅色 ============================ */
+:root {
+  color-scheme: light;
+  /* 结构 */
+  --app-frame: #eef4f6;
+  --app-sheet-bg: #ffffff;
+  --app-ground: #f9fbfc;
+  --app-surface: #ffffff;
+  --app-raised: #f4f6f8;
+  --app-active: #ebedee;
+  --app-border: #e8eaec;
+  --app-rule: #f0f1f2;
+  --app-control: #cdced1;
+  --app-text: #131416;
+  --app-muted: #5d5f60;
+  --app-faint: #6b6b6b;
+
+  /* 数据与主操作 */
+  --app-accent: #1b6c80;
+  --app-primary: #1d1f20;
+  --app-primary-ink: #ffffff;
+  --app-primary-hover: #333638;
+  --app-primary-active: #000000;
+
+  /* 草稿/待确认的暖色卡片（AI 助手确认卡一族）在深色下也要保持“暖”语义 */
+  --app-warm-bg: #fffcf5;
+  --app-warm-bg-top: #fffdf8;
+  --app-warm-border: #f3d19e;
+  --app-warm-rule: #f7ecd4;
+  --app-warm-done-bg: #f6fceb;
+  --app-warm-done-border: #c2e7b0;
+
+  /* 度量 */
+  --app-sidebar-w: 228px;
+  --app-topbar-h: 48px;
+  --app-sheet-radius: 16px;
+  --app-sheet-inset: 8px;
+  --app-card-radius: 8px;
+  --app-control-radius: 6px;
+  --app-card-border: 1px solid var(--app-border);
+  --app-card-shadow: none;
+  --app-shadow-sm: none;
+  --app-shadow-md: none;
+  --app-shadow-lg: none;
+  --app-surface-bg: var(--app-surface);
+  --app-surface-border: var(--app-border);
+
+  /* Element Plus 映射 */
+  --el-font-family: 'IBM Plex Sans', 'MiSans', 'HarmonyOS Sans SC', 'PingFang SC', 'Source Han Sans SC', 'Noto Sans SC',
+    'Microsoft YaHei', sans-serif;
+  --el-font-size-base: 14px;
+  --el-bg-color-page: var(--app-ground);
+  --el-bg-color: var(--app-surface);
+  --el-bg-color-overlay: var(--app-surface);
+  --el-text-color-primary: var(--app-text);
+  --el-text-color-regular: var(--app-muted);
+  --el-text-color-secondary: var(--app-faint);
+  --el-text-color-placeholder: #9a9c9d;
+  --el-border-color: var(--app-border);
+  --el-border-color-light: var(--app-border);
+  --el-border-color-lighter: var(--app-rule);
+  --el-border-color-extra-light: var(--app-rule);
+  --el-fill-color: #f1f3f4;
+  --el-fill-color-light: var(--app-raised);
+  --el-fill-color-lighter: #f7f8f9;
+  --el-fill-color-blank: var(--app-surface);
+  --el-border-radius-base: var(--app-card-radius);
+  --el-border-radius-small: var(--app-control-radius);
+  --el-box-shadow-light: none;
+  --el-box-shadow-lighter: none;
+  --el-color-success: #1e7b4f;
+  --el-color-warning: #92400e;
+  --el-color-danger: #c4242a;
+  --el-color-info: #5d5f60;
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: var(--app-muted);
+  --el-menu-hover-bg-color: var(--app-raised);
+  --el-menu-active-color: var(--app-text);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-border-color: var(--app-rule);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+
+  /* 首屏前的主色兜底（App 挂载后由 handleThemeStyle 写成同样的值，避免闪一下蓝） */
+  --el-color-primary: #1d1f20;
+  --el-color-primary-light-3: #606262;
+  --el-color-primary-light-5: #8e8f8f;
+  --el-color-primary-light-7: #bbbcbc;
+  --el-color-primary-light-8: #d2d2d2;
+  --el-color-primary-light-9: #e8e9e9;
+  --el-color-primary-dark-2: #17191a;
+}
+
+/* ============================ 常亮页：登录 / 注册 / 协议 / 助手抽屉 ============================ */
+/* 这几处自带一套品牌浅色外观（并覆盖了 --el-color-primary）。把 --app-* 也钉回浅色口径，
+   否则深色主题残留时，全局规则会把它们的输入框/卡片刷成黑面 */
+:is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper) {
+  color-scheme: light;
+  --app-frame: #eef4f6;
+  --app-sheet-bg: #ffffff;
+  --app-ground: #f9fbfc;
+  --app-surface: #ffffff;
+  --app-raised: #f4f6f8;
+  --app-active: #ebedee;
+  --app-border: #e8eaec;
+  --app-rule: #f0f1f2;
+  --app-control: #cdced1;
+  --app-text: #131416;
+  --app-muted: #5d5f60;
+  --app-faint: #6b6b6b;
+  --app-accent: #1b6c80;
+  --app-primary: #1d1f20;
+  --app-primary-ink: #ffffff;
+  --app-primary-hover: #333537;
+  --app-primary-active: #0b0c0d;
+  --app-card-radius: 12px;
+  --app-sheet-radius: 16px;
+  --app-control-radius: 8px;
+  --app-card-border: 1px solid var(--app-border);
+  --app-card-shadow: none;
+  --app-warm-bg: #fffcf5;
+  --app-warm-bg-top: #fffdf8;
+  --app-warm-border: #f3d19e;
+  --app-warm-rule: #f7ecd4;
+  --app-warm-done-bg: #f6fceb;
+  --app-warm-done-border: #c2e7b0;
+}
+
+/* 助手抽屉复用的是 --dcs-* 派生变量：它们在 :root 已按当时的主题解析成具体色，
+   只改 --el-* 传不进去，必须在这里整套重新声明，否则深色下白字压在灰画布上。
+   忘记密码弹窗是 append-to-body，脱离登录页作用域，同样要把 EP 变量钉回浅色 */
+:is(.dcs-dw, .forgot-pwd, .login-tenant-popper) {
+  --el-text-color-primary: #131416;
+  --el-text-color-regular: #5d5f60;
+  --el-text-color-secondary: #6b6b6b;
+  --el-text-color-placeholder: #a8abb2;
+  --el-text-color-disabled: #c0c4cc;
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f7f8fa;
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color: #f4f6f8;
+  --el-fill-color-light: #f4f6f8;
+  --el-fill-color-lighter: #f7f8fa;
+  --el-fill-color-blank: #ffffff;
+  --el-border-color: #e8eaec;
+  --el-border-color-light: #e8eaec;
+  --el-border-color-lighter: #f0f1f2;
+  --el-border-color-extra-light: #f0f1f2;
+  --el-color-white: #ffffff;
+  --dcs-text-primary: #131416;
+  --dcs-text-regular: #5d5f60;
+  --dcs-text-secondary: #6b6b6b;
+  --dcs-text-placeholder: #a8abb2;
+  --dcs-bg-page: #f7f8fa;
+  --dcs-bg-card: #ffffff;
+  --dcs-bg-fill-light: #f4f6f8;
+  --dcs-bg-fill-lighter: #f7f8fa;
+  --dcs-border-color: #e8eaec;
+  --dcs-border-color-light: #e8eaec;
+  --dcs-border-color-lighter: #f0f1f2;
+  --dcs-color-success-light-9: #f0f9eb;
+  --dcs-color-warning-light-9: #fdf6ec;
+  --dcs-color-danger-light-9: #fef0f0;
+  --dcs-color-info-light-9: #f4f4f5;
+}
+
+html.dark {
+  /* ============================ D · 深色 ============================ */
+  /* 让原生滚动条 / 日期选择 / 下拉框跟随深色，否则黑底上挂一条浅灰滚动条 */
+  color-scheme: dark;
+  --app-frame: #000000;
+  --app-sheet-bg: #000000;
+  --app-ground: #000000;
+  --app-surface: #111111;
+  --app-raised: #1d1d1d;
+  --app-active: transparent;
+  --app-border: #1a1a1a;
+  --app-rule: #161616;
+  --app-control: #3a3a3e;
+  --app-text: #ffffff;
+  --app-muted: #b4b4b4;
+  --app-faint: #949494;
+
+  --app-accent: #c6f24e;
+  --app-primary: #ffffff;
+  --app-primary-ink: #000000;
+  --app-primary-hover: #e6e6e6;
+  --app-primary-active: #cfcfcf;
+
+  --app-warm-bg: #1c1810;
+  --app-warm-bg-top: #221d13;
+  --app-warm-border: #57431f;
+  --app-warm-rule: #3a2e19;
+  --app-warm-done-bg: #121c11;
+  --app-warm-done-border: #2c4a28;
+
+  --app-card-radius: 20px;
+  --app-sheet-radius: 20px;
+  --app-control-radius: 999px;
+  --app-card-border: 0;
+  --app-card-shadow: none;
+  --app-surface-bg: var(--app-surface);
+  --app-surface-border: var(--app-border);
+
+  --el-color-primary: #ffffff;
+  /* 主色在深色下是白底，Element 里凡是「主色填充 + 白字」的地方（分页当前页、
+     勾选框对勾、单选圆点、开关滑块）都靠这个变量取反相墨色，否则白底白字消失 */
+  --el-color-white: #000000;
+  --el-color-primary-light-3: #d6d6d6;
+  --el-color-primary-light-5: #a8a8a8;
+  --el-color-primary-light-7: #7a7a7a;
+  --el-color-primary-light-8: #4d4d4d;
+  --el-color-primary-light-9: #2a2a2a;
+  --el-color-primary-dark-2: #cccccc;
+  --el-color-success: #7ed6a5;
+  --el-color-success-light-9: #10251a;
+  --el-color-warning: #f0c060;
+  --el-color-warning-light-9: #2a2110;
+  --el-color-danger: #f08585;
+  --el-color-danger-light-9: #2a1414;
+  --el-color-info: #a8a8a8;
+  --el-bg-color-page: #000000;
+  --el-bg-color: #111111;
+  --el-bg-color-overlay: #111111;
+  --el-text-color-primary: #ffffff;
+  --el-text-color-regular: #b4b4b4;
+  --el-text-color-secondary: #949494;
+  --el-text-color-placeholder: #7a7a7a;
+  --el-border-color: #1a1a1a;
+  --el-border-color-light: #1a1a1a;
+  --el-border-color-lighter: #161616;
+  --el-border-color-extra-light: #161616;
+  --el-fill-color: #222222;
+  --el-fill-color-light: #1d1d1d;
+  --el-fill-color-lighter: #161616;
+  --el-fill-color-blank: #111111;
+  --el-mask-color: rgba(0, 0, 0, 0.72);
+  --el-table-row-hover-bg-color: #161616;
+}
+
+/* ============================ 基础排版 ============================ */
+body {
+  background: var(--app-frame);
+  color: var(--app-text);
+  font-family: var(--el-font-family);
+}
+
+/* 数字一律等宽对齐（A 的核心要求：数字像账本的一列） */
+.el-table,
+.el-pagination,
+.el-statistic,
+.el-descriptions,
+.el-form-item__label {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 标题只到 22px，正文 14px；页面小标题由各页自己控制 */
+.app-container {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ============================ 壳层 ============================ */
+#app .main-container {
+  background: var(--app-frame);
+  /* 纸面的 margin-top=壳层高度会穿过 height:100% 的容器塌到 body 上，
+     把整页顶下去 82px 并多出一条整页滚动条；建立 BFC 把外边距收在容器里 */
+  display: flow-root;
+}
+
+#app .sidebar-container {
+  background-color: var(--app-frame) !important;
+  box-shadow: none !important;
+  border-right: 0;
+}
+
+#app .sidebar-container .el-menu {
+  background: transparent !important;
+  padding: 4px 0;
+}
+
+#app .sidebar-container .el-menu-item,
+#app .sidebar-container .el-sub-menu__title {
+  height: 34px !important;
+  line-height: 34px !important;
+  margin: 1px 8px !important;
+  border-radius: var(--app-control-radius) !important;
+  font-size: 14px;
+  color: var(--app-muted);
+}
+
+#app .sidebar-container .el-menu-item:hover,
+#app .sidebar-container .el-sub-menu__title:hover {
+  background-color: var(--app-raised) !important;
+  color: var(--app-text) !important;
+}
+
+#app .sidebar-container .el-menu-item.is-active,
+#app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: var(--app-active) !important;
+  color: var(--app-text) !important;
+  font-weight: 500;
+}
+
+html.dark #app .sidebar-container .el-menu-item.is-active,
+html.dark #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: transparent !important;
+  color: #ffffff !important;
+}
+
+#app .sidebar-container .svg-icon {
+  width: 16px;
+  height: 16px;
+  margin-right: 10px;
+}
+
+/* 侧栏底部用户行（页面里没有专门组件，保留弹性） */
+#app .sidebar-container .el-scrollbar {
+  background: transparent;
+}
+
+/* ============================ 卡片 ============================ */
+.el-card {
+  --el-card-border-color: var(--app-border);
+  --el-card-border-radius: var(--app-card-radius);
+  --el-card-padding: 20px;
+  background: var(--app-surface);
+  border: var(--app-card-border);
+  border-radius: var(--app-card-radius);
+  box-shadow: var(--app-card-shadow) !important;
+}
+
+.el-card__header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--app-rule);
+  font-weight: 500;
+  color: var(--app-text);
+}
+
+.el-card__body {
+  padding: var(--el-card-padding);
+}
+
+html.dark .el-card {
+  border: 0;
+}
+
+/* ============================ 按钮 ============================ */
+.el-button {
+  border-radius: var(--app-control-radius);
+  font-weight: 500;
+}
+
+.el-button--default {
+  --el-button-bg-color: var(--app-surface);
+  --el-button-border-color: var(--app-control);
+  --el-button-text-color: var(--app-text);
+  --el-button-hover-bg-color: var(--app-raised);
+  --el-button-hover-border-color: var(--app-muted);
+  --el-button-hover-text-color: var(--app-text);
+  --el-button-active-bg-color: var(--app-raised);
+  --el-button-active-border-color: var(--app-text);
+  --el-button-active-text-color: var(--app-text);
+}
+
+.el-button--primary,
+.el-button--primary:hover,
+.el-button--primary:focus,
+.el-button--primary:active {
+  background-color: var(--app-primary);
+  border-color: var(--app-primary);
+  color: var(--app-primary-ink);
+}
+
+.el-button--primary:hover {
+  background-color: var(--app-primary-hover);
+  border-color: var(--app-primary-hover);
+}
+
+.el-button--primary:active {
+  background-color: var(--app-primary-active);
+  border-color: var(--app-primary-active);
+}
+
+.el-button--primary.is-plain,
+.el-button--primary.is-text,
+.el-button--primary.is-link {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--app-text);
+}
+
+.el-button--primary.is-plain {
+  border-color: var(--app-control);
+  color: var(--app-text);
+}
+
+.el-button--primary.is-plain:hover {
+  background-color: var(--app-raised);
+  border-color: var(--app-muted);
+  color: var(--app-text);
+}
+
+.el-button.is-link,
+.el-button.is-text {
+  color: var(--app-muted);
+}
+
+.el-button.is-link:hover,
+.el-button.is-text:hover {
+  color: var(--app-text);
+  background-color: var(--app-raised);
+}
+
+/* 工具栏里的「修改/删除/邀请」默认是彩色的（成/危/警），在纸面与纯黑下都太吵；
+   统一成中性描边，只给删除保留红字警示，其余用图标和文案区分 */
+.el-button--success.is-plain,
+.el-button--warning.is-plain,
+.el-button--info.is-plain {
+  background-color: transparent;
+  border-color: var(--app-control);
+  color: var(--app-text);
+}
+
+.el-button--success.is-plain:hover,
+.el-button--warning.is-plain:hover,
+.el-button--info.is-plain:hover {
+  background-color: var(--app-raised);
+  border-color: var(--app-muted);
+  color: var(--app-text);
+}
+
+.el-button--danger.is-plain {
+  background-color: transparent;
+  border-color: var(--app-control);
+  color: var(--el-color-danger);
+}
+
+.el-button--danger.is-plain:hover {
+  background-color: var(--app-raised);
+  border-color: var(--el-color-danger);
+  color: var(--el-color-danger);
+}
+
+/* 禁用态也要中性：Element 的 is-disabled 选择器优先级更高，会带回状态色底 */
+.el-button--success.is-plain.is-disabled,
+.el-button--warning.is-plain.is-disabled,
+.el-button--info.is-plain.is-disabled,
+.el-button--danger.is-plain.is-disabled {
+  background-color: transparent;
+  border-color: var(--app-rule);
+  color: var(--app-faint);
+}
+
+/* ============================ 表单控件 ============================ */
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  background-color: var(--app-surface);
+  box-shadow: 0 0 0 1px var(--app-control) inset;
+  border-radius: var(--app-control-radius);
+}
+
+.el-input__wrapper:hover,
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--app-muted) inset;
+}
+
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--app-primary) inset;
+}
+
+.el-input__inner,
+.el-textarea__inner {
+  color: var(--app-text);
+}
+
+.el-form-item__label {
+  color: var(--app-muted);
+  font-weight: 500;
+}
+
+/* 勾选框 / 单选框未选中时用控件描边色；深色下 --el-border-color 太黑会看不见 */
+.el-checkbox__inner,
+.el-radio__inner {
+  background-color: transparent;
+  border-color: var(--app-control);
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-radio__input.is-checked .el-radio__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner {
+  background-color: var(--app-primary);
+  border-color: var(--app-primary);
+}
+
+/* 手机档：行内查询表单逐行铺满。桌面写的 240px/320px 固定输入宽在 390 屏上会撑出
+   卡片内部横向滚动条（卡片左右各 24px 后只剩 ~290px 可用） */
+@media (max-width: 768px) {
+  .el-form--inline .el-form-item {
+    display: flex;
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .el-form--inline .el-form-item__content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .el-form--inline .el-form-item__content > .el-input,
+  .el-form--inline .el-form-item__content > .el-select,
+  .el-form--inline .el-form-item__content > .el-input-number,
+  .el-form--inline .el-form-item__content > .el-date-editor,
+  .el-form--inline .el-form-item__content > .el-autocomplete {
+    width: 100% !important;
+  }
+}
+
+/* Element 的 .el-switch 自身声明了 --el-switch-off-color:var(--el-border-color)，
+   比 :root 更近，必须打到 .el-switch 上才生效；否则关闭态轨道接近纸色、白滑块看不见 */
+.el-switch {
+  --el-switch-off-color: var(--app-control);
+  --el-switch-on-color: var(--app-primary);
+}
+
+html.dark .el-switch {
+  --el-switch-off-color: #3a3a3e;
+  --el-switch-on-color: #ffffff;
+}
+
+/* ============================ 表格 ============================ */
+.el-table {
+  color: var(--app-muted);
+  font-size: 13px;
+  background: transparent;
+}
+
+.el-table th.el-table__cell {
+  background-color: transparent !important;
+  color: var(--app-faint) !important;
+  font-size: 12px;
+  font-weight: 400;
+  height: 40px !important;
+  border-bottom: 1px solid var(--app-rule) !important;
+}
+
+.el-table td.el-table__cell {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--app-rule) !important;
+}
+
+.el-table--border .el-table__cell {
+  border-right: 1px solid var(--app-rule) !important;
+}
+
+.el-table__inner-wrapper::before {
+  background-color: var(--app-rule);
+}
+
+.el-table__empty-text {
+  color: var(--app-faint);
+}
+
+/* 冻结列必须有不透明底：普通行是透明的（透出卡片底色），但 sticky 单元格叠在滚动内容上，
+   继承 transparent 会让下层文字直接透上来（全仓 38 处 fixed 列都会中招） */
+.el-table .el-table-fixed-column--left,
+.el-table .el-table-fixed-column--right {
+  background-color: var(--app-surface);
+}
+
+/* 表头行上面有 !important 的透明规则，冻结表头要更高优先级压回来 */
+.el-table th.el-table-fixed-column--left,
+.el-table th.el-table-fixed-column--right {
+  background-color: var(--app-surface) !important;
+}
+
+/* 深色下主色是白色，Element 的日期面板却给选中日硬编码了 color:#fff，
+   白底白字等于看不见——用反相墨色把选中的日/月/年读回来 */
+html.dark .el-date-table td.selected .el-date-table-cell__text,
+html.dark .el-date-table td.start-date .el-date-table-cell__text,
+html.dark .el-date-table td.end-date .el-date-table-cell__text,
+html.dark .el-date-table td.current:not(.disabled) .el-date-table-cell__text,
+html.dark .el-month-table td.current:not(.disabled) .el-date-table-cell__text,
+html.dark .el-year-table td.current:not(.disabled) .el-date-table-cell__text {
+  color: var(--app-primary-ink);
+}
+
+/* ============================ 弹层 ============================ */
+.el-dialog {
+  background: var(--app-surface);
+  border-radius: var(--app-card-radius);
+  box-shadow: 0 24px 64px rgba(19, 20, 22, 0.18);
+  padding: 0;
+}
+
+.el-dialog__header {
+  margin: 0;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--app-rule);
+}
+
+.el-dialog__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--app-text);
+}
+
+.el-dialog__body {
+  padding: 20px 24px;
+  color: var(--app-muted);
+}
+
+.el-dialog__footer {
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--app-rule);
+}
+
+.el-drawer {
+  background: var(--app-surface);
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--app-rule);
+  color: var(--app-text);
+}
+
+.el-popover.el-popper,
+.el-dropdown__popper.el-popper,
+.el-select__popper.el-popper {
+  border-radius: var(--app-card-radius);
+  border-color: var(--app-border);
+}
+
+/* ============================ 标签页 ============================ */
+.el-tabs__item {
+  font-size: 14px;
+  color: var(--app-muted);
+}
+
+.el-tabs__item.is-active {
+  color: var(--app-text);
+  font-weight: 500;
+}
+
+.el-tabs__active-bar {
+  height: 2px;
+  background-color: var(--app-text);
+}
+
+.el-tabs__nav-wrap::after {
+  height: 1px;
+  background-color: var(--app-rule);
+}
+
+/* ============================ 其它 ============================ */
+.el-pagination {
+  --el-pagination-button-bg-color: transparent;
+  --el-pagination-hover-color: var(--app-text);
+  color: var(--app-muted);
+}
+
+.el-tag {
+  border-radius: var(--app-control-radius);
+}
+
+.el-divider--horizontal {
+  border-top-color: var(--app-rule);
+}
+
+.el-message-box {
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  border-color: var(--app-border);
+}
+
+.el-notification {
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+}
+
+/* ===== 深色连带修补：--el-color-white 取反后，Element 里拿它当「亮件」的地方要单独救 ===== */
+html.dark .el-switch .el-switch__action {
+  /* 关闭态轨道 #3a3a3e，滑块若跟着取反成黑色等于消失；开态轨道是白，滑块必须黑 */
+  background-color: #d0d0d0;
+}
+
+html.dark .el-switch.is-checked .el-switch__action {
+  background-color: #000000;
+}
+
+html.dark .el-slider__button {
+  background-color: #ffffff;
+  border-color: #ffffff;
+}
+
+html.dark .el-slider {
+  /* 刻度点默认取 --el-color-white，深色下取反成黑色，落在 #1a1a1a 轨道上等于消失 */
+  --el-slider-stop-bg-color: #3a3a3e;
+}
+
+html.dark .el-alert {
+  background-color: var(--el-bg-color-overlay);
+}

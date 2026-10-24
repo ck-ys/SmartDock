@@ -1,5 +1,5 @@
 <template>
-  <el-menu class="topbar-menu" :ellipsis="false" :default-active="activeMenu" :active-text-color="theme" mode="horizontal">
+  <el-menu class="topbar-menu" :ellipsis="false" :default-active="activeMenu" active-text-color="var(--app-text)" mode="horizontal">
     <sidebar-item :key="route.path + index" v-for="(route, index) in topMenus" :item="route" :base-path="route.path" />
 
     <el-sub-menu index="more" class="el-sub-menu__hide-arrow" v-if="moreRoutes.length > 0">
@@ -14,16 +14,13 @@
 <script setup>
 import SidebarItem from '../Sidebar/SidebarItem';
 import { useAppStore } from '@/store/modules/app';
-import { useSettingsStore } from '@/store/modules/settings';
 import { usePermissionStore } from '@/store/modules/permission';
 
 const route = useRoute();
 const appStore = useAppStore();
-const settingsStore = useSettingsStore();
 const permissionStore = usePermissionStore();
 
 const sidebarRouters = computed(() => permissionStore.sidebarRouters);
-const theme = computed(() => settingsStore.theme);
 const device = computed(() => appStore.device);
 const activeMenu = computed(() => {
   const { meta, path } = route;
@@ -69,9 +66,9 @@ onMounted(() => {
 
 .topbar-menu.el-menu--horizontal > .el-menu-item {
   float: left;
-  height: 50px !important;
-  line-height: 50px !important;
-  color: #303133 !important;
+  height: var(--app-topbar-h) !important;
+  line-height: var(--app-topbar-h) !important;
+  color: var(--app-text) !important;
   padding: 0 5px !important;
   margin: 0 10px !important;
 }
@@ -80,14 +77,14 @@ onMounted(() => {
 .el-menu-item.is-active .svg-icon + span,
 .el-sub-menu.is-active .svg-icon + span,
 .el-sub-menu.is-active .el-sub-menu__title span {
-  color: v-bind(theme);
+  color: var(--app-text);
 }
 
 /* sub-menu item */
 .topbar-menu.el-menu--horizontal > .el-sub-menu .el-sub-menu__title {
   float: left;
-  line-height: 50px !important;
-  color: #303133 !important;
+  line-height: var(--app-topbar-h) !important;
+  color: var(--app-text) !important;
   margin: 0 15px -3px !important;
 }
 
@@ -102,6 +99,7 @@ onMounted(() => {
 /* menu__title el-menu-item */
 .topbar-menu.el-menu--horizontal .el-sub-menu__title,
 .topbar-menu.el-menu--horizontal .el-menu-item {
-  height: 60px;
+  /* 顶栏只有 48px，菜单项写死 60px 会垂到页签行上 */
+  height: var(--app-topbar-h);
 }
 </style>

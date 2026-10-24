@@ -25,8 +25,9 @@
  * 柱/折线开顶部数据标签、Y 轴整数刻度、浅灰轴线；仪表盘去指针改中心大数字；商务色板
  * 替换 EP 裸五色。协议（type/title/data/value 白名单）不变，纯渲染层改动。</p>
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as echarts from 'echarts';
+import { useChartTokens, alpha, type ChartTokens } from '@/utils/chart-theme';
 
 const props = defineProps<{ spec: string }>();
 
@@ -34,13 +35,9 @@ const el = ref<HTMLDivElement | null>(null);
 const err = ref('');
 let chart: echarts.ECharts | null = null;
 let ro: ResizeObserver | null = null;
-
-/** 商务色板：主蓝起步、语义友好、尾部低饱和（12 色对齐协议 12 项上限） */
-const PALETTE = ['#3b7dd8', '#46b98f', '#f0a742', '#e26d6d', '#8a7fe0', '#43b3c9', '#c9a25e', '#d98ab0', '#7f96a8', '#9db4c9', '#c3d0dd', '#dfe5ec'];
-const PRIMARY = PALETTE[0];
-const INK_SUB = '#606266';
-const INK_DIM = '#909399';
-const LINE_SOFT = '#e4e7ed';
+/** 助手内嵌图与整站同一套取色：A 墨青 / D 青柠，切主题后重画 */
+const ct = useChartTokens();
+let currentSpec: ChartSpec | null = null;
 
 type Datum = { name: string; value: number };
 interface ChartSpec {
@@ -109,7 +106,7 @@ function axisMaxWithHeadroom(value: { max: number }): number {
   return value.max + Math.max(1, Math.ceil(value.max * 0.15));
 }
 
-function hBarOption(s: ChartSpec): echarts.EChartsCoreOption {
+function hBarOption(s: ChartSpec, t: ChartTokens): echarts.EChartsCoreOption {
   const data = s.data ?? [];
   return {
     grid: { left: 6, right: 40, top: 6, bottom: 0, containLabel: true },
@@ -118,15 +115,15 @@ function hBarOption(s: ChartSpec): echarts.EChartsCoreOption {
       type: 'value',
       minInterval: 1,
       max: axisMaxWithHeadroom,
-      axisLabel: { color: INK_DIM, fontSize: 11 },
-      splitLine: { lineStyle: { color: LINE_SOFT, type: 'dashed' } }
+      axisLabel: { color: t.faint, fontSize: 11 },
+      splitLine: { lineStyle: { color: t.rule, type: 'dashed' } }
     },
     yAxis: {
       type: 'category',
       inverse: true,
       data: data.map((d) => d.name),
-      axisLabel: { color: INK_SUB, fontSize: 11.5, width: 96, overflow: 'truncate' },
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
+      axisLabel: { color: t.muted, fontSize: 11.5, width: 96, overflow: 'truncate' },
+      axisLine: { lineStyle: { color: t.border } },
       axisTick: { show: false }
     },
     series: [
@@ -134,14 +131,14 @@ function hBarOption(s: ChartSpec): echarts.EChartsCoreOption {
         type: 'bar',
         data: data.map((d) => d.value),
         barMaxWidth: 18,
-        itemStyle: { color: PRIMARY, borderRadius: [0, 3, 3, 0] },
-        label: { show: true, position: 'right', fontSize: 11, color: INK_SUB }
+        itemStyle: { color: t.accent, borderRadius: [0, 3, 3, 0] },
+        label: { show: true, position: 'right', fontSize: 11, color: t.muted }
       }
     ]
   };
 }
 
-function buildOption(s: ChartSpec): echarts.EChartsCoreOption {
+function buildOption(s: ChartSpec, t: ChartTokens): echarts.EChartsCoreOption {
   // 标题已在组件头部渲染，画布内不再重复占位
   if (s.type === 'gauge') {
     return {
@@ -154,15 +151,15 @@ function buildOption(s: ChartSpec): echarts.EChartsCoreOption {
           max: 100,
           radius: '92%',
           center: ['50%', '58%'],
-          progress: { show: true, width: 13, roundCap: true, itemStyle: { color: PRIMARY } },
-          axisLine: { lineStyle: { width: 13, color: [[1, '#edf1f6']] } },
+          progress: { show: true, width: 13, roundCap: true, itemStyle: { color: t.accent } },
+          axisLine: { lineStyle: { width: 13, color: [[1, t.rule]] } },
           axisTick: { show: false },
-          splitLine: { length: 6, distance: -19, lineStyle: { width: 2, color: '#d3dae4' } },
-          axisLabel: { distance: -34, color: INK_DIM, fontSize: 10 },
+          splitLine: { length: 6, distance: -19, lineStyle: { width: 2, color: t.border } },
+          axisLabel: { distance: -34, color: t.faint, fontSize: 10 },
           pointer: { show: false },
           // 去指针后数值放正中，不再被悬浮按钮遮挡/挤到边缘
-          detail: { valueAnimation: true, fontSize: 26, fontWeight: 700, color: INK_SUB, offsetCenter: [0, '-6%'], formatter: '{value}%' },
-          title: { offsetCenter: [0, '38%'], fontSize: 12, color: INK_DIM },
+          detail: { valueAnimation: true, fontSize: 26, fontWeight: 700, color: t.ink, offsetCenter: [0, '-6%'], formatter: '{value}%' },
+          title: { offsetCenter: [0, '38%'], fontSize: 12, color: t.faint },
           data: [{ value: s.value, name: s.name ?? '' }]
         }
       ]
@@ -173,11 +170,11 @@ function buildOption(s: ChartSpec): echarts.EChartsCoreOption {
   const values = data.map((d) => d.value);
   if (s.type === 'pie') {
     if (data.length > PIE_MAX_SLICES) {
-      return hBarOption(s);
+      return hBarOption(s, t);
     }
     return {
       tooltip: { trigger: 'item' },
-      color: PALETTE,
+      color: t.ramp,
       series: [
         {
           type: 'pie',
@@ -185,11 +182,11 @@ function buildOption(s: ChartSpec): echarts.EChartsCoreOption {
           center: ['50%', '54%'],
           data,
           // 标签贴边对齐+引导线+极小扇区隐字：治「标签挤向中心」的根（Q5A）
-          label: { alignTo: 'edge', edgeDistance: 12, minMargin: 4, fontSize: 11.5, color: INK_SUB, formatter: '{b} {c}' },
-          labelLine: { length: 14, length2: 0, maxSurfaceAngle: 80, lineStyle: { color: '#c0c6cf' } },
+          label: { alignTo: 'edge', edgeDistance: 12, minMargin: 4, fontSize: 11.5, color: t.muted, formatter: '{b} {c}' },
+          labelLine: { length: 14, length2: 0, maxSurfaceAngle: 80, lineStyle: { color: t.border } },
           labelLayout: { hideOverlap: true },
           minShowLabelRadian: 0.08,
-          itemStyle: { borderColor: '#fff', borderWidth: 2 }
+          itemStyle: { borderColor: t.surface, borderWidth: 2 }
         }
       ]
     };
@@ -200,16 +197,16 @@ function buildOption(s: ChartSpec): echarts.EChartsCoreOption {
     xAxis: {
       type: 'category',
       data: names,
-      axisLabel: { color: INK_SUB, fontSize: 11, interval: 0, width: 72, overflow: 'truncate' },
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
+      axisLabel: { color: t.muted, fontSize: 11, interval: 0, width: 72, overflow: 'truncate' },
+      axisLine: { lineStyle: { color: t.border } },
       axisTick: { show: false }
     },
     yAxis: {
       type: 'value',
       minInterval: 1,
       max: axisMaxWithHeadroom,
-      axisLabel: { color: INK_DIM, fontSize: 11 },
-      splitLine: { lineStyle: { color: LINE_SOFT, type: 'dashed' } }
+      axisLabel: { color: t.faint, fontSize: 11 },
+      splitLine: { lineStyle: { color: t.rule, type: 'dashed' } }
     },
     series: [
       s.type === 'bar'
@@ -217,8 +214,8 @@ function buildOption(s: ChartSpec): echarts.EChartsCoreOption {
             type: 'bar',
             data: values,
             barMaxWidth: 26,
-            itemStyle: { color: PRIMARY, borderRadius: [4, 4, 0, 0] },
-            label: { show: true, position: 'top', fontSize: 11, color: INK_SUB }
+            itemStyle: { color: t.accent, borderRadius: [4, 4, 0, 0] },
+            label: { show: true, position: 'top', fontSize: 11, color: t.muted }
           }
         : {
             type: 'line',
@@ -226,13 +223,13 @@ function buildOption(s: ChartSpec): echarts.EChartsCoreOption {
             smooth: false,
             symbol: 'circle',
             symbolSize: 6,
-            lineStyle: { width: 2.5, color: PRIMARY },
-            itemStyle: { color: PRIMARY, borderColor: '#fff', borderWidth: 1.5 },
-            label: { show: true, position: 'top', fontSize: 11, color: INK_SUB },
+            lineStyle: { width: 2.5, color: t.accent },
+            itemStyle: { color: t.accent, borderColor: t.surface, borderWidth: 1.5 },
+            label: { show: true, position: 'top', fontSize: 11, color: t.muted },
             areaStyle: {
               color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(59,125,216,0.24)' },
-                { offset: 1, color: 'rgba(59,125,216,0.03)' }
+                { offset: 0, color: alpha(t.accent, 0.24) },
+                { offset: 1, color: alpha(t.accent, 0.03) }
               ])
             }
           }
@@ -289,10 +286,21 @@ onMounted(() => {
     headSub.value = `共 ${n} 项 · 合计 ${total}`;
   }
   chart = echarts.init(el.value);
-  chart.setOption(buildOption(s));
+  currentSpec = s;
+  chart.setOption(buildOption(s, ct.value));
   ro = new ResizeObserver(() => chart?.resize());
   ro.observe(el.value);
 });
+
+// 切主题后按新 token 重画（canvas 读不到 CSS 变量）
+watch(
+  () => ct.value,
+  () => {
+    if (chart && currentSpec) {
+      chart.setOption(buildOption(currentSpec, ct.value), true);
+    }
+  }
+);
 
 onBeforeUnmount(() => {
   ro?.disconnect();
@@ -313,10 +321,10 @@ onBeforeUnmount(() => {
 }
 .cb-wrap {
   width: 100%;
-  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border: 1px solid var(--app-border, #ebeef5);
   border-radius: 10px;
   padding: 12px 12px 6px;
-  background: #fff;
+  background: var(--app-surface, #fff);
 }
 .cb-head {
   display: flex;

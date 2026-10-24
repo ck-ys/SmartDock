@@ -6,6 +6,30 @@
     <meta name="renderer" content="webkit" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="icon" href="/favicon.ico" />
+    <!-- 纯黑夜主题要在首帧前落到 html 上，否则会先白后黑闪一下。
+         必须排在任何外部样式表之前：内联脚本会等前面的阻塞样式表下载完才执行，
+         而内网环境 fonts.googleapis.com 可能挂到超时，游戏带主题一起卡住 -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('useDarkKey') === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          /* 隐私模式下读不到，按浅色渲染 */
+        }
+      })();
+    </script>
+    <!-- 框架纸字体：IBM Plex Sans/Mono。用 media=print + onload 换成 all 做非阻塞，
+         内网连不上字体站时只回落系统字，不拖慢首屏 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
     <title>%VITE_APP_TITLE%</title>
     <!--[if lt IE 11
       ]><script>
@@ -19,6 +43,16 @@
         height: 100%;
         margin: 0px;
         padding: 0px;
+      }
+
+      html,
+      body {
+        background: #f9fbfc;
+      }
+
+      html.dark,
+      html.dark body {
+        background: #000000;
       }
 
       .chromeframe {
@@ -47,7 +81,7 @@
         margin: -75px 0 0 -75px;
         border-radius: 50%;
         border: 3px solid transparent;
-        border-top-color: #fff;
+        border-top-color: #1b6c80;
         -webkit-animation: spin 2s linear infinite;
         -ms-animation: spin 2s linear infinite;
         -moz-animation: spin 2s linear infinite;
@@ -65,7 +99,7 @@
         bottom: 5px;
         border-radius: 50%;
         border: 3px solid transparent;
-        border-top-color: #fff;
+        border-top-color: #1b6c80;
         -webkit-animation: spin 3s linear infinite;
         -moz-animation: spin 3s linear infinite;
         -o-animation: spin 3s linear infinite;
@@ -82,7 +116,7 @@
         bottom: 15px;
         border-radius: 50%;
         border: 3px solid transparent;
-        border-top-color: #fff;
+        border-top-color: #1b6c80;
         -moz-animation: spin 1.5s linear infinite;
         -o-animation: spin 1.5s linear infinite;
         -ms-animation: spin 1.5s linear infinite;
@@ -123,11 +157,22 @@
         top: 0;
         width: 51%;
         height: 100%;
-        background: #7171c6;
+        background: #eef4f6;
         z-index: 1000;
         -webkit-transform: translateX(0);
         -ms-transform: translateX(0);
         transform: translateX(0);
+      }
+
+      /* 深色用户冷启动时，加载遮罩也要跟着黑，否则先闪一片浅灰 */
+      html.dark #loader-wrapper .loader-section {
+        background: #000000;
+      }
+
+      html.dark #loader,
+      html.dark #loader:before,
+      html.dark #loader:after {
+        border-top-color: #c6f24e;
       }
 
       #loader-wrapper .loader-section.section-left {
@@ -178,8 +223,8 @@
       }
 
       #loader-wrapper .load_title {
-        font-family: 'Open Sans';
-        color: #fff;
+        font-family: 'IBM Plex Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        color: #5d5f60;
         font-size: 19px;
         width: 100%;
         text-align: center;
@@ -190,12 +235,16 @@
         line-height: 30px;
       }
 
+      html.dark #loader-wrapper .load_title {
+        color: #b4b4b4;
+      }
+
       #loader-wrapper .load_title span {
         font-weight: normal;
         font-style: italic;
         font-size: 13px;
-        color: #fff;
-        opacity: 0.5;
+        color: #6b6b6b;
+        opacity: 0.7;
       }
     </style>
   </head>

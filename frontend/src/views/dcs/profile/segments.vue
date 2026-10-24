@@ -230,7 +230,7 @@
     </el-dialog>
 
     <!-- 成员 -->
-    <el-drawer v-model="memberVisible" :title="`成员 · ${activeSegment?.segmentName || ''}`" size="720px" destroy-on-close>
+    <el-drawer v-model="memberVisible" :title="`成员 · ${activeSegment?.segmentName || ''}`" size="min(720px, 92vw)" destroy-on-close>
       <div class="drawer-toolbar">
         <el-input v-model="memberQuery.keyword" placeholder="主体 ID / 名称" clearable style="width: 220px" @keyup.enter="loadMembers" />
         <el-button type="primary" @click="loadMembers">查询</el-button>
@@ -268,7 +268,7 @@
     </el-drawer>
 
     <!-- 运行记录（含人数趋势） -->
-    <el-drawer v-model="runVisible" :title="`运行记录 · ${activeSegment?.segmentName || ''}`" size="720px" destroy-on-close>
+    <el-drawer v-model="runVisible" :title="`运行记录 · ${activeSegment?.segmentName || ''}`" size="min(720px, 92vw)" destroy-on-close>
       <v-chart v-if="runs.length >= 2" class="run-trend-chart" :option="runTrendOption" autoresize />
       <el-table v-loading="runLoading" :data="runs" stripe size="small">
         <el-table-column label="运行 ID" prop="runId" min-width="180" />
@@ -335,7 +335,7 @@
     </el-dialog>
 
     <!-- 触达/导出记录 -->
-    <el-drawer v-model="recordsVisible" :title="`触达与导出记录 · ${activeSegment?.segmentName || ''}`" size="760px" destroy-on-close>
+    <el-drawer v-model="recordsVisible" :title="`触达与导出记录 · ${activeSegment?.segmentName || ''}`" size="min(760px, 92vw)" destroy-on-close>
       <el-table
         v-loading="recordsLoading"
         :data="reachBatches"
@@ -437,6 +437,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
+import { useChartTokens } from '@/utils/chart-theme';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { download } from '@/utils/request';
 import {
@@ -469,6 +470,8 @@ const source = ref('dcs');
 const segments = ref<ProfileSegment[]>([]);
 const loading = ref(false);
 const evaluatingId = ref('');
+/** 图表色随主题切换 */
+const ct = useChartTokens();
 
 const dynamicCount = computed(() => segments.value.filter((s) => s.segmentType === 'DYNAMIC').length);
 const staticCount = computed(() => segments.value.filter((s) => s.segmentType === 'STATIC').length);
@@ -784,16 +787,29 @@ const triggerLabel = (trigger?: string) =>
 const runTrendOption = computed<any>(() => {
   const ordered = [...runs.value].reverse();
   return {
-    title: { text: '人数趋势（按运行记录）', left: 0, top: 0, textStyle: { fontSize: 13, fontWeight: 600 } },
+    color: ct.value.series,
+    title: { text: '人数趋势（按运行记录）', left: 0, top: 0, textStyle: { fontSize: 13, fontWeight: 600, color: ct.value.ink } },
     tooltip: { trigger: 'axis' },
     grid: { left: 40, right: 16, top: 34, bottom: 26 },
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: ordered.map((run, i) => (run.finishedAt || run.startedAt || `#${i + 1}`).slice(5, 16))
+      data: ordered.map((run, i) => (run.finishedAt || run.startedAt || `#${i + 1}`).slice(5, 16)),
+      axisLabel: { color: ct.value.faint },
+      axisLine: { lineStyle: { color: ct.value.border } }
     },
-    yAxis: { type: 'value', minInterval: 1 },
-    series: [{ type: 'line', smooth: true, symbolSize: 6, areaStyle: { opacity: 0.12 }, data: ordered.map((run) => run.memberCount) }]
+    yAxis: { type: 'value', minInterval: 1, axisLabel: { color: ct.value.faint }, splitLine: { lineStyle: { color: ct.value.rule } } },
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        symbolSize: 6,
+        areaStyle: { opacity: 0.12, color: ct.value.accent },
+        itemStyle: { color: ct.value.accent },
+        lineStyle: { color: ct.value.accent },
+        data: ordered.map((run) => run.memberCount)
+      }
+    ]
   };
 });
 

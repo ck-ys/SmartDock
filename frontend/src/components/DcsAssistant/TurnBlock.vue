@@ -1358,7 +1358,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       flex: none;
       border: none;
       background: var(--el-color-primary);
-      color: #fff;
+      color: var(--app-primary-ink);
       border-radius: 4px;
       padding: 6px 14px;
       font-size: 13px;
@@ -2114,7 +2114,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   margin-left: 8px;
   border: 1px solid var(--el-color-primary, #409eff);
   background: var(--el-color-primary, #409eff);
-  color: #fff;
+  color: var(--app-primary-ink);
   border-radius: 6px;
   padding: 2px 10px;
   font-size: 12px;

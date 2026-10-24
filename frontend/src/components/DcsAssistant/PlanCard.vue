@@ -110,11 +110,11 @@ const planText = computed(() => `按这个计划执行：\n${props.plan.steps.ma
   .pa-go {
     background: var(--el-color-primary);
     border-color: var(--el-color-primary);
-    color: #fff;
+    color: var(--app-primary-ink);
 
     &:hover {
       background: var(--el-color-primary-light-3);
-      color: #fff;
+      color: var(--app-primary-ink);
     }
   }
 }

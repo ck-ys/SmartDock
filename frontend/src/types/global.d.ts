@@ -133,6 +133,10 @@ declare global {
      */
     theme: string;
     /**
+     * 数据强调色（只用于图表与数据标记）
+     */
+    accent?: string;
+    /**
      * 页面圆角大小
      */
     radiusBase: number;

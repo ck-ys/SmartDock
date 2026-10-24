@@ -133,7 +133,7 @@ const emit = defineEmits<{ ok: [] }>();
     border: none;
     border-radius: 6px;
     background: var(--el-color-primary);
-    color: #fff;
+    color: var(--app-primary-ink);
     font-size: 14px;
     cursor: pointer;
 

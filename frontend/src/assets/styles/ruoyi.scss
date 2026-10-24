@@ -187,15 +187,15 @@ h6 {
   float: right !important;
 }
 
+/* 卡片内外边距交给 theme-framed（A/D 统一 20px）；这里的 !important 会让主题规则永远失效 */
 .el-card__header {
-  padding: 14px 15px 7px !important;
   min-height: 40px;
   background: var(--el-fill-color-blank);
   border-bottom: 1px solid var(--el-border-color-light);
 }
 
 .el-card__body {
-  padding: 15px 20px 20px 20px !important;
+  padding: var(--el-card-padding, 20px);
 }
 
 .el-card {

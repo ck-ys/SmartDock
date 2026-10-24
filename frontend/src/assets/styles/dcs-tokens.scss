@@ -21,6 +21,11 @@
   --dcs-color-warning: var(--el-color-warning);
   --dcs-color-danger: var(--el-color-danger);
   --dcs-color-info: var(--el-color-info);
+  // 浅色底（深色下由 Element 暗色变量给深色底）：卡片里的告警/失败/完成胶囊
+  --dcs-color-success-light-9: var(--el-color-success-light-9);
+  --dcs-color-warning-light-9: var(--el-color-warning-light-9);
+  --dcs-color-danger-light-9: var(--el-color-danger-light-9);
+  --dcs-color-info-light-9: var(--el-color-info-light-9);
 
   // === 文字层次 ===
   --dcs-text-primary: var(--el-text-color-primary);

@@ -74,6 +74,12 @@
           <size-select id="size-select" class="right-menu-item hover-effect" />
         </el-tooltip>
       </template>
+      <el-tooltip :content="dark ? '切到框架纸（浅色）' : '切到纯黑夜（深色）'" effect="dark" placement="bottom">
+        <div class="right-menu-item hover-effect theme-switch" @click="toggleAppearance">
+          <el-icon v-if="dark"><Sunny /></el-icon>
+          <el-icon v-else><Moon /></el-icon>
+        </div>
+      </el-tooltip>
       <div class="avatar-container">
         <el-dropdown class="right-menu-item hover-effect" trigger="click" @command="handleCommand">
           <div class="avatar-wrapper">
@@ -157,6 +163,8 @@ watch(
 const userId = ref(userStore.userId);
 const navType = computed(() => settingsStore.navType);
 const showLogo = computed(() => settingsStore.sidebarLogo);
+const dark = computed(() => settingsStore.dark);
+const toggleAppearance = () => settingsStore.setDark(!settingsStore.dark);
 
 const companyName = ref(undefined);
 const tenantList = ref<TenantVO[]>([]);
@@ -291,6 +299,10 @@ onMounted(() => {
   transform: translateY(-50%);
 }
 
+.theme-switch {
+  cursor: pointer;
+}
+
 .flex {
   display: flex;
 }
@@ -300,11 +312,11 @@ onMounted(() => {
 }
 
 .navbar {
-  height: 50px;
+  height: var(--app-topbar-h);
   overflow: hidden;
   position: relative;
-  background: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  background: transparent;
+  border-bottom: 0;
   box-shadow: none;
   display: flex;
   align-items: center;
@@ -379,8 +391,8 @@ onMounted(() => {
           color 0.2s ease;
 
         &:hover {
-          background: var(--el-fill-color-light);
-          color: var(--el-color-primary);
+          background: var(--app-raised);
+          color: var(--app-text);
         }
       }
     }
@@ -416,7 +428,7 @@ onMounted(() => {
      波 0.1：断点 768→992 对齐壳层设备判定（width-1<992 即手机形态，iPad 竖屏/手机横屏同享补偿） */
   /* 顶部安全区：状态栏/刘海不吃进顶栏内容（env 在桌面/无刘海设备恒 0）；
      AppMain 的高度扣减在所有宽度都消费 --sp-top，这里同口径，避免宽屏错位 */
-  height: calc(50px + var(--sp-top, 0px));
+  height: calc(var(--app-topbar-h) + var(--sp-top, 0px));
   padding-top: var(--sp-top, 0px);
 
   @media (max-width: 992px) {

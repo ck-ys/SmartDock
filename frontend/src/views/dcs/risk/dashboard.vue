@@ -388,6 +388,7 @@ import { getDashboard, type DashboardVO, type RiskEventVO, EVENT_TYPE_LABELS, EV
 import { safeLoad } from '../utils/safeLoad';
 import { formatRiskRelativeTime } from './riskDashboardPresentation';
 import { maskSensitiveDetail, maskToken } from './sensitiveMask';
+import { useChartTokens, alpha } from '@/utils/chart-theme';
 import { useRoute, useRouter } from 'vue-router';
 
 defineOptions({ name: 'DcsRiskDashboard' });
@@ -468,12 +469,14 @@ const levelCount = (lvl: string) => (dashboard.value.levelStats || []).find((l) 
 const topRules = computed(() => dashboard.value.topRules || []);
 const maxRankCount = computed(() => topRules.value.reduce((max, r) => Math.max(max, r.cnt), 0));
 const rankPercentage = (cnt: number) => (maxRankCount.value > 0 ? Math.round((cnt / maxRankCount.value) * 100) : 0);
-// echarts/el-progress 无法消费 CSS 变量, 此处取值与 dcs-tokens 语义色(--el-color-*)一致
+// echarts/el-progress 无法消费 CSS 变量，统一从 chart-theme 取（主题切换自动重算）
+const ct = useChartTokens();
 const rankColor = (idx: number) => {
-  if (idx === 0) return '#f56c6c';
-  if (idx === 1) return '#e6a23c';
-  if (idx === 2) return '#f0c78a';
-  return '#409eff';
+  if (idx === 0) return ct.value.accent;
+  if (idx === 1) return alpha(ct.value.accent, 0.6);
+  if (idx === 2) return alpha(ct.value.accent, 0.4);
+  // 第 4 名往后用中性灰：--app-rule 是分隔线色，压在卡片底上几乎看不见
+  return ct.value.muted;
 };
 const levelLabel = (lvl: string) => {
   const m: Record<string, string> = { L0: '正常', L1: '低风险', L2: '中风险', L3: '高风险', L4: '极高危' };
@@ -511,34 +514,40 @@ const renderTypeChart = async () => {
     name: EVENT_TYPE_LABELS[t.eventType] || t.eventType,
     value: t.cnt
   }));
-  // 取值与 dcs-tokens 语义色(--el-color-warning/danger/primary/info)一致
+  // 风险等级本身是有语义的：红=高危、黄=中危、墨色=常规，不套用单一数据色
   const COLORS: Record<string, string> = {
-    SENSITIVE_WORD: '#e6a23c',
-    REPORTED: '#f56c6c',
-    LOGIN_FAIL: '#e6a23c',
-    HIGH_FREQ_API: '#409eff',
-    UPLOAD_ABUSE: '#909399',
-    TASK_CONTENT_RISK: '#e6a23c',
-    FILE_REJECTED: '#f56c6c'
+    SENSITIVE_WORD: ct.value.warning,
+    REPORTED: ct.value.danger,
+    LOGIN_FAIL: ct.value.warning,
+    HIGH_FREQ_API: ct.value.accent,
+    UPLOAD_ABUSE: ct.value.muted,
+    TASK_CONTENT_RISK: ct.value.warning,
+    FILE_REJECTED: ct.value.danger
   };
-  const colors = (dashboard.value.eventTypeStats || []).map((t) => COLORS[t.eventType] || '#409eff');
+  const colors = (dashboard.value.eventTypeStats || []).map((t) => COLORS[t.eventType] || ct.value.accent);
   typeChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c} 次 ({d}%)' },
-    legend: { bottom: 0, type: 'scroll' },
+    legend: { bottom: 0, type: 'scroll', textStyle: { color: ct.value.muted } },
     series: [
       {
         type: 'pie',
         radius: ['40%', '70%'],
         center: ['50%', '45%'],
         avoidLabelOverlap: true,
-        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-        label: { show: true, formatter: '{b}\n{c}次' },
+        itemStyle: { borderRadius: 6, borderColor: ct.value.surface, borderWidth: 2 },
+        label: { show: true, formatter: '{b}\n{c}次', color: ct.value.muted },
         data,
         color: colors
       }
     ]
   });
 };
+
+// 切主题后重画饼图（canvas 读不到 CSS 变量，必须按新 token 重建 option）
+watch(
+  () => ct.value,
+  () => renderTypeChart()
+);
 
 const resizeObserver = ref<ResizeObserver | null>(null);
 onMounted(() => {

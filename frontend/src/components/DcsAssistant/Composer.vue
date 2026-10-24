@@ -3204,7 +3204,7 @@ defineExpose({
     width: 20px;
     height: 20px;
     border-radius: 6px;
-    color: #fff;
+    color: var(--app-primary-ink);
     font-size: 11px;
     font-style: normal;
     display: flex;

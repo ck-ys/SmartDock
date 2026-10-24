@@ -70,8 +70,8 @@ const getLogoTextColor = computed(() => {
 
 .sidebar-logo-container {
   position: relative;
-  height: 50px;
-  line-height: 50px;
+  height: var(--app-topbar-h);
+  line-height: var(--app-topbar-h);
   background: v-bind(getLogoBackground);
   text-align: center;
   overflow: hidden;
@@ -81,10 +81,10 @@ const getLogoTextColor = computed(() => {
     width: 100%;
 
     & .sidebar-logo {
-      width: 32px;
-      height: 32px;
+      width: 26px;
+      height: 26px;
       vertical-align: middle;
-      margin-right: 12px;
+      margin-right: 9px;
       margin-left: 12px;
     }
 

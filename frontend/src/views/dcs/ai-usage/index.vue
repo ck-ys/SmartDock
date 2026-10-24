@@ -18,7 +18,7 @@
           <el-card v-if="summary && summary.costByCaller" shadow="never" class="caller-overview-card">
             <template #header><span>调用方成本分布</span></template>
             <el-row :gutter="12">
-              <el-col v-for="(cost, caller) in summary.costByCaller" :key="caller" :span="6">
+              <el-col v-for="(cost, caller) in summary.costByCaller" :key="caller" :span="6" :xs="12" :sm="6">
                 <div class="caller-stat">
                   <span class="caller-name">{{ callerLabel(String(caller)) }}</span>
                   <span class="caller-cost">¥{{ Number(cost).toFixed(4) }}</span>
@@ -184,6 +184,7 @@
 import * as echarts from 'echarts';
 import { Search, Refresh, RefreshLeft, Download } from '@element-plus/icons-vue';
 import { humanizeAiError } from '@/utils/aiErrorText';
+import { useChartTokens } from '@/utils/chart-theme';
 import { listDcsAiUsage, getDcsAiUsageSummary, getDcsAiUsageAnalysis } from '@/api/dcs/ai';
 import { DcsAiUsageVO } from '@/api/dcs/ai/types';
 
@@ -335,6 +336,8 @@ const defaultRange = (): [string, string] => {
 };
 const analysisRange = ref<[string, string]>(defaultRange());
 const analysis = ref<any>(null);
+/** 图表色随主题切换（A 墨青 / D 青柠） */
+const ct = useChartTokens();
 
 const trendRef = ref<HTMLDivElement>();
 const modelRef = ref<HTMLDivElement>();
@@ -388,19 +391,31 @@ const renderCharts = () => {
   trendChart?.setOption({
     grid: { left: 60, right: 50, top: 30, bottom: 40 },
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: trend.map((d: any) => d.day?.substring(5)) },
+    xAxis: {
+      type: 'category',
+      data: trend.map((d: any) => d.day?.substring(5)),
+      axisLabel: { color: ct.value.faint },
+      axisLine: { lineStyle: { color: ct.value.border } }
+    },
     yAxis: [
-      { type: 'value', name: '元', axisLabel: { formatter: (v: number) => (v >= 1 ? v : v.toFixed(2)) } },
-      { type: 'value', name: '次', splitLine: { show: false } }
+      {
+        type: 'value',
+        name: '元',
+        nameTextStyle: { color: ct.value.faint },
+        axisLabel: { color: ct.value.faint, formatter: (v: number) => (v >= 1 ? v : v.toFixed(2)) },
+        splitLine: { lineStyle: { color: ct.value.rule } }
+      },
+      { type: 'value', name: '次', splitLine: { show: false }, nameTextStyle: { color: ct.value.faint }, axisLabel: { color: ct.value.faint } }
     ],
     series: [
-      { name: '消耗(元)', type: 'bar', data: trend.map((d: any) => Number(d.cost || 0)), itemStyle: { color: '#409eff' }, barMaxWidth: 26 },
+      { name: '消耗(元)', type: 'bar', data: trend.map((d: any) => Number(d.cost || 0)), itemStyle: { color: ct.value.accent }, barMaxWidth: 26 },
       {
         name: '调用次数',
         type: 'line',
         yAxisIndex: 1,
         data: trend.map((d: any) => Number(d.calls || 0)),
-        itemStyle: { color: '#67c23a' },
+        itemStyle: { color: ct.value.series[1] },
+        lineStyle: { color: ct.value.series[1] },
         smooth: true
       }
     ]
@@ -411,17 +426,18 @@ const renderCharts = () => {
     value: Number(m.cost || 0)
   }));
   modelChart?.setOption({
+    color: ct.value.ramp,
     tooltip: { trigger: 'item', formatter: '{b}<br/>消耗 ¥{c}（{d}%）' },
-    legend: { type: 'scroll', orient: 'vertical', right: 0, top: 'middle', textStyle: { fontSize: 11 } },
+    legend: { type: 'scroll', orient: 'vertical', right: 0, top: 'middle', textStyle: { fontSize: 11, color: ct.value.muted } },
     series: [
       {
         type: 'pie',
         radius: ['38%', '68%'],
         center: ['38%', '50%'],
         avoidLabelOverlap: true,
-        itemStyle: { borderColor: '#fff', borderWidth: 2 },
+        itemStyle: { borderColor: ct.value.surface, borderWidth: 2 },
         label: { show: false },
-        data: models.length ? models : [{ name: '窗口内无调用', value: 0, itemStyle: { color: '#ebeef5' } }]
+        data: models.length ? models : [{ name: '窗口内无调用', value: 0, itemStyle: { color: ct.value.rule } }]
       }
     ]
   });
@@ -436,9 +452,9 @@ const renderCharts = () => {
         return `${u.user_name}（${u.dept_name}）<br/>消耗 ¥${Number(p.value || 0).toFixed(4)} · ${u.calls} 次`;
       }
     },
-    xAxis: { type: 'value', axisLabel: { formatter: (v: number) => v.toFixed(2) } },
-    yAxis: { type: 'category', data: users.map((u: any) => u.user_name), axisLabel: { width: 90, overflow: 'truncate' } },
-    series: [{ type: 'bar', data: users.map((u: any) => Number(u.cost || 0)), itemStyle: { color: '#409eff' }, barMaxWidth: 16 }]
+    xAxis: { type: 'value', axisLabel: { formatter: (v: number) => v.toFixed(2), color: ct.value.faint }, splitLine: { lineStyle: { color: ct.value.rule } } },
+    yAxis: { type: 'category', data: users.map((u: any) => u.user_name), axisLabel: { width: 90, overflow: 'truncate', color: ct.value.muted } },
+    series: [{ type: 'bar', data: users.map((u: any) => Number(u.cost || 0)), itemStyle: { color: ct.value.accent }, barMaxWidth: 16 }]
   });
   // 部门消耗横向条
   const depts = (data.deptShare || []).slice().reverse();
@@ -451,11 +467,17 @@ const renderCharts = () => {
         return `${d.dept_name}<br/>消耗 ¥${Number(p.value || 0).toFixed(4)} · ${d.calls} 次`;
       }
     },
-    xAxis: { type: 'value', axisLabel: { formatter: (v: number) => v.toFixed(2) } },
-    yAxis: { type: 'category', data: depts.map((d: any) => d.dept_name) },
-    series: [{ type: 'bar', data: depts.map((d: any) => Number(d.cost || 0)), itemStyle: { color: '#e6a23c' }, barMaxWidth: 16 }]
+    xAxis: { type: 'value', axisLabel: { formatter: (v: number) => v.toFixed(2), color: ct.value.faint }, splitLine: { lineStyle: { color: ct.value.rule } } },
+    yAxis: { type: 'category', data: depts.map((d: any) => d.dept_name), axisLabel: { color: ct.value.muted } },
+    series: [{ type: 'bar', data: depts.map((d: any) => Number(d.cost || 0)), itemStyle: { color: ct.value.series[1] }, barMaxWidth: 16 }]
   });
 };
+
+// 切主题后按新 token 重画四张图（canvas 读不到 CSS 变量）
+watch(
+  () => ct.value,
+  () => renderCharts()
+);
 
 /** Q7：明细导出（按当前筛选） */
 const exportUsage = () => {
@@ -478,6 +500,12 @@ onBeforeUnmount(() => {
   modelChart?.dispose();
   userChart?.dispose();
   deptChart?.dispose();
+  // 卸载后再进来（keep-alive 淘汰 / 路由重建）必须重新 init：仍留 chartsInited=true 会拿到已销毁的实例
+  trendChart = null;
+  modelChart = null;
+  userChart = null;
+  deptChart = null;
+  chartsInited = false;
 });
 
 onMounted(loadData);

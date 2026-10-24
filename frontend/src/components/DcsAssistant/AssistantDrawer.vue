@@ -1475,6 +1475,13 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
   font-size: 14px;
   /* J-2 原型 bg2：灰画布，白头/白气泡/白输入盒在其上分层 */
   background: #f7f8fa;
+  /* 助手抽屉是自带浅色工作台（深色换肤不在本批范围）：内部主色钉回近黑，
+     否则 html.dark 下 --el-color-primary=白，卡里「主色底 + 白字」的按钮会整个消失 */
+  --el-color-primary: #1d1f20;
+  --el-color-primary-light-3: #606262;
+  --el-color-primary-light-5: #8e8f8f;
+  --el-color-primary-light-9: #e8e9e9;
+  --el-color-white: #ffffff;
   box-shadow: -6px 0 24px rgb(0 0 0 / 16%);
   transition: right 0.28s cubic-bezier(0.2, 0.8, 0.3, 1);
 

@@ -338,7 +338,7 @@ const submit = async () => {
     padding: 0 5px;
     border-radius: 999px;
     background: var(--el-color-danger);
-    color: #fff;
+    color: var(--el-color-white);
     font-size: 11px;
     line-height: 18px;
     text-align: center;

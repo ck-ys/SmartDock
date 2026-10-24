@@ -1230,7 +1230,7 @@ onMounted(() => {
   left: 50%;
   transform: translateX(-50%);
   background: var(--el-color-primary);
-  color: #fff;
+  color: var(--app-primary-ink);
   font-size: 11px;
   font-weight: 600;
   padding: 2px 10px;

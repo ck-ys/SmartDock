@@ -313,6 +313,7 @@ onMounted(() => {
           v-model="loginForm.tenantId"
           filterable
           size="large"
+          popper-class="login-tenant-popper"
           :placeholder="t('login.specifyTenantPlaceholder')"
           :aria-label="t('login.specifyTenant')"
         >

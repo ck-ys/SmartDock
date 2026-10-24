@@ -361,7 +361,7 @@ draw4();
 
   .sn {
     background: var(--el-color-primary);
-    color: #fff;
+    color: var(--app-primary-ink);
     border-radius: 6px;
     padding: 1px 8px;
     font-size: 10.5px;
@@ -390,7 +390,7 @@ draw4();
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
+    color: var(--app-primary-ink);
     background: linear-gradient(145deg, var(--el-color-primary), var(--el-color-primary-dark-2));
     box-shadow: 0 2px 6px rgb(64 158 255 / 35%);
     flex: none;

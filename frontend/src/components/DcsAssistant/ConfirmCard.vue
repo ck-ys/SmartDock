@@ -522,8 +522,8 @@ function onConfirm() {
 
 <style lang="scss" scoped>
 .dcs-confirm {
-  border: 1px solid #f3d19e;
-  background: #fffcf5;
+  border: 1px solid var(--app-warm-border);
+  background: var(--app-warm-bg);
   border-radius: 10px;
   padding: 0;
   font-size: 13px;
@@ -543,13 +543,13 @@ function onConfirm() {
     background: var(--el-color-primary-light-9);
   }
   &.done {
-    border-color: #c2e7b0;
-    background: #f6fceb;
+    border-color: var(--app-warm-done-border);
+    background: var(--app-warm-done-bg);
 
     /* 079：停止态去绿——结果未知不是成功，回中性琥珀底 */
     &.stopped {
-      border-color: #f3d19e;
-      background: #fffcf5;
+      border-color: var(--app-warm-border);
+      background: var(--app-warm-bg);
     }
   }
 }
@@ -558,8 +558,8 @@ function onConfirm() {
   display: flex;
   align-items: center;
   gap: 6px;
-  border-bottom: 1px solid #f7ecd4;
-  background: linear-gradient(#fffdf8, #fffcf5);
+  border-bottom: 1px solid var(--app-warm-rule);
+  background: linear-gradient(var(--app-warm-bg-top), var(--app-warm-bg));
 
   b {
     font-size: 13.5px;
@@ -744,10 +744,10 @@ function onConfirm() {
     color: var(--dcs-text-regular);
 
     &.cf-go {
-      /* 原型确认发送主钮=主色蓝（L1362 .btn-p），非琥珀 */
+      /* 原型确认发送主钮=主色（L1362 .btn-p），非琥珀 */
       background: var(--el-color-primary);
       border-color: var(--el-color-primary);
-      color: #fff;
+      color: var(--app-primary-ink);
 
       &:hover:not(:disabled) {
         background: var(--el-color-primary-light-3);

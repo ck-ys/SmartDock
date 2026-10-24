@@ -7,12 +7,17 @@ const setting: DefaultSettings = {
    */
   title: import.meta.env.VITE_APP_TITLE,
 
-  theme: '#409EFF',
+  theme: '#1d1f20',
+
+  /**
+   * 数据强调色（只给图表与数据标记，不给按钮/导航）
+   */
+  accent: '#1b6c80',
 
   /**
    * 侧边栏主题 深色主题theme-dark，浅色主题theme-light
    */
-  sideTheme: 'theme-dark',
+  sideTheme: 'theme-light',
   /**
    * 是否系统布局配置
    */

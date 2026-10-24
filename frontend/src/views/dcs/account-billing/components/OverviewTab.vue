@@ -401,9 +401,9 @@ onMounted(reloadAll);
   font-size: 10px;
   margin-left: 2px;
 }
-/* 低于阈值整行浅橙预警 + 首格左缘 3px 竖条 */
+/* 低于阈值整行浅橙预警 + 首格左缘 3px 竖条（深色下用 --el-color-warning-light-9 的暗底） */
 :deep(.ab-row-low td) {
-  background: #fdf6ec;
+  background: var(--el-color-warning-light-9);
 }
 :deep(.ab-row-low td:first-child) {
   box-shadow: inset 3px 0 0 var(--el-color-warning);

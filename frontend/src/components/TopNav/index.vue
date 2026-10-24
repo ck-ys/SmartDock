@@ -163,9 +163,9 @@ onMounted(() => {
 <style lang="scss">
 .topmenu-container.el-menu--horizontal > .el-menu-item {
   float: left;
-  height: 50px !important;
-  line-height: 50px !important;
-  color: #999093 !important;
+  height: var(--app-topbar-h) !important;
+  line-height: var(--app-topbar-h) !important;
+  color: var(--app-muted) !important;
   padding: 0 5px !important;
   margin: 0 10px !important;
 }
@@ -173,15 +173,15 @@ onMounted(() => {
 .topmenu-container.el-menu--horizontal > .el-menu-item.is-active,
 .el-menu--horizontal > .el-sub-menu.is-active .el-submenu__title {
   border-bottom: 2px solid #{'var(--theme)'} !important;
-  color: #303133;
+  color: var(--app-text);
 }
 
 /* sub-menu item */
 .topmenu-container.el-menu--horizontal > .el-sub-menu .el-sub-menu__title {
   float: left;
-  height: 50px !important;
-  line-height: 50px !important;
-  color: #999093 !important;
+  height: var(--app-topbar-h) !important;
+  line-height: var(--app-topbar-h) !important;
+  color: var(--app-muted) !important;
   padding: 0 5px !important;
   margin: 0 10px !important;
 }
@@ -190,7 +190,7 @@ onMounted(() => {
 .topmenu-container.el-menu--horizontal > .el-menu-item:not(.is-disabled):focus,
 .topmenu-container.el-menu--horizontal > .el-menu-item:not(.is-disabled):hover,
 .topmenu-container.el-menu--horizontal > .el-submenu .el-submenu__title:hover {
-  background-color: #ffffff !important;
+  background-color: var(--app-raised) !important;
 }
 
 /* 图标右间距 */

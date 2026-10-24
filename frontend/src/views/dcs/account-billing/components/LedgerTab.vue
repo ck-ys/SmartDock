@@ -458,7 +458,7 @@ onMounted(() => {
   font-size: 13px;
   font-weight: 600;
   border: 1px solid var(--el-border-color);
-  background: #fff;
+  background: var(--app-surface);
   color: var(--el-text-color-secondary);
   cursor: pointer;
   transition: all 0.15s;
@@ -475,7 +475,7 @@ onMounted(() => {
 .ab-dim.on {
   background: var(--el-color-primary);
   border-color: var(--el-color-primary);
-  color: #fff;
+  color: var(--app-primary-ink);
 }
 .ab-dim-hint {
   font-size: 12.5px;

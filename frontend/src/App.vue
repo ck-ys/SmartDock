@@ -6,15 +6,16 @@
 
 <script setup lang="ts">
 import { useSettingsStore } from '@/store/modules/settings';
-import { handleThemeStyle } from '@/utils/theme';
+import { applyThemeMode } from '@/utils/theme';
 import { useAppStore } from '@/store/modules/app';
 
 const appStore = useAppStore();
 
 onMounted(() => {
   nextTick(() => {
-    // 初始化主题样式
-    handleThemeStyle(useSettingsStore().theme);
+    // 初始化外观：框架纸（浅）/ 纯黑夜（深），同时把主色与数据强调色落到 :root
+    const settingsStore = useSettingsStore();
+    applyThemeMode(settingsStore.dark, settingsStore.accent);
   });
 });
 </script>

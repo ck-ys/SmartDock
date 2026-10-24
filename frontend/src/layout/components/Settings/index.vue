@@ -6,7 +6,7 @@
         <div
           class="item left"
           @click="handleNavType(NavTypeEnum.LEFT)"
-          :style="{ '--theme': theme }"
+          :style="{ '--theme': accent }"
           :class="{ activeItem: navType == NavTypeEnum.LEFT }"
         >
           <b></b><b></b>
@@ -17,7 +17,7 @@
         <div
           class="item mix"
           @click="handleNavType(NavTypeEnum.MIX)"
-          :style="{ '--theme': theme }"
+          :style="{ '--theme': accent }"
           :class="{ activeItem: navType == NavTypeEnum.MIX }"
         >
           <b></b><b></b>
@@ -27,7 +27,7 @@
         <div
           class="item top"
           @click="handleNavType(NavTypeEnum.TOP)"
-          :style="{ '--theme': theme }"
+          :style="{ '--theme': accent }"
           :class="{ activeItem: navType == NavTypeEnum.TOP }"
         >
           <b></b><b></b>
@@ -35,44 +35,16 @@
       </el-tooltip>
     </div>
 
-    <h3 class="drawer-title">主题风格设置</h3>
-
-    <div class="setting-drawer-block-checbox">
-      <div class="setting-drawer-block-checbox-item" @click="handleTheme(SideThemeEnum.DARK)">
-        <img src="@/assets/images/dark.svg" alt="dark" />
-        <div v-if="sideTheme === 'theme-dark'" class="setting-drawer-block-checbox-selectIcon" style="display: block">
-          <i aria-label="图标: check" class="anticon anticon-check">
-            <svg viewBox="64 64 896 896" data-icon="check" width="1em" height="1em" :fill="theme" aria-hidden="true" focusable="false">
-              <path
-                d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 0 0-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"
-              />
-            </svg>
-          </i>
-        </div>
-      </div>
-      <div class="setting-drawer-block-checbox-item" @click="handleTheme(SideThemeEnum.LIGHT)">
-        <img src="@/assets/images/light.svg" alt="light" />
-        <div v-if="sideTheme === 'theme-light'" class="setting-drawer-block-checbox-selectIcon" style="display: block">
-          <i aria-label="图标: check" class="anticon anticon-check">
-            <svg viewBox="64 64 896 896" data-icon="check" width="1em" height="1em" :fill="theme" aria-hidden="true" focusable="false">
-              <path
-                d="M912 190h-69.9c-9.8 0-19.1 4.5-25.1 12.2L404.7 724.5 207 474a32 32 0 0 0-25.1-12.2H112c-6.7 0-10.4 7.7-6.3 12.9l273.9 347c12.8 16.2 37.4 16.2 50.3 0l488.4-618.9c4.1-5.1.4-12.8-6.3-12.8z"
-              />
-            </svg>
-          </i>
-        </div>
-      </div>
-    </div>
     <div class="drawer-item">
-      <span>主题颜色</span>
+      <span>数据强调色</span>
       <span class="comp-style">
-        <el-color-picker v-model="theme" :predefine="predefineColors" @change="themeChange" />
+        <el-color-picker v-model="accent" :predefine="predefineColors" @change="accentChange" />
       </span>
     </div>
     <div class="drawer-item">
-      <span>深色模式</span>
+      <span>纯黑夜主题</span>
       <span class="comp-style">
-        <el-switch v-model="isDark" class="drawer-switch" @change="toggleDark" />
+        <el-switch :model-value="settingsStore.dark" class="drawer-switch" @change="onDarkChange" />
       </span>
     </div>
     <div class="drawer-item">
@@ -133,8 +105,6 @@ import { useDynamicTitle } from '@/utils/dynamicTitle';
 import { useAppStore } from '@/store/modules/app';
 import { useSettingsStore } from '@/store/modules/settings';
 import { usePermissionStore } from '@/store/modules/permission';
-import { handleThemeStyle } from '@/utils/theme';
-import { SideThemeEnum } from '@/enums/SideThemeEnum';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import defaultSettings from '@/settings';
 
@@ -144,30 +114,15 @@ const settingsStore = useSettingsStore();
 const permissionStore = usePermissionStore();
 
 const showSettings = ref(false);
-const theme = ref(settingsStore.theme);
-const sideTheme = ref(settingsStore.sideTheme);
+const accent = ref(settingsStore.accent);
 const storeSettings = computed(() => settingsStore);
-const predefineColors = ref(['#409EFF', '#ff4500', '#ff8c00', '#ffd700', '#90ee90', '#00ced1', '#1e90ff', '#c71585']);
+const predefineColors = ref(['#1b6c80', '#1d5fbf', '#b8336a', '#2e7d5b', '#a86f0c', '#5b5f66']);
 const navType = ref(settingsStore.navType);
 const radiusBase = ref(settingsStore.radiusBase);
-// 是否暗黑模式
-const isDark = useDark({
-  storageKey: 'useDarkKey',
-  valueDark: 'dark',
-  valueLight: 'light'
-});
-// 匹配菜单颜色
-// G5 三审回修（dspro+dsflash 双席 P1）：settingsStore.dark 此前无任何写入点——
-// 暗色 Logo 分支恒为死代码。此处为唯一状态源，immediate 让刷新后立即按持久化暗色态纠正。
-watch(
-  isDark,
-  (v) => {
-    settingsStore.dark = v;
-    settingsStore.sideTheme = v ? SideThemeEnum.DARK : sideTheme.value;
-  },
-  { immediate: true }
-);
-const toggleDark = () => useToggle(isDark);
+// 外观状态唯一入口在 store：切换时同步 html.dark、localStorage 与主色
+const onDarkChange = (value: boolean | string | number) => {
+  settingsStore.setDark(Boolean(value));
+};
 
 /** 菜单导航设置 */
 watch(
@@ -196,9 +151,8 @@ const dynamicTitleChange = () => {
   useDynamicTitle();
 };
 
-const themeChange = (val: string) => {
-  settingsStore.theme = val;
-  handleThemeStyle(val);
+const accentChange = (val: string | null) => {
+  settingsStore.setAccent(val || '#1b6c80');
 };
 const radiusBaseChange = (val: number) => {
   settingsStore.radiusBase = val;
@@ -210,15 +164,6 @@ const radiusBaseChange = (val: number) => {
   el.style.setProperty('--el-border-radius-base', `${val}px`);
   el.style.setProperty('--el-border-radius-small', `${Math.round(val * 0.6)}px`);
 };
-const handleTheme = (val: string) => {
-  sideTheme.value = val;
-  if (isDark.value && val === SideThemeEnum.LIGHT) {
-    // 暗黑模式颜色不变
-    settingsStore.sideTheme = SideThemeEnum.DARK;
-    return;
-  }
-  settingsStore.sideTheme = val;
-};
 const saveSetting = () => {
   proxy?.$modal.loading('正在保存到本地，请稍候...');
   const settings = useStorage<LayoutSetting>('layout-setting', defaultSettings);
@@ -229,6 +174,7 @@ const saveSetting = () => {
   settings.value.dynamicTitle = storeSettings.value.dynamicTitle;
   settings.value.sideTheme = storeSettings.value.sideTheme;
   settings.value.theme = storeSettings.value.theme;
+  settings.value.accent = storeSettings.value.accent;
   settings.value.navType = storeSettings.value.navType;
   settings.value.radiusBase = storeSettings.value.radiusBase;
   setTimeout(() => {
@@ -238,6 +184,7 @@ const saveSetting = () => {
 const resetSetting = () => {
   proxy?.$modal.loading('正在清除设置缓存并刷新，请稍候...');
   useStorage<any>('layout-setting', null).value = null;
+  localStorage.removeItem('useDarkKey');
   setTimeout(() => window.location.reload(), 1000);
 };
 const openSetting = () => {
@@ -332,7 +279,8 @@ defineExpose({
     width: 56px;
     height: 48px;
     border-radius: 4px;
-    background: #f0f2f5;
+    /* 缩略图跟随主题：深色下不能还画成亮灰底 + 藏青块 */
+    background: var(--app-raised);
     border: 2px solid transparent;
   }
 
@@ -340,11 +288,11 @@ defineExpose({
     b:first-child {
       display: block;
       height: 30%;
-      background: #fff;
+      background: var(--app-sheet-bg);
     }
     b:last-child {
       width: 30%;
-      background: #1b2a47;
+      background: var(--app-text);
       position: absolute;
       height: 100%;
       top: 0;
@@ -356,11 +304,11 @@ defineExpose({
       border-radius: 4px 4px 0 0;
       display: block;
       height: 30%;
-      background: #1b2a47;
+      background: var(--app-text);
     }
     b:last-child {
       width: 30%;
-      background: #1b2a47;
+      background: var(--app-text);
       position: absolute;
       height: 70%;
       border-radius: 0 0 0 4px;
@@ -370,7 +318,7 @@ defineExpose({
     b:first-child {
       display: block;
       height: 30%;
-      background: #1b2a47;
+      background: var(--app-text);
       border-radius: 4px 4px 0 0;
     }
   }

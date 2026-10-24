@@ -318,17 +318,16 @@ defineExpose({ closeMenu });
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  /* 原型 #ball 同款：左上高光/右下深底三层径向渐变 + 四层投影（Q10 向原型对齐） */
+  /* 悬浮球跟框架纸/纯黑夜同一口径：唯一数据色当球身，字形取纸面色（浅=白、深=黑），
+     去掉原型的三层蓝渐变与四层发光——安静的壳里不该挂一颗亮蓝玻璃球 */
+  color: var(--app-sheet-bg);
   background:
-    radial-gradient(circle at 30% 25%, rgb(255 255 255 / 95%), rgb(255 255 255 / 0%) 32%),
-    radial-gradient(circle at 72% 80%, rgb(18 66 128 / 50%), transparent 58%), linear-gradient(145deg, #82c8ff 0%, #409eff 48%, #2a6bc4 100%);
+    radial-gradient(circle at 30% 25%, rgb(255 255 255 / 22%), transparent 45%),
+    var(--app-accent);
   box-shadow:
-    0 8px 20px rgb(42 107 196 / 40%),
-    0 2px 6px rgb(42 107 196 / 22%),
-    0 0 22px rgb(64 158 255 / 30%),
-    inset 0 2px 3px rgb(255 255 255 / 55%),
-    inset 0 -4px 8px rgb(8 36 84 / 35%);
+    0 6px 16px rgb(0 0 0 / 18%),
+    0 2px 5px rgb(0 0 0 / 10%),
+    inset 0 1px 2px rgb(255 255 255 / 22%);
   transition:
     transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.25s,
@@ -337,16 +336,14 @@ defineExpose({ closeMenu });
 
   /* 原型 .glyph 同款球脸投影 */
   svg {
-    filter: drop-shadow(0 1px 1px rgb(255 255 255 / 40%));
+    filter: drop-shadow(0 1px 1px rgb(255 255 255 / 20%));
   }
   &:hover {
     transform: translateY(-3px) scale(1.06);
     box-shadow:
-      0 14px 28px rgb(42 107 196 / 48%),
-      0 4px 10px rgb(42 107 196 / 26%),
-      0 0 30px rgb(64 158 255 / 38%),
-      inset 0 2px 3px rgb(255 255 255 / 55%),
-      inset 0 -4px 8px rgb(8 36 84 / 35%);
+      0 10px 22px rgb(0 0 0 / 24%),
+      0 3px 8px rgb(0 0 0 / 14%),
+      inset 0 1px 2px rgb(255 255 255 / 22%);
   }
   &:focus-visible {
     box-shadow: 0 0 0 3px var(--el-color-primary-light-7);
@@ -372,13 +369,13 @@ defineExpose({ closeMenu });
   inset: -7px;
   border-radius: 50%;
   pointer-events: none;
-  border: 2.5px solid rgb(64 158 255 / 55%);
+  border: 2.5px solid color-mix(in srgb, var(--app-accent) 55%, transparent);
   animation: dcs-fab-breath 3.4s ease-out infinite;
 
   /* 生成中：呼吸圈切旋转环（原型 .exec::after） */
   &.exec {
     animation: dcs-fab-spin 1s linear infinite;
-    border-color: rgb(64 158 255 / 85%);
+    border-color: color-mix(in srgb, var(--app-accent) 85%, transparent);
     border-top-color: transparent;
     border-width: 3px;
   }
@@ -543,7 +540,7 @@ defineExpose({ closeMenu });
     .pa-go {
       border: none;
       background: var(--el-color-primary);
-      color: #fff;
+      color: var(--app-primary-ink);
 
       &:hover {
         background: var(--el-color-primary-light-3);

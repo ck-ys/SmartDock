@@ -328,8 +328,8 @@ function onRevise() {
 <style lang="scss" scoped>
 /* 与 ConfirmCard 同族的暖底确认卡；字段行=左标签右控件（EP 真控件，工作面企业风） */
 .dcs-form-card {
-  border: 1px solid #f3d19e;
-  background: #fffcf5;
+  border: 1px solid var(--app-warm-border);
+  background: var(--app-warm-bg);
   border-radius: 10px;
   font-size: 13px;
   line-height: 1.6;
@@ -450,24 +450,24 @@ function onRevise() {
     white-space: nowrap;
   }
   .cf-cancel {
-    border: 1px solid #dcdfe6;
-    background: #fff;
-    color: #606266;
+    border: 1px solid var(--app-control);
+    background: var(--app-surface);
+    color: var(--app-text);
     padding: 5px 14px;
   }
   .cf-mid {
-    border: 1px solid #c6e2ff;
-    background: #ecf5ff;
-    color: #409eff;
+    border: 1px solid var(--app-control);
+    background: var(--app-raised);
+    color: var(--app-text);
     padding: 5px 12px;
   }
   .cf-go {
     border: 0;
-    background: #409eff;
-    color: #fff;
+    background: var(--el-color-primary);
+    color: var(--app-primary-ink);
     padding: 5px 16px;
     &:disabled {
-      background: #a0cfff;
+      background: var(--el-color-primary-light-5);
       cursor: not-allowed;
     }
   }

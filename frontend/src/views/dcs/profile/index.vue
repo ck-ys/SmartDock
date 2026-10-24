@@ -289,7 +289,8 @@ const formatScore = (value?: number | string | null) => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(1) : String(value);
 };
-const scoreColor = (value: number) => (value >= riskBands.lowMin ? '#67c23a' : value >= riskBands.highBelow ? '#e6a23c' : '#f56c6c');
+const scoreColor = (value: number) =>
+  value >= riskBands.lowMin ? 'var(--el-color-success)' : value >= riskBands.highBelow ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
 const scoreClass = (value: number) => (value >= riskBands.lowMin ? 'dim-good' : value >= riskBands.highBelow ? 'dim-mid' : 'dim-low');
 const riskOf = (value?: number | string | null) => {
   const n = Number(value);

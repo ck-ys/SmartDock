@@ -270,7 +270,7 @@
     </el-dialog>
 
     <!-- 主体分箱详情 -->
-    <el-drawer v-model="drawerVisible" :title="drawerTitle" size="620px" destroy-on-close>
+    <el-drawer v-model="drawerVisible" :title="drawerTitle" size="min(620px, 92vw)" destroy-on-close>
       <div v-loading="drawerLoading" class="drawer-body">
         <template v-if="subjectDetail?.latest">
           <div class="drawer-score">
@@ -331,7 +331,7 @@
     </el-drawer>
 
     <!-- 试算预览（草稿影子计算，不落快照） -->
-    <el-drawer v-model="dryVisible" title="试算预览（影子计算，不落快照）" size="720px" destroy-on-close>
+    <el-drawer v-model="dryVisible" title="试算预览（影子计算，不落快照）" size="min(720px, 92vw)" destroy-on-close>
       <div v-loading="dryLoading" class="drawer-body">
         <template v-if="dryResult">
           <el-alert :type="psiAlertType(dryResult.psi?.verdict)" :closable="false" show-icon class="psi-alert">
@@ -416,7 +416,7 @@
     </el-drawer>
 
     <!-- 版本对比（两个已完成 run） -->
-    <el-drawer v-model="compareVisible" title="版本对比" size="720px" destroy-on-close>
+    <el-drawer v-model="compareVisible" title="版本对比" size="min(720px, 92vw)" destroy-on-close>
       <div class="compare-picker">
         <el-select v-model="compareRunA" placeholder="旧版本 run" style="width: 300px" @change="loadCompare">
           <el-option v-for="run in doneRuns" :key="run.runId" :label="`${run.modelVersion} · ${run.finishedAt || run.startedAt || ''}`" :value="run.runId" />
@@ -564,6 +564,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
+import { useChartTokens } from '@/utils/chart-theme';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   compareModelRuns,
@@ -603,6 +604,8 @@ const models = ref<ProfileScoreModel[]>([]);
 const modelId = ref<string>('');
 const overview = ref<Partial<ProfileModelOverview>>({});
 const trend = ref<ProfileModelTrendPoint[]>([]);
+/** 图表色随主题切换 */
+const ct = useChartTokens();
 const rows = ref<ProfileModelSubjectRow[]>([]);
 const total = ref(0);
 const loading = ref(false);
@@ -621,7 +624,8 @@ const formatScore = (value?: number | string | null) => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(2) : String(value);
 };
-const scoreColor = (value: number) => (value >= 75 ? '#67c23a' : value >= 60 ? '#e6a23c' : '#f56c6c');
+const scoreColor = (value: number) =>
+  value >= 75 ? 'var(--el-color-success)' : value >= 60 ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
 const scoreClass = (value: number) => (value >= 75 ? 'score-good' : value >= 60 ? 'score-mid' : 'score-low');
 
 const levelTagType = (level?: string) => {
@@ -634,7 +638,13 @@ const levelTagType = (level?: string) => {
 };
 const levelColor = (level?: string) => {
   const type = levelTagType(level);
-  return type === 'success' ? '#67c23a' : type === 'primary' ? '#409eff' : type === 'warning' ? '#e6a23c' : '#f56c6c';
+  return type === 'success'
+    ? 'var(--el-color-success)'
+    : type === 'primary'
+      ? 'var(--app-accent)'
+      : type === 'warning'
+        ? 'var(--el-color-warning)'
+        : 'var(--el-color-danger)';
 };
 
 // ---------------------------------------------------------------- 发布纪律（批9）
@@ -671,16 +681,25 @@ const binChips = (row: ProfileModelSubjectRow) => {
 };
 
 const trendOption = computed<any>(() => ({
+  color: ct.value.series,
   tooltip: { trigger: 'axis' },
   grid: { left: 46, right: 20, top: 20, bottom: 32 },
-  xAxis: { type: 'category', boundaryGap: false, data: trend.value.map((p) => p.day) },
-  yAxis: { type: 'value', min: 0, max: 100 },
+  xAxis: {
+    type: 'category',
+    boundaryGap: false,
+    data: trend.value.map((p) => p.day),
+    axisLabel: { color: ct.value.faint },
+    axisLine: { lineStyle: { color: ct.value.border } }
+  },
+  yAxis: { type: 'value', min: 0, max: 100, axisLabel: { color: ct.value.faint }, splitLine: { lineStyle: { color: ct.value.rule } } },
   series: [
     {
       type: 'line',
       smooth: true,
       symbolSize: 6,
-      areaStyle: { opacity: 0.12 },
+      areaStyle: { opacity: 0.12, color: ct.value.accent },
+      itemStyle: { color: ct.value.accent },
+      lineStyle: { color: ct.value.accent },
       data: trend.value.map((p) => Number(p.avgScore || 0))
     }
   ]

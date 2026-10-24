@@ -1,7 +1,7 @@
 .dcs-ops-page {
   min-height: 100%;
   padding: 20px;
-  background: var(--el-bg-color-page);
+  background: transparent;
 }
 
 .dcs-ops-header {
@@ -14,11 +14,9 @@
 
 .dcs-ops-header__eyebrow {
   margin-bottom: 5px;
-  color: var(--el-color-primary);
+  color: var(--app-muted);
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 500;
 }
 
 .dcs-ops-header__title-row {
@@ -64,33 +62,24 @@
   padding: 15px 18px;
   overflow: hidden;
   background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgb(31 42 68 / 4%);
+  border: 1px solid var(--app-border, var(--el-border-color-lighter));
+  border-radius: var(--app-card-radius, 10px);
 }
 
+/* 四个指标条统一用唯一数据色：状态色留给真正的状态标签，不做装饰 */
 .dcs-ops-metric::before {
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
-  background: var(--el-color-primary);
+  background: var(--app-accent);
   content: '';
 }
 
-.dcs-ops-metric--success::before {
-  background: var(--el-color-success);
-}
-
-.dcs-ops-metric--warning::before {
-  background: var(--el-color-warning);
-}
-
-.dcs-ops-metric--danger::before {
-  background: var(--el-color-danger);
-}
-
+.dcs-ops-metric--success::before,
+.dcs-ops-metric--warning::before,
+.dcs-ops-metric--danger::before,
 .dcs-ops-metric--neutral::before {
-  background: var(--el-text-color-placeholder);
+  background: var(--app-accent);
 }
 
 .dcs-ops-metric__label,
@@ -111,7 +100,8 @@
 
 @media (max-width: 992px) {
   .dcs-ops-metrics {
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    /* 手机档两列：原来的 96px 下限会挤成三列，说明文字被压成三行且第四张掉单 */
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 8px;
     margin-top: 14px;
   }

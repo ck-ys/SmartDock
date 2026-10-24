@@ -135,8 +135,8 @@ const setLayout = () => {
   z-index: 9;
   width: calc(100% - #{$base-sidebar-width});
   transition: width 0.28s;
-  background: $fixed-header-bg;
-  box-shadow: 0 2px 8px rgba(0, 21, 41, 0.1);
+  background: var(--app-frame);
+  box-shadow: none;
 }
 
 .hideSidebar .fixed-header {

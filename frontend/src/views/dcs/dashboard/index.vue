@@ -108,7 +108,8 @@ onMounted(async () => {
 .badge {
   margin-left: 4px;
   background: var(--el-color-danger);
-  color: #fff;
+  /* 深色下 danger 是浅红，白字读不清；--el-color-white 在深色已取反成黑 */
+  color: var(--el-color-white);
   border-radius: 9px;
   padding: 0 6px;
   font-size: 12px;

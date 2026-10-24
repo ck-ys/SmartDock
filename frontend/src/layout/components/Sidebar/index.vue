@@ -9,7 +9,7 @@
           :background-color="bgColor"
           :text-color="textColor"
           :unique-opened="true"
-          :active-text-color="theme"
+          active-text-color="var(--app-text)"
           :collapse-transition="false"
           :popper-offset="12"
           mode="vertical"
@@ -51,6 +51,6 @@ const activeMenu = computed(() => {
   return path;
 });
 
-const bgColor = computed(() => (sideTheme.value === 'theme-dark' ? variables.menuBackground : variables.menuLightBackground));
-const textColor = computed(() => (sideTheme.value === 'theme-dark' ? variables.menuColor : variables.menuLightColor));
+const bgColor = computed(() => (settingsStore.dark ? variables.menuBackground : variables.menuLightBackground));
+const textColor = computed(() => (settingsStore.dark ? variables.menuColor : variables.menuLightColor));
 </script>

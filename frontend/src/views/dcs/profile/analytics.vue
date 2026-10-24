@@ -569,7 +569,7 @@
     </el-tabs>
 
     <!-- 会话详情抽屉 -->
-    <el-drawer v-model="sessionDrawer" size="560px" :title="sessionDetail?.session?.visitorId || '访问详情'">
+    <el-drawer v-model="sessionDrawer" size="min(560px, 92vw)" :title="sessionDetail?.session?.visitorId || '访问详情'">
       <template v-if="sessionDetail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="开始时间">{{ sessionDetail.session.startedAt }}</el-descriptions-item>
@@ -655,6 +655,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { BarChart, LineChart, SankeyChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
+import { useChartTokens, alpha } from '@/utils/chart-theme';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   deleteAnalyticsFunnel,
@@ -702,6 +703,8 @@ const days = ref(30);
 const tab = ref('overview');
 const loading = ref(false);
 const rebuilding = ref(false);
+/** 图表色随主题切换（A 墨青 / D 青柠），切深色时 SVG 画布自动重算 */
+const ct = useChartTokens();
 
 const overview = ref<Partial<AnalyticsOverview>>({});
 const trend = ref<AnalyticsTrendPoint[]>([]);
@@ -805,20 +808,35 @@ const channelOptions = computed(() => {
 });
 
 const trendOption = computed<any>(() => ({
+  color: ct.value.series,
   tooltip: { trigger: 'axis' },
   legend: { data: ['PV', 'UV', '访问次数'], left: 'center', top: 0, itemWidth: 14, itemHeight: 8 },
   grid: { left: 52, right: 74, top: 34, bottom: 32 },
-  xAxis: { type: 'category', boundaryGap: false, data: trend.value.map((p) => p.statDate) },
+  xAxis: {
+    type: 'category',
+    boundaryGap: false,
+    data: trend.value.map((p) => p.statDate),
+    axisLabel: { color: ct.value.faint },
+    axisLine: { lineStyle: { color: ct.value.border } }
+  },
   // PV 与 UV/访问次数量级差一个数量级，分左右轴，避免 UV 贴在 0 轴上看不见
   yAxis: [
-    { type: 'value', name: 'PV', nameGap: 16, minInterval: 1, axisLabel: { color: '#909399' } },
+    {
+      type: 'value',
+      name: 'PV',
+      nameGap: 16,
+      minInterval: 1,
+      axisLabel: { color: ct.value.faint },
+      nameTextStyle: { color: ct.value.faint },
+      splitLine: { lineStyle: { color: ct.value.rule } }
+    },
     {
       type: 'value',
       name: 'UV / 访问',
       nameGap: 16,
       minInterval: 1,
-      nameTextStyle: { fontSize: 11 },
-      axisLabel: { color: '#909399' },
+      nameTextStyle: { fontSize: 11, color: ct.value.faint },
+      axisLabel: { color: ct.value.faint },
       splitLine: { show: false }
     }
   ],
@@ -829,7 +847,9 @@ const trendOption = computed<any>(() => ({
       yAxisIndex: 0,
       smooth: true,
       symbolSize: 5,
-      areaStyle: { opacity: 0.08 },
+      itemStyle: { color: ct.value.accent },
+      lineStyle: { width: 2.2, color: ct.value.accent },
+      areaStyle: { opacity: 0.08, color: ct.value.accent },
       data: trend.value.map((p) => Number(p.pv || 0))
     },
     {
@@ -838,20 +858,20 @@ const trendOption = computed<any>(() => ({
       yAxisIndex: 1,
       smooth: true,
       symbol: 'none',
-      lineStyle: { width: 1.5, color: '#8a8f99' },
-      itemStyle: { color: '#8a8f99' },
+      lineStyle: { width: 1.5, color: ct.value.muted },
+      itemStyle: { color: ct.value.muted },
       data: trend.value.map((p) => Number(p.visits || 0))
     },
     {
-      // UV 画在最上层并改用虚线暖色：UV 与访问次数同值时也能分辨两条线
+      // UV 与访问次数同值时也要能分辨：同色系浅一档 + 虚线，不另起色相
       name: 'UV',
       type: 'line',
       yAxisIndex: 1,
       smooth: true,
       symbol: 'circle',
       symbolSize: 6,
-      lineStyle: { width: 2.2, type: 'dashed', color: '#e6a23c' },
-      itemStyle: { color: '#e6a23c' },
+      lineStyle: { width: 2, type: 'dashed', color: ct.value.series[1] },
+      itemStyle: { color: ct.value.series[1] },
       z: 6,
       data: trend.value.map((p) => Number(p.uv || 0))
     }
@@ -1018,8 +1038,8 @@ const loadRetention = async () => {
 const retentionStyle = (cell?: { visitors: number; rate: number | string }) => {
   const rate = Number(cell?.rate || 0);
   if (!rate) return {};
-  const alpha = Math.min(0.85, 0.08 + rate / 130);
-  return { background: `rgba(64, 158, 255, ${alpha})`, color: alpha > 0.45 ? '#fff' : 'var(--el-text-color-primary)' };
+  const a = Math.min(0.85, 0.08 + rate / 130);
+  return { background: alpha(ct.value.accent, a), color: a > 0.45 ? 'var(--app-primary-ink)' : 'var(--app-text)' };
 };
 
 // ---------------------------------------------------------------- 访问明细
@@ -1053,21 +1073,31 @@ const openSession = async (row: AnalyticsSession) => {
 const customOption = computed<any>(() => {
   const isDay = customForm.dimension === 'day';
   return {
+    color: ct.value.series,
     tooltip: { trigger: 'axis' },
     grid: { left: 52, right: 20, top: 24, bottom: isDay ? 32 : 80 },
     xAxis: {
       type: 'category',
       data: customRows.value.map((p) => p.label),
-      axisLabel: isDay ? { rotate: 0 } : { rotate: 35, interval: 0, overflow: 'truncate', width: 90 }
+      axisLabel: isDay
+        ? { rotate: 0, color: ct.value.faint }
+        : { rotate: 35, interval: 0, overflow: 'truncate', width: 90, color: ct.value.faint },
+      axisLine: { lineStyle: { color: ct.value.border } }
     },
-    yAxis: { type: 'value', minInterval: 1 },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLabel: { color: ct.value.faint },
+      splitLine: { lineStyle: { color: ct.value.rule } }
+    },
     series: [
       {
         type: isDay ? 'line' : 'bar',
         smooth: true,
         symbolSize: 5,
-        areaStyle: isDay ? { opacity: 0.08 } : undefined,
+        areaStyle: isDay ? { opacity: 0.08, color: ct.value.accent } : undefined,
         barMaxWidth: 28,
+        itemStyle: { color: ct.value.accent },
         data: customRows.value.map((p) => Number(p.value || 0))
       }
     ]
@@ -1103,6 +1133,7 @@ const loadPaths = async () => {
   }
 };
 const pathsOption = computed<any>(() => ({
+  color: ct.value.ramp,
   tooltip: { trigger: 'item', triggerOn: 'mousemove' },
   series: [
     {
@@ -1115,8 +1146,8 @@ const pathsOption = computed<any>(() => ({
       emphasis: { focus: 'adjacency' },
       data: (pathsData.value?.nodes || []).map((n) => ({ name: n.name, value: n.value })),
       links: (pathsData.value?.links || []).map((l) => ({ source: l.source, target: l.target, value: l.value })),
-      label: { color: '#606266', fontSize: 11 },
-      lineStyle: { color: 'gradient', curveness: 0.5 },
+      label: { color: ct.value.muted, fontSize: 11 },
+      lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.28 },
       itemStyle: { borderWidth: 0 }
     }
   ]
@@ -1145,15 +1176,42 @@ const loadActivity = async () => {
   }
 };
 const activityOption = computed<any>(() => ({
+  color: ct.value.series,
   tooltip: { trigger: 'axis' },
   legend: { bottom: 0, icon: 'circle', itemWidth: 8 },
   grid: { left: 52, right: 24, top: 30, bottom: 44 },
-  xAxis: { type: 'category', data: activityData.value?.dayList || [] },
-  yAxis: { type: 'value', minInterval: 1 },
+  xAxis: {
+    type: 'category',
+    data: activityData.value?.dayList || [],
+    axisLabel: { color: ct.value.faint },
+    axisLine: { lineStyle: { color: ct.value.border } }
+  },
+  yAxis: {
+    type: 'value',
+    minInterval: 1,
+    axisLabel: { color: ct.value.faint },
+    splitLine: { lineStyle: { color: ct.value.rule } }
+  },
   series: [
-    { name: 'DAU 日活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.dau || [], itemStyle: { color: '#409eff' } },
-    { name: 'WAU 周活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.wau || [], itemStyle: { color: '#e6a23c' }, lineStyle: { type: 'dashed' } },
-    { name: 'MAU 月活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.mau || [], itemStyle: { color: '#909399' }, lineStyle: { width: 1 } }
+    { name: 'DAU 日活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.dau || [], itemStyle: { color: ct.value.accent }, lineStyle: { color: ct.value.accent } },
+    {
+      name: 'WAU 周活',
+      type: 'line',
+      smooth: true,
+      symbolSize: 4,
+      data: activityData.value?.wau || [],
+      itemStyle: { color: ct.value.series[1] },
+      lineStyle: { type: 'dashed', color: ct.value.series[1] }
+    },
+    {
+      name: 'MAU 月活',
+      type: 'line',
+      smooth: true,
+      symbolSize: 4,
+      data: activityData.value?.mau || [],
+      itemStyle: { color: ct.value.muted },
+      lineStyle: { width: 1, color: ct.value.muted }
+    }
   ]
 }));
 
@@ -1668,7 +1726,8 @@ onMounted(async () => {
   flex: 1;
   min-height: 3px;
   border-radius: 2px 2px 0 0;
-  background: linear-gradient(180deg, #79bbff, #a0cfff);
+  background: var(--app-accent);
+  opacity: 0.7;
   transition: height 0.4s ease;
 }
 @media (max-width: 1200px) {

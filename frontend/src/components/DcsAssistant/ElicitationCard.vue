@@ -264,9 +264,9 @@ async function submit(action: 'accept' | 'decline' | 'cancel') {
 <style lang="scss" scoped>
 /* 视觉语言对齐 ConfirmCard（dcs-confirm 家族）：同卡头/按钮/字段行基调 */
 .dcs-elicit {
-  border: 1px solid var(--dcs-border, #dcdfe6);
+  border: 1px solid var(--app-border);
   border-radius: 10px;
-  background: var(--dcs-card-bg, #fff);
+  background: var(--app-surface);
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
@@ -384,7 +384,7 @@ textarea.ev {
   .cf-go {
     background: var(--el-color-primary);
     border-color: var(--el-color-primary);
-    color: #fff;
+    color: var(--app-primary-ink);
     &:not(:disabled):hover {
       background: var(--el-color-primary-light-3);
     }

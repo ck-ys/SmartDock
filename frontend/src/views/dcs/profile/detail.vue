@@ -184,6 +184,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart, RadarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
+import { useChartTokens, alpha } from '@/utils/chart-theme';
 import { getScore, type ProfileDetail, type ProfileDimensionRow } from '@/api/dcs/core/profile';
 
 use([CanvasRenderer, LineChart, RadarChart, GridComponent, LegendComponent, TooltipComponent]);
@@ -197,6 +198,8 @@ const subjectType = computed(() => String(route.query.subjectType || 'user'));
 
 const loading = ref(false);
 const detail = ref<ProfileDetail | null>(null);
+/** 图表色随主题切换 */
+const ct = useChartTokens();
 
 const subjectName = computed(() => detail.value?.subject?.displayName || subjectId.value);
 const dimensions = computed<ProfileDimensionRow[]>(() =>
@@ -205,12 +208,15 @@ const dimensions = computed<ProfileDimensionRow[]>(() =>
 const radarDims = computed(() => dimensions.value.filter((d) => !d.skipped && !d.missing && Number.isFinite(Number(d.normalizedScore ?? d.score))));
 
 const radarOption = computed<any>(() => ({
+  color: ct.value.series,
   tooltip: { trigger: 'item' },
   radar: {
     radius: '68%',
     indicator: radarDims.value.map((d) => ({ name: d.dimName, max: 100 })),
-    splitArea: { areaStyle: { color: ['rgba(64,158,255,0.04)', 'rgba(64,158,255,0.10)'] } },
-    axisName: { color: '#606266', fontSize: 12 }
+    splitArea: { areaStyle: { color: [alpha(ct.value.accent, 0.04), alpha(ct.value.accent, 0.1)] } },
+    splitLine: { lineStyle: { color: ct.value.rule } },
+    axisLine: { lineStyle: { color: ct.value.rule } },
+    axisName: { color: ct.value.muted, fontSize: 12 }
   },
   series: [
     {
@@ -220,8 +226,9 @@ const radarOption = computed<any>(() => ({
         {
           value: radarDims.value.map((d) => Number(d.normalizedScore ?? d.score)),
           name: '维度得分',
-          areaStyle: { opacity: 0.22 },
-          lineStyle: { width: 2 }
+          itemStyle: { color: ct.value.accent },
+          areaStyle: { opacity: 0.22, color: ct.value.accent },
+          lineStyle: { width: 2, color: ct.value.accent }
         }
       ]
     }
@@ -231,22 +238,32 @@ const radarOption = computed<any>(() => ({
 const trendOption = computed<any>(() => {
   const trend = detail.value?.trend || [];
   return {
+    color: ct.value.series,
     tooltip: { trigger: 'axis' },
     grid: { left: 42, right: 18, top: 20, bottom: 30 },
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: trend.map((t) => formatTime(t.calcTime))
+      data: trend.map((t) => formatTime(t.calcTime)),
+      axisLabel: { color: ct.value.faint },
+      axisLine: { lineStyle: { color: ct.value.border } }
     },
-    yAxis: { type: 'value', min: 0, max: 100, splitLine: { lineStyle: { type: 'dashed' } } },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      axisLabel: { color: ct.value.faint },
+      splitLine: { lineStyle: { type: 'dashed', color: ct.value.rule } }
+    },
     series: [
       {
         type: 'line',
         smooth: true,
         symbolSize: 6,
         data: trend.map((t) => Number(t.totalScore ?? 0)),
-        areaStyle: { opacity: 0.12 },
-        lineStyle: { width: 2.5 }
+        itemStyle: { color: ct.value.accent },
+        areaStyle: { opacity: 0.12, color: ct.value.accent },
+        lineStyle: { width: 2.5, color: ct.value.accent }
       }
     ]
   };
@@ -291,7 +308,8 @@ const ruleWeights = computed(() => {
 
 const back = () => router.back();
 const clamp = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
-const scoreColor = (value: number) => (value >= 75 ? '#67c23a' : value >= 60 ? '#e6a23c' : '#f56c6c');
+const scoreColor = (value: number) =>
+  value >= 75 ? 'var(--el-color-success)' : value >= 60 ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
 const formatScore = (value?: number | string | null) => {
   if (value === null || value === undefined || value === '') return '—';
   const n = Number(value);
