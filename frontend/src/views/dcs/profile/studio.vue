@@ -1,26 +1,20 @@
 <template>
   <div class="app-container studio-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>画像工作室</h3>
-          <p>配置指标口径与权重版本：维度改口径，规则改权重，发布后再重算生效。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="onSourceChange">
-            <el-option label="dcs 数据采集" value="dcs" />
-            <el-option label="risk 风控" value="risk" />
-          </el-select>
-          <el-button @click="goBack">返回画像</el-button>
-          <el-button type="primary" :loading="loading" @click="loadAll">刷新</el-button>
-        </div>
-      </div>
-      <div class="hero-hints">
-        <el-tag type="info" effect="plain">维度 = 指标口径</el-tag>
-        <el-tag type="info" effect="plain">规则 = 权重版本</el-tag>
-        <el-tag type="warning" effect="plain">修改后需重算才会进入新快照</el-tag>
-      </div>
-    </el-card>
+    <dcs-operations-page-header eyebrow="画像引擎" title="画像工作室" subtitle="配置指标口径与权重版本：维度改口径，规则改权重，发布后再重算生效。">
+      <template #actions>
+        <el-select v-model="source" class="source-select" @change="onSourceChange">
+          <el-option label="dcs 数据采集" value="dcs" />
+          <el-option label="risk 风控" value="risk" />
+        </el-select>
+        <el-button @click="goBack">返回画像</el-button>
+        <el-button :loading="loading" @click="loadAll">刷新</el-button>
+      </template>
+    </dcs-operations-page-header>
+    <div class="hero-hints">
+      <el-tag type="info" effect="plain">维度 = 指标口径</el-tag>
+      <el-tag type="info" effect="plain">规则 = 权重版本</el-tag>
+      <el-tag type="warning" effect="plain">修改后需重算才会进入新快照</el-tag>
+    </div>
 
     <el-card shadow="never" class="main-card">
       <el-tabs v-model="activeTab">
@@ -33,7 +27,13 @@
             <div class="toolbar-right muted">共 {{ dimensions.length }} 个维度，启用 {{ enabledDimensions.length }} 个</div>
           </div>
 
-          <el-table v-loading="dimensionLoading" :data="dimensionRows" row-key="dimensionId" stripe>
+          <el-table v-loading="dimensionLoading" class="ui-table" :data="dimensionRows" row-key="dimensionId">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">该业务源还没有维度</p>
+                <p class="ui-empty__hint">先新建一个 EVENT_AGG 维度</p>
+              </div>
+            </template>
             <el-table-column label="维度" min-width="200">
               <template #default="{ row }">
                 <div class="dim-cell">
@@ -86,7 +86,6 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-if="!dimensionLoading && dimensions.length === 0" description="该业务源还没有维度，先新建一个 EVENT_AGG 维度" />
           <el-alert
             class="tip"
             type="info"
@@ -201,11 +200,11 @@
                 </div>
 
                 <div class="draft-actions wrap">
-                  <el-button v-hasPermi="['profile:rule:edit']" type="primary" size="small" :loading="ruleActionLoading" @click="saveDraft()">保存草稿</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" :loading="ruleActionLoading" @click="saveDraft()">保存草稿</el-button>
                   <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="validateDraft">校验</el-button>
                   <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="showDiff">对比当前</el-button>
                   <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="showImpact">影响评估</el-button>
-                  <el-button v-hasPermi="['profile:rule:edit']" type="success" size="small" @click="openPublish">发布</el-button>
+                  <el-button v-hasPermi="['profile:rule:edit']" size="small" @click="openPublish">发布</el-button>
                   <el-button v-hasPermi="['profile:rule:edit']" type="danger" plain size="small" @click="deleteDraft">删除草稿</el-button>
                 </div>
               </div>
@@ -213,7 +212,13 @@
           </div>
 
           <el-divider content-position="left">版本历史</el-divider>
-          <el-table v-loading="ruleLoading" :data="ruleHistory" stripe>
+          <el-table v-loading="ruleLoading" class="ui-table" :data="ruleHistory">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">还没有权重版本</p>
+                <p class="ui-empty__hint">创建草稿并发布后会在这里留下版本记录</p>
+              </div>
+            </template>
             <el-table-column label="版本" min-width="180">
               <template #default="{ row }">
                 <div class="dim-cell">
@@ -242,14 +247,13 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-if="!ruleLoading && ruleHistory.length === 0" description="还没有规则版本。先配置维度，再创建草稿。" :image-size="70" />
         </el-tab-pane>
       </el-tabs>
     </el-card>
 
     <!-- 维度编辑 -->
     <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="780px" top="4vh" destroy-on-close>
-            <el-form label-width="108px" class="dim-form">
+      <el-form label-width="108px" class="dim-form">
         <el-collapse v-model="formSections" class="dim-sections">
           <el-collapse-item name="src">
             <template #title><span class="section-num">①</span> 数据源 —— 这个维度看什么、叫什么</template>
@@ -521,7 +525,7 @@
           <el-tag v-for="code in diffResult?.added || []" :key="`a-${code}`" type="success" size="small" effect="plain"> 新增 {{ code }} </el-tag>
           <el-tag v-for="code in diffResult?.removed || []" :key="`r-${code}`" type="danger" size="small" effect="plain"> 移除 {{ code }} </el-tag>
         </div>
-        <el-table :data="diffRows" stripe size="small">
+        <el-table :data="diffRows" class="ui-table">
           <el-table-column label="维度" prop="code" min-width="140">
             <template #default="{ row }"
               >{{ dimensionName(row.code) }} <span class="mono muted">{{ row.code }}</span></template
@@ -611,6 +615,7 @@ import {
   type ProfileRuleTemplate,
   type ProfileRuleValidation
 } from '@/api/dcs/core/profile';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 const router = useRouter();
 
@@ -1289,34 +1294,59 @@ onMounted(async () => {
 .studio-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
-.hero-card :deep(.el-card__body) {
-  padding: 18px 20px;
+.studio-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
 }
-.hero-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+.studio-page :deep(.dcs-ops-header__actions) {
+  flex-wrap: wrap;
 }
-.hero-copy h3 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 650;
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
 }
-.hero-copy p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.studio-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.studio-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+.studio-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
+}
+.studio-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
+}
+.studio-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
+}
+.studio-page :deep(.el-card__body),
+.studio-page :deep(.el-dialog__body) {
+  min-width: 0;
 }
 .hero-hints {
-  margin-top: 14px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -1345,6 +1375,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  line-height: 1.35;
 }
 .dim-title {
   display: flex;
@@ -1353,10 +1384,12 @@ onMounted(async () => {
 }
 .dim-name {
   font-weight: 600;
+  line-height: 1.4;
 }
 .dim-code {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  line-height: 1.35;
 }
 .coverage-cell {
   display: flex;
@@ -1637,9 +1670,6 @@ onMounted(async () => {
   }
   .weight-row {
     grid-template-columns: 120px minmax(0, 1fr) 100px;
-  }
-  .hero-head {
-    flex-direction: column;
   }
 }
 </style>

@@ -1,40 +1,20 @@
 <template>
   <div class="app-container review-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>低分复核</h3>
-          <p>重算后低于阈值的主体自动进入队列；人工确认或驳回后，分数没有继续恶化就不再重复打扰。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="onSourceChange">
-            <el-option label="dcs 数据采集" value="dcs" />
-            <el-option label="risk 风控" value="risk" />
-          </el-select>
-          <el-button v-hasPermi="['profile:review:edit']" :loading="scanning" type="primary" @click="scan">扫描当前快照</el-button>
-          <el-button :loading="loading" @click="loadAll">刷新</el-button>
-        </div>
-      </div>
-
-      <div class="stat-grid">
-        <div class="stat stat-pending">
-          <span class="stat-label">待复核</span>
-          <strong>{{ counts.pending }}</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">已确认</span>
-          <strong>{{ counts.confirmed }}</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">已驳回</span>
-          <strong>{{ counts.dismissed }}</strong>
-        </div>
-        <div class="stat stat-high">
-          <span class="stat-label">待复核·高风险</span>
-          <strong>{{ counts.highPending }}</strong>
-        </div>
-      </div>
-    </el-card>
+    <dcs-operations-page-header
+      eyebrow="画像引擎"
+      title="低分复核"
+      subtitle="重算后低于阈值的主体自动进入队列；人工确认或驳回后，分数没有继续恶化就不再重复打扰。"
+      :metrics="reviewMetrics"
+    >
+      <template #actions>
+        <el-select v-model="source" class="source-select" @change="onSourceChange">
+          <el-option label="dcs 数据采集" value="dcs" />
+          <el-option label="risk 风控" value="risk" />
+        </el-select>
+        <el-button v-hasPermi="['profile:review:edit']" :loading="scanning" type="primary" @click="scan">扫描当前快照</el-button>
+        <el-button :loading="loading" @click="loadAll">刷新</el-button>
+      </template>
+    </dcs-operations-page-header>
 
     <el-card shadow="never" class="config-card">
       <template #header>
@@ -69,7 +49,7 @@
           <el-input-number v-model="config.reviewSlaDays" :min="1" :max="365" controls-position="right" style="width: 120px" />
           <span class="muted small">天，超时每天 09:10 提醒管理员</span>
         </div>
-        <el-button v-hasPermi="['profile:review:edit']" type="primary" :loading="configSaving" @click="saveConfig">保存策略</el-button>
+        <el-button v-hasPermi="['profile:review:edit']" :loading="configSaving" @click="saveConfig">保存策略</el-button>
       </div>
     </el-card>
 
@@ -88,11 +68,17 @@
           <el-option label="低" value="LOW" />
         </el-select>
         <el-input v-model="query.keyword" placeholder="主体 ID / 名称" clearable style="width: 200px" @keyup.enter="search" />
-        <el-button type="primary" @click="search">查询</el-button>
+        <el-button @click="search">查询</el-button>
         <el-button @click="resetQuery">重置</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="rows" row-key="reviewId" stripe>
+      <el-table v-loading="loading" class="ui-table" :data="rows" row-key="reviewId">
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">当前筛选下没有复核项</p>
+            <p class="ui-empty__hint">调整筛选条件，或先扫描当前快照</p>
+          </div>
+        </template>
         <el-table-column label="主体" min-width="200">
           <template #default="{ row }">
             <div class="subject-cell">
@@ -101,7 +87,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="总分" width="110">
+        <el-table-column label="总分" width="110" align="right">
           <template #default="{ row }">
             <strong :class="scoreClass(Number(row.totalScore))">{{ formatScore(row.totalScore) }}</strong>
           </template>
@@ -224,6 +210,7 @@
 
 <script setup name="DcsProfileReview" lang="ts">
 import { ElMessage } from 'element-plus';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 import {
   confirmReview,
   dismissReview,
@@ -243,6 +230,12 @@ const total = ref(0);
 const loading = ref(false);
 const scanning = ref(false);
 const counts = reactive({ pending: 0, confirmed: 0, dismissed: 0, highPending: 0 });
+const reviewMetrics = computed(() => [
+  { label: '待复核', value: counts.pending },
+  { label: '已确认', value: counts.confirmed },
+  { label: '已驳回', value: counts.dismissed },
+  { label: '待复核·高风险', value: counts.highPending }
+]);
 const query = reactive({ pageNum: 1, pageSize: 20, status: 'PENDING', riskLevel: '', keyword: '' });
 
 const formatScore = (value?: number | string | null) => {
@@ -428,63 +421,53 @@ onMounted(loadAll);
 .review-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
-.hero-card :deep(.el-card__body) {
-  padding: 18px 20px;
+.review-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
 }
-.hero-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+.review-page :deep(.dcs-ops-header__actions) {
   flex-wrap: wrap;
 }
-.hero-copy h3 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 650;
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
 }
-.hero-copy p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-  max-width: 760px;
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.review-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.review-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
 }
-.stat-grid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.review-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
 }
-.stat {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--el-fill-color-blank);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.review-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
 }
-.stat-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.stat strong {
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-.stat-pending strong {
-  color: var(--el-color-warning);
-}
-.stat-high strong {
-  color: var(--el-color-danger);
+.review-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
 }
 .config-card :deep(.el-card__body) {
   padding-top: 12px;
@@ -512,25 +495,30 @@ onMounted(loadAll);
 }
 .table-card :deep(.el-card__body) {
   padding-top: 16px;
+  min-width: 0;
 }
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  min-width: 0;
 }
 .subject-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  line-height: 1.35;
 }
 .subject-name {
   font-weight: 600;
+  line-height: 1.4;
 }
 .subject-meta {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  line-height: 1.35;
 }
 .score-mid {
   color: var(--el-color-warning);
@@ -565,10 +553,5 @@ onMounted(loadAll);
 }
 .detail-actions {
   margin-top: 16px;
-}
-@media (max-width: 900px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 </style>

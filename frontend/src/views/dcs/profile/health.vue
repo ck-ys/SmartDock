@@ -1,52 +1,68 @@
 <template>
   <div class="app-container health-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>引擎健康</h3>
-          <p>事件从采集到可见要过"重建、汇总、重算"几道后台工序——哪道堵了、慢了、悄悄失败了，这里一屏看清；越线自动给管理员发站内告警（每小时 :15 巡检）。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="load">
-            <el-option v-for="s in sourceOptions" :key="s" :label="s" :value="s" />
-          </el-select>
-          <el-button :loading="loading" @click="load">刷新</el-button>
-        </div>
+    <div class="ui-page-head">
+      <div class="ui-page-head__main">
+        <div class="ui-page-head__eyebrow">画像引擎</div>
+        <h1 class="ui-page-head__title">引擎健康</h1>
+        <p class="ui-page-head__sub">
+          事件从采集到可见要过"重建、汇总、重算"几道后台工序——哪道堵了、慢了、悄悄失败了，这里一屏看清；越线自动给管理员发站内告警（每小时
+          :15 巡检）。
+        </p>
       </div>
-
-      <div v-if="health" class="alert-bar">
-        <template v-if="health.alerts.length">
-          <div v-for="(a, i) in health.alerts" :key="i" class="alert-item">
-            <span class="alert-dot" />{{ a.message }}
-          </div>
-        </template>
-        <div v-else class="alert-item ok">
-          <span class="alert-dot ok" />近 24 小时四项指标全部在阈值内
-        </div>
+      <div class="ui-page-head__actions">
+        <el-select v-model="source" class="source-select" @change="load">
+          <el-option v-for="s in sourceOptions" :key="s" :label="s" :value="s" />
+        </el-select>
+        <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
-    </el-card>
+    </div>
 
-    <div v-loading="loading" class="metric-grid">
-      <el-card shadow="never" class="metric-card">
-        <span class="metric-label">事件延迟 P95</span>
-        <strong :class="{ warn: overLatency }">{{ ms(health?.eventLatency?.p95) }}</strong>
-        <span class="metric-sub muted">采集 → 落库（P50 {{ ms(health?.eventLatency?.p50) }} · {{ health?.eventLatency?.times ?? 0 }} 条样本）</span>
-      </el-card>
-      <el-card shadow="never" class="metric-card">
-        <span class="metric-label">重建耗时 P95</span>
-        <strong :class="{ warn: overRebuild }">{{ ms(health?.rebuildDuration?.p95) }}</strong>
-        <span class="metric-sub muted">会话+日汇总（P50 {{ ms(health?.rebuildDuration?.p50) }} · 近 24h {{ health?.rebuildDuration?.times ?? 0 }} 次）</span>
-      </el-card>
-      <el-card shadow="never" class="metric-card">
-        <span class="metric-label">任务失败率</span>
-        <strong :class="{ warn: overFailRate }">{{ health?.tasks?.failRatePct ?? '0' }}%</strong>
-        <span class="metric-sub muted">模型重算+全量重算（{{ health?.tasks?.failed ?? 0 }}/{{ health?.tasks?.total ?? 0 }} 失败）</span>
-      </el-card>
-      <el-card shadow="never" class="metric-card">
-        <span class="metric-label">队列积压</span>
-        <strong :class="{ warn: overBacklog }">{{ health?.backlog?.events ?? 0 }}</strong>
-        <span class="metric-sub muted">待重建事件（上次重建 {{ fmt(health?.backlog?.lastRebuildAt) }}）</span>
-      </el-card>
+    <div v-if="health" class="alert-list">
+      <template v-if="health.alerts.length">
+        <div v-for="(a, i) in health.alerts" :key="i" class="alert-item">
+          <span class="ui-pill ui-pill--neg">告警</span>
+          <span>{{ a.message }}</span>
+        </div>
+      </template>
+      <div v-else class="alert-item">
+        <span class="ui-pill ui-pill--pos">正常</span>
+        <span>近 24 小时四项指标全部在阈值内</span>
+      </div>
+    </div>
+
+    <div v-loading="loading" class="ui-kpi-strip">
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">事件延迟 P95</span>
+        <strong class="ui-kpi__value">{{ ms(health?.eventLatency?.p95) }}</strong>
+        <span class="ui-kpi__hint">
+          <span v-if="overLatency" class="ui-pill ui-pill--warn">超阈值</span>
+          采集 → 落库（P50 {{ ms(health?.eventLatency?.p50) }} · {{ health?.eventLatency?.times ?? 0 }} 条样本）
+        </span>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">重建耗时 P95</span>
+        <strong class="ui-kpi__value">{{ ms(health?.rebuildDuration?.p95) }}</strong>
+        <span class="ui-kpi__hint">
+          <span v-if="overRebuild" class="ui-pill ui-pill--warn">超阈值</span>
+          会话+日汇总（P50 {{ ms(health?.rebuildDuration?.p50) }} · 近 24h {{ health?.rebuildDuration?.times ?? 0 }} 次）
+        </span>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">任务失败率</span>
+        <strong class="ui-kpi__value">{{ health?.tasks?.failRatePct ?? '0' }}%</strong>
+        <span class="ui-kpi__hint">
+          <span v-if="overFailRate" class="ui-pill ui-pill--warn">超阈值</span>
+          模型重算+全量重算（{{ health?.tasks?.failed ?? 0 }}/{{ health?.tasks?.total ?? 0 }} 失败）
+        </span>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">队列积压</span>
+        <strong class="ui-kpi__value">{{ health?.backlog?.events ?? 0 }}</strong>
+        <span class="ui-kpi__hint">
+          <span v-if="overBacklog" class="ui-pill ui-pill--warn">超阈值</span>
+          待重建事件（上次重建 {{ fmt(health?.backlog?.lastRebuildAt) }}）
+        </span>
+      </div>
     </div>
 
     <el-card shadow="never">
@@ -121,26 +137,93 @@ onMounted(load);
 </script>
 
 <style scoped>
-.hero-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.hero-copy h3 { margin: 0 0 4px; }
-.hero-copy p { margin: 0; color: var(--el-text-color-secondary); font-size: 13px; max-width: 640px; }
-.hero-actions { display: flex; gap: 8px; align-items: center; }
-.alert-bar { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
-.alert-item { background: var(--el-color-danger-light-9); color: var(--el-color-danger); border-radius: 6px; padding: 6px 12px; font-size: 13px; }
-.alert-item.ok { background: var(--el-color-success-light-9); color: var(--el-color-success); }
-.alert-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: currentColor; margin-right: 8px; vertical-align: middle; }
-.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; }
-.metric-card { display: flex; flex-direction: column; gap: 4px; }
-.metric-card :deep(.el-card__body) { display: flex; flex-direction: column; gap: 4px; }
-.metric-label { font-size: 13px; color: var(--el-text-color-secondary); }
-.metric-card strong { font-size: 26px; font-weight: 700; color: var(--el-color-primary); }
-.metric-card strong.warn { color: var(--el-color-danger); }
-.metric-sub { font-size: 12px; }
-.panel-head { display: flex; justify-content: space-between; align-items: center; }
-.muted { color: var(--el-text-color-secondary); }
-.small { font-size: 12px; }
-.bars { display: flex; align-items: flex-end; gap: 18px; height: 140px; padding: 8px 4px 0; }
-.bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
-.bar { width: 60%; max-width: 42px; background: linear-gradient(180deg, var(--el-color-primary-light-3), var(--el-color-primary)); border-radius: 4px 4px 0 0; }
-.threshold-row { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: var(--el-text-color-regular); }
+.health-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.health-page > .ui-page-head {
+  margin-bottom: 4px;
+}
+.health-page .ui-page-head__title {
+  font-size: var(--dcs-font-page);
+}
+.health-page .ui-page-head__sub {
+  font-size: var(--dcs-font-md);
+}
+.health-page .ui-page-head__actions {
+  flex-wrap: wrap;
+}
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
+}
+.health-page :deep(.el-card__body) {
+  min-width: 0;
+}
+.alert-list {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-card-radius);
+  overflow: hidden;
+}
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.alert-item + .alert-item {
+  border-top: 1px solid var(--app-rule);
+}
+.ui-kpi-strip {
+  margin-top: 0;
+}
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.muted {
+  color: var(--el-text-color-secondary);
+}
+.small {
+  font-size: 12px;
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  height: 140px;
+  padding: 8px 4px 0;
+}
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 4px;
+}
+.bar {
+  width: 60%;
+  max-width: 42px;
+  background: var(--app-accent);
+  border-radius: var(--app-control-radius) var(--app-control-radius) 0 0;
+}
+.threshold-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
 </style>

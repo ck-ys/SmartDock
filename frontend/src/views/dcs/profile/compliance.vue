@@ -1,16 +1,14 @@
 <template>
   <div class="app-container compliance-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>合规中心</h3>
-          <p>敏感字段打码规则、主体级删除、导出审计——三类合规动作一页管齐，全部留痕可查。</p>
-        </div>
-        <div class="hero-actions">
-          <el-button :loading="exportLoading" @click="loadExportLogs">刷新导出审计</el-button>
-        </div>
-      </div>
-    </el-card>
+    <dcs-operations-page-header
+      eyebrow="画像引擎"
+      title="合规中心"
+      subtitle="敏感字段打码规则、主体级删除、导出审计——三类合规动作一页管齐，全部留痕可查。"
+    >
+      <template #actions>
+        <el-button :loading="exportLoading" @click="loadExportLogs">刷新导出审计</el-button>
+      </template>
+    </dcs-operations-page-header>
 
     <el-row :gutter="12">
       <el-col :xs="24" :lg="12">
@@ -23,9 +21,15 @@
           </template>
           <div class="row-between" style="margin-bottom: 10px">
             <span class="muted small">规则 60 秒内全站生效</span>
-            <el-button v-hasPermi="['profile:pii:edit']" size="small" type="primary" @click="openPiiEdit(null)">新增字段</el-button>
+            <el-button v-hasPermi="['profile:pii:edit']" type="primary" @click="openPiiEdit(null)">新增字段</el-button>
           </div>
-          <el-table v-loading="piiLoading" :data="piiFields" size="small" border>
+          <el-table v-loading="piiLoading" class="ui-table" :data="piiFields">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">还没有 PII 字段规则</p>
+                <p class="ui-empty__hint">新增字段后，命中键名的值会在查询出参里打码</p>
+              </div>
+            </template>
             <el-table-column label="键名" prop="fieldKey" min-width="110" />
             <el-table-column label="规则" width="100">
               <template #default="{ row }">
@@ -102,7 +106,12 @@
           </template>
 
           <el-divider content-position="left">最近删除审计</el-divider>
-          <el-table v-loading="delLogLoading" :data="deletionLogs" size="small" border max-height="260">
+          <el-table v-loading="delLogLoading" class="ui-table" :data="deletionLogs" max-height="260">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">还没有删除审计</p>
+              </div>
+            </template>
             <el-table-column label="时间" width="140">
               <template #default="{ row }">{{ fmtTime(row.executedAt) }}</template>
             </el-table-column>
@@ -114,7 +123,7 @@
                 <el-tag size="small" :type="row.status === 'EXECUTED' ? 'success' : 'danger'" effect="light">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="事件/会话" width="92" align="center">
+            <el-table-column label="事件/会话" width="92" align="right">
               <template #default="{ row }">{{ row.eventsDeleted }}/{{ row.sessionsDeleted }}</template>
             </el-table-column>
             <el-table-column label="错误" prop="errorMsg" min-width="90" show-overflow-tooltip />
@@ -130,14 +139,20 @@
           <span class="muted small">每次分群成员 CSV 导出留一行（行数/是否明文/文件指纹），明文导出会通知管理员</span>
         </div>
       </template>
-      <el-table v-loading="exportLoading" :data="exportLogs" size="small" border>
+      <el-table v-loading="exportLoading" class="ui-table" :data="exportLogs">
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">还没有导出记录</p>
+            <p class="ui-empty__hint">分群成员 CSV 导出会在这里留痕</p>
+          </div>
+        </template>
         <el-table-column label="时间" width="160">
           <template #default="{ row }">{{ fmtTime(row.exportAt) }}</template>
         </el-table-column>
         <el-table-column label="分群" min-width="160">
           <template #default="{ row }">{{ row.segmentName || row.segmentId }}</template>
         </el-table-column>
-        <el-table-column label="行数" prop="rowCount" width="80" align="center" />
+        <el-table-column label="行数" prop="rowCount" width="80" align="right" />
         <el-table-column label="口径" width="90" align="center">
           <template #default="{ row }">
             <el-tag size="small" :type="row.masked === '1' ? 'success' : 'danger'" effect="light">
@@ -192,6 +207,7 @@ import {
   previewDeletion, executeDeletion, listDeletionLogs, listExportLogs
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 defineOptions({ name: 'ProfileCompliance' });
 
@@ -317,23 +333,54 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.compliance-page .hero-card {
-  margin-bottom: 12px;
-}
-.hero-head {
+.compliance-page {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
   gap: 12px;
+  min-width: 0;
+}
+.compliance-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
+}
+.compliance-page :deep(.dcs-ops-header__actions) {
   flex-wrap: wrap;
 }
-.hero-head h3 {
-  margin: 0 0 4px;
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.compliance-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
-.hero-head p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.compliance-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+.compliance-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
+}
+.compliance-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
+}
+.compliance-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
+}
+.compliance-page :deep(.el-card__body) {
+  min-width: 0;
 }
 .row-between {
   display: flex;
@@ -343,7 +390,7 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 .block-card {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 .panel-head {
   display: flex;
@@ -359,20 +406,27 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 .impact {
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-control-radius);
   padding: 6px 8px;
   text-align: center;
 }
 .impact span {
   display: block;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--app-faint);
 }
 .impact strong {
   font-size: 16px;
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
 }
 .del-form :deep(.el-form-item) {
   margin-bottom: 8px;
+}
+@media (max-width: 1199px) {
+  .compliance-page :deep(.el-col:first-child) .block-card {
+    margin-bottom: 12px;
+  }
 }
 </style>

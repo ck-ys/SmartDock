@@ -1,53 +1,49 @@
 <template>
   <div class="app-container detail-page">
-    <el-card v-loading="loading" shadow="never" class="head-card">
-      <div class="head-row">
-        <div class="head-main">
-          <el-button text @click="back">← 返回列表</el-button>
-          <div class="head-title">
-            <h3>{{ subjectName }}</h3>
-            <div class="head-meta">
-              <el-tag size="small" effect="plain">{{ source }}</el-tag>
-              <el-tag size="small" effect="plain" type="info">{{ subjectType }}</el-tag>
-              <span class="mono">{{ subjectId }}</span>
-            </div>
-          </div>
+    <div class="ui-page-head">
+      <div class="ui-page-head__main">
+        <div class="ui-page-head__eyebrow">画像引擎 · 主体详情</div>
+        <h1 class="ui-page-head__title">{{ subjectName }}</h1>
+        <div class="head-meta">
+          <el-tag effect="plain">{{ source }}</el-tag>
+          <el-tag effect="plain" type="info">{{ subjectType }}</el-tag>
+          <span class="mono">{{ subjectId }}</span>
+          <span v-if="detail?.risk" :class="['ui-pill', riskPillClass(detail.risk.color)]">{{ detail.risk.label }}</span>
         </div>
+      </div>
+      <div class="ui-page-head__actions">
+        <el-button @click="back">返回列表</el-button>
         <el-button type="primary" @click="load">刷新</el-button>
       </div>
+    </div>
 
-      <template v-if="detail">
-        <div class="summary-grid">
-          <div class="summary-card primary">
-            <span class="summary-label">综合分</span>
-            <strong class="summary-value">{{ formatScore(detail.latest?.totalScore) }}</strong>
-            <el-tag v-if="detail.risk" :type="riskTagType(detail.risk.color)" effect="light" size="small">
-              {{ detail.risk.label }}
-            </el-tag>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">排名</span>
-            <strong class="summary-value">{{ detail.rank ? `#${detail.rank}` : '—' }}</strong>
-            <span class="summary-hint">同主体类型</span>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">事件数</span>
-            <strong class="summary-value">{{ detail.subject?.eventCount ?? '—' }}</strong>
-            <span class="summary-hint">最近 {{ formatTime(detail.subject?.lastEventTime) }}</span>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">维度覆盖</span>
-            <strong class="summary-value">{{ detail.dataQuality?.coverageRate ?? '—' }}%</strong>
-            <span class="summary-hint">{{ detail.dataQuality?.coveredCount ?? 0 }}/{{ detail.dataQuality?.dimensionCount ?? 0 }} 维有证据</span>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">规则版本</span>
-            <strong class="summary-value rule-version">{{ detail.latest?.ruleVersion || '—' }}</strong>
-            <span class="summary-hint">算于 {{ formatTime(detail.latest?.calcTime) }}</span>
-          </div>
-        </div>
-      </template>
-    </el-card>
+    <div v-if="detail" v-loading="loading" class="ui-kpi-strip">
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">综合分</span>
+        <strong class="ui-kpi__value">{{ formatScore(detail.latest?.totalScore) }}</strong>
+        <span class="ui-kpi__hint">{{ detail.risk?.label || '未分档' }}</span>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">排名</span>
+        <strong class="ui-kpi__value">{{ detail.rank ? `#${detail.rank}` : '—' }}</strong>
+        <span class="ui-kpi__hint">同主体类型</span>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">事件数</span>
+        <strong class="ui-kpi__value">{{ detail.subject?.eventCount ?? '—' }}</strong>
+        <span class="ui-kpi__hint">最近 {{ formatTime(detail.subject?.lastEventTime) }}</span>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">维度覆盖</span>
+        <strong class="ui-kpi__value">{{ detail.dataQuality?.coverageRate ?? '—' }}%</strong>
+        <span class="ui-kpi__hint">{{ detail.dataQuality?.coveredCount ?? 0 }}/{{ detail.dataQuality?.dimensionCount ?? 0 }} 维有证据</span>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">规则版本</span>
+        <strong class="ui-kpi__value rule-version">{{ detail.latest?.ruleVersion || '—' }}</strong>
+        <span class="ui-kpi__hint">算于 {{ formatTime(detail.latest?.calcTime) }}</span>
+      </div>
+    </div>
 
     <template v-if="detail && detail.latest">
       <div class="chart-grid">
@@ -70,7 +66,13 @@
             <span class="card-sub">分数按各维度 scoreMax 归一化到 100 后加权</span>
           </div>
         </template>
-        <el-table :data="dimensions" row-key="dimCode">
+        <el-table class="ui-table" :data="dimensions" row-key="dimCode">
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无维度明细</p>
+              <p class="ui-empty__hint">产生事件并触发重算后，这里会出现各维度得分与证据</p>
+            </div>
+          </template>
           <el-table-column type="expand">
             <template #default="{ row }">
               <div class="evidence-box">
@@ -87,13 +89,13 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="分数" width="120">
+          <el-table-column label="分数" width="120" align="right">
             <template #default="{ row }">
               <span class="score-text">{{ formatScore(row.score) }}</span>
               <span class="score-max"> / {{ formatScore(row.scoreMax) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="归一化" width="180">
+          <el-table-column label="归一化" width="180" align="center">
             <template #default="{ row }">
               <el-progress
                 v-if="row.normalizedScore != null"
@@ -104,7 +106,7 @@
               <span v-else class="muted">—</span>
             </template>
           </el-table-column>
-          <el-table-column label="权重" width="110">
+          <el-table-column label="权重" width="110" align="right">
             <template #default="{ row }">
               <span>{{ row.weight != null ? `${(Number(row.weight) * 100).toFixed(0)}%` : '—' }}</span>
             </template>
@@ -114,7 +116,7 @@
               <el-tag :type="levelTagType(levelOf(row))" size="small" effect="light">{{ levelOf(row) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="sampleCount" label="样本" width="80" />
+          <el-table-column prop="sampleCount" label="样本" width="80" align="right" />
           <el-table-column label="窗口/算子" min-width="150">
             <template #default="{ row }">
               <span class="dim-code">{{ row.tags?.window || '—' }} · {{ row.tags?.operator || row.tags?.evidence?.operator || '—' }}</span>
@@ -173,7 +175,10 @@
     </template>
 
     <el-card v-else-if="!loading" shadow="never">
-      <el-empty description="该主体暂无画像快照（先产生事件并触发重算）" />
+      <div class="ui-empty">
+        <p class="ui-empty__title">该主体暂无画像快照</p>
+        <p class="ui-empty__hint">先产生事件并触发重算，再回来看维度证据</p>
+      </div>
     </el-card>
   </div>
 </template>
@@ -336,7 +341,8 @@ const pretty = (value: unknown) => {
     return String(value);
   }
 };
-const riskTagType = (color?: string) => (color === 'success' ? 'success' : color === 'warning' ? 'warning' : color === 'danger' ? 'danger' : 'info');
+const riskPillClass = (color?: string) =>
+  color === 'success' ? 'ui-pill--pos' : color === 'warning' ? 'ui-pill--warn' : color === 'danger' ? 'ui-pill--neg' : 'ui-pill--muted';
 const levelTagType = (level?: string) =>
   level === '优秀'
     ? 'success'
@@ -369,77 +375,79 @@ watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
 .detail-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-.head-card :deep(.el-card__body) {
-  padding-bottom: 16px;
-}
-.head-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   gap: 12px;
+  min-width: 0;
 }
-.head-main {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+.detail-page > .ui-page-head {
+  margin-bottom: 4px;
 }
-.head-title h3 {
-  margin: 4px 0 4px;
-  font-size: 20px;
-  font-weight: 650;
+.detail-page .ui-page-head__title {
+  font-size: var(--dcs-font-page);
+}
+.detail-page .ui-page-head__sub {
+  font-size: var(--dcs-font-md);
 }
 .head-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--el-text-color-secondary);
+  flex-wrap: wrap;
+  margin-top: 6px;
+  color: var(--app-muted);
   font-size: 12px;
 }
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
+.ui-kpi-strip {
+  margin-top: 0;
 }
-.summary-card {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  background: var(--el-fill-color-blank);
-}
-.summary-card.primary {
-  border-color: var(--el-color-primary-light-5);
-  background: var(--el-color-primary-light-9);
-}
-.summary-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.summary-value {
-  font-size: 24px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-}
-.summary-value.rule-version {
-  font-size: 16px;
+.rule-version {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--dcs-font-xl);
 }
-.summary-hint {
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.detail-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
+}
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.detail-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+.detail-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
+}
+.detail-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
+}
+.detail-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
+}
+.detail-page :deep(.el-card__body) {
+  min-width: 0;
 }
 .chart-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
 .chart {
   height: 300px;
@@ -462,13 +470,16 @@ watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  line-height: 1.35;
 }
 .dim-name {
   font-weight: 600;
+  line-height: 1.4;
 }
 .dim-code {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  line-height: 1.35;
 }
 .score-text {
   font-weight: 600;
@@ -502,7 +513,8 @@ watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
 .bottom-grid {
   display: grid;
   grid-template-columns: 1.1fr 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
 .tag-wrap {
   display: flex;
@@ -542,17 +554,9 @@ watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
   gap: 2px;
 }
 @media (max-width: 1100px) {
-  .summary-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .chart-grid,
   .bottom-grid {
     grid-template-columns: 1fr;
-  }
-}
-@media (max-width: 720px) {
-  .summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

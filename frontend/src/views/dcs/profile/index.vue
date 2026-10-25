@@ -1,80 +1,62 @@
 <template>
   <div class="app-container profile-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>用户画像</h3>
-          <p>事件驱动的通用画像引擎：主体、维度、权重、排行与证据一条链。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="onSourceChange">
-            <el-option label="dcs 数据采集" value="dcs" />
-            <el-option label="risk 风控" value="risk" />
-          </el-select>
-          <el-button @click="goStudio">画像工作室</el-button>
-          <el-button type="primary" @click="loadAll">刷新</el-button>
-        </div>
-      </div>
-      <div class="stat-grid" v-loading="overviewLoading">
-        <div class="stat">
-          <span class="stat-label">主体数</span>
-          <strong>{{ overview.subjectCount ?? '—' }}</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">已算分</span>
-          <strong>{{ overview.scoredCount ?? '—' }}</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">平均分</span>
-          <strong>{{ formatScore(overview.avgScore) }}</strong>
-        </div>
-        <div class="stat stat-low">
-          <span class="stat-label">低风险</span>
-          <strong>{{ overview.lowRisk ?? '—' }}</strong>
-        </div>
-        <div class="stat stat-medium">
-          <span class="stat-label">关注</span>
-          <strong>{{ overview.mediumRisk ?? '—' }}</strong>
-        </div>
-        <div class="stat stat-high">
-          <span class="stat-label">高风险</span>
-          <strong>{{ overview.highRisk ?? '—' }}</strong>
-        </div>
-      </div>
-    </el-card>
+    <dcs-operations-page-header
+      eyebrow="画像引擎"
+      title="用户画像"
+      subtitle="事件驱动的通用画像引擎：主体、维度、权重、排行与证据一条链。"
+      :metrics="overviewMetrics"
+    >
+      <template #actions>
+        <el-select v-model="source" class="source-select" @change="onSourceChange">
+          <el-option label="dcs 数据采集" value="dcs" />
+          <el-option label="risk 风控" value="risk" />
+        </el-select>
+        <el-button @click="goStudio">画像工作室</el-button>
+        <el-button type="primary" @click="loadAll">刷新</el-button>
+      </template>
+    </dcs-operations-page-header>
 
     <el-card shadow="never" class="table-card">
       <el-tabs v-model="activeTab" @tab-change="onTabChange">
         <el-tab-pane label="主体列表" name="list">
           <div class="filter-bar">
-            <el-input v-model="query.keyword" placeholder="主体 ID / 名称" clearable style="width: 200px" @keyup.enter="search" />
-            <el-select v-model="query.subjectType" clearable placeholder="主体类型" style="width: 130px">
+            <el-input v-model="query.keyword" placeholder="主体 ID / 名称" clearable style="width: 150px" @keyup.enter="search" />
+            <el-select v-model="query.subjectType" clearable placeholder="主体类型" style="width: 110px">
               <el-option label="用户" value="user" />
               <el-option label="订单" value="order" />
               <el-option label="访客" value="visitor" />
             </el-select>
-            <el-input-number v-model="query.minScore" :min="0" :max="100" placeholder="最低分" controls-position="right" style="width: 120px" />
-            <el-input-number v-model="query.maxScore" :min="0" :max="100" placeholder="最高分" controls-position="right" style="width: 120px" />
-            <el-select v-model="query.risk" clearable placeholder="风险档" style="width: 120px" @change="search">
+            <el-input-number v-model="query.minScore" :min="0" :max="100" placeholder="最低分" controls-position="right" style="width: 104px" />
+            <el-input-number v-model="query.maxScore" :min="0" :max="100" placeholder="最高分" controls-position="right" style="width: 104px" />
+            <el-select v-model="query.risk" clearable placeholder="风险档" style="width: 100px" @change="search">
               <el-option label="高风险" value="HIGH" />
               <el-option label="关注" value="MEDIUM" />
               <el-option label="低风险" value="LOW" />
             </el-select>
-            <el-select v-model="query.sortBy" style="width: 130px">
+            <el-select v-model="query.sortBy" style="width: 110px">
               <el-option label="最近事件" value="lastEvent" />
               <el-option label="总分" value="score" />
               <el-option label="事件数" value="events" />
               <el-option label="名称" value="name" />
             </el-select>
-            <el-select v-model="query.sortOrder" style="width: 100px">
+            <el-select v-model="query.sortOrder" style="width: 90px">
               <el-option label="降序" value="desc" />
               <el-option label="升序" value="asc" />
             </el-select>
-            <el-button type="primary" @click="search">查询</el-button>
-            <el-button @click="resetQuery">重置</el-button>
+            <div class="filter-actions">
+              <el-button @click="search">查询</el-button>
+              <el-button @click="resetQuery">重置</el-button>
+              <DcsTableColumnSettings v-model="hiddenSubjectColumns" :columns="subjectColumnOptions" storage-key="profile-subjects" />
+            </div>
           </div>
 
-          <el-table v-loading="loading" :data="rows" row-key="id" stripe>
+          <el-table v-loading="loading" class="ui-table" :data="rows" row-key="id">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">没有符合条件的主体</p>
+                <p class="ui-empty__hint">调整筛选条件，或先产生事件并触发重算</p>
+              </div>
+            </template>
             <el-table-column label="主体" min-width="190">
               <template #default="{ row }">
                 <div class="subject-cell">
@@ -83,7 +65,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column v-if="canSeeScore" label="总分" width="170">
+            <el-table-column v-if="canSeeScore && isSubjectColumnVisible('score')" label="总分" width="170">
               <template #default="{ row }">
                 <div v-if="row.totalScore != null" class="score-cell">
                   <el-progress
@@ -97,20 +79,27 @@
                 <span v-else class="muted">未算分</span>
               </template>
             </el-table-column>
-            <el-table-column v-if="canSeeScore" v-for="dim in dimensions" :key="dim.dimCode" :label="dim.dimName" width="120">
-              <template #default="{ row }">
-                <span :class="dimScoreClass(row, dim.dimCode)">{{ dimScore(row, dim.dimCode) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="eventCount" label="事件数" width="90" />
-            <el-table-column label="最近事件" width="170">
+            <template v-for="dim in dimensions" :key="dim.dimCode">
+              <el-table-column
+                v-if="canSeeScore && isSubjectColumnVisible('dim:' + dim.dimCode)"
+                :label="dim.dimName"
+                width="120"
+                align="right"
+              >
+                <template #default="{ row }">
+                  <span :class="dimScoreClass(row, dim.dimCode)">{{ dimScore(row, dim.dimCode) }}</span>
+                </template>
+              </el-table-column>
+            </template>
+            <el-table-column v-if="isSubjectColumnVisible('eventCount')" prop="eventCount" label="事件数" width="90" align="right" />
+            <el-table-column v-if="isSubjectColumnVisible('lastEvent')" label="最近事件" width="170">
               <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
             </el-table-column>
-            <el-table-column v-if="canSeeScore" label="风险" width="100">
+            <el-table-column v-if="canSeeScore && isSubjectColumnVisible('risk')" label="风险" width="100">
               <template #default="{ row }">
-                <el-tag v-if="row.totalScore != null" :type="riskOf(row.totalScore).color" effect="light">
+                <span v-if="row.totalScore != null" :class="['ui-pill', riskPillClass(row.totalScore)]">
                   {{ riskOf(row.totalScore).label }}
-                </el-tag>
+                </span>
                 <span v-else class="muted">—</span>
               </template>
             </el-table-column>
@@ -137,10 +126,16 @@
             </el-select>
             <el-button @click="loadRanking">刷新排行</el-button>
           </div>
-          <el-table v-loading="rankingLoading" :data="rankingRows" stripe>
-            <el-table-column prop="rank" label="排名" width="70">
+          <el-table v-loading="rankingLoading" class="ui-table" :data="rankingRows">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">暂无排行数据</p>
+                <p class="ui-empty__hint">先产生事件并触发重算</p>
+              </div>
+            </template>
+            <el-table-column prop="rank" label="排名" width="70" align="right">
               <template #default="{ row }">
-                <span :class="['rank-badge', row.rank <= 3 ? `rank-${row.rank}` : '']">{{ row.rank }}</span>
+                <span class="ui-pill ui-pill--muted rank-pill">{{ row.rank }}</span>
               </template>
             </el-table-column>
             <el-table-column label="主体" min-width="220">
@@ -151,12 +146,12 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="分数" width="130">
+            <el-table-column label="分数" width="130" align="right">
               <template #default="{ row }">
                 <strong>{{ formatScore(ranking.dimension ? row.dimensionScore : row.totalScore) }}</strong>
               </template>
             </el-table-column>
-            <el-table-column prop="eventCount" label="事件数" width="100" />
+            <el-table-column prop="eventCount" label="事件数" width="100" align="right" />
             <el-table-column label="最近事件" width="180">
               <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
             </el-table-column>
@@ -166,7 +161,6 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-if="!rankingLoading && rankingRows.length === 0" description="暂无排行数据（先产生事件并触发重算）" />
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -199,19 +193,24 @@
                 </div>
               </div>
               <h4 class="basis-title">维度贡献</h4>
-              <el-table :data="basisDimensions" size="small" stripe>
+              <el-table class="ui-table" :data="basisDimensions">
+                <template #empty>
+                  <div class="ui-empty">
+                    <p class="ui-empty__title">暂无维度得分</p>
+                  </div>
+                </template>
                 <el-table-column label="维度" min-width="130">
                   <template #default="{ row }"
                     >{{ row.dimName || row.code }} <span class="mono muted">{{ row.code }}</span></template
                   >
                 </el-table-column>
-                <el-table-column label="得分" width="80">
+                <el-table-column label="得分" width="80" align="right">
                   <template #default="{ row }">{{ formatScore(row.score) }}</template>
                 </el-table-column>
-                <el-table-column label="权重" width="70">
+                <el-table-column label="权重" width="70" align="right">
                   <template #default="{ row }">{{ row.weight ?? '—' }}</template>
                 </el-table-column>
-                <el-table-column label="加权分" width="90">
+                <el-table-column label="加权分" width="90" align="right">
                   <template #default="{ row }">{{ formatScore(row.weightedScore) }}</template>
                 </el-table-column>
               </el-table>
@@ -241,6 +240,9 @@ import {
   type ProfileSubjectSummary
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+import DcsTableColumnSettings from '@/components/DcsTableColumnSettings/index.vue';
+import { readHiddenColumns, type TableColumnOption } from '@/components/DcsTableColumnSettings/table-columns';
 
 const router = useRouter();
 // 批11 列级权限: 无 profile:pii:score 权限者不渲染分数/维度/风险三族列(后端同步置空)
@@ -256,6 +258,23 @@ const total = ref(0);
 const dimensions = ref<ProfileDimension[]>([]);
 const rankingRows = ref<ProfileRankingRow[]>([]);
 const overview = ref<Partial<ProfileOverview>>({});
+
+// 交互三件 ③：主体列表列显隐（按页面存 localStorage；主体/操作列常显）
+const SUBJECT_COLUMN_STORAGE_KEY = 'profile-subjects';
+const subjectColumnOptions = computed<TableColumnOption[]>(() => {
+  const options: TableColumnOption[] = [];
+  if (canSeeScore) {
+    options.push({ key: 'score', label: '总分' });
+    dimensions.value.forEach((dim) => options.push({ key: `dim:${dim.dimCode}`, label: dim.dimName || dim.dimCode }));
+  }
+  options.push({ key: 'eventCount', label: '事件数' }, { key: 'lastEvent', label: '最近事件' });
+  if (canSeeScore) {
+    options.push({ key: 'risk', label: '风险' });
+  }
+  return options;
+});
+const hiddenSubjectColumns = ref<string[]>(readHiddenColumns(SUBJECT_COLUMN_STORAGE_KEY));
+const isSubjectColumnVisible = (key: string) => !hiddenSubjectColumns.value.includes(key);
 
 const query = reactive({
   pageNum: 1,
@@ -299,6 +318,17 @@ const riskOf = (value?: number | string | null) => {
   if (n >= riskBands.highBelow) return { label: '关注', color: 'warning' as const };
   return { label: '高风险', color: 'danger' as const };
 };
+const riskPillClass = (value?: number | string | null) =>
+  ({ success: 'ui-pill--pos', warning: 'ui-pill--warn', danger: 'ui-pill--neg', info: 'ui-pill--muted' })[riskOf(value).color];
+
+const overviewMetrics = computed(() => [
+  { label: '主体数', value: overview.value.subjectCount ?? '—' },
+  { label: '已算分', value: overview.value.scoredCount ?? '—' },
+  { label: '平均分', value: formatScore(overview.value.avgScore) },
+  { label: '低风险', value: overview.value.lowRisk ?? '—' },
+  { label: '关注', value: overview.value.mediumRisk ?? '—' },
+  { label: '高风险', value: overview.value.highRisk ?? '—' }
+]);
 
 const parseDetail = (row: ProfileSubjectRow): Record<string, ProfileDimensionDetail> => {
   const raw = row.dimensionDetail;
@@ -431,86 +461,90 @@ onMounted(loadAll);
 .profile-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
-.hero-card :deep(.el-card__body) {
-  padding: 18px 20px;
+.profile-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
 }
-.hero-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+.profile-page :deep(.dcs-ops-header__actions) {
+  flex-wrap: wrap;
 }
-.hero-copy h3 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 650;
-}
-.hero-copy p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.stat-grid {
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 10px;
-}
-.stat {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--el-fill-color-blank);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.stat-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.stat strong {
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-.stat-low strong {
-  color: var(--el-color-success);
-}
-.stat-medium strong {
-  color: var(--el-color-warning);
-}
-.stat-high strong {
-  color: var(--el-color-danger);
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
 }
 .table-card :deep(.el-card__body) {
   padding-top: 6px;
+  min-width: 0;
+}
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.profile-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
+}
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.profile-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+.profile-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
+}
+.profile-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
+}
+.profile-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
 }
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  min-width: 0;
+}
+/* 查询/重置/列设置作为一个整体换行：窄屏时要么整组在行尾，要么整组掉下一行，
+   不允许把「重置」单独甩到下一行（侧栏 228→256 后 1440 宽就踩过这个坑） */
+.filter-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 .subject-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  line-height: 1.35;
 }
 .subject-name {
   font-weight: 600;
   color: var(--el-text-color-primary);
+  line-height: 1.4;
 }
 .subject-meta {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  line-height: 1.35;
 }
 .score-cell {
   display: flex;
@@ -564,41 +598,8 @@ onMounted(loadAll);
   color: var(--el-color-danger);
   font-weight: 600;
 }
-.rank-badge {
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
+.rank-pill {
+  min-width: 24px;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--el-fill-color);
-  color: var(--el-text-color-regular);
-  font-weight: 600;
-  font-size: 12px;
-}
-.rank-1 {
-  background: #f7d774;
-  color: #6b4b00;
-}
-.rank-2 {
-  background: #dfe4ea;
-  color: #4a5563;
-}
-.rank-3 {
-  background: #e8c39e;
-  color: #6b3f1c;
-}
-@media (max-width: 1100px) {
-  .stat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-@media (max-width: 720px) {
-  .hero-head {
-    flex-direction: column;
-  }
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 </style>

@@ -1,33 +1,31 @@
 <template>
   <div class="app-container analytics-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>数据分析中心</h3>
-          <p>事件账本 → 会话重建 → 日汇总 → 漏斗/留存/下钻。同一套采集协议可接官网、订单、供应链、工程等任意业务源。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="onSourceChange">
-            <el-option label="web 演示站点" value="web" />
-            <el-option label="dcs 数据采集" value="dcs" />
-            <el-option label="order 订单" value="order" />
-            <el-option label="supply 供应链" value="supply" />
-          </el-select>
-          <el-select v-model="days" style="width: 120px" @change="onDaysChange">
-            <el-option label="近 7 天" :value="7" />
-            <el-option label="近 30 天" :value="30" />
-            <el-option label="近 90 天" :value="90" />
-          </el-select>
-          <el-button v-hasPermi="['analytics:center:edit']" :loading="rebuilding" @click="rebuild"> 重建汇总 </el-button>
-          <el-button :loading="loading" @click="reloadCurrent">刷新</el-button>
-        </div>
-      </div>
-      <div class="meta-line">
-        <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
-        <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
-        <span class="muted">口径：PV=页面浏览 · UV=去重访客 · 访问次数=去重会话 · 跳出=只看一页</span>
-      </div>
-    </el-card>
+    <dcs-operations-page-header
+      eyebrow="画像与分析"
+      title="数据分析中心"
+      subtitle="事件账本 → 会话重建 → 日汇总 → 漏斗/留存/下钻。同一套采集协议可接官网、订单、供应链、工程等任意业务源。"
+    >
+      <template #actions>
+        <el-select v-model="source" class="source-select" @change="onSourceChange">
+          <el-option label="web 演示站点" value="web" />
+          <el-option label="dcs 数据采集" value="dcs" />
+          <el-option label="order 订单" value="order" />
+          <el-option label="supply 供应链" value="supply" />
+        </el-select>
+        <el-select v-model="days" class="days-select" @change="onDaysChange">
+          <el-option label="近 7 天" :value="7" />
+          <el-option label="近 30 天" :value="30" />
+          <el-option label="近 90 天" :value="90" />
+        </el-select>
+        <el-button v-hasPermi="['analytics:center:edit']" :loading="rebuilding" @click="rebuild"> 重建汇总 </el-button>
+        <el-button :loading="loading" @click="reloadCurrent">刷新</el-button>
+      </template>
+    </dcs-operations-page-header>
+    <div class="meta-line">
+      <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
+      <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
+      <span class="muted">口径：PV=页面浏览 · UV=去重访客 · 访问次数=去重会话 · 跳出=只看一页</span>
+    </div>
 
     <el-tabs v-model="tab" class="analytics-tabs" @tab-change="onTabChange">
       <!-- ---------------------------------------------------------- 数据导入（2026-10-23 拍板：移除外部网站接入，仅保留 CSV 补录与全域总览） -->
@@ -59,11 +57,11 @@
               <span class="muted">近 {{ crossData?.days ?? 30 }} 天 · 跨业务源直读事件账本</span>
             </div>
           </template>
-          <div class="stat-grid" v-if="crossData?.sources?.length">
-            <div class="stat" v-for="s in crossData.sources" :key="s.source">
-              <span class="stat-label">{{ s.source }} 事件</span>
-              <strong>{{ formatNumber(s.events) }}</strong>
-              <span class="muted small">访客 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
+          <div class="ui-kpi-strip analytics-kpi" v-if="crossData?.sources?.length">
+            <div class="ui-kpi" v-for="s in crossData.sources" :key="s.source">
+              <span class="ui-kpi__label">{{ s.source }} 事件</span>
+              <strong class="ui-kpi__value">{{ formatNumber(s.events) }}</strong>
+              <span class="ui-kpi__hint">访客 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
             </div>
           </div>
           <el-empty v-else :image-size="50" description="还没有任何业务源写入事件" />
@@ -72,46 +70,46 @@
       </el-tab-pane>
       <!-- ---------------------------------------------------------- 流量概览 -->
       <el-tab-pane label="流量概览" name="overview">
-        <div v-loading="overviewLoading" class="stat-grid">
-          <div class="stat">
-            <span class="stat-label">浏览量 PV</span>
-            <strong>{{ formatNumber(overview.current?.pv) }}</strong>
-            <span class="delta" :class="deltaTone('pv')">{{ deltaText('pv') }}</span>
+        <div v-loading="overviewLoading" class="ui-kpi-strip analytics-kpi">
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">浏览量 PV</span>
+            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.pv) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('pv')">{{ deltaText('pv') }}</span>
           </div>
-          <div class="stat">
-            <span class="stat-label">访客数 UV</span>
-            <strong>{{ formatNumber(overview.current?.uv) }}</strong>
-            <span class="delta" :class="deltaTone('uv')">{{ deltaText('uv') }}</span>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">访客数 UV</span>
+            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.uv) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('uv')">{{ deltaText('uv') }}</span>
           </div>
-          <div class="stat">
-            <span class="stat-label">访问次数</span>
-            <strong>{{ formatNumber(overview.current?.visits) }}</strong>
-            <span class="delta" :class="deltaTone('visits')">{{ deltaText('visits') }}</span>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">访问次数</span>
+            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.visits) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('visits')">{{ deltaText('visits') }}</span>
           </div>
-          <div class="stat">
-            <span class="stat-label">新访客占比</span>
-            <strong>{{ formatPercent(overview.current?.newRate) }}</strong>
-            <span class="delta muted">新 {{ overview.current?.newVisitors ?? 0 }} / 回访 {{ overview.current?.returningVisitors ?? 0 }}</span>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">新访客占比</span>
+            <strong class="ui-kpi__value">{{ formatPercent(overview.current?.newRate) }}</strong>
+            <span class="ui-kpi__hint">新 {{ overview.current?.newVisitors ?? 0 }} / 回访 {{ overview.current?.returningVisitors ?? 0 }}</span>
           </div>
-          <div class="stat">
-            <span class="stat-label">跳出率</span>
-            <strong>{{ formatPercent(overview.current?.bounceRate) }}</strong>
-            <span class="delta" :class="deltaTone('bounceRate')">{{ deltaText('bounceRate') }}</span>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">跳出率</span>
+            <strong class="ui-kpi__value">{{ formatPercent(overview.current?.bounceRate) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('bounceRate')">{{ deltaText('bounceRate') }}</span>
           </div>
-          <div class="stat">
-            <span class="stat-label">平均停留</span>
-            <strong>{{ formatDuration(overview.current?.avgDuration) }}</strong>
-            <span class="delta" :class="deltaTone('avgDuration')">{{ deltaText('avgDuration') }}</span>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">平均停留</span>
+            <strong class="ui-kpi__value">{{ formatDuration(overview.current?.avgDuration) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('avgDuration')">{{ deltaText('avgDuration') }}</span>
           </div>
-          <div class="stat">
-            <span class="stat-label">每次访问页数</span>
-            <strong>{{ formatNumber(overview.current?.pagesPerVisit, 2) }}</strong>
-            <span class="delta" :class="deltaTone('pagesPerVisit')">{{ deltaText('pagesPerVisit') }}</span>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">每次访问页数</span>
+            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.pagesPerVisit, 2) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('pagesPerVisit')">{{ deltaText('pagesPerVisit') }}</span>
           </div>
-          <div class="stat">
-            <span class="stat-label">事件数</span>
-            <strong>{{ formatNumber(overview.current?.events) }}</strong>
-            <span class="delta muted">会话 {{ formatNumber(overview.current?.visits) }} 次</span>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">事件数</span>
+            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.events) }}</strong>
+            <span class="ui-kpi__hint">会话 {{ formatNumber(overview.current?.visits) }} 次</span>
           </div>
         </div>
 
@@ -133,7 +131,7 @@
                   <span class="muted">{{ block.hint }}</span>
                 </div>
               </template>
-              <el-table :data="breakdowns[block.type] || []" size="small" :show-header="true">
+              <el-table class="ui-table" :data="breakdowns[block.type] || []" :show-header="true">
                 <el-table-column prop="label" :label="block.label" min-width="140" show-overflow-tooltip />
                 <el-table-column prop="pv" label="PV" width="76" align="right" />
                 <el-table-column prop="uv" label="UV" width="76" align="right" />
@@ -164,7 +162,7 @@
                   <span class="muted">按 page_view 统计</span>
                 </div>
               </template>
-              <el-table :data="pageRows" size="small">
+              <el-table class="ui-table" :data="pageRows">
                 <el-table-column prop="label" label="页面" min-width="180" show-overflow-tooltip />
                 <el-table-column prop="pv" label="PV" width="80" align="right" />
                 <el-table-column prop="uv" label="UV" width="80" align="right" />
@@ -188,7 +186,7 @@
                   <span class="muted">search / keyword</span>
                 </div>
               </template>
-              <el-table :data="searchRows" size="small">
+              <el-table class="ui-table" :data="searchRows">
                 <el-table-column prop="label" label="关键词" min-width="120" show-overflow-tooltip />
                 <el-table-column prop="pv" label="次数" width="70" align="right" />
                 <el-table-column prop="uv" label="人数" width="70" align="right" />
@@ -208,7 +206,7 @@
               <span class="muted">全部已接入事件</span>
             </div>
           </template>
-          <el-table :data="eventRows" size="small">
+          <el-table class="ui-table" :data="eventRows">
             <el-table-column prop="label" label="事件" min-width="160" />
             <el-table-column prop="events" label="事件数" width="100" align="right" />
             <el-table-column prop="uv" label="触达人数" width="100" align="right" />
@@ -340,12 +338,12 @@
               </span>
             </div>
           </template>
-          <el-table v-if="attributionData?.rows?.length" :data="attributionData.rows" size="small">
+          <el-table v-if="attributionData?.rows?.length" class="ui-table" :data="attributionData.rows">
             <el-table-column prop="channel" label="渠道" min-width="110" />
-            <el-table-column prop="first" label="首次归因" width="90" />
-            <el-table-column prop="last" label="末次归因" width="90" />
-            <el-table-column prop="linear" label="线性" width="80" />
-            <el-table-column prop="visitors" label="触达访客" width="90" />
+            <el-table-column prop="first" label="首次归因" width="90" align="right" />
+            <el-table-column prop="last" label="末次归因" width="90" align="right" />
+            <el-table-column prop="linear" label="线性" width="80" align="right" />
+            <el-table-column prop="visitors" label="触达访客" width="90" align="right" />
           </el-table>
           <el-empty v-else :image-size="50" description="窗口期内没有转化事件，无法归因" />
           <p class="muted small">首次=最早带来的渠道记功；末次=临门一脚记功；线性=沿途触点平分。只统计转化发生之前的访问。</p>
@@ -374,7 +372,7 @@
               </div>
             </div>
           </template>
-          <el-table v-if="retention.cohorts?.length" :data="retention.cohorts" size="small" border class="retention-table">
+          <el-table v-if="retention.cohorts?.length" class="ui-table retention-table" :data="retention.cohorts">
             <el-table-column prop="cohort" label="首次访问" width="120" fixed />
             <el-table-column prop="total" label="新增访客" width="96" align="right" />
             <el-table-column v-for="i in retention.window" :key="i" :label="`第 ${i - 1} 天`" min-width="78" align="center">
@@ -400,22 +398,22 @@
               <span class="muted">DAU/WAU/MAU 滚动窗口 · 粘性 = DAU÷MAU</span>
             </div>
           </template>
-          <div class="stat-grid">
-            <div class="stat">
-              <span class="stat-label">日活 DAU（最新一天）</span>
-              <strong>{{ formatNumber(activityData?.latest?.dau) }}</strong>
+          <div class="ui-kpi-strip analytics-kpi">
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">日活 DAU（最新一天）</span>
+              <strong class="ui-kpi__value">{{ formatNumber(activityData?.latest?.dau) }}</strong>
             </div>
-            <div class="stat">
-              <span class="stat-label">周活 WAU（近 7 天）</span>
-              <strong>{{ formatNumber(activityData?.latest?.wau) }}</strong>
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">周活 WAU（近 7 天）</span>
+              <strong class="ui-kpi__value">{{ formatNumber(activityData?.latest?.wau) }}</strong>
             </div>
-            <div class="stat">
-              <span class="stat-label">月活 MAU（近 30 天）</span>
-              <strong>{{ formatNumber(activityData?.latest?.mau) }}</strong>
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">月活 MAU（近 30 天）</span>
+              <strong class="ui-kpi__value">{{ formatNumber(activityData?.latest?.mau) }}</strong>
             </div>
-            <div class="stat">
-              <span class="stat-label">粘性 DAU/MAU</span>
-              <strong>{{ activityData?.latest?.sticky == null ? '—' : formatPercent(activityData.latest.sticky) }}</strong>
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">粘性 DAU/MAU</span>
+              <strong class="ui-kpi__value">{{ activityData?.latest?.sticky == null ? '—' : formatPercent(activityData.latest.sticky) }}</strong>
             </div>
           </div>
           <v-chart v-if="activityData?.dayList?.length" class="trend-chart" :option="activityOption" autoresize />
@@ -447,7 +445,13 @@
             <el-button @click="resetSessions">重置</el-button>
           </div>
 
-          <el-table :data="sessions" size="small" v-loading="sessionLoading">
+          <el-table class="ui-table" :data="sessions" v-loading="sessionLoading">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">当前筛选下没有访问记录</p>
+                <p class="ui-empty__hint">调整筛选条件，或确认该业务源已有事件写入</p>
+              </div>
+            </template>
             <el-table-column prop="visitorId" label="访客" min-width="130" show-overflow-tooltip />
             <el-table-column prop="startedAt" label="开始时间" width="170" />
             <el-table-column prop="sourceChannel" label="渠道" width="100" />
@@ -513,7 +517,13 @@
             <el-button type="primary" :loading="customLoading" @click="loadCustom">运行</el-button>
           </div>
           <v-chart class="custom-chart" :option="customOption" autoresize v-loading="customLoading" />
-          <el-table :data="customRows" size="small" class="custom-table">
+          <el-table :data="customRows" class="ui-table custom-table">
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">暂无自定义分析结果</p>
+                <p class="ui-empty__hint">选择维度与指标后点「运行」</p>
+              </div>
+            </template>
             <el-table-column type="index" label="#" width="56" />
             <el-table-column prop="label" :label="dimensionLabel" min-width="180" show-overflow-tooltip />
             <el-table-column :label="metricLabel" width="120" align="right">
@@ -535,22 +545,22 @@
               </div>
             </div>
           </template>
-          <div class="stat-grid">
-            <div class="stat">
-              <span class="stat-label">在线访客</span>
-              <strong>{{ formatNumber(realtimeData?.summary?.visitors) }}</strong>
+          <div class="ui-kpi-strip analytics-kpi">
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">在线访客</span>
+              <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.visitors) }}</strong>
             </div>
-            <div class="stat">
-              <span class="stat-label">页面浏览</span>
-              <strong>{{ formatNumber(realtimeData?.summary?.pv) }}</strong>
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">页面浏览</span>
+              <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.pv) }}</strong>
             </div>
-            <div class="stat">
-              <span class="stat-label">事件</span>
-              <strong>{{ formatNumber(realtimeData?.summary?.events) }}</strong>
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">事件</span>
+              <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.events) }}</strong>
             </div>
-            <div class="stat">
-              <span class="stat-label">新访客</span>
-              <strong>{{ formatNumber(realtimeData?.summary?.newVisitors) }}</strong>
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">新访客</span>
+              <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.newVisitors) }}</strong>
             </div>
           </div>
           <div class="realtime-pulse">
@@ -564,7 +574,6 @@
           <p class="muted small">更新于 {{ realtimeData?.now || '—' }}（按分钟的浏览量脉冲条，条越高那一分钟越热闹）</p>
         </el-card>
       </el-tab-pane>
-
 
     </el-tabs>
 
@@ -695,6 +704,7 @@ import {
   type AnalyticsSessionQuery,
   type AnalyticsTrendPoint
 } from '@/api/dcs/core/analytics';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 use([CanvasRenderer, LineChart, BarChart, SankeyChart, GridComponent, LegendComponent, TooltipComponent]);
 
@@ -1405,91 +1415,118 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-
 .analytics-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
-.hero-card :deep(.el-card__body) {
-  padding: 18px 20px;
+.analytics-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
 }
-.hero-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+.analytics-page :deep(.dcs-ops-header__actions) {
   flex-wrap: wrap;
 }
-.hero-copy h3 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 650;
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
+  .days-select {
+    width: 120px;
+  }
 }
-.hero-copy p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-  max-width: 760px;
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.analytics-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
-.hero-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.analytics-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+.analytics-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
+}
+.analytics-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
+}
+.analytics-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
+}
+.analytics-page :deep(.el-card__body),
+.analytics-page :deep(.el-tabs__content) {
+  min-width: 0;
 }
 .meta-line {
-  margin-top: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
   font-size: 12px;
 }
 .analytics-tabs {
   min-height: 400px;
+  min-width: 0;
 }
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+/* KPI 带：一个容器 + 1px 分隔；桌面 4 列，≤992 由 dcs-ui-kit 落成 2 列 */
+.ui-kpi-strip {
+  margin-top: 0;
 }
-.stat {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: var(--el-fill-color-blank);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.analytics-kpi {
+  margin-bottom: 12px;
 }
-.stat-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.stat strong {
-  font-size: 21px;
-  font-variant-numeric: tabular-nums;
+@media (min-width: 993px) {
+  .analytics-kpi {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .analytics-kpi .ui-kpi {
+    border-top: 1px solid var(--app-rule);
+  }
+  .analytics-kpi .ui-kpi:nth-child(4n + 1) {
+    border-left: 0;
+  }
+  .analytics-kpi .ui-kpi:nth-child(-n + 4) {
+    border-top: 0;
+  }
 }
 .delta {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
+  font-size: var(--dcs-font-xs);
+  color: var(--app-faint);
+  font-variant-numeric: tabular-nums;
 }
 .delta.good {
-  color: var(--el-color-success);
+  color: var(--dcs-color-success);
 }
 .delta.bad {
-  color: var(--el-color-danger);
+  color: var(--dcs-color-danger);
 }
 .delta.flat {
-  color: var(--el-text-color-placeholder);
+  color: var(--app-faint);
 }
 .panel-card {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .panel-card :deep(.el-card__body) {
   padding-top: 12px;
+  min-width: 0;
 }
 .panel-head {
   display: flex;
@@ -1581,8 +1618,8 @@ onMounted(async () => {
   border-radius: 50%;
   align-items: center;
   justify-content: center;
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
+  background: var(--app-raised);
+  color: var(--app-text);
   font-size: 12px;
 }
 .funnel-numbers {
@@ -1604,7 +1641,7 @@ onMounted(async () => {
 .funnel-bar-inner {
   height: 100%;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--el-color-primary), var(--el-color-primary-light-3));
+  background: var(--app-accent);
   transition: width 0.35s ease;
 }
 .tip-card {
@@ -1617,9 +1654,6 @@ onMounted(async () => {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-}
-.retention-table :deep(.el-table__cell) {
-  padding: 4px 0;
 }
 .retention-cell {
   border-radius: 6px;
@@ -1637,9 +1671,10 @@ onMounted(async () => {
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  min-width: 0;
 }
 .drawer-section-title {
   margin: 18px 0 10px;
@@ -1729,15 +1764,5 @@ onMounted(async () => {
   background: var(--app-accent);
   opacity: 0.7;
   transition: height 0.4s ease;
-}
-@media (max-width: 1200px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 640px) {
-  .stat-grid {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

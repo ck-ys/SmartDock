@@ -1,67 +1,65 @@
 <template>
-  <div class="app-container">
-    <dcs-operations-page-header
-      title="数据看板"
-      subtitle="任务采集的发布与填报总量（内置示例能力的统计）"
-      eyebrow="任务中心"
-      :metrics="[
-        { label: '我发布的', value: (stats?.publisher?.draft ?? 0) + (stats?.publisher?.collecting ?? 0) + (stats?.publisher?.closed ?? 0) },
-        { label: '待我完成', value: stats?.member?.todo ?? 0, tone: 'warning' },
-        { label: '已通过', value: stats?.member?.approved ?? 0, tone: 'success' }
-      ]"
-    />
+  <div class="app-container dashboard-page">
+    <dcs-operations-page-header title="数据看板" subtitle="任务采集的发布与填报总量（内置示例能力的统计）" eyebrow="任务中心" />
 
-    <el-row :gutter="16">
-      <el-col v-if="isPublisher" :span="12">
+    <div class="ui-kpi-strip dashboard-kpi">
+      <template v-if="isPublisher">
+        <div class="ui-kpi">
+          <span class="ui-kpi__label">我发布的 · 合计</span>
+          <strong class="ui-kpi__value">
+            {{ (stats?.publisher?.draft ?? 0) + (stats?.publisher?.collecting ?? 0) + (stats?.publisher?.closed ?? 0) }}
+          </strong>
+        </div>
+        <div class="ui-kpi">
+          <span class="ui-kpi__label">我发布的 · 草稿</span>
+          <strong class="ui-kpi__value">{{ stats?.publisher?.draft ?? 0 }}</strong>
+        </div>
+        <div class="ui-kpi">
+          <span class="ui-kpi__label">我发布的 · 收集中</span>
+          <strong class="ui-kpi__value">{{ stats?.publisher?.collecting ?? 0 }}</strong>
+        </div>
+        <div class="ui-kpi">
+          <span class="ui-kpi__label">我发布的 · 已关闭</span>
+          <strong class="ui-kpi__value">{{ stats?.publisher?.closed ?? 0 }}</strong>
+        </div>
+      </template>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">待我完成</span>
+        <strong class="ui-kpi__value">{{ stats?.member?.todo ?? 0 }}</strong>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">待我审核</span>
+        <strong class="ui-kpi__value">{{ stats?.member?.pendingAudit ?? 0 }}</strong>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">已通过</span>
+        <strong class="ui-kpi__value">{{ stats?.member?.approved ?? 0 }}</strong>
+      </div>
+      <div class="ui-kpi">
+        <span class="ui-kpi__label">被退回</span>
+        <strong class="ui-kpi__value">{{ stats?.member?.rejected ?? 0 }}</strong>
+      </div>
+    </div>
+
+    <el-row :gutter="12">
+      <el-col v-if="isPublisher" :xs="24" :md="12">
         <el-card shadow="never">
           <template #header><span>我发布的任务</span></template>
-          <div class="stat-row">
-            <div class="stat">
-              <div class="num">{{ stats?.publisher?.draft ?? 0 }}</div>
-              <div class="lbl">草稿</div>
-            </div>
-            <div class="stat">
-              <div class="num" style="color: var(--el-color-success)">{{ stats?.publisher?.collecting ?? 0 }}</div>
-              <div class="lbl">收集中</div>
-            </div>
-            <div class="stat">
-              <div class="num" style="color: var(--el-color-info)">{{ stats?.publisher?.closed ?? 0 }}</div>
-              <div class="lbl">已关闭</div>
-            </div>
-          </div>
-          <el-button style="margin-top: 12px" @click="go('/dcs/mission')">任务管理</el-button>
-          <el-button style="margin-top: 12px" @click="go('/dcs/audit')">审核队列</el-button>
+          <el-button @click="go('/dcs/mission')">任务管理</el-button>
+          <el-button @click="go('/dcs/audit')">审核队列</el-button>
         </el-card>
       </el-col>
-      <el-col :span="isPublisher ? 12 : 24">
+      <el-col :xs="24" :md="isPublisher ? 12 : 24">
         <el-card shadow="never">
           <template #header><span>我的填报</span></template>
-          <div class="stat-row">
-            <div class="stat">
-              <div class="num" style="color: var(--el-color-warning)">{{ stats?.member?.todo ?? 0 }}</div>
-              <div class="lbl">待完成</div>
-            </div>
-            <div class="stat">
-              <div class="num">{{ stats?.member?.pendingAudit ?? 0 }}</div>
-              <div class="lbl">待审核</div>
-            </div>
-            <div class="stat">
-              <div class="num" style="color: var(--el-color-success)">{{ stats?.member?.approved ?? 0 }}</div>
-              <div class="lbl">已通过</div>
-            </div>
-            <div class="stat">
-              <div class="num" style="color: var(--el-color-danger)">{{ stats?.member?.rejected ?? 0 }}</div>
-              <div class="lbl">被退回</div>
-            </div>
-          </div>
-          <el-button style="margin-top: 12px" @click="go('/dcs/todo')">我的待办</el-button>
-          <el-button style="margin-top: 12px" @click="go('/dcs/notice')">
+          <el-button @click="go('/dcs/todo')">我的待办</el-button>
+          <el-button @click="go('/dcs/notice')">
             消息<span v-if="stats?.member?.unreadNotices" class="badge">{{ stats.member.unreadNotices }}</span>
           </el-button>
         </el-card>
       </el-col>
     </el-row>
-    <el-card shadow="never" style="margin-top: 16px">
+    <el-card shadow="never">
       <template #header><span>口径说明</span></template>
       <p class="tip">
         统计来自服务端全量分组（/dcs/stats/overview）：发布人视角按任务状态计数；成员视角按本人提交状态计数。发布人若无 dcs:task:list
@@ -90,32 +88,44 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.stat-row {
+.dashboard-page {
   display: flex;
-  gap: 28px;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
-.stat {
-  text-align: center;
+.dashboard-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
 }
-.num {
-  font-size: 30px;
-  font-weight: 600;
+.dashboard-kpi {
+  margin-top: 0;
 }
-.lbl {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+.dashboard-page :deep(.el-card__body) {
+  padding: 16px;
+  min-width: 0;
+}
+.dashboard-page :deep(.el-col) {
+  min-width: 0;
+}
+.dashboard-page :deep(.el-card__body > .el-button) {
+  margin-top: 0;
 }
 .badge {
   margin-left: 4px;
-  background: var(--el-color-danger);
+  background: var(--dcs-color-danger);
   /* 深色下 danger 是浅红，白字读不清；--el-color-white 在深色已取反成黑 */
   color: var(--el-color-white);
-  border-radius: 9px;
+  border-radius: var(--dcs-pill-radius);
   padding: 0 6px;
-  font-size: 12px;
+  font-size: var(--dcs-font-xs);
 }
 .tip {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-md);
+}
+@media (max-width: 992px) {
+  .dashboard-page :deep(.el-col:not(:last-child)) {
+    margin-bottom: 12px;
+  }
 }
 </style>

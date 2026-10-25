@@ -1,39 +1,20 @@
 <template>
   <div class="app-container segment-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>标签分群</h3>
-          <p>动态分群按画像快照实时求值，静态分群按名单导入；成员与运行记录都可追溯。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="loadAll">
-            <el-option label="dcs 数据采集" value="dcs" />
-            <el-option label="risk 风控" value="risk" />
-          </el-select>
-          <el-button v-hasPermi="['profile:segment:edit']" type="primary" @click="openCreate">新建分群</el-button>
-          <el-button :loading="loading" @click="loadAll">刷新</el-button>
-        </div>
-      </div>
-      <div class="stat-grid">
-        <div class="stat">
-          <span class="stat-label">分群总数</span>
-          <strong>{{ segments.length }}</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">动态分群</span>
-          <strong>{{ dynamicCount }}</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">静态分群</span>
-          <strong>{{ staticCount }}</strong>
-        </div>
-        <div class="stat">
-          <span class="stat-label">成员人次</span>
-          <strong>{{ segmentMemberTotal }}</strong>
-        </div>
-      </div>
-    </el-card>
+    <dcs-operations-page-header
+      eyebrow="画像引擎"
+      title="标签分群"
+      subtitle="动态分群按画像快照实时求值，静态分群按名单导入；成员与运行记录都可追溯。"
+      :metrics="segmentMetrics"
+    >
+      <template #actions>
+        <el-select v-model="source" class="source-select" @change="loadAll">
+          <el-option label="dcs 数据采集" value="dcs" />
+          <el-option label="risk 风控" value="risk" />
+        </el-select>
+        <el-button v-hasPermi="['profile:segment:edit']" type="primary" @click="openCreate">新建分群</el-button>
+        <el-button :loading="loading" @click="loadAll">刷新</el-button>
+      </template>
+    </dcs-operations-page-header>
 
     <div v-loading="loading" class="segment-grid">
       <el-card v-for="segment in segments" :key="segment.segmentId" shadow="hover" class="segment-card">
@@ -75,20 +56,19 @@
         </div>
 
         <div class="segment-actions">
-          <el-button v-hasPermi="['profile:segment:edit']"
+          <el-button
+            v-hasPermi="['profile:segment:edit']"
             v-if="segment.segmentType === 'DYNAMIC'"
-            size="small"
-            type="primary"
             :loading="evaluatingId === segment.segmentId"
             @click="evaluate(segment)"
           >
             评估
           </el-button>
-          <el-button v-hasPermi="['profile:segment:edit']" v-else size="small" type="primary" @click="openImport(segment)">导入名单</el-button>
-          <el-button size="small" @click="openMembers(segment)">成员</el-button>
-          <el-button size="small" @click="openRuns(segment)">运行记录</el-button>
+          <el-button v-hasPermi="['profile:segment:edit']" v-else @click="openImport(segment)">导入名单</el-button>
+          <el-button @click="openMembers(segment)">成员</el-button>
+          <el-button @click="openRuns(segment)">运行记录</el-button>
           <el-dropdown trigger="click" @command="(cmd: string) => onMoreCommand(cmd, segment)">
-            <el-button size="small">
+            <el-button>
               更多<el-icon class="el-icon--right"><arrow-down /></el-icon>
             </el-button>
             <template #dropdown>
@@ -104,7 +84,7 @@
         </div>
       </el-card>
       <el-empty v-if="!loading && segments.length === 0" description="当前业务源还没有分群">
-        <el-button v-hasPermi="['profile:segment:edit']" type="primary" @click="openCreate">新建第一个分群</el-button>
+        <el-button v-hasPermi="['profile:segment:edit']" @click="openCreate">新建第一个分群</el-button>
       </el-empty>
     </div>
 
@@ -236,7 +216,13 @@
         <el-button type="primary" @click="loadMembers">查询</el-button>
         <span class="muted small">当前分群 {{ activeSegment?.memberCount ?? 0 }} 人</span>
       </div>
-      <el-table v-loading="memberLoading" :data="members" stripe size="small">
+      <el-table v-loading="memberLoading" class="ui-table" :data="members">
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">该分群暂无成员</p>
+            <p class="ui-empty__hint">先评估动态分群，或为静态分群导入名单</p>
+          </div>
+        </template>
         <el-table-column label="主体" min-width="180">
           <template #default="{ row }">
             <div class="subject-cell">
@@ -245,10 +231,10 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="总分" width="90">
+        <el-table-column label="总分" width="90" align="right">
           <template #default="{ row }">{{ formatScore(row.totalScore) }}</template>
         </el-table-column>
-        <el-table-column prop="eventCount" label="事件数" width="80" />
+        <el-table-column prop="eventCount" label="事件数" width="80" align="right" />
         <el-table-column label="命中原因" min-width="200">
           <template #default="{ row }"
             ><span class="muted">{{ row.reason || '—' }}</span></template
@@ -270,7 +256,13 @@
     <!-- 运行记录（含人数趋势） -->
     <el-drawer v-model="runVisible" :title="`运行记录 · ${activeSegment?.segmentName || ''}`" size="min(720px, 92vw)" destroy-on-close>
       <v-chart v-if="runs.length >= 2" class="run-trend-chart" :option="runTrendOption" autoresize />
-      <el-table v-loading="runLoading" :data="runs" stripe size="small">
+      <el-table v-loading="runLoading" class="ui-table" :data="runs">
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">还没有运行记录</p>
+            <p class="ui-empty__hint">点击分群卡片的「评估」后会留下运行留痕</p>
+          </div>
+        </template>
         <el-table-column label="运行 ID" prop="runId" min-width="180" />
         <el-table-column label="触发" width="110">
           <template #default="{ row }">{{ triggerLabel(row.triggerType) }}</template>
@@ -282,8 +274,8 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="totalCandidates" label="候选数" width="90" />
-        <el-table-column prop="memberCount" label="命中数" width="90" />
+        <el-table-column prop="totalCandidates" label="候选数" width="90" align="right" />
+        <el-table-column prop="memberCount" label="命中数" width="90" align="right" />
         <el-table-column label="完成时间" width="170">
           <template #default="{ row }">{{ row.finishedAt || row.startedAt || '—' }}</template>
         </el-table-column>
@@ -338,16 +330,20 @@
     <el-drawer v-model="recordsVisible" :title="`触达与导出记录 · ${activeSegment?.segmentName || ''}`" size="min(760px, 92vw)" destroy-on-close>
       <el-table
         v-loading="recordsLoading"
+        class="ui-table"
         :data="reachBatches"
-        stripe
-        size="small"
         row-key="reachId"
         @expand-change="(row: ProfileReachBatch, expanded: ProfileReachBatch[]) => expanded.length && loadItems(row)"
       >
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">还没有触达或导出记录</p>
+          </div>
+        </template>
         <el-table-column type="expand">
           <template #default="{ row }">
             <div class="reach-items-wrap">
-              <el-table v-loading="itemsLoadingId === row.reachId" :data="reachItemsData[row.reachId] || []" size="small" stripe>
+              <el-table v-loading="itemsLoadingId === row.reachId" class="ui-table" :data="reachItemsData[row.reachId] || []">
                 <el-table-column prop="subjectId" label="主体 ID" min-width="160" />
                 <el-table-column prop="userName" label="接收用户" width="120">
                   <template #default="{ row: item }">{{ item.userName || item.userId || '—' }}</template>
@@ -463,6 +459,7 @@ import {
   type ProfileSegmentPreview,
   type ProfileSegmentRun
 } from '@/api/dcs/core/profile';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 
@@ -476,6 +473,12 @@ const ct = useChartTokens();
 const dynamicCount = computed(() => segments.value.filter((s) => s.segmentType === 'DYNAMIC').length);
 const staticCount = computed(() => segments.value.filter((s) => s.segmentType === 'STATIC').length);
 const segmentMemberTotal = computed(() => segments.value.reduce((sum, s) => sum + Number(s.memberCount || 0), 0));
+const segmentMetrics = computed(() => [
+  { label: '分群总数', value: segments.value.length },
+  { label: '动态分群', value: dynamicCount.value },
+  { label: '静态分群', value: staticCount.value },
+  { label: '成员人次', value: segmentMemberTotal.value }
+]);
 
 const refreshModeLabel = (mode?: string) => {
   if (mode === 'HOURLY') return '自动·每小时';
@@ -950,62 +953,64 @@ onMounted(loadAll);
 .segment-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
-.hero-card :deep(.el-card__body) {
-  padding: 18px 20px;
+.segment-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
 }
-.hero-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+.segment-page :deep(.dcs-ops-header__actions) {
   flex-wrap: wrap;
 }
-.hero-copy h3 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 650;
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
 }
-.hero-copy p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.segment-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
-.hero-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.segment-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
 }
-.stat-grid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.segment-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
 }
-.stat {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--el-fill-color-blank);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.segment-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
 }
-.stat-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
+.segment-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
 }
-.stat strong {
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
+.segment-page :deep(.el-card__body),
+.segment-page :deep(.el-drawer__body) {
+  min-width: 0;
 }
 .segment-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 14px;
+  gap: 12px;
   min-height: 120px;
+  min-width: 0;
 }
 .segment-card :deep(.el-card__body) {
   padding: 16px 18px;
@@ -1153,18 +1158,18 @@ onMounted(loadAll);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  line-height: 1.35;
 }
 .subject-name {
   font-weight: 600;
+  line-height: 1.4;
 }
 .subject-meta {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  line-height: 1.35;
 }
 @media (max-width: 900px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .segment-grid {
     grid-template-columns: 1fr;
   }

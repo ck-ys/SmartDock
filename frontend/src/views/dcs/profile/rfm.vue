@@ -1,86 +1,65 @@
 <template>
   <div class="app-container rfm-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>RFM 分层与通用评分模型</h3>
-          <p>指标 → 分箱 → 加权 → 快照：同一套模型协议既能跑 RFM，也能跑订单、供应链、工程等任意主体。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="onSourceChange">
-            <el-option label="dcs 数据采集" value="dcs" />
-            <el-option label="risk 风控" value="risk" />
-          </el-select>
-          <el-select v-model="modelId" placeholder="选择模型" style="width: 220px" @change="loadModelData">
-            <el-option v-for="m in models" :key="m.modelId" :label="`${m.modelName} · ${m.modelVersion}`" :value="m.modelId">
-              <span>{{ m.modelName }}</span>
-              <span class="option-meta">{{ m.modelType }} / {{ m.modelVersion }}</span>
-            </el-option>
-          </el-select>
-          <el-button v-hasPermi="['profile:model:edit']" :disabled="!currentModel" @click="openModelDialog('edit')">编辑模型</el-button>
-          <el-button v-hasPermi="['profile:model:edit']" v-if="currentModel && currentModel.builtin !== '1'" type="danger" plain @click="removeCurrent"> 删除 </el-button>
-          <el-button v-hasPermi="['profile:model:edit']" type="primary" :disabled="!currentModel" @click="createNewModel">新建模型</el-button>
-          <el-button
-            v-hasPermi="['profile:model:edit']"
-            :disabled="!currentModel || currentModel.status !== 'PUBLISHED'"
-            :loading="running"
-            @click="runCurrent"
-          >
-            运行模型
-          </el-button>
-          <el-button v-hasPermi="['profile:model:query']" :disabled="!currentModel" :loading="dryLoading" @click="runDryRun">试算预览</el-button>
-          <el-button
-            v-hasPermi="['profile:model:edit']"
-            :disabled="!currentModel || currentModel.status === 'PUBLISHED'"
-            :loading="publishing"
-            type="success"
-            plain
-            @click="publishCurrent"
-          >
-            发布
-          </el-button>
-          <el-button v-hasPermi="['profile:model:query']" :disabled="!currentModel" @click="openCompare">版本对比</el-button>
-          <el-button v-hasPermi="['profile:model:query']" :disabled="!currentModel" @click="openSnapshots">配置历史</el-button>
-          <el-button :loading="loading" @click="loadAll">刷新</el-button>
-        </div>
-      </div>
-
-      <el-empty v-if="!loading && models.length === 0" description="当前业务源还没有评分模型">
-        <el-button v-hasPermi="['profile:model:edit']" type="primary" @click="createNewModel">用 RFM 预设新建</el-button>
-      </el-empty>
-
-      <template v-else>
-        <div class="model-meta">
-          <el-tag :type="statusTagType(currentModel?.status)" effect="plain">{{ statusLabel(currentModel?.status) }}</el-tag>
-          <el-tag v-if="currentModel?.builtin === '1'" type="info" effect="plain">内置</el-tag>
-          <el-tag :type="currentModel?.enabled === '1' ? 'success' : 'info'" effect="plain">
-            {{ currentModel?.enabled === '1' ? '启用中' : '已停用' }}
-          </el-tag>
-          <span class="mono">{{ currentModel?.modelCode }}</span>
-          <span class="muted">{{ currentModel?.modelVersion }}</span>
-          <span class="muted">{{ currentModel?.remark || '无说明' }}</span>
-        </div>
-
-        <div class="stat-grid" v-loading="overviewLoading">
-          <div class="stat">
-            <span class="stat-label">已评分主体</span>
-            <strong>{{ overview.scoredCount ?? '—' }}</strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label">平均标准分</span>
-            <strong>{{ formatScore(overview.avgNormalizedScore) }}</strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label">分层数</span>
-            <strong>{{ overview.levels?.length ?? '—' }}</strong>
-          </div>
-          <div class="stat">
-            <span class="stat-label">最近计算</span>
-            <strong class="stat-time">{{ overview.lastCalcTime || '尚未运行' }}</strong>
-          </div>
-        </div>
+    <dcs-operations-page-header
+      eyebrow="画像引擎"
+      title="RFM 分层与通用评分模型"
+      subtitle="指标 → 分箱 → 加权 → 快照：同一套模型协议既能跑 RFM，也能跑订单、供应链、工程等任意主体。"
+      :metrics="rfmMetrics"
+    >
+      <template #actions>
+        <el-select v-model="source" class="source-select" @change="onSourceChange">
+          <el-option label="dcs 数据采集" value="dcs" />
+          <el-option label="risk 风控" value="risk" />
+        </el-select>
+        <el-select v-model="modelId" placeholder="选择模型" class="model-select" @change="loadModelData">
+          <el-option v-for="m in models" :key="m.modelId" :label="`${m.modelName} · ${m.modelVersion}`" :value="m.modelId">
+            <span>{{ m.modelName }}</span>
+            <span class="option-meta">{{ m.modelType }} / {{ m.modelVersion }}</span>
+          </el-option>
+        </el-select>
+        <el-button v-hasPermi="['profile:model:edit']" :disabled="!currentModel" @click="openModelDialog('edit')">编辑模型</el-button>
+        <el-button v-hasPermi="['profile:model:edit']" v-if="currentModel && currentModel.builtin !== '1'" type="danger" plain @click="removeCurrent">
+          删除
+        </el-button>
+        <el-button v-hasPermi="['profile:model:edit']" type="primary" :disabled="!currentModel" @click="createNewModel">新建模型</el-button>
+        <el-button
+          v-hasPermi="['profile:model:edit']"
+          :disabled="!currentModel || currentModel.status !== 'PUBLISHED'"
+          :loading="running"
+          @click="runCurrent"
+        >
+          运行模型
+        </el-button>
+        <el-button v-hasPermi="['profile:model:query']" :disabled="!currentModel" :loading="dryLoading" @click="runDryRun">试算预览</el-button>
+        <el-button
+          v-hasPermi="['profile:model:edit']"
+          :disabled="!currentModel || currentModel.status === 'PUBLISHED'"
+          :loading="publishing"
+          @click="publishCurrent"
+        >
+          发布
+        </el-button>
+        <el-button v-hasPermi="['profile:model:query']" :disabled="!currentModel" @click="openCompare">版本对比</el-button>
+        <el-button v-hasPermi="['profile:model:query']" :disabled="!currentModel" @click="openSnapshots">配置历史</el-button>
+        <el-button :loading="loading" @click="loadAll">刷新</el-button>
       </template>
-    </el-card>
+    </dcs-operations-page-header>
+
+    <div v-if="currentModel" class="model-meta">
+      <el-tag :type="statusTagType(currentModel?.status)" effect="plain">{{ statusLabel(currentModel?.status) }}</el-tag>
+      <el-tag v-if="currentModel?.builtin === '1'" type="info" effect="plain">内置</el-tag>
+      <el-tag :type="currentModel?.enabled === '1' ? 'success' : 'info'" effect="plain">
+        {{ currentModel?.enabled === '1' ? '启用中' : '已停用' }}
+      </el-tag>
+      <span class="mono">{{ currentModel?.modelCode }}</span>
+      <span class="muted">{{ currentModel?.modelVersion }}</span>
+      <span class="muted">{{ currentModel?.remark || '无说明' }}</span>
+      <span class="muted">最近计算 {{ overview.lastCalcTime || '尚未运行' }}</span>
+    </div>
+
+    <el-empty v-if="!loading && models.length === 0" description="当前业务源还没有评分模型">
+      <el-button v-hasPermi="['profile:model:edit']" @click="createNewModel">用 RFM 预设新建</el-button>
+    </el-empty>
 
     <template v-if="currentModel">
       <el-row :gutter="14">
@@ -156,10 +135,16 @@
           <el-select v-model="query.level" clearable placeholder="全部分层" style="width: 170px" @change="search">
             <el-option v-for="item in overview.levels || []" :key="item.level" :label="item.level" :value="item.level" />
           </el-select>
-          <el-button type="primary" @click="search">查询</el-button>
+          <el-button @click="search">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
         </div>
-        <el-table v-loading="tableLoading" :data="rows" row-key="subjectId" stripe>
+        <el-table v-loading="tableLoading" class="ui-table" :data="rows" row-key="subjectId">
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">当前筛选下没有评分主体</p>
+              <p class="ui-empty__hint">调整筛选条件，或先运行一次模型</p>
+            </div>
+          </template>
           <el-table-column label="主体" min-width="190">
             <template #default="{ row }">
               <div class="subject-cell">
@@ -195,7 +180,7 @@
               <el-tag :type="levelTagType(row.level)" effect="light">{{ row.level || '未分层' }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="eventCount" label="事件数" width="90" />
+          <el-table-column prop="eventCount" label="事件数" width="90" align="right" />
           <el-table-column label="计算时间" width="170">
             <template #default="{ row }">{{ row.calcTime || '—' }}</template>
           </el-table-column>
@@ -289,24 +274,24 @@
               </el-tag>
             </div>
           </div>
-          <el-table :data="drawerDimensions" size="small" stripe>
+          <el-table :data="drawerDimensions" class="ui-table">
             <el-table-column label="维度" min-width="130">
               <template #default="{ row }"
                 >{{ row.name }} <span class="mono muted">{{ row.code }}</span></template
               >
             </el-table-column>
-            <el-table-column label="指标值" width="100">
+            <el-table-column label="指标值" width="100" align="right">
               <template #default="{ row }">{{ formatScore(row.value) }}</template>
             </el-table-column>
-            <el-table-column label="分箱" width="90">
+            <el-table-column label="分箱" width="90" align="center">
               <template #default="{ row }">{{ row.score }} / {{ row.maxScore }}</template>
             </el-table-column>
-            <el-table-column label="标准分" width="90">
+            <el-table-column label="标准分" width="90" align="right">
               <template #default="{ row }">
                 <span :class="scoreClass(Number(row.normalizedScore))">{{ formatScore(row.normalizedScore) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="权重" width="80">
+            <el-table-column label="权重" width="80" align="right">
               <template #default="{ row }">{{ row.weight }}</template>
             </el-table-column>
           </el-table>
@@ -337,7 +322,9 @@
           <el-alert :type="psiAlertType(dryResult.psi?.verdict)" :closable="false" show-icon class="psi-alert">
             <template #title>
               稳定性 PSI = {{ formatScore(dryResult.psi?.psi) }}
-              <el-tag size="small" :type="psiTagType(dryResult.psi?.verdict)" effect="light" class="psi-tag">{{ psiLabel(dryResult.psi?.verdict) }}</el-tag>
+              <el-tag size="small" :type="psiTagType(dryResult.psi?.verdict)" effect="light" class="psi-tag">{{
+                psiLabel(dryResult.psi?.verdict)
+              }}</el-tag>
               <span class="muted small">（&lt;0.1 稳定 / 0.1~0.25 中等 / &gt;0.25 显著偏移）</span>
             </template>
           </el-alert>
@@ -349,26 +336,26 @@
             <span class="delta-chip muted">仅新版 {{ dryResult.deltaStat?.onlyInCand ?? 0 }}</span>
           </div>
           <h4 class="section-title">分层分布对比</h4>
-          <el-table :data="dryResult.distribution || []" size="small" stripe>
+          <el-table :data="dryResult.distribution || []" class="ui-table">
             <el-table-column label="分层" min-width="110">
               <template #default="{ row }">
                 <el-tag :type="levelTagType(row.level)" effect="light">{{ row.level }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="当前" width="100">
+            <el-table-column label="当前" width="100" align="right">
               <template #default="{ row }">{{ row.baseCount }}（{{ formatScore(row.baseRate) }}%）</template>
             </el-table-column>
-            <el-table-column label="草稿试算" width="100">
+            <el-table-column label="草稿试算" width="100" align="right">
               <template #default="{ row }">{{ row.candCount }}（{{ formatScore(row.candRate) }}%）</template>
             </el-table-column>
-            <el-table-column label="人数变化" width="100">
+            <el-table-column label="人数变化" width="100" align="right">
               <template #default="{ row }">
                 <span :class="Number(row.delta) > 0 ? 'delta-up' : Number(row.delta) < 0 ? 'delta-down' : 'muted'">
                   {{ Number(row.delta) > 0 ? '+' : '' }}{{ row.delta }}
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="样本量" width="110">
+            <el-table-column label="样本量" width="110" align="right">
               <template #default="{ row }">
                 <el-tag v-if="row.smallSample" type="warning" size="small" effect="plain">小样本</el-tag>
                 <span v-else class="muted small">充足</span>
@@ -376,7 +363,7 @@
             </el-table-column>
           </el-table>
           <h4 class="section-title">Top 变化主体</h4>
-          <el-table :data="dryResult.topMovers || []" size="small" stripe max-height="320">
+          <el-table :data="dryResult.topMovers || []" class="ui-table" max-height="320">
             <el-table-column label="主体" min-width="160">
               <template #default="{ row }">
                 <div class="subject-cell">
@@ -385,13 +372,13 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="旧分" width="80">
+            <el-table-column label="旧分" width="80" align="right">
               <template #default="{ row }">{{ formatScore(row.baseScore) }}</template>
             </el-table-column>
-            <el-table-column label="新分" width="80">
+            <el-table-column label="新分" width="80" align="right">
               <template #default="{ row }">{{ formatScore(row.candScore) }}</template>
             </el-table-column>
-            <el-table-column label="变化" width="90">
+            <el-table-column label="变化" width="90" align="right">
               <template #default="{ row }">
                 <span :class="Number(row.delta) > 0 ? 'delta-up' : 'delta-down'">
                   {{ Number(row.delta) > 0 ? '+' : '' }}{{ formatScore(row.delta) }}
@@ -419,11 +406,21 @@
     <el-drawer v-model="compareVisible" title="版本对比" size="min(720px, 92vw)" destroy-on-close>
       <div class="compare-picker">
         <el-select v-model="compareRunA" placeholder="旧版本 run" style="width: 300px" @change="loadCompare">
-          <el-option v-for="run in doneRuns" :key="run.runId" :label="`${run.modelVersion} · ${run.finishedAt || run.startedAt || ''}`" :value="run.runId" />
+          <el-option
+            v-for="run in doneRuns"
+            :key="run.runId"
+            :label="`${run.modelVersion} · ${run.finishedAt || run.startedAt || ''}`"
+            :value="run.runId"
+          />
         </el-select>
         <span class="muted">对比</span>
         <el-select v-model="compareRunB" placeholder="新版本 run" style="width: 300px" @change="loadCompare">
-          <el-option v-for="run in doneRuns" :key="run.runId" :label="`${run.modelVersion} · ${run.finishedAt || run.startedAt || ''}`" :value="run.runId" />
+          <el-option
+            v-for="run in doneRuns"
+            :key="run.runId"
+            :label="`${run.modelVersion} · ${run.finishedAt || run.startedAt || ''}`"
+            :value="run.runId"
+          />
         </el-select>
       </div>
       <div v-loading="compareLoading" class="drawer-body">
@@ -443,7 +440,9 @@
           <el-alert :type="psiAlertType(compareResult.psi?.verdict)" :closable="false" show-icon class="psi-alert">
             <template #title>
               稳定性 PSI = {{ formatScore(compareResult.psi?.psi) }}
-              <el-tag size="small" :type="psiTagType(compareResult.psi?.verdict)" effect="light" class="psi-tag">{{ psiLabel(compareResult.psi?.verdict) }}</el-tag>
+              <el-tag size="small" :type="psiTagType(compareResult.psi?.verdict)" effect="light" class="psi-tag">{{
+                psiLabel(compareResult.psi?.verdict)
+              }}</el-tag>
             </template>
           </el-alert>
           <div class="delta-chips">
@@ -454,32 +453,32 @@
             <span class="delta-chip muted">仅 B {{ compareResult.deltaStat?.onlyInCand ?? 0 }}</span>
           </div>
           <h4 class="section-title">等级迁移</h4>
-          <el-table v-if="(compareResult.migration || []).length" :data="compareResult.migration" size="small" stripe>
+          <el-table v-if="(compareResult.migration || []).length" :data="compareResult.migration" class="ui-table">
             <el-table-column prop="path" label="迁移路径" min-width="200" />
-            <el-table-column prop="count" label="人数" width="100" />
+            <el-table-column prop="count" label="人数" width="100" align="right" />
           </el-table>
           <el-empty v-else :image-size="60" description="两个版本分层完全一致，无迁移" />
           <h4 class="section-title">分层分布对比</h4>
-          <el-table :data="compareResult.distribution || []" size="small" stripe>
+          <el-table :data="compareResult.distribution || []" class="ui-table">
             <el-table-column label="分层" min-width="110">
               <template #default="{ row }">
                 <el-tag :type="levelTagType(row.level)" effect="light">{{ row.level }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="版本 A" width="120">
+            <el-table-column label="版本 A" width="120" align="right">
               <template #default="{ row }">{{ row.baseCount }}（{{ formatScore(row.baseRate) }}%）</template>
             </el-table-column>
-            <el-table-column label="版本 B" width="120">
+            <el-table-column label="版本 B" width="120" align="right">
               <template #default="{ row }">{{ row.candCount }}（{{ formatScore(row.candRate) }}%）</template>
             </el-table-column>
-            <el-table-column label="人数变化" width="100">
+            <el-table-column label="人数变化" width="100" align="right">
               <template #default="{ row }">
                 <span :class="Number(row.delta) > 0 ? 'delta-up' : Number(row.delta) < 0 ? 'delta-down' : 'muted'">
                   {{ Number(row.delta) > 0 ? '+' : '' }}{{ row.delta }}
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="样本量" width="110">
+            <el-table-column label="样本量" width="110" align="right">
               <template #default="{ row }">
                 <el-tag v-if="row.smallSample" type="warning" size="small" effect="plain">小样本</el-tag>
                 <span v-else class="muted small">充足</span>
@@ -487,7 +486,7 @@
             </el-table-column>
           </el-table>
           <h4 class="section-title">Top 变化主体</h4>
-          <el-table :data="compareResult.topMovers || []" size="small" stripe max-height="320">
+          <el-table :data="compareResult.topMovers || []" class="ui-table" max-height="320">
             <el-table-column label="主体" min-width="160">
               <template #default="{ row }">
                 <div class="subject-cell">
@@ -496,13 +495,13 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column label="A 分" width="80">
+            <el-table-column label="A 分" width="80" align="right">
               <template #default="{ row }">{{ formatScore(row.baseScore) }}</template>
             </el-table-column>
-            <el-table-column label="B 分" width="80">
+            <el-table-column label="B 分" width="80" align="right">
               <template #default="{ row }">{{ formatScore(row.candScore) }}</template>
             </el-table-column>
-            <el-table-column label="变化" width="90">
+            <el-table-column label="变化" width="90" align="right">
               <template #default="{ row }">
                 <span :class="Number(row.delta) > 0 ? 'delta-up' : 'delta-down'">
                   {{ Number(row.delta) > 0 ? '+' : '' }}{{ formatScore(row.delta) }}
@@ -523,9 +522,15 @@
 
     <!-- 配置历史（发布存档 + 回滚） -->
     <el-dialog v-model="snapshotsVisible" title="配置版本历史" width="680px" destroy-on-close>
-      <el-table v-loading="snapshotsLoading" :data="snapshots" size="small" stripe>
+      <el-table v-loading="snapshotsLoading" class="ui-table" :data="snapshots">
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">还没有配置版本</p>
+            <p class="ui-empty__hint">发布模型后每次配置变更都会留一个版本</p>
+          </div>
+        </template>
         <el-table-column prop="modelVersion" label="版本" width="90" />
-        <el-table-column prop="scoreMax" label="标准分上限" width="100" />
+        <el-table-column prop="scoreMax" label="标准分上限" width="100" align="right" />
         <el-table-column label="发布时间" width="170">
           <template #default="{ row }">{{ row.createTime || '—' }}</template>
         </el-table-column>
@@ -548,7 +553,6 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!snapshotsLoading && snapshots.length === 0" description="还没有发布存档（发布一次模型后才会生成）" />
     </el-dialog>
 
     <!-- 存档配置查看 -->
@@ -594,6 +598,7 @@ import {
   type ProfileModelTrendPoint,
   type ProfileScoreModel
 } from '@/api/dcs/core/profile';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 
@@ -624,8 +629,12 @@ const formatScore = (value?: number | string | null) => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(2) : String(value);
 };
-const scoreColor = (value: number) =>
-  value >= 75 ? 'var(--el-color-success)' : value >= 60 ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
+const rfmMetrics = computed(() => [
+  { label: '已评分主体', value: overview.value.scoredCount ?? '—' },
+  { label: '平均标准分', value: formatScore(overview.value.avgNormalizedScore) },
+  { label: '分层数', value: overview.value.levels?.length ?? '—' }
+]);
+const scoreColor = (value: number) => (value >= 75 ? 'var(--el-color-success)' : value >= 60 ? 'var(--el-color-warning)' : 'var(--el-color-danger)');
 const scoreClass = (value: number) => (value >= 75 ? 'score-good' : value >= 60 ? 'score-mid' : 'score-low');
 
 const levelTagType = (level?: string) => {
@@ -1067,34 +1076,67 @@ onMounted(loadAll);
 .rfm-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  min-width: 0;
 }
-.hero-card :deep(.el-card__body) {
-  padding: 18px 20px;
+.rfm-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
 }
-.hero-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+.rfm-page :deep(.dcs-ops-header__actions) {
   flex-wrap: wrap;
 }
-.hero-copy h3 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 650;
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
+  .model-select {
+    width: 220px;
+  }
 }
-.hero-copy p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-  max-width: 720px;
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.rfm-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
-.hero-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+/* 模型分列两行（进度条 + 原始分）压掉多余行高，整行落回 44 */
+.rfm-page .score-cell {
+  line-height: 20px;
+}
+.rfm-page .score-cell + .muted.small {
+  line-height: 16px;
+}
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.rfm-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+.rfm-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
+}
+.rfm-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
+}
+.rfm-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
+}
+.rfm-page :deep(.el-card__body),
+.rfm-page :deep(.el-drawer__body) {
+  min-width: 0;
 }
 .option-meta {
   float: right;
@@ -1103,11 +1145,11 @@ onMounted(loadAll);
   margin-left: 12px;
 }
 .model-meta {
-  margin-top: 14px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
   font-size: 13px;
 }
 .mono {
@@ -1118,33 +1160,6 @@ onMounted(loadAll);
 }
 .small {
   font-size: 12px;
-}
-.stat-grid {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-.stat {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--el-fill-color-blank);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.stat-label {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.stat strong {
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-}
-.stat-time {
-  font-size: 14px !important;
-  font-weight: 600;
 }
 .panel-card :deep(.el-card__body) {
   padding-top: 12px;
@@ -1197,21 +1212,25 @@ onMounted(loadAll);
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  min-width: 0;
 }
 .subject-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  line-height: 1.35;
 }
 .subject-name {
   font-weight: 600;
+  line-height: 1.4;
 }
 .subject-meta {
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  line-height: 1.35;
 }
 .score-cell {
   display: flex;
@@ -1352,10 +1371,5 @@ onMounted(loadAll);
 }
 .run-brief-item strong {
   font-size: 16px;
-}
-@media (max-width: 1100px) {
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 </style>

@@ -1,20 +1,18 @@
 <template>
   <div class="app-container ops-page">
-    <el-card shadow="never" class="hero-card">
-      <div class="hero-head">
-        <div class="hero-copy">
-          <h3>数据运维</h3>
-          <p>事件账本只增不改——改错了口径、补了历史数据，用回放按窗口重算派生数据；数据老化按源配置保留期，过期先归档再删；身份合错了可以拆开。</p>
-        </div>
-        <div class="hero-actions">
-          <el-select v-model="source" style="width: 150px" @change="loadAll">
-            <el-option v-for="s in sourceOptions" :key="s" :label="s" :value="s" />
-          </el-select>
-          <el-button v-hasPermi="['profile:replay:edit']" type="primary" @click="openCreate">发起回放</el-button>
-          <el-button :loading="loading" @click="loadAll">刷新</el-button>
-        </div>
-      </div>
-    </el-card>
+    <dcs-operations-page-header
+      eyebrow="画像引擎"
+      title="数据运维"
+      subtitle="事件账本只增不改——改错了口径、补了历史数据，用回放按窗口重算派生数据；数据老化按源配置保留期，过期先归档再删；身份合错了可以拆开。"
+    >
+      <template #actions>
+        <el-select v-model="source" class="source-select" @change="loadAll">
+          <el-option v-for="s in sourceOptions" :key="s" :label="s" :value="s" />
+        </el-select>
+        <el-button v-hasPermi="['profile:replay:edit']" type="primary" @click="openCreate">发起回放</el-button>
+        <el-button :loading="loading" @click="loadAll">刷新</el-button>
+      </template>
+    </dcs-operations-page-header>
 
     <el-card shadow="never">
       <template #header>
@@ -23,7 +21,13 @@
           <span class="muted small">断点续跑 · 重算幂等（事件账本 append-only）· 完成后对账数字前后对比</span>
         </div>
       </template>
-      <el-table v-loading="loading" :data="tasks" size="small" empty-text="还没有回放任务">
+      <el-table v-loading="loading" class="ui-table" :data="tasks">
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">还没有回放任务</p>
+            <p class="ui-empty__hint">选择时间窗发起一次回放，完成后这里会显示前后对账数字</p>
+          </div>
+        </template>
         <el-table-column label="任务" width="170">
           <template #default="{ row }">
             <span class="mono">{{ shortId(row.replayId) }}</span>
@@ -88,7 +92,7 @@
           <span class="config-label">过期去向</span>
           <el-switch v-model="retention.eventArchive" active-value="1" inactive-value="0" active-text="先归档再删" inactive-text="直接删" />
         </div>
-        <el-button v-hasPermi="['profile:review:edit']" type="primary" size="small" :loading="savingConfig" @click="saveRetention">保存</el-button>
+        <el-button v-hasPermi="['profile:review:edit']" :loading="savingConfig" @click="saveRetention">保存</el-button>
       </div>
     </el-card>
 
@@ -99,7 +103,13 @@
           <span class="muted small">合并只迁链接不改历史事件 · 拆分会把误并的匿名事件归属改回并重算（不可逆，需二次确认）</span>
         </div>
       </template>
-      <el-table v-loading="mergeLoading" :data="merges" size="small" empty-text="该源还没有身份合并记录">
+      <el-table v-loading="mergeLoading" class="ui-table" :data="merges">
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">该源还没有身份合并记录</p>
+            <p class="ui-empty__hint">共享浏览器换账号时会自动生成匿名身份链接</p>
+          </div>
+        </template>
         <el-table-column label="发生时间" width="170">
           <template #default="{ row }">{{ fmt(row.occurredAt) }}</template>
         </el-table-column>
@@ -174,6 +184,7 @@ import {
   type ProfileReplayTask,
   type ProfileIdentityMerge,
 } from '@/api/dcs/core/profile';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 const sourceOptions = ['web', 'order', 'supply', 'dcs', 'risk'];
 const source = ref('web');
@@ -328,11 +339,61 @@ onMounted(loadAll);
 </script>
 
 <style scoped>
-.hero-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-.hero-copy h3 { margin: 0 0 4px; }
-.hero-copy p { margin: 0; color: var(--el-text-color-secondary); font-size: 13px; max-width: 640px; }
-.hero-actions { display: flex; gap: 8px; align-items: center; }
-.panel-head { display: flex; justify-content: space-between; align-items: center; }
+.ops-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.ops-page :deep(.dcs-ops-header) {
+  margin-bottom: 4px;
+}
+.ops-page :deep(.dcs-ops-header__actions) {
+  flex-wrap: wrap;
+}
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
+}
+/* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+.ops-page :deep(.el-table) {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
+}
+/* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
+.ops-page :deep(.el-tag) {
+  --el-tag-bg-color: var(--dcs-pill-off-bg);
+  --el-tag-text-color: var(--dcs-pill-off-ink);
+  --el-tag-border-color: transparent;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+.ops-page :deep(.el-tag--success) {
+  --el-tag-bg-color: var(--dcs-pill-pos-bg);
+  --el-tag-text-color: var(--dcs-pill-pos-ink);
+}
+.ops-page :deep(.el-tag--warning) {
+  --el-tag-bg-color: var(--dcs-pill-warn-bg);
+  --el-tag-text-color: var(--dcs-pill-warn-ink);
+}
+.ops-page :deep(.el-tag--danger) {
+  --el-tag-bg-color: var(--dcs-pill-neg-bg);
+  --el-tag-text-color: var(--dcs-pill-neg-ink);
+}
+.ops-page :deep(.el-card__body) {
+  min-width: 0;
+}
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
 .muted { color: var(--el-text-color-secondary); }
 .small { font-size: 12px; }
 .mono { font-family: Consolas, monospace; font-size: 12px; }
