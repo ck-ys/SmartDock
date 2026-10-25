@@ -1,14 +1,21 @@
 <template>
   <div class="sidebar-user" :class="{ 'is-collapse': collapse }">
-    <dcs-user-menu placement="top-start" class="sidebar-user__menu" @layout="emit('set-layout')" @feedback="emit('feedback')">
-      <button type="button" class="sidebar-user__row" :title="`${nickname}${meta ? ' · ' + meta : ''}`">
+    <dcs-user-menu
+      placement="top-start"
+      show-tenant-switch
+      class="sidebar-user__menu"
+      @layout="emit('set-layout')"
+      @feedback="emit('feedback')"
+    >
+      <button type="button" class="sidebar-user__row" aria-label="账号菜单" :title="`${nickname}${meta ? ' · ' + meta : ''}`">
         <img v-if="avatar" :src="avatar" class="sidebar-user__avatar" alt="" />
         <span v-else class="sidebar-user__avatar sidebar-user__avatar--text">{{ initial }}</span>
         <span class="sidebar-user__text">
           <b class="sidebar-user__name">{{ nickname || '当前账号' }}</b>
           <span v-if="meta" class="sidebar-user__meta">{{ meta }}</span>
         </span>
-        <el-icon class="sidebar-user__chev"><ArrowUp /></el-icon>
+        <span v-if="canSwitch" class="sidebar-user__switch">切换</span>
+        <el-icon class="sidebar-user__chev"><DCaret /></el-icon>
       </button>
     </dcs-user-menu>
   </div>
@@ -19,12 +26,15 @@ import { computed } from 'vue';
 import DcsUserMenu from '@/components/DcsUserMenu/index.vue';
 import { useUserStore } from '@/store/modules/user';
 import { useWorkspace } from '@/composables/useWorkspace';
+import { useTenantSwitch } from '@/composables/useTenantSwitch';
 
 defineProps<{ collapse: boolean }>();
 const emit = defineEmits<{ 'set-layout': []; feedback: [] }>();
 
 const userStore = useUserStore();
 const { tenantName } = useWorkspace();
+// 租户列表由子菜单加载；这里只取「能不能切」决定要不要在行里给提示
+const { canSwitch } = useTenantSwitch();
 
 const nickname = computed(() => userStore.nickname);
 const avatar = computed(() => userStore.avatar);
@@ -68,13 +78,18 @@ const meta = computed(() => [roleLabel.value === nickname.value ? '' : roleLabel
   &:hover {
     background: var(--app-raised);
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--app-control);
+    outline-offset: -2px;
+  }
 }
 
 .sidebar-user__avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex: none;
-  border-radius: 10px;
+  border-radius: 12px;
   object-fit: cover;
   background: var(--app-raised);
 }
@@ -112,11 +127,21 @@ const meta = computed(() => [roleLabel.value === nickname.value ? '' : roleLabel
   text-overflow: ellipsis;
 }
 
-.sidebar-user__chev {
+.sidebar-user__switch {
   margin-left: auto;
   flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.sidebar-user__chev {
+  flex: none;
   color: var(--app-faint);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .sidebar-user.is-collapse {
@@ -128,6 +153,7 @@ const meta = computed(() => [roleLabel.value === nickname.value ? '' : roleLabel
   }
 
   .sidebar-user__text,
+  .sidebar-user__switch,
   .sidebar-user__chev {
     display: none;
   }

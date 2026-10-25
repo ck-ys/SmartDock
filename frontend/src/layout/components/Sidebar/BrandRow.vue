@@ -1,21 +1,23 @@
 <template>
   <div class="sidebar-brand" :class="{ 'is-collapse': collapse }">
-    <!-- 超管 + 开租户：整块是租户切换器（参考实现里 workspace switcher 就在这个位置） -->
-    <el-dropdown v-if="canSwitch" trigger="click" placement="bottom-start" :disabled="tenantSwitching" @command="onSwitch">
-      <button type="button" class="sidebar-brand__row" :title="`${title}${scope ? ' · ' + scope : ''}（点击切换租户）`">
+    <!-- 超管 + 多单位：整块是单位切换器（参考实现里 workspace switcher 就在这个位置） -->
+    <el-dropdown v-if="canSwitch" trigger="click" placement="bottom-start" :disabled="switching" @command="switchTo">
+      <button type="button" class="sidebar-brand__row" :title="`${title}${scope ? ' · ' + scope : ''}（点击切换单位）`">
         <img :src="logo" class="sidebar-brand__mark" alt="" />
         <span class="sidebar-brand__text">
           <b class="sidebar-brand__name">{{ title }}</b>
-          <span v-if="scope" class="sidebar-brand__scope">{{ tenantSwitching ? '切换中…' : scope }}</span>
+          <span v-if="switching || scope" class="sidebar-brand__scope">{{ switching ? '切换中…' : scope }}</span>
         </span>
+        <span v-if="!switching" class="sidebar-brand__switch">切换</span>
         <el-icon class="sidebar-brand__chev"><ArrowDown /></el-icon>
       </button>
       <template #dropdown>
         <el-dropdown-menu>
-          <el-dropdown-item v-for="item in tenantList" :key="item.tenantId" :command="String(item.tenantId)" :disabled="String(item.tenantId) === currentId">
+          <li class="sidebar-brand__caption">切换单位</li>
+          <el-dropdown-item v-for="item in otherTenants" :key="item.tenantId" :command="String(item.tenantId)">
             {{ item.companyName }}
           </el-dropdown-item>
-          <el-dropdown-item v-if="currentId !== defaultTenantId" divided command="__default">回到默认租户</el-dropdown-item>
+          <el-dropdown-item v-if="!isDefaultTenant" divided command="__default">回到默认单位</el-dropdown-item>
         </el-dropdown-menu>
       </template>
     </el-dropdown>
@@ -31,86 +33,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { getCurrentInstance } from 'vue';
+import { computed, onMounted } from 'vue';
 import logo from '@/assets/logo/logo.png';
-import { getTenantList } from '@/api/login';
-import { dynamicClear, dynamicTenant } from '@/api/system/tenant';
-import { TenantVO } from '@/api/types';
-import { useUserStore } from '@/store/modules/user';
-import { useWorkspace } from '@/composables/useWorkspace';
+import { useTenantSwitch } from '@/composables/useTenantSwitch';
 
 defineProps<{ collapse: boolean }>();
 
 const title = import.meta.env.VITE_APP_LOGO_TITLE;
-const { proxy } = getCurrentInstance() as ComponentInternalInstance;
-const router = useRouter();
-const userStore = useUserStore();
+const { canSwitch, switching, currentTenant, otherTenants, isDefaultTenant, load, switchTo } = useTenantSwitch();
 
-const tenantList = ref<TenantVO[]>([]);
-const tenantEnabled = ref(false);
-const tenantSwitching = ref(false);
-const currentId = ref(String(userStore.tenantId || ''));
-// 默认租户：登录时下发的那个，用于显示「回到默认租户」
-const defaultTenantId = ref(String(userStore.tenantId || ''));
+// 左侧第二行：当前单位；拿不到就不显示这一行（不编造文案）
+const scope = computed(() => currentTenant.value?.companyName || '');
 
-const isAdmin = computed(() => String(userStore.userId) === '1');
-const canSwitch = computed(() => isAdmin.value && tenantEnabled.value && tenantList.value.length > 0);
-// 左侧第二行：当前租户名；拿不到就不显示这一行（不编造文案）
-const scope = computed(() => tenantList.value.find((item) => String(item.tenantId) === currentId.value)?.companyName || '');
-
-// 写进共享态：左下用户行据此显示「角色 · 单位」，账号菜单据此决定是否显示「个人中心」
-const { tenantName, tenantSwitched } = useWorkspace();
-watch(scope, (value) => (tenantName.value = value), { immediate: true });
-watch(currentId, (value) => (tenantSwitched.value = value !== defaultTenantId.value), { immediate: true });
-
-onMounted(async () => {
-  if (!isAdmin.value) {
-    return;
-  }
-  try {
-    const { data } = await getTenantList(true);
-    tenantEnabled.value = data.tenantEnabled === undefined ? true : data.tenantEnabled;
-    tenantList.value = tenantEnabled.value ? data.voList || [] : [];
-  } catch {
-    // 租户接口失败不阻断壳层：退回普通品牌块
-    tenantList.value = [];
-  }
-});
-
-// 切换租户：与旧顶栏下拉同一套流程（切完回首页、清页签、刷新），只是入口从顶栏搬到了左上
-const onSwitch = async (tenantId: string) => {
-  if (tenantSwitching.value) {
-    return;
-  }
-  tenantSwitching.value = true;
-  try {
-    if (tenantId === '__default') {
-      await dynamicClear();
-      currentId.value = defaultTenantId.value;
-      await router.push('/');
-      await proxy?.$tab.closeAllPage();
-      await proxy?.$tab.refreshPage();
-      ElMessage.success('已回到默认租户');
-      return;
-    }
-    if (tenantId === currentId.value) {
-      return;
-    }
-    await dynamicTenant(tenantId);
-    currentId.value = tenantId;
-    await router.push('/');
-    await proxy?.$tab.closeAllPage();
-    await proxy?.$tab.refreshPage();
-    const hit = tenantList.value.find((item) => String(item.tenantId) === tenantId);
-    ElMessage.success(`已切换到「${hit?.companyName || tenantId}」，数据加载中`);
-  } catch {
-    ElMessage.error(tenantId === '__default' ? '切回默认租户失败，请重试' : '切换租户失败，请重试');
-  } finally {
-    tenantSwitching.value = false;
-  }
-};
+onMounted(load);
 </script>
 
 <style lang="scss" scoped>
@@ -150,8 +85,8 @@ const onSwitch = async (tenantId: string) => {
 }
 
 .sidebar-brand__mark {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex: none;
   object-fit: contain;
 }
@@ -181,10 +116,20 @@ const onSwitch = async (tenantId: string) => {
 }
 
 .sidebar-brand__chev {
-  margin-left: auto;
   flex: none;
   color: var(--app-faint);
   font-size: 12px;
+}
+
+.sidebar-brand__switch {
+  margin-left: auto;
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .sidebar-brand.is-collapse {
@@ -196,8 +141,20 @@ const onSwitch = async (tenantId: string) => {
   }
 
   .sidebar-brand__text,
+  .sidebar-brand__switch,
   .sidebar-brand__chev {
     display: none;
   }
+}
+</style>
+
+<style lang="scss">
+/* 下拉是 teleport 到 body 的，scoped 选择器打不到；用带前缀的全局类，只影响本组件的小标题 */
+.el-dropdown-menu .sidebar-brand__caption {
+  padding: 6px 12px 4px;
+  color: var(--app-faint);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: default;
 }
 </style>
