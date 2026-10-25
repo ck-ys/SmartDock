@@ -106,7 +106,7 @@
           </template>
 
           <div class="dcs-ops-table-wrap">
-            <el-table v-loading="loading" border class="ui-table" :data="userList" @selection-change="handleSelectionChange">
+            <el-table v-loading="loading" class="ui-table" :data="userList" @selection-change="handleSelectionChange">
               <el-table-column type="selection" width="50" align="center" />
               <el-table-column v-if="columns[0].visible" key="userId" label="用户编号" align="center" prop="userId" />
               <el-table-column

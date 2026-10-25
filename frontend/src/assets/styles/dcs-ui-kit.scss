@@ -17,7 +17,7 @@
 /* ============================ 新增令牌 ============================ */
 :root {
   /* 页面节奏与字阶 */
-  --dcs-page-head-size: 16px; // .ui-page-head 标题（本文件口径）
+  --dcs-page-head-size: 20px; // .ui-page-head 标题（契约 §2.2 页题 20）
   --dcs-font-page: 20px; // 共用页头 DcsOperationsPageHeader 标题（契约 §2.2）
   --dcs-kpi-size: 26px; // KPI 数字（契约 24-28 取中值）
   --dcs-kpi-weight: 600; // KPI 字重
@@ -45,15 +45,16 @@
   --dcs-pill-warn-ink: var(--dcs-color-warning);
   --dcs-pill-neg-bg: var(--dcs-color-danger-light-9);
   --dcs-pill-neg-ink: var(--dcs-color-danger);
-  --dcs-pill-info-bg: var(--dcs-color-info-light-9);
-  --dcs-pill-info-ink: var(--dcs-color-info);
   --dcs-pill-off-bg: var(--app-raised);
   --dcs-pill-off-ink: var(--app-muted);
+  /* 契约 §1.7：控件高必须映射到 EP 变量，输入/下拉才会长到 36。
+     按钮不吃这个变量（EP 内部写死 32），下面单独给规则 */
+  --el-component-size: var(--dcs-control-h);
 }
 
 html.dark {
   /* 尺寸令牌与亮色一致（契约 §1.7 表内暗值同亮值） */
-  --dcs-page-head-size: 16px;
+  --dcs-page-head-size: 20px;
   --dcs-font-page: 20px;
   --dcs-kpi-size: 26px;
   --dcs-kpi-weight: 600;
@@ -68,10 +69,9 @@ html.dark {
   --dcs-pill-warn-ink: var(--dcs-color-warning);
   --dcs-pill-neg-bg: var(--dcs-color-danger-light-9);
   --dcs-pill-neg-ink: var(--dcs-color-danger);
-  --dcs-pill-info-bg: var(--dcs-color-info-light-9);
-  --dcs-pill-info-ink: var(--dcs-color-info);
   --dcs-pill-off-bg: var(--app-raised);
   --dcs-pill-off-ink: var(--app-muted);
+  --el-component-size: var(--dcs-control-h);
 }
 
 /* 紧凑密度：只收紧 .ui-* 的间距变量（页面布局结构不动） */
@@ -84,6 +84,23 @@ html.density-compact {
   --dcs-density-kpi-pad-x: 12px;
   --dcs-density-row-h: 36px;
   --dcs-density-control-h: 32px;
+}
+
+/* ============================ 全局控件高（契约 §1.7） ============================ */
+/* EP 的 .el-button 把 height:32px 写死、不吃 --el-component-size，必须显式给。
+   :not 链排除文字/链接/圆形/小号/大号——尤其 size=small（24px）不能被动长高。 */
+.el-button:not(.is-text):not(.is-link):not(.is-circle):not(.el-button--small):not(.el-button--large) {
+  height: var(--dcs-control-h);
+}
+
+/* 禁改区守卫：AI 助手抽屉（.dcs-dw，teleport 到 body）保持既有 32px。
+   只钉住原值，不改抽屉任何样式 */
+.dcs-dw .el-button:not(.is-text):not(.is-link):not(.is-circle):not(.el-button--small):not(.el-button--large) {
+  height: 32px;
+}
+
+.dcs-dw {
+  --el-component-size: 32px;
 }
 
 /* ============================ 页面容器与纵向节奏 ============================ */
@@ -335,11 +352,6 @@ html.density-compact {
   color: var(--dcs-pill-neg-ink);
 }
 
-.ui-pill--info {
-  background: var(--dcs-pill-info-bg);
-  color: var(--dcs-pill-info-ink);
-}
-
 .ui-pill--muted {
   background: var(--dcs-pill-off-bg);
   color: var(--dcs-pill-off-ink);
@@ -379,43 +391,6 @@ html.density-compact {
   justify-content: center;
   gap: 8px;
   margin-top: 4px;
-}
-
-/* ============================ 加载骨架 ============================ */
-/* 契约 §2.8 默认用 v-loading；本类只是需要局部占位时的可选件。
-   不用渐变 / 发光，只做透明度呼吸；尊重 reduced-motion。 */
-.ui-skeleton {
-  display: block;
-  width: 100%;
-  height: var(--dcs-font-sm);
-  border-radius: var(--app-control-radius);
-  background: var(--app-raised);
-  animation: ui-skeleton-pulse 1.4s ease-in-out infinite;
-}
-
-.ui-skeleton--title {
-  width: 40%;
-  height: var(--dcs-page-head-size);
-}
-
-.ui-skeleton--row {
-  height: var(--dcs-row-h);
-  border-radius: var(--app-card-radius);
-}
-
-.ui-skeleton + .ui-skeleton {
-  margin-top: 8px;
-}
-
-@keyframes ui-skeleton-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.55;
-  }
 }
 
 /* ============================ 数字列 ============================ */
@@ -507,11 +482,5 @@ html.density-compact {
   .dcs-ops-metric__value {
     margin-top: 4px;
     font-size: var(--dcs-kpi-size);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ui-skeleton {
-    animation: none;
   }
 }

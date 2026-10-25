@@ -48,8 +48,8 @@
   --app-topbar-h: 64px;
   --app-sheet-radius: 16px;
   --app-sheet-inset: 8px;
-  --app-card-radius: 8px;
-  --app-control-radius: 6px;
+  --app-card-radius: 10px;
+  --app-control-radius: 8px;
   --app-nav-radius: 8px; // 导航药丸专用：不跟控件圆角走
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
@@ -243,9 +243,9 @@ html.dark {
   --app-warm-done-border: #2c4a28;
   --app-warm-ink: #f0d08a;
 
-  --app-card-radius: 20px;
+  --app-card-radius: 10px;
   --app-sheet-radius: 20px;
-  --app-control-radius: 999px;
+  --app-control-radius: 8px;
   --app-nav-radius: 8px;
   --app-card-border: 0;
   --app-card-shadow: none;

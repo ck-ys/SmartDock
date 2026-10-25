@@ -66,7 +66,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRouter, type RouteRecordRaw } from 'vue-router';
 import { Menu, Search } from '@element-plus/icons-vue';
 import { usePermissionStore } from '@/store/modules/permission';
-import { isHttp } from '@/utils/validate';
+import { isExternal } from '@/utils/validate';
 import { getNormalPath } from '@/utils/ruoyi';
 
 interface CommandItem {
@@ -95,7 +95,7 @@ const collectItems = (routes: RouteRecordRaw[], basePath = '', parents: string[]
     }
     const rawPath = String(route.path || '');
     // 根路由的 path 可能为空字符串（仅作 Layout 容器），不能直接丢弃，否则子路由（如 /index）会一起丢
-    const fullPath = isHttp(rawPath) ? rawPath : getNormalPath(rawPath.startsWith('/') ? rawPath : `${basePath}/${rawPath}`);
+    const fullPath = isExternal(rawPath) ? rawPath : getNormalPath(rawPath.startsWith('/') ? rawPath : `${basePath}/${rawPath}`);
     const title = typeof route.meta?.title === 'string' ? route.meta.title : '';
     const icon = typeof route.meta?.icon === 'string' ? route.meta.icon : undefined;
 
@@ -170,7 +170,7 @@ const moveActive = (step: number) => {
 
 const selectItem = (item: CommandItem) => {
   visible.value = false;
-  if (isHttp(item.path)) {
+  if (isExternal(item.path)) {
     window.open(item.path, '_blank', 'noopener');
     return;
   }
