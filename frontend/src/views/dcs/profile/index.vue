@@ -321,11 +321,11 @@ const riskOf = (value?: number | string | null) => {
 const riskPillClass = (value?: number | string | null) =>
   ({ success: 'ui-pill--pos', warning: 'ui-pill--warn', danger: 'ui-pill--neg', info: 'ui-pill--muted' })[riskOf(value).color];
 
+// 指标带只留 4 格：关注/高风险直接回答「谁要跟」，已算分是分母、低风险是结论的补集，
+// 两者下方分布图里都有，不再各占一格（KPI 一容器 3–4 格）
 const overviewMetrics = computed(() => [
   { label: '主体数', value: overview.value.subjectCount ?? '—' },
-  { label: '已算分', value: overview.value.scoredCount ?? '—' },
   { label: '平均分', value: formatScore(overview.value.avgScore) },
-  { label: '低风险', value: overview.value.lowRisk ?? '—' },
   { label: '关注', value: overview.value.mediumRisk ?? '—' },
   { label: '高风险', value: overview.value.highRisk ?? '—' }
 ]);
