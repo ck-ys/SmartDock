@@ -11,6 +11,11 @@ export const useAppStore = defineStore('app', () => {
     withoutAnimation: false,
     hide: false
   });
+  // 题2-② 展开记忆：折叠/再展开会重挂菜单，开着的分组记在这里不丢
+  const sidebarOpenedMenus = useStorage<string[]>('sidebarOpenedMenus', []);
+  const setOpenedMenus = (indexes: string[]) => {
+    sidebarOpenedMenus.value = indexes;
+  };
   const device = ref<string>('desktop');
   const size = useStorage<'large' | 'default' | 'small'>('size', 'default');
 
@@ -60,6 +65,8 @@ export const useAppStore = defineStore('app', () => {
   return {
     device,
     sidebar,
+    sidebarOpenedMenus,
+    setOpenedMenus,
     language,
     locale,
     size,

@@ -27,14 +27,15 @@ const title = import.meta.env.VITE_APP_LOGO_TITLE;
   box-sizing: border-box;
 }
 
-/* 品牌行是 <a>：sidebar.scss 的菜单链接规则已排除本类，这里保持一行 flex */
+/* 品牌行是 <a>：sidebar.scss 的菜单链接规则已排除本类，这里保持一行 flex。
+   左内边距 10px：外层 .sidebar-brand 8px + 本行 10px = logo 左缘 x=18，与菜单图标左缘同一竖轴（题1-④） */
 .sidebar-brand .sidebar-brand__row {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
   height: 48px;
-  padding: 0 8px;
+  padding: 0 8px 0 10px;
   border: 0;
   border-radius: var(--app-nav-radius);
   background: transparent;

@@ -40,6 +40,21 @@ export const useFileReviewBadgeStore = defineStore('fileReviewBadge', () => {
     timer = setInterval(fetchPendingCount, 60_000);
   };
 
+  /**
+   * 徽标取数（声明式，题3-④）：SidebarItem 只带 meta.badge 键来问数，
+   * 键到数据的映射收敛在这里；目前只有文件审核一种，以后加徽标在此扩展
+   */
+  const badgeCount = (badge: string): number => (badge === 'fileReview' ? count.value : 0);
+
+  // 题3-⑤ 切换单位后立即对齐新单位的待审数（原来最长要等 60s 轮询）
+  if (typeof window !== 'undefined' && !(window as any).__dcsBadgeTenantListener) {
+    // store 重建（HMR/测试）会重复挂监听导致一次事件多次拉数，模块级旗子防重
+    (window as any).__dcsBadgeTenantListener = true;
+    window.addEventListener('dcs:tenant-changed', () => {
+      fetchPendingCount();
+    });
+  }
+
   /** 审核通过 N 条后的本地即时修正（下一轮轮询对齐真值） */
   const decrement = (n = 1) => {
     count.value = Math.max(0, count.value - n);
@@ -54,5 +69,5 @@ export const useFileReviewBadgeStore = defineStore('fileReviewBadge', () => {
     count.value = 0;
   };
 
-  return { count, fetchPendingCount, ensureStarted, decrement, stop };
+  return { count, badgeCount, fetchPendingCount, ensureStarted, decrement, stop };
 });

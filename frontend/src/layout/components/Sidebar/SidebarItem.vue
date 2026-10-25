@@ -6,10 +6,11 @@
           <svg-icon :icon-class="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" />
           <template #title>
             <span class="menu-title" :title="hasTitle(onlyOneChild.meta.title)">{{ onlyOneChild.meta.title }}</span>
-            <!-- 12b 文件审核菜单待审徽标（Q7-A：仅有权限者显示，折叠态红点） -->
+            <!-- 待审徽标：声明式——菜单 meta.badge 指定徽标键（路径→键的映射在 permission store 建路由时注入），
+                 通用组件不认识具体业务路径；仅有权限者显示，折叠态红点 -->
             <el-badge
-              v-if="isFileReviewItem(onlyOneChild) && fileReviewBadge.count > 0"
-              :value="fileReviewBadge.count > 99 ? '99+' : fileReviewBadge.count"
+              v-if="badgeKey && badgeValue > 0"
+              :value="badgeValue > 99 ? '99+' : badgeValue"
               :max="99"
               :is-dot="sidebarCollapsed"
               class="menu-review-badge"
@@ -19,7 +20,7 @@
       </app-link>
     </template>
 
-    <el-sub-menu v-else ref="subMenu" :index="resolvePath(item.path)" teleported>
+    <el-sub-menu v-else ref="subMenu" :index="resolvePath(item.path)" teleported popper-class="dcs-sidebar-popper">
       <template v-if="item.meta" #title>
         <svg-icon :icon-class="item.meta ? item.meta.icon : ''" />
         <span class="menu-title" :title="hasTitle(item.meta?.title)">{{ item.meta?.title }}</span>
@@ -67,9 +68,10 @@ const onlyOneChild = ref<any>({});
 const fileReviewBadge = useFileReviewBadgeStore();
 const appStore = useAppStore();
 const sidebarCollapsed = computed(() => !appStore.sidebar.opened);
-// 叶子菜单经 hasOneShowingChild 时 path 被覆写为空串，须按 resolvePath 拼出完整路径判定
-// （带前导斜杠防 'xfile-review' 类误报）
-const isFileReviewItem = (route: any) => String(resolvePath(route?.path || '')).endsWith('/file-review');
+// 待审徽标（声明式）：菜单 meta.badge 指定徽标键，键到数据的取数在 badge store；
+// 路径 → meta.badge 的注入见 permission store 的 MENU_BADGE_MAP，以后加角标不再改本组件
+const badgeKey = computed(() => (onlyOneChild.value?.meta as Record<string, unknown> | undefined)?.badge as string | undefined || '');
+const badgeValue = computed(() => fileReviewBadge.badgeCount(badgeKey.value));
 onMounted(() => fileReviewBadge.ensureStarted());
 
 const hasOneShowingChild = (parent: RouteRecordRaw, children?: RouteRecordRaw[]) => {
@@ -106,8 +108,14 @@ const resolvePath = (routePath: string, routeQuery?: string): any => {
     return props.basePath;
   }
   if (routeQuery) {
-    const query = JSON.parse(routeQuery);
-    return { path: getNormalPath(props.basePath + '/' + routePath), query: query };
+    try {
+      const query = JSON.parse(routeQuery);
+      return { path: getNormalPath(props.basePath + '/' + routePath), query: query };
+    } catch {
+      // 题3-① 菜单参数填了非 JSON（如 tab=1）时 JSON.parse 抛错会让整条菜单渲染失败凭空消失：
+      // 容错退化为无参跳转，控制台留痕便于排查配置
+      console.warn(`[menu] 菜单参数不是合法 JSON，已按无参跳转处理：${props.basePath}/${routePath}（query=${routeQuery}）`);
+    }
   }
   return getNormalPath(props.basePath + '/' + routePath);
 };

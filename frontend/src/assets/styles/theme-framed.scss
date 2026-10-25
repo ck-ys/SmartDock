@@ -387,7 +387,7 @@ html.dark #app .sidebar-container .el-menu--vertical > div > .el-sub-menu > .el-
 
 html.dark #app .sidebar-container .el-menu-item.is-active,
 html.dark #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
-  background-color: transparent !important;
+  /* 底色（药丸 raised）由下方「区域优化批」的规则统一给，这里只留文字色 */
   color: #ffffff !important;
 }
 
@@ -821,4 +821,100 @@ html.dark .el-popper.is-dark {
     background: var(--app-raised);
     border-color: var(--app-border);
   }
+}
+
+/* ============================ 区域优化批（2026-10-24 七题全 A）· 左栏/顶栏 ============================ */
+/* 题1-① 暗色侧栏右边界：#000 栏贴 #000 地，1px #262626 缝把两块分开（浅色靠纸面白已分层，不动） */
+html.dark #app .sidebar-container {
+  border-right: 1px solid #262626;
+}
+
+/* 题1-② 暗色当前页药丸：raised 底 + 白字 + 图标按暗色主色提亮（浅色白药丸不变） */
+html.dark #app .sidebar-container .el-menu-item.is-active,
+html.dark #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: var(--app-raised) !important;
+  color: #ffffff !important;
+}
+
+/* 图标提亮取纯白：暗色 --app-accent 是亮绿 #c6f24e（theme-framed.scss html.dark 块），
+   落在 #1d1d1d 药丸上可用但抢眼，选中态要的是"认出位置"不是"高亮口号"——白最稳 */
+html.dark #app .sidebar-container .el-menu-item.is-active .svg-icon {
+  color: #ffffff;
+}
+
+/* 题3-③ 折叠态子菜单浮层：限高可滚（矮屏不再溢出视口） */
+.el-menu--popup {
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+}
+
+/* 题1-③ 暗色浮层描边+投影：数值沿用已上线的单位切换卡片。
+   用 SidebarItem 上的 popper-class 钩子选浮层，不依赖 :has()（浏览器矩阵只到 Chrome 87/Safari 14，
+   :has() 要 105/15.4，声明支持的浏览器上一半拿不到效果） */
+html.dark .el-popper.dcs-sidebar-popper {
+  background: #161616;
+  border: 1px solid #2e2e33;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7);
+}
+
+html.dark .el-menu--popup .el-menu-item,
+html.dark .el-menu--popup .el-sub-menu__title {
+  background-color: transparent !important;
+}
+
+/* 题1-⑤ 二级引导线：展开态嵌套叶菜单左侧竖线（折叠浮层是飞出面板，不画线） */
+#app .sidebar-container .nest-menu .el-menu-item {
+  position: relative;
+}
+
+#app .sidebar-container .nest-menu .el-menu-item::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 1px;
+  /* 视觉席位像素实测：--app-rule（浅 #f0f1f2 / 暗 #232323）与菜单底色灰阶差只有 2~3，
+     1:1 视距几乎不可见——改按主题钉"看得见但不抢"的中性线 */
+  background: rgba(19, 20, 22, 0.16);
+}
+
+html.dark #app .sidebar-container .nest-menu .el-menu-item::before {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* 题1-⑦ 悬停过渡统一 140ms（原 Element 默认 0.3s 与零过渡混用，忽轻忽重） */
+#app .sidebar-container .el-menu-item,
+#app .sidebar-container .el-sub-menu__title {
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+/* 题1-⑧ 嵌套缩进节奏：三级相对二级只多 4px（原 6px；二级 Element 默认 20px 不动） */
+#app .sidebar-container .nest-menu .nest-menu .el-menu-item {
+  padding-left: 24px;
+}
+
+/* 三级项的引导线跟着缩进左移，与二级线错开表达层级（线宽与二级一致） */
+#app .sidebar-container .nest-menu .nest-menu .el-menu-item::before {
+  left: 24px;
+}
+
+/* 题6-① 顶栏暗色底边界：顶栏与内容区同为 #000 时 1px 缝把顶栏「托」起来 */
+html.dark #app .fixed-header {
+  border-bottom: 1px solid #262626;
+}
+
+/* 题3-⑥ 手机抽屉关闭后键盘不可聚焦：收起时藏掉侧栏，隐藏延迟到滑出动画结束。
+   带 #app 前缀 + 显式长写：sidebar.scss 的 #app .mobile .sidebar-container{transition:transform .28s}
+   特异性更高，短写 transition 会被它整条吃掉（visibility 立即生效=动画"啪"一下没掉） */
+#app .mobile.hideSidebar .sidebar-container {
+  visibility: hidden;
+  transition-property: transform, visibility;
+  transition-duration: 0.3s, 0s;
+  transition-delay: 0s, 0.3s;
+}
+
+#app .mobile.openSidebar .sidebar-container {
+  visibility: visible;
 }

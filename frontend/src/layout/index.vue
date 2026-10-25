@@ -103,6 +103,39 @@ const handleClickOutside = () => {
   useAppStore().closeSideBar({ withoutAnimation: false });
 };
 
+// 题2-① 手机抽屉自动关：点菜单跳转后收起抽屉（原来跳转后抽屉还盖着页面，要再点一次黑遮罩）
+const route = useRoute();
+watch(
+  () => route.fullPath,
+  () => {
+    if (device.value === 'mobile' && sidebar.value.opened) {
+      useAppStore().closeSideBar({ withoutAnimation: false });
+    }
+  }
+);
+
+// 题2-③ Ctrl+B 开合左栏（桌面）；Esc 关手机抽屉（题2-① 的键盘通道）。
+// 输入框里不拦 Ctrl+B（不抢系统/输入习惯）；移动端不给 Ctrl+B（抽屉语义与桌面折叠不同）
+onMounted(() => {
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && device.value === 'mobile' && sidebar.value.opened) {
+      useAppStore().closeSideBar({ withoutAnimation: false });
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === 'b' || e.key === 'B') && device.value !== 'mobile') {
+      const target = e.target as HTMLElement | null;
+      // contenteditable="" / plaintext-only 等价可编辑，一并让行
+      if (target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) {
+        return;
+      }
+      e.preventDefault();
+      useAppStore().toggleSideBar(false);
+    }
+  };
+  window.addEventListener('keydown', onKeydown);
+  onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+});
+
 const setLayout = () => {
   settingRef.value?.openSetting();
 };

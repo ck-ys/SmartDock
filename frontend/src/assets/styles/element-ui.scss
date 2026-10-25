@@ -128,6 +128,10 @@
   box-sizing: content-box;
 }
 
+/* 题3-② 死选择器复活：类名是 EP1 的 .el-submenu（EP2 实为 .el-sub-menu）。
+   补充：sidebar.scss 已用 & > i 高宽置 0 藏过箭头，EP 自带规则又因 SidebarItem 的
+   div 包裹层不匹配——这里是第三道兜底，三处任一生效即可 */
+.el-menu--collapse > div > .el-sub-menu > .el-sub-menu__title .el-sub-menu__icon-arrow,
 .el-menu--collapse > div > .el-submenu > .el-submenu__title .el-submenu__icon-arrow {
   display: none;
 }

@@ -12,6 +12,26 @@ import { createCustomNameComponent } from '@/utils/createCustomNameComponent';
 
 // 匹配views里面所有的.vue文件
 const modules = import.meta.glob('./../../views/**/*.vue');
+
+/**
+ * 菜单徽标声明式映射（题3-④）：key=菜单完整路径（尾段匹配），value=徽标键。
+ * 以后加角标在这里加一行 + badge store 加取数，不再改 SidebarItem 通用组件。
+ */
+const MENU_BADGE_MAP: Array<[suffix: string, badge: string]> = [['/file-review', 'fileReview']];
+const applyMenuBadges = (routes: any[], parentPath = ''): void => {
+  // 菜单数据来自后端配置，畸形行（null 子节点/children 是字符串）不让整棵路由生成跟着炸
+  if (!Array.isArray(routes)) return;
+  routes.forEach((route) => {
+    if (!route || typeof route !== 'object') return;
+    const path = String(route.path || '').startsWith('/') ? String(route.path) : `${parentPath}/${route.path}`;
+    if (route.meta && MENU_BADGE_MAP.some(([suffix]) => path.replace(/\/+$/, '').endsWith(suffix))) {
+      route.meta.badge = MENU_BADGE_MAP.find(([suffix]) => path.replace(/\/+$/, '').endsWith(suffix))![1];
+    }
+    if (Array.isArray(route.children) && route.children.length) {
+      applyMenuBadges(route.children, path);
+    }
+  });
+};
 export const usePermissionStore = defineStore('permission', () => {
   const routes = ref<RouteRecordRaw[]>([]);
   const addRoutes = ref<RouteRecordRaw[]>([]);
@@ -51,6 +71,7 @@ export const usePermissionStore = defineStore('permission', () => {
     const sdata = JSON.parse(JSON.stringify(data));
     const rdata = JSON.parse(JSON.stringify(data));
     const defaultData = JSON.parse(JSON.stringify(data));
+    applyMenuBadges(sdata);
     const sidebarRoutes = filterAsyncRouter(sdata);
     const rewriteRoutes = filterAsyncRouter(rdata, undefined, true);
     const defaultRoutes = filterAsyncRouter(defaultData);
