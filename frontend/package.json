@@ -29,7 +29,7 @@
     "@vue-office/docx": "1.6.3",
     "@vue-office/excel": "1.7.14",
     "@vueup/vue-quill": "1.2.0",
-    "@vueuse/core": "14.2.1",
+    "@vueuse/core": "^15.0.0",
     "animate.css": "4.1.1",
     "await-to-js": "3.0.0",
     "axios": "1.13.6",
@@ -58,7 +58,7 @@
     "vxe-table": "4.18.1"
   },
   "devDependencies": {
-    "@iconify/json": "^2.2.448",
+    "@iconify-json/ep": "^1.2.4",
     "@types/crypto-js": "4.2.2",
     "@types/file-saver": "2.0.7",
     "@types/js-cookie": "3.0.6",

@@ -8,6 +8,7 @@
  * 路径: frontend/src/utils/websocket.ts
  */
 
+import { useIntervalFn } from '@vueuse/core';
 import { getToken } from '@/utils/auth';
 import { ElNotification } from 'element-plus';
 import { useNoticeStore } from '@/store/modules/notice';
@@ -29,7 +30,10 @@ export const initWebSocket = (url: any) => {
     },
     heartbeat: {
       message: JSON.stringify({ type: 'ping' }),
-      interval: 10000,
+      // @vueuse/core 15 起心跳配置不再收 interval，改经 scheduler 定节奏。
+      // immediate:false 对齐 VueUse 自身默认与 14.x 行为：首个 ping 从连接建立后起算，
+      // 否则定时器在 setup 时刻就开跑——握手慢于 pongTimeout 时会被自己判死重连
+      scheduler: (cb) => useIntervalFn(cb, 10000, { immediate: false }),
       pongTimeout: 2000
     },
     onConnected() {
