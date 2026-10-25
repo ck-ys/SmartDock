@@ -197,8 +197,17 @@ const onGlobalKeydown = (event: KeyboardEvent) => {
   }
 };
 
-onMounted(() => window.addEventListener('keydown', onGlobalKeydown));
-onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown));
+// 顶栏的「搜索页面…」假输入框通过窗口事件唤起面板（与 Ctrl/Cmd+K 同一个入口）
+const onExternalOpen = () => open();
+
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKeydown);
+  window.addEventListener('dcs:open-palette', onExternalOpen);
+});
+onUnmounted(() => {
+  window.removeEventListener('keydown', onGlobalKeydown);
+  window.removeEventListener('dcs:open-palette', onExternalOpen);
+});
 </script>
 
 <style lang="scss">

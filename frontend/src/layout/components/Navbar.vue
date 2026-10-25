@@ -10,30 +10,19 @@
       <top-bar id="topbar-container" class="topbar-container" />
     </template>
     <div class="right-menu flex align-center">
-      <!-- 波 0：手机顶栏保留「搜索 + 消息」两条高频入口（此前整块被 device 判断隐藏，
-           手机上既看不到未读也搜不到菜单）；租户切换/全屏/语言/字号/仓库链接仍只在桌面出现 -->
-      <el-select
-        v-if="appStore.device !== 'mobile' && userId === 1 && tenantEnabled"
-        v-model="companyName"
-        class="min-w-244px mr-2"
-        clearable
-        filterable
-        reserve-keyword
-        :loading="tenantSwitching"
-        :placeholder="proxy.$t('navbar.selectTenant')"
-        @change="dynamicTenantEvent"
-        @clear="dynamicClearEvent"
-      >
-        <el-option v-for="item in tenantList" :key="item.tenantId" :label="item.companyName" :value="item.tenantId"> </el-option>
-        <template #prefix><svg-icon icon-class="company" class="el-input__icon input-icon" /></template>
-      </el-select>
-
-      <search-menu ref="searchMenuRef" />
-      <el-tooltip content="搜索" effect="dark" placement="bottom">
-        <div class="right-menu-item hover-effect" @click="openSearchMenu">
+      <!-- 方案一：顶栏只留 5 个——搜索 / 消息 / 外观 / 全屏 / 头像。
+           租户搬左上品牌行，反馈回头像菜单，语言/字号/主题收进外观抽屉（见 DcsAppearanceDrawer） -->
+      <button v-if="appStore.device !== 'mobile'" type="button" class="nav-search" aria-label="搜索页面" @click="openPalette">
+        <svg-icon class="nav-search__icon" icon-class="search" />
+        <span class="nav-search__label">搜索页面…</span>
+        <kbd class="nav-search__kbd">{{ shortcutLabel }}</kbd>
+      </button>
+      <el-tooltip v-else :content="proxy.$t('navbar.search')" effect="dark" placement="bottom">
+        <div class="right-menu-item hover-effect" @click="openPalette">
           <svg-icon class-name="search-icon" icon-class="search" />
         </div>
       </el-tooltip>
+
       <!-- 消息 -->
       <el-tooltip :content="proxy.$t('navbar.message')" effect="dark" placement="bottom">
         <div style="display: flex; align-items: center">
@@ -49,86 +38,42 @@
           </el-popover>
         </div>
       </el-tooltip>
-      <!-- 公告入口收进消息气泡（Q11 2026-10-23）：手机顶栏只保留搜索 + 消息，避免右侧溢出 -->
-      <template v-if="appStore.device !== 'mobile'">
-        <!-- 反馈问题（N3 2026-10-23：全员入口，弹窗内提交 / 我的反馈两页签） -->
-        <el-tooltip content="反馈问题" effect="dark" placement="bottom">
-          <div class="right-menu-item hover-effect" @click="openFeedback('submit')"><svg-icon icon-class="chat" /></div>
-        </el-tooltip>
-        <el-tooltip v-if="showRepositoryLink" content="Github" effect="dark" placement="bottom">
-          <ruo-yi-git id="ruoyi-git" class="right-menu-item hover-effect" />
-        </el-tooltip>
 
-        <!-- RuoYi 框架"项目文档"外链入口已删(2026-09-24 业务反馈#5): 点了跳框架官网, 与本系统无关。
-             RuoYiDoc 组件文件保留(框架自动注册, 无引用零开销); Github 入口此前已由 showRepositoryLink=false 隐藏。 -->
-
-        <el-tooltip :content="proxy.$t('navbar.full')" effect="dark" placement="bottom">
-          <screenfull id="screenfull" class="right-menu-item hover-effect" />
-        </el-tooltip>
-
-        <el-tooltip :content="proxy.$t('navbar.language')" effect="dark" placement="bottom">
-          <lang-select id="lang-select" class="right-menu-item hover-effect" />
-        </el-tooltip>
-
-        <el-tooltip :content="proxy.$t('navbar.layoutSize')" effect="dark" placement="bottom">
-          <size-select id="size-select" class="right-menu-item hover-effect" />
-        </el-tooltip>
-      </template>
-      <!-- 交互三件 ②：外观抽屉入口（主题 + 密度），与右侧主题按钮并存但职责不同 -->
+      <!-- 外观抽屉：主题 / 密度 / 语言 / 字号都在里面 -->
       <el-tooltip v-if="appStore.device !== 'mobile'" content="外观" effect="dark" placement="bottom">
         <div class="right-menu-item hover-effect appearance-entry" @click="openAppearance">
           <el-icon><Brush /></el-icon>
         </div>
       </el-tooltip>
-      <el-tooltip :content="dark ? '切到框架纸（浅色）' : '切到纯黑夜（深色）'" effect="dark" placement="bottom">
-        <div class="right-menu-item hover-effect theme-switch" @click="toggleAppearance">
-          <el-icon v-if="dark"><Sunny /></el-icon>
-          <el-icon v-else><Moon /></el-icon>
-        </div>
+
+      <el-tooltip v-if="appStore.device !== 'mobile'" :content="proxy.$t('navbar.full')" effect="dark" placement="bottom">
+        <screenfull id="screenfull" class="right-menu-item hover-effect" />
       </el-tooltip>
+
+      <!-- 头像：与左下用户行共用同一份账号菜单 -->
       <div class="avatar-container">
-        <el-dropdown class="right-menu-item hover-effect" trigger="click" @command="handleCommand">
-          <div class="avatar-wrapper">
+        <dcs-user-menu @layout="setLayout" @feedback="requestFeedback">
+          <div class="right-menu-item hover-effect avatar-wrapper">
             <img :src="userStore.avatar" class="user-avatar" />
             <el-icon><caret-bottom /></el-icon>
           </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <router-link v-if="!dynamic" to="/user/profile">
-                <el-dropdown-item>{{ proxy.$t('navbar.personalCenter') }}</el-dropdown-item>
-              </router-link>
-              <el-dropdown-item v-if="settingsStore.showSettings" command="setLayout">
-                <span>{{ proxy.$t('navbar.layoutSetting') }}</span>
-              </el-dropdown-item>
-              <el-dropdown-item v-if="appStore.device === 'mobile'" command="feedback">反馈问题</el-dropdown-item>
-              <el-dropdown-item divided command="logout">
-                <span>{{ proxy.$t('navbar.logout') }}</span>
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        </dcs-user-menu>
       </div>
     </div>
-    <feedback-dialog v-model:visible="feedbackOpen" :initial-tab="feedbackTab" />
     <dcs-appearance-drawer ref="appearanceDrawerRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import SearchMenu from './TopBar/search.vue';
 import { useAppStore } from '@/store/modules/app';
 import { useUserStore } from '@/store/modules/user';
 import { useSettingsStore } from '@/store/modules/settings';
 import { useNoticeStore } from '@/store/modules/notice';
 import { useAnnouncementStore } from '@/store/modules/announcement';
-import { getTenantList } from '@/api/login';
-import { dynamicClear, dynamicTenant } from '@/api/system/tenant';
-import { TenantVO } from '@/api/types';
 import notice from './notice/index.vue';
-import FeedbackDialog from '@/views/dcs/feedback/components/FeedbackDialog.vue';
 import DcsAppearanceDrawer from '@/components/DcsAppearanceDrawer/index.vue';
+import DcsUserMenu from '@/components/DcsUserMenu/index.vue';
 import { ElMessage } from 'element-plus';
-import { ElMessageBoxOptions } from 'element-plus/es/components/message-box/src/message-box.type';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import Logo from '@/layout/components/Sidebar/Logo.vue';
 import TopBar from './TopBar/index.vue';
@@ -139,19 +84,15 @@ const settingsStore = useSettingsStore();
 const noticeStore = useNoticeStore();
 const announcementStore = useAnnouncementStore();
 const newNotice = computed(() => noticeStore.state.unreadCount);
-// 暂时隐藏框架源码仓库入口，保留组件与目标地址，便于后续恢复。
-const showRepositoryLink = false;
+const emit = defineEmits<{ setLayout: []; feedback: [tab: 'submit' | 'mine'] }>();
+const setLayout = () => {
+  emit('setLayout');
+};
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const route = useRoute();
-/** 反馈弹窗开关（三件套 2026-09-24） */
-const feedbackOpen = ref(false);
-const feedbackTab = ref<'submit' | 'mine'>('submit');
-
-const openFeedback = (tab: 'submit' | 'mine') => {
-  feedbackTab.value = tab;
-  feedbackOpen.value = true;
-};
+// 反馈弹窗由 layout 持有（左下用户行也要能开同一个框），这里只发事件
+const requestFeedback = () => emit('feedback', 'submit');
 
 // 「反馈已处理」通知的落地动作：/index?feedback=mine → 打开「我的反馈」，随后清掉参数
 watch(
@@ -160,7 +101,7 @@ watch(
     if (value !== 'mine') {
       return;
     }
-    openFeedback('mine');
+    emit('feedback', 'mine');
     const query = { ...route.query };
     delete query.feedback;
     proxy?.$router.replace({ path: route.path, query });
@@ -168,120 +109,22 @@ watch(
   { immediate: true }
 );
 
-const userId = ref(userStore.userId);
 const navType = computed(() => settingsStore.navType);
 const showLogo = computed(() => settingsStore.sidebarLogo);
-const dark = computed(() => settingsStore.dark);
-const toggleAppearance = () => settingsStore.setDark(!settingsStore.dark);
 
-// 交互三件 ②：外观抽屉（主题 + 密度）
+// 搜索入口：桌面是一条假输入框，点击开命令面板；徽标按平台显示 ⌘K / Ctrl K
+const isMac = /mac/i.test(navigator.platform);
+const shortcutLabel = isMac ? '⌘ K' : 'Ctrl K';
+const openPalette = () => window.dispatchEvent(new Event('dcs:open-palette'));
+
+// 交互三件 ②：外观抽屉（主题 + 密度 + 语言 + 字号）
 const appearanceDrawerRef = ref<InstanceType<typeof DcsAppearanceDrawer>>();
 const openAppearance = () => appearanceDrawerRef.value?.open();
-
-const companyName = ref(undefined);
-const tenantList = ref<TenantVO[]>([]);
-// 是否切换了租户
-const dynamic = ref(false);
-// 租户开关
-const tenantEnabled = ref(true);
-// 搜索菜单
-const searchMenuRef = ref<InstanceType<typeof SearchMenu>>();
-
-const openSearchMenu = () => {
-  searchMenuRef.value?.openSearch();
-};
-
-// 动态切换
-// 业务反馈批1015b Q7：切租户全程可见——下拉 loading + 切完成功提示（新租户看板冷启约 2~4s，
-// 此前零反馈像"卡掉了"；失败提示并回滚选中值）
-const tenantSwitching = ref(false);
-
-// 动态切换
-const dynamicTenantEvent = async (tenantId: string) => {
-  if (companyName.value != null && companyName.value !== '') {
-    tenantSwitching.value = true;
-    try {
-      await dynamicTenant(tenantId);
-      dynamic.value = true;
-      await proxy?.$router.push('/');
-      await proxy?.$tab.closeAllPage();
-      await proxy?.$tab.refreshPage();
-      const hit = tenantList.value.find((t) => t.tenantId === tenantId);
-      ElMessage.success(`已切换到「${hit?.companyName || tenantId}」，数据加载中`);
-    } catch {
-      ElMessage.error('切换租户失败，请重试');
-    } finally {
-      tenantSwitching.value = false;
-    }
-  }
-};
-
-const dynamicClearEvent = async () => {
-  tenantSwitching.value = true;
-  try {
-    await dynamicClear();
-    dynamic.value = false;
-    await proxy?.$router.push('/');
-    await proxy?.$tab.closeAllPage();
-    await proxy?.$tab.refreshPage();
-    ElMessage.success('已回到默认租户');
-  } catch {
-    ElMessage.error('切回默认租户失败，请重试');
-  } finally {
-    tenantSwitching.value = false;
-  }
-};
-
-/** 租户列表 */
-const initTenantList = async () => {
-  const { data } = await getTenantList(true);
-  tenantEnabled.value = data.tenantEnabled === undefined ? true : data.tenantEnabled;
-  if (tenantEnabled.value) {
-    tenantList.value = data.voList;
-  }
-};
-
-defineExpose({
-  initTenantList
-});
 
 const toggleSideBar = () => {
   appStore.toggleSideBar(false);
 };
 
-const logout = async () => {
-  await ElMessageBox.confirm('确定注销并退出系统吗？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  } as ElMessageBoxOptions);
-  userStore.logout().then(() => {
-    // 换账号弹回无权页面修复(2026-09-29): 主动退出=换人/收工, 整页跳登录页且不带 redirect——
-    // 整页刷新一次性清掉上个账号的内存残留(页签卡片/动态路由/字典与通知缓存), 免挨个手工清;
-    // 同时清掉 401 场景可能遗留的 redirect 归属章, 防上个账号的章误伤本次登录
-    sessionStorage.removeItem('dcs:login-redirect-owner');
-    location.href = import.meta.env.VITE_APP_CONTEXT_PATH + 'login';
-  });
-};
-
-const emits = defineEmits(['setLayout']);
-const setLayout = () => {
-  emits('setLayout');
-};
-// 定义Command方法对象 通过key直接调用方法
-const commandMap: { [key: string]: any } = {
-  setLayout,
-  logout,
-  feedback: () => {
-    openFeedback('submit');
-  }
-};
-const handleCommand = (command: string) => {
-  // 判断是否存在该方法
-  if (commandMap[command]) {
-    commandMap[command]();
-  }
-};
 //用深度监听 消息
 onMounted(() => {
   // PERF-HOME(2026-09-19): 只调 fetchRecent——其内部已并行刷未读数; 此处再单发一次会让
@@ -299,10 +142,6 @@ onMounted(() => {
   }
 }
 
-:deep(.el-select .el-input__wrapper) {
-  height: 30px;
-}
-
 :deep(.el-badge__content.is-fixed) {
   top: 12px;
   // "99+"等宽角标默认 translateX(100%) 外溢到容器右缘外，会盖住右侧相邻图标
@@ -311,8 +150,56 @@ onMounted(() => {
   transform: translateY(-50%);
 }
 
-.theme-switch {
+.nav-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  width: clamp(150px, 18vw, 240px);
+  height: 32px;
+  margin-right: 8px;
+  padding: 0 8px 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-control-radius);
+  background: transparent;
+  color: var(--app-muted);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
   cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    border-color: var(--app-control);
+    color: var(--app-text);
+  }
+
+  &__icon {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+
+  &__label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__kbd {
+    flex: none;
+    margin-left: auto;
+    padding: 0 4px;
+    border: 1px solid var(--app-border);
+    border-radius: 4px;
+    color: var(--app-faint);
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 17px;
+  }
 }
 
 .flex {
@@ -410,27 +297,28 @@ onMounted(() => {
     }
 
     .avatar-container {
-      margin-right: 40px;
+      margin-right: 8px;
 
       .avatar-wrapper {
-        margin-top: 0;
-        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding-right: 4px;
 
         .user-avatar {
           cursor: pointer;
-          width: 40px;
-          height: 40px;
-          border-radius: var(--app-radius-md);
-          margin-top: 0;
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
           display: block;
         }
 
+        /* 箭头跟头像同一行居中，不再用 absolute + right:-20px 外溢（旧写法逼着给容器留 40px 右边距） */
         i {
           cursor: pointer;
-          position: absolute;
-          right: -20px;
-          top: 25px;
+          position: static;
           font-size: 12px;
+          color: var(--app-faint);
         }
       }
     }
@@ -444,6 +332,34 @@ onMounted(() => {
   padding-top: var(--sp-top, 0px);
 
   @media (max-width: 992px) {
+    /* 手机只留最后一级做「你在哪」的提示：完整面包屑 + 未读角标 + 头像三者加起来会
+       超出 390 视口（实测 413），把头像顶出右边缘；截断后约 294，留足余量 */
+    .breadcrumb-container {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+
+      :deep(.el-breadcrumb__item) {
+        display: none;
+      }
+
+      :deep(.el-breadcrumb__item:last-child) {
+        display: inline-flex;
+        align-items: center;
+        max-width: 100%;
+      }
+
+      :deep(.el-breadcrumb__separator) {
+        display: none;
+      }
+
+      :deep(.el-breadcrumb__inner) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
     .right-menu {
       gap: 2px;
 
@@ -455,8 +371,8 @@ onMounted(() => {
       }
 
       .avatar-container {
-        /* 头像右侧 12px：给下拉箭头（right:-20px）留位，同时保证 390px 下整个头像可见 */
-        margin-right: 12px;
+        /* 头像右侧 8px：箭头已改内联，不再需要给 absolute 箭头留位 */
+        margin-right: 8px;
       }
     }
   }

@@ -1,7 +1,7 @@
 <template>
   <div :class="classObj" class="app-wrapper" :style="{ '--current-color': theme }">
     <div v-if="device === 'mobile' && sidebar.opened" class="drawer-bg" @click="handleClickOutside" />
-    <side-bar v-if="!sidebar.hide" class="sidebar-container" />
+    <side-bar v-if="!sidebar.hide" class="sidebar-container" @set-layout="setLayout" @feedback="openFeedback" />
     <div :class="{ hasTagsView: needTagsView, sidebarHide: sidebar.hide }" class="main-container">
       <!-- <el-scrollbar>
         <div :class="{ 'fixed-header': fixedHeader }">
@@ -12,7 +12,7 @@
         <settings ref="settingRef" />
       </el-scrollbar> -->
       <div :class="{ 'fixed-header': fixedHeader }">
-        <navbar ref="navbarRef" @set-layout="setLayout" />
+        <navbar @set-layout="setLayout" @feedback="openFeedback" />
         <!-- 波 0.1（多审 P2）：手机用 v-show 而非 v-if——addView（visitedViews/cachedViews 的唯一写入点）
              在 TagsView 内部 watch 路由，v-if 卸载后手机 keep-alive 整体失效（返回丢筛选/滚动）；
              保留挂载只藏 DOM，设置关掉页签时仍彻底卸载 -->
@@ -20,6 +20,8 @@
       </div>
       <app-main />
       <settings ref="settingRef" />
+      <!-- 反馈弹窗归壳层持有：顶栏头像菜单与左下用户行开的是同一个框 -->
+      <feedback-dialog v-model:visible="feedbackOpen" :initial-tab="feedbackTab" />
       <!-- DCS AI 助手（批E：悬浮球+抽屉；组件内自判权限与租户开关，未开启=零渲染） -->
       <dcs-assistant />
       <!-- 交互三件 ①：Ctrl+K / Cmd+K 命令面板（数据源=权限过滤后的路由菜单） -->
@@ -31,6 +33,7 @@
 <script setup lang="ts">
 import SideBar from './components/Sidebar/index.vue';
 import { AppMain, Navbar, Settings, TagsView } from './components';
+import FeedbackDialog from '@/views/dcs/feedback/components/FeedbackDialog.vue';
 // S-38：悬浮球仅壳常驻，抽屉主体在组件内 dynamic import
 const DcsAssistant = defineAsyncComponent(() => import('@/components/DcsAssistant/index.vue'));
 // 交互三件 ①：命令面板随壳常驻；异步加载避免与 permission store → router → Layout 形成同步环
@@ -79,14 +82,13 @@ watchEffect(() => {
   }
 });
 
-const navbarRef = ref<InstanceType<typeof Navbar>>();
 const settingRef = ref<InstanceType<typeof Settings>>();
-
-onMounted(() => {
-  nextTick(() => {
-    navbarRef.value?.initTenantList();
-  });
-});
+const feedbackOpen = ref(false);
+const feedbackTab = ref<'submit' | 'mine'>('submit');
+const openFeedback = (tab: 'submit' | 'mine' = 'submit') => {
+  feedbackTab.value = tab;
+  feedbackOpen.value = true;
+};
 
 onMounted(() => {
   const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';

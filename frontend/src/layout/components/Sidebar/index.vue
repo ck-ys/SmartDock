@@ -1,6 +1,6 @@
 <template>
   <div :class="{ 'has-logo': showLogo }" :style="{ backgroundColor: bgColor }">
-    <logo v-if="showLogo" :collapse="isCollapse" />
+    <brand-row v-if="showLogo" :collapse="isCollapse" />
     <el-scrollbar :class="sideTheme" wrap-class="scrollbar-wrapper">
       <transition :enter-active-class="proxy?.animate.menuSearchAnimate.enter" mode="out-in">
         <el-menu
@@ -18,11 +18,13 @@
         </el-menu>
       </transition>
     </el-scrollbar>
+    <user-row :collapse="isCollapse" @set-layout="emit('set-layout')" @feedback="emit('feedback')" />
   </div>
 </template>
 
 <script setup lang="ts">
-import Logo from './Logo.vue';
+import BrandRow from './BrandRow.vue';
+import UserRow from './UserRow.vue';
 import SidebarItem from './SidebarItem.vue';
 import variables from '@/assets/styles/variables.module.scss';
 import { useAppStore } from '@/store/modules/app';
@@ -31,6 +33,7 @@ import { usePermissionStore } from '@/store/modules/permission';
 import { RouteRecordRaw } from 'vue-router';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
+const emit = defineEmits<{ 'set-layout': []; feedback: [] }>();
 
 const route = useRoute();
 const appStore = useAppStore();

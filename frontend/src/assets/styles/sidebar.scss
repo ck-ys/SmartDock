@@ -16,6 +16,9 @@
   .sidebar-container {
     -webkit-transition: width 0.28s;
     transition: width 0.28s;
+    /* 三段式：品牌 64 / 菜单吃剩余 / 用户行 64——用户行钉在底部，菜单自己滚 */
+    display: flex;
+    flex-direction: column;
     width: $base-sidebar-width !important;
     background-color: $base-menu-background;
     height: 100%;
@@ -44,21 +47,18 @@
     }
 
     .el-scrollbar {
-      height: 100%;
-    }
-
-    &.has-logo {
-      .el-scrollbar {
-        /* 顶栏提到 64 后 Logo 也变 64，这里必须跟令牌走，写死 48 会让菜单底部被裁 16px */
-        height: calc(100% - var(--app-topbar-h));
-      }
+      /* 交给 flex 分配高度：品牌与用户行都是定高，菜单吃剩下的（不再用 calc 扣两次） */
+      height: auto;
+      flex: 1 1 auto;
+      min-height: 0;
     }
 
     .is-horizontal {
       display: none;
     }
 
-    a {
+    // 菜单链接按整个宽度裁切；品牌行（<a> 分支）自己是一行 flex，不能被这条 #app 级规则改成 inline-block
+    a:not(.sidebar-brand__row) {
       display: inline-block;
       width: 100%;
       overflow: hidden;
