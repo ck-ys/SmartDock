@@ -65,7 +65,7 @@
     }
 
     .svg-icon {
-      margin-right: 10px;
+      margin-right: 12px;
     }
 
     .el-menu {
@@ -89,7 +89,7 @@
     .theme-dark .sub-menu-title-noDropdown,
     .theme-dark .el-sub-menu__title {
       border-radius: var(--app-radius-md);
-      margin: 1px 8px 1px 8px;
+      margin: 0 var(--app-nav-inset);
       &:hover {
         background-color: $base-sub-menu-title-hover !important;
       }
@@ -97,7 +97,7 @@
     .sub-menu-title-noDropdown,
     .el-sub-menu__title {
       border-radius: var(--app-radius-md);
-      margin: 1px 8px 1px 8px;
+      margin: 0 var(--app-nav-inset);
       &:hover {
         background-color: rgba(0, 0, 0, 0.05) !important;
       }
@@ -111,8 +111,8 @@
     & .el-sub-menu .el-menu-item {
       min-width: calc($base-sidebar-width - 20px) !important;
       border-radius: var(--app-radius-md);
-      height: 34px;
-      margin: 1px 8px 1px 8px;
+      height: var(--app-nav-row-h);
+      margin: 0 var(--app-nav-inset);
       &:not(.is-active):hover {
         background-color: rgba(0, 0, 0, 0.1) !important;
       }
@@ -122,8 +122,8 @@
     & .theme-dark .el-sub-menu .el-menu-item {
       background-color: $base-sub-menu-background !important;
       border-radius: var(--app-radius-md);
-      height: 34px;
-      margin: 1px 8px 1px 8px;
+      height: var(--app-nav-row-h);
+      margin: 0 var(--app-nav-inset);
 
       &.is-active {
         background-color: var(--app-active) !important;
@@ -138,8 +138,8 @@
     & .theme-dark .nest-menu .el-sub-menu > .el-sub-menu__title,
     & .theme-dark .el-menu-item {
       border-radius: var(--app-radius-md);
-      height: 34px;
-      margin: 1px 8px 1px 8px;
+      height: var(--app-nav-row-h);
+      margin: 0 var(--app-nav-inset);
 
       &.is-active {
         background-color: var(--app-active) !important;
@@ -154,8 +154,8 @@
     & .nest-menu .el-sub-menu > .el-sub-menu__title,
     & .el-menu-item {
       border-radius: var(--app-radius-md);
-      height: 34px;
-      margin: 1px 8px 1px 8px;
+      height: var(--app-nav-row-h);
+      margin: 0 var(--app-nav-inset);
 
       &.is-active {
         background-color: var(--app-active) !important;
@@ -181,7 +181,7 @@
     .sub-menu-title-noDropdown {
       padding: 0 !important;
       position: relative;
-      height: 34px;
+      height: var(--app-nav-row-h);
       // 选中状态的菜单
       &.is-active {
         background-color: var(--app-active) !important;
@@ -198,7 +198,7 @@
       border-radius: var(--app-radius-md);
       .el-sub-menu__title.el-tooltip__trigger {
         border-radius: var(--app-radius-md);
-        height: 34px;
+        height: var(--app-nav-row-h);
       }
 
       // 选中状态的菜单

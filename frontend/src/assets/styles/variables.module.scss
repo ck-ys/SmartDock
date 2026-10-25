@@ -13,7 +13,7 @@
   // 菜单栏缩进
   --el-menu-base-level-padding: 12px;
   --el-menu-level-padding: 8px;
-  --el-menu-item-height: 34px;
+  --el-menu-item-height: var(--app-nav-row-h, 38px);
 
   --fixedHeaderBg: var(--app-frame);
   --tableHeaderBg: transparent;

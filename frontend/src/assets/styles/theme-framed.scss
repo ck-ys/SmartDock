@@ -51,6 +51,11 @@
   --app-card-radius: 10px;
   --app-control-radius: 8px;
   --app-nav-radius: 8px; // 导航药丸专用：不跟控件圆角走
+  /* 导航行：行高比 shadcn 的 32 大一档（中文字面更矮），左右留 6px 让药丸不顶边 */
+  --app-nav-row-h: 38px;
+  --app-nav-row-gap: 4px;
+  --app-nav-inset: 6px;
+  --app-nav-icon: 18px;
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
   --app-shadow-sm: none;
@@ -324,18 +329,42 @@ body {
   border-right: 0;
 }
 
+/* 侧栏菜单：行高/行距/内缩走 --app-nav-* 令牌，与左上品牌、左下用户行同一套节奏 */
 #app .sidebar-container .el-menu {
   background: transparent !important;
-  padding: 4px 0;
+  padding: 6px 0;
+  /* 行距用 flex gap：Element 把每行包在 <a>/<div> 里，竖向外边距会穿透包裹层，
+     顶层只剩 2px 而二级有 4px；统一成 gap 后两级节奏一致 */
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-nav-row-gap);
 }
 
 #app .sidebar-container .el-menu-item,
 #app .sidebar-container .el-sub-menu__title {
-  height: 34px !important;
-  line-height: 34px !important;
-  margin: 1px 8px !important;
+  height: var(--app-nav-row-h) !important;
+  line-height: var(--app-nav-row-h) !important;
+  margin: 0 var(--app-nav-inset) !important;
   border-radius: var(--app-nav-radius) !important;
   font-size: 14px;
+  color: var(--app-muted);
+}
+
+/* 顶层条目是分组标题：墨色 + 500；二级条目保持灰字 400，层级靠缩进与字色区分
+   （Element 把 li 包在 <a>/<div> 里，所以按 el-menu--vertical 这一层认顶层，别用 > li） */
+#app .sidebar-container .el-menu--vertical > .el-menu-item,
+#app .sidebar-container .el-menu--vertical > a > .el-menu-item,
+#app .sidebar-container .el-menu--vertical > .el-sub-menu > .el-sub-menu__title,
+#app .sidebar-container .el-menu--vertical > div > .el-sub-menu > .el-sub-menu__title {
+  color: var(--app-text);
+  font-weight: 500;
+}
+
+/* 深色靠亮度分层（非当前项灰、当前项白），顶层条目不能跟着变白，否则看不出当前页 */
+html.dark #app .sidebar-container .el-menu--vertical > .el-menu-item,
+html.dark #app .sidebar-container .el-menu--vertical > a > .el-menu-item,
+html.dark #app .sidebar-container .el-menu--vertical > .el-sub-menu > .el-sub-menu__title,
+html.dark #app .sidebar-container .el-menu--vertical > div > .el-sub-menu > .el-sub-menu__title {
   color: var(--app-muted);
 }
 
@@ -347,7 +376,8 @@ body {
 
 #app .sidebar-container .el-menu-item.is-active,
 #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
-  background-color: var(--app-active) !important;
+  /* 浅色下用纸面白做当前页：侧栏是青灰框，灰药丸(#ebedee)贴在上面几乎看不出 */
+  background-color: var(--app-surface) !important;
   color: var(--app-text) !important;
   font-weight: 500;
 }
@@ -359,9 +389,9 @@ html.dark #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
 }
 
 #app .sidebar-container .svg-icon {
-  width: 16px;
-  height: 16px;
-  margin-right: 10px;
+  width: var(--app-nav-icon);
+  height: var(--app-nav-icon);
+  margin-right: 12px;
 }
 
 /* 侧栏底部用户行（页面里没有专门组件，保留弹性） */
