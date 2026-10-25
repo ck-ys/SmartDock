@@ -331,24 +331,22 @@
           </div>
         </div>
       </template>
-      <!-- 业务批8 Q3：汇总条——本周/本月消耗 + 周池剩余（账单感；数据源 summary 同口现算）。
-           step5 P1-D1 回修：三格是全租户口径，「只看我的」视角下表格只剩本人行，租户数字会与
-           表格对不上造成误导——个人视角隐藏三格，换一行灰字指路 -->
+      <!-- 业务批8 Q3：汇总条——本周消耗 + 周池剩余（账单感；数据源 summary 同口现算）。
+           step5 P1-D1 回修：汇总带是全租户口径，「只看我的」视角下表格只剩本人行，租户数字会与
+           表格对不上造成误导——个人视角隐藏汇总带，换一行灰字指路 -->
+      <!-- 题5-② 汇总带收到 2 格：「本月消耗」降级进本周格的 hint（明细在下方流水表） -->
       <div v-if="ledgerView === 'tenant'" class="ui-kpi-strip ledger-summary">
         <div class="ui-kpi">
           <span class="ui-kpi__label">全租户 · 本周消耗</span>
           <strong class="ui-kpi__value">{{ summary.weekSpent > 0 ? `-${fmt(summary.weekSpent)}` : '0' }}</strong>
-        </div>
-        <div class="ui-kpi">
-          <span class="ui-kpi__label">全租户 · 本月消耗</span>
-          <strong class="ui-kpi__value">{{ summary.monthSpent > 0 ? `-${fmt(summary.monthSpent)}` : '0' }}</strong>
+          <span class="ui-kpi__hint">本月 {{ summary.monthSpent > 0 ? `-${fmt(summary.monthSpent)}` : '0' }}</span>
         </div>
         <div class="ui-kpi">
           <span class="ui-kpi__label">本周剩余（周池）</span>
           <strong class="ui-kpi__value">{{ fmt(Math.max(0, summary.weeklyCap - summary.weeklyUsed)) }}</strong>
         </div>
       </div>
-      <div v-else class="ledger-summary-mine">三格汇总为全租户口径，与「只看我的」列表对不上——切回「租户全景」查看汇总</div>
+      <div v-else class="ledger-summary-mine">汇总带为全租户口径，与「只看我的」列表对不上——切回「租户全景」查看汇总</div>
       <div class="ledger-table-wrap">
         <el-table v-loading="ledgerLoading" :data="ledgerRows" class="ui-table">
           <el-table-column label="时间" prop="createTime" width="170" />

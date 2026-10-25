@@ -457,6 +457,11 @@ onMounted(load);
   background: var(--app-raised);
 }
 
+/* 题5-④ 选中态补下划线：只靠底色变化扫视分不清哪格是当前筛选，加一条主色底边 */
+.fb-stat.is-active {
+  box-shadow: inset 0 -2px 0 var(--app-accent);
+}
+
 /* 激活格同时提亮标签：深色下也能一眼看出当前筛选 */
 .fb-stat.is-active .ui-kpi__label {
   color: var(--app-text);
