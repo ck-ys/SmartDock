@@ -1,8 +1,22 @@
 <template>
   <div class="sidebar-user" :class="{ 'is-collapse': collapse }">
-    <!-- 单位行（2026-10-24 拍板 题1-A：账号归账号、单位归单位）：超管且多单位才有 -->
-    <el-dropdown v-if="canSwitch" trigger="click" placement="top-start" :disabled="switching" @command="switchTo">
-      <button type="button" class="sidebar-user__unit" :title="`${unitName}（点击切换单位）`">
+    <!-- 单位行（2026-10-24 拍板 题1-A：账号归账号、单位归单位）：超管且多单位才有；
+         列表回来前渲染同高占位，避免菜单区被单位行顶上去跳一下 -->
+    <el-dropdown
+      v-if="canSwitch"
+      trigger="click"
+      placement="top-start"
+      :disabled="switching"
+      popper-class="sidebar-user-unit-popper"
+      @command="switchTo"
+    >
+      <button
+        type="button"
+        class="sidebar-user__unit"
+        :title="`${unitName}（点击切换单位）`"
+        :aria-label="`当前单位：${unitName}，点击切换单位`"
+        aria-haspopup="menu"
+      >
         <el-icon class="sidebar-user__unit-ic"><OfficeBuilding /></el-icon>
         <span class="sidebar-user__unit-name">{{ switching ? '切换中…' : unitName }}</span>
         <span v-if="!switching" class="sidebar-user__switch" aria-hidden="true">切换</span>
@@ -28,6 +42,7 @@
         </el-dropdown-menu>
       </template>
     </el-dropdown>
+    <div v-else-if="isSuperAdmin && !ready" class="sidebar-user__unit sidebar-user__unit--ghost" aria-hidden="true"></div>
     <!-- 账号行：菜单里只有账号的事（单位切换在上一行） -->
     <div class="sidebar-user__menu">
       <dcs-user-menu placement="top-start" @layout="emit('set-layout')" @feedback="emit('feedback')">
@@ -57,20 +72,18 @@ const emit = defineEmits<{ 'set-layout': []; feedback: [] }>();
 
 const userStore = useUserStore();
 const { tenantName } = useWorkspace();
-const { canSwitch, switching, currentTenant, isDefaultTenant, defaultId, unitOptions, load, switchTo } =
-  useTenantSwitch();
+const { canSwitch, switching, ready, currentTenant, isDefaultTenant, defaultId, unitOptions, isSuperAdmin, load, switchTo } = useTenantSwitch();
 
 const nickname = computed(() => userStore.nickname);
 const avatar = computed(() => userStore.avatar);
 const initial = computed(() => (nickname.value || '?').slice(0, 1).toUpperCase());
 // 角色用现有角色码翻译：超管 admin，其余统一叫「成员」，不臆造岗位名
 const roleLabel = computed(() => (userStore.roles.includes('superadmin') ? '管理员' : '成员'));
-// 超管的单位已在上一行常驻显示，账号行不再重复；普通成员没有单位行，副文字保留单位
-const meta = computed(() =>
-  canSwitch.value
-    ? ''
-    : [roleLabel.value === nickname.value ? '' : roleLabel.value, tenantName.value].filter(Boolean).join(' · ')
-);
+// 昵称本身就叫「管理员」时不再重复角色，避免出现「管理员 / 管理员 · 演示单位」
+const roleText = computed(() => (roleLabel.value === nickname.value ? '' : roleLabel.value));
+// 超管的单位已在上一行常驻显示，账号行只留角色；普通成员没有单位行，副文字留角色位
+//（成员的单位名缺数据源，2026-10-24 已知问题，见拍板板）
+const meta = computed(() => (canSwitch.value ? roleText.value : [roleText.value, tenantName.value].filter(Boolean).join(' · ')));
 
 // 单位行显示名：优先租户列表里的当前单位，加载前退回工作区名称，不编造
 const unitName = computed(() => currentTenant.value?.companyName || tenantName.value || '当前单位');
@@ -125,6 +138,12 @@ onMounted(load);
   flex: none;
   color: var(--app-muted);
   font-size: var(--app-nav-icon);
+}
+
+/* 加载期同高占位：占住 38px 防跳，不可见不可点 */
+.sidebar-user__unit--ghost {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .sidebar-user__unit-name {
@@ -324,6 +343,21 @@ html.dark .el-dropdown-menu .sidebar-user__tag {
 
 .el-dropdown-menu .sidebar-user__opt {
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 单位浮层限宽限高：单位名长/数量多时省略号与滚动才真正生效（popper 挂 body，用 popper-class 命中） */
+.sidebar-user-unit-popper .el-dropdown-menu {
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(360px, 60vh);
+  overflow-y: auto;
+}
+
+.sidebar-user-unit-popper .sidebar-user__current-name {
+  flex: 1 1 auto;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

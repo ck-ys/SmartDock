@@ -19,6 +19,8 @@ const tenants = ref<TenantVO[]>([]);
 const tenantEnabled = ref(false);
 const currentId = ref('');
 const switching = ref(false);
+// 首次加载是否已返回（无论成败）：给底区渲染同高占位，避免单位行晚到把菜单顶上去
+const ready = ref(false);
 let loadedFor = '';
 
 export const useTenantSwitch = () => {
@@ -74,6 +76,8 @@ export const useTenantSwitch = () => {
       currentId.value = defaultId.value;
       tenantName.value = '';
       tenantSwitched.value = false;
+    } finally {
+      ready.value = true;
     }
   };
 
@@ -110,9 +114,7 @@ export const useTenantSwitch = () => {
       await router.push('/');
       await proxy?.$tab.closeAllPage();
       await proxy?.$tab.refreshPage();
-      ElMessage.success(
-        tenantId === '__default' ? '已回到默认单位' : `已切换到「${currentTenant.value?.companyName || target}」，数据加载中`
-      );
+      ElMessage.success(tenantId === '__default' ? '已回到默认单位' : `已切换到「${currentTenant.value?.companyName || target}」，数据加载中`);
     } catch {
       // 单位已切成功，只是收尾导航没走完：别报「切换失败」骗用户重试
       ElMessage.warning('单位已切换，页面自动刷新失败，请手动刷新');
@@ -125,6 +127,7 @@ export const useTenantSwitch = () => {
     tenants,
     currentId,
     switching,
+    ready,
     currentTenant,
     otherTenants,
     unitOptions,
