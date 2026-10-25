@@ -66,7 +66,7 @@ const short = computed(() => key.value.slice(0, 2) || '?');
 const boxStyle = computed(() => ({ width: `${props.size}px`, height: `${props.size}px` }));
 const fallbackStyle = computed(() => ({
   ...boxStyle.value,
-  background: FALLBACK_BG[key.value] || '#909399',
+  background: FALLBACK_BG[key.value] || 'var(--app-muted)',
   fontSize: `${Math.max(9, Math.round(props.size * 0.38))}px`
 }));
 </script>
@@ -75,12 +75,12 @@ const fallbackStyle = computed(() => ({
 .plogo {
   flex: none;
   object-fit: contain;
-  border-radius: 6px;
-  background: #fff;
-  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: var(--app-control-radius);
+  background: var(--app-surface);
+  border: 1px solid var(--app-rule);
   padding: 2px;
   &.plogo-sm {
-    border-radius: 4px;
+    border-radius: var(--el-border-radius-small);
     padding: 1px;
   }
 }
@@ -88,7 +88,7 @@ const fallbackStyle = computed(() => ({
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--app-primary-ink);
   font-weight: 700;
   letter-spacing: 0.5px;
 }

@@ -26,29 +26,37 @@
       </div>
     </div>
 
-    <el-table v-loading="loading" :data="domainList" border size="small">
-      <el-table-column label="域名" prop="domain" min-width="220" show-overflow-tooltip />
-      <el-table-column label="服务商" width="160" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="providerTagType(row.provider)">{{ providerLabel(row.provider) }}</el-tag>
+    <div class="dd-table-wrap">
+      <el-table v-loading="loading" :data="domainList" class="ui-table">
+        <el-table-column label="域名" prop="domain" min-width="220" show-overflow-tooltip />
+        <el-table-column label="服务商" width="160" align="center">
+          <template #default="{ row }">
+            <span class="ui-pill ui-pill--muted">{{ providerLabel(row.provider) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" prop="remark" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.remark || '--' }}</template>
+        </el-table-column>
+        <el-table-column label="启用" width="90" align="center">
+          <template #default="{ row }">
+            <span class="ui-pill" :class="row.enabled === '1' ? 'ui-pill--pos' : 'ui-pill--muted'">{{ row.enabled === '1' ? '启用' : '停用' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
+        <el-table-column label="操作" width="150" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" :icon="Edit" v-hasPermi="['dcs:ai:edit']" @click="openEdit(row)">编辑</el-button>
+            <el-button link type="danger" size="small" :icon="Delete" v-hasPermi="['dcs:ai:edit']" @click="onDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">还没有识别域名</p>
+            <p class="ui-empty__hint">添加域名后，这些外部域名下的文档才能被解析为 AI 文档来源</p>
+          </div>
         </template>
-      </el-table-column>
-      <el-table-column label="备注" prop="remark" min-width="200" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.remark || '--' }}</template>
-      </el-table-column>
-      <el-table-column label="启用" width="90" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="row.enabled === '1' ? 'success' : 'info'">{{ row.enabled === '1' ? '启用' : '停用' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="创建时间" prop="createTime" width="170" align="center" />
-      <el-table-column label="操作" width="150" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" size="small" :icon="Edit" v-hasPermi="['dcs:ai:edit']" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="danger" size="small" :icon="Delete" v-hasPermi="['dcs:ai:edit']" @click="onDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+      </el-table>
+    </div>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
@@ -120,22 +128,6 @@ const providerOptions = [
 ];
 
 const providerLabel = (p: string) => providerOptions.find((o) => o.value === p)?.label || p || '--';
-const providerTagType = (p: string) => {
-  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
-    DEEPSEEK: 'success',
-    QWEN: 'warning',
-    ZHIPU: 'primary',
-    KIMI: 'primary',
-    BAIDU_QIANFAN: 'success',
-    TENCENT_HUNYUAN: 'warning',
-    XFYUN_SPARK: 'danger',
-    MINIMAX: 'warning',
-    SILICONFLOW: 'success',
-    OPENAI: 'success',
-    CUSTOM: 'info'
-  };
-  return map[p] || 'info';
-};
 
 const getList = async () => {
   loading.value = true;
@@ -224,6 +216,9 @@ onMounted(getList);
 </script>
 
 <style scoped>
+.doc-domain-panel {
+  min-width: 0;
+}
 .dd-toolbar {
   display: flex;
   justify-content: space-between;
@@ -239,9 +234,26 @@ onMounted(getList);
   display: flex;
   margin-bottom: 8px;
 }
+/* 375：表格在容器内横滚，父链 min-width:0 防整页横向溢出 */
+.dd-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.dd-table-wrap :deep(.el-table) {
+  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加 */
+  min-width: 990px;
+  /* 只覆盖 EP 表格 CSS 变量，不重写组件（契约 §2.5） */
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: var(--app-surface);
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+}
 .dd-footnote {
   margin-top: 10px;
-  font-size: 12.5px;
-  color: var(--el-text-color-secondary);
+  font-size: var(--dcs-font-sm);
+  color: var(--app-muted);
 }
 </style>

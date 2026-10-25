@@ -2,6 +2,7 @@
   <div class="dcs-ops-page">
     <DcsOperationsPageHeader
       title="AI 用量明细"
+      eyebrow="AI 配置与用量"
       subtitle="追踪每次大模型调用的 Token、时延、基础成本与服务费，帮助租户核对消耗并定位失败请求。"
       :metrics="headerMetrics"
     >
@@ -17,15 +18,13 @@
           <!-- 各调用方分布 -->
           <el-card v-if="summary && summary.costByCaller" shadow="never" class="caller-overview-card">
             <template #header><span>调用方成本分布</span></template>
-            <el-row :gutter="12">
-              <el-col v-for="(cost, caller) in summary.costByCaller" :key="caller" :span="6" :xs="12" :sm="6">
-                <div class="caller-stat">
-                  <span class="caller-name">{{ callerLabel(String(caller)) }}</span>
-                  <span class="caller-cost">¥{{ Number(cost).toFixed(4) }}</span>
-                  <span class="caller-count">{{ summary.byCaller[caller] || 0 }} 次</span>
-                </div>
-              </el-col>
-            </el-row>
+            <div class="ui-kpi-strip caller-strip">
+              <div v-for="(cost, caller) in summary.costByCaller" :key="caller" class="ui-kpi">
+                <span class="ui-kpi__label">{{ callerLabel(String(caller)) }}</span>
+                <strong class="ui-kpi__value">¥{{ Number(cost).toFixed(4) }}</strong>
+                <span class="ui-kpi__hint">{{ summary.byCaller[caller] || 0 }} 次调用</span>
+              </div>
+            </div>
           </el-card>
         </div>
 
@@ -41,79 +40,83 @@
               <el-button :icon="Download" :loading="exporting" @click="exportUsage">导出 Excel</el-button>
             </div>
           </template>
-          <el-table v-loading="loading" :data="usageList" border size="small">
-            <el-table-column label="时间" prop="createTime" width="170" />
-            <el-table-column label="调用方" width="120">
-              <template #default="{ row }">
-                <el-tag size="small">{{ callerLabel(row.caller) }}</el-tag>
+          <div class="usage-table-wrap">
+            <el-table v-loading="loading" :data="usageList" class="ui-table">
+              <el-table-column label="时间" prop="createTime" width="170" />
+              <el-table-column label="调用方" width="120">
+                <template #default="{ row }">
+                  <span class="ui-pill ui-pill--muted">{{ callerLabel(row.caller) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column width="150" show-overflow-tooltip>
+                <template #header>
+                  场景
+                  <el-tooltip placement="top" content="这次调用在业务里的位置：第几轮会话、自动起标题、追问建议等；保留原文的是未收录的新场景">
+                    <span class="col-info">ⓘ</span>
+                  </el-tooltip>
+                </template>
+                <template #default="{ row }">{{ sceneLabel(row.scene) }}</template>
+              </el-table-column>
+              <el-table-column label="模型" prop="modelName" min-width="150" show-overflow-tooltip />
+              <el-table-column label="计费模式" width="120" align="center">
+                <template #default="{ row }">
+                  <span class="ui-pill ui-pill--muted">{{ billingModeLabel(row.billingMode) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column min-width="190" show-overflow-tooltip>
+                <template #header>
+                  Token
+                  <el-tooltip
+                    placement="top"
+                    content="输入=发送内容消耗的 Token；输出=AI 回答生成的 Token；缓存=命中缓存的输入部分（更便宜，为 0 时不显示）"
+                  >
+                    <span class="col-info">ⓘ</span>
+                  </el-tooltip>
+                </template>
+                <template #default="{ row }">{{ tokenText(row) }}</template>
+              </el-table-column>
+              <el-table-column label="耗时(ms)" prop="latencyMs" width="100" align="right" class-name="ui-num" />
+              <el-table-column label="基础成本" width="105" align="right" class-name="ui-num">
+                <template #default="{ row }">{{ money(row.baseCostAmount ?? row.unitPrice, row.currency) }}</template>
+              </el-table-column>
+              <el-table-column label="服务费" width="105" align="right" class-name="ui-num">
+                <template #default="{ row }">
+                  <span>{{ money(row.serviceFeeAmount, row.currency) }}</span>
+                  <span v-if="row.serviceFeeRate" class="fee-rate">({{ Number(row.serviceFeeRate).toFixed(2) }}%)</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="最终消耗" width="110" align="right" class-name="ui-num">
+                <template #default="{ row }">
+                  <span :class="{ 'cost-zero': Number(row.costAmount || 0) === 0 }">{{ money(row.costAmount, row.currency) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="90" align="center">
+                <template #default="{ row }">
+                  <span class="ui-pill" :class="row.success === '1' ? 'ui-pill--pos' : 'ui-pill--neg'">{{
+                    row.success === '1' ? '成功' : '失败'
+                  }}</span>
+                </template>
+              </el-table-column>
+              <!-- 业务反馈批1015c Q9(拍板A)：错误列不再裸出库内英文原文（管理员满屏英文吓人）——
+                   全站公共映射 humanizeAiError 归类成中文短语（与聊天错误卡同表），悬停看原文。
+                   title 直接挂原文（detail 就是原文），单行只调一次映射（三审 P2：原写法 3 次/行）；
+                   nowrap+ellipsis 防长原文换行撑高行 -->
+              <el-table-column label="错误" prop="errorMsg" min-width="200">
+                <template #default="{ row }">
+                  <span v-if="row.errorMsg" :title="row.errorMsg" class="error-ellipsis">
+                    {{ humanizeAiError(row.errorMsg).title }}
+                  </span>
+                  <template v-else>--</template>
+                </template>
+              </el-table-column>
+              <template #empty>
+                <div class="ui-empty">
+                  <p class="ui-empty__title">当前筛选下没有调用明细</p>
+                  <p class="ui-empty__hint">换个调用方或清空筛选后再看；有调用发生后这里会逐条列出 Token 与成本</p>
+                </div>
               </template>
-            </el-table-column>
-            <el-table-column width="150" show-overflow-tooltip>
-              <template #header>
-                场景
-                <el-tooltip placement="top" content="这次调用在业务里的位置：第几轮会话、自动起标题、追问建议等；保留原文的是未收录的新场景">
-                  <span class="col-info">ⓘ</span>
-                </el-tooltip>
-              </template>
-              <template #default="{ row }">{{ sceneLabel(row.scene) }}</template>
-            </el-table-column>
-            <el-table-column label="模型" prop="modelName" min-width="150" show-overflow-tooltip />
-            <el-table-column label="计费模式" width="120" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" :type="row.billingMode === 'OFFICIAL_TOKEN' ? 'success' : 'info'">{{
-                  billingModeLabel(row.billingMode)
-                }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column min-width="190" show-overflow-tooltip>
-              <template #header>
-                Token
-                <el-tooltip
-                  placement="top"
-                  content="输入=发送内容消耗的 Token；输出=AI 回答生成的 Token；缓存=命中缓存的输入部分（更便宜，为 0 时不显示）"
-                >
-                  <span class="col-info">ⓘ</span>
-                </el-tooltip>
-              </template>
-              <template #default="{ row }">{{ tokenText(row) }}</template>
-            </el-table-column>
-            <el-table-column label="耗时(ms)" prop="latencyMs" width="100" align="center" />
-            <el-table-column label="基础成本" width="105" align="center">
-              <template #default="{ row }">{{ money(row.baseCostAmount ?? row.unitPrice, row.currency) }}</template>
-            </el-table-column>
-            <el-table-column label="服务费" width="105" align="center">
-              <template #default="{ row }">
-                <span>{{ money(row.serviceFeeAmount, row.currency) }}</span>
-                <span v-if="row.serviceFeeRate" class="fee-rate">({{ Number(row.serviceFeeRate).toFixed(2) }}%)</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="最终消耗" width="110" align="center">
-              <template #default="{ row }">
-                <span :class="{ 'cost-zero': Number(row.costAmount || 0) === 0 }">{{ money(row.costAmount, row.currency) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="90" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" :type="row.success === '1' ? 'success' : 'danger'">{{ row.success === '1' ? '成功' : '失败' }}</el-tag>
-              </template>
-            </el-table-column>
-            <!-- 业务反馈批1015c Q9(拍板A)：错误列不再裸出库内英文原文（管理员满屏英文吓人）——
-                 全站公共映射 humanizeAiError 归类成中文短语（与聊天错误卡同表），悬停看原文。
-                 title 直接挂原文（detail 就是原文），单行只调一次映射（三审 P2：原写法 3 次/行）；
-                 nowrap+ellipsis 防长原文换行撑高行 -->
-            <el-table-column label="错误" prop="errorMsg" min-width="200">
-              <template #default="{ row }">
-                <span
-                  v-if="row.errorMsg"
-                  :title="row.errorMsg"
-                  style="display: inline-block; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"
-                >
-                  {{ humanizeAiError(row.errorMsg).title }}
-                </span>
-                <template v-else>--</template>
-              </template>
-            </el-table-column>
-          </el-table>
+            </el-table>
+          </div>
           <pagination
             v-show="total > 0"
             :total="total"
@@ -523,7 +526,7 @@ onMounted(loadData);
 }
 .page-subtitle {
   font-size: 13px;
-  color: #909399;
+  color: var(--app-faint);
   margin-top: 4px;
 }
 .filter-row {
@@ -532,37 +535,61 @@ onMounted(loadData);
   align-items: center;
   flex-wrap: wrap;
 }
-.caller-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  background: var(--el-fill-color-lighter);
-  margin-bottom: 12px;
+/* 调用方成本：一个连通带 + 1px 分隔，不再做四宫格磁贴（契约 §2.3） */
+.caller-overview-card {
+  margin-bottom: 0;
 }
-.caller-name {
-  font-weight: 600;
-  font-size: 14px;
+.caller-overview-card :deep(.el-card__body) {
+  padding: 16px;
 }
-.caller-cost {
-  font-size: 20px;
-  color: var(--el-color-primary);
-  font-weight: 700;
+.caller-strip {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  margin-top: 0;
+  background: var(--app-rule);
 }
-.caller-count {
-  font-size: 12px;
-  color: #909399;
+.caller-strip .ui-kpi {
+  border: 0;
+  background: var(--app-surface);
+  padding: 14px 16px;
+}
+/* 375：明细表在容器内横滚，父链 min-width:0 防整页溢出 */
+.usage-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+.usage-table-wrap :deep(.el-table) {
+  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加 */
+  min-width: 1610px;
+  /* 只覆盖 EP 表格 CSS 变量，不重写组件（契约 §2.5） */
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: var(--app-surface);
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+}
+.dcs-ops-page :deep(.el-tabs__content),
+.dcs-ops-page :deep(.el-tab-pane) {
+  min-width: 0;
 }
 .cost-zero {
-  color: #c0c4cc;
+  color: var(--app-faint);
 }
 .fee-rate {
   display: block;
-  color: #909399;
+  color: var(--app-faint);
   font-size: 12px;
   line-height: 16px;
+}
+.error-ellipsis {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* 业务批5 Q6-A：列头 ⓘ 信息钮——悬浮给 Token/场景的术语人话解释 */
 .col-info {

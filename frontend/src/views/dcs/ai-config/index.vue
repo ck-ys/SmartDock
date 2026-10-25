@@ -2,6 +2,7 @@
   <div class="dcs-ops-page">
     <DcsOperationsPageHeader
       title="AI 模型配置"
+      eyebrow="AI 配置与用量"
       subtitle="统一管理各租户的大模型供应商、密钥、价格参数与连接健康状态，确保业务调用可用且成本可控。"
       :metrics="headerMetrics"
     >
@@ -94,7 +95,7 @@
               <!-- 8+=B(2026-10-15)：钥匙健康角标——不点开管理钥匙也能扫一眼每家厂商几把钥匙、健康与否 -->
               <el-tooltip v-if="keyBadgeOf(g).level !== 'none'" :content="keyBadgeOf(g).tip" placement="top">
                 <!-- Q6：角标拆"本租户 N + 其他租户 M"——与钥匙管理页签口径一致，不再 2 vs 1 打架 -->
-                <span class="vc-key-chip" :class="'k-' + keyBadgeOf(g).level"
+                <span class="ui-pill vc-key-chip" :class="keyPillClass(keyBadgeOf(g).level)"
                   >🔑{{ keyBadgeOf(g).own }}{{ keyBadgeOf(g).others ? '+' + keyBadgeOf(g).others : '' }}</span
                 >
               </el-tooltip>
@@ -127,20 +128,14 @@
                 <div class="vc-head-main">
                   <div class="vc-head-name">
                     {{ getProviderName(activeGroup.provider) }}
-                    <el-tag :type="activeGroup.accessConfigured ? 'primary' : 'warning'" size="small" effect="plain">
+                    <span class="ui-pill" :class="activeGroup.accessConfigured ? 'ui-pill--pos' : 'ui-pill--muted'">
                       {{ activeGroup.accessConfigured ? '已接入 ✓' : '未接入' }}
-                    </el-tag>
+                    </span>
                     <!-- 8+=B(2026-10-15)：钥匙健康徽标——绿=全部启用、橙=部分停用/部分查失败、红=全停用或启用中全失败 -->
                     <el-tooltip v-if="activeKeyBadge && activeKeyBadge.level !== 'none'" :content="activeKeyBadge.tip" placement="top">
-                      <el-tag
-                        :type="activeKeyBadge.level === 'ok' ? 'success' : activeKeyBadge.level === 'warn' ? 'warning' : 'danger'"
-                        size="small"
-                        effect="light"
-                      >
-                        {{ activeKeyBadge.text }}
-                      </el-tag>
+                      <span class="ui-pill" :class="keyPillClass(activeKeyBadge.level)">{{ activeKeyBadge.text }}</span>
                     </el-tooltip>
-                    <el-tag v-else-if="activeKeyBadge" type="info" size="small" effect="plain">未配钥匙</el-tag>
+                    <span v-else-if="activeKeyBadge" class="ui-pill ui-pill--muted">未配钥匙</span>
                     <!-- 业务批(1015) Q1 拆星：头部「默认★在此」黄标退场（批1015c Q1 起默认管理在「AI 助手管理」页） -->
                   </div>
                   <div class="vc-head-url">
@@ -195,12 +190,12 @@
               </div>
 
               <div class="vc-toolbar">
-                <el-radio-group v-model="vcTypeFilter" size="small">
+                <el-radio-group v-model="vcTypeFilter">
                   <el-radio-button value="">全部类型</el-radio-button>
                   <el-radio-button value="CHAT">AI 调用</el-radio-button>
                   <el-radio-button value="EMBEDDING">向量化</el-radio-button>
                 </el-radio-group>
-                <el-radio-group v-model="vcEnabledFilter" size="small">
+                <el-radio-group v-model="vcEnabledFilter">
                   <el-radio-button value="">全部状态</el-radio-button>
                   <el-radio-button value="1">可用</el-radio-button>
                   <el-radio-button value="0">停用</el-radio-button>
@@ -208,9 +203,7 @@
                 <span class="vc-toolbar-right">
                   <template v-if="ids.length">
                     <span class="vc-sel-count">已选 {{ ids.length }} 个</span>
-                    <el-button v-hasPermi="['dcs:ai:remove']" type="danger" plain size="small" icon="Delete" @click="handleDelete()"
-                      >批量删除</el-button
-                    >
+                    <el-button v-hasPermi="['dcs:ai:remove']" type="danger" plain icon="Delete" @click="handleDelete()">批量删除</el-button>
                   </template>
                   <span v-else class="vc-hint">
                     {{ vendorModels.length }} 个模型<template v-if="vendorModels.length !== activeGroup.models.length"
@@ -238,10 +231,8 @@
                   <div class="vc-model-main">
                     <div class="vc-model-name">
                       <span class="vc-model-title">{{ row.modelName }}</span>
-                      <el-tag :type="useTypeTagType(row.useType)" size="small" effect="light">{{ useTypeLabel(row.useType) }}</el-tag>
-                      <el-tag size="small" effect="plain" :type="row.tenantId === '000000' ? 'info' : 'primary'">{{
-                        row.tenantId === '000000' ? '平台默认租户' : '租户 ' + row.tenantId
-                      }}</el-tag>
+                      <span class="ui-pill ui-pill--muted">{{ useTypeLabel(row.useType) }}</span>
+                      <span class="ui-pill ui-pill--muted">{{ row.tenantId === '000000' ? '平台默认租户' : '租户 ' + row.tenantId }}</span>
                     </div>
                     <div class="vc-model-meta">
                       {{ formatContext(row.contextWindow) }} 上下文 · {{ billingModeLabel(row.billingMode) }} ·
@@ -249,28 +240,27 @@
                       <template v-else-if="row.apiKey === '****'">🔑 行内钥匙（存量）</template>
                       <template v-else>未设钥匙</template>
                       <template v-if="row.apiFormat && row.apiFormat !== 'CHAT_COMPLETIONS'">
-                        · <el-tag size="small" type="warning" effect="plain">{{ apiFormatShort(row.apiFormat) }}</el-tag>
+                        · <span class="ui-pill ui-pill--warn">{{ apiFormatShort(row.apiFormat) }}</span>
                       </template>
                       · <span class="vc-updated">更新于 {{ row.updateTime || '-' }}</span>
                     </div>
                   </div>
                   <div class="vc-model-side">
                     <span class="vc-price">{{ priceText(row) }}</span>
-                    <el-tag
+                    <span
                       v-if="healthCheckResults[row.configId]"
-                      :type="healthCheckResults[row.configId].success ? 'success' : 'danger'"
-                      size="small"
-                      effect="light"
+                      class="ui-pill"
+                      :class="healthCheckResults[row.configId].success ? 'ui-pill--pos' : 'ui-pill--neg'"
                     >
                       {{ healthCheckResults[row.configId].success ? '连通' : '异常'
                       }}{{ healthCheckResults[row.configId].latencyMs ? ' ' + healthCheckResults[row.configId].latencyMs + 'ms' : '' }}
-                    </el-tag>
+                    </span>
                     <!-- AI 缺口批 Q9：04:00 定时巡检徽标（只读；手动连通测试是上面的实心 tag）。
                          k3 P3-4 回修：停用行不渲染——巡检跳过停用配置，旧健康行会永驻误导 -->
                     <el-tooltip v-if="row.enabled === '1' && patrolHealth[row.configId]" :content="patrolTip(row)" placement="top">
-                      <el-tag :type="patrolHealth[row.configId].status === 'OK' ? 'success' : 'danger'" size="small" effect="plain">
+                      <span class="ui-pill" :class="patrolHealth[row.configId].status === 'OK' ? 'ui-pill--pos' : 'ui-pill--neg'">
                         巡检{{ patrolHealth[row.configId].status === 'OK' ? '正常' : '异常' }}
-                      </el-tag>
+                      </span>
                     </el-tooltip>
                     <el-popover placement="top" trigger="hover" width="230">
                       <template #reference>
@@ -329,44 +319,54 @@
             >官方价来自 models.dev（同步不覆盖手工行）；币种非 CNY 的模型会被全系统统一拒用（钱包仅支持人民币）</span
           >
         </div>
-        <el-table v-loading="priceLoading" :data="priceList" border size="small">
-          <el-table-column label="租户" prop="tenantId" width="90" />
-          <el-table-column label="厂商" prop="provider" width="100">
-            <template #default="{ row }">{{ getProviderName(row.provider) }}</template>
-          </el-table-column>
-          <el-table-column label="模型" prop="modelName" min-width="150" show-overflow-tooltip />
-          <!-- N1 回修（视觉复核）：来源列前移到模型右边——表格横向超宽时，「这条价是哪来的」
-               是判断能不能被同步覆盖的关键信息，不能藏在滚动条后面 -->
-          <el-table-column label="价格来源" width="120" align="center">
-            <template #default="{ row }">
-              <el-tooltip :content="priceSourceTip(row)" placement="top">
-                <el-tag size="small" effect="plain" :type="priceSourceTagType(row)">{{ priceSourceLabel(row) }}</el-tag>
-              </el-tooltip>
+        <div class="price-table-wrap">
+          <el-table v-loading="priceLoading" :data="priceList" class="ui-table">
+            <el-table-column label="租户" prop="tenantId" width="90" />
+            <el-table-column label="厂商" prop="provider" width="100">
+              <template #default="{ row }">{{ getProviderName(row.provider) }}</template>
+            </el-table-column>
+            <el-table-column label="模型" prop="modelName" min-width="150" show-overflow-tooltip />
+            <!-- N1 回修（视觉复核）：来源列前移到模型右边——表格横向超宽时，「这条价是哪来的」
+                 是判断能不能被同步覆盖的关键信息，不能藏在滚动条后面 -->
+            <el-table-column label="价格来源" width="120" align="center">
+              <template #default="{ row }">
+                <el-tooltip :content="priceSourceTip(row)" placement="top">
+                  <span class="ui-pill" :class="pillOf(priceSourceTagType(row))">{{ priceSourceLabel(row) }}</span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
+            <el-table-column label="币种" prop="currency" width="66" align="center" />
+            <el-table-column label="输入/1M" width="100" align="right">
+              <template #default="{ row }">{{ Number(row.inputPricePerMillion || 0).toFixed(6) }}</template>
+            </el-table-column>
+            <el-table-column label="缓存输入/1M" width="112" align="right">
+              <template #default="{ row }">{{ Number(row.cachedInputPricePerMillion || 0).toFixed(6) }}</template>
+            </el-table-column>
+            <el-table-column label="输出/1M" width="100" align="right">
+              <template #default="{ row }">{{ Number(row.outputPricePerMillion || 0).toFixed(6) }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="70" align="center">
+              <template #default="{ row }">
+                <span class="ui-pill" :class="row.enabled === '1' ? 'ui-pill--pos' : 'ui-pill--muted'">{{
+                  row.enabled === '1' ? '启用' : '停用'
+                }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="来源" prop="sourceUrl" min-width="130" show-overflow-tooltip />
+            <el-table-column label="操作" width="100" align="center">
+              <template #default="{ row }">
+                <el-button v-hasPermi="['dcs:ai:edit']" link type="primary" icon="Edit" @click="openPriceDialog(row)" />
+                <el-button v-hasPermi="['dcs:ai:remove']" link type="danger" icon="Delete" @click="handleDeletePrice(row)" />
+              </template>
+            </el-table-column>
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">还没有价格数据</p>
+                <p class="ui-empty__hint">点「从 models.dev 同步」或「新增价格」后，模型成本会在这里逐行列出</p>
+              </div>
             </template>
-          </el-table-column>
-          <el-table-column label="币种" prop="currency" width="66" align="center" />
-          <el-table-column label="输入/1M" width="100" align="right">
-            <template #default="{ row }">{{ Number(row.inputPricePerMillion || 0).toFixed(6) }}</template>
-          </el-table-column>
-          <el-table-column label="缓存输入/1M" width="112" align="right">
-            <template #default="{ row }">{{ Number(row.cachedInputPricePerMillion || 0).toFixed(6) }}</template>
-          </el-table-column>
-          <el-table-column label="输出/1M" width="100" align="right">
-            <template #default="{ row }">{{ Number(row.outputPricePerMillion || 0).toFixed(6) }}</template>
-          </el-table-column>
-          <el-table-column label="状态" width="70" align="center">
-            <template #default="{ row }">
-              <el-tag size="small" :type="row.enabled === '1' ? 'success' : 'info'">{{ row.enabled === '1' ? '启用' : '停用' }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="来源" prop="sourceUrl" min-width="130" show-overflow-tooltip />
-          <el-table-column label="操作" width="100" align="center">
-            <template #default="{ row }">
-              <el-button v-hasPermi="['dcs:ai:edit']" link type="primary" icon="Edit" @click="openPriceDialog(row)" />
-              <el-button v-hasPermi="['dcs:ai:remove']" link type="danger" icon="Delete" @click="handleDeletePrice(row)" />
-            </template>
-          </el-table-column>
-        </el-table>
+          </el-table>
+        </div>
         <pagination
           v-show="priceTotal > 0"
           v-model:page="priceQuery.pageNum"
@@ -394,67 +394,75 @@
           </div>
         </div>
 
-        <el-table v-loading="keysLoading" :data="keyList" :empty-text="keysEmptyText">
-          <el-table-column v-if="keysTenantOptions.length > 1" label="租户" min-width="150">
-            <template #default="{ row }">
-              <span>{{ tenantNameOf(String(row.tenantId)) }}</span>
-              <el-tag v-if="String(row.tenantId) === myTenantId" size="small" type="success" effect="plain" class="ml-1">本租户</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="启用" width="70" align="center">
-            <template #default="{ row }">
-              <el-switch
-                :model-value="row.enabled !== '0'"
-                :aria-label="(row.label || '钥匙') + ' 启停'"
-                v-hasPermi="['dcs:ai:edit']"
-                @change="onToggleKey(row)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="名称" min-width="170">
-            <template #default="{ row }">
-              <span class="keys-name">{{ row.label || '未命名钥匙' }}</span>
-              <el-tag v-if="row.primary" size="small" type="primary" effect="light">主钥匙</el-tag>
-              <el-tag v-if="row.enabled === '0'" size="small" type="info" effect="plain">已停用</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="密钥" width="150">
-            <template #default="{ row }">
-              <code class="keys-mask">{{ row.apiKeyMask || '—' }}</code>
-            </template>
-          </el-table-column>
-          <el-table-column label="余额" width="130">
-            <template #default="{ row }">
-              <template v-if="row.balanceStatus === 'UNSUPPORTED'"><span class="keys-muted">--</span></template>
-              <template v-else-if="row.balanceAmount != null">
-                <!-- Q6：Kimi/MiniMax 是订阅额度，快照单位是「剩余百分比」而不是金额 -->
-                <span v-if="row.balanceCurrency === '%'" :class="{ 'keys-zero': Number(row.balanceAmount) <= 0 }"
-                  >剩余 {{ Number(row.balanceAmount).toFixed(1) }}%</span
-                >
-                <span v-else :class="{ 'keys-zero': Number(row.balanceAmount) <= 0 }"
-                  >{{ row.balanceCurrency || 'CNY' }} {{ Number(row.balanceAmount).toFixed(2) }}</span
-                >
+        <div class="keys-table-wrap">
+          <el-table v-loading="keysLoading" :data="keyList" class="ui-table">
+            <el-table-column v-if="keysTenantOptions.length > 1" label="租户" min-width="150">
+              <template #default="{ row }">
+                <span>{{ tenantNameOf(String(row.tenantId)) }}</span>
+                <span v-if="String(row.tenantId) === myTenantId" class="ui-pill ui-pill--muted ml-1">本租户</span>
               </template>
-              <template v-else><span class="keys-muted">--</span></template>
+            </el-table-column>
+            <el-table-column label="启用" width="70" align="center">
+              <template #default="{ row }">
+                <el-switch
+                  :model-value="row.enabled !== '0'"
+                  :aria-label="(row.label || '钥匙') + ' 启停'"
+                  v-hasPermi="['dcs:ai:edit']"
+                  @change="onToggleKey(row)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="名称" min-width="170">
+              <template #default="{ row }">
+                <span class="keys-name">{{ row.label || '未命名钥匙' }}</span>
+                <span v-if="row.primary" class="ui-pill ui-pill--muted">主钥匙</span>
+                <span v-if="row.enabled === '0'" class="ui-pill ui-pill--muted">已停用</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="密钥" width="150">
+              <template #default="{ row }">
+                <code class="keys-mask">{{ row.apiKeyMask || '—' }}</code>
+              </template>
+            </el-table-column>
+            <el-table-column label="余额" width="130" align="right">
+              <template #default="{ row }">
+                <template v-if="row.balanceStatus === 'UNSUPPORTED'"><span class="keys-muted">--</span></template>
+                <template v-else-if="row.balanceAmount != null">
+                  <!-- Q6：Kimi/MiniMax 是订阅额度，快照单位是「剩余百分比」而不是金额 -->
+                  <span v-if="row.balanceCurrency === '%'" :class="{ 'keys-zero': Number(row.balanceAmount) <= 0 }"
+                    >剩余 {{ Number(row.balanceAmount).toFixed(1) }}%</span
+                  >
+                  <span v-else :class="{ 'keys-zero': Number(row.balanceAmount) <= 0 }"
+                    >{{ row.balanceCurrency || 'CNY' }} {{ Number(row.balanceAmount).toFixed(2) }}</span
+                  >
+                </template>
+                <template v-else><span class="keys-muted">--</span></template>
+              </template>
+            </el-table-column>
+            <el-table-column label="最近探测" width="150">
+              <template #default="{ row }">
+                <span :class="{ 'keys-fail': row.balanceStatus === 'FAILED' }">
+                  {{ row.balanceStatus === 'FAILED' ? fmtCheckedAt(row) + ' · 失败' : fmtCheckedAt(row) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="180" align="center">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" @click="onEditKey(row)">编辑</el-button>
+                <el-button link type="primary" size="small" :loading="balanceRefreshingId === row.id" @click="onRefreshKeyBalance(row)"
+                  >查余额</el-button
+                >
+                <el-button link type="danger" size="small" v-hasPermi="['dcs:ai:remove']" @click="onDeleteKey(row)">删除</el-button>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">还没有配置钥匙</p>
+                <p class="ui-empty__hint">{{ keysEmptyText }}</p>
+              </div>
             </template>
-          </el-table-column>
-          <el-table-column label="最近探测" width="150">
-            <template #default="{ row }">
-              <span :class="{ 'keys-fail': row.balanceStatus === 'FAILED' }">
-                {{ row.balanceStatus === 'FAILED' ? fmtCheckedAt(row) + ' · 失败' : fmtCheckedAt(row) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="180" align="center">
-            <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="onEditKey(row)">编辑</el-button>
-              <el-button link type="primary" size="small" :loading="balanceRefreshingId === row.id" @click="onRefreshKeyBalance(row)"
-                >查余额</el-button
-              >
-              <el-button link type="danger" size="small" v-hasPermi="['dcs:ai:remove']" @click="onDeleteKey(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+          </el-table>
+        </div>
         <div class="keys-footnote">
           余额为厂商账户快照：手动刷新即时更新，每天 04:30
           自动刷新；多把钥匙自动轮询分摊限流，失败/余额耗尽自动切下一把，改动立即生效于该厂商全部模型。
@@ -569,14 +577,14 @@
         <div v-if="apiPathPreview" class="api-path-preview">
           <span class="api-path-label">实际请求</span>
           <code>{{ apiPathPreview }}</code>
-          <el-tag v-if="isNonChatFormat" type="warning" size="small" effect="plain">仅连通测试</el-tag>
+          <span v-if="isNonChatFormat" class="ui-pill ui-pill--warn">仅连通测试</span>
         </div>
         <el-row :gutter="20">
           <el-col :span="12">
             <!-- 批B(多模型改造): 该厂商已有接入 → 钥匙由接入层统一提供, 表单不再出现 Key 输入框 -->
             <el-form-item v-if="accessInfo" label="API Key">
               <div class="access-provided">
-                <el-tag type="primary" effect="light">由厂商接入统一提供 ✓</el-tag>
+                <span class="ui-pill ui-pill--pos">由厂商接入统一提供 ✓</span>
                 <span class="access-mask">{{ accessInfo.apiKeyMask }}</span>
                 <el-button v-hasPermi="['dcs:ai:edit']" link type="primary" @click="openAccessDialog()">管理钥匙</el-button>
               </div>
@@ -633,7 +641,7 @@
         </div>
         <el-descriptions v-if="balanceInfo || speedInfo" :column="2" border class="probe-result">
           <el-descriptions-item v-if="balanceInfo" label="余额状态">
-            <el-tag :type="balanceInfo.available ? 'success' : 'warning'">{{ balanceInfo.message || '已返回' }}</el-tag>
+            <span class="ui-pill" :class="balanceInfo.available ? 'ui-pill--pos' : 'ui-pill--warn'">{{ balanceInfo.message || '已返回' }}</span>
           </el-descriptions-item>
           <el-descriptions-item v-if="balanceInfo && balanceInfo.balances?.length" label="余额">
             <span v-for="item in balanceInfo.balances" :key="`${item.currency}-${item.totalBalance}`" class="mr-2">
@@ -641,9 +649,9 @@
             </span>
           </el-descriptions-item>
           <el-descriptions-item v-if="speedInfo" label="测速">
-            <el-tag :type="speedInfo.success ? 'success' : 'danger'">{{
+            <span class="ui-pill" :class="speedInfo.success ? 'ui-pill--pos' : 'ui-pill--neg'">{{
               speedInfo.latencyMs ? `${speedInfo.latencyMs} ms` : speedInfo.message
-            }}</el-tag>
+            }}</span>
           </el-descriptions-item>
           <el-descriptions-item v-if="speedInfo" label="模型响应" :span="2">
             <span class="probe-message">{{ speedInfo.message }}</span>
@@ -655,9 +663,7 @@
           <el-collapse-item name="adv">
             <template #title>
               <span class="ai-config-adv__title">高级设置：模型默认参数（一般不用动）</span>
-              <el-tag v-if="advancedCustomCount > 0" type="warning" size="small" effect="light" class="ai-config-adv__badge">
-                已自定义 {{ advancedCustomCount }} 项
-              </el-tag>
+              <span v-if="advancedCustomCount > 0" class="ui-pill ui-pill--warn ai-config-adv__badge">已自定义 {{ advancedCustomCount }} 项</span>
               <el-tooltip
                 placement="top"
                 content="这里只是各调用方的默认值：AI 助手会话按用户所选思考档即时覆盖，单发接口也可按请求带参覆盖，没传才回落到这里"
@@ -677,9 +683,7 @@
                       <el-input :model-value="formatContext(form.contextWindow)" disabled />
                       <div class="field-hint">
                         模型出厂能力（自带），由能力目录按模型名自动带出，不可改
-                        <el-tag v-if="capabilityMatched" type="success" size="small" effect="plain" class="ml-1"
-                          >已按「{{ form.modelName }}」自动匹配</el-tag
-                        >
+                        <span v-if="capabilityMatched" class="ui-pill ui-pill--pos ml-1">已按「{{ form.modelName }}」自动匹配</span>
                       </div>
                     </el-form-item>
                     <el-form-item label="最大输出" prop="maxTokens">
@@ -818,9 +822,9 @@
                   <div class="official-price-title">官方 token 计费参数</div>
                   <div class="official-price-desc">用于 AI 用量明细按官方输入/缓存输入/输出 token 单价计算成本，可按租户和模型微调。</div>
                 </div>
-                <el-tag :type="inlinePriceForm.priceId ? 'success' : 'warning'" effect="light">{{
+                <span class="ui-pill" :class="inlinePriceForm.priceId ? 'ui-pill--pos' : 'ui-pill--warn'">{{
                   inlinePriceForm.priceId ? '已匹配价格' : '待新增价格'
-                }}</el-tag>
+                }}</span>
               </div>
               <el-row :gutter="16">
                 <el-col :span="6">
@@ -1120,7 +1124,7 @@
       </el-alert>
       <el-form label-width="90px">
         <el-form-item label="导入到">
-          <el-tag type="info" effect="plain">当前登录租户</el-tag>
+          <span class="ui-pill ui-pill--muted">当前登录租户</span>
           <span class="import-foot-hint ml-2">全平台价格请用平台默认租户账号导入</span>
         </el-form-item>
         <el-form-item label="价格 JSON">
@@ -2022,16 +2026,19 @@ const balanceTagType = (configId: number | string): 'success' | 'warning' | 'inf
   return 'info';
 };
 
-// 使用类型: 标签文字 + 颜色 (业务批5 Q1-A：CHAT 由「对话/推理」改「AI 调用」——业务反馈术语
+// 使用类型: 标签文字 (业务批5 Q1-A：CHAT 由「对话/推理」改「AI 调用」——业务反馈术语
 // 生硬且误以为与聊天选模型有关，实际是后台功能调用的兜底口径; EMBEDDING=向量化)
 const useTypeLabel = (t?: string): string => {
   if (t === 'CHAT') return 'AI 调用';
   if (t === 'EMBEDDING') return '向量化';
   return t || '-';
 };
-const useTypeTagType = (t?: string): 'primary' | 'success' => {
-  return t === 'EMBEDDING' ? 'success' : 'primary';
-};
+/** 既有语义色 → 统一药丸四组（全站 UI 契约 §2.6：一屏只有一种药丸形态） */
+const pillOf = (tone?: string): string =>
+  tone === 'success' ? 'ui-pill--pos' : tone === 'warning' ? 'ui-pill--warn' : tone === 'danger' ? 'ui-pill--neg' : 'ui-pill--muted';
+/** 钥匙健康级 → 药丸类（ok 绿 / warn 橙 / bad 红 / none 中性） */
+const keyPillClass = (level: 'none' | 'ok' | 'warn' | 'bad'): string =>
+  level === 'ok' ? 'ui-pill--pos' : level === 'warn' ? 'ui-pill--warn' : level === 'bad' ? 'ui-pill--neg' : 'ui-pill--muted';
 
 // 业务批(1015) Q1 拆星 + 批1015c Q1 入口收敛：defaultStarTip/handleSetDefaultForRow/
 // 「默认模型」页签（defaultGroups/handleSetDefault/助手默认只读卡/PROVIDER_SHORT 徽章族）
@@ -3151,6 +3158,7 @@ onUnmounted(() => {
   display: flex;
   gap: 14px;
   align-items: stretch;
+  min-width: 0;
 }
 
 /* 左栏：厂商导航（真厂标为页面唯一彩色点，其余走 EP 灰阶） */
@@ -3160,9 +3168,9 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-card-radius);
   padding: 12px;
 }
 .vc-nav-head {
@@ -3184,18 +3192,18 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 9px 10px;
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   border: 1px solid transparent;
   cursor: pointer;
   transition: background-color 0.15s;
   &:hover {
-    background: var(--el-fill-color-light);
+    background: var(--app-raised);
   }
   &.is-active {
-    background: var(--el-color-primary-light-9);
-    border-color: var(--el-color-primary-light-7);
+    background: var(--app-active);
+    border-color: var(--app-control);
     .vc-nav-name {
-      color: var(--el-color-primary);
+      color: var(--app-text);
       font-weight: 600;
     }
   }
@@ -3223,30 +3231,9 @@ onUnmounted(() => {
 }
 /* 业务批7 Q6：默认★槽位 chip——替换单颗裸★，多槽位多 chip（对话/向量 × 平台/租户） */
 /* 业务批(1015) Q1 拆星：chip 样式随模板移除 */
-/* 8+=B：钥匙健康角标（同 chip 语言，EP 三档状态色——绿=全启用/橙=部分异常/红=全停或全失败） */
+/* 8+=B：钥匙健康角标——形态统一走 .ui-pill，类内只保留 nav 行的不可压缩 */
 .vc-key-chip {
   flex: none;
-  font-size: 10.5px;
-  line-height: 1;
-  padding: 3px 6px;
-  border-radius: 9px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.vc-key-chip.k-ok {
-  background: var(--el-color-success-light-9);
-  border: 1px solid var(--el-color-success-light-7);
-  color: var(--el-color-success-dark-2);
-}
-.vc-key-chip.k-warn {
-  background: var(--el-color-warning-light-9);
-  border: 1px solid var(--el-color-warning-light-7);
-  color: var(--el-color-warning-dark-2);
-}
-.vc-key-chip.k-bad {
-  background: var(--el-color-danger-light-9);
-  border: 1px solid var(--el-color-danger-light-7);
-  color: var(--el-color-danger-dark-2);
 }
 /* 业务批(1015) Q1 拆星：.vc-star-chip/.vc-default-tag 随主页面星标一起移除 */
 .vc-dot {
@@ -3270,14 +3257,14 @@ onUnmounted(() => {
   justify-content: center;
   gap: 4px;
   padding: 8px 0;
-  border: 1px dashed var(--el-color-primary);
-  border-radius: 6px;
-  color: var(--el-color-primary);
+  border: 1px dashed var(--app-control);
+  border-radius: var(--app-control-radius);
+  color: var(--app-muted);
   font-size: 13px;
   cursor: pointer;
   transition: background-color 0.15s;
   &:hover {
-    background: var(--el-color-primary-light-9);
+    background: var(--app-raised);
   }
 }
 
@@ -3285,9 +3272,9 @@ onUnmounted(() => {
 .vc-detail {
   flex: 1;
   min-width: 0;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-card-radius);
   padding: 16px 18px 18px;
 }
 .vc-head {
@@ -3295,7 +3282,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding-bottom: 14px;
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--app-rule);
   flex-wrap: wrap;
 }
 .vc-head-main {
@@ -3364,7 +3351,7 @@ onUnmounted(() => {
 }
 .vc-sel-count {
   font-size: 13px;
-  color: var(--el-color-primary);
+  color: var(--app-muted);
 }
 .vc-hint {
   font-size: 12px;
@@ -3382,12 +3369,12 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   padding: 11px 12px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
-  background: var(--el-bg-color);
-  transition: box-shadow 0.15s;
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-control-radius);
+  background: var(--app-surface);
+  transition: border-color 0.15s;
   &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border-color: var(--app-control);
   }
   &.is-off .vc-model-title {
     color: var(--el-text-color-secondary);
@@ -3435,7 +3422,8 @@ onUnmounted(() => {
 .vc-price {
   font-size: 13px;
   font-weight: 600;
-  color: var(--el-color-primary);
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .vc-param {
@@ -3454,7 +3442,7 @@ onUnmounted(() => {
 /* 窄屏：厂商导航折到顶部横向滚动（不锁死左右布局）；模型卡换行堆叠——
    卡内 flex 元素多，极窄下 main 被压到逐字符竖排（5.3fh 视觉复审 P0），改为
    main 独占整行 + side/actions 顺延换行 */
-@media (max-width: 900px) {
+@media (max-width: 992px) {
   .vendor-center {
     flex-direction: column;
   }
@@ -3565,6 +3553,38 @@ onUnmounted(() => {
   margin-bottom: 12px;
 }
 
+/* 375：表格在容器内横滚（父链逐级 min-width:0），不让整页横向溢出 */
+.dcs-ops-page {
+  min-width: 0;
+}
+.dcs-ops-page :deep(.el-tabs__content),
+.dcs-ops-page :deep(.el-tab-pane) {
+  min-width: 0;
+}
+.price-table-wrap,
+.keys-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+/* 只覆盖 EP 表格 CSS 变量，不重写组件（契约 §2.5） */
+.price-table-wrap :deep(.el-table),
+.keys-table-wrap :deep(.el-table) {
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: var(--app-surface);
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+}
+.price-table-wrap :deep(.el-table) {
+  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加 */
+  min-width: 1138px;
+}
+.keys-table-wrap :deep(.el-table) {
+  min-width: 1000px;
+}
+
 .ai-config-table {
   :deep(.nowrap-column .cell) {
     overflow: hidden;
@@ -3573,11 +3593,11 @@ onUnmounted(() => {
   }
 
   :deep(.el-table-fixed-column--right) {
-    background: var(--el-bg-color) !important;
+    background: var(--app-surface) !important;
   }
 
   :deep(.row-active .el-table-fixed-column--right) {
-    background: #f4fbf0 !important;
+    background: var(--app-raised) !important;
   }
 }
 
@@ -3779,7 +3799,7 @@ onUnmounted(() => {
   margin-top: 14px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 992px) {
   .config-section-grid {
     grid-template-columns: 1fr;
   }
@@ -3826,7 +3846,7 @@ onUnmounted(() => {
    PROVIDER_SHORT）随模板一并下线——厂商标识统一走 ProviderLogo 组件 */
 .provider-name {
   font-size: 13px;
-  color: #303133;
+  color: var(--app-text);
 }
 
 /* 状态指示灯: 圆点+文字(state-clarity 规则) */
@@ -3844,20 +3864,19 @@ onUnmounted(() => {
   border-radius: 50%;
 }
 .dot-on {
-  background: #67c23a;
-  box-shadow: 0 0 4px rgba(103, 194, 58, 0.6);
+  background: var(--dcs-color-success);
 }
 .dot-off {
-  background: #c0c4cc;
+  background: var(--app-faint);
 }
 
 /* API Key 设置状态图标 */
 .key-set {
-  color: #67c23a;
+  color: var(--dcs-color-success);
   font-size: 16px;
 }
 .key-unset {
-  color: #f56c6c;
+  color: var(--dcs-color-danger);
   font-size: 16px;
 }
 
@@ -3883,16 +3902,16 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   padding: 12px 16px;
-  border: 1px solid var(--el-border-color, #e4e7ed);
-  border-radius: 8px;
-  background: #fff;
-  transition: box-shadow 0.2s ease;
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+  transition: border-color 0.2s ease;
 
   &:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    border-color: var(--app-control);
   }
   &.is-off {
-    background: var(--el-fill-color-light, #f5f7fa);
+    background: var(--app-raised);
 
     .kp-label {
       color: var(--el-text-color-secondary);
@@ -3913,11 +3932,10 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #c0c4cc;
+  background: var(--app-faint);
 
   &.on {
-    background: var(--el-color-success);
-    box-shadow: 0 0 4px rgba(103, 194, 58, 0.6);
+    background: var(--dcs-color-success);
   }
 }
 .kp-label {
@@ -3942,7 +3960,7 @@ onUnmounted(() => {
   color: var(--el-text-color-regular);
 }
 .kp-sep {
-  color: var(--el-border-color, #dcdfe6);
+  color: var(--app-rule);
 }
 .kp-balance {
   flex: none;
@@ -3959,7 +3977,7 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 
   &.muted {
-    color: var(--el-text-color-placeholder, #a8abb2);
+    color: var(--el-text-color-placeholder);
     font-size: 14px;
   }
   &.zero {
@@ -3979,7 +3997,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   padding-left: 12px;
-  border-left: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-left: 1px solid var(--app-rule);
 }
 .kp-foot {
   margin-top: 8px;
@@ -3991,9 +4009,9 @@ onUnmounted(() => {
 <style lang="scss">
 /* 活跃行高亮(CC Switch: 当前活跃配置视觉突出) */
 .el-table .row-active {
-  background-color: rgba(103, 194, 58, 0.08) !important;
+  background-color: var(--app-raised) !important;
   td {
-    border-left: 3px solid #67c23a;
+    border-left: 1px solid var(--app-rule);
   }
 }
 </style>

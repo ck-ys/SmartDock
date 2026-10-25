@@ -2,6 +2,7 @@
   <div class="dcs-ops-page credit-page">
     <DcsOperationsPageHeader
       title="积分套餐"
+      eyebrow="AI 配置与用量"
       subtitle="AI 助手积分订阅：钱包是钱，套餐是优惠额度——订阅后对话扣积分不扣钱包，用完即停可随时切换回按量计费。"
       :metrics="headerMetrics"
     >
@@ -17,7 +18,7 @@
           <span>当前状态</span>
           <div class="mode-switch">
             <span class="mode-label">消费方式</span>
-            <el-radio-group :model-value="consumeMode" size="small" @change="onSwitchMode">
+            <el-radio-group :model-value="consumeMode" @change="onSwitchMode">
               <el-radio-button value="WALLET">钱包按量</el-radio-button>
               <el-radio-button value="CREDIT" :disabled="!summary.subscribed">积分订阅</el-radio-button>
             </el-radio-group>
@@ -28,8 +29,8 @@
         </div>
       </template>
       <div class="sub-line">
-        <el-tag v-if="summary.subscribed" type="success" size="small">{{ summary.planName }} · 至 {{ shortDate(summary.endTime) }}</el-tag>
-        <el-tag v-else type="info" size="small">未订阅</el-tag>
+        <span v-if="summary.subscribed" class="ui-pill ui-pill--pos">{{ summary.planName }} · 至 {{ shortDate(summary.endTime) }}</span>
+        <span v-else class="ui-pill ui-pill--muted">未订阅</span>
         <span class="sub-hint">{{
           consumeMode === 'CREDIT'
             ? '积分消费中：助手对话扣积分不扣钱包；免费档模型（0 元）不扣积分；积分用尽可买加油包或切回钱包按量'
@@ -99,8 +100,8 @@
             class="plan-card"
             :class="{ current: summary.planCode === p.planCode, hot: p.planCode === recommendedPlanCode, off: p.enabled === '0' }"
           >
-            <div v-if="p.planCode === recommendedPlanCode" class="plan-hot-badge">最受欢迎</div>
-            <el-tag v-if="p.enabled === '0'" class="plan-off-tag" type="info" size="small" effect="dark">已下架 · 仅超管可见</el-tag>
+            <span v-if="p.planCode === recommendedPlanCode" class="ui-pill ui-pill--warn plan-hot-badge">最受欢迎</span>
+            <span v-if="p.enabled === '0'" class="ui-pill ui-pill--muted plan-off-tag">已下架 · 仅超管可见</span>
             <div class="plan-name" :class="`plan-name-${idx}`">{{ p.planName }}</div>
             <div class="plan-price">
               ¥{{ Number(p.priceYuan).toFixed(0) }}<span class="plan-per"> / {{ p.durationWeeks }} 周</span>
@@ -127,7 +128,6 @@
                 class="plan-buy"
                 :type="summary.planCode === p.planCode ? 'success' : 'primary'"
                 :plain="summary.planCode === p.planCode"
-                size="small"
                 :disabled="p.enabled === '0'"
                 :loading="busy === p.planCode"
                 @click="onSubscribe(p)"
@@ -144,7 +144,7 @@
               <el-button v-hasPermi="['dcs:aicredit:plan-edit']" size="small" text type="primary" @click="onSubscribe(p, true)">赠送</el-button>
               <el-button v-hasPermi="['dcs:aicredit:plan-edit']" size="small" text @click="openPlanEdit(p)">改价</el-button>
             </div>
-            <el-tag v-if="summary.planCode === p.planCode" class="plan-cur" type="success" size="small" effect="light">当前档</el-tag>
+            <span v-if="summary.planCode === p.planCode" class="ui-pill ui-pill--pos plan-cur">当前档</span>
             <!-- 业务批8 Q4：改价影响提示——该档当前在订租户数（跨租户，仅超管可见数据） -->
             <div v-if="planActiveCounts[p.planCode] > 0" class="plan-active-n">
               当前 {{ planActiveCounts[p.planCode] }} 家租户在订此档，改价立即影响它们
@@ -161,7 +161,7 @@
         </div>
         <span class="boost-desc">{{ boostPlan.description || '池尽顶上，不受窗口限制' }}</span>
         <div class="boost-actions">
-          <el-button v-hasPermi="['dcs:aicredit:subscribe']" size="small" type="warning" :loading="busy === 'boost'" @click="onBoost(false)">
+          <el-button v-hasPermi="['dcs:aicredit:subscribe']" type="warning" :loading="busy === 'boost'" @click="onBoost(false)">
             购买 · 扣钱包 ¥{{ Number(boostPlan.priceYuan).toFixed(0) }}
           </el-button>
           <el-button v-hasPermi="['dcs:aicredit:plan-edit']" size="small" text type="primary" @click="onBoost(true)">赠送</el-button>
@@ -182,9 +182,9 @@
       />
       <el-form :model="planEdit.form" label-width="130px" size="default">
         <el-form-item label="套餐类型">
-          <el-tag size="small" :type="planEdit.form.kind === 'BOOST' ? 'warning' : 'primary'">
+          <span class="ui-pill ui-pill--muted">
             {{ planEdit.form.kind === 'BOOST' ? '加油包' : '订阅档' }}
-          </el-tag>
+          </span>
           <span class="edit-ro-hint">类型与编码是技术键，不可改（改了会让存量订阅断链）</span>
         </el-form-item>
         <el-form-item label="套餐名称"><el-input v-model="planEdit.form.planName" maxlength="60" /></el-form-item>
@@ -246,7 +246,7 @@
             <ProviderLogo :provider="g.provider" :size="20" />
             <b>{{ providerNameOf(g.provider) }}</b>
             <span class="rate-gcount">{{ g.rows.length }} 个模型</span>
-            <span v-if="g.hasDefault" class="rate-gdef">含默认</span>
+            <span v-if="g.hasDefault" class="ui-pill ui-pill--pos rate-gdef">含默认</span>
             <span class="rate-garrow" :class="{ open: !isRateCollapsed(g) }">▸</span>
           </button>
           <template v-if="!isRateCollapsed(g)">
@@ -259,11 +259,11 @@
               <div v-for="row in g.rows" :key="row.configId" class="rate-grow">
                 <span class="rate-gname">
                   <span class="dcs-ops-id">{{ row.modelName }}</span>
-                  <el-tag v-if="row.isDefault" size="small" type="success" effect="light" class="rate-star">默认</el-tag>
+                  <span v-if="row.isDefault" class="ui-pill ui-pill--pos rate-star">默认</span>
                 </span>
                 <!-- 免费由计费配置判定（FIXED_PER_CALL 且单价 0），无视倍率占位（step5 P1-3 口径保持） -->
-                <span v-if="row.free" class="rate-badge tier-free">免费</span>
-                <span v-else class="rate-badge" :class="`tier-x${rateTierIdx(row.multiplier)}`">×{{ row.multiplier }}</span>
+                <span v-if="row.free" class="ui-pill ui-pill--pos">免费</span>
+                <span v-else class="ui-pill" :class="ratePillClass(row.multiplier)">×{{ row.multiplier }}</span>
                 <span class="rate-gcost">{{ row.free ? '不耗积分' : `约 ${row.perRound} 积分/轮` }}</span>
               </div>
             </div>
@@ -292,14 +292,13 @@
           >
           <div class="ledger-filter">
             <!-- 业务批8 Q6：双视角——租户全景 / 只看我的（管理员看全租户账，个人核对自分） -->
-            <el-radio-group v-model="ledgerView" size="small" @change="onSwitchView">
+            <el-radio-group v-model="ledgerView" @change="onSwitchView">
               <el-radio-button value="tenant">租户全景</el-radio-button>
               <el-radio-button value="mine">只看我的</el-radio-button>
             </el-radio-group>
             <el-select
               v-if="ledgerView === 'tenant'"
               v-model="ledgerUserId"
-              size="small"
               style="width: 150px"
               filterable
               clearable
@@ -308,7 +307,7 @@
             >
               <el-option v-for="u in ledgerUsers" :key="u.userId" :label="u.nickName" :value="u.userId" />
             </el-select>
-            <el-select v-model="ledgerBiz" size="small" style="width: 120px" @change="onSearch">
+            <el-select v-model="ledgerBiz" style="width: 120px" @change="onSearch">
               <el-option label="全部类型" value="" />
               <el-option label="消耗" value="DEDUCT" />
               <el-option label="加油包" value="BOOST" />
@@ -318,7 +317,6 @@
             <el-date-picker
               v-model="ledgerRange"
               type="daterange"
-              size="small"
               value-format="YYYY-MM-DD"
               range-separator="~"
               start-placeholder="开始日期"
@@ -326,73 +324,80 @@
               style="width: 240px"
               @change="onSearch"
             />
-            <el-button size="small" :icon="Refresh" @click="onSearch">查询</el-button>
-            <el-button size="small" @click="resetLedgerFilter">重置</el-button>
+            <el-button :icon="Refresh" @click="onSearch">查询</el-button>
+            <el-button @click="resetLedgerFilter">重置</el-button>
             <!-- AI 缺口批 Q7：按当前筛选导出流水 Excel（与列表同口径，上限 1 万行） -->
-            <el-button size="small" :icon="Download" @click="exportLedger">导出 Excel</el-button>
+            <el-button :icon="Download" @click="exportLedger">导出 Excel</el-button>
           </div>
         </div>
       </template>
       <!-- 业务批8 Q3：汇总条——本周/本月消耗 + 周池剩余（账单感；数据源 summary 同口现算）。
            step5 P1-D1 回修：三格是全租户口径，「只看我的」视角下表格只剩本人行，租户数字会与
            表格对不上造成误导——个人视角隐藏三格，换一行灰字指路 -->
-      <div v-if="ledgerView === 'tenant'" class="ledger-summary">
-        <div class="sum-cell">
-          <div class="sum-num sum-out">{{ summary.weekSpent > 0 ? `-${fmt(summary.weekSpent)}` : '0' }}</div>
-          <div class="sum-label">全租户 · 本周消耗</div>
+      <div v-if="ledgerView === 'tenant'" class="ui-kpi-strip ledger-summary">
+        <div class="ui-kpi">
+          <span class="ui-kpi__label">全租户 · 本周消耗</span>
+          <strong class="ui-kpi__value">{{ summary.weekSpent > 0 ? `-${fmt(summary.weekSpent)}` : '0' }}</strong>
         </div>
-        <div class="sum-cell">
-          <div class="sum-num sum-out">{{ summary.monthSpent > 0 ? `-${fmt(summary.monthSpent)}` : '0' }}</div>
-          <div class="sum-label">全租户 · 本月消耗</div>
+        <div class="ui-kpi">
+          <span class="ui-kpi__label">全租户 · 本月消耗</span>
+          <strong class="ui-kpi__value">{{ summary.monthSpent > 0 ? `-${fmt(summary.monthSpent)}` : '0' }}</strong>
         </div>
-        <div class="sum-cell">
-          <div class="sum-num sum-in">{{ fmt(Math.max(0, summary.weeklyCap - summary.weeklyUsed)) }}</div>
-          <div class="sum-label">本周剩余（周池）</div>
+        <div class="ui-kpi">
+          <span class="ui-kpi__label">本周剩余（周池）</span>
+          <strong class="ui-kpi__value">{{ fmt(Math.max(0, summary.weeklyCap - summary.weeklyUsed)) }}</strong>
         </div>
       </div>
       <div v-else class="ledger-summary-mine">三格汇总为全租户口径，与「只看我的」列表对不上——切回「租户全景」查看汇总</div>
-      <el-table v-loading="ledgerLoading" :data="ledgerRows" border size="small">
-        <el-table-column label="时间" prop="createTime" width="170" />
-        <el-table-column label="消耗人" width="110" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span>{{ row.operatorName || '--' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" :type="bizTag(row.bizType).tone">{{ bizTag(row.bizType).label }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="积分" width="170" align="right">
-          <template #default="{ row }">
-            <div>
-              <!-- 业务批8 Q3：扣分从蓝改红（与钱包流水页「支出红/收入绿」统一）；
-                   订阅入账行从 remark 提取真实量显示（此前显示「—」，本该最喜庆的行反而空着） -->
-              <span v-if="row.bizType === 'DEDUCT'" class="ded-num">-{{ fmt(row.credits) }}</span>
-              <span v-else-if="row.bizType === 'SUBSCRIBE' && subscribeAmountOf(row)" class="add-num">
-                +{{ fmt(subscribeAmountOf(row)!.perWeek) }}<span class="add-sub"> ×{{ subscribeAmountOf(row)!.weeks }}周</span>
-              </span>
-              <span v-else-if="row.credits > 0" class="add-num">+{{ fmt(row.credits) }}</span>
-              <span v-else class="add-none">—</span>
+      <div class="ledger-table-wrap">
+        <el-table v-loading="ledgerLoading" :data="ledgerRows" class="ui-table">
+          <el-table-column label="时间" prop="createTime" width="170" />
+          <el-table-column label="消耗人" width="110" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span>{{ row.operatorName || '--' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="类型" width="90" align="center">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="pillOf(bizTag(row.bizType).tone)">{{ bizTag(row.bizType).label }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="积分" width="170" align="right">
+            <template #default="{ row }">
+              <div>
+                <!-- 业务批8 Q3：扣分从蓝改红（与钱包流水页「支出红/收入绿」统一）；
+                     订阅入账行从 remark 提取真实量显示（此前显示「—」，本该最喜庆的行反而空着） -->
+                <span v-if="row.bizType === 'DEDUCT'" class="ded-num">-{{ fmt(row.credits) }}</span>
+                <span v-else-if="row.bizType === 'SUBSCRIBE' && subscribeAmountOf(row)" class="add-num">
+                  +{{ fmt(subscribeAmountOf(row)!.perWeek) }}<span class="add-sub"> ×{{ subscribeAmountOf(row)!.weeks }}周</span>
+                </span>
+                <span v-else-if="row.credits > 0" class="add-num">+{{ fmt(row.credits) }}</span>
+                <span v-else class="add-none">—</span>
+              </div>
+              <!-- 业务批7 Q4：扣减构成从独立列并入小字（「来源拆分」列整列下线——看不懂的是列名） -->
+              <div v-if="row.bizType === 'DEDUCT' && row.credits > 0" class="credit-src">
+                {{ row.tankCredits > 0 ? `周池 ${fmt(row.weeklyCredits)} · 加油包 ${fmt(row.tankCredits)}` : `周池 ${fmt(row.weeklyCredits)}` }}
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="场景" width="170" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="dcs-ops-id">{{ sceneLabel(row) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="说明" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span>{{ row.remark || (row.bizType === 'DEDUCT' ? '助手对话消耗' : '--') }}</span>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无积分流水</p>
+              <p class="ui-empty__hint">订阅并产生一次助手对话后，可在此对账</p>
             </div>
-            <!-- 业务批7 Q4：扣减构成从独立列并入小字（「来源拆分」列整列下线——看不懂的是列名） -->
-            <div v-if="row.bizType === 'DEDUCT' && row.credits > 0" class="credit-src">
-              {{ row.tankCredits > 0 ? `周池 ${fmt(row.weeklyCredits)} · 加油包 ${fmt(row.tankCredits)}` : `周池 ${fmt(row.weeklyCredits)}` }}
-            </div>
           </template>
-        </el-table-column>
-        <el-table-column label="场景" width="170" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span class="dcs-ops-id">{{ sceneLabel(row) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="说明" min-width="200" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span>{{ row.remark || (row.bizType === 'DEDUCT' ? '助手对话消耗' : '--') }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div v-if="!ledgerLoading && ledgerRows.length === 0" class="empty-tip">暂无积分流水——订阅并产生一次助手对话后可在此对账</div>
+        </el-table>
+      </div>
       <div class="ledger-pager">
         <el-pagination
           v-model:current-page="ledgerPage.pageNum"
@@ -485,10 +490,9 @@ const ledgerUserId = ref<number | null>(null);
 const ledgerUsers = ref<Array<{ userId: number; nickName: string }>>([]);
 /** 业务批8 Q2：模型积分倍率表 */
 const modelRates = ref<ModelRateVO[]>([]);
-/** 徽章归一（业务反馈批1015c Q12）：免费=绿「免费」（计费配置判定），其余=×N 单色阶
- *  档位只留色深差异（x1 浅→x4 深），去掉"免费档/经济/标准/旗舰"字样——"×1 免费档"
- *  与绿色"免费"徽章同屏打架是"列表乱"的实锤之一 */
-const rateTierIdx = (m: number): number => (m <= 1 ? 1 : m <= 2 ? 2 : m <= 3 ? 3 : 4);
+/** 徽章归一（业务反馈批1015c Q12 + 全站 UI 契约 §2.6）：免费=成功药丸，×N 只按四组语义药丸
+ *  分档（×1/×2 中性、×3 警告、≥×4 危险），不再自造蓝色阶（契约明令禁止四档蓝阶） */
+const ratePillClass = (m: number): string => (m >= 4 ? 'ui-pill--neg' : m >= 3 ? 'ui-pill--warn' : 'ui-pill--muted');
 /** Q12 折叠：用户手动开合过的组记名册（自动收起只发生在首次加载，不覆盖用户选择）。
  *  ⚠必须是 reactive Set：模板折叠态读 isRateCollapsed()→rateCollapsed.has()，
  *  普通 Set 变更不触发重渲染=点击组头无反应（1015c 批①第二次热修实录：
@@ -575,6 +579,9 @@ const bizTag = (t: string) => {
   };
   return map[t] || { label: t || '--', tone: 'info' };
 };
+/** 既有语义色 → 统一药丸四组（契约 §2.6：一屏只有一种药丸形态） */
+const pillOf = (tone?: string): string =>
+  tone === 'success' ? 'ui-pill--pos' : tone === 'warning' ? 'ui-pill--warn' : tone === 'danger' ? 'ui-pill--neg' : 'ui-pill--muted';
 
 const loadPlans = async () => {
   loading.value = true;
@@ -881,10 +888,10 @@ onMounted(() => {
 }
 .mode-label {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-muted);
 }
 .mode-tip {
-  color: #c0c4cc;
+  color: var(--app-faint);
   font-size: 14px;
 }
 .sub-line {
@@ -896,48 +903,49 @@ onMounted(() => {
 }
 .sub-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-muted);
 }
 .head-sub {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-faint);
   font-weight: 400;
 }
 .status-card :deep(.el-card__body) {
   padding-top: 12px;
 }
 .ledger-box {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-card-radius);
   padding: 14px 16px;
   height: 100%;
 }
 .ledger-title {
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: var(--app-muted);
   margin-bottom: 6px;
 }
 .ledger-num {
   font-size: 22px;
   font-weight: 600;
+  color: var(--app-text);
   margin-bottom: 8px;
   /* 六审回修（视觉席）：数字列 tabular-nums——比例数字下 1/4/7 宽窄不一，刷新后数字抖动 */
   font-variant-numeric: tabular-nums;
 }
 .ledger-unit {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-faint);
   font-weight: 400;
 }
 .ledger-hint {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-faint);
   margin-top: 8px;
 }
 .plan-card {
   position: relative;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-card-radius);
   padding: 18px 18px 16px;
   margin-bottom: 16px;
   display: flex;
@@ -946,8 +954,8 @@ onMounted(() => {
   height: calc(100% - 16px);
 }
 .plan-card.current {
-  border-color: var(--el-color-success-light-5);
-  background: var(--el-color-success-light-9);
+  border-color: var(--app-control);
+  background: var(--app-raised);
 }
 /* step5 P2-5：下架行置灰（仅超管可见——租管列表不含 enabled=0 行） */
 .plan-card.off {
@@ -968,20 +976,20 @@ onMounted(() => {
   font-size: 24px;
   font-weight: 700;
   margin: 8px 0 10px;
-  color: var(--el-color-primary);
+  color: var(--app-text);
 }
 .plan-per {
   font-size: 12px;
-  color: #909399;
+  color: var(--app-faint);
   font-weight: 400;
 }
 .plan-total {
-  /* Q12：整周期总额——蓝色高亮一行，介于价格与功能列表之间 */
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  border-radius: 6px;
+  /* Q12：整周期总额——中性信息条，介于价格与功能列表之间 */
+  background: var(--app-raised);
+  color: var(--app-muted);
+  border-radius: var(--app-control-radius);
   padding: 4px 10px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   margin-bottom: 8px;
   align-self: flex-start;
@@ -993,14 +1001,14 @@ onMounted(() => {
   flex: 1;
 }
 .plan-features li {
-  font-size: 12.5px;
-  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  color: var(--app-muted);
   line-height: 1.9;
 }
 .plan-features li::before {
   content: '·';
   margin-right: 6px;
-  color: var(--el-color-primary);
+  color: var(--app-faint);
   font-weight: 700;
 }
 .plan-buy {
@@ -1015,8 +1023,8 @@ onMounted(() => {
 }
 .plan-active-n {
   margin-top: 8px;
-  font-size: 11.5px;
-  color: var(--el-color-warning);
+  font-size: 11px;
+  color: var(--dcs-color-warning);
 }
 .boost-actions {
   display: flex;
@@ -1028,40 +1036,12 @@ onMounted(() => {
 }
 .edit-ro-hint {
   margin-left: 8px;
-  font-size: 11.5px;
-  color: #909399;
+  font-size: 11px;
+  color: var(--app-faint);
 }
-/* 业务批8 Q2：倍率档位徽章 */
-.rate-badge {
-  display: inline-block;
-  min-width: 34px;
-  padding: 1px 8px;
-  border-radius: 99px;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-}
-.rate-badge.tier-free {
-  background: #f4f4f5;
-  color: #909399;
-}
-.rate-badge.tier-econ {
-  background: var(--el-color-success-light-9);
-  color: var(--el-color-success);
-}
-.rate-badge.tier-std {
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-}
-.rate-badge.tier-flag {
-  background: var(--el-color-warning-light-9);
-  color: var(--el-color-warning);
-}
+/* 业务批8 Q2：倍率档位徽章统一走 .ui-pill 四组语义，不再自造蓝色阶（契约 §2.6） */
 .rate-star {
   margin-left: 6px;
-}
-.rate-free {
-  color: var(--el-color-success);
 }
 /* 业务批(1015) Q12：厂商分组卡——组头 logo+中文名+模型数；组内行=模型名+倍率徽章+预估 */
 .rate-groups {
@@ -1070,8 +1050,8 @@ onMounted(() => {
   gap: 14px;
 }
 .rate-group {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-card-radius);
   overflow: hidden;
 }
 .rate-ghead {
@@ -1081,18 +1061,18 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: var(--el-fill-color-light);
+  background: var(--app-raised);
   border: none;
   cursor: pointer;
   font: inherit;
   text-align: left;
 
   &:hover b {
-    color: var(--el-color-primary);
+    color: var(--app-text);
   }
   .rate-garrow {
     margin-left: 4px;
-    color: var(--el-text-color-secondary);
+    color: var(--app-faint);
     font-size: 12px;
     transition: transform 0.15s;
 
@@ -1101,21 +1081,15 @@ onMounted(() => {
     }
   }
   b {
-    font-size: 13.5px;
+    font-size: 13px;
   }
   .rate-gcount {
     font-size: 12px;
-    color: var(--el-text-color-secondary);
+    color: var(--app-faint);
   }
+  /* 「含默认」走统一药丸，这里只负责推到行尾 */
   .rate-gdef {
     margin-left: auto;
-    font-size: 11px;
-    line-height: 1;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: var(--el-color-success-light-9);
-    border: 1px solid var(--el-color-success-light-7);
-    color: var(--el-color-success-dark-2);
   }
 }
 /* Q12：组内改三列 grid 严格对齐（列头与数据行同模板），右列右对齐 */
@@ -1128,9 +1102,9 @@ onMounted(() => {
 }
 .rate-cols {
   padding: 6px 12px 2px;
-  font-size: 11.5px;
-  color: var(--el-text-color-secondary);
-  border-bottom: 1px solid var(--el-border-color-lighter);
+  font-size: 12px;
+  color: var(--app-faint);
+  border-bottom: 1px solid var(--app-rule);
 
   .ta-r {
     text-align: right;
@@ -1141,7 +1115,7 @@ onMounted(() => {
 }
 .rate-grow {
   padding: 7px 0;
-  border-bottom: 1px dashed var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--app-rule);
 
   &:last-child {
     border-bottom: none;
@@ -1154,31 +1128,11 @@ onMounted(() => {
     overflow: hidden;
   }
   .rate-gcost {
-    font-size: 12.5px;
-    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    color: var(--app-muted);
     text-align: right;
+    font-variant-numeric: tabular-nums;
   }
-}
-/* Q12 色阶：×N 单 hue 由浅到深（工作面克制，去多色分类） */
-.rate-badge.tier-x1 {
-  background: #eef3ff;
-  border-color: #d5e3ff;
-  color: #5a6f96;
-}
-.rate-badge.tier-x2 {
-  background: #dfe9ff;
-  border-color: #b9d1ff;
-  color: #3f5e94;
-}
-.rate-badge.tier-x3 {
-  background: #cfe0ff;
-  border-color: #9dc0ff;
-  color: #2f5aa8;
-}
-.rate-badge.tier-x4 {
-  background: #b8d4ff;
-  border-color: #86b1ff;
-  color: #1f4488;
 }
 /* Q8/Q11：钱包模式引导条 */
 .wallet-lead {
@@ -1199,83 +1153,73 @@ onMounted(() => {
 }
 .ded-num {
   /* 业务批8 Q3：扣分从主色蓝改红——与钱包流水页「支出红/收入绿」统一（此前两页打架） */
-  color: var(--el-color-danger);
+  color: var(--dcs-color-danger);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .add-num {
-  color: var(--el-color-success-dark-2, var(--el-color-success));
+  color: var(--dcs-color-success);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .add-sub {
   font-size: 11px;
-  color: #909399;
+  color: var(--app-faint);
   font-weight: 400;
 }
 .add-none {
-  color: #c0c4cc;
+  color: var(--app-faint);
 }
 /* ---- 业务批8 Q4：套餐卡分档样式 ---- */
 /* Q3：撤 scale(1.03)——放大让中间卡视觉高出 3%（322/324/346 实测的主因之一）；
-   box-sizing:border-box 下加粗边框不增外高，等高不受影响 */
+   box-sizing:border-box 下加粗边框不增外高，等高不受影响。细线 1px，无投影。 */
 .plan-card.hot {
-  border: 2px solid var(--el-color-primary);
-  box-shadow: 0 6px 18px rgba(64, 158, 255, 0.13);
+  border: 1px solid var(--app-primary);
   z-index: 2;
 }
+/* 「最受欢迎」走统一药丸；本类只负责悬浮定位 */
 .plan-hot-badge {
   position: absolute;
   top: -10px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--el-color-primary);
-  color: var(--app-primary-ink);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 10px;
-  border-radius: 99px;
   white-space: nowrap;
 }
-/* 三档名色由浅到深渐进表达档次感（同构不同色——「每档不同样式」的正确打开方式） */
-.plan-name-0 {
-  color: var(--el-color-primary-light-3);
-}
-.plan-name-1 {
-  color: var(--el-color-primary);
-}
+/* 档位名统一主文字色：不再用三阶蓝表达档次（契约 §2.6 禁止自造蓝阶） */
+.plan-name-0,
+.plan-name-1,
 .plan-name-2 {
-  color: var(--el-color-primary-dark-2);
+  color: var(--app-text);
 }
 .plan-who {
   font-size: 12px;
-  color: var(--el-color-primary-dark-2);
-  background: var(--el-color-primary-light-9);
-  border-radius: 6px;
+  color: var(--app-muted);
+  background: var(--app-raised);
+  border-radius: var(--app-control-radius);
   padding: 3px 8px;
   display: inline-block;
   margin-bottom: 8px;
 }
 .plan-tech {
   font-size: 11px;
-  color: #a8abb2;
-  border-top: 1px dashed var(--el-border-color-lighter);
+  color: var(--app-faint);
+  border-top: 1px solid var(--app-rule);
   padding-top: 6px;
   margin-bottom: 10px;
 }
 /* step5 P2-D5：轮数折算口径的灰字标注 */
 .rounds-basis {
   font-size: 11px;
-  color: #a8abb2;
+  color: var(--app-faint);
 }
-/* 加油包升格窄卡（黄虚线横条） */
+/* 加油包窄条：中性容器，颜色只留给药丸与数据 */
 .boost-bar {
   display: flex;
   align-items: center;
   gap: 12px;
-  border: 1px dashed var(--el-color-warning-light-5);
-  background: var(--el-color-warning-light-9);
-  border-radius: 8px;
+  border: 1px solid var(--app-rule);
+  background: var(--app-raised);
+  border-radius: var(--app-card-radius);
   padding: 10px 16px;
 }
 .boost-main {
@@ -1286,73 +1230,60 @@ onMounted(() => {
 }
 .boost-name {
   font-weight: 600;
-  color: var(--el-color-warning-dark-2);
+  color: var(--app-text);
 }
 .boost-price {
   font-size: 18px;
   font-weight: 700;
-  color: var(--el-color-warning-dark-2);
+  color: var(--app-text);
+  font-variant-numeric: tabular-nums;
 }
 .boost-qty {
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--app-muted);
 }
 .boost-desc {
   flex: 1;
   font-size: 12px;
-  color: #909399;
+  color: var(--app-muted);
 }
-/* ---- 业务批8 Q3：流水汇总条 ---- */
+/* ---- 业务批8 Q3：流水汇总条（连通 KPI 带，数字不染色） ---- */
 .ledger-summary {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
+  margin: 12px 16px;
 }
 /* step5 P1-D1：「只看我的」视角下汇总三格隐藏后的指路灰字 */
 .ledger-summary-mine {
-  margin-bottom: 12px;
+  margin: 12px 16px;
   font-size: 12px;
-  color: var(--dcs-text-secondary);
+  color: var(--app-muted);
 }
-.sum-cell {
-  flex: 1;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  padding: 8px 14px;
-  background: var(--el-fill-color-extra-light);
+/* 375：流水表在容器内横滚，父链 min-width:0 防整页溢出 */
+.ledger-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
-.sum-num {
-  font-size: 20px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.sum-out {
-  color: var(--el-color-danger);
-}
-.sum-in {
-  color: var(--el-color-success-dark-2, var(--el-color-success));
-}
-.sum-label {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 2px;
-}
-.empty-tip {
-  text-align: center;
-  color: #909399;
-  font-size: 13px;
-  padding: 18px 0 6px;
+.ledger-table-wrap :deep(.el-table) {
+  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加 */
+  min-width: 910px;
+  /* 只覆盖 EP 表格 CSS 变量，不重写组件（契约 §2.5） */
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: var(--app-surface);
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
 }
 /* 业务批7 Q4：扣减构成小字 + 分页条 */
 .credit-src {
   font-size: 11px;
-  color: #909399;
+  color: var(--app-faint);
   font-weight: 400;
   line-height: 1.5;
 }
 .ledger-pager {
   display: flex;
   justify-content: flex-end;
-  padding-top: 10px;
+  padding: 0 16px 12px;
 }
 </style>
