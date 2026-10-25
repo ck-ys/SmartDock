@@ -21,6 +21,10 @@ const currentId = ref('');
 const switching = ref(false);
 // 首次加载是否已返回（无论成败）：给底区渲染同高占位，避免单位行晚到把菜单顶上去
 const ready = ref(false);
+// 列表加载失败标记：失败时底区渲染「点击重试」行，而不是让唯一入口整会话消失（2026-10-24 审查 P1 回修）
+const loadFailed = ref(false);
+// 最近一次真正发请求的时间：浮层打开时的静默刷新用它节流（60s 内不重复请求）
+let lastFetchAt = 0;
 let loadedFor = '';
 
 export const useTenantSwitch = () => {
@@ -37,13 +41,6 @@ export const useTenantSwitch = () => {
   const canSwitch = computed(() => isSuperAdmin.value && tenantEnabled.value && tenants.value.length > 1);
   const currentTenant = computed(() => tenants.value.find((item) => String(item.tenantId) === currentId.value));
   const isDefaultTenant = computed(() => !currentId.value || currentId.value === defaultId.value);
-  // 菜单里列「其它单位」；默认单位单独用「回到默认单位」表达，避免同一个目标出现两行
-  const otherTenants = computed(() =>
-    tenants.value.filter((item) => {
-      const id = String(item.tenantId);
-      return id !== currentId.value && id !== defaultId.value;
-    })
-  );
   // 底部单位行浮层用（2026-10-24 拍板 题2-1）：当前之外的单位全列，默认单位在列并带「默认」标记，
   // 点它即回默认，不再单设「回到默认单位」一行
   const unitOptions = computed(() => tenants.value.filter((item) => String(item.tenantId) !== currentId.value));
@@ -55,30 +52,52 @@ export const useTenantSwitch = () => {
     tenantSwitched.value = !!tenantId && tenantId !== defaultId.value;
   };
 
-  const load = async () => {
-    if (!isSuperAdmin.value || loadedFor === userId.value) {
+  const load = async (force = false) => {
+    if (!isSuperAdmin.value || (!force && loadedFor === userId.value)) {
       return;
     }
-    // 先占位再请求：BrandRow 与账号菜单同时 mount 也只发一次请求
+    // 先占位再请求：并发挂载也只发一次请求
     loadedFor = userId.value;
+    lastFetchAt = Date.now();
     try {
       const { data } = await getTenantList(true);
       tenantEnabled.value = data.tenantEnabled === undefined ? true : data.tenantEnabled;
       tenants.value = tenantEnabled.value ? data.voList || [] : [];
-      const storedId = readTenantMirror(userId.value);
       // 服务端由 permission.ts 的回放保证与镜像一致；这里只对齐显示，镜像失效时回默认
+      // 静默刷新（force）时保留当前选择；首次加载才走镜像回放
+      const storedId = readTenantMirror(userId.value);
       const stored = storedId && tenants.value.some((item) => String(item.tenantId) === storedId) ? storedId : '';
-      apply(stored || defaultId.value);
+      const kept =
+        force && currentId.value && tenants.value.some((item) => String(item.tenantId) === currentId.value)
+          ? currentId.value
+          : stored || defaultId.value;
+      apply(kept);
+      loadFailed.value = false;
     } catch {
-      // 失败不记账（下次挂载重试）、不动镜像、不伪造当前单位
-      loadedFor = '';
-      tenants.value = [];
-      currentId.value = defaultId.value;
-      tenantName.value = '';
-      tenantSwitched.value = false;
+      loadFailed.value = true;
+      if (!force) {
+        // 首次加载失败不记账（重试行可再试）、不动镜像、不伪造当前单位；
+        // 静默刷新失败保留旧列表，比清空更稳
+        loadedFor = '';
+        tenants.value = [];
+        currentId.value = defaultId.value;
+        tenantName.value = '';
+        tenantSwitched.value = false;
+      }
     } finally {
       ready.value = true;
     }
+  };
+
+  // 浮层打开时的静默刷新：单位管理页增删了单位，回来打开浮层就能看到（60s 节流）
+  const refresh = () => {
+    if (!isSuperAdmin.value || loadFailed.value) {
+      return;
+    }
+    if (Date.now() - lastFetchAt < 60000) {
+      return;
+    }
+    return load(true);
   };
 
   // 退出登录时服务端会清掉动态租户，本地镜像由 user store 的 logout 统一清
@@ -128,14 +147,15 @@ export const useTenantSwitch = () => {
     currentId,
     switching,
     ready,
+    loadFailed,
     currentTenant,
-    otherTenants,
     unitOptions,
     isSuperAdmin,
     isDefaultTenant,
     canSwitch,
     defaultId,
     load,
+    refresh,
     forget,
     switchTo
   };
