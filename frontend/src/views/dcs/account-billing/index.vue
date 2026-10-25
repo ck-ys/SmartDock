@@ -1,6 +1,7 @@
 <template>
   <div class="dcs-ops-page">
     <DcsOperationsPageHeader
+      eyebrow="钱包与计费"
       title="账户与账单"
       subtitle="平台侧钱包资金、两本账流水与充值订单的一站式对账入口（原「租户钱包 / 钱包流水 / 充值订单」三菜单合并）。"
       :metrics="metrics"
@@ -18,7 +19,10 @@
       </el-tab-pane>
     </el-tabs>
     <!-- 深审回修(P2-6): 三页签权限全无时的兜底空态（深链误入场景），不留纯空白页 -->
-    <el-empty v-if="!permOverview && !permLedger && !permOrders" description="当前账号没有账户与账单的查看权限，请联系管理员授权" />
+    <div v-if="!permOverview && !permLedger && !permOrders" class="ui-empty">
+      <p class="ui-empty__title">当前账号没有账户与账单的查看权限</p>
+      <p class="ui-empty__hint">请联系管理员授权后再访问。</p>
+    </div>
   </div>
 </template>
 
@@ -74,13 +78,21 @@ const setMetrics = (m: DcsOperationsMetric[]) => {
 </script>
 
 <style scoped>
+.dcs-ops-page {
+  min-width: 0;
+}
 .ab-tabs {
   margin-top: 4px;
 }
 .ab-tabs :deep(.el-tabs__header) {
   margin-bottom: 12px;
 }
+/* 页签底线 1px，激活条走主文字色（theme-framed 已给，这里只锁高度防被页面覆盖） */
 .ab-tabs :deep(.el-tabs__nav-wrap::after) {
   height: 1px;
+  background: var(--app-rule);
+}
+.ab-tabs :deep(.el-tabs__active-bar) {
+  background-color: var(--app-text);
 }
 </style>

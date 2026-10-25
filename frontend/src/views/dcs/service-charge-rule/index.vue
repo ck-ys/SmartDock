@@ -1,6 +1,7 @@
 <template>
   <div class="dcs-ops-page">
     <DcsOperationsPageHeader
+      eyebrow="钱包与计费"
       title="余额兜底策略"
       subtitle="只管一件事：钱包余额不足时怎么办。模型本身怎么定价，去「AI 模型配置」看。"
       :metrics="headerMetrics"
@@ -13,53 +14,65 @@
 
     <el-card shadow="never" class="dcs-ops-table-card">
       <!-- 搜索栏 -->
-      <el-form :model="queryParams" :inline="true" class="search-form">
-        <el-form-item label="服务码">
-          <el-input v-model="queryParams.serviceCode" placeholder="服务码" clearable style="width: 200px" @keyup.enter="handleQuery" />
-        </el-form-item>
-        <el-form-item label="服务名">
-          <el-input v-model="queryParams.serviceName" placeholder="服务名" clearable style="width: 200px" @keyup.enter="handleQuery" />
-        </el-form-item>
-        <el-form-item label="启用状态">
-          <el-select v-model="queryParams.enabled" clearable placeholder="全部" style="width: 130px" @change="handleQuery">
-            <el-option label="启用" value="1" />
-            <el-option label="停用" value="0" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
-          <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
+      <div class="ui-toolbar">
+        <el-form :model="queryParams" :inline="true" class="search-form" @submit.prevent>
+          <el-form-item label="服务码">
+            <el-input v-model="queryParams.serviceCode" placeholder="服务码" clearable style="width: 200px" @keyup.enter="handleQuery" />
+          </el-form-item>
+          <el-form-item label="服务名">
+            <el-input v-model="queryParams.serviceName" placeholder="服务名" clearable style="width: 200px" @keyup.enter="handleQuery" />
+          </el-form-item>
+          <el-form-item label="启用状态">
+            <el-select v-model="queryParams.enabled" clearable placeholder="全部" style="width: 130px" @change="handleQuery">
+              <el-option label="启用" value="1" />
+              <el-option label="停用" value="0" />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button :icon="Search" @click="handleQuery">搜索</el-button>
+            <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
 
-      <el-table v-loading="loading" :data="ruleList" border size="small">
-        <el-table-column label="规则ID" prop="ruleId" min-width="172" align="center">
-          <template #default="{ row }"
-            ><span class="dcs-ops-id">{{ row.ruleId }}</span></template
-          >
-        </el-table-column>
-        <el-table-column label="服务码" prop="serviceCode" min-width="160" show-overflow-tooltip />
-        <el-table-column label="服务名" prop="serviceName" min-width="160" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.serviceName || '--' }}</template>
-        </el-table-column>
-        <el-table-column label="兜底策略" width="140" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" :type="fallbackPolicyType(row.fallbackPolicy)" effect="plain">{{ fallbackPolicyLabel(row.fallbackPolicy) }}</el-tag>
+      <div class="ui-table-wrap">
+        <el-table v-loading="loading" :data="ruleList" class="ui-table">
+          <el-table-column label="规则ID" prop="ruleId" min-width="172" align="center">
+            <template #default="{ row }"
+              ><span class="dcs-ops-id">{{ row.ruleId }}</span></template
+            >
+          </el-table-column>
+          <el-table-column label="服务码" prop="serviceCode" min-width="160" show-overflow-tooltip />
+          <el-table-column label="服务名" prop="serviceName" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.serviceName || '--' }}</template>
+          </el-table-column>
+          <el-table-column label="兜底策略" width="140" align="center">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="fallbackPolicyPillClass(row.fallbackPolicy)">{{ fallbackPolicyLabel(row.fallbackPolicy) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="排序" prop="sortOrder" width="80" align="right" />
+          <el-table-column label="启用" width="80" align="center">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="row.enabled === '1' ? 'ui-pill--pos' : 'ui-pill--muted'">{{
+                row.enabled === '1' ? '启用' : '停用'
+              }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button link class="ui-row-action" @click="openEdit(row)">编辑</el-button>
+              <el-button link type="danger" @click="onDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无兜底规则</p>
+              <p class="ui-empty__hint">点右上角「新增规则」配置钱包余额不足时的处理方式。</p>
+            </div>
           </template>
-        </el-table-column>
-        <el-table-column label="排序" prop="sortOrder" width="80" align="center" />
-        <el-table-column label="启用" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" :type="row.enabled === '1' ? 'success' : 'info'">{{ row.enabled === '1' ? '启用' : '停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" size="small" :icon="Edit" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" size="small" :icon="Delete" @click="onDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
     </el-card>
@@ -121,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { Plus, Search, Refresh, RefreshLeft, Edit, Delete } from '@element-plus/icons-vue';
+import { Plus, Search, Refresh, RefreshLeft } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import {
   listServiceChargeRule,
@@ -165,9 +178,15 @@ const fallbackPolicyOptions = [
 ];
 
 const fallbackPolicyLabel = (p: string) => fallbackPolicyOptions.find((o) => o.value === p)?.label || p || '--';
-const fallbackPolicyType = (p: string) => {
-  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = { BLOCK: 'danger', ALGORITHM_FALLBACK: 'warning', ALLOW_FREE: 'success', ADMIN_OVERRIDE: 'primary' };
-  return map[p] || 'info';
+/** 兜底策略药丸：拦截=危险 / 算法兜底=警告 / 免费降级=成功 / 管理员覆写=中性 */
+const fallbackPolicyPillClass = (p: string) => {
+  const map: Record<string, string> = {
+    BLOCK: 'ui-pill--neg',
+    ALGORITHM_FALLBACK: 'ui-pill--warn',
+    ALLOW_FREE: 'ui-pill--pos',
+    ADMIN_OVERRIDE: 'ui-pill--muted'
+  };
+  return map[p] || 'ui-pill--muted';
 };
 
 const getList = async () => {
@@ -270,21 +289,56 @@ onMounted(getList);
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.dcs-ops-page {
+  min-width: 0;
 }
-.page-title {
-  font-size: 18px;
-  font-weight: 600;
+/* 页头主操作与工具栏控件同高 36 */
+.dcs-ops-header :deep(.dcs-ops-header__actions) {
+  --el-component-size: var(--dcs-control-h);
 }
-.page-subtitle {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 4px;
+.dcs-ops-header :deep(.dcs-ops-header__actions .el-button:not(.is-text):not(.is-link)) {
+  height: var(--dcs-control-h);
 }
 .search-form {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+.search-form :deep(.el-form-item) {
   margin-bottom: 8px;
+}
+/* 375：表格外层容器可横滚，父链 min-width:0 */
+.dcs-ops-table-card {
+  min-width: 0;
+}
+.ui-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+/* 表格规格走 Element Plus 变量：表头无底带 / 行线令牌 / 行 hover 中性底 / 冻结列无阴影 */
+.ui-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-border: 1px solid var(--app-rule);
+  --el-table-text-color: var(--app-muted);
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-header-bg-color: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-current-row-bg-color: var(--app-raised);
+  --el-table-fixed-box-shadow: none;
+  --el-table-fixed-left-column: none;
+  --el-table-fixed-right-column: none;
+}
+.ui-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+.ui-row-action.el-button.is-link {
+  color: var(--app-muted);
+}
+.ui-row-action.el-button.is-link:hover {
+  color: var(--app-text);
 }
 </style>

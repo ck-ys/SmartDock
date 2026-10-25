@@ -1,12 +1,12 @@
 <template>
   <el-card shadow="never" class="dcs-ops-table-card">
-    <div class="ab-toolbar">
+    <div class="ui-toolbar">
       <el-form :model="queryParams" :inline="true" class="search-form" @submit.prevent>
         <el-form-item label="租户ID">
           <el-input v-model="queryParams.tenantId" placeholder="请输入租户ID" clearable style="width: 220px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button :icon="Search" @click="handleQuery">搜索</el-button>
           <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
@@ -16,57 +16,67 @@
       </div>
     </div>
 
-    <el-table v-loading="loading" :data="walletList" border size="small" :row-class-name="walletRowClass">
-      <el-table-column label="钱包" min-width="150">
-        <template #default="{ row }">
-          <span :title="`钱包ID ${row.walletId}`" class="dcs-ops-id">{{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
+    <div class="ui-table-wrap">
+      <el-table v-loading="loading" :data="walletList" class="ui-table" :row-class-name="walletRowClass">
+        <el-table-column label="钱包" min-width="150">
+          <template #default="{ row }">
+            <span :title="`钱包ID ${row.walletId}`" class="dcs-ops-id">{{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="类型" width="100" align="center">
+          <template #default="{ row }">
+            <span class="ui-pill" :class="row.walletType === 'MAIN' ? 'ui-pill--pos' : 'ui-pill--muted'">{{ walletTypeLabel(row.walletType) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="余额" width="130" align="right">
+          <template #default="{ row }">{{ money(row.balanceAmount) }}</template>
+        </el-table-column>
+        <el-table-column label="冻结" width="120" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'amount-warn': Number(row.frozenAmount || 0) > 0 }">{{ money(row.frozenAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="可用" width="130" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'amount-danger': Number(row.availableAmount || 0) < 0 }">{{ money(row.availableAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="低余额阈值" width="120" align="right">
+          <template #default="{ row }">{{ money(row.lowBalanceThreshold) }}</template>
+        </el-table-column>
+        <el-table-column label="创建时间" prop="createTime" width="170" />
+        <el-table-column label="操作" width="210" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link class="ui-row-action" @click="openRecharge(row)">充值</el-button>
+            <el-button link class="ui-row-action" @click="openThreshold(row)">调阈值</el-button>
+            <el-dropdown trigger="click" @command="(cmd: string) => onMoreCommand(cmd, row)">
+              <el-button link class="ab-more-btn ui-row-action" aria-label="更多资金操作">
+                ···<el-icon class="ab-more-caret"><CaretBottom /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="deduct">扣减</el-dropdown-item>
+                  <el-dropdown-item v-if="row.status !== 'DISABLED'" command="toggle">{{
+                    row.status === 'ACTIVE' ? '冻结' : '解冻'
+                  }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">暂无钱包</p>
+            <p class="ui-empty__hint">初始化钱包后，这里会显示租户钱包的余额、冻结与阈值状态。</p>
+          </div>
         </template>
-      </el-table-column>
-      <el-table-column label="类型" width="100" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="row.walletType === 'MAIN' ? 'success' : 'info'">{{ walletTypeLabel(row.walletType) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="余额" width="130" align="right">
-        <template #default="{ row }">{{ money(row.balanceAmount) }}</template>
-      </el-table-column>
-      <el-table-column label="冻结" width="120" align="right">
-        <template #default="{ row }">
-          <span :class="{ 'amount-warn': Number(row.frozenAmount || 0) > 0 }">{{ money(row.frozenAmount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="可用" width="130" align="right">
-        <template #default="{ row }">
-          <span :class="{ 'amount-danger': Number(row.availableAmount || 0) < 0 }">{{ money(row.availableAmount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="100" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="row.status === 'ACTIVE' ? 'success' : 'danger'">{{ statusLabel(row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="低余额阈值" width="120" align="right">
-        <template #default="{ row }">{{ money(row.lowBalanceThreshold) }}</template>
-      </el-table-column>
-      <el-table-column label="创建时间" prop="createTime" width="170" />
-      <el-table-column label="操作" width="210" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openRecharge(row)">充值</el-button>
-          <el-button link type="primary" size="small" @click="openThreshold(row)">调阈值</el-button>
-          <el-dropdown trigger="click" @command="(cmd: string) => onMoreCommand(cmd, row)">
-            <el-button link type="primary" size="small" class="ab-more-btn">
-              ···<el-icon class="ab-more-caret"><CaretBottom /></el-icon>
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="deduct">扣减</el-dropdown-item>
-                <el-dropdown-item v-if="row.status !== 'DISABLED'" command="toggle">{{ row.status === 'ACTIVE' ? '冻结' : '解冻' }}</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-      </el-table-column>
-    </el-table>
+      </el-table>
+    </div>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
@@ -190,6 +200,12 @@ const walletTypeLabel = (t: string) => {
 const statusLabel = (s: string) => {
   const map: Record<string, string> = { ACTIVE: '正常', FROZEN: '已冻结', DISABLED: '已停用' };
   return map[s] || s || '--';
+};
+
+/** 状态药丸：与全站四组语义色对齐（正常=成功 / 冻结=警告 / 停用=中性） */
+const statusPillClass = (s: string) => {
+  const map: Record<string, string> = { ACTIVE: 'ui-pill--pos', FROZEN: 'ui-pill--warn', DISABLED: 'ui-pill--muted' };
+  return map[s] || 'ui-pill--muted';
 };
 
 const money = (value?: number) => `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -371,20 +387,58 @@ onMounted(reloadAll);
 </script>
 
 <style scoped>
-.ab-toolbar {
-  display: flex;
+/* 筛选条与表格同卡：容器留给 .ui-toolbar（1px 底线 + 控件高 36），这里只排左右两栏 */
+.ui-toolbar {
   justify-content: space-between;
   align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
 }
-.ab-toolbar .search-form {
+.search-form {
+  flex: 1 1 520px;
+  min-width: 0;
+  margin: 0;
+}
+.search-form :deep(.el-form-item) {
   margin-bottom: 8px;
 }
 .ab-toolbar-actions {
   display: flex;
-  gap: 0;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
+}
+/* 375：表格外层容器可横滚，父链 min-width:0，避免整页横向溢出 */
+.dcs-ops-table-card {
+  min-width: 0;
+}
+.ui-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+/* 表格规格走 Element Plus 变量：表头无底带 / 行线令牌 / 行 hover 中性底 / 冻结列无阴影 */
+.ui-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-border: 1px solid var(--app-rule);
+  --el-table-text-color: var(--app-muted);
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-header-bg-color: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-current-row-bg-color: var(--app-raised);
+  --el-table-fixed-box-shadow: none;
+  --el-table-fixed-left-column: none;
+  --el-table-fixed-right-column: none;
+}
+.ui-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
+}
+.ui-row-action.el-button.is-link {
+  color: var(--app-muted);
+}
+.ui-row-action.el-button.is-link:hover {
+  color: var(--app-text);
 }
 .amount-warn {
   color: var(--el-color-warning);

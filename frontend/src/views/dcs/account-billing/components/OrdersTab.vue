@@ -1,9 +1,9 @@
 <template>
   <el-card shadow="never" class="dcs-ops-table-card">
-    <div class="ab-toolbar">
+    <div class="ui-toolbar">
       <el-form :model="queryParams" :inline="true" class="search-form" @submit.prevent>
         <el-form-item label="租户ID">
-          <el-input v-model="queryParams.tenantId" placeholder="租户ID" clearable style="width: 200px" @keyup.enter="handleQuery" />
+          <el-input v-model="queryParams.tenantId" placeholder="请输入租户ID" clearable style="width: 200px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item label="订单状态">
           <el-select v-model="queryParams.status" clearable placeholder="全部" style="width: 130px" @change="handleQuery">
@@ -13,7 +13,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button :icon="Search" @click="handleQuery">搜索</el-button>
           <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
@@ -34,53 +34,56 @@
       description="钱包初始化时系统会赠送体验金；日常给租户加钱在「账户总览」页签直接点「充值」，只有需要走订单留痕的充值才在这里创建。"
     />
 
-    <el-table v-loading="loading" :data="orderList" border size="small">
-      <el-table-column label="订单号" prop="orderNo" min-width="200" show-overflow-tooltip />
-      <el-table-column label="租户ID" prop="tenantId" min-width="150" show-overflow-tooltip />
-      <el-table-column label="钱包ID" prop="walletId" min-width="172" align="center">
-        <template #default="{ row }"
-          ><span class="dcs-ops-id">{{ row.walletId }}</span></template
-        >
-      </el-table-column>
-      <el-table-column label="渠道" width="110" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" effect="plain">{{ channelLabel(row.channel) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="金额" width="140" align="right">
-        <template #default="{ row }">
-          <span class="amount">{{ money(row.amount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="100" align="center">
-        <template #default="{ row }">
-          <el-tag size="small" :type="statusType(row.status)">{{ statusLabel(row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="支付时间" width="170">
-        <template #default="{ row }">{{ row.payTime || '--' }}</template>
-      </el-table-column>
-      <el-table-column label="创建时间" prop="createTime" width="170" />
-      <el-table-column label="备注" prop="remark" min-width="150" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.remark || '--' }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="100" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button v-if="row.status === 'PENDING'" v-hasPermi="['dcs:payment-order:close']" link type="danger" size="small" @click="onClose(row)"
-            >关闭</el-button
+    <div class="ui-table-wrap">
+      <el-table v-loading="loading" :data="orderList" class="ui-table">
+        <el-table-column label="订单号" prop="orderNo" min-width="200" show-overflow-tooltip />
+        <el-table-column label="租户ID" prop="tenantId" min-width="150" show-overflow-tooltip />
+        <el-table-column label="钱包ID" prop="walletId" min-width="172" align="center">
+          <template #default="{ row }"
+            ><span class="dcs-ops-id">{{ row.walletId }}</span></template
           >
-          <span v-else class="text-muted">--</span>
+        </el-table-column>
+        <el-table-column label="渠道" width="110" align="center">
+          <template #default="{ row }">
+            <span class="ui-pill">{{ channelLabel(row.channel) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" width="140" align="right">
+          <template #default="{ row }">
+            <span class="amount">{{ money(row.amount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="支付时间" width="170">
+          <template #default="{ row }">{{ row.payTime || '--' }}</template>
+        </el-table-column>
+        <el-table-column label="创建时间" prop="createTime" width="170" />
+        <el-table-column label="备注" prop="remark" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.remark || '--' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="row.status === 'PENDING'" v-hasPermi="['dcs:payment-order:close']" link type="danger" @click="onClose(row)"
+              >关闭</el-button
+            >
+            <span v-else class="text-muted">--</span>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="ui-empty">
+            <p class="ui-empty__title">暂无充值订单</p>
+            <p class="ui-empty__hint">可先创建一笔手工充值订单，再在列表中跟踪支付状态。</p>
+            <div class="ui-empty__actions">
+              <el-button :icon="Plus" @click="openCreate">创建首笔订单</el-button>
+            </div>
+          </div>
         </template>
-      </el-table-column>
-      <template #empty>
-        <div class="dcs-ops-empty">
-          <el-empty description="暂无充值订单" :image-size="96">
-            <p class="order-empty-hint">可先创建一笔手工充值订单，再在列表中跟踪支付状态。</p>
-            <el-button type="primary" :icon="Plus" @click="openCreate">创建首笔订单</el-button>
-          </el-empty>
-        </div>
-      </template>
-    </el-table>
+      </el-table>
+    </div>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
@@ -159,9 +162,10 @@ const statusLabel = (s: string) => {
   return map[s] || s || '--';
 };
 
-const statusType = (s: string) => {
-  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = { PENDING: 'warning', PAID: 'success', CLOSED: 'info' };
-  return map[s] || 'info';
+/** 状态药丸：待支付=警告 / 已支付=成功 / 已关闭=中性 */
+const statusPillClass = (s: string) => {
+  const map: Record<string, string> = { PENDING: 'ui-pill--warn', PAID: 'ui-pill--pos', CLOSED: 'ui-pill--muted' };
+  return map[s] || 'ui-pill--muted';
 };
 
 const money = (value?: number) => `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -261,29 +265,61 @@ onMounted(getList);
 </script>
 
 <style scoped>
-.ab-toolbar {
-  display: flex;
+/* 筛选条与表格同卡：容器留给 .ui-toolbar（1px 底线 + 控件高 36），这里只排左右两栏 */
+.ui-toolbar {
   justify-content: space-between;
   align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 8px;
 }
-.ab-toolbar .search-form {
+.search-form {
+  flex: 1 1 520px;
+  min-width: 0;
+  margin: 0;
+}
+.search-form :deep(.el-form-item) {
   margin-bottom: 8px;
 }
 .ab-toolbar-actions {
   display: flex;
-  gap: 0;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 .ab-empty-strip {
-  margin-bottom: 12px;
+  margin: 12px 16px;
+}
+/* 375：表格外层容器可横滚，父链 min-width:0 */
+.dcs-ops-table-card {
+  min-width: 0;
+}
+.ui-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+}
+/* 表格规格走 Element Plus 变量：表头无底带 / 行线令牌 / 行 hover 中性底 / 冻结列无阴影 */
+.ui-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-border: 1px solid var(--app-rule);
+  --el-table-text-color: var(--app-muted);
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-header-bg-color: transparent;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-current-row-bg-color: var(--app-raised);
+  --el-table-fixed-box-shadow: none;
+  --el-table-fixed-left-column: none;
+  --el-table-fixed-right-column: none;
+}
+.ui-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: 1.6;
 }
 .amount {
+  color: var(--app-text);
   font-weight: 600;
-  color: var(--el-color-primary);
 }
 .text-muted {
-  color: #c0c4cc;
+  color: var(--app-faint);
 }
 </style>
