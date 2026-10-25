@@ -36,33 +36,40 @@
       </el-alert>
 
       <!-- 已有链接列表 -->
-      <el-table v-loading="listLoading" :data="linkRows" stripe size="default" class="link-table">
-        <el-table-column label="邀请码" min-width="135" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span class="code-text">{{ row.inviteCode }}</span>
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="listLoading" :data="linkRows" class="ui-table">
+          <el-table-column label="邀请码" min-width="135" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="code-text">{{ row.inviteCode }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="isSuperAdmin" label="单位" min-width="105" show-overflow-tooltip prop="companyName" />
+          <el-table-column label="注册后角色" min-width="100" prop="roleName" show-overflow-tooltip />
+          <el-table-column label="状态" width="78" align="center">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="statusOf(row).tagType === 'success' ? 'ui-pill--pos' : 'ui-pill--muted'">
+                {{ statusOf(row).label }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="有效期至" width="132" align="center">
+            <template #default="{ row }">{{ row.expireTime ? formatTime(row.expireTime) : '永久' }}</template>
+          </el-table-column>
+          <el-table-column label="已注册" width="68" align="right" class-name="ui-num" prop="useCount" />
+          <el-table-column label="生成时间" width="132" align="center">
+            <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="122" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" icon="CopyDocument" @click="copyLink(buildLink(row.inviteCode))">复制</el-button>
+              <el-button v-if="row.status === '0'" link type="danger" icon="CircleClose" @click="handleRevoke(row)"> 作废 </el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无邀请链接</div>
           </template>
-        </el-table-column>
-        <el-table-column v-if="isSuperAdmin" label="单位" min-width="105" show-overflow-tooltip prop="companyName" />
-        <el-table-column label="注册后角色" min-width="100" prop="roleName" show-overflow-tooltip />
-        <el-table-column label="状态" width="78" align="center">
-          <template #default="{ row }">
-            <el-tag :type="statusOf(row).tagType" effect="light">{{ statusOf(row).label }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="有效期至" width="132" align="center">
-          <template #default="{ row }">{{ row.expireTime ? formatTime(row.expireTime) : '永久' }}</template>
-        </el-table-column>
-        <el-table-column label="已注册" width="68" align="center" prop="useCount" />
-        <el-table-column label="生成时间" width="132" align="center">
-          <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="122" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" icon="CopyDocument" @click="copyLink(buildLink(row.inviteCode))">复制</el-button>
-            <el-button v-if="row.status === '0'" link type="danger" icon="CircleClose" @click="handleRevoke(row)"> 作废 </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
       <div class="pager-row">
         <el-pagination
           v-model:current-page="pageNum"
@@ -114,9 +121,7 @@ watch(visible, (open) => {
       listTenant({ pageNum: 1, pageSize: 100, tenantId: '', contactUserName: '', contactPhone: '', companyName: '' })
         .then((res: any) => {
           // 下拉先滤掉过期/停用单位（后端生成时也会拦 loginable，提前滤免得选完才报错；E2E 实证过期租户会被拦）
-          tenantOptions.value = (res.rows || []).filter(
-            (t: any) => t.status !== '1' && (!t.expireTime || dayjs(t.expireTime).isAfter(dayjs()))
-          );
+          tenantOptions.value = (res.rows || []).filter((t: any) => t.status !== '1' && (!t.expireTime || dayjs(t.expireTime).isAfter(dayjs())));
         })
         .catch(() => {
           // 拉取失败下拉为空，可重开重试（本接口仅超管有权，不弹全局错误——批1 同款处理）
@@ -281,16 +286,14 @@ export default { name: 'InviteLinkDialog' };
     }
   }
 
-  .link-table {
-    :deep(.el-table__cell) {
-      padding: 10px 0;
-    }
+  .code-text {
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
 
-    .code-text {
-      font-family: monospace;
-      font-size: 12px;
-      color: var(--el-text-color-secondary);
-    }
+  .dcs-ops-table-wrap :deep(.el-table) {
+    min-width: 880px;
   }
 
   .pager-row {
@@ -301,7 +304,7 @@ export default { name: 'InviteLinkDialog' };
 
     .pager-tip {
       font-size: 12px;
-      color: #909399;
+      color: var(--app-faint);
     }
   }
 }

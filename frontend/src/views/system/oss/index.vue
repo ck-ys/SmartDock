@@ -13,7 +13,7 @@
             <el-form-item label="文件后缀" prop="fileSuffix">
               <el-input v-model="queryParams.fileSuffix" placeholder="请输入文件后缀" clearable @keyup.enter="handleQuery" />
             </el-form-item>
-            <el-form-item label="创建时间" style="width: 308px">
+            <el-form-item label="创建时间">
               <el-date-picker
                 v-model="dateRangeCreateTime"
                 value-format="YYYY-MM-DD HH:mm:ss"
@@ -66,50 +66,56 @@
         </el-row>
       </template>
 
-      <el-table
-        v-if="showTable"
-        v-loading="loading"
-        :data="ossList"
-        border
-        :header-cell-class-name="handleHeaderClass"
-        @selection-change="handleSelectionChange"
-        @header-click="handleHeaderCLick"
-      >
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column v-if="false" label="对象存储主键" align="center" prop="ossId" />
-        <el-table-column label="文件名" align="center" prop="fileName" />
-        <el-table-column label="原名" align="center" prop="originalName" />
-        <el-table-column label="文件后缀" align="center" prop="fileSuffix" />
-        <el-table-column label="文件展示" align="center" prop="url">
-          <template #default="scope">
-            <ImagePreview
-              v-if="previewListResource && checkFileSuffix(scope.row.fileSuffix)"
-              :width="100"
-              :height="100"
-              :src="buildPreviewUrl(scope.row.ossId)"
-              :preview-src-list="[buildPreviewUrl(scope.row.ossId)]"
-            />
-            <span v-if="!checkFileSuffix(scope.row.fileSuffix) || !previewListResource" v-text="scope.row.url" />
+      <div class="dcs-ops-table-wrap">
+        <el-table
+          v-if="showTable"
+          v-loading="loading"
+          :data="ossList"
+          border
+          class="ui-table"
+          :header-cell-class-name="handleHeaderClass"
+          @selection-change="handleSelectionChange"
+          @header-click="handleHeaderCLick"
+        >
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column v-if="false" label="对象存储主键" align="center" prop="ossId" />
+          <el-table-column label="文件名" align="center" prop="fileName" />
+          <el-table-column label="原名" align="center" prop="originalName" />
+          <el-table-column label="文件后缀" align="center" prop="fileSuffix" />
+          <el-table-column label="文件展示" align="center" prop="url">
+            <template #default="scope">
+              <ImagePreview
+                v-if="previewListResource && checkFileSuffix(scope.row.fileSuffix)"
+                :width="100"
+                :height="100"
+                :src="buildPreviewUrl(scope.row.ossId)"
+                :preview-src-list="[buildPreviewUrl(scope.row.ossId)]"
+              />
+              <span v-if="!checkFileSuffix(scope.row.fileSuffix) || !previewListResource" v-text="scope.row.url" />
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" align="center" prop="createTime" width="180" sortable="custom">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="上传人" align="center" prop="createByName" />
+          <el-table-column label="服务商" align="center" prop="service" sortable="custom" />
+          <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+            <template #default="scope">
+              <el-tooltip content="下载" placement="top">
+                <el-button v-hasPermi="['system:oss:download']" link type="primary" icon="Download" @click="handleDownload(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button v-hasPermi="['system:oss:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无文件</div>
           </template>
-        </el-table-column>
-        <el-table-column label="创建时间" align="center" prop="createTime" width="180" sortable="custom">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.createTime, '{y}-{m}-{d}') }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="上传人" align="center" prop="createByName" />
-        <el-table-column label="服务商" align="center" prop="service" sortable="custom" />
-        <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-          <template #default="scope">
-            <el-tooltip content="下载" placement="top">
-              <el-button v-hasPermi="['system:oss:download']" link type="primary" icon="Download" @click="handleDownload(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button v-hasPermi="['system:oss:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
@@ -335,3 +341,9 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 820px;
+}
+</style>

@@ -28,13 +28,7 @@
                   <el-input v-model="queryParams.postCode" placeholder="请输入岗位编码" clearable @keyup.enter="handleQuery" />
                 </el-form-item>
                 <el-form-item label="类别编码" prop="postCategory">
-                  <el-input
-                    v-model="queryParams.postCategory"
-                    placeholder="请输入类别编码"
-                    clearable
-                    style="width: 200px"
-                    @keyup.enter="handleQuery"
-                  />
+                  <el-input v-model="queryParams.postCategory" placeholder="请输入类别编码" clearable @keyup.enter="handleQuery" />
                 </el-form-item>
                 <el-form-item label="岗位名称" prop="postName">
                   <el-input v-model="queryParams.postName" placeholder="请输入岗位名称" clearable @keyup.enter="handleQuery" />
@@ -84,35 +78,40 @@
               <right-toolbar v-model:show-search="showSearch" @query-table="getList"></right-toolbar>
             </el-row>
           </template>
-          <el-table v-loading="loading" border :data="postList" @selection-change="handleSelectionChange">
-            <el-table-column type="selection" width="55" align="center" />
-            <el-table-column v-if="false" label="岗位编号" align="center" prop="postId" />
-            <el-table-column label="岗位编码" align="center" prop="postCode" />
-            <el-table-column label="类别编码" align="center" prop="postCategory" />
-            <el-table-column label="岗位名称" align="center" prop="postName" />
-            <el-table-column label="部门" align="center" prop="deptName" />
-            <el-table-column label="排序" align="center" prop="postSort" />
-            <el-table-column label="状态" align="center" prop="status">
-              <template #default="scope">
-                <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
+          <div class="dcs-ops-table-wrap">
+            <el-table v-loading="loading" border class="ui-table" :data="postList" @selection-change="handleSelectionChange">
+              <el-table-column type="selection" width="55" align="center" />
+              <el-table-column v-if="false" label="岗位编号" align="center" prop="postId" />
+              <el-table-column label="岗位编码" align="center" prop="postCode" />
+              <el-table-column label="类别编码" align="center" prop="postCategory" />
+              <el-table-column label="岗位名称" align="center" prop="postName" />
+              <el-table-column label="部门" align="center" prop="deptName" />
+              <el-table-column label="排序" align="right" class-name="ui-num" prop="postSort" />
+              <el-table-column label="状态" align="center" prop="status">
+                <template #default="scope">
+                  <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
+                </template>
+              </el-table-column>
+              <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+                <template #default="scope">
+                  <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="180" align="center" class-name="small-padding fixed-width">
+                <template #default="scope">
+                  <el-tooltip content="修改" placement="top">
+                    <el-button v-hasPermi="['system:post:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+                  </el-tooltip>
+                  <el-tooltip content="删除" placement="top">
+                    <el-button v-hasPermi="['system:post:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+                  </el-tooltip>
+                </template>
+              </el-table-column>
+              <template #empty>
+                <div class="ui-empty">暂无岗位</div>
               </template>
-            </el-table-column>
-            <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-              <template #default="scope">
-                <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="180" align="center" class-name="small-padding fixed-width">
-              <template #default="scope">
-                <el-tooltip content="修改" placement="top">
-                  <el-button v-hasPermi="['system:post:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
-                </el-tooltip>
-                <el-tooltip content="删除" placement="top">
-                  <el-button v-hasPermi="['system:post:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-          </el-table>
+            </el-table>
+          </div>
 
           <pagination
             v-show="total > 0"
@@ -359,3 +358,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 860px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

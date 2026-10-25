@@ -12,7 +12,7 @@
             <div class="text-center">
               <userAvatar />
             </div>
-            <ul class="list-group list-group-striped">
+            <ul class="list-group">
               <li class="list-group-item">
                 <svg-icon icon-class="user" />用户名称
                 <div class="pull-right">{{ state.user.userName }}</div>
@@ -140,7 +140,7 @@ onMounted(() => {
     word-break: break-all;
   }
   &--empty {
-    color: #909399;
+    color: var(--app-faint);
   }
 }
 </style>

@@ -45,38 +45,43 @@
         </el-row>
       </template>
 
-      <el-table v-loading="loading" border :data="ossConfigList" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column v-if="columns[0].visible" label="主建" align="center" prop="ossConfigId" />
-        <el-table-column v-if="columns[1].visible" label="配置key" align="center" prop="configKey" />
-        <el-table-column v-if="columns[2].visible" label="访问站点" align="center" prop="endpoint" width="200" />
-        <el-table-column v-if="columns[3].visible" label="自定义域名" align="center" prop="domain" width="200" />
-        <el-table-column v-if="columns[4].visible" label="桶名称" align="center" prop="bucketName" />
-        <el-table-column v-if="columns[5].visible" label="前缀" align="center" prop="prefix" />
-        <el-table-column v-if="columns[6].visible" label="域" align="center" prop="region" />
-        <el-table-column v-if="columns[7].visible" label="桶权限类型" align="center" prop="accessPolicy">
-          <template #default="scope">
-            <el-tag v-if="scope.row.accessPolicy === '0'" type="warning">private</el-tag>
-            <el-tag v-if="scope.row.accessPolicy === '1'" type="success">public</el-tag>
-            <el-tag v-if="scope.row.accessPolicy === '2'" type="info">custom</el-tag>
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" border class="ui-table" :data="ossConfigList" @selection-change="handleSelectionChange">
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column v-if="columns[0].visible" label="主建" align="center" prop="ossConfigId" />
+          <el-table-column v-if="columns[1].visible" label="配置key" align="center" prop="configKey" />
+          <el-table-column v-if="columns[2].visible" label="访问站点" align="center" prop="endpoint" width="200" />
+          <el-table-column v-if="columns[3].visible" label="自定义域名" align="center" prop="domain" width="200" />
+          <el-table-column v-if="columns[4].visible" label="桶名称" align="center" prop="bucketName" />
+          <el-table-column v-if="columns[5].visible" label="前缀" align="center" prop="prefix" />
+          <el-table-column v-if="columns[6].visible" label="域" align="center" prop="region" />
+          <el-table-column v-if="columns[7].visible" label="桶权限类型" align="center" prop="accessPolicy">
+            <template #default="scope">
+              <span v-if="scope.row.accessPolicy === '0'" class="ui-pill ui-pill--warn">private</span>
+              <span v-if="scope.row.accessPolicy === '1'" class="ui-pill ui-pill--pos">public</span>
+              <span v-if="scope.row.accessPolicy === '2'" class="ui-pill ui-pill--muted">custom</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="columns[8].visible" label="是否默认" align="center" prop="status">
+            <template #default="scope">
+              <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" fixed="right" align="center" width="150" class-name="small-padding">
+            <template #default="scope">
+              <el-tooltip content="修改" placement="top">
+                <el-button v-hasPermi="['system:ossConfig:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button v-hasPermi="['system:ossConfig:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无对象存储配置</div>
           </template>
-        </el-table-column>
-        <el-table-column v-if="columns[8].visible" label="是否默认" align="center" prop="status">
-          <template #default="scope">
-            <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" fixed="right" align="center" width="150" class-name="small-padding">
-          <template #default="scope">
-            <el-tooltip content="修改" placement="top">
-              <el-button v-hasPermi="['system:ossConfig:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button v-hasPermi="['system:ossConfig:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
@@ -89,14 +94,14 @@
         <el-form-item label="访问站点" prop="endpoint">
           <el-input v-model="form.endpoint" placeholder="请输入访问站点">
             <template #prefix>
-              <span style="color: #999">{{ protocol }}</span>
+              <span class="prefix-protocol">{{ protocol }}</span>
             </template>
           </el-input>
         </el-form-item>
         <el-form-item label="自定义域名" prop="domain">
           <el-input v-model="form.domain" placeholder="请输入自定义域名">
             <template #prefix>
-              <span style="color: #999">{{ protocol }}</span>
+              <span class="prefix-protocol">{{ protocol }}</span>
             </template>
           </el-input>
         </el-form-item>
@@ -342,3 +347,13 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.prefix-protocol {
+  color: var(--app-faint);
+}
+
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 860px;
+}
+</style>

@@ -33,30 +33,35 @@
           <right-toolbar v-model:show-search="showSearch" :search="true" @query-table="getList"></right-toolbar>
         </el-row>
       </template>
-      <el-table v-loading="loading" border :data="userList" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="用户名称" prop="userName" :show-overflow-tooltip="true" />
-        <el-table-column label="用户昵称" prop="nickName" :show-overflow-tooltip="true" />
-        <el-table-column label="邮箱" prop="email" :show-overflow-tooltip="true" />
-        <el-table-column label="手机" prop="phonenumber" :show-overflow-tooltip="true" />
-        <el-table-column label="状态" align="center" prop="status">
-          <template #default="scope">
-            <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" border class="ui-table" :data="userList" @selection-change="handleSelectionChange">
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column label="用户名称" prop="userName" :show-overflow-tooltip="true" />
+          <el-table-column label="用户昵称" prop="nickName" :show-overflow-tooltip="true" />
+          <el-table-column label="邮箱" prop="email" :show-overflow-tooltip="true" />
+          <el-table-column label="手机" prop="phonenumber" :show-overflow-tooltip="true" />
+          <el-table-column label="状态" align="center" prop="status">
+            <template #default="scope">
+              <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+            <template #default="scope">
+              <span>{{ scope.row.createTime }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+            <template #default="scope">
+              <el-tooltip content="取消授权" placement="top">
+                <el-button v-hasPermi="['system:role:remove']" link type="primary" icon="CircleClose" @click="cancelAuthUser(scope.row)"> </el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无已授权用户</div>
           </template>
-        </el-table-column>
-        <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-          <template #default="scope">
-            <span>{{ scope.row.createTime }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-          <template #default="scope">
-            <el-tooltip content="取消授权" placement="top">
-              <el-button v-hasPermi="['system:role:remove']" link type="primary" icon="CircleClose" @click="cancelAuthUser(scope.row)"> </el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
       <select-user ref="selectRef" :role-id="queryParams.roleId" @ok="handleQuery" />
@@ -156,3 +161,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 800px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

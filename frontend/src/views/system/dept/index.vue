@@ -8,7 +8,7 @@
               <el-input v-model="queryParams.deptName" placeholder="请输入部门名称" clearable @keyup.enter="handleQuery" />
             </el-form-item>
             <el-form-item label="类别编码" prop="deptCategory">
-              <el-input v-model="queryParams.deptCategory" placeholder="请输入类别编码" clearable style="width: 240px" @keyup.enter="handleQuery" />
+              <el-input v-model="queryParams.deptCategory" placeholder="请输入类别编码" clearable @keyup.enter="handleQuery" />
             </el-form-item>
             <el-form-item label="状态" prop="status">
               <el-select v-model="queryParams.status" placeholder="部门状态" clearable>
@@ -37,42 +37,48 @@
         </el-row>
       </template>
 
-      <el-table
-        ref="deptTableRef"
-        v-loading="loading"
-        :data="deptList"
-        row-key="deptId"
-        border
-        :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
-        :default-expand-all="isExpandAll"
-      >
-        <el-table-column prop="deptName" label="部门名称" width="260"></el-table-column>
-        <el-table-column prop="deptCategory" align="center" label="类别编码" width="200"></el-table-column>
-        <el-table-column prop="orderNum" align="center" label="排序" width="200"></el-table-column>
-        <el-table-column prop="status" align="center" label="状态" width="100">
-          <template #default="scope">
-            <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
+      <div class="dcs-ops-table-wrap">
+        <el-table
+          ref="deptTableRef"
+          v-loading="loading"
+          :data="deptList"
+          row-key="deptId"
+          border
+          class="ui-table"
+          :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+          :default-expand-all="isExpandAll"
+        >
+          <el-table-column prop="deptName" label="部门名称" width="260"></el-table-column>
+          <el-table-column prop="deptCategory" align="center" label="类别编码" width="200"></el-table-column>
+          <el-table-column prop="orderNum" align="right" class-name="ui-num" label="排序" width="200"></el-table-column>
+          <el-table-column prop="status" align="center" label="状态" width="100">
+            <template #default="scope">
+              <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" align="center" prop="createTime" width="200">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column fixed="right" align="center" label="操作">
+            <template #default="scope">
+              <el-tooltip content="修改" placement="top">
+                <el-button v-hasPermi="['system:dept:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" />
+              </el-tooltip>
+              <el-tooltip content="新增" placement="top">
+                <el-button v-hasPermi="['system:dept:add']" link type="primary" icon="Plus" @click="handleAdd(scope.row)" />
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button v-hasPermi="['system:dept:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)" />
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无部门</div>
           </template>
-        </el-table-column>
-        <el-table-column label="创建时间" align="center" prop="createTime" width="200">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column fixed="right" align="center" label="操作">
-          <template #default="scope">
-            <el-tooltip content="修改" placement="top">
-              <el-button v-hasPermi="['system:dept:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" />
-            </el-tooltip>
-            <el-tooltip content="新增" placement="top">
-              <el-button v-hasPermi="['system:dept:add']" link type="primary" icon="Plus" @click="handleAdd(scope.row)" />
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button v-hasPermi="['system:dept:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)" />
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" destroy-on-close append-to-body width="600px">
@@ -318,3 +324,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 1060px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

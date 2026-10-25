@@ -14,7 +14,15 @@
         </el-form-item>
       </el-form>
       <el-row>
-        <el-table ref="tableRef" border :data="userList" height="260px" @row-click="clickRow" @selection-change="handleSelectionChange">
+        <el-table
+          ref="tableRef"
+          border
+          class="ui-table"
+          :data="userList"
+          height="260px"
+          @row-click="clickRow"
+          @selection-change="handleSelectionChange"
+        >
           <el-table-column type="selection" width="55"></el-table-column>
           <el-table-column label="用户名称" prop="userName" :show-overflow-tooltip="true" />
           <el-table-column label="用户昵称" prop="nickName" :show-overflow-tooltip="true" />
@@ -30,6 +38,9 @@
               <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
             </template>
           </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无可选用户</div>
+          </template>
         </el-table>
         <pagination v-if="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
       </el-row>
@@ -128,3 +139,18 @@ defineExpose({
   show
 });
 </script>
+
+<style lang="scss" scoped>
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

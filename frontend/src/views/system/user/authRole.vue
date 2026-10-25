@@ -20,30 +20,36 @@
     <div class="panel">
       <h4 class="panel-title">角色信息</h4>
       <div>
-        <el-table
-          ref="tableRef"
-          v-loading="loading"
-          border
-          :row-key="getRowKey"
-          :data="roles.slice((pageNum - 1) * pageSize, pageNum * pageSize)"
-          @row-click="clickRow"
-          @selection-change="handleSelectionChange"
-        >
-          <el-table-column label="序号" width="55" type="index" align="center">
-            <template #default="scope">
-              <span>{{ (pageNum - 1) * pageSize + scope.$index + 1 }}</span>
+        <div class="dcs-ops-table-wrap">
+          <el-table
+            ref="tableRef"
+            v-loading="loading"
+            border
+            class="ui-table"
+            :row-key="getRowKey"
+            :data="roles.slice((pageNum - 1) * pageSize, pageNum * pageSize)"
+            @row-click="clickRow"
+            @selection-change="handleSelectionChange"
+          >
+            <el-table-column label="序号" width="55" type="index" align="center">
+              <template #default="scope">
+                <span>{{ (pageNum - 1) * pageSize + scope.$index + 1 }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column type="selection" :reserve-selection="true" :selectable="checkSelectable" width="55"></el-table-column>
+            <el-table-column label="角色编号" align="center" prop="roleId" />
+            <el-table-column label="角色名称" align="center" prop="roleName" />
+            <el-table-column label="权限字符" align="center" prop="roleKey" />
+            <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+              <template #default="scope">
+                <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
+              </template>
+            </el-table-column>
+            <template #empty>
+              <div class="ui-empty">暂无可分配角色</div>
             </template>
-          </el-table-column>
-          <el-table-column type="selection" :reserve-selection="true" :selectable="checkSelectable" width="55"></el-table-column>
-          <el-table-column label="角色编号" align="center" prop="roleId" />
-          <el-table-column label="角色名称" align="center" prop="roleName" />
-          <el-table-column label="权限字符" align="center" prop="roleKey" />
-          <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-            <template #default="scope">
-              <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
+          </el-table>
+        </div>
         <pagination v-show="total > 0" v-model:page="pageNum" v-model:limit="pageSize" :total="total" />
         <div style="text-align: center; margin-left: -120px; margin-top: 30px">
           <el-button type="primary" @click="submitForm()">提交</el-button>
@@ -144,3 +150,9 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 720px;
+}
+</style>

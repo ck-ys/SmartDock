@@ -19,7 +19,7 @@
               <el-form-item label="字典类型" prop="dictType">
                 <el-input v-model="typeQueryParams.dictType" placeholder="请输入字典类型" clearable @keyup.enter="handleTypeQuery" />
               </el-form-item>
-              <el-form-item label="创建时间" style="width: 308px">
+              <el-form-item label="创建时间">
                 <el-date-picker
                   v-model="dateRange"
                   value-format="YYYY-MM-DD HH:mm:ss"
@@ -54,6 +54,7 @@
               ref="typeTableRef"
               v-loading="typeLoading"
               border
+              class="ui-table"
               :data="typeList"
               highlight-current-row
               @row-click="handleTypeRowClick"
@@ -83,6 +84,9 @@
                   </el-tooltip>
                 </template>
               </el-table-column>
+              <template #empty>
+                <div class="ui-empty">暂无字典类型</div>
+              </template>
             </el-table>
           </div>
 
@@ -155,7 +159,7 @@
           </div>
 
           <div class="dict-table-wrap">
-            <el-table v-loading="dataLoading" border :data="dataList" @selection-change="handleDataSelectionChange">
+            <el-table v-loading="dataLoading" border class="ui-table" :data="dataList" @selection-change="handleDataSelectionChange">
               <el-table-column type="selection" width="55" align="center" />
               <el-table-column v-if="false" label="字典编码" align="center" prop="dictCode" />
               <el-table-column label="字典标签" align="center" prop="dictLabel" width="80">
@@ -175,7 +179,7 @@
                 </template>
               </el-table-column>
               <el-table-column label="字典键值" align="center" prop="dictValue" width="80" />
-              <el-table-column label="字典排序" align="center" prop="dictSort" width="80" />
+              <el-table-column label="字典排序" align="right" class-name="ui-num" prop="dictSort" width="80" />
               <el-table-column label="备注" align="center" prop="remark" width="100" />
               <el-table-column label="创建时间" align="center" prop="createTime" width="180">
                 <template #default="scope">
@@ -192,6 +196,9 @@
                   </el-tooltip>
                 </template>
               </el-table-column>
+              <template #empty>
+                <div class="ui-empty">暂无字典数据</div>
+              </template>
             </el-table>
           </div>
 
@@ -214,12 +221,14 @@
         </el-form-item>
         <el-form-item prop="dictType">
           <el-input v-model="typeForm.dictType" placeholder="请输入字典类型" maxlength="100" />
-          <span slot="label">
-            <el-tooltip content="数据存储中的Key值，如：sys_user_sex" placement="top">
-              <i class="el-icon-question"></i>
-            </el-tooltip>
-            字典类型
-          </span>
+          <template v-slot:label>
+            <span>
+              <el-tooltip content="数据存储中的Key值，如：sys_user_sex" placement="top">
+                <i class="el-icon-question"></i>
+              </el-tooltip>
+              字典类型
+            </span>
+          </template>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="typeForm.remark" type="textarea" placeholder="请输入内容"></el-input>
@@ -660,7 +669,7 @@ onMounted(() => {
 }
 
 .dict-actions :deep(.el-button) {
-  height: 32px;
+  height: var(--dcs-control-h);
   padding: 0 14px;
 }
 
@@ -670,5 +679,22 @@ onMounted(() => {
 
 .dict-table-wrap {
   overflow-x: auto;
+}
+
+.dict-table-wrap :deep(.el-table) {
+  min-width: 800px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
 }
 </style>

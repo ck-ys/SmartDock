@@ -23,7 +23,7 @@
                 <el-option v-for="dict in sys_common_status" :key="dict.value" :label="dict.label" :value="dict.value" />
               </el-select>
             </el-form-item>
-            <el-form-item label="操作时间" style="width: 308px">
+            <el-form-item label="操作时间">
               <el-date-picker
                 v-model="dateRange"
                 value-format="YYYY-MM-DD HH:mm:ss"
@@ -61,65 +61,72 @@
         </el-row>
       </template>
 
-      <el-table
-        ref="operLogTableRef"
-        v-loading="loading"
-        :data="operlogList"
-        border
-        :default-sort="defaultSort"
-        @selection-change="handleSelectionChange"
-        @sort-change="handleSortChange"
-      >
-        <el-table-column type="selection" width="50" align="center" />
-        <el-table-column label="日志编号" align="center" prop="operId" />
-        <el-table-column label="系统模块" align="center" prop="title" :show-overflow-tooltip="true" />
-        <el-table-column label="操作类型" align="center" prop="businessType">
-          <template #default="scope">
-            <dict-tag :options="sys_oper_type" :value="scope.row.businessType" />
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="操作人员"
-          align="center"
-          width="110"
-          prop="operName"
-          :show-overflow-tooltip="true"
-          sortable="custom"
-          :sort-orders="['descending', 'ascending']"
-        />
-        <el-table-column label="部门" align="center" prop="deptName" width="130" :show-overflow-tooltip="true" />
-        <el-table-column label="操作地址" align="center" prop="operIp" width="130" :show-overflow-tooltip="true" />
-        <el-table-column label="操作状态" align="center" prop="status">
-          <template #default="scope">
-            <dict-tag :options="sys_common_status" :value="scope.row.status" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作日期" align="center" prop="operTime" width="180" sortable="custom" :sort-orders="['descending', 'ascending']">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.operTime) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          label="消耗时间"
-          align="center"
-          prop="costTime"
-          width="110"
-          :show-overflow-tooltip="true"
-          sortable="custom"
-          :sort-orders="['descending', 'ascending']"
+      <div class="dcs-ops-table-wrap">
+        <el-table
+          ref="operLogTableRef"
+          v-loading="loading"
+          :data="operlogList"
+          border
+          class="ui-table"
+          :default-sort="defaultSort"
+          @selection-change="handleSelectionChange"
+          @sort-change="handleSortChange"
         >
-          <template #default="scope">
-            <span>{{ scope.row.costTime }}毫秒</span>
+          <el-table-column type="selection" width="50" align="center" />
+          <el-table-column label="日志编号" align="center" prop="operId" />
+          <el-table-column label="系统模块" align="center" prop="title" :show-overflow-tooltip="true" />
+          <el-table-column label="操作类型" align="center" prop="businessType">
+            <template #default="scope">
+              <dict-tag :options="sys_oper_type" :value="scope.row.businessType" />
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作人员"
+            align="center"
+            width="110"
+            prop="operName"
+            :show-overflow-tooltip="true"
+            sortable="custom"
+            :sort-orders="['descending', 'ascending']"
+          />
+          <el-table-column label="部门" align="center" prop="deptName" width="130" :show-overflow-tooltip="true" />
+          <el-table-column label="操作地址" align="center" prop="operIp" width="130" :show-overflow-tooltip="true" />
+          <el-table-column label="操作状态" align="center" prop="status">
+            <template #default="scope">
+              <dict-tag :options="sys_common_status" :value="scope.row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作日期" align="center" prop="operTime" width="180" sortable="custom" :sort-orders="['descending', 'ascending']">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.operTime) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="消耗时间"
+            align="right"
+            class-name="ui-num"
+            prop="costTime"
+            width="110"
+            :show-overflow-tooltip="true"
+            sortable="custom"
+            :sort-orders="['descending', 'ascending']"
+          >
+            <template #default="scope">
+              <span>{{ scope.row.costTime }}毫秒</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" fixed="right" align="center" class-name="small-padding fixed-width">
+            <template #default="scope">
+              <el-tooltip content="详细" placement="top">
+                <el-button v-hasPermi="['monitor:operlog:query']" link type="primary" icon="View" @click="handleView(scope.row)"> </el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无操作日志</div>
           </template>
-        </el-table-column>
-        <el-table-column label="操作" fixed="right" align="center" class-name="small-padding fixed-width">
-          <template #default="scope">
-            <el-tooltip content="详细" placement="top">
-              <el-button v-hasPermi="['monitor:operlog:query']" link type="primary" icon="View" @click="handleView(scope.row)"> </el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
@@ -259,3 +266,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 1120px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

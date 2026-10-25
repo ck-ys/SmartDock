@@ -17,44 +17,50 @@
       </el-card>
     </div>
     <el-card shadow="hover">
-      <el-table
-        v-loading="loading"
-        border
-        :data="onlineList.slice((queryParams.pageNum - 1) * queryParams.pageSize, queryParams.pageNum * queryParams.pageSize)"
-        style="width: 100%"
-      >
-        <el-table-column label="序号" width="50" type="index" align="center">
-          <template #default="scope">
-            <span>{{ (queryParams.pageNum - 1) * queryParams.pageSize + scope.$index + 1 }}</span>
+      <div class="dcs-ops-table-wrap">
+        <el-table
+          v-loading="loading"
+          border
+          :data="onlineList.slice((queryParams.pageNum - 1) * queryParams.pageSize, queryParams.pageNum * queryParams.pageSize)"
+          class="ui-table"
+          style="width: 100%"
+        >
+          <el-table-column label="序号" width="50" type="index" align="center">
+            <template #default="scope">
+              <span>{{ (queryParams.pageNum - 1) * queryParams.pageSize + scope.$index + 1 }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="会话编号" align="center" prop="tokenId" :show-overflow-tooltip="true" />
+          <el-table-column label="登录名称" align="center" prop="userName" :show-overflow-tooltip="true" />
+          <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
+          <el-table-column label="设备类型" align="center">
+            <template #default="scope">
+              <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
+            </template>
+          </el-table-column>
+          <el-table-column label="所属部门" align="center" prop="deptName" :show-overflow-tooltip="true" />
+          <el-table-column label="主机" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
+          <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
+          <el-table-column label="操作系统" align="center" prop="os" :show-overflow-tooltip="true" />
+          <el-table-column label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
+          <el-table-column label="登录时间" align="center" prop="loginTime" width="180">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.loginTime) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+            <template #default="scope">
+              <el-tooltip content="强退" placement="top">
+                <el-button v-hasPermi="['monitor:online:forceLogout']" link type="primary" icon="Delete" @click="handleForceLogout(scope.row)">
+                </el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无在线用户</div>
           </template>
-        </el-table-column>
-        <el-table-column label="会话编号" align="center" prop="tokenId" :show-overflow-tooltip="true" />
-        <el-table-column label="登录名称" align="center" prop="userName" :show-overflow-tooltip="true" />
-        <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
-        <el-table-column label="设备类型" align="center">
-          <template #default="scope">
-            <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
-          </template>
-        </el-table-column>
-        <el-table-column label="所属部门" align="center" prop="deptName" :show-overflow-tooltip="true" />
-        <el-table-column label="主机" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
-        <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
-        <el-table-column label="操作系统" align="center" prop="os" :show-overflow-tooltip="true" />
-        <el-table-column label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
-        <el-table-column label="登录时间" align="center" prop="loginTime" width="180">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.loginTime) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-          <template #default="scope">
-            <el-tooltip content="强退" placement="top">
-              <el-button v-hasPermi="['monitor:online:forceLogout']" link type="primary" icon="Delete" @click="handleForceLogout(scope.row)">
-              </el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" />
     </el-card>
@@ -115,3 +121,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 1050px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

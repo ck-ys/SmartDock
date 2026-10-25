@@ -15,7 +15,7 @@
                 <el-option v-for="dict in sys_common_status" :key="dict.value" :label="dict.label" :value="dict.value" />
               </el-select>
             </el-form-item>
-            <el-form-item label="登录时间" style="width: 308px">
+            <el-form-item label="登录时间">
               <el-date-picker
                 v-model="dateRange"
                 value-format="YYYY-MM-DD HH:mm:ss"
@@ -58,47 +58,53 @@
         </el-row>
       </template>
 
-      <el-table
-        ref="loginInfoTableRef"
-        v-loading="loading"
-        :data="loginInfoList"
-        :default-sort="defaultSort"
-        border
-        @selection-change="handleSelectionChange"
-        @sort-change="handleSortChange"
-      >
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="访问编号" align="center" prop="infoId" />
-        <el-table-column
-          label="用户名称"
-          align="center"
-          prop="userName"
-          :show-overflow-tooltip="true"
-          sortable="custom"
-          :sort-orders="['descending', 'ascending']"
-        />
-        <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
-        <el-table-column label="设备类型" align="center">
-          <template #default="scope">
-            <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
+      <div class="dcs-ops-table-wrap">
+        <el-table
+          ref="loginInfoTableRef"
+          v-loading="loading"
+          :data="loginInfoList"
+          :default-sort="defaultSort"
+          border
+          class="ui-table"
+          @selection-change="handleSelectionChange"
+          @sort-change="handleSortChange"
+        >
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column label="访问编号" align="center" prop="infoId" />
+          <el-table-column
+            label="用户名称"
+            align="center"
+            prop="userName"
+            :show-overflow-tooltip="true"
+            sortable="custom"
+            :sort-orders="['descending', 'ascending']"
+          />
+          <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
+          <el-table-column label="设备类型" align="center">
+            <template #default="scope">
+              <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
+            </template>
+          </el-table-column>
+          <el-table-column label="地址" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
+          <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
+          <el-table-column label="操作系统" align="center" prop="os" :show-overflow-tooltip="true" />
+          <el-table-column label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
+          <el-table-column label="登录状态" align="center" prop="status">
+            <template #default="scope">
+              <dict-tag :options="sys_common_status" :value="scope.row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="描述" align="center" prop="msg" :show-overflow-tooltip="true" />
+          <el-table-column label="访问时间" align="center" prop="loginTime" sortable="custom" :sort-orders="['descending', 'ascending']" width="180">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.loginTime) }}</span>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无登录日志</div>
           </template>
-        </el-table-column>
-        <el-table-column label="地址" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
-        <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
-        <el-table-column label="操作系统" align="center" prop="os" :show-overflow-tooltip="true" />
-        <el-table-column label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
-        <el-table-column label="登录状态" align="center" prop="status">
-          <template #default="scope">
-            <dict-tag :options="sys_common_status" :value="scope.row.status" />
-          </template>
-        </el-table-column>
-        <el-table-column label="描述" align="center" prop="msg" :show-overflow-tooltip="true" />
-        <el-table-column label="访问时间" align="center" prop="loginTime" sortable="custom" :sort-orders="['descending', 'ascending']" width="180">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.loginTime) }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
@@ -211,3 +217,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 980px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

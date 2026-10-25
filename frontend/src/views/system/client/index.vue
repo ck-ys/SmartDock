@@ -45,40 +45,45 @@
         </el-row>
       </template>
 
-      <el-table v-loading="loading" :data="clientList" border @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column v-if="true" label="id" align="center" prop="id" />
-        <el-table-column label="客户端id" align="center" prop="clientId" />
-        <el-table-column label="客户端key" align="center" prop="clientKey" />
-        <el-table-column label="客户端秘钥" align="center" prop="clientSecret" />
-        <el-table-column label="授权类型" align="center">
-          <template #default="scope">
-            <dict-tag :options="sys_grant_type" :value="scope.row.grantTypeList" />
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" :data="clientList" border class="ui-table" @selection-change="handleSelectionChange">
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column v-if="true" label="id" align="center" prop="id" />
+          <el-table-column label="客户端id" align="center" prop="clientId" />
+          <el-table-column label="客户端key" align="center" prop="clientKey" />
+          <el-table-column label="客户端秘钥" align="center" prop="clientSecret" />
+          <el-table-column label="授权类型" align="center">
+            <template #default="scope">
+              <dict-tag :options="sys_grant_type" :value="scope.row.grantTypeList" />
+            </template>
+          </el-table-column>
+          <el-table-column label="设备类型" align="center">
+            <template #default="scope">
+              <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
+            </template>
+          </el-table-column>
+          <el-table-column label="Token活跃超时时间" align="right" class-name="ui-num" prop="activeTimeout" />
+          <el-table-column label="Token固定超时时间" align="right" class-name="ui-num" prop="timeout" />
+          <el-table-column key="status" label="状态" align="center">
+            <template #default="scope">
+              <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+            <template #default="scope">
+              <el-tooltip content="修改" placement="top">
+                <el-button v-hasPermi="['system:client:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button v-hasPermi="['system:client:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无客户端</div>
           </template>
-        </el-table-column>
-        <el-table-column label="设备类型" align="center">
-          <template #default="scope">
-            <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
-          </template>
-        </el-table-column>
-        <el-table-column label="Token活跃超时时间" align="center" prop="activeTimeout" />
-        <el-table-column label="Token固定超时时间" align="center" prop="timeout" />
-        <el-table-column key="status" label="状态" align="center">
-          <template #default="scope">
-            <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
-          <template #default="scope">
-            <el-tooltip content="修改" placement="top">
-              <el-button v-hasPermi="['system:client:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button v-hasPermi="['system:client:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
@@ -314,3 +319,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 880px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

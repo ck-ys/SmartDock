@@ -54,39 +54,44 @@
         </el-row>
       </template>
 
-      <el-table v-loading="loading" border :data="tenantList" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column v-if="false" label="id" align="center" prop="id" />
-        <el-table-column label="租户编号" align="center" prop="tenantId" />
-        <el-table-column label="联系人" align="center" prop="contactUserName" />
-        <el-table-column label="联系电话" align="center" prop="contactPhone" />
-        <el-table-column label="企业名称" align="center" prop="companyName" />
-        <el-table-column label="社会信用代码" align="center" prop="licenseNumber" />
-        <el-table-column label="过期时间" align="center" prop="expireTime" width="180">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.expireTime, '{y}-{m}-{d}') }}</span>
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" border class="ui-table" :data="tenantList" @selection-change="handleSelectionChange">
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column v-if="false" label="id" align="center" prop="id" />
+          <el-table-column label="租户编号" align="center" prop="tenantId" />
+          <el-table-column label="联系人" align="center" prop="contactUserName" />
+          <el-table-column label="联系电话" align="center" prop="contactPhone" />
+          <el-table-column label="企业名称" align="center" prop="companyName" />
+          <el-table-column label="社会信用代码" align="center" prop="licenseNumber" />
+          <el-table-column label="过期时间" align="center" prop="expireTime" width="180">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.expireTime, '{y}-{m}-{d}') }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="租户状态" align="center" prop="status">
+            <template #default="scope">
+              <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
+            </template>
+          </el-table-column>
+          <el-table-column width="150" label="操作" align="center" fixed="right" class-name="small-padding fixed-width">
+            <template #default="scope">
+              <el-tooltip content="修改" placement="top">
+                <el-button v-hasPermi="['system:tenant:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip content="同步套餐" placement="top">
+                <el-button v-hasPermi="['system:tenant:edit']" link type="primary" icon="Refresh" @click="handleSyncTenantPackage(scope.row)">
+                </el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button v-hasPermi="['system:tenant:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无租户</div>
           </template>
-        </el-table-column>
-        <el-table-column label="租户状态" align="center" prop="status">
-          <template #default="scope">
-            <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
-          </template>
-        </el-table-column>
-        <el-table-column width="150" label="操作" align="center" fixed="right" class-name="small-padding fixed-width">
-          <template #default="scope">
-            <el-tooltip content="修改" placement="top">
-              <el-button v-hasPermi="['system:tenant:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip content="同步套餐" placement="top">
-              <el-button v-hasPermi="['system:tenant:edit']" link type="primary" icon="Refresh" @click="handleSyncTenantPackage(scope.row)">
-              </el-button>
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button v-hasPermi="['system:tenant:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
@@ -395,6 +400,10 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 960px;
+}
+
 .account-count-hint {
   display: flex;
   align-items: center;

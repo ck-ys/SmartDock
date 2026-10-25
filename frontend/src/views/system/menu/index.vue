@@ -36,51 +36,57 @@
         </el-row>
       </template>
 
-      <el-table
-        ref="menuTableRef"
-        v-loading="loading"
-        :data="menuList"
-        row-key="menuId"
-        border
-        :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
-        :default-expand-all="false"
-        lazy
-        :load="getChildrenList"
-        :expand-change="expandMenuHandle"
-      >
-        <el-table-column prop="menuName" label="菜单名称" :show-overflow-tooltip="true" width="160"></el-table-column>
-        <el-table-column prop="icon" label="图标" align="center" width="100">
-          <template #default="scope">
-            <svg-icon :icon-class="scope.row.icon" />
+      <div class="dcs-ops-table-wrap">
+        <el-table
+          ref="menuTableRef"
+          v-loading="loading"
+          :data="menuList"
+          row-key="menuId"
+          border
+          class="ui-table"
+          :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+          :default-expand-all="false"
+          lazy
+          :load="getChildrenList"
+          :expand-change="expandMenuHandle"
+        >
+          <el-table-column prop="menuName" label="菜单名称" :show-overflow-tooltip="true" width="160"></el-table-column>
+          <el-table-column prop="icon" label="图标" align="center" width="100">
+            <template #default="scope">
+              <svg-icon :icon-class="scope.row.icon" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="orderNum" label="排序" width="60" align="right" class-name="ui-num"></el-table-column>
+          <el-table-column prop="perms" label="权限标识" :show-overflow-tooltip="true"></el-table-column>
+          <el-table-column prop="component" label="组件路径" :show-overflow-tooltip="true"></el-table-column>
+          <el-table-column prop="status" label="状态" width="80">
+            <template #default="scope">
+              <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" align="center" prop="createTime">
+            <template #default="scope">
+              <span>{{ scope.row.createTime }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column fixed="right" label="操作" width="180">
+            <template #default="scope">
+              <el-tooltip content="修改" placement="top">
+                <el-button v-hasPermi="['system:menu:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" />
+              </el-tooltip>
+              <el-tooltip content="新增" placement="top">
+                <el-button v-hasPermi="['system:menu:add']" link type="primary" icon="Plus" @click="handleAdd(scope.row)" />
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button v-hasPermi="['system:menu:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)" />
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无菜单</div>
           </template>
-        </el-table-column>
-        <el-table-column prop="orderNum" label="排序" width="60"></el-table-column>
-        <el-table-column prop="perms" label="权限标识" :show-overflow-tooltip="true"></el-table-column>
-        <el-table-column prop="component" label="组件路径" :show-overflow-tooltip="true"></el-table-column>
-        <el-table-column prop="status" label="状态" width="80">
-          <template #default="scope">
-            <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
-          </template>
-        </el-table-column>
-        <el-table-column label="创建时间" align="center" prop="createTime">
-          <template #default="scope">
-            <span>{{ scope.row.createTime }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column fixed="right" label="操作" width="180">
-          <template #default="scope">
-            <el-tooltip content="修改" placement="top">
-              <el-button v-hasPermi="['system:menu:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)" />
-            </el-tooltip>
-            <el-tooltip content="新增" placement="top">
-              <el-button v-hasPermi="['system:menu:add']" link type="primary" icon="Plus" @click="handleAdd(scope.row)" />
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button v-hasPermi="['system:menu:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)" />
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" destroy-on-close append-to-bod width="750px">
@@ -538,5 +544,22 @@ onMounted(() => {
 .tree-border {
   height: 300px;
   overflow: auto;
+}
+
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 860px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
 }
 </style>

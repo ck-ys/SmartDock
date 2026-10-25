@@ -15,7 +15,7 @@
                 <el-option v-for="dict in sys_yes_no" :key="dict.value" :label="dict.label" :value="dict.value" />
               </el-select>
             </el-form-item>
-            <el-form-item label="创建时间" style="width: 308px">
+            <el-form-item label="创建时间">
               <el-date-picker
                 v-model="dateRange"
                 value-format="YYYY-MM-DD HH:mm:ss"
@@ -60,34 +60,39 @@
         </el-row>
       </template>
 
-      <el-table v-loading="loading" border :data="configList" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column v-if="false" label="参数主键" align="center" prop="configId" />
-        <el-table-column label="参数名称" align="center" prop="configName" :show-overflow-tooltip="true" />
-        <el-table-column label="参数键名" align="center" prop="configKey" :show-overflow-tooltip="true" />
-        <el-table-column label="参数键值" align="center" prop="configValue" :show-overflow-tooltip="true" />
-        <el-table-column label="系统内置" align="center" prop="configType">
-          <template #default="scope">
-            <dict-tag :options="sys_yes_no" :value="scope.row.configType" />
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" border class="ui-table" :data="configList" @selection-change="handleSelectionChange">
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column v-if="false" label="参数主键" align="center" prop="configId" />
+          <el-table-column label="参数名称" align="center" prop="configName" :show-overflow-tooltip="true" />
+          <el-table-column label="参数键名" align="center" prop="configKey" :show-overflow-tooltip="true" />
+          <el-table-column label="参数键值" align="center" prop="configValue" :show-overflow-tooltip="true" />
+          <el-table-column label="系统内置" align="center" prop="configType">
+            <template #default="scope">
+              <dict-tag :options="sys_yes_no" :value="scope.row.configType" />
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
+          <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
+            <template #default="scope">
+              <el-tooltip content="修改" placement="top">
+                <el-button v-hasPermi="['system:config:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip content="删除" placement="top">
+                <el-button v-hasPermi="['system:config:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无参数配置</div>
           </template>
-        </el-table-column>
-        <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
-        <el-table-column label="创建时间" align="center" prop="createTime" width="180">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" align="center" width="150" class-name="small-padding fixed-width">
-          <template #default="scope">
-            <el-tooltip content="修改" placement="top">
-              <el-button v-hasPermi="['system:config:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip content="删除" placement="top">
-              <el-button v-hasPermi="['system:config:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
 
@@ -259,3 +264,22 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 760px;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
+}
+</style>

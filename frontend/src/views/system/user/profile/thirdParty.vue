@@ -1,21 +1,26 @@
 <template>
   <div>
-    <el-table :data="auths" border style="width: 100%; height: 100%; font-size: 14px">
-      <el-table-column label="序号" width="50" type="index" />
-      <el-table-column label="绑定账号平台" width="140" align="center" prop="source" show-overflow-tooltip />
-      <el-table-column label="头像" width="120" align="center" prop="avatar">
-        <template #default="scope">
-          <img :src="scope.row.avatar" style="width: 45px; height: 45px" />
+    <div class="dcs-ops-table-wrap">
+      <el-table :data="auths" border class="ui-table" style="width: 100%; height: 100%">
+        <el-table-column label="序号" width="50" type="index" />
+        <el-table-column label="绑定账号平台" width="140" align="center" prop="source" show-overflow-tooltip />
+        <el-table-column label="头像" width="120" align="center" prop="avatar">
+          <template #default="scope">
+            <img :src="scope.row.avatar" style="width: 45px; height: 45px" />
+          </template>
+        </el-table-column>
+        <el-table-column label="系统账号" width="180" align="center" prop="userName" :show-overflow-tooltip="true" />
+        <el-table-column label="绑定时间" width="180" align="center" prop="createTime" />
+        <el-table-column label="操作" width="80" align="center" class-name="small-padding fixed-width">
+          <template #default="scope">
+            <el-button link type="danger" @click="unlockAuth(scope.row)">解绑</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="ui-empty">暂未绑定第三方账号</div>
         </template>
-      </el-table-column>
-      <el-table-column label="系统账号" width="180" align="center" prop="userName" :show-overflow-tooltip="true" />
-      <el-table-column label="绑定时间" width="180" align="center" prop="createTime" />
-      <el-table-column label="操作" width="80" align="center" class-name="small-padding fixed-width">
-        <template #default="scope">
-          <el-button size="small" type="text" @click="unlockAuth(scope.row)">解绑</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+      </el-table>
+    </div>
 
     <div id="git-user-binding">
       <h4 class="provider-desc">你可以绑定以下第三方帐号</h4>
@@ -124,7 +129,11 @@ const authUrl = (source: string) => {
 a {
   text-decoration: none;
   cursor: pointer;
-  color: #005980;
+  color: var(--app-accent);
+}
+
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 760px;
 }
 
 .provider-desc {

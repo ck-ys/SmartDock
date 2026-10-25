@@ -8,7 +8,7 @@
             <span style="vertical-align: middle">基本信息</span>
           </template>
 
-          <div class="el-table el-table--enable-row-hover el-table--medium">
+          <div class="el-table el-table--enable-row-hover el-table--medium ui-table">
             <table style="width: 100%">
               <tbody>
                 <tr>
@@ -180,7 +180,7 @@ const renderCharts = () => {
           type: 'gauge',
           min: 0,
           max: 1000,
-          // 仪表盘的读数与标题不跟 textStyle 走，深色下默认 #333 会看不见
+          // 仪表盘的读数与标题不跟 textStyle 走，深色下默认深灰字会看不见
           detail: { formatter: cache.value.info?.used_memory_human, color: ct.value.ink },
           title: { color: ct.value.muted },
           axisLabel: { color: ct.value.faint },

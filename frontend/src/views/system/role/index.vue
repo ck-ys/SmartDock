@@ -15,7 +15,7 @@
                 <el-option v-for="dict in sys_normal_disable" :key="dict.value" :label="dict.label" :value="dict.value" />
               </el-select>
             </el-form-item>
-            <el-form-item label="创建时间" style="width: 308px">
+            <el-form-item label="创建时间">
               <el-date-picker
                 v-model="dateRange"
                 value-format="YYYY-MM-DD HH:mm:ss"
@@ -55,40 +55,45 @@
         </el-row>
       </template>
 
-      <el-table ref="roleTableRef" border v-loading="loading" :data="roleList" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
-        <el-table-column v-if="false" label="角色编号" prop="roleId" width="120" />
-        <el-table-column label="角色名称" prop="roleName" :show-overflow-tooltip="true" width="150" />
-        <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true" width="200" />
-        <el-table-column label="显示顺序" prop="roleSort" width="100" />
-        <el-table-column label="状态" align="center" width="100">
-          <template #default="scope">
-            <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
-          </template>
-        </el-table-column>
-        <el-table-column label="创建时间" align="center" prop="createTime">
-          <template #default="scope">
-            <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
-          </template>
-        </el-table-column>
+      <div class="dcs-ops-table-wrap">
+        <el-table ref="roleTableRef" border v-loading="loading" :data="roleList" class="ui-table" @selection-change="handleSelectionChange">
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column v-if="false" label="角色编号" prop="roleId" width="120" />
+          <el-table-column label="角色名称" prop="roleName" :show-overflow-tooltip="true" width="150" />
+          <el-table-column label="权限字符" prop="roleKey" :show-overflow-tooltip="true" width="200" />
+          <el-table-column label="显示顺序" prop="roleSort" width="100" align="right" class-name="ui-num" />
+          <el-table-column label="状态" align="center" width="100">
+            <template #default="scope">
+              <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" align="center" prop="createTime">
+            <template #default="scope">
+              <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
+            </template>
+          </el-table-column>
 
-        <el-table-column fixed="right" label="操作" width="180">
-          <template #default="scope">
-            <el-tooltip v-if="scope.row.roleId !== 1" content="修改" placement="top">
-              <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip v-if="scope.row.roleId !== 1" content="删除" placement="top">
-              <el-button v-hasPermi="['system:role:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip v-if="scope.row.roleId !== 1" content="数据权限" placement="top">
-              <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="CircleCheck" @click="handleDataScope(scope.row)"></el-button>
-            </el-tooltip>
-            <el-tooltip v-if="scope.row.roleId !== 1" content="分配用户" placement="top">
-              <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="User" @click="handleAuthUser(scope.row)"></el-button>
-            </el-tooltip>
+          <el-table-column fixed="right" label="操作" width="180">
+            <template #default="scope">
+              <el-tooltip v-if="scope.row.roleId !== 1" content="修改" placement="top">
+                <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip v-if="scope.row.roleId !== 1" content="删除" placement="top">
+                <el-button v-hasPermi="['system:role:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip v-if="scope.row.roleId !== 1" content="数据权限" placement="top">
+                <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="CircleCheck" @click="handleDataScope(scope.row)"></el-button>
+              </el-tooltip>
+              <el-tooltip v-if="scope.row.roleId !== 1" content="分配用户" placement="top">
+                <el-button v-hasPermi="['system:role:edit']" link type="primary" icon="User" @click="handleAuthUser(scope.row)"></el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">暂无角色</div>
           </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <pagination
         v-if="total > 0"
@@ -501,3 +506,9 @@ onMounted(() => {
   getList();
 });
 </script>
+
+<style lang="scss" scoped>
+.dcs-ops-table-wrap :deep(.el-table) {
+  min-width: 900px;
+}
+</style>

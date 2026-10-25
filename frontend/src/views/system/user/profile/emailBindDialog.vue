@@ -124,7 +124,7 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .email-bind__current {
-  color: #909399;
+  color: var(--app-faint);
   word-break: break-all;
 }
 .email-bind__code {
@@ -141,7 +141,7 @@ onBeforeUnmount(() => {
 }
 .email-bind__hint {
   margin: 0;
-  color: #909399;
+  color: var(--app-faint);
   font-size: 12px;
   line-height: 1.7;
 }

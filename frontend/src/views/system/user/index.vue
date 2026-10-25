@@ -44,7 +44,7 @@
                     <el-option v-for="dict in sys_normal_disable" :key="dict.value" :label="dict.label" :value="dict.value" />
                   </el-select>
                 </el-form-item>
-                <el-form-item label="创建时间" style="width: 308px">
+                <el-form-item label="创建时间">
                   <el-date-picker
                     v-model="dateRange"
                     value-format="YYYY-MM-DD HH:mm:ss"
@@ -105,62 +105,87 @@
             </el-row>
           </template>
 
-          <el-table v-loading="loading" border :data="userList" @selection-change="handleSelectionChange">
-            <el-table-column type="selection" width="50" align="center" />
-            <el-table-column v-if="columns[0].visible" key="userId" label="用户编号" align="center" prop="userId" />
-            <el-table-column v-if="columns[1].visible" key="userName" label="登录账号" align="center" prop="userName" :show-overflow-tooltip="true" />
-            <el-table-column v-if="columns[2].visible" key="nickName" label="用户昵称" align="center" prop="nickName" :show-overflow-tooltip="true" />
-            <!-- UI八条Q6(2026-09-17): 只显示末级(如"26级")看不出部门归属, 用左侧部门树拼"父级 / 本级"; 树里找不到(数据权限裁剪)回退末级名。
+          <div class="dcs-ops-table-wrap">
+            <el-table v-loading="loading" border class="ui-table" :data="userList" @selection-change="handleSelectionChange">
+              <el-table-column type="selection" width="50" align="center" />
+              <el-table-column v-if="columns[0].visible" key="userId" label="用户编号" align="center" prop="userId" />
+              <el-table-column
+                v-if="columns[1].visible"
+                key="userName"
+                label="登录账号"
+                align="center"
+                prop="userName"
+                :show-overflow-tooltip="true"
+              />
+              <el-table-column
+                v-if="columns[2].visible"
+                key="nickName"
+                label="用户昵称"
+                align="center"
+                prop="nickName"
+                :show-overflow-tooltip="true"
+              />
+              <!-- UI八条Q6(2026-09-17): 只显示末级(如"26级")看不出部门归属, 用左侧部门树拼"父级 / 本级"; 树里找不到(数据权限裁剪)回退末级名。
                  min-width=170 防两段名被 ellipsis 压成"信息工程学…"(视觉复核K3+glm53双席实抓), 完整可见优先于省宽度 -->
-            <el-table-column v-if="columns[3].visible" key="deptName" label="部门" align="center" min-width="170" :show-overflow-tooltip="true">
-              <template #default="scope">{{ deptDisplay(scope.row) }}</template>
-            </el-table-column>
-            <!-- 业务批9 Q6(2026-10-14 拍板A): 角色列(部门后)——多角色小标签排开, 只读展示, 改角色仍走编辑/分配角色 -->
-            <el-table-column v-if="columns[8].visible" key="roleNames" label="角色" align="center" min-width="110">
-              <template #default="scope">
-                <div v-if="scope.row.roles && scope.row.roles.length" class="role-tags">
-                  <el-tag v-for="role in scope.row.roles" :key="role.roleId" size="small" effect="plain">{{ role.roleName }}</el-tag>
-                </div>
-                <span v-else>—</span>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="columns[4].visible" key="phonenumber" label="手机号码" align="center" prop="phonenumber" width="120" />
-            <el-table-column v-if="columns[5].visible" key="userLevel" label="级别" align="center" prop="userLevel" width="80">
-              <template #default="scope">
-                <dict-tag :options="sys_user_level" :value="scope.row.userLevel" />
-              </template>
-            </el-table-column>
-            <el-table-column v-if="columns[6].visible" key="status" label="状态" align="center">
-              <template #default="scope">
-                <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
-              </template>
-            </el-table-column>
+              <el-table-column v-if="columns[3].visible" key="deptName" label="部门" align="center" min-width="170" :show-overflow-tooltip="true">
+                <template #default="scope">{{ deptDisplay(scope.row) }}</template>
+              </el-table-column>
+              <!-- 业务批9 Q6(2026-10-14 拍板A): 角色列(部门后)——多角色小标签排开, 只读展示, 改角色仍走编辑/分配角色 -->
+              <el-table-column v-if="columns[8].visible" key="roleNames" label="角色" align="center" min-width="110">
+                <template #default="scope">
+                  <div v-if="scope.row.roles && scope.row.roles.length" class="role-tags">
+                    <el-tag v-for="role in scope.row.roles" :key="role.roleId" effect="plain">{{ role.roleName }}</el-tag>
+                  </div>
+                  <span v-else>—</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columns[4].visible" key="phonenumber" label="手机号码" align="center" prop="phonenumber" width="120" />
+              <el-table-column v-if="columns[5].visible" key="userLevel" label="级别" align="center" prop="userLevel" width="80">
+                <template #default="scope">
+                  <dict-tag :options="sys_user_level" :value="scope.row.userLevel" />
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columns[6].visible" key="status" label="状态" align="center">
+                <template #default="scope">
+                  <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
+                </template>
+              </el-table-column>
 
-            <el-table-column v-if="columns[7].visible" label="创建时间" align="center" prop="createTime" width="160">
-              <template #default="scope">
-                <span>{{ scope.row.createTime }}</span>
+              <el-table-column v-if="columns[7].visible" label="创建时间" align="center" prop="createTime" width="160">
+                <template #default="scope">
+                  <span>{{ scope.row.createTime }}</span>
+                </template>
+              </el-table-column>
+
+              <el-table-column label="操作" fixed="right" width="150" class-name="small-padding fixed-width">
+                <template #default="scope">
+                  <el-tooltip v-if="scope.row.userId !== 1" content="修改" placement="top">
+                    <el-button v-hasPermi="['system:user:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
+                  </el-tooltip>
+                  <el-tooltip v-if="scope.row.userId !== 1" content="删除" placement="top">
+                    <el-button v-hasPermi="['system:user:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
+                  </el-tooltip>
+
+                  <el-tooltip v-if="scope.row.userId !== 1" content="重置密码" placement="top">
+                    <el-button v-hasPermi="['system:user:resetPwd']" link type="primary" icon="Key" @click="handleResetPwd(scope.row)"></el-button>
+                  </el-tooltip>
+
+                  <el-tooltip v-if="scope.row.userId !== 1" content="分配角色" placement="top">
+                    <el-button
+                      v-hasPermi="['system:user:edit']"
+                      link
+                      type="primary"
+                      icon="CircleCheck"
+                      @click="handleAuthRole(scope.row)"
+                    ></el-button>
+                  </el-tooltip>
+                </template>
+              </el-table-column>
+              <template #empty>
+                <div class="ui-empty">暂无用户</div>
               </template>
-            </el-table-column>
-
-            <el-table-column label="操作" fixed="right" width="180" class-name="small-padding fixed-width">
-              <template #default="scope">
-                <el-tooltip v-if="scope.row.userId !== 1" content="修改" placement="top">
-                  <el-button v-hasPermi="['system:user:edit']" link type="primary" icon="Edit" @click="handleUpdate(scope.row)"></el-button>
-                </el-tooltip>
-                <el-tooltip v-if="scope.row.userId !== 1" content="删除" placement="top">
-                  <el-button v-hasPermi="['system:user:remove']" link type="primary" icon="Delete" @click="handleDelete(scope.row)"></el-button>
-                </el-tooltip>
-
-                <el-tooltip v-if="scope.row.userId !== 1" content="重置密码" placement="top">
-                  <el-button v-hasPermi="['system:user:resetPwd']" link type="primary" icon="Key" @click="handleResetPwd(scope.row)"></el-button>
-                </el-tooltip>
-
-                <el-tooltip v-if="scope.row.userId !== 1" content="分配角色" placement="top">
-                  <el-button v-hasPermi="['system:user:edit']" link type="primary" icon="CircleCheck" @click="handleAuthRole(scope.row)"></el-button>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-          </el-table>
+            </el-table>
+          </div>
 
           <pagination
             v-show="total > 0"
@@ -343,9 +368,7 @@ import { buildLoginNameChangeConfirmMessage, shouldConfirmLoginNameChange } from
 
 const router = useRouter();
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
-const { sys_normal_disable, sys_user_sex, sys_user_level } = toRefs<any>(
-  proxy?.useDict('sys_normal_disable', 'sys_user_sex', 'sys_user_level')
-);
+const { sys_normal_disable, sys_user_sex, sys_user_level } = toRefs<any>(proxy?.useDict('sys_normal_disable', 'sys_user_sex', 'sys_user_level'));
 const userList = ref<UserVO[]>();
 const loading = ref(true);
 const showSearch = ref(true);
@@ -387,7 +410,8 @@ const columns = ref<FieldOption[]>([
   { key: 4, label: `手机号码`, visible: true, children: [] },
   { key: 5, label: `级别`, visible: true, children: [] },
   { key: 6, label: `状态`, visible: true, children: [] },
-  { key: 7, label: `创建时间`, visible: true, children: [] },
+  // 默认收起：1440 下内容区只有 920px，这一列会把操作列挤出卡片（列设置里可随时打开）
+  { key: 7, label: `创建时间`, visible: false, children: [] },
   // 业务批9 Q6(2026-10-14 拍板A): 角色列——列表直判谁是管理员/发布人/成员(原只能点编辑弹窗看);
   // 后端分页已按 userIds 聚合 roles; 追加在数组尾部避免重排既有下标绑定
   { key: 8, label: `角色`, visible: true, children: [] }
@@ -772,5 +796,18 @@ async function handleDeptChange(value: number | string) {
   flex-wrap: wrap;
   gap: 4px;
   justify-content: center;
+}
+
+/* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */
+:deep(.el-tag) {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: var(--dcs-pill-radius);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+}
+
+:deep(.el-tag:not(.el-tag--plain)) {
+  border-color: transparent;
 }
 </style>
