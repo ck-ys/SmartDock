@@ -42,6 +42,9 @@ export const useTenantSwitch = () => {
       return id !== currentId.value && id !== defaultId.value;
     })
   );
+  // 底部单位行浮层用（2026-10-24 拍板 题2-1）：当前之外的单位全列，默认单位在列并带「默认」标记，
+  // 点它即回默认，不再单设「回到默认单位」一行
+  const unitOptions = computed(() => tenants.value.filter((item) => String(item.tenantId) !== currentId.value));
 
   const apply = (tenantId: string) => {
     currentId.value = tenantId;
@@ -124,9 +127,11 @@ export const useTenantSwitch = () => {
     switching,
     currentTenant,
     otherTenants,
+    unitOptions,
     isSuperAdmin,
     isDefaultTenant,
     canSwitch,
+    defaultId,
     load,
     forget,
     switchTo

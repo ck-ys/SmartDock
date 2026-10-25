@@ -3,16 +3,7 @@
     <slot />
     <template #dropdown>
       <el-dropdown-menu>
-        <template v-if="showTenantSwitch && canSwitch">
-          <li role="presentation" class="dcs-user-menu__caption">单位：{{ currentTenant?.companyName || '—' }}</li>
-          <el-dropdown-item v-for="item in otherTenants" :key="item.tenantId" :command="`tenant:${item.tenantId}`">
-            {{ item.companyName }}
-          </el-dropdown-item>
-          <el-dropdown-item v-if="!isDefaultTenant" command="tenant:__default">回到默认单位</el-dropdown-item>
-        </template>
-        <el-dropdown-item v-if="showProfile" :divided="showTenantSwitch && canSwitch" command="profile">
-          {{ t('navbar.personalCenter') }}
-        </el-dropdown-item>
+        <el-dropdown-item v-if="showProfile" command="profile">{{ t('navbar.personalCenter') }}</el-dropdown-item>
         <el-dropdown-item v-if="showLayout" command="layout">{{ t('navbar.layoutSetting') }}</el-dropdown-item>
         <el-dropdown-item command="feedback">反馈问题</el-dropdown-item>
         <el-dropdown-item divided command="logout">{{ t('navbar.logout') }}</el-dropdown-item>
@@ -22,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useSettingsStore } from '@/store/modules/settings';
@@ -33,17 +24,16 @@ import { ElMessageBox } from 'element-plus';
 import type { ElMessageBoxOptions } from 'element-plus/es/components/message-box/src/message-box.type';
 
 /**
- * 账号菜单：顶栏头像与左下用户行共用同一份，改一处两处同步。
+ * 账号菜单：顶栏头像与左下账号行共用同一份，改一处两处同步。
  * 个人中心 / 退出在这里自处理；布局设置和反馈交给宿主（一个要开设置抽屉，一个要弹反馈框）。
- * 左下入口额外带「切换单位」——收起侧栏后品牌行只剩图标，这里是最稳的入口。
+ * 菜单里只有账号的事——单位切换在侧栏底部独立的单位行（2026-10-24 拍板 题1-A）。
  */
 const props = withDefaults(
   defineProps<{
     placement?: 'bottom-end' | 'top-start' | 'top' | 'bottom';
     hideProfile?: boolean;
-    showTenantSwitch?: boolean;
   }>(),
-  { placement: 'bottom-end', hideProfile: false, showTenantSwitch: false }
+  { placement: 'bottom-end', hideProfile: false }
 );
 
 const emit = defineEmits<{ layout: []; feedback: [] }>();
@@ -54,17 +44,10 @@ const settingsStore = useSettingsStore();
 const userStore = useUserStore();
 
 const { tenantSwitched } = useWorkspace();
-const { canSwitch, currentTenant, otherTenants, isDefaultTenant, switchTo, load, forget } = useTenantSwitch();
+const { forget } = useTenantSwitch();
 const showLayout = computed(() => settingsStore.showSettings);
 // 切到非默认租户后不再给「个人中心」入口（与旧顶栏同口径：那里看到的是默认租户的人）
 const showProfile = computed(() => !props.hideProfile && !tenantSwitched.value);
-
-// 左下入口要列单位；侧栏品牌行被关掉时也由这里兜底加载（composable 内部只请求一次）
-onMounted(() => {
-  if (props.showTenantSwitch) {
-    void load();
-  }
-});
 
 const logout = async () => {
   await ElMessageBox.confirm('确定注销并退出系统吗？', '提示', {
@@ -84,10 +67,6 @@ const logout = async () => {
 };
 
 const onCommand = (command: string) => {
-  if (command.startsWith('tenant:')) {
-    void switchTo(command.slice('tenant:'.length));
-    return;
-  }
   if (command === 'profile') {
     router.push('/user/profile');
     return;
@@ -108,13 +87,3 @@ const onCommand = (command: string) => {
 defineOptions({ name: 'DcsUserMenu' });
 </script>
 
-<style lang="scss">
-/* 下拉 teleport 到 body，scoped 打不到：全局类加组件前缀，避免影响别的菜单 */
-.el-dropdown-menu .dcs-user-menu__caption {
-  padding: 6px 12px 4px;
-  color: var(--app-faint);
-  font-size: 12px;
-  line-height: 1.4;
-  cursor: default;
-}
-</style>
