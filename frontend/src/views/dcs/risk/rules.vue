@@ -1,16 +1,17 @@
 <template>
-  <div class="risk-rules">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>风控规则配置</span>
-          <div>
-            <el-button v-hasPermi="['dcs:risk:rule:edit']" type="primary" :icon="Plus" @click="openAdd">新增规则</el-button>
-            <el-button link :icon="Refresh" @click="loadRules">刷新</el-button>
-          </div>
-        </div>
+  <div class="dcs-ops-page risk-rules">
+    <DcsOperationsPageHeader
+      title="风控规则配置"
+      subtitle="按事件类型配置单次分值、统计窗口与 L1-L4 阈值；累计分达到阈值即定级，阈值须逐级递增。"
+      eyebrow="风控与审计"
+    >
+      <template #actions>
+        <el-button :icon="Refresh" @click="loadRules">刷新</el-button>
+        <el-button v-hasPermi="['dcs:risk:rule:edit']" type="primary" :icon="Plus" @click="openAdd">新增规则</el-button>
       </template>
+    </DcsOperationsPageHeader>
 
+    <el-card shadow="never" class="risk-list-card">
       <el-alert type="info" :closable="false" class="mb-3" show-icon title="计分规则说明">
         <div class="rule-guide">
           <p>单次分值=该事件每发生一次贡献的分；累计到窗口内上限后按 L1→L4 阈值逐级定风险（阈值须递增）。</p>
@@ -18,104 +19,94 @@
         </div>
       </el-alert>
 
-      <el-table v-loading="loading" :data="rules" stripe :row-class-name="rowClassName">
-        <el-table-column label="事件类型" min-width="140">
-          <template #default="{ row }">
-            <span v-if="row._dirty" class="dirty-dot" title="有未保存的修改"></span>
-            <el-tag :type="EVENT_TYPE_COLORS[row.eventType]" effect="plain" size="small">
-              {{ EVENT_TYPE_LABELS[row.eventType] || row.eventType }}
-            </el-tag>
-            <div class="text-xs text-gray-400 mt-1">{{ row.ruleScope === 'GLOBAL' ? '聚合兜底策略' : row.eventType }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column label="说明" min-width="180" prop="description" show-overflow-tooltip />
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" :data="rules" class="ui-table risk-table" :row-class-name="rowClassName">
+          <el-table-column label="事件类型" min-width="140">
+            <template #default="{ row }">
+              <span v-if="row._dirty" class="dirty-dot" title="有未保存的修改"></span>
+              <span class="ui-pill ui-pill--muted">{{ EVENT_TYPE_LABELS[row.eventType] || row.eventType }}</span>
+              <div class="rule-scope">{{ row.ruleScope === 'GLOBAL' ? '聚合兜底策略' : row.eventType }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="说明" min-width="180" prop="description" show-overflow-tooltip />
 
-        <el-table-column label="单次分值" width="110" align="center">
-          <template #default="{ row }">
-            <span v-if="row.ruleScope === 'GLOBAL'" class="text-gray-400">不适用</span>
-            <el-input-number
-              v-else
-              v-model="row.weight"
-              :min="1"
-              :max="20"
-              size="small"
-              :controls="false"
-              style="width: 72px"
-              @change="markDirty(row)"
-            />
-          </template>
-        </el-table-column>
+          <el-table-column label="单次分值" width="110" align="center">
+            <template #default="{ row }">
+              <span v-if="row.ruleScope === 'GLOBAL'" class="rule-na">不适用</span>
+              <el-input-number v-else v-model="row.weight" :min="1" :max="20" :controls="false" class="cell-w-72" @change="markDirty(row)" />
+            </template>
+          </el-table-column>
 
-        <el-table-column label="窗口(分钟)" width="120" align="center">
-          <template #default="{ row }">
-            <el-input-number
-              v-model="row.windowMinutes"
-              :min="1"
-              :max="10080"
-              size="small"
-              :controls="false"
-              style="width: 82px"
-              @change="markDirty(row)"
-            />
-          </template>
-        </el-table-column>
+          <el-table-column label="窗口(分钟)" width="120" align="center">
+            <template #default="{ row }">
+              <el-input-number v-model="row.windowMinutes" :min="1" :max="10080" :controls="false" class="cell-w-82" @change="markDirty(row)" />
+            </template>
+          </el-table-column>
 
-        <el-table-column v-for="f in ['thresholdL1', 'thresholdL2', 'thresholdL3', 'thresholdL4']" :key="f" :width="82" align="center">
-          <template #header>
-            <span>L{{ f.slice(-1) }}<HelpHint :content="'累计分达到该值触发 L' + f.slice(-1) + ' 风险级，须大于前一级阈值'" /></span>
-          </template>
-          <template #default="{ row }">
-            <!-- placeholder 显示前级阈值, 直观传达递增约束(K3 P2-1) -->
-            <el-input-number
-              v-model="row[f]"
-              :min="1"
-              :max="100"
-              size="small"
-              :controls="false"
-              :placeholder="f === 'thresholdL1' ? '≥1' : '> ' + (row['thresholdL' + (Number(f.slice(-1)) - 1)] ?? '—')"
-              style="width: 64px"
-              :class="{ 'threshold-error': !!thresholdError(row) }"
-              @change="markDirty(row)"
-            />
-          </template>
-        </el-table-column>
+          <el-table-column v-for="f in ['thresholdL1', 'thresholdL2', 'thresholdL3', 'thresholdL4']" :key="f" :width="82" align="center">
+            <template #header>
+              <span>L{{ f.slice(-1) }}<HelpHint :content="'累计分达到该值触发 L' + f.slice(-1) + ' 风险级，须大于前一级阈值'" /></span>
+            </template>
+            <template #default="{ row }">
+              <!-- placeholder 显示前级阈值, 直观传达递增约束(K3 P2-1) -->
+              <el-input-number
+                v-model="row[f]"
+                :min="1"
+                :max="100"
+                :controls="false"
+                :placeholder="f === 'thresholdL1' ? '≥1' : '> ' + (row['thresholdL' + (Number(f.slice(-1)) - 1)] ?? '—')"
+                class="cell-w-64"
+                :class="{ 'threshold-error': !!thresholdError(row) }"
+                @change="markDirty(row)"
+              />
+            </template>
+          </el-table-column>
 
-        <el-table-column label="启用" width="100" align="center">
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.enabled"
-              active-value="1"
-              inactive-value="0"
-              :loading="row._toggling"
-              @change="(val: '0' | '1') => onToggleEnabled(row, val)"
-            />
-          </template>
-        </el-table-column>
+          <el-table-column label="启用" width="100" align="center">
+            <template #default="{ row }">
+              <button
+                type="button"
+                class="ui-pill rule-toggle"
+                :class="row.enabled === '1' ? 'ui-pill--pos' : 'ui-pill--muted'"
+                :disabled="row._toggling"
+                :aria-label="row.enabled === '1' ? '停用规则' : '启用规则'"
+                @click="onToggleEnabled(row, row.enabled === '1' ? '0' : '1')"
+              >
+                {{ row.enabled === '1' ? '已启用' : '已停用' }}
+              </button>
+            </template>
+          </el-table-column>
 
-        <el-table-column label="操作" width="150" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-tooltip v-if="thresholdError(row)" :content="thresholdError(row)" placement="top">
-              <el-icon class="threshold-warn"><WarningFilled /></el-icon>
-            </el-tooltip>
-            <el-button
-              v-hasPermi="['dcs:risk:rule:edit']"
-              :type="row._dirty ? 'primary' : 'default'"
-              link
-              size="small"
-              :disabled="!row._dirty || !!thresholdError(row)"
-              :loading="row._saving"
-              @click="onSave(row)"
-              >保存</el-button
-            >
-            <el-button v-if="row.ruleScope !== 'GLOBAL'" v-hasPermi="['dcs:risk:rule:edit']" type="danger" link size="small" @click="onDelete(row)">
-              删除
-            </el-button>
+          <el-table-column label="操作" width="150" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-tooltip v-if="thresholdError(row)" :content="thresholdError(row)" placement="top">
+                <el-icon class="threshold-warn"><WarningFilled /></el-icon>
+              </el-tooltip>
+              <el-button
+                v-hasPermi="['dcs:risk:rule:edit']"
+                :type="row._dirty ? 'primary' : 'default'"
+                link
+                :disabled="!row._dirty || !!thresholdError(row)"
+                :loading="row._saving"
+                @click="onSave(row)"
+                >保存</el-button
+              >
+              <el-button v-if="row.ruleScope !== 'GLOBAL'" v-hasPermi="['dcs:risk:rule:edit']" type="danger" link @click="onDelete(row)">
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无风控规则</p>
+              <p class="ui-empty__hint">新增规则后，命中事件会按分值累计并逐级定风险</p>
+            </div>
           </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <!-- Req 7.2: 新增规则对话框; 事件类型改可建词下拉(2026-08-23, 替代手输英文枚举) -->
-      <el-dialog v-model="addDialog.visible" title="新增风控规则" width="520px">
+      <el-dialog v-model="addDialog.visible" title="新增风控规则" width="min(520px, calc(100vw - 32px))">
         <el-form :model="addDialog.form" label-width="110px">
           <el-form-item label="事件类型" required>
             <el-select
@@ -184,8 +175,9 @@
 <script setup lang="ts">
 import { Refresh, Plus, WarningFilled } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 import { listRules, updateRule, addRule, deleteRule, toggleRuleEnabled } from '@/api/dcs/risk';
-import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS, type RiskRuleVO } from '@/api/dcs/risk/types';
+import { EVENT_TYPE_LABELS, type RiskRuleVO } from '@/api/dcs/risk/types';
 import HelpHint from '@/components/HelpHint/index.vue';
 
 defineOptions({ name: 'DcsRiskRules' });
@@ -278,6 +270,8 @@ const onSave = async (row: RuleRow) => {
  * 走 PATCH 单字段接口，避免回填全部阈值字段；切换失败时回滚前端状态。
  */
 const onToggleEnabled = async (row: RuleRow, val: '0' | '1') => {
+  // 药丸按钮不经过 el-switch 的 v-model 预写，先落 UI 态再调接口；失败时下方回滚
+  row.enabled = val;
   row._toggling = true;
   try {
     const r: any = await toggleRuleEnabled(row.ruleId, val);
@@ -358,26 +352,69 @@ onMounted(loadRules);
 </script>
 
 <style scoped lang="scss">
-.risk-rules {
-  padding: 12px;
+.risk-list-card {
+  min-width: 0;
+
+  :deep(.el-card__body) {
+    min-width: 0;
+    padding: 16px;
+  }
 }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
+
+/* 表格只覆盖 Element Plus 变量与行线，不重写组件内部结构 */
+.risk-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
+
 .rule-guide p {
   margin: 2px 0;
   font-size: 12px;
   line-height: 1.7;
 }
-:deep(.global-aggregate-row) {
-  background: var(--dcs-bg-fill-lighter);
-  td {
-    border-top: 2px solid var(--dcs-border-color-light);
+
+.rule-scope {
+  margin-top: 4px;
+  color: var(--app-faint);
+  font-size: 12px;
+}
+
+.rule-na {
+  color: var(--app-faint);
+}
+
+.cell-w-64 {
+  width: 64px;
+}
+.cell-w-72 {
+  width: 72px;
+}
+.cell-w-82 {
+  width: 82px;
+}
+
+.rule-toggle {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: progress;
   }
 }
+
+:deep(.global-aggregate-row) {
+  background: var(--app-raised);
+
+  td {
+    border-top: 1px solid var(--app-control);
+  }
+}
+
 .dirty-dot {
   display: inline-block;
   width: 8px;
@@ -387,9 +424,11 @@ onMounted(loadRules);
   background: var(--dcs-color-warning);
   vertical-align: middle;
 }
+
 .threshold-error :deep(.el-input__wrapper) {
   box-shadow: 0 0 0 1px var(--dcs-color-danger) inset;
 }
+
 .threshold-warn {
   color: var(--dcs-color-danger);
   margin-right: 4px;

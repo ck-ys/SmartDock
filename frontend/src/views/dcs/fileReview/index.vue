@@ -3,10 +3,11 @@
     <DcsOperationsPageHeader
       title="文件审核"
       subtitle="非管理员上传的文件先审后可见：待审期间仅本人与审核员可见，驳回将通知上传人重新上传。"
+      eyebrow="风控与审计"
       :metrics="headerMetrics"
     >
       <template #actions>
-        <el-button v-hasPermi="['dcs:fileReview:config']" type="primary" plain icon="Setting" @click="openConfigDialog">审核设置</el-button>
+        <el-button v-hasPermi="['dcs:fileReview:config']" type="primary" icon="Setting" @click="openConfigDialog">审核设置</el-button>
       </template>
     </DcsOperationsPageHeader>
 
@@ -23,17 +24,17 @@
       <el-card v-show="showSearch" shadow="never" class="dcs-ops-filter-card">
         <el-form ref="queryFormRef" :model="filters" :inline="true" label-position="right">
           <el-form-item label="文件类别" prop="category">
-            <el-select v-model="filters.category" clearable placeholder="全部类别" style="width: 150px">
+            <el-select v-model="filters.category" clearable placeholder="全部类别" class="filter-w-150">
               <el-option v-for="opt in categoryOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
             </el-select>
           </el-form-item>
           <el-form-item label="来源" prop="bizSource">
-            <el-select v-model="filters.bizSource" clearable placeholder="全部来源" style="width: 150px">
+            <el-select v-model="filters.bizSource" clearable placeholder="全部来源" class="filter-w-150">
               <el-option v-for="opt in sourceOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
             </el-select>
           </el-form-item>
           <el-form-item label="上传人" prop="uploaderName">
-            <el-input v-model.trim="filters.uploaderName" clearable placeholder="姓名，模糊匹配" style="width: 160px" @keyup.enter="handleQuery" />
+            <el-input v-model.trim="filters.uploaderName" clearable placeholder="姓名，模糊匹配" class="filter-w-160" @keyup.enter="handleQuery" />
           </el-form-item>
           <el-form-item label="上传时间">
             <el-date-picker
@@ -43,11 +44,11 @@
               range-separator="至"
               start-placeholder="开始时间"
               end-placeholder="结束时间"
-              style="width: 360px"
+              class="filter-w-360"
             />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" icon="Search" @click="handleQuery">查询</el-button>
+            <el-button icon="Search" @click="handleQuery">查询</el-button>
             <el-button icon="Refresh" @click="resetQuery">重置</el-button>
           </el-form-item>
         </el-form>
@@ -87,7 +88,7 @@
           </div>
         </div>
         <div class="dcs-ops-table-wrap">
-          <el-table v-loading="loading" :data="pendingList" min-width="1180" stripe @selection-change="onSelectionChange">
+          <el-table v-loading="loading" :data="pendingList" class="ui-table file-review-table" @selection-change="onSelectionChange">
             <el-table-column type="selection" width="46" align="center" />
             <el-table-column label="文件" width="76" align="center">
               <template #default="scope">
@@ -101,12 +102,12 @@
                   preview-teleported
                 >
                   <template #error>
-                    <div class="file-review-icon file-review-icon--primary">
+                    <div class="file-review-icon">
                       <el-icon><Picture /></el-icon>
                     </div>
                   </template>
                 </el-image>
-                <div v-else class="file-review-icon" :class="`file-review-icon--${categoryTone(scope.row.fileCategory)}`">
+                <div v-else class="file-review-icon">
                   <el-icon><component :is="categoryIcon(scope.row.fileCategory)" /></el-icon>
                 </div>
               </template>
@@ -114,48 +115,46 @@
             <el-table-column label="文件名" min-width="220">
               <template #default="scope">
                 <span class="file-review-name-text">{{ scope.row.fileName || '—' }}</span>
-                <el-tag
-                  v-if="scope.row.guardReason"
-                  type="danger"
-                  effect="light"
-                  size="small"
-                  class="file-review-guard-tag"
-                  :title="scope.row.guardReason"
-                  >{{ guardTagText(scope.row.guardReason) }}</el-tag
-                >
+                <span v-if="scope.row.guardReason" class="ui-pill ui-pill--neg file-review-guard-tag" :title="scope.row.guardReason">{{
+                  guardTagText(scope.row.guardReason)
+                }}</span>
               </template>
             </el-table-column>
             <el-table-column label="类别" width="96" align="center">
               <template #default="scope">
-                <el-tag effect="plain" size="small">{{ categoryLabel(scope.row.fileCategory) }}</el-tag>
+                <span class="ui-pill ui-pill--muted">{{ categoryLabel(scope.row.fileCategory) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="大小" width="100">
-              <template #default="scope">{{ formatFileSize(scope.row.fileSize) }}</template>
+            <el-table-column label="大小" width="100" align="right">
+              <template #default="scope"
+                ><span class="ui-num">{{ formatFileSize(scope.row.fileSize) }}</span></template
+              >
             </el-table-column>
             <el-table-column label="上传人" min-width="120" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.uploaderName || '—' }}</template>
             </el-table-column>
             <el-table-column label="来源" width="100" align="center">
               <template #default="scope">
-                <el-tag effect="light" size="small" type="info">{{ sourceLabel(scope.row.bizSource) }}</el-tag>
+                <span class="ui-pill ui-pill--muted">{{ sourceLabel(scope.row.bizSource) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="上传时间" width="180">
               <template #default="scope">{{ proxy?.parseTime(scope.row.createTime) }}</template>
             </el-table-column>
-            <el-table-column label="操作" width="170" fixed="right" align="center">
+            <el-table-column label="操作" width="170" fixed="right">
               <template #default="scope">
-                <el-button link type="primary" @click="handlePreview(scope.row)">预览</el-button>
-                <el-button v-hasPermi="['dcs:fileReview:approve']" link type="success" @click="handleApproveOne(scope.row)">通过</el-button>
+                <el-button link @click="handlePreview(scope.row)">预览</el-button>
+                <el-button v-hasPermi="['dcs:fileReview:approve']" link @click="handleApproveOne(scope.row)">通过</el-button>
                 <el-button v-hasPermi="['dcs:fileReview:reject']" link type="danger" @click="openRejectDialog(scope.row)">驳回</el-button>
               </template>
             </el-table-column>
             <template #empty>
-              <div class="dcs-ops-empty">
-                <el-empty description="没有待审核的文件" :image-size="96">
-                  <el-button type="primary" plain @click="resetQuery">清空筛选条件</el-button>
-                </el-empty>
+              <div class="ui-empty">
+                <p class="ui-empty__title">没有待审核的文件</p>
+                <p class="ui-empty__hint">调整筛选条件，或等成员上传新文件后再来</p>
+                <div class="ui-empty__actions">
+                  <el-button @click="resetQuery">清空筛选条件</el-button>
+                </div>
               </div>
             </template>
           </el-table>
@@ -176,7 +175,7 @@
         <div class="dcs-ops-table-toolbar">
           <span class="dcs-ops-table-toolbar__title">已审列表</span>
           <div class="file-review-toolbar-actions">
-            <el-radio-group v-model="reviewedStatus" size="small" @change="handleQuery">
+            <el-radio-group v-model="reviewedStatus" @change="handleQuery">
               <el-radio-button value="APPROVED">已通过</el-radio-button>
               <el-radio-button value="REJECTED">已驳回</el-radio-button>
             </el-radio-group>
@@ -184,10 +183,10 @@
           </div>
         </div>
         <div class="dcs-ops-table-wrap">
-          <el-table v-loading="reviewedLoading" :data="reviewedList" min-width="1180" stripe>
+          <el-table v-loading="reviewedLoading" :data="reviewedList" class="ui-table file-review-table">
             <el-table-column label="文件" width="76" align="center">
               <template #default="scope">
-                <div class="file-review-icon" :class="`file-review-icon--${categoryTone(scope.row.fileCategory)}`">
+                <div class="file-review-icon">
                   <el-icon><component :is="categoryIcon(scope.row.fileCategory)" /></el-icon>
                 </div>
               </template>
@@ -205,16 +204,18 @@
             </el-table-column>
             <el-table-column label="结论" width="96" align="center">
               <template #default="scope">
-                <el-tag :type="statusMeta(scope.row.status).tagType" effect="light">{{ statusMeta(scope.row.status).label }}</el-tag>
+                <span class="ui-pill" :class="statusPillClass(scope.row.status)">{{ statusMeta(scope.row.status).label }}</span>
               </template>
             </el-table-column>
             <el-table-column label="类别" width="96" align="center">
               <template #default="scope">
-                <el-tag effect="plain" size="small">{{ categoryLabel(scope.row.fileCategory) }}</el-tag>
+                <span class="ui-pill ui-pill--muted">{{ categoryLabel(scope.row.fileCategory) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="大小" width="100">
-              <template #default="scope">{{ formatFileSize(scope.row.fileSize) }}</template>
+            <el-table-column label="大小" width="100" align="right">
+              <template #default="scope"
+                ><span class="ui-num">{{ formatFileSize(scope.row.fileSize) }}</span></template
+              >
             </el-table-column>
             <el-table-column label="上传人" min-width="120" show-overflow-tooltip>
               <template #default="scope">{{ scope.row.uploaderName || '—' }}</template>
@@ -225,14 +226,15 @@
             <el-table-column label="审核时间" width="180">
               <template #default="scope">{{ proxy?.parseTime(scope.row.reviewTime) }}</template>
             </el-table-column>
-            <el-table-column label="操作" width="88" fixed="right" align="center">
+            <el-table-column label="操作" width="100" fixed="right">
               <template #default="scope">
-                <el-button link type="primary" icon="View" @click="handlePreview(scope.row)">预览</el-button>
+                <el-button link icon="View" @click="handlePreview(scope.row)">预览</el-button>
               </template>
             </el-table-column>
             <template #empty>
-              <div class="dcs-ops-empty">
-                <el-empty :description="reviewedStatus === 'APPROVED' ? '没有已通过的审核记录' : '没有已驳回的审核记录'" :image-size="96" />
+              <div class="ui-empty">
+                <p class="ui-empty__title">{{ reviewedStatus === 'APPROVED' ? '没有已通过的审核记录' : '没有已驳回的审核记录' }}</p>
+                <p class="ui-empty__hint">审核结论产生后会归档在这里</p>
               </div>
             </template>
           </el-table>
@@ -258,7 +260,7 @@
           </div>
         </div>
         <div class="dcs-ops-table-wrap">
-          <el-table v-loading="guardLogLoading" :data="guardLogList" min-width="980" stripe>
+          <el-table v-loading="guardLogLoading" :data="guardLogList" class="ui-table file-review-table">
             <el-table-column label="时间" width="180">
               <template #default="scope">{{ proxy?.parseTime(scope.row.createTime) }}</template>
             </el-table-column>
@@ -279,14 +281,15 @@
             </el-table-column>
             <el-table-column label="处置" width="104" align="center">
               <template #default="scope">
-                <el-tag :type="guardDispositionMeta(scope.row.disposition).tagType" effect="light" size="small">
+                <span class="ui-pill" :class="dispositionPillClass(scope.row.disposition)">
                   {{ guardDispositionMeta(scope.row.disposition).label }}
-                </el-tag>
+                </span>
               </template>
             </el-table-column>
             <template #empty>
-              <div class="dcs-ops-empty">
-                <el-empty description="近段无安全检测命中——干净" :image-size="96" />
+              <div class="ui-empty">
+                <p class="ui-empty__title">近段无安全检测命中</p>
+                <p class="ui-empty__hint">上传文件通过结构检测后不会产生命中记录</p>
               </div>
             </template>
           </el-table>
@@ -304,9 +307,9 @@
     </el-card>
 
     <!-- ============ 驳回弹窗 ============ -->
-    <el-dialog v-model="rejectVisible" title="驳回文件" width="520px" append-to-body>
+    <el-dialog v-model="rejectVisible" title="驳回文件" width="min(520px, calc(100vw - 32px))" append-to-body>
       <div v-if="rejectTarget" class="file-review-reject-file">
-        <div class="file-review-icon" :class="`file-review-icon--${categoryTone(rejectTarget.fileCategory)}`">
+        <div class="file-review-icon">
           <el-icon><component :is="categoryIcon(rejectTarget.fileCategory)" /></el-icon>
         </div>
         <div class="file-review-reject-file__meta">
@@ -316,9 +319,15 @@
       </div>
       <div class="file-review-reason-presets">
         <span class="file-review-reason-presets__label">常用理由</span>
-        <el-tag v-for="reason in presetReasons" :key="reason" class="file-review-reason-tag" effect="plain" @click="rejectForm.reason = reason">
+        <button
+          v-for="reason in presetReasons"
+          :key="reason"
+          type="button"
+          class="ui-pill ui-pill--muted file-review-reason-tag"
+          @click="rejectForm.reason = reason"
+        >
           {{ reason }}
-        </el-tag>
+        </button>
       </div>
       <el-input v-model="rejectForm.reason" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="填写驳回理由（2-500 字）" />
       <div class="file-review-reject-hint">
@@ -338,7 +347,7 @@
     </el-dialog>
 
     <!-- ============ 设置弹窗（改版：两页签分家，Q5=A） ============ -->
-    <el-dialog v-model="configVisible" title="文件审核设置" width="600px" append-to-body>
+    <el-dialog v-model="configVisible" title="文件审核设置" width="min(600px, calc(100vw - 32px))" append-to-body>
       <div v-loading="configLoading">
         <el-tabs v-model="configTab" class="file-review-config-tabs">
           <!-- ===== 页签一：内容审核（人审尺度） ===== -->
@@ -447,7 +456,7 @@
                 :closable="false"
                 title="当前白名单为此前手工配置的扩展名组合，与六大类勾选不完全对应；调整勾选或点恢复默认后回到大类口径。"
               >
-                <el-button link type="primary" size="small" @click="resetGuardCats">恢复默认（全开）</el-button>
+                <el-button link type="primary" @click="resetGuardCats">恢复默认（全开）</el-button>
               </el-alert>
 
               <!-- 高级设置折叠（Q2=A：性能参数不出现在默认视线） -->
@@ -463,7 +472,7 @@
                       :max="500"
                       :step="10"
                       controls-position="right"
-                      style="width: 140px"
+                      class="file-review-deepscan"
                     />
                     <span class="file-review-guard-unit">MB —— 更大的文件只核对类型不逐页翻查，防卡顿；一般不用改</span>
                   </el-form-item>
@@ -705,10 +714,21 @@ const headerMetrics = computed<DcsOperationsMetric[]>(() => [
 ]);
 
 const categoryLabel = (code: string) => FILE_REVIEW_CATEGORY_META[code]?.label || code || '—';
-const categoryTone = (code: string) => FILE_REVIEW_CATEGORY_META[code]?.tone || 'info';
 const categoryIcon = (code: string) => categoryIcons[FILE_REVIEW_CATEGORY_META[code]?.icon || 'Box'];
 const sourceLabel = (code: string) => FILE_REVIEW_SOURCE_LABEL[code] || code || '—';
 const statusMeta = (status: string) => FILE_REVIEW_STATUS_META[status] || { label: status, tagType: 'info' as const };
+/** 审核结论药丸：通过=成功、驳回=危险、待审=警告 */
+const statusPillClass = (status: string) => {
+  if (status === 'APPROVED') return 'ui-pill--pos';
+  if (status === 'REJECTED') return 'ui-pill--neg';
+  return 'ui-pill--warn';
+};
+/** 检测处置药丸：拒传=危险、强制进审=警告、观察放行=中性 */
+const dispositionPillClass = (code?: string) => {
+  if (code === 'DENIED') return 'ui-pill--neg';
+  if (code === 'REVIEWED') return 'ui-pill--warn';
+  return 'ui-pill--muted';
+};
 
 const buildQuery = (status: string, page: { pageNum: number; pageSize: number }) => {
   const query: Record<string, unknown> = {
@@ -923,14 +943,23 @@ onMounted(() => {
    （2026-09-18 检测模式卡片竖排事故根因）。弹窗内元素同样携带本组件 data-v
    属性，顶层 scoped 规则即可命中。 */
 
+.file-review-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-row-hover-bg-color: var(--app-raised);
+}
+
 .file-review-reject-file {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
   margin-bottom: 14px;
-  background: var(--el-fill-color-light);
-  border-radius: 8px;
+  background: var(--app-raised);
+  border-radius: var(--app-control-radius);
 
   &__meta {
     min-width: 0;
@@ -964,11 +993,12 @@ onMounted(() => {
   }
 
   .file-review-reason-tag {
+    border: 0;
+    font-family: inherit;
     cursor: pointer;
 
     &:hover {
-      color: var(--el-color-danger);
-      border-color: var(--el-color-danger-light-5);
+      color: var(--app-text);
     }
   }
 }
@@ -1031,18 +1061,19 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 14px;
-  padding: 9px 14px;
+  padding: 10px 14px;
   margin-bottom: 14px;
-  background: var(--el-color-primary-light-9);
-  border: 1px solid var(--el-color-primary-light-7);
-  border-radius: 4px;
+  background: var(--app-raised);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-control-radius);
   font-size: 13px;
-  color: var(--el-text-color-regular);
+  color: var(--app-text);
 
   &__main b {
-    font-size: 17px;
-    color: var(--el-color-primary);
     margin: 0 2px;
+    color: var(--app-text);
+    font-size: 17px;
+    font-variant-numeric: tabular-nums;
   }
 
   &__sub {
@@ -1062,58 +1093,58 @@ onMounted(() => {
 }
 
 .file-review-mode-card {
-  border: 1.5px solid var(--el-border-color);
-  border-radius: 6px;
   padding: 10px 6px 8px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-control-radius);
+  background: var(--app-surface);
   text-align: center;
   cursor: pointer;
   transition:
     border-color 0.15s,
     background-color 0.15s;
-  background: var(--el-bg-color);
 
   &:hover {
-    border-color: var(--el-color-primary-light-5);
+    border-color: var(--app-control);
   }
 
   &.is-active {
-    border-color: var(--el-color-primary);
-    background: var(--el-color-primary-light-9);
+    border-color: var(--app-text);
+    background: var(--app-raised);
 
     .file-review-mode-card__icon {
-      color: var(--el-color-primary);
-      background: var(--el-bg-color);
+      color: var(--app-text);
+      background: var(--app-surface);
     }
 
     .file-review-mode-card__label {
-      color: var(--el-color-primary);
+      color: var(--app-text);
     }
   }
 
   &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 32px;
     height: 32px;
     margin: 0 auto 6px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--el-fill-color-light);
-    color: var(--el-text-color-secondary);
+    background: var(--app-raised);
+    color: var(--app-muted);
     font-size: 16px;
   }
 
   &__label {
+    margin-bottom: 2px;
+    color: var(--app-text);
     font-size: 14px;
     font-weight: 600;
-    color: var(--el-text-color-primary);
-    margin-bottom: 2px;
   }
 
   &__desc {
-    font-size: 11.5px;
+    color: var(--app-muted);
+    font-size: 12px;
     line-height: 1.5;
-    color: var(--el-text-color-secondary);
     white-space: pre-line;
   }
 }
@@ -1131,9 +1162,9 @@ onMounted(() => {
   height: auto;
   margin-right: 0;
   padding: 8px 10px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  background: var(--el-bg-color);
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-control-radius);
+  background: var(--app-surface);
 
   :deep(.el-checkbox__label) {
     display: flex;
@@ -1157,7 +1188,7 @@ onMounted(() => {
 }
 
 .file-review-adv {
-  border-top: 1px dashed var(--el-border-color-lighter);
+  border-top: 1px solid var(--app-rule);
   border-bottom: none;
   margin-top: 4px;
 
@@ -1197,8 +1228,24 @@ onMounted(() => {
 }
 
 .file-review-page {
+  min-width: 0;
+
+  :deep(.el-card__body) {
+    min-width: 0;
+  }
+
   .file-review-off-alert {
     margin-bottom: 12px;
+  }
+
+  .filter-w-150 {
+    width: 150px;
+  }
+  .filter-w-160 {
+    width: 160px;
+  }
+  .filter-w-360 {
+    width: 360px;
   }
 
   .file-review-tabs {
@@ -1231,41 +1278,6 @@ onMounted(() => {
     border-radius: 6px;
   }
 
-  .file-review-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    height: 38px;
-    font-size: 18px;
-    border-radius: 6px;
-
-    &--primary {
-      color: var(--el-color-primary);
-      background: var(--el-color-primary-light-9);
-    }
-
-    &--success {
-      color: var(--el-color-success);
-      background: var(--el-color-success-light-9);
-    }
-
-    &--warning {
-      color: var(--el-color-warning);
-      background: var(--el-color-warning-light-9);
-    }
-
-    &--danger {
-      color: var(--el-color-danger);
-      background: var(--el-color-danger-light-9);
-    }
-
-    &--info {
-      color: var(--el-text-color-secondary);
-      background: var(--el-fill-color-light);
-    }
-  }
-
   .file-review-name-rejected {
     color: var(--el-color-danger);
     cursor: help;
@@ -1285,5 +1297,22 @@ onMounted(() => {
     margin-left: 6px;
     vertical-align: middle;
   }
+}
+
+/* append-to-body 弹窗内的元素也必须用顶层规则（祖先 .file-review-page 匹配不到） */
+.file-review-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--app-control-radius);
+  background: var(--app-raised);
+  color: var(--app-muted);
+  font-size: 18px;
+}
+
+.file-review-deepscan {
+  width: 140px;
 }
 </style>

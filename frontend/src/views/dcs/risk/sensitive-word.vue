@@ -1,143 +1,128 @@
 <template>
-  <div class="sensitive-word-page">
-    <el-card shadow="never">
-      <template #header>
-        <div class="page-header">
-          <div class="header-text">
-            <span class="page-title">内容安全词库</span>
-            <p class="page-subtitle">
-              配置替换、阻断和复核规则，按场景（表单/文件/聊天）生效；列表打码，编辑抽屉内看原文。聊天入口现已暂停，仅表单与文件场景在实际生效。
-            </p>
-          </div>
-          <div class="header-actions">
-            <el-button link :icon="Refresh" @click="reload">刷新</el-button>
-            <el-button v-hasPermi="['dcs:sensitive-word:list']" :icon="Aim" @click="openTest">命中测试</el-button>
-            <el-button v-hasPermi="['dcs:sensitive-word:add']" :icon="Upload" @click="openImport">批量导入</el-button>
-            <el-button v-hasPermi="['dcs:sensitive-word:add']" type="primary" :icon="Plus" @click="openAdd">新增词条</el-button>
-          </div>
-        </div>
+  <div class="dcs-ops-page sensitive-word-page">
+    <DcsOperationsPageHeader
+      title="内容安全词库"
+      subtitle="配置替换、阻断和复核规则，按场景（表单/文件/聊天）生效；列表打码，编辑抽屉内看原文。聊天入口现已暂停，仅表单与文件场景在实际生效。"
+      eyebrow="风控与审计"
+      :metrics="headerMetrics"
+    >
+      <template #actions>
+        <el-button :icon="Refresh" @click="reload">刷新</el-button>
+        <el-button v-hasPermi="['dcs:sensitive-word:list']" :icon="Aim" @click="openTest">命中测试</el-button>
+        <el-button v-hasPermi="['dcs:sensitive-word:add']" :icon="Upload" @click="openImport">批量导入</el-button>
+        <el-button v-hasPermi="['dcs:sensitive-word:add']" type="primary" :icon="Plus" @click="openAdd">新增词条</el-button>
       </template>
+    </DcsOperationsPageHeader>
 
-      <!-- 全量口径统计(2026-08-23: 旧版只算当前页有误导), 语义分色 -->
-      <div class="summary-row">
-        <div v-for="item in summaryItems" :key="item.label" class="summary-item">
-          <span :class="['summary-value', `v-${item.tone}`]">{{ item.value }}</span>
-          <span class="summary-label">{{ item.label }}</span>
-        </div>
-      </div>
-
-      <el-form :model="queryParams" inline label-width="76px" class="filter-form">
+    <el-card shadow="never" class="risk-list-card">
+      <el-form :model="queryParams" inline label-width="76px" class="ui-toolbar filter-form">
         <el-form-item label="关键词">
           <el-input v-model="queryParams.wordText" clearable placeholder="词条内容" @keyup.enter="onSearch" />
         </el-form-item>
         <el-form-item label="分类">
-          <el-select v-model="queryParams.category" clearable filterable placeholder="全部分类" style="width: 150px">
+          <el-select v-model="queryParams.category" clearable filterable placeholder="全部分类" class="filter-w-150">
             <el-option v-for="(label, key) in CATEGORY_LABELS" :key="key" :label="label" :value="key" />
           </el-select>
         </el-form-item>
         <el-form-item label="动作">
-          <el-select v-model="queryParams.action" clearable placeholder="全部动作" style="width: 140px">
+          <el-select v-model="queryParams.action" clearable placeholder="全部动作" class="filter-w-140">
             <el-option v-for="item in actionOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="生效场景">
-          <el-select v-model="queryParams.scene" clearable placeholder="全部场景" style="width: 140px">
+          <el-select v-model="queryParams.scene" clearable placeholder="全部场景" class="filter-w-140">
             <el-option v-for="item in sceneOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="queryParams.enabled" clearable placeholder="全部状态" style="width: 140px">
+          <el-select v-model="queryParams.enabled" clearable placeholder="全部状态" class="filter-w-140">
             <el-option label="启用" value="1" />
             <el-option label="停用" value="0" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :icon="Search" @click="onSearch">查询</el-button>
+          <el-button :icon="Search" @click="onSearch">查询</el-button>
           <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="wordList" stripe>
-        <el-table-column label="词条" min-width="200">
-          <template #default="{ row }">
-            <div class="word-main">
-              <!-- 列表态打码(2026-08-23 拍板), 编辑抽屉内明文 -->
-              <span>{{ maskToken(row.wordText) }}</span>
-              <el-tag v-if="row.builtin === '1'" size="small" type="info" effect="light">内置</el-tag>
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" :data="wordList" class="ui-table risk-table">
+          <el-table-column label="词条" min-width="200">
+            <template #default="{ row }">
+              <div class="word-main">
+                <!-- 列表态打码(2026-08-23 拍板), 编辑抽屉内明文 -->
+                <span>{{ maskToken(row.wordText) }}</span>
+                <span v-if="row.builtin === '1'" class="ui-pill ui-pill--muted">内置</span>
+              </div>
+              <div class="word-meta">{{ row.remark || '发送前实时检测' }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="分类" width="120">
+            <template #default="{ row }">
+              <span class="ui-pill ui-pill--muted">{{ CATEGORY_LABELS[row.category] || row.category }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="动作" width="110">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="actionPillClass(row.action)">{{ actionLabel(row.action) }}</span>
+            </template>
+          </el-table-column>
+          <!-- 近 7 天误报(收尾批 Q1+Q2, 2026-09-23): 误报/命中 + 疑似过严标; 排序仅当前页 -->
+          <el-table-column label="近 7 天误报" width="170" align="right" sortable :sort-method="sortByFpRate">
+            <template #header>
+              <el-tooltip content="近 7 天被审核人判误报次数 / 命中次数；排序仅对当前页生效" placement="top">
+                <span
+                  >近 7 天误报 <el-icon><InfoFilled /></el-icon
+                ></span>
+              </el-tooltip>
+            </template>
+            <template #default="{ row }">
+              <span v-if="row.fpCnt" class="fp-rate ui-num">{{ row.fpCnt }}/{{ row.hitCnt || 0 }}</span>
+              <span v-else class="fp-none">—</span>
+              <span v-if="row.overstrict" class="ui-pill ui-pill--warn overstrict-tag" title="误报率≥50% 且命中≥5 次，建议复核该词是否过严"
+                >疑似过严</span
+              >
+            </template>
+          </el-table-column>
+          <!-- 生效场景(2026-09-22 场景化): CSV 拆 tag, 未配置按存量口径显示"聊天" -->
+          <el-table-column label="生效场景" width="150">
+            <template #default="{ row }">
+              <span v-for="s in splitScenes(row.scene)" :key="s" class="ui-pill ui-pill--muted scene-tag">
+                {{ sceneLabel(s) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="90">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="row.enabled === '1' ? 'ui-pill--pos' : 'ui-pill--muted'">{{
+                row.enabled === '1' ? '启用' : '停用'
+              }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="更新时间" prop="updateTime" width="170" />
+          <el-table-column label="操作" fixed="right" width="170">
+            <template #default="{ row }">
+              <el-button v-hasPermi="['dcs:sensitive-word:edit']" link @click="openEdit(row)">编辑</el-button>
+              <el-button v-if="row.builtin !== '1'" v-hasPermi="['dcs:sensitive-word:remove']" link type="danger" @click="onDelete(row)">
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">词库为空</p>
+              <p class="ui-empty__hint">可新增词条或批量导入后开始检测</p>
             </div>
-            <div class="word-meta">{{ row.remark || '发送前实时检测' }}</div>
           </template>
-        </el-table-column>
-        <el-table-column label="分类" width="120">
-          <template #default="{ row }">
-            <el-tag size="small" effect="plain" type="info">{{ CATEGORY_LABELS[row.category] || row.category }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="动作" width="110">
-          <template #default="{ row }">
-            <el-tag :type="actionType(row.action)" effect="light">{{ actionLabel(row.action) }}</el-tag>
-          </template>
-        </el-table-column>
-        <!-- 近 7 天误报(收尾批 Q1+Q2, 2026-09-23): 误报/命中 + 疑似过严橙标; 排序仅当前页 -->
-        <el-table-column label="近 7 天误报" width="170" sortable :sort-method="sortByFpRate">
-          <template #header>
-            <el-tooltip content="近 7 天被审核人判误报次数 / 命中次数；排序仅对当前页生效" placement="top">
-              <span
-                >近 7 天误报 <el-icon><InfoFilled /></el-icon
-              ></span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <span v-if="row.fpCnt" class="fp-rate">{{ row.fpCnt }}/{{ row.hitCnt || 0 }}</span>
-            <span v-else class="fp-none">—</span>
-            <el-tag
-              v-if="row.overstrict"
-              size="small"
-              type="warning"
-              effect="light"
-              class="overstrict-tag"
-              title="误报率≥50% 且命中≥5 次，建议复核该词是否过严"
-              >疑似过严</el-tag
-            >
-          </template>
-        </el-table-column>
-        <!-- 生效场景(2026-09-22 场景化): CSV 拆 tag, 未配置按存量口径显示"聊天" -->
-        <el-table-column label="生效场景" width="150">
-          <template #default="{ row }">
-            <el-tag
-              v-for="s in splitScenes(row.scene)"
-              :key="s"
-              size="small"
-              effect="plain"
-              :type="s === 'FORM' ? 'primary' : s === 'FILE' ? 'warning' : 'info'"
-              class="scene-tag"
-            >
-              {{ sceneLabel(s) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="90">
-          <template #default="{ row }">
-            <el-tag :type="row.enabled === '1' ? 'success' : 'info'" effect="light">{{ row.enabled === '1' ? '启用' : '停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="更新时间" prop="updateTime" width="170" />
-        <el-table-column label="操作" fixed="right" width="170">
-          <template #default="{ row }">
-            <el-button v-hasPermi="['dcs:sensitive-word:edit']" link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="row.builtin !== '1'" v-hasPermi="['dcs:sensitive-word:remove']" link type="danger" @click="onDelete(row)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="词库为空，可新增词条或批量导入" />
-        </template>
-      </el-table>
-      <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
+        </el-table>
+      </div>
+      <div class="risk-list-pagination">
+        <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
+      </div>
     </el-card>
 
-    <el-drawer v-model="drawerOpen" :title="drawerTitle" size="560px" append-to-body>
+    <el-drawer v-model="drawerOpen" :title="drawerTitle" size="min(560px, calc(100vw - 16px))" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" class="word-form">
         <el-form-item label="词条" prop="wordText">
           <el-input v-model="form.wordText" :disabled="editingBuiltin" maxlength="100" show-word-limit placeholder="请输入敏感词" />
@@ -169,7 +154,7 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="importOpen" title="批量导入敏感词" width="520px" append-to-body>
+    <el-dialog v-model="importOpen" title="批量导入敏感词" width="min(520px, calc(100vw - 32px))" append-to-body>
       <el-alert title="单次最多 500 条；批内与库内重复词条自动跳过，非法词条跳过并计数。" type="info" :closable="false" show-icon class="mb-4" />
       <el-form label-width="86px">
         <el-form-item label="分类">
@@ -196,7 +181,7 @@
     </el-dialog>
 
     <!-- 命中自测抽屉(2026-08-24): 真实过滤规则只读验证, 不产生风险事件; 结果为管理员验证场景, 命中词明文展示 -->
-    <el-drawer v-model="testOpen" title="命中测试" size="560px" append-to-body>
+    <el-drawer v-model="testOpen" title="命中测试" size="min(560px, calc(100vw - 16px))" append-to-body>
       <el-alert
         title="粘贴文本就地验证词库效果：与真实链路同一套规则，选择场景后按该场景装载词库（含系统基线·仅聊天场景），仅测试不记分。"
         type="info"
@@ -243,19 +228,23 @@
           class="mb-2"
         />
         <el-alert v-else title="未命中任何词条，可正常发送" type="success" :closable="false" show-icon class="mb-2" />
-        <el-table v-if="testForm.result.hits.length" :data="testForm.result.hits" stripe size="small">
-          <el-table-column label="命中词" prop="word" min-width="140" />
-          <el-table-column label="动作" width="110">
-            <template #default="{ row }">
-              <el-tag :type="row.action === 'BLOCK' ? 'danger' : row.action === 'REVIEW' ? 'warning' : 'success'" size="small">
-                {{ row.action === 'BLOCK' ? '阻断' : row.action === 'REVIEW' ? '转复核' : '替换' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="位置(字符)" width="110" align="center">
-            <template #default="{ row }">{{ row.start }}–{{ row.end }}</template>
-          </el-table-column>
-        </el-table>
+        <div class="dcs-ops-table-wrap">
+          <el-table v-if="testForm.result.hits.length" :data="testForm.result.hits" class="ui-table risk-table">
+            <el-table-column label="命中词" prop="word" min-width="140" />
+            <el-table-column label="动作" width="110">
+              <template #default="{ row }">
+                <span class="ui-pill" :class="actionPillClass(row.action)">
+                  {{ row.action === 'BLOCK' ? '阻断' : row.action === 'REVIEW' ? '转复核' : '替换' }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="位置(字符)" width="110" align="right">
+              <template #default="{ row }"
+                ><span class="ui-num">{{ row.start }}–{{ row.end }}</span></template
+              >
+            </el-table-column>
+          </el-table>
+        </div>
       </template>
     </el-drawer>
   </div>
@@ -263,6 +252,8 @@
 
 <script setup lang="ts">
 import { Aim, InfoFilled, Plus, Refresh, RefreshLeft, Search, Upload } from '@element-plus/icons-vue';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+import type { DcsOperationsMetric } from '@/components/DcsOperationsPageHeader/index.vue';
 import {
   addSensitiveWord,
   batchImportSensitiveWords,
@@ -368,14 +359,14 @@ const rules = {
 };
 
 const editingBuiltin = computed(() => form.builtin === '1');
-/** 全量口径统计卡(词条总数 primary / 启用 success / 阻断 danger / 转复核 warning) */
-const summaryItems = computed(() => {
+/** 页头指标带：全量口径（旧版只算当前页有误导），数字统一主文字色 */
+const headerMetrics = computed<DcsOperationsMetric[]>(() => {
   const s = stats.value;
   return [
-    { label: '词条总数', value: s?.total ?? '-', tone: 'primary' },
-    { label: '启用规则', value: s?.enabled ?? '-', tone: 'success' },
-    { label: '阻断规则', value: s?.actionBlock ?? '-', tone: 'danger' },
-    { label: '转人工复核', value: s?.actionReview ?? '-', tone: 'warning' }
+    { label: '词条总数', value: s?.total ?? '—', hint: '全量口径，非当前页' },
+    { label: '启用规则', value: s?.enabled ?? '—', hint: '当前参与检测的词条' },
+    { label: '阻断规则', value: s?.actionBlock ?? '—', hint: '命中即拒绝提交' },
+    { label: '转人工复核', value: s?.actionReview ?? '—', hint: '命中后进入人工复核' }
   ];
 });
 
@@ -390,10 +381,11 @@ const sortByFpRate = (a: SensitiveWordVO, b: SensitiveWordVO) => {
 };
 
 const actionLabel = (action: ActionType) => actionOptions.find((item) => item.value === action)?.label || action;
-const actionType = (action: ActionType): 'success' | 'danger' | 'warning' => {
-  if (action === 'BLOCK') return 'danger';
-  if (action === 'REVIEW') return 'warning';
-  return 'success';
+/** 处理动作药丸：替换=成功、复核=警告、阻断=危险 */
+const actionPillClass = (action: string) => {
+  if (action === 'BLOCK') return 'ui-pill--neg';
+  if (action === 'REVIEW') return 'ui-pill--warn';
+  return 'ui-pill--pos';
 };
 
 const resetForm = () => {
@@ -559,81 +551,27 @@ onMounted(reload);
 
 <style scoped lang="scss">
 .sensitive-word-page {
-  padding: 12px;
+  .risk-list-card {
+    min-width: 0;
 
-  .page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .page-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--dcs-text-primary);
-  }
-
-  .page-subtitle {
-    margin: 4px 0 0;
-    color: var(--dcs-text-secondary);
-    font-size: 12px;
-    line-height: 1.6;
-  }
-
-  .header-actions {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-  }
-
-  .summary-row {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(120px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  .summary-item {
-    min-height: 64px;
-    border: 1px solid var(--dcs-border-color-lighter);
-    border-radius: 6px;
-    padding: 12px 14px;
-    background: var(--dcs-bg-fill-lighter);
-  }
-
-  .summary-value {
-    display: block;
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1.2;
-
-    &.v-primary {
-      color: var(--el-color-primary);
+    :deep(.el-card__body) {
+      min-width: 0;
+      padding: 0;
     }
-    &.v-success {
-      color: var(--dcs-color-success);
-    }
-    &.v-danger {
-      color: var(--dcs-color-danger);
-    }
-    &.v-warning {
-      color: var(--dcs-color-warning);
-    }
-  }
-
-  .summary-label {
-    display: block;
-    margin-top: 6px;
-    color: var(--dcs-text-secondary);
-    font-size: 13px;
   }
 
   .filter-form {
     :deep(.el-form-item) {
-      margin-bottom: 8px;
+      margin-right: 0;
+      margin-bottom: 0;
     }
+  }
+
+  .filter-w-140 {
+    width: 140px;
+  }
+  .filter-w-150 {
+    width: 150px;
   }
 
   .word-main {
@@ -643,25 +581,19 @@ onMounted(reload);
     font-weight: 600;
   }
 
-  .test-actions {
-    display: flex;
-    gap: 8px;
-    margin: 12px 0;
-  }
-
   .word-meta {
     margin-top: 4px;
-    color: var(--dcs-text-secondary);
+    color: var(--app-muted);
     font-size: 12px;
   }
 
   .fp-rate {
-    color: var(--el-color-warning);
+    color: var(--app-accent);
     font-weight: 600;
     font-variant-numeric: tabular-nums;
   }
   .fp-none {
-    color: var(--dcs-text-placeholder, #c0c4cc);
+    color: var(--app-faint);
   }
   .overstrict-tag {
     margin-left: 6px;
@@ -675,23 +607,31 @@ onMounted(reload);
     }
   }
 
-  .scene-hint {
-    width: 100%;
-    color: var(--dcs-text-secondary);
-    font-size: 11px;
-    line-height: 1.6;
+  .risk-list-pagination {
+    padding: 4px 16px 8px;
   }
 }
 
-@media (max-width: 768px) {
-  .sensitive-word-page {
-    .page-header {
-      flex-direction: column;
-    }
+/* 表格变量与抽屉内元素走顶层规则：抽屉 append-to-body，祖先 .sensitive-word-page 匹配不到 */
+.risk-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-row-hover-bg-color: var(--app-raised);
+}
 
-    .summary-row {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
+.test-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.scene-hint {
+  width: 100%;
+  color: var(--app-faint);
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>

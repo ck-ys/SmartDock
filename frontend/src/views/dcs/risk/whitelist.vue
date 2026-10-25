@@ -1,80 +1,91 @@
 <template>
-  <div class="risk-whitelist">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <div class="header-text">
-            <span class="page-title">白名单管理</span>
-            <p class="page-sub">白名单内的 IP / 用户不参与风控、不触发验证码；IP 支持精确 IPv4/IPv6，USER 使用数字 ID，域名白名单接入后开放。</p>
-          </div>
-          <div>
-            <el-button v-hasPermi="['dcs:risk:whitelist:edit']" type="primary" :icon="Plus" @click="onAdd">新增</el-button>
-            <el-button link :icon="Refresh" @click="loadList">刷新</el-button>
-          </div>
-        </div>
+  <div class="dcs-ops-page risk-whitelist">
+    <DcsOperationsPageHeader
+      title="白名单管理"
+      subtitle="白名单内的 IP / 用户不参与风控、不触发验证码；IP 支持精确 IPv4/IPv6，USER 使用数字 ID，域名白名单接入后开放。"
+      eyebrow="风控与审计"
+    >
+      <template #actions>
+        <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+        <el-button v-hasPermi="['dcs:risk:whitelist:edit']" type="primary" :icon="Plus" @click="onAdd">新增</el-button>
       </template>
+    </DcsOperationsPageHeader>
 
+    <el-card shadow="never" class="risk-list-card">
       <!-- 筛选 -->
-      <el-form :inline="true" class="mb-3">
+      <el-form :inline="true" class="ui-toolbar filter-form">
         <el-form-item label="类型">
-          <el-select v-model="query.listType" placeholder="全部" clearable style="width: 120px" @change="onSearch">
+          <el-select v-model="query.listType" placeholder="全部" clearable class="filter-w-120" @change="onSearch">
             <el-option label="IP" value="IP" />
             <el-option label="用户" value="USER" />
           </el-select>
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="list" stripe>
-        <el-table-column label="类型" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="typeColor(row.listType)" size="small">{{ row.listType }}</el-tag>
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" :data="list" class="ui-table risk-table">
+          <el-table-column label="类型" width="100" align="center">
+            <template #default="{ row }">
+              <span class="ui-pill ui-pill--muted">{{ row.listType }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="值" prop="value" min-width="200" show-overflow-tooltip />
+          <el-table-column label="原因" prop="reason" min-width="180" show-overflow-tooltip />
+          <el-table-column label="启用" width="100" align="center">
+            <template #default="{ row }">
+              <el-switch
+                v-model="row.enabled"
+                active-value="1"
+                inactive-value="0"
+                :loading="row._toggling"
+                @change="(val: '0' | '1') => onToggleEnabled(row, val)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="创建时间" prop="createTime" width="160">
+            <template #default="{ row }">{{ row.createTime ? parseTime(parseDcsServerTime(row.createTime), '{y}-{m}-{d} {h}:{i}') : '-' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="140">
+            <template #default="{ row }">
+              <el-button v-hasPermi="['dcs:risk:whitelist:edit']" link :icon="Edit" @click="onEdit(row)">编辑</el-button>
+              <el-button v-hasPermi="['dcs:risk:whitelist:edit']" type="danger" link :icon="Delete" @click="onDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无白名单记录</p>
+              <p class="ui-empty__hint">加入白名单的 IP 或用户不参与风控、不触发验证码</p>
+              <div v-if="checkPermi(['dcs:risk:whitelist:edit'])" class="ui-empty__actions">
+                <el-button @click="onAdd">新增白名单</el-button>
+              </div>
+            </div>
           </template>
-        </el-table-column>
-        <el-table-column label="值" prop="value" min-width="200" show-overflow-tooltip />
-        <el-table-column label="原因" prop="reason" min-width="180" show-overflow-tooltip />
-        <el-table-column label="启用" width="100" align="center">
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.enabled"
-              active-value="1"
-              inactive-value="0"
-              :loading="row._toggling"
-              @change="(val: '0' | '1') => onToggleEnabled(row, val)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="创建时间" prop="createTime" width="160">
-          <template #default="{ row }">{{ row.createTime ? parseTime(parseDcsServerTime(row.createTime), '{y}-{m}-{d} {h}:{i}') : '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" align="center">
-          <template #default="{ row }">
-            <el-button v-hasPermi="['dcs:risk:whitelist:edit']" type="primary" link size="small" :icon="Edit" @click="onEdit(row)">编辑</el-button>
-            <el-button v-hasPermi="['dcs:risk:whitelist:edit']" type="danger" link size="small" :icon="Delete" @click="onDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="暂无白名单记录">
-            <el-button v-if="checkPermi(['dcs:risk:whitelist:edit'])" type="primary" size="small" @click="onAdd">新增白名单</el-button>
-          </el-empty>
-        </template>
-      </el-table>
+        </el-table>
+      </div>
 
-      <pagination v-show="total > 0" :total="total" v-model:page="query.pageNum" v-model:limit="query.pageSize" @pagination="loadList" />
+      <div class="risk-list-pagination">
+        <pagination v-show="total > 0" :total="total" v-model:page="query.pageNum" v-model:limit="query.pageSize" @pagination="loadList" />
+      </div>
     </el-card>
 
     <!-- 新增/编辑对话框（共用） -->
-    <el-dialog v-model="formDialog.visible" :title="formDialog.editingId ? '编辑白名单' : '新增白名单'" width="480px" append-to-body>
+    <el-dialog
+      v-model="formDialog.visible"
+      :title="formDialog.editingId ? '编辑白名单' : '新增白名单'"
+      width="min(480px, calc(100vw - 32px))"
+      append-to-body
+    >
       <el-form ref="formRef" :model="formDialog.form" :rules="formRules" label-width="80px">
         <el-form-item label="类型" prop="listType">
           <el-radio-group v-model="formDialog.form.listType" :disabled="!!formDialog.editingId">
             <el-radio-button value="IP">IP 地址</el-radio-button>
             <el-radio-button value="USER">用户</el-radio-button>
           </el-radio-group>
-          <div v-if="formDialog.editingId" class="text-xs text-gray-400 mt-1">编辑时类型不可改（语义不变）</div>
+          <div v-if="formDialog.editingId" class="form-hint">编辑时类型不可改（语义不变）</div>
         </el-form-item>
         <el-form-item label="值" prop="value">
           <el-input v-model="formDialog.form.value" :placeholder="valuePlaceholder" :disabled="!!formDialog.editingId" />
-          <div v-if="formDialog.editingId" class="text-xs text-gray-400 mt-1">编辑时值不可改（语义不变）</div>
+          <div v-if="formDialog.editingId" class="form-hint">编辑时值不可改（语义不变）</div>
         </el-form-item>
         <el-form-item label="原因">
           <el-input v-model="formDialog.form.reason" type="textarea" :rows="2" placeholder="选填, 说明为何加入白名单" />
@@ -94,6 +105,7 @@
 <script setup lang="ts">
 import { Plus, Refresh, Delete, Edit } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 import { listWhitelist, addWhitelist, updateWhitelist, deleteWhitelist, type RiskWhitelistVO } from '@/api/dcs/risk';
 import { parseDcsServerTime } from './riskDashboardPresentation';
 import { parseTime } from '@/utils/ruoyi';
@@ -106,8 +118,6 @@ const query = reactive({ pageNum: 1, pageSize: 20, listType: '' });
 const list = ref<(RiskWhitelistVO & { _toggling?: boolean })[]>([]);
 const total = ref(0);
 const loading = ref(false);
-
-const typeColor = (t: string) => (t === 'IP' ? 'primary' : t === 'USER' ? 'success' : 'warning');
 
 const valuePlaceholder = computed(() => {
   switch (formDialog.form.listType) {
@@ -240,25 +250,44 @@ onMounted(loadList);
 </script>
 
 <style scoped lang="scss">
-.risk-whitelist {
-  padding: 12px;
+.risk-list-card {
+  min-width: 0;
+
+  :deep(.el-card__body) {
+    min-width: 0;
+    padding: 0;
+  }
 }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  font-weight: 600;
+
+/* 表格只覆盖 Element Plus 变量与行线，不重写组件内部结构 */
+.risk-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
-.page-title {
-  font-size: 16px;
-  color: var(--dcs-text-primary);
+
+.filter-form {
+  :deep(.el-form-item) {
+    margin-right: 0;
+    margin-bottom: 0;
+  }
 }
-.page-sub {
-  margin: 4px 0 0;
-  color: var(--dcs-text-secondary);
+
+.filter-w-120 {
+  width: 120px;
+}
+
+.form-hint {
+  margin-top: 4px;
+  color: var(--app-faint);
   font-size: 12px;
-  line-height: 1.6;
-  font-weight: 400;
+  line-height: 1.5;
+}
+
+.risk-list-pagination {
+  padding: 4px 16px 8px;
 }
 </style>

@@ -1,14 +1,13 @@
 <template>
-  <div class="app-container">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>内容机检</span>
-          <el-tag size="small" type="info" effect="plain">运行时开关</el-tag>
-        </div>
+  <div class="dcs-ops-page content-config-page">
+    <DcsOperationsPageHeader title="内容机检" subtitle="表单/在线批量/Excel 导入与追加记录四个入口的文本敏感词检测开关。" eyebrow="风控与审计">
+      <template #actions>
+        <span class="ui-pill ui-pill--muted">运行时开关</span>
       </template>
+    </DcsOperationsPageHeader>
 
-      <el-alert type="info" :closable="false" show-icon class="mb-4">
+    <el-card shadow="never" class="content-config-card">
+      <el-alert type="info" :closable="false" show-icon class="config-alert">
         <template #title> 开关为运行时内存态：后端重启后恢复配置文件默认档（观察模式，只记不拦）。每次修改记入系统操作日志。 </template>
       </el-alert>
 
@@ -26,8 +25,6 @@
             @change="onSwitch('contentModerationEnabled', $event as boolean)"
           />
         </div>
-
-        <el-divider />
 
         <div class="switch-row">
           <div class="switch-info">
@@ -56,6 +53,7 @@
 <script setup lang="ts">
 import { getContentConfigState, updateContentConfig, type ContentConfigState } from '@/api/dcs/risk';
 import { InfoFilled } from '@element-plus/icons-vue';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 defineOptions({ name: 'DcsRiskContentConfig' });
 
@@ -123,14 +121,20 @@ onMounted(getState);
 </script>
 
 <style lang="scss" scoped>
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.content-config-card {
+  min-width: 0;
+
+  :deep(.el-card__body) {
+    padding: 16px;
+  }
+}
+
+.config-alert {
+  margin-bottom: 12px;
 }
 
 .switch-list {
-  padding: 4px 0;
+  padding: 0;
 }
 
 .switch-row {
@@ -138,38 +142,44 @@ onMounted(getState);
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 10px 2px;
+  padding: 14px 0;
+
+  & + .switch-row {
+    border-top: 1px solid var(--app-rule);
+  }
+}
+
+.switch-info {
+  min-width: 0;
 }
 
 .switch-name {
-  font-size: 14px;
+  color: var(--app-text);
+  font-size: var(--dcs-font-xl);
   font-weight: 600;
-  color: var(--dcs-text-primary);
 }
 
 .switch-sub {
   margin-top: 4px;
+  color: var(--app-muted);
   font-size: 12px;
   font-weight: 400;
-  color: var(--dcs-text-secondary);
+  line-height: 1.6;
 }
 
 .hint-line {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 14px;
+  margin-top: 4px;
   padding-top: 12px;
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--app-rule);
+  color: var(--app-muted);
   font-size: 12px;
-  color: var(--dcs-text-secondary);
+  line-height: 1.6;
 
   .el-icon {
-    color: var(--el-color-info);
+    color: var(--app-faint);
   }
-}
-
-.mb-4 {
-  margin-bottom: 16px;
 }
 </style>

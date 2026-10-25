@@ -1,33 +1,33 @@
 <template>
-  <div class="risk-events">
-    <el-card shadow="never">
-      <template #header>
-        <div class="card-header">
-          <div class="header-text">
-            <span class="page-title">风险事件流水</span>
-            <p class="page-sub">用户/行为的每一次风险记分留痕；可用风险分下限滤掉低分噪音，点开详情查看完整原文。</p>
-          </div>
-          <el-button link :icon="Refresh" @click="loadEvents">刷新</el-button>
-        </div>
+  <div class="dcs-ops-page risk-events">
+    <DcsOperationsPageHeader
+      title="风险事件流水"
+      subtitle="用户/行为的每一次风险记分留痕；可用风险分下限滤掉低分噪音，点开详情查看完整原文。"
+      eyebrow="风控与审计"
+    >
+      <template #actions>
+        <el-button :icon="Refresh" @click="loadEvents">刷新</el-button>
       </template>
+    </DcsOperationsPageHeader>
 
+    <el-card shadow="never" class="risk-list-card">
       <!-- 筛选 -->
-      <el-form :inline="true" :model="query" class="mb-3 filter-form">
+      <el-form :inline="true" :model="query" class="ui-toolbar filter-form">
         <el-form-item label="事件类型">
-          <el-select v-model="query.eventType" placeholder="全部" clearable style="width: 160px">
+          <el-select v-model="query.eventType" placeholder="全部" clearable class="filter-w-160">
             <el-option v-for="(label, key) in EVENT_TYPE_LABELS" :key="key" :label="label" :value="key" />
           </el-select>
         </el-form-item>
         <el-form-item>
           <template #label>用户ID<span class="filter-hint">(精确)</span></template>
-          <el-input v-model="query.userId" placeholder="输入完整ID" clearable style="width: 150px" />
+          <el-input v-model="query.userId" placeholder="输入完整ID" clearable class="filter-w-150" />
         </el-form-item>
         <el-form-item>
           <template #label>IP<span class="filter-hint">(精确)</span></template>
-          <el-input v-model="query.ip" placeholder="输入完整IP" clearable style="width: 150px" />
+          <el-input v-model="query.ip" placeholder="输入完整IP" clearable class="filter-w-150" />
         </el-form-item>
         <el-form-item label="风险分≥">
-          <el-input-number v-model="query.minRiskScore" :min="0" :max="9999" controls-position="right" style="width: 120px" />
+          <el-input-number v-model="query.minRiskScore" :min="0" :max="9999" controls-position="right" class="filter-w-120" />
         </el-form-item>
         <el-form-item label="按分排序">
           <el-switch v-model="query.orderByScore" />
@@ -40,7 +40,7 @@
             start-placeholder="开始时间"
             end-placeholder="结束时间"
             value-format="x"
-            style="width: 320px"
+            class="filter-w-320"
           />
         </el-form-item>
         <el-form-item>
@@ -49,57 +49,65 @@
         </el-form-item>
       </el-form>
 
-      <el-table v-loading="loading" :data="eventList" stripe>
-        <el-table-column label="时间" prop="createdTime" width="160">
-          <template #default="{ row }">{{ formatTime(row.createdTime) }}</template>
-        </el-table-column>
-        <el-table-column label="事件类型" width="120">
-          <template #default="{ row }">
-            <el-tag :type="EVENT_TYPE_COLORS[row.eventType]" effect="plain" size="small">
-              {{ EVENT_TYPE_LABELS[row.eventType] || row.eventType }}
-            </el-tag>
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" :data="eventList" class="ui-table risk-table">
+          <el-table-column label="时间" prop="createdTime" width="160">
+            <template #default="{ row }">{{ formatTime(row.createdTime) }}</template>
+          </el-table-column>
+          <el-table-column label="事件类型" width="120">
+            <template #default="{ row }">
+              <span class="ui-pill ui-pill--muted">{{ EVENT_TYPE_LABELS[row.eventType] || row.eventType }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="来源" prop="source" width="90">
+            <template #default="{ row }">
+              <span class="ui-pill ui-pill--muted">{{ EVENT_SOURCE_LABELS[row.source] || row.source }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="用户" width="160" show-overflow-tooltip>
+            <template #default="{ row }">
+              {{ row.nickName || row.userName || row.userId || '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="IP" prop="ip" width="140" show-overflow-tooltip />
+          <!-- 列表态打码(2026-08-23 拍板: 防肩窥/截图外泄), 详情弹窗内明文 -->
+          <el-table-column label="详情" min-width="240" show-overflow-tooltip>
+            <template #default="{ row }">{{ maskSensitiveDetail(row.detail || '-') }}</template>
+          </el-table-column>
+          <el-table-column label="风险分" prop="riskScore" width="90" align="right">
+            <template #default="{ row }">
+              <span class="ui-num">+{{ row.riskScore }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="160" fixed="right">
+            <template #default="{ row }">
+              <el-button link @click="openDetail(row)">查看详情</el-button>
+              <el-button v-if="row.userId" link @click="viewProfile(row.userId)">查看画像</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无风险事件</p>
+              <p class="ui-empty__hint">调整筛选条件或换一个时间区间再试</p>
+            </div>
           </template>
-        </el-table-column>
-        <el-table-column label="来源" prop="source" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag size="small">{{ EVENT_SOURCE_LABELS[row.source] || row.source }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="用户" width="160" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ row.nickName || row.userName || row.userId || '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="IP" prop="ip" width="140" show-overflow-tooltip />
-        <!-- 列表态打码(2026-08-23 拍板: 防肩窥/截图外泄), 详情弹窗内明文 -->
-        <el-table-column label="详情" min-width="240" show-overflow-tooltip>
-          <template #default="{ row }">{{ maskSensitiveDetail(row.detail || '-') }}</template>
-        </el-table-column>
-        <el-table-column label="风险分" prop="riskScore" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag type="danger" size="small">+{{ row.riskScore }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="openDetail(row)">查看详情</el-button>
-            <el-button v-if="row.userId" type="primary" link size="small" @click="viewProfile(row.userId)">查看画像</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
-      <pagination v-show="total > 0" :total="total" v-model:page="query.pageNum" v-model:limit="query.pageSize" @pagination="loadEvents" />
+      <div class="risk-list-pagination">
+        <pagination v-show="total > 0" :total="total" v-model:page="query.pageNum" v-model:limit="query.pageSize" @pagination="loadEvents" />
+      </div>
     </el-card>
 
     <!-- 事件详情弹窗 -->
-    <el-dialog v-model="detailDialog.visible" title="事件详情" width="560px" append-to-body>
+    <el-dialog v-model="detailDialog.visible" title="事件详情" width="min(560px, calc(100vw - 32px))" append-to-body>
       <el-descriptions v-if="detailDialog.data" :column="2" border>
         <el-descriptions-item label="事件 ID">{{ detailDialog.data.eventId }}</el-descriptions-item>
         <el-descriptions-item label="时间">{{ formatTime(detailDialog.data.createdTime) }}</el-descriptions-item>
         <el-descriptions-item label="事件类型">
-          <el-tag :type="EVENT_TYPE_COLORS[detailDialog.data.eventType]" effect="plain" size="small">
+          <span class="ui-pill ui-pill--muted">
             {{ EVENT_TYPE_LABELS[detailDialog.data.eventType] || detailDialog.data.eventType }}
-          </el-tag>
+          </span>
         </el-descriptions-item>
         <el-descriptions-item label="来源">{{ EVENT_SOURCE_LABELS[detailDialog.data.source] || detailDialog.data.source }}</el-descriptions-item>
         <el-descriptions-item v-if="detailDialog.data.hitWord" label="命中词">{{ maskToken(detailDialog.data.hitWord) }}</el-descriptions-item>
@@ -108,7 +116,7 @@
         }}</el-descriptions-item>
         <el-descriptions-item label="IP">{{ detailDialog.data.ip || '-' }}</el-descriptions-item>
         <el-descriptions-item label="风险分">
-          <el-tag type="danger" size="small">+{{ detailDialog.data.riskScore }}</el-tag>
+          <span class="ui-num">+{{ detailDialog.data.riskScore }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="引用 ID">
           <template v-if="detailDialog.data.eventType === 'TASK_CONTENT_RISK' && detailDialog.data.refId">
@@ -131,7 +139,8 @@
 <script setup lang="ts">
 import { Refresh, RefreshLeft, Search } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
-import { listEvents, getEventDetail, EVENT_TYPE_LABELS, EVENT_TYPE_COLORS, EVENT_SOURCE_LABELS, type RiskEventVO } from '@/api/dcs/risk';
+import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+import { listEvents, getEventDetail, EVENT_TYPE_LABELS, EVENT_SOURCE_LABELS, type RiskEventVO } from '@/api/dcs/risk';
 import { parseDcsServerTime } from './riskDashboardPresentation';
 import { parseTime } from '@/utils/ruoyi';
 import { maskSensitiveDetail, maskToken } from './sensitiveMask';
@@ -231,20 +240,55 @@ onMounted(loadEvents);
 </script>
 
 <style scoped lang="scss">
-.risk-events {
-  padding: 12px;
+.risk-list-card {
+  min-width: 0;
+
+  :deep(.el-card__body) {
+    min-width: 0;
+    padding: 0;
+  }
 }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
+
+/* 表格只覆盖 Element Plus 变量与行线，不重写组件内部结构 */
+.risk-table {
+  --el-table-border-color: var(--app-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-row-hover-bg-color: var(--app-raised);
 }
+
+.filter-form {
+  :deep(.el-form-item) {
+    margin-right: 0;
+    margin-bottom: 0;
+  }
+
+  :deep(.el-form-item__label) {
+    white-space: nowrap;
+  }
+}
+
 .filter-hint {
-  color: var(--dcs-text-secondary);
-  font-size: 11px;
+  color: var(--app-faint);
+  font-size: 12px;
 }
-.filter-form :deep(.el-form-item__label) {
-  white-space: nowrap;
+
+.filter-w-120 {
+  width: 120px;
+}
+.filter-w-150 {
+  width: 150px;
+}
+.filter-w-160 {
+  width: 160px;
+}
+.filter-w-320 {
+  width: 320px;
+}
+
+.risk-list-pagination {
+  padding: 4px 16px 8px;
 }
 </style>
