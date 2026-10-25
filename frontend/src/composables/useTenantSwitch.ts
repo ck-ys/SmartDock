@@ -27,6 +27,39 @@ const loadFailed = ref(false);
 let lastFetchAt = 0;
 let loadedFor = '';
 
+// 题4-② 多标签页同步：同一管理员在 A 页切了单位，B 页界面还显示旧单位、
+// 新请求却按新单位算（permission.ts 回放镜像）——静默写错单位。
+// 监听 storage 跨页事件，发现镜像被别页改过就提示刷新（本页自己写镜像不触发）
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e: StorageEvent) => {
+    // 镜像键形如 dcs:dynamic-tenant:<userId>，只响应当前登录用户的事件；
+    // 别页切回默认单位是 removeItem（newValue 为 null）同样算"被切走"，也要提醒
+    const key = String(e.key || '');
+    if (!key.startsWith('dcs:dynamic-tenant:') || (e.newValue == null && e.oldValue == null)) {
+      return;
+    }
+    const keyUserId = key.split(':')[2] || '';
+    let myUserId = '';
+    try {
+      myUserId = String(useUserStore().userId || '');
+    } catch {
+      return; // pinia 尚未激活（登录前），忽略
+    }
+    if (!keyUserId || keyUserId !== myUserId) {
+      return;
+    }
+    import('element-plus').then(({ ElMessageBox }) => {
+      ElMessageBox.confirm('单位已在另一个标签页被切换，本页继续操作会把数据写到错误单位。建议立即刷新。', '单位已变更', {
+        confirmButtonText: '立即刷新',
+        cancelButtonText: '稍后自行刷新',
+        type: 'warning'
+      })
+        .then(() => window.location.reload())
+        .catch(() => undefined);
+    });
+  });
+}
+
 export const useTenantSwitch = () => {
   const router = useRouter();
   const userStore = useUserStore();
@@ -76,13 +109,15 @@ export const useTenantSwitch = () => {
     } catch {
       loadFailed.value = true;
       if (!force) {
-        // 首次加载失败不记账（重试行可再试）、不动镜像、不伪造当前单位；
-        // 静默刷新失败保留旧列表，比清空更稳
+        // 题4-① 首次加载失败：不记账（重试行可再试）、不动镜像；
+        // 显示按本地镜像对齐（数据层仍挂在镜像里的单位），不瞎回默认——
+        // 否则界面显示默认单位、还放出「个人中心」，数据却还是切换后的单位
         loadedFor = '';
         tenants.value = [];
-        currentId.value = defaultId.value;
+        const storedId = readTenantMirror(userId.value);
+        currentId.value = storedId || defaultId.value;
         tenantName.value = '';
-        tenantSwitched.value = false;
+        tenantSwitched.value = !!storedId && storedId !== defaultId.value;
       }
     } finally {
       ready.value = true;
@@ -129,6 +164,8 @@ export const useTenantSwitch = () => {
       return;
     }
     apply(target);
+    // 题3-⑤ 广播切换单位：侧栏待审徽标等立即拉新单位数据（原来最长等 60s 轮询）
+    window.dispatchEvent(new Event('dcs:tenant-changed'));
     try {
       await router.push('/');
       await proxy?.$tab.closeAllPage();
