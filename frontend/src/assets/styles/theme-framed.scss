@@ -44,12 +44,13 @@
   --app-warm-ink: #6b5900;
 
   /* 度量 */
-  --app-sidebar-w: 228px;
-  --app-topbar-h: 48px;
+  --app-sidebar-w: 256px;
+  --app-topbar-h: 64px;
   --app-sheet-radius: 16px;
   --app-sheet-inset: 8px;
   --app-card-radius: 8px;
   --app-control-radius: 6px;
+  --app-nav-radius: 8px; // 导航药丸专用：不跟控件圆角走
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
   --app-shadow-sm: none;
@@ -245,6 +246,7 @@ html.dark {
   --app-card-radius: 20px;
   --app-sheet-radius: 20px;
   --app-control-radius: 999px;
+  --app-nav-radius: 8px;
   --app-card-border: 0;
   --app-card-shadow: none;
   --app-surface-bg: var(--app-surface);
@@ -332,7 +334,7 @@ body {
   height: 34px !important;
   line-height: 34px !important;
   margin: 1px 8px !important;
-  border-radius: var(--app-control-radius) !important;
+  border-radius: var(--app-nav-radius) !important;
   font-size: 14px;
   color: var(--app-muted);
 }
@@ -613,10 +615,20 @@ html.dark .el-switch {
 }
 
 /* 冻结列必须有不透明底：普通行是透明的（透出卡片底色），但 sticky 单元格叠在滚动内容上，
-   继承 transparent 会让下层文字直接透上来（全仓 38 处 fixed 列都会中招） */
-.el-table .el-table-fixed-column--left,
-.el-table .el-table-fixed-column--right {
+   继承 transparent 会让下层文字直接透上来（全仓 38 处 fixed 列都会中招）。
+   Element 2.13 自己的选择器是 `.el-table__body-wrapper tr td.el-table-fixed-column--right`
+   （权重 0,2,2），下面这条必须带满 tr td 同权重才压得住，少写一级就完全不生效 */
+.el-table .el-table__body-wrapper tr td.el-table-fixed-column--left,
+.el-table .el-table__body-wrapper tr td.el-table-fixed-column--right {
   background-color: var(--app-surface);
+}
+
+/* 悬停时冻结列跟着整行变色，否则那一格看起来像被挖掉 */
+.el-table .el-table__body tr:hover > td.el-table-fixed-column--left,
+.el-table .el-table__body tr:hover > td.el-table-fixed-column--right,
+.el-table .el-table__body tr.hover-row > td.el-table-fixed-column--left,
+.el-table .el-table__body tr.hover-row > td.el-table-fixed-column--right {
+  background-color: var(--app-raised);
 }
 
 /* 表头行上面有 !important 的透明规则，冻结表头要更高优先级压回来 */

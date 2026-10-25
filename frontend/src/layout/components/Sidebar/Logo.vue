@@ -93,7 +93,7 @@ const getLogoTextColor = computed(() => {
       margin: 0;
       color: v-bind(getLogoTextColor);
       font-weight: 600;
-      line-height: 50px;
+      line-height: var(--app-topbar-h);
       font-size: 14px;
       font-family:
         Avenir,

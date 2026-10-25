@@ -74,6 +74,12 @@
           <size-select id="size-select" class="right-menu-item hover-effect" />
         </el-tooltip>
       </template>
+      <!-- 交互三件 ②：外观抽屉入口（主题 + 密度），与右侧主题按钮并存但职责不同 -->
+      <el-tooltip v-if="appStore.device !== 'mobile'" content="外观" effect="dark" placement="bottom">
+        <div class="right-menu-item hover-effect appearance-entry" @click="openAppearance">
+          <el-icon><Brush /></el-icon>
+        </div>
+      </el-tooltip>
       <el-tooltip :content="dark ? '切到框架纸（浅色）' : '切到纯黑夜（深色）'" effect="dark" placement="bottom">
         <div class="right-menu-item hover-effect theme-switch" @click="toggleAppearance">
           <el-icon v-if="dark"><Sunny /></el-icon>
@@ -104,6 +110,7 @@
       </div>
     </div>
     <feedback-dialog v-model:visible="feedbackOpen" :initial-tab="feedbackTab" />
+    <dcs-appearance-drawer ref="appearanceDrawerRef" />
   </div>
 </template>
 
@@ -119,6 +126,7 @@ import { dynamicClear, dynamicTenant } from '@/api/system/tenant';
 import { TenantVO } from '@/api/types';
 import notice from './notice/index.vue';
 import FeedbackDialog from '@/views/dcs/feedback/components/FeedbackDialog.vue';
+import DcsAppearanceDrawer from '@/components/DcsAppearanceDrawer/index.vue';
 import { ElMessage } from 'element-plus';
 import { ElMessageBoxOptions } from 'element-plus/es/components/message-box/src/message-box.type';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
@@ -165,6 +173,10 @@ const navType = computed(() => settingsStore.navType);
 const showLogo = computed(() => settingsStore.sidebarLogo);
 const dark = computed(() => settingsStore.dark);
 const toggleAppearance = () => settingsStore.setDark(!settingsStore.dark);
+
+// 交互三件 ②：外观抽屉（主题 + 密度）
+const appearanceDrawerRef = ref<InstanceType<typeof DcsAppearanceDrawer>>();
+const openAppearance = () => appearanceDrawerRef.value?.open();
 
 const companyName = ref(undefined);
 const tenantList = ref<TenantVO[]>([]);

@@ -49,7 +49,8 @@
 
     &.has-logo {
       .el-scrollbar {
-        height: calc(100% - 48px);
+        /* 顶栏提到 64 后 Logo 也变 64，这里必须跟令牌走，写死 48 会让菜单底部被裁 16px */
+        height: calc(100% - var(--app-topbar-h));
       }
     }
 
@@ -170,11 +171,11 @@
   // 收起菜单后的样式
   .hideSidebar {
     .sidebar-container {
-      width: 54px !important;
+      width: 48px !important;
     }
 
     .main-container {
-      margin-left: 54px;
+      margin-left: 48px;
     }
 
     .sub-menu-title-noDropdown {
