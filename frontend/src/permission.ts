@@ -8,6 +8,7 @@ import { isRelogin } from '@/utils/request';
 import { useUserStore } from '@/store/modules/user';
 import { useSettingsStore } from '@/store/modules/settings';
 import { usePermissionStore } from '@/store/modules/permission';
+import { restoreDynamicTenant } from '@/composables/tenantMirror';
 import { ElMessage } from 'element-plus/es';
 
 NProgress.configure({ showSpinner: false });
@@ -39,6 +40,9 @@ router.beforeEach(async (to) => {
           return { path: '/' };
         }
         isRelogin.show = false;
+        // 后端 getInfo 会清掉超管的动态租户：若本地记着切换过的单位，先重新下发给服务端再放行路由，
+        // 否则壳层显示切换单位、首屏数据却回到默认单位（2026-10-24 三审 P0 回修）
+        await restoreDynamicTenant(String(useUserStore().userId || ''), String(useUserStore().tenantId || ''));
         const accessRoutes = await usePermissionStore().generateRoutes();
         // 根据roles权限生成可访问的路由表
         accessRoutes.forEach((route) => {

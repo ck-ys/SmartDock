@@ -4,7 +4,7 @@
     <template #dropdown>
       <el-dropdown-menu>
         <template v-if="showTenantSwitch && canSwitch">
-          <li class="dcs-user-menu__caption">单位：{{ currentTenant?.companyName || '—' }}</li>
+          <li role="presentation" class="dcs-user-menu__caption">单位：{{ currentTenant?.companyName || '—' }}</li>
           <el-dropdown-item v-for="item in otherTenants" :key="item.tenantId" :command="`tenant:${item.tenantId}`">
             {{ item.companyName }}
           </el-dropdown-item>

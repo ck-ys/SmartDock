@@ -6,48 +6,26 @@ import { dynamicClear, dynamicTenant } from '@/api/system/tenant';
 import { TenantVO } from '@/api/types';
 import { useUserStore } from '@/store/modules/user';
 import { useWorkspace } from '@/composables/useWorkspace';
+import { clearTenantMirror, readTenantMirror, writeTenantMirror } from '@/composables/tenantMirror';
 
 /**
  * 超管切换租户：左上品牌行、左下账号菜单共用这一份状态。
  * 模块级单例——租户列表一次请求，两处入口立刻同步。
  *
- * 当前租户落一份 localStorage：动态租户存在服务端 Redis（按用户），前端刷新后
- * token 里仍是登录租户，不落盘就会「切完刷新又变回默认」，也找不到回默认的入口。
+ * 当前单位的「记住 + 刷新回放」在 tenantMirror.ts（permission.ts 在路由放行前
+ * 会先把镜像里的单位重新下发给服务端，保证标签和数据一致）。
  */
-const DYNAMIC_TENANT_KEY = 'dcs:dynamic-tenant';
-
 const tenants = ref<TenantVO[]>([]);
 const tenantEnabled = ref(false);
 const currentId = ref('');
 const switching = ref(false);
 let loadedFor = '';
 
-const storageKey = (userId: string) => `${DYNAMIC_TENANT_KEY}:${userId}`;
-
-const readStored = (userId: string) => {
-  try {
-    return localStorage.getItem(storageKey(userId)) || '';
-  } catch {
-    return '';
-  }
-};
-
-const writeStored = (userId: string, tenantId: string, defaultId: string) => {
-  try {
-    if (!tenantId || tenantId === defaultId) {
-      localStorage.removeItem(storageKey(userId));
-    } else {
-      localStorage.setItem(storageKey(userId), tenantId);
-    }
-  } catch {
-    // 隐私模式禁存时不阻断切换
-  }
-};
-
 export const useTenantSwitch = () => {
   const router = useRouter();
   const userStore = useUserStore();
-  const { proxy } = getCurrentInstance() as ComponentInternalInstance;
+  // 只在 setup 内调用；拿不到实例时跳过页面跳转相关能力（切换仍可用）
+  const proxy = getCurrentInstance()?.proxy;
   const { tenantName, tenantSwitched } = useWorkspace();
 
   const userId = computed(() => String(userStore.userId || ''));
@@ -67,7 +45,7 @@ export const useTenantSwitch = () => {
 
   const apply = (tenantId: string) => {
     currentId.value = tenantId;
-    writeStored(userId.value, tenantId, defaultId.value);
+    writeTenantMirror(userId.value, tenantId, defaultId.value);
     tenantName.value = tenants.value.find((item) => String(item.tenantId) === tenantId)?.companyName || '';
     tenantSwitched.value = !!tenantId && tenantId !== defaultId.value;
   };
@@ -76,33 +54,35 @@ export const useTenantSwitch = () => {
     if (!isSuperAdmin.value || loadedFor === userId.value) {
       return;
     }
+    // 先占位再请求：BrandRow 与账号菜单同时 mount 也只发一次请求
     loadedFor = userId.value;
     try {
       const { data } = await getTenantList(true);
       tenantEnabled.value = data.tenantEnabled === undefined ? true : data.tenantEnabled;
       tenants.value = tenantEnabled.value ? data.voList || [] : [];
-      const stored = readStored(userId.value);
-      // 存储值必须还在列表里才认（租户被删或换库时自动回默认）
-      apply(stored && tenants.value.some((item) => String(item.tenantId) === stored) ? stored : defaultId.value);
+      const storedId = readTenantMirror(userId.value);
+      // 服务端由 permission.ts 的回放保证与镜像一致；这里只对齐显示，镜像失效时回默认
+      const stored = storedId && tenants.value.some((item) => String(item.tenantId) === storedId) ? storedId : '';
+      apply(stored || defaultId.value);
     } catch {
-      // 租户接口失败不阻断壳层：退回普通品牌块
+      // 失败不记账（下次挂载重试）、不动镜像、不伪造当前单位
+      loadedFor = '';
       tenants.value = [];
-      apply(defaultId.value);
+      currentId.value = defaultId.value;
+      tenantName.value = '';
+      tenantSwitched.value = false;
     }
   };
 
-  // 退出登录时服务端会清掉动态租户，本地镜像必须同步清，否则下次登录仍显示上个单位
+  // 退出登录时服务端会清掉动态租户，本地镜像由 user store 的 logout 统一清
   const forget = () => {
-    try {
-      localStorage.removeItem(storageKey(userId.value));
-    } catch {
-      // ignore
-    }
+    clearTenantMirror(userId.value);
     currentId.value = defaultId.value;
     tenantSwitched.value = false;
   };
 
-  const switchTo = async (tenantId: string) => {    if (switching.value) {
+  const switchTo = async (tenantId: string) => {
+    if (switching.value) {
       return;
     }
     const target = tenantId === '__default' ? defaultId.value : tenantId;
@@ -111,12 +91,19 @@ export const useTenantSwitch = () => {
     }
     switching.value = true;
     try {
+      // 第一步只做切换本身：失败时状态原封不动，提示重试才有意义
       if (tenantId === '__default') {
         await dynamicClear();
       } else {
         await dynamicTenant(target);
       }
-      apply(target);
+    } catch {
+      ElMessage.error('切换单位失败，请重试');
+      switching.value = false;
+      return;
+    }
+    apply(target);
+    try {
       await router.push('/');
       await proxy?.$tab.closeAllPage();
       await proxy?.$tab.refreshPage();
@@ -124,7 +111,8 @@ export const useTenantSwitch = () => {
         tenantId === '__default' ? '已回到默认单位' : `已切换到「${currentTenant.value?.companyName || target}」，数据加载中`
       );
     } catch {
-      ElMessage.error('切换单位失败，请重试');
+      // 单位已切成功，只是收尾导航没走完：别报「切换失败」骗用户重试
+      ElMessage.warning('单位已切换，页面自动刷新失败，请手动刷新');
     } finally {
       switching.value = false;
     }

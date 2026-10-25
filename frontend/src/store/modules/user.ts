@@ -7,6 +7,7 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { previewUrl } from '@/api/system/oss';
 import { resolveOssResourceUrl } from '@/utils/ossResource';
+import { clearTenantMirror } from '@/composables/tenantMirror';
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(getToken());
@@ -64,6 +65,8 @@ export const useUserStore = defineStore('user', () => {
   // 注销
   const logout = async (): Promise<void> => {
     await logoutApi();
+    // 服务端登出会清动态租户，本地镜像在这统一清（覆盖 401 自动登出等所有退出路径）
+    clearTenantMirror(String(userId.value || ''));
     token.value = '';
     roles.value = [];
     permissions.value = [];

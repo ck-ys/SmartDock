@@ -7,14 +7,19 @@
       @layout="emit('set-layout')"
       @feedback="emit('feedback')"
     >
-      <button type="button" class="sidebar-user__row" aria-label="账号菜单" :title="`${nickname}${meta ? ' · ' + meta : ''}`">
+      <button
+        type="button"
+        class="sidebar-user__row"
+        :aria-label="`账号菜单，${nickname}${meta ? '，' + meta : ''}`"
+        :title="`${nickname}${meta ? ' · ' + meta : ''}`"
+      >
         <img v-if="avatar" :src="avatar" class="sidebar-user__avatar" alt="" />
         <span v-else class="sidebar-user__avatar sidebar-user__avatar--text">{{ initial }}</span>
         <span class="sidebar-user__text">
           <b class="sidebar-user__name">{{ nickname || '当前账号' }}</b>
           <span v-if="meta" class="sidebar-user__meta">{{ meta }}</span>
         </span>
-        <span v-if="canSwitch" class="sidebar-user__switch">切换</span>
+        <span v-if="canSwitch" aria-hidden="true" class="sidebar-user__switch">切换</span>
         <el-icon class="sidebar-user__chev"><DCaret /></el-icon>
       </button>
     </dcs-user-menu>
@@ -107,7 +112,9 @@ const meta = computed(() => [roleLabel.value === nickname.value ? '' : roleLabel
   display: flex;
   flex-direction: column;
   min-width: 0;
-  line-height: 1.25;
+  /* 文字块占满左侧剩余空间：普通成员没有「切换」chip 时箭头也靠右，排版与超管一致 */
+  margin-right: auto;
+  line-height: 1.3;
 }
 
 .sidebar-user__name {
@@ -128,7 +135,6 @@ const meta = computed(() => [roleLabel.value === nickname.value ? '' : roleLabel
 }
 
 .sidebar-user__switch {
-  margin-left: auto;
   flex: none;
   padding: 1px 6px;
   border: 1px solid var(--app-border);

@@ -13,7 +13,7 @@
       </button>
       <template #dropdown>
         <el-dropdown-menu>
-          <li class="sidebar-brand__caption">切换单位</li>
+          <li role="presentation" class="sidebar-brand__caption">切换单位</li>
           <el-dropdown-item v-for="item in otherTenants" :key="item.tenantId" :command="String(item.tenantId)">
             {{ item.companyName }}
           </el-dropdown-item>
@@ -95,6 +95,8 @@ onMounted(load);
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* 文字块占满左侧剩余空间，切换提示与箭头统一靠右 */
+  margin-right: auto;
   line-height: 1.25;
 }
 
@@ -122,7 +124,6 @@ onMounted(load);
 }
 
 .sidebar-brand__switch {
-  margin-left: auto;
   flex: none;
   padding: 1px 6px;
   border: 1px solid var(--app-border);

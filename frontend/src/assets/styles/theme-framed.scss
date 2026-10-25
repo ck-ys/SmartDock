@@ -351,9 +351,11 @@ body {
 }
 
 /* 顶层条目是分组标题：墨色 + 500；二级条目保持灰字 400，层级靠缩进与字色区分
-   （Element 把 li 包在 <a>/<div> 里，所以按 el-menu--vertical 这一层认顶层，别用 > li） */
+   （Element 把 li 包在 <a>/<div> 里，所以按 el-menu--vertical 这一层认顶层，别用 > li；
+   叶子菜单实测路径是 ul > div > a > li，四条都要写齐，漏一条顶层叶子就掉回灰字 400） */
 #app .sidebar-container .el-menu--vertical > .el-menu-item,
 #app .sidebar-container .el-menu--vertical > a > .el-menu-item,
+#app .sidebar-container .el-menu--vertical > div > a > .el-menu-item,
 #app .sidebar-container .el-menu--vertical > .el-sub-menu > .el-sub-menu__title,
 #app .sidebar-container .el-menu--vertical > div > .el-sub-menu > .el-sub-menu__title {
   color: var(--app-text);
@@ -363,6 +365,7 @@ body {
 /* 深色靠亮度分层（非当前项灰、当前项白），顶层条目不能跟着变白，否则看不出当前页 */
 html.dark #app .sidebar-container .el-menu--vertical > .el-menu-item,
 html.dark #app .sidebar-container .el-menu--vertical > a > .el-menu-item,
+html.dark #app .sidebar-container .el-menu--vertical > div > a > .el-menu-item,
 html.dark #app .sidebar-container .el-menu--vertical > .el-sub-menu > .el-sub-menu__title,
 html.dark #app .sidebar-container .el-menu--vertical > div > .el-sub-menu > .el-sub-menu__title {
   color: var(--app-muted);
