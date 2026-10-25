@@ -10,7 +10,7 @@
     <div class="dcs-appearance">
       <section class="dcs-appearance__section" aria-labelledby="dcs-appearance-theme">
         <h3 id="dcs-appearance-theme" class="dcs-appearance__title">主题</h3>
-        <p class="dcs-appearance__hint">与顶栏的主题按钮共用同一套切换逻辑，切换后立即生效。</p>
+        <p class="dcs-appearance__hint">浅色是框架纸，深色是纯黑夜，切换后立即生效。</p>
         <div class="dcs-appearance__options">
           <button
             type="button"
@@ -62,6 +62,51 @@
         </div>
       </section>
 
+      <section class="dcs-appearance__section" aria-labelledby="dcs-appearance-lang">
+        <h3 id="dcs-appearance-lang" class="dcs-appearance__title">语言</h3>
+        <p class="dcs-appearance__hint">界面文案语言，切换后立即生效。</p>
+        <div class="dcs-appearance__options">
+          <button
+            type="button"
+            class="dcs-appearance__option"
+            :class="{ 'is-active': language === 'zh_CN' }"
+            :aria-pressed="language === 'zh_CN'"
+            @click="setLanguage('zh_CN')"
+          >
+            <span class="dcs-appearance__label">中文</span>
+          </button>
+          <button
+            type="button"
+            class="dcs-appearance__option"
+            :class="{ 'is-active': language === 'en_US' }"
+            :aria-pressed="language === 'en_US'"
+            @click="setLanguage('en_US')"
+          >
+            <span class="dcs-appearance__label">English</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="dcs-appearance__section" aria-labelledby="dcs-appearance-size">
+        <h3 id="dcs-appearance-size" class="dcs-appearance__title">字号</h3>
+        <p class="dcs-appearance__hint">调整表格与表单的控件尺寸，不改页面布局。</p>
+        <div class="dcs-appearance__options dcs-appearance__options--three">
+          <button
+            v-for="item in sizeOptions"
+            :key="item.value"
+            type="button"
+            class="dcs-appearance__option"
+            :class="{ 'is-active': size === item.value }"
+            :aria-pressed="size === item.value"
+            @click="setSize(item.value)"
+          >
+            <span class="dcs-appearance__label">{{ item.label }}</span>
+          </button>
+        </div>
+      </section>
+
+      <button type="button" class="dcs-appearance__reset" @click="resetAll">恢复默认外观</button>
+
       <p class="dcs-appearance__footnote">选择会保存在本机浏览器，下次打开自动生效。</p>
     </div>
   </el-drawer>
@@ -69,16 +114,29 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useSettingsStore } from '@/store/modules/settings';
+import { useAppStore } from '@/store/modules/app';
 
 type DensityMode = 'comfortable' | 'compact';
+type SizeMode = 'large' | 'default' | 'small';
 
 const DENSITY_STORAGE_KEY = 'dcs:ui:density';
 const DENSITY_CLASS = 'density-compact';
 
 const settingsStore = useSettingsStore();
+const appStore = useAppStore();
+const { locale } = useI18n();
 const visible = ref(false);
 const dark = computed(() => settingsStore.dark);
+const language = computed(() => appStore.language);
+const size = computed(() => appStore.size);
+
+const sizeOptions: { label: string; value: SizeMode }[] = [
+  { label: '较大', value: 'large' },
+  { label: '默认', value: 'default' },
+  { label: '稍小', value: 'small' }
+];
 
 const readDensity = (): DensityMode => {
   try {
@@ -113,6 +171,24 @@ const setDensity = (mode: DensityMode) => {
 
 const open = () => {
   visible.value = true;
+};
+
+const setLanguage = (lang: 'zh_CN' | 'en_US') => {
+  locale.value = lang;
+  appStore.changeLanguage(lang);
+};
+
+const setSize = (next: SizeMode) => {
+  appStore.setSize(next);
+};
+
+// 一键回到出厂外观：浅色 + 舒适 + 中文 + 默认字号（四项都在本机 Storage，刷新后仍生效）
+const resetAll = () => {
+  setTheme(false);
+  setDensity('comfortable');
+  setLanguage('zh_CN');
+  setSize('default');
+  ElMessage.success('已恢复默认外观');
 };
 
 defineExpose({ open });
@@ -169,6 +245,10 @@ defineExpose({ open });
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+
+    &--three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
   }
 
   &__option {
@@ -226,6 +306,27 @@ defineExpose({ open });
     font-size: 11px;
     font-weight: 400;
     line-height: 1.4;
+  }
+
+  &__reset {
+    align-self: flex-start;
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: transparent;
+    color: var(--app-muted);
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      border-color: var(--app-control);
+      color: var(--app-text);
+    }
   }
 
   &__footnote {
