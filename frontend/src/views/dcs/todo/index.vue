@@ -6,46 +6,57 @@
       eyebrow="任务中心"
       :metrics="[
         { label: '待办任务', value: total },
-        { label: '本页被退回', value: rejectedCount, tone: 'danger' }
+        { label: '本页被退回', value: rejectedCount }
       ]"
     />
 
-    <el-card shadow="never">
-      <el-table class="dcs-table-only" v-loading="loading" :data="rows">
-        <el-table-column label="任务" min-width="240">
-          <template #default="{ row }">
-            <el-link type="primary" @click="goFill(row)">{{ row.title }}</el-link>
+    <el-card shadow="never" class="todo-card">
+      <div class="dcs-ops-table-wrap">
+        <el-table v-loading="loading" class="dcs-table-only ui-table todo-table" :data="rows">
+          <el-table-column label="任务" min-width="240">
+            <template #default="{ row }">
+              <el-link class="todo-title-link" @click="goFill(row)">{{ row.title }}</el-link>
+            </template>
+          </el-table-column>
+          <el-table-column label="我的状态" width="130">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="myStatusPill(row)">{{ row.myStatus }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="deadline" label="截止" width="120">
+            <template #default="{ row }">
+              <span :class="{ 'is-overdue': overdue(row) }">{{ row.deadline || '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="publishTime" label="发布时间" width="170" />
+          <el-table-column label="操作" width="110" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="goFill(row)">去填报</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无待办</p>
+              <p class="ui-empty__hint">当前没有需要你填报的任务，有新任务会出现在这里。</p>
+            </div>
           </template>
-        </el-table-column>
-        <el-table-column label="我的状态" width="130">
-          <template #default="{ row }">
-            <el-tag :type="row.myStatus === '未提交' ? 'info' : 'danger'">{{ row.myStatus }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="deadline" label="截止" width="120">
-          <template #default="{ row }">
-            <span :style="overdue(row) ? 'color: var(--el-color-danger)' : ''">{{ row.deadline || '—' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="publishTime" label="发布时间" width="170" />
-        <el-table-column label="操作" width="110" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="goFill(row)">去填报</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
       <!-- ≤992：表格改卡片 -->
       <div class="dcs-mobile-list">
-        <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
+        <div v-if="rows.length === 0" class="ui-empty">
+          <p class="ui-empty__title">暂无待办</p>
+          <p class="ui-empty__hint">当前没有需要你填报的任务，有新任务会出现在这里。</p>
+        </div>
         <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
           <div class="dcs-card-head">
             <span class="dcs-card-title" @click="goFill(row)">{{ row.title }}</span>
             <span class="dcs-card-badge"
-              ><el-tag :type="row.myStatus === '未提交' ? 'info' : 'danger'">{{ row.myStatus }}</el-tag></span
+              ><span class="ui-pill" :class="myStatusPill(row)">{{ row.myStatus }}</span></span
             >
           </div>
           <div class="dcs-card-meta">
-            <span :style="overdue(row) ? 'color: var(--el-color-danger)' : ''">截止 {{ row.deadline || '—' }}</span>
+            <span :class="{ 'is-overdue': overdue(row) }">截止 {{ row.deadline || '—' }}</span>
             <span>发布于 {{ row.publishTime || '—' }}</span>
           </div>
           <div class="dcs-card-foot">
@@ -78,6 +89,7 @@ const rejectedCount = computed(() => rows.value.filter((r) => r.mySubmissionStat
 const goFill = (row: DcsTaskRow) =>
   router.push(`/dcs/mission/detail/${row.id}${row.mySubmissionStatus === 'REJECTED' ? '?action=revise-reason' : ''}`);
 const overdue = (row: any) => row.deadline && new Date(row.deadline) < new Date(new Date().toDateString());
+const myStatusPill = (row: DcsTaskRow & { myStatus: string }) => (row.mySubmissionStatus === 'REJECTED' ? 'ui-pill--neg' : 'ui-pill--muted');
 
 const load = async () => {
   loading.value = true;
@@ -95,3 +107,34 @@ const load = async () => {
 
 onMounted(load);
 </script>
+
+<style scoped>
+.todo-card :deep(.el-card__body) {
+  min-width: 0;
+  padding: 16px;
+}
+
+.todo-table {
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-border-color: var(--app-rule);
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+}
+
+.todo-title-link {
+  color: var(--app-text);
+  font-weight: 500;
+}
+
+.todo-title-link:hover {
+  color: var(--app-muted);
+}
+
+.is-overdue {
+  color: var(--dcs-pill-neg-ink);
+  font-variant-numeric: tabular-nums;
+}
+</style>

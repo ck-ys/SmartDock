@@ -1,14 +1,14 @@
 <template>
   <div class="app-container changelog-page">
-    <support-page-head title="更新日志" description="每次改进都用大白话记在这里，方便你快速知道系统变了什么。">
+    <support-page-head eyebrow="系统支持" title="更新日志" description="每次改进都用大白话记在这里，方便你快速知道系统变了什么。">
       <template #aside>
-        <span v-if="latest" class="cl-latest" aria-label="最新版本">最新 · {{ latest.version }}</span>
+        <span v-if="latest" class="ui-pill ui-pill--pos" aria-label="最新版本">最新 · {{ latest.version }}</span>
         <el-button v-if="canManage" type="primary" :icon="Plus" @click="openCreate">新建版本</el-button>
       </template>
     </support-page-head>
 
     <div v-if="canManage" class="cl-admin-bar">
-      <el-radio-group v-model="query.status" size="small" @change="reload">
+      <el-radio-group v-model="query.status" @change="reload">
         <el-radio-button value="">全部</el-radio-button>
         <el-radio-button value="1">已发布</el-radio-button>
         <el-radio-button value="0">草稿</el-radio-button>
@@ -27,8 +27,8 @@
           <div class="cl-meta">
             <span class="cl-ver">{{ entry.version }}</span>
             <time class="cl-date" :datetime="entry.publishTime || entry.createTime">{{ formatDate(entry.publishTime || entry.createTime) }}</time>
-            <span v-if="entry.logId === latestLogId" class="cl-badge">本次更新</span>
-            <span v-if="entry.status === '0'" class="cl-draft">草稿</span>
+            <span v-if="entry.logId === latestLogId" class="ui-pill ui-pill--pos">本次更新</span>
+            <span v-if="entry.status === '0'" class="ui-pill ui-pill--warn">草稿</span>
             <span v-if="canManage && entry.status === '1'" class="cl-targets">推送 {{ entry.targetTenantList?.length || 0 }} 家</span>
             <span v-if="canManage" class="cl-actions">
               <el-button link type="primary" size="small" @click="openEdit(entry)">编辑</el-button>
@@ -40,7 +40,7 @@
             <h2 class="cl-title">{{ entry.title }}</h2>
             <ul class="cl-points">
               <li v-for="(item, idx) in entry.itemList" :key="idx">
-                <span class="cl-type" :class="`is-${item.type}`">{{ itemTypeLabel(item.type) }}</span>
+                <span class="ui-pill cl-type" :class="typePill(item.type)">{{ itemTypeLabel(item.type) }}</span>
                 <span class="cl-point-text">{{ item.text }}</span>
               </li>
             </ul>
@@ -158,6 +158,8 @@ const emptyText = computed(() => {
 
 const TYPE_LABELS: Record<ChangelogItem['type'], string> = { new: '新增', optimize: '优化', fix: '修复' };
 const itemTypeLabel = (type: ChangelogItem['type']) => TYPE_LABELS[type] || '改进';
+const TYPE_PILLS: Record<ChangelogItem['type'], string> = { new: 'ui-pill--pos', optimize: 'ui-pill--muted', fix: 'ui-pill--warn' };
+const typePill = (type: ChangelogItem['type']) => TYPE_PILLS[type] || 'ui-pill--muted';
 
 /** 2026-10-19 12:00:00 → 2026年10月19日（业务口径，不用斜杠/ISO） */
 const formatDate = (value?: string) => {
@@ -333,32 +335,19 @@ onMounted(load);
   margin: 0 auto;
 }
 
-.cl-latest {
-  padding: 3px 10px;
-  border: 1px solid var(--el-color-primary-light-7);
-  border-radius: 999px;
-  background: var(--el-color-primary-light-9);
-  color: var(--el-color-primary);
-  font-size: 12px;
-  line-height: 20px;
-  white-space: nowrap;
-}
-
 .cl-admin-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
+  padding-bottom: 12px;
   margin-bottom: 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 14px;
-  background: var(--el-fill-color-lighter);
+  border-bottom: 1px solid var(--app-rule);
 
   .cl-admin-tip {
     font-size: 12px;
     line-height: 1.6;
-    color: var(--dcs-text-placeholder);
+    color: var(--app-faint);
   }
 }
 
@@ -366,7 +355,7 @@ onMounted(load);
 .cl-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
   min-height: 160px;
 }
 
@@ -379,22 +368,26 @@ onMounted(load);
   flex-direction: column;
   height: 100%;
   padding: 18px 20px;
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 16px;
-  background: var(--el-bg-color);
+  border: var(--app-card-border);
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
   transition:
     border-color 0.18s ease,
-    box-shadow 0.18s ease;
+    background-color 0.18s ease;
 }
 
-.cl-item:hover .cl-card {
-  border-color: var(--el-color-primary-light-5);
-  box-shadow: 0 10px 24px rgb(0 0 0 / 6%);
+.cl-item:not(.is-featured):hover .cl-card {
+  background: var(--app-raised);
+  border-color: var(--app-control);
+}
+
+.cl-item.is-featured:hover .cl-card {
+  border-color: var(--app-control);
 }
 
 .cl-item.is-draft .cl-card {
   border-style: dashed;
-  background: var(--el-fill-color-lighter);
+  background: var(--app-raised);
 }
 
 /* 最新一版占满整行，左侧版本信息做视觉锚点 */
@@ -406,7 +399,6 @@ onMounted(load);
     grid-template-columns: 200px minmax(0, 1fr);
     padding: 0;
     overflow: hidden;
-    border-color: var(--el-color-primary-light-7);
   }
 
   .cl-meta {
@@ -416,8 +408,8 @@ onMounted(load);
     gap: 8px;
     margin: 0;
     padding: 20px;
-    background: var(--el-color-primary-light-9);
-    border-right: 1px solid var(--el-color-primary-light-8);
+    background: var(--app-raised);
+    border-right: 1px solid var(--app-rule);
   }
 
   .cl-main {
@@ -468,53 +460,34 @@ onMounted(load);
 
 .cl-ver {
   font-size: 14px;
-  font-weight: 700;
-  color: var(--el-color-primary);
+  font-weight: 600;
+  color: var(--app-text);
   font-variant-numeric: tabular-nums;
 }
 
 .cl-date {
   font-size: 12.5px;
-  color: var(--dcs-text-placeholder);
+  color: var(--app-faint);
   font-variant-numeric: tabular-nums;
-}
-
-.cl-badge {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--el-color-success-light-9);
-  color: var(--el-color-success);
-  font-size: 11.5px;
-  line-height: 18px;
-}
-
-.cl-draft {
-  padding: 1px 8px;
-  border: 1px solid var(--el-color-warning-light-7);
-  border-radius: 999px;
-  background: var(--el-color-warning-light-9);
-  color: var(--el-color-warning);
-  font-size: 11.5px;
-  line-height: 18px;
 }
 
 .cl-targets {
   font-size: 11.5px;
-  color: var(--dcs-text-placeholder);
+  color: var(--app-faint);
 }
 
+/* 操作栏常显 55%，悬停/聚焦升到 100%：不再依赖悬停才出现（可发现性） */
 .cl-actions {
   display: inline-flex;
   align-items: center;
   margin-left: auto;
+  opacity: 0.55;
   transition: opacity 0.15s ease;
 }
 
-/* 仅在真正支持悬停的精确指针设备上收起操作栏；触屏/笔默认常显 */
-@media (hover: hover) and (pointer: fine) {
-  .cl-item:not(:hover):not(:focus-within) .cl-actions {
-    opacity: 0;
-  }
+.cl-item:hover .cl-actions,
+.cl-item:focus-within .cl-actions {
+  opacity: 1;
 }
 
 .cl-main {
@@ -526,7 +499,7 @@ onMounted(load);
   font-size: 16px;
   line-height: 1.55;
   font-weight: 600;
-  color: var(--dcs-text-primary);
+  color: var(--app-text);
   overflow-wrap: anywhere;
 }
 
@@ -539,9 +512,9 @@ onMounted(load);
     display: flex;
     align-items: flex-start;
     gap: 8px;
-    font-size: 13.8px;
+    font-size: 13px;
     line-height: 1.72;
-    color: var(--dcs-text-regular);
+    color: var(--app-muted);
     overflow-wrap: anywhere;
 
     & + li {
@@ -552,27 +525,7 @@ onMounted(load);
 
 .cl-type {
   flex: none;
-  margin-top: 3px;
-  padding: 0 6px;
-  border-radius: 5px;
-  font-size: 11px;
-  line-height: 18px;
-  white-space: nowrap;
-
-  &.is-new {
-    background: var(--el-color-success-light-9);
-    color: var(--el-color-success);
-  }
-
-  &.is-optimize {
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
-  }
-
-  &.is-fix {
-    background: var(--el-color-warning-light-9);
-    color: var(--el-color-warning);
-  }
+  margin-top: 1px;
 }
 
 .cl-point-text {
@@ -582,15 +535,15 @@ onMounted(load);
 .cl-empty {
   grid-column: 1 / -1;
   padding: 40px 0;
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 16px;
+  border: var(--app-card-border);
+  border-radius: var(--app-card-radius);
 }
 
 .cl-foot {
   margin: 14px 0 0;
   font-size: 12.5px;
   line-height: 1.7;
-  color: var(--dcs-text-placeholder);
+  color: var(--app-faint);
 }
 
 /* ---------- 编辑器 ---------- */
@@ -601,8 +554,8 @@ onMounted(load);
 
   :deep(.el-form-item__label) {
     padding-bottom: 4px;
-    font-size: 13px;
-    color: var(--dcs-text-secondary);
+    font-size: var(--dcs-font-md);
+    color: var(--app-muted);
   }
 
   &__row {
@@ -622,7 +575,7 @@ onMounted(load);
     margin: 6px 0 0;
     font-size: 12px;
     line-height: 1.6;
-    color: var(--dcs-text-placeholder);
+    color: var(--app-faint);
   }
 }
 
@@ -657,7 +610,7 @@ onMounted(load);
 }
 
 /* ---------- 响应式 ---------- */
-@media (max-width: 1199px) {
+@media (max-width: 992px) {
   .cl-item.is-featured .cl-points {
     display: block;
   }
@@ -665,9 +618,7 @@ onMounted(load);
   .cl-item.is-featured .cl-points li + li {
     margin-top: 8px;
   }
-}
 
-@media (max-width: 992px) {
   .cl-list {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -691,7 +642,7 @@ onMounted(load);
     gap: 8px;
     padding: 14px 16px;
     border-right: 0;
-    border-bottom: 1px solid var(--el-color-primary-light-8);
+    border-bottom: 1px solid var(--app-rule);
   }
 
   .cl-item.is-featured .cl-main {
@@ -711,7 +662,7 @@ onMounted(load);
 
   .cl-card {
     padding: 16px;
-    border-radius: 14px;
+    border-radius: var(--app-card-radius);
   }
 
   .cl-title {

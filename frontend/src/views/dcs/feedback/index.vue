@@ -1,107 +1,109 @@
 <template>
   <div class="app-container feedback-page">
-    <support-page-head title="反馈中心" description="用户提交的缺陷、体验与建议都在这里；处理结果会通知提交人。">
+    <support-page-head eyebrow="系统支持" title="反馈中心" description="用户提交的缺陷、体验与建议都在这里；处理结果会通知提交人。">
       <template #aside>
         <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
         <el-button type="primary" :icon="EditPen" @click="dialogVisible = true">提交反馈</el-button>
       </template>
     </support-page-head>
 
-    <section class="fb-stats" aria-label="反馈状态概览">
+    <section class="ui-kpi-strip fb-stats" aria-label="反馈状态概览">
       <button
         v-for="item in statCards"
         :key="item.key"
         type="button"
-        class="fb-stat"
-        :class="[`is-${(item.key || 'all').toLowerCase()}`, { 'is-active': query.status === item.key }]"
+        class="ui-kpi fb-stat"
+        :class="{ 'is-active': query.status === item.key }"
+        :aria-pressed="query.status === item.key"
         @click="pickStatus(item.key)"
       >
-        <span class="fb-stat__label">
-          <i class="fb-stat__dot" aria-hidden="true" />
-          {{ item.label }}
-        </span>
-        <b class="fb-stat__value">{{ item.key ? (summary[item.key] ?? 0) : totalAll }}</b>
-        <span class="fb-stat__hint">{{ item.hint }}</span>
+        <span class="ui-kpi__label">{{ item.label }}</span>
+        <b class="ui-kpi__value">{{ item.key ? (summary[item.key] ?? 0) : totalAll }}</b>
+        <span class="ui-kpi__hint">{{ item.hint }}</span>
       </button>
     </section>
 
-    <section class="fb-filters">
-      <el-input
-        v-model="query.title"
-        class="fb-filters__search"
-        clearable
-        placeholder="搜索标题"
-        :prefix-icon="Search"
-        @clear="reload"
-        @keyup.enter="reload"
-      />
-      <el-select v-model="query.feedbackType" class="fb-filters__select" clearable placeholder="全部类型" @change="reload">
-        <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
-      </el-select>
-      <el-select v-model="query.status" class="fb-filters__select" clearable placeholder="全部状态" @change="reload">
-        <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-      </el-select>
-      <el-button @click="reload">查询</el-button>
-      <el-button text @click="resetFilters">重置</el-button>
-    </section>
-
     <el-card shadow="never" class="fb-card">
-      <el-table v-loading="loading" class="dcs-table-only" :data="rows" row-key="feedbackId" @row-click="(row) => openDetail(row)">
-        <el-table-column label="反馈" min-width="320">
-          <template #default="{ row }">
-            <div class="fb-cell">
-              <div class="fb-cell__line">
-                <span class="fb-type" :class="`is-${(row.feedbackType || 'other').toLowerCase()}`">{{ typeLabel(row.feedbackType) }}</span>
-                <span class="fb-cell__title">{{ row.title }}</span>
-                <span v-if="row.ossIdList?.length" class="fb-attach">{{ row.ossIdList.length }} 图</span>
+      <div class="ui-toolbar fb-filters">
+        <el-input
+          v-model="query.title"
+          class="fb-filters__search"
+          clearable
+          placeholder="搜索标题"
+          :prefix-icon="Search"
+          @clear="reload"
+          @keyup.enter="reload"
+        />
+        <el-select v-model="query.feedbackType" class="fb-filters__select" clearable placeholder="全部类型" @change="reload">
+          <el-option v-for="item in typeOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+        <el-select v-model="query.status" class="fb-filters__select" clearable placeholder="全部状态" @change="reload">
+          <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+        <el-button @click="reload">查询</el-button>
+        <el-button text @click="resetFilters">重置</el-button>
+      </div>
+
+      <div class="dcs-ops-table-wrap">
+        <el-table
+          v-loading="loading"
+          class="dcs-table-only ui-table fb-table"
+          :data="rows"
+          row-key="feedbackId"
+          @row-click="(row) => openDetail(row)"
+        >
+          <el-table-column label="反馈" min-width="320">
+            <template #default="{ row }">
+              <div class="fb-cell">
+                <div class="fb-cell__line">
+                  <span class="ui-pill" :class="typePill(row.feedbackType)">{{ typeLabel(row.feedbackType) }}</span>
+                  <span class="fb-cell__title">{{ row.title }}</span>
+                  <span v-if="row.ossIdList?.length" class="fb-attach">{{ row.ossIdList.length }} 图</span>
+                </div>
+                <p class="fb-cell__excerpt">{{ row.content }}</p>
               </div>
-              <p class="fb-cell__excerpt">{{ row.content }}</p>
+            </template>
+          </el-table-column>
+          <el-table-column label="提交人" width="120">
+            <template #default="{ row }">{{ row.createByName || row.createBy || '—' }}</template>
+          </el-table-column>
+          <el-table-column prop="createTime" label="提交时间" width="170" />
+          <el-table-column label="状态" width="96">
+            <template #default="{ row }">
+              <span class="ui-pill" :class="statusPill(row.status)">{{ statusLabel(row.status) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="处理人" width="120">
+            <template #default="{ row }">{{ row.handlerName || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="130" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
+              <el-button link type="primary" v-hasPermi="['dcs:feedback:handle']" @click.stop="openDetail(row, true)">处理</el-button>
+            </template>
+          </el-table-column>
+          <template #empty>
+            <div class="ui-empty">
+              <p class="ui-empty__title">{{ emptyTitle }}</p>
+              <p class="ui-empty__hint">{{ emptyHint }}</p>
+              <div class="ui-empty__actions">
+                <el-button v-if="hasFilter" @click="resetFilters">清空筛选</el-button>
+                <el-button v-else @click="dialogVisible = true">提交第一条反馈</el-button>
+              </div>
             </div>
           </template>
-        </el-table-column>
-        <el-table-column label="提交人" width="120">
-          <template #default="{ row }">{{ row.createByName || row.createBy || '—' }}</template>
-        </el-table-column>
-        <el-table-column prop="createTime" label="提交时间" width="170" />
-        <el-table-column label="状态" width="96">
-          <template #default="{ row }">
-            <span class="fb-status" :class="`is-${(row.status || 'pending').toLowerCase()}`">{{ statusLabel(row.status) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="处理人" width="120">
-          <template #default="{ row }">{{ row.handlerName || '—' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="130" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
-            <el-button link type="primary" v-hasPermi="['dcs:feedback:handle']" @click.stop="openDetail(row, true)">处理</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <div class="fb-empty">
-            <p class="fb-empty__title">{{ hasFilter ? '没有匹配的反馈' : '还没有反馈' }}</p>
-            <p class="fb-empty__desc">
-              {{
-                hasFilter ? '换个关键词或状态试试，也可以清空筛选查看全部反馈。' : '遇到问题或有改进建议，点右上角「提交反馈」；处理进度会回到这里。'
-              }}
-            </p>
-            <el-button v-if="hasFilter" @click="resetFilters">清空筛选</el-button>
-            <el-button v-else type="primary" plain @click="dialogVisible = true">提交第一条反馈</el-button>
-          </div>
-        </template>
-      </el-table>
+        </el-table>
+      </div>
 
       <!-- ≤992：表格改卡片（与其它业务页同一套全局类）；v-loading 挂在列表上，表格隐藏时仍可见 -->
-      <div v-loading="loading" class="dcs-mobile-list">
-        <div v-if="!loading && rows.length === 0" class="fb-empty fb-empty--mobile">
-          <p class="fb-empty__title">{{ hasFilter ? '没有匹配的反馈' : '还没有反馈' }}</p>
-          <p class="fb-empty__desc">
-            {{
-              hasFilter ? '换个关键词或状态试试，也可以清空筛选查看全部反馈。' : '遇到问题或有改进建议，点右上角「提交反馈」；处理进度会回到这里。'
-            }}
-          </p>
-          <el-button v-if="hasFilter" @click="resetFilters">清空筛选</el-button>
-          <el-button v-else type="primary" plain @click="dialogVisible = true">提交第一条反馈</el-button>
+      <div v-loading="loading" class="dcs-mobile-list fb-mobile">
+        <div v-if="!loading && rows.length === 0" class="ui-empty fb-empty--mobile">
+          <p class="ui-empty__title">{{ emptyTitle }}</p>
+          <p class="ui-empty__hint">{{ emptyHint }}</p>
+          <div class="ui-empty__actions">
+            <el-button v-if="hasFilter" @click="resetFilters">清空筛选</el-button>
+            <el-button v-else @click="dialogVisible = true">提交第一条反馈</el-button>
+          </div>
         </div>
         <div
           v-for="row in rows"
@@ -114,7 +116,7 @@
         >
           <div class="dcs-card-head">
             <span class="dcs-card-title">{{ row.title }}</span>
-            <span class="fb-status" :class="`is-${(row.status || 'pending').toLowerCase()}`">{{ statusLabel(row.status) }}</span>
+            <span class="ui-pill" :class="statusPill(row.status)">{{ statusLabel(row.status) }}</span>
           </div>
           <p class="fb-mcard__excerpt">{{ row.content }}</p>
           <div class="dcs-card-time">{{ typeLabel(row.feedbackType) }} · {{ row.createByName || row.createBy }} · {{ row.createTime }}</div>
@@ -128,8 +130,8 @@
     <el-drawer v-model="drawerVisible" :size="drawerSize" :title="drawerTitle" destroy-on-close>
       <div v-if="current" v-loading="detailLoading" class="fb-detail">
         <div class="fb-detail__head">
-          <span class="fb-type" :class="`is-${(current.feedbackType || 'other').toLowerCase()}`">{{ typeLabel(current.feedbackType) }}</span>
-          <span class="fb-status" :class="`is-${(current.status || 'pending').toLowerCase()}`">{{ statusLabel(current.status) }}</span>
+          <span class="ui-pill" :class="typePill(current.feedbackType)">{{ typeLabel(current.feedbackType) }}</span>
+          <span class="ui-pill" :class="statusPill(current.status)">{{ statusLabel(current.status) }}</span>
           <span class="fb-detail__id">#{{ current.feedbackId }}</span>
         </div>
         <h2 class="fb-detail__title">{{ current.title }}</h2>
@@ -251,9 +253,27 @@ const TYPE_LABELS: Record<FeedbackType, string> = { BUG: '缺陷', EXPERIENCE: '
 const STATUS_LABELS: Record<FeedbackStatus, string> = { PENDING: '待处理', PROCESSING: '处理中', RESOLVED: '已解决', CLOSED: '已关闭' };
 const typeLabel = (type?: string) => TYPE_LABELS[(type as FeedbackType) || 'OTHER'] || '其它';
 const statusLabel = (status?: string) => STATUS_LABELS[(status as FeedbackStatus) || 'PENDING'] || '待处理';
+const TYPE_PILLS: Record<FeedbackType, string> = {
+  BUG: 'ui-pill--neg',
+  EXPERIENCE: 'ui-pill--warn',
+  SUGGEST: 'ui-pill--muted',
+  OTHER: 'ui-pill--muted'
+};
+const STATUS_PILLS: Record<FeedbackStatus, string> = {
+  PENDING: 'ui-pill--warn',
+  PROCESSING: 'ui-pill--muted',
+  RESOLVED: 'ui-pill--pos',
+  CLOSED: 'ui-pill--muted'
+};
+const typePill = (type?: string) => TYPE_PILLS[(type as FeedbackType) || 'OTHER'] || 'ui-pill--muted';
+const statusPill = (status?: string) => STATUS_PILLS[(status as FeedbackStatus) || 'PENDING'] || 'ui-pill--muted';
 
 const totalAll = computed(() => Object.values(summary.value).reduce((sum, value) => sum + Number(value || 0), 0));
 const hasFilter = computed(() => Boolean(query.title || query.feedbackType || query.status));
+const emptyTitle = computed(() => (hasFilter.value ? '没有匹配的反馈' : '还没有反馈'));
+const emptyHint = computed(() =>
+  hasFilter.value ? '换个关键词或状态试试，也可以清空筛选查看全部反馈。' : '遇到问题或有改进建议，点右上角「提交反馈」；处理进度会回到这里。'
+);
 
 const drawerVisible = ref(false);
 const drawerSize = computed(() => (window.innerWidth < 768 ? '100%' : '560px'));
@@ -420,137 +440,31 @@ onMounted(load);
   margin: 0 auto;
 }
 
-/* ---------- 状态概览 ---------- */
+/* ---------- 状态概览（连通指标带，可点筛选） ---------- */
 .fb-stats {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-bottom: 16px;
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 16px;
-  background: var(--el-bg-color);
-  overflow: hidden;
+  margin: 0 0 16px;
 }
 
 .fb-stat {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  min-width: 0;
-  padding: 15px 18px 14px;
-  border: 0;
-  border-right: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 0;
-  background: transparent;
+  font-family: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background-color 0.15s ease;
+}
 
-  &::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    height: 2px;
-    background: transparent;
-    transition: background 0.15s ease;
-  }
+.fb-stat:hover,
+.fb-stat.is-active {
+  background: var(--app-raised);
+}
 
-  &:last-child {
-    border-right: 0;
-  }
-
-  &:hover {
-    background: var(--el-fill-color-lighter);
-  }
-
-  &.is-active {
-    background: var(--el-color-primary-light-9);
-
-    &::after {
-      background: var(--el-color-primary);
-    }
-
-    .fb-stat__value {
-      color: var(--el-color-primary);
-    }
-  }
-
-  &__label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--dcs-text-secondary);
-  }
-
-  &__dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--dcs-text-placeholder);
-  }
-
-  &__value {
-    font-size: 26px;
-    line-height: 1.15;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    font-variant-numeric: tabular-nums;
-    color: var(--dcs-text-primary);
-  }
-
-  &__hint {
-    font-size: 11.5px;
-    color: var(--dcs-text-placeholder);
-  }
-
-  &.is-all .fb-stat__dot {
-    background: var(--el-color-primary);
-  }
-
-  &.is-pending {
-    .fb-stat__dot {
-      background: var(--el-color-warning);
-    }
-
-    .fb-stat__value {
-      color: var(--el-color-warning);
-    }
-  }
-
-  &.is-processing .fb-stat__dot {
-    background: var(--el-color-primary);
-  }
-
-  &.is-resolved {
-    .fb-stat__dot {
-      background: var(--el-color-success);
-    }
-
-    .fb-stat__value {
-      color: var(--el-color-success);
-    }
-  }
-
-  &.is-closed .fb-stat__dot {
-    background: var(--dcs-text-placeholder);
-  }
+/* 激活格同时提亮标签：深色下也能一眼看出当前筛选 */
+.fb-stat.is-active .ui-kpi__label {
+  color: var(--app-text);
+  font-weight: 500;
 }
 
 /* ---------- 筛选工具条 ---------- */
 .fb-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--el-fill-color-lighter);
-
   &__search {
     flex: 1 1 240px;
     max-width: 380px;
@@ -567,22 +481,12 @@ onMounted(load);
 
 /* ---------- 列表 ---------- */
 .fb-card {
-  border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 16px;
+  border: var(--app-card-border);
+  border-radius: var(--app-card-radius);
 
   :deep(.el-card__body) {
-    padding: 2px 16px 14px;
-  }
-
-  /* 表头底色/行高由全局 ruoyi.scss 的 !important 统一定义，这里只调字重与字色 */
-  :deep(.el-table th.el-table__cell) {
-    color: var(--dcs-text-secondary);
-    font-size: 12.5px;
-    font-weight: 600;
-  }
-
-  :deep(.el-table td.el-table__cell) {
-    padding: 13px 0;
+    min-width: 0;
+    padding: 0;
   }
 
   :deep(.el-table__row) {
@@ -590,8 +494,18 @@ onMounted(load);
   }
 
   :deep(.el-table__body tr:hover > td.el-table__cell) {
-    background: var(--el-color-primary-light-9);
+    background: var(--app-raised);
   }
+}
+
+.fb-table {
+  --el-table-header-bg-color: transparent;
+  --el-table-header-text-color: var(--app-faint);
+  --el-table-text-color: var(--app-muted);
+  --el-table-border-color: var(--app-rule);
+  --el-table-row-hover-bg-color: var(--app-raised);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
 }
 
 .fb-cell {
@@ -607,9 +521,9 @@ onMounted(load);
   &__title {
     flex: 1;
     min-width: 0;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--dcs-text-primary);
+    font-size: var(--dcs-font-md);
+    font-weight: 500;
+    color: var(--app-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -617,9 +531,9 @@ onMounted(load);
 
   &__excerpt {
     margin: 5px 0 0;
-    font-size: 12.5px;
+    font-size: var(--dcs-font-sm);
     line-height: 1.6;
-    color: var(--dcs-text-placeholder);
+    color: var(--app-faint);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -628,108 +542,28 @@ onMounted(load);
 
 .fb-attach {
   flex: none;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--el-fill-color-light);
-  font-size: 11px;
+  font-size: var(--dcs-font-xs);
   line-height: 18px;
-  color: var(--dcs-text-placeholder);
+  color: var(--app-faint);
+  font-variant-numeric: tabular-nums;
 }
 
-.fb-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 48px 16px 42px;
-  text-align: center;
-
-  &__title {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--dcs-text-primary);
-  }
-
-  &__desc {
-    margin: 0;
-    max-width: 440px;
-    font-size: 13px;
-    line-height: 1.7;
-    color: var(--dcs-text-secondary);
-  }
-
-  .el-button {
-    margin-top: 6px;
-    margin-left: 0;
-  }
-
-  &--mobile {
-    width: 100%;
-    /* 641–992 时全局列表是两列网格，空态必须整行占满 */
-    grid-column: 1 / -1;
-    padding: 32px 16px;
-  }
+.fb-empty--mobile {
+  width: 100%;
+  /* 641–992 时全局列表是两列网格，空态必须整行占满 */
+  grid-column: 1 / -1;
 }
 
-.fb-type,
-.fb-status {
-  flex: none;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 18px;
-  white-space: nowrap;
-}
-
-.fb-type {
-  background: var(--el-fill-color-light);
-  color: var(--dcs-text-secondary);
-
-  &.is-bug {
-    background: var(--el-color-danger-light-9);
-    color: var(--el-color-danger);
-  }
-
-  &.is-suggest {
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
-  }
-
-  &.is-experience {
-    background: var(--el-color-warning-light-9);
-    color: var(--el-color-warning);
-  }
-}
-
-.fb-status {
-  &.is-pending {
-    background: var(--el-color-warning-light-9);
-    color: var(--el-color-warning);
-  }
-
-  &.is-processing {
-    background: var(--el-color-primary-light-9);
-    color: var(--el-color-primary);
-  }
-
-  &.is-resolved {
-    background: var(--el-color-success-light-9);
-    color: var(--el-color-success);
-  }
-
-  &.is-closed {
-    background: var(--el-fill-color-light);
-    color: var(--dcs-text-placeholder);
-  }
+.fb-mobile {
+  padding: 12px 16px 0;
 }
 
 .fb-mcard {
   &__excerpt {
     margin: 6px 0 0;
-    font-size: 13px;
+    font-size: var(--dcs-font-md);
     line-height: 1.6;
-    color: var(--dcs-text-secondary);
+    color: var(--app-muted);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -750,16 +584,16 @@ onMounted(load);
   &__id {
     margin-left: auto;
     font-size: 12px;
-    color: var(--dcs-text-placeholder);
+    color: var(--app-faint);
     font-variant-numeric: tabular-nums;
   }
 
   &__title {
     margin: 10px 0 6px;
-    font-size: 19px;
+    font-size: 18px;
     line-height: 1.45;
-    font-weight: 650;
-    color: var(--dcs-text-primary);
+    font-weight: 600;
+    color: var(--app-text);
     overflow-wrap: anywhere;
   }
 
@@ -767,36 +601,36 @@ onMounted(load);
     margin: 0;
     font-size: 12.5px;
     line-height: 1.7;
-    color: var(--dcs-text-placeholder);
+    color: var(--app-faint);
   }
 
   &__readonly {
     margin: 18px 0 0;
     padding: 10px 12px;
-    border-radius: 8px;
-    background: var(--el-fill-color-lighter);
+    border-radius: var(--app-control-radius);
+    background: var(--app-raised);
     font-size: 12.5px;
-    color: var(--dcs-text-placeholder);
+    color: var(--app-muted);
   }
 }
 
 .fb-block {
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid var(--dcs-border-color-lighter);
+  border-top: 1px solid var(--app-rule);
 
   &__title {
     margin: 0 0 8px;
-    font-size: 13px;
+    font-size: var(--dcs-font-md);
     font-weight: 600;
-    color: var(--dcs-text-secondary);
+    color: var(--app-muted);
   }
 
   &__text {
     margin: 0;
     font-size: 14px;
     line-height: 1.8;
-    color: var(--dcs-text-regular);
+    color: var(--app-text);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -810,8 +644,8 @@ onMounted(load);
   &__item {
     width: 96px;
     height: 96px;
-    border-radius: 8px;
-    border: 1px solid var(--dcs-border-color-lighter);
+    border-radius: var(--app-control-radius);
+    border: 1px solid var(--app-border);
     cursor: zoom-in;
   }
 }
@@ -825,33 +659,33 @@ onMounted(load);
   line-height: 1.65;
 
   dt {
-    color: var(--dcs-text-placeholder);
+    color: var(--app-faint);
   }
 
   dd {
     margin: 0;
-    color: var(--dcs-text-regular);
+    color: var(--app-text);
     overflow-wrap: anywhere;
   }
 }
 
 .fb-reply {
   padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--el-color-primary-light-9);
-  border-left: 3px solid var(--el-color-primary-light-5);
+  border-radius: var(--app-control-radius);
+  background: var(--app-raised);
+  border-left: 2px solid var(--app-control);
 
   &__who {
     margin: 0;
     font-size: 12px;
-    color: var(--el-color-primary);
+    color: var(--app-muted);
   }
 
   &__text {
     margin: 5px 0 0;
     font-size: 13.5px;
     line-height: 1.75;
-    color: var(--dcs-text-regular);
+    color: var(--app-text);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -865,27 +699,6 @@ onMounted(load);
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 992px) {
-  .fb-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-    border: 0;
-    background: transparent;
-    overflow: visible;
-  }
-
-  .fb-stat {
-    border: 1px solid var(--dcs-border-color-lighter);
-    border-radius: 12px;
-
-    &:last-child {
-      border-right: 1px solid var(--dcs-border-color-lighter);
-    }
-
-    &::after {
-      display: none;
-    }
-  }
-
   .fb-filters {
     &__search {
       flex-basis: 100%;
@@ -912,25 +725,7 @@ onMounted(load);
 }
 
 @media (max-width: 640px) {
-  .fb-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .fb-stat {
-    padding: 10px 12px;
-
-    &:last-child {
-      grid-column: auto;
-    }
-
-    &__value {
-      font-size: 20px;
-    }
-  }
-
   .fb-filters {
-    padding: 8px;
-
     &__select {
       flex: 0 1 calc(50% - 4px);
       width: auto;
@@ -939,12 +734,6 @@ onMounted(load);
     > .el-button {
       flex: 1;
       margin-left: 0;
-    }
-  }
-
-  .fb-card {
-    :deep(.el-card__body) {
-      padding: 0 10px 10px;
     }
   }
 }
