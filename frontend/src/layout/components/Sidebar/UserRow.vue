@@ -112,8 +112,22 @@ const emit = defineEmits<{ 'set-layout': []; feedback: [] }>();
 const router = useRouter();
 const userStore = useUserStore();
 const { tenantName } = useWorkspace();
-const { tenants, canSwitch, switching, ready, loadFailed, currentTenant, currentId, isDefaultTenant, defaultId, unitOptions, isSuperAdmin, load, refresh, switchTo } =
-  useTenantSwitch();
+const {
+  tenants,
+  canSwitch,
+  switching,
+  ready,
+  loadFailed,
+  currentTenant,
+  currentId,
+  isDefaultTenant,
+  defaultId,
+  unitOptions,
+  isSuperAdmin,
+  load,
+  refresh,
+  switchTo
+} = useTenantSwitch();
 
 const nickname = computed(() => userStore.nickname);
 const avatar = computed(() => userStore.avatar);
@@ -398,17 +412,42 @@ onMounted(load);
 
 <style lang="scss">
 /* 浮层 teleport 到 body，scoped 打不到：全局类都带 sidebar-user__ 前缀，只影响本组件 */
+
+/* 卡片本体（popper 根节点）：固定加宽 + 大圆角 + 轻投影——工作区切换器的「卡片」形态
+   （2026-10-24 用户回执「是左下侧打开的卡片」：默认窄菜单 → 卡片化打磨） */
+.sidebar-user-unit-popper.el-popper {
+  min-width: 268px;
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--app-border);
+  border-radius: 12px;
+  background: var(--app-surface);
+  box-shadow: 0 12px 32px rgba(15, 30, 40, 0.14);
+}
+
+html.dark .sidebar-user-unit-popper.el-popper {
+  border-color: #2e2e33;
+  background: #161616;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7);
+}
+
 /* 搜索行（单位 ≥5 才渲染）：内嵌原生输入框，点它不触发菜单项 */
 .el-dropdown-menu .sidebar-user__search {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 4px 6px 6px;
+  margin: 2px 4px 8px;
   padding: 0 10px;
-  height: 34px;
-  border-radius: 8px;
+  height: 36px;
+  border-radius: 9px;
   background: var(--app-raised);
   cursor: default;
+}
+
+html.dark .el-dropdown-menu .sidebar-user__search {
+  background: #1d1d1d;
 }
 
 .el-dropdown-menu .sidebar-user__search-ic {
@@ -432,25 +471,30 @@ onMounted(load);
   }
 }
 
-/* 当前单位行：不可点，只作「你在哪」的锚；色块 + 名字 + 默认标记 + 打勾 */
+/* 当前单位行：raised 底药丸锚定「你在哪」，不可点 */
 .el-dropdown-menu .sidebar-user__current {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  margin: 0 4px;
-  padding: 0 8px;
-  border-radius: 9px;
+  gap: 10px;
+  height: 44px;
+  margin: 2px 4px 8px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--app-raised);
   color: var(--app-text);
   font-size: 13.5px;
   font-weight: 600;
   cursor: default;
 }
 
+html.dark .el-dropdown-menu .sidebar-user__current {
+  background: #1d1d1d;
+}
+
 .el-dropdown-menu .sidebar-user__check {
   flex: none;
   color: var(--app-accent);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .el-dropdown-menu .sidebar-user__current-name {
@@ -465,8 +509,8 @@ onMounted(load);
 .el-dropdown-menu .sidebar-user__tag {
   flex: none;
   margin-left: auto;
-  padding: 0 5px;
-  border-radius: 4px;
+  padding: 0 6px;
+  border-radius: 5px;
   background: color-mix(in srgb, var(--app-accent) 8%, transparent);
   color: var(--app-accent);
   font-size: 11px;
@@ -480,15 +524,27 @@ html.dark .el-dropdown-menu .sidebar-user__tag {
   color: color-mix(in srgb, var(--app-accent) 55%, #ffffff);
 }
 
-/* 可切单位行：色块 + 名字占左、标记靠右 */
+/* 可切单位行：色块 + 名字占左、标记靠右，行距放宽到 44 */
 .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
+  gap: 10px;
+  height: 44px;
   margin: 0 4px;
-  padding: 0 8px;
-  border-radius: 9px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 13.5px;
+
+  &:hover,
+  &:not(.is-disabled):focus-visible {
+    background: var(--app-raised);
+    color: var(--app-text);
+  }
+}
+
+html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__item:hover,
+html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__item:not(.is-disabled):focus-visible {
+  background: #1d1d1d;
 }
 
 .el-dropdown-menu .sidebar-user__opt {
@@ -502,7 +558,7 @@ html.dark .el-dropdown-menu .sidebar-user__tag {
 
 /* 搜索无结果的空态行 */
 .el-dropdown-menu .sidebar-user__empty {
-  padding: 8px 14px;
+  padding: 10px 14px;
   color: var(--app-faint);
   font-size: 12.5px;
   cursor: default;
@@ -513,12 +569,23 @@ html.dark .el-dropdown-menu .sidebar-user__tag {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 34px;
-  margin: 2px 4px 0;
-  padding: 0 8px;
-  border-radius: 8px;
+  height: 36px;
+  margin: 4px 4px 0;
+  padding: 0 10px;
+  border-radius: 9px;
   color: var(--app-muted);
   font-size: 12.5px;
+
+  &:hover,
+  &:not(.is-disabled):focus-visible {
+    background: var(--app-raised);
+    color: var(--app-text);
+  }
+}
+
+html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__manage:hover,
+html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__manage:not(.is-disabled):focus-visible {
+  background: #1d1d1d;
 }
 
 .el-dropdown-menu .sidebar-user__manage-ic {
@@ -536,12 +603,5 @@ html.dark .el-dropdown-menu .sidebar-user__tag {
   flex: none;
   color: var(--app-faint);
   font-size: 12px;
-}
-
-/* 单位浮层限宽限高：单位名长/数量多时省略号与滚动才真正生效（popper 挂 body，用 popper-class 命中） */
-.sidebar-user-unit-popper .el-dropdown-menu {
-  max-width: min(320px, calc(100vw - 24px));
-  max-height: min(360px, 60vh);
-  overflow-y: auto;
 }
 </style>
