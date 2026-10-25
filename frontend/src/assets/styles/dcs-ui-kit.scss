@@ -1,0 +1,517 @@
+/**
+ * DCS 页面级组件底座（dcs-ui-kit）
+ *
+ * 口径来自 `.workshop/plans/20261024-ui-contract.md`：
+ *   - §1.7 新增语义令牌（只允许别名 / 尺寸，不新增色值）
+ *   - §2   页面骨架规范（页头 / KPI 带 / 筛选条 / 表格 / 药丸 / 空态）
+ *
+ * 纪律：
+ *   1. 本文件只提供页面级组件类（前缀 `.ui-`）与共用页头的细节补偿，不改结构；
+ *   2. 除 `:root` 里的尺寸令牌外不写任何颜色字面量，颜色一律引用
+ *      `var(--app-*)` / `var(--dcs-*)` / `var(--el-*)`；
+ *   3. 新增令牌全部在 `html.dark` 下显式重声明（颜色为别名，跟随深色变量翻转；
+ *      尺寸亮暗同值，重声明用于锁定深色口径）；
+ *   4. 加载顺序：index.scss 中排在 theme-framed 之后，同特异性声明覆盖旧值。
+ */
+
+/* ============================ 新增令牌 ============================ */
+:root {
+  /* 页面节奏与字阶 */
+  --dcs-page-head-size: 16px; // .ui-page-head 标题（本文件口径）
+  --dcs-font-page: 20px; // 共用页头 DcsOperationsPageHeader 标题（契约 §2.2）
+  --dcs-kpi-size: 26px; // KPI 数字（契约 24-28 取中值）
+  --dcs-kpi-weight: 600; // KPI 字重
+
+  /* 密度 */
+  --dcs-control-h: 36px; // 控件高（按钮 / 输入 / 下拉）
+  --dcs-row-h: 44px; // 表格行高（契约 44-46 取下沿）
+  --dcs-pill-radius: 999px; // 药丸圆角
+
+  /* 密度档位（外观抽屉切 html.density-compact）：默认值与既有视觉完全一致，
+     只作用在 .ui-* 的间距变量上，不改变壳层与页面布局结构 */
+  --dcs-density-page-pad: 20px;
+  --dcs-density-page-gap: 12px;
+  --dcs-density-toolbar-pad-y: 12px;
+  --dcs-density-toolbar-pad-x: 16px;
+  --dcs-density-kpi-pad-y: 14px;
+  --dcs-density-kpi-pad-x: 16px;
+  --dcs-density-row-h: var(--dcs-row-h);
+  --dcs-density-control-h: var(--dcs-control-h);
+
+  /* 药丸色对：全部是别名，亮暗由 theme-framed / Element 变量决定 */
+  --dcs-pill-pos-bg: var(--dcs-color-success-light-9);
+  --dcs-pill-pos-ink: var(--dcs-color-success);
+  --dcs-pill-warn-bg: var(--dcs-color-warning-light-9);
+  --dcs-pill-warn-ink: var(--dcs-color-warning);
+  --dcs-pill-neg-bg: var(--dcs-color-danger-light-9);
+  --dcs-pill-neg-ink: var(--dcs-color-danger);
+  --dcs-pill-info-bg: var(--dcs-color-info-light-9);
+  --dcs-pill-info-ink: var(--dcs-color-info);
+  --dcs-pill-off-bg: var(--app-raised);
+  --dcs-pill-off-ink: var(--app-muted);
+}
+
+html.dark {
+  /* 尺寸令牌与亮色一致（契约 §1.7 表内暗值同亮值） */
+  --dcs-page-head-size: 16px;
+  --dcs-font-page: 20px;
+  --dcs-kpi-size: 26px;
+  --dcs-kpi-weight: 600;
+  --dcs-control-h: 36px;
+  --dcs-row-h: 44px;
+  --dcs-pill-radius: 999px;
+
+  /* 颜色别名重绑定：目标变量已在 html.dark 内换值，这里显式声明深色口径 */
+  --dcs-pill-pos-bg: var(--dcs-color-success-light-9);
+  --dcs-pill-pos-ink: var(--dcs-color-success);
+  --dcs-pill-warn-bg: var(--dcs-color-warning-light-9);
+  --dcs-pill-warn-ink: var(--dcs-color-warning);
+  --dcs-pill-neg-bg: var(--dcs-color-danger-light-9);
+  --dcs-pill-neg-ink: var(--dcs-color-danger);
+  --dcs-pill-info-bg: var(--dcs-color-info-light-9);
+  --dcs-pill-info-ink: var(--dcs-color-info);
+  --dcs-pill-off-bg: var(--app-raised);
+  --dcs-pill-off-ink: var(--app-muted);
+}
+
+/* 紧凑密度：只收紧 .ui-* 的间距变量（页面布局结构不动） */
+html.density-compact {
+  --dcs-density-page-pad: 14px;
+  --dcs-density-page-gap: 8px;
+  --dcs-density-toolbar-pad-y: 8px;
+  --dcs-density-toolbar-pad-x: 12px;
+  --dcs-density-kpi-pad-y: 10px;
+  --dcs-density-kpi-pad-x: 12px;
+  --dcs-density-row-h: 36px;
+  --dcs-density-control-h: 32px;
+}
+
+/* ============================ 页面容器与纵向节奏 ============================ */
+/* 页面本身必须透明：底色由壳层给（契约 §2.1 开放平面）。
+   纵向节奏只留 12 / 16 两档：卡与卡 12，页头→内容 16。 */
+.ui-page {
+  display: flex;
+  flex-direction: column;
+  row-gap: var(--dcs-density-page-gap);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: var(--dcs-density-page-pad);
+  background: transparent;
+  color: var(--app-text);
+}
+
+.ui-page > .ui-page-head {
+  /* row-gap 12 + 4 = 页头→内容 16 */
+  margin-bottom: 4px;
+}
+
+/* ============================ 页头 ============================ */
+.ui-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+  min-width: 0;
+}
+
+.ui-page-head__main {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.ui-page-head__eyebrow {
+  margin-bottom: 5px;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.ui-page-head__title {
+  margin: 0;
+  color: var(--app-text);
+  font-size: var(--dcs-page-head-size);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.ui-page-head__sub {
+  margin: 6px 0 0;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-base);
+  line-height: 1.6;
+}
+
+.ui-page-head__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  /* 页头主操作与工具栏控件同高 36；输入类吃的就是 EP 这个变量 */
+  --el-component-size: var(--dcs-density-control-h);
+}
+
+.ui-page-head__actions .el-button:not(.is-text):not(.is-link):not(.is-circle):not(.el-button--small):not(.el-button--large) {
+  height: var(--dcs-density-control-h);
+}
+
+/* ============================ KPI 指标带 ============================ */
+/* 一个外框容器 + 1px 分隔线的一排指标；禁止四张独立浮起卡。
+   `.dcs-ops-metrics` 是共用页头里的同类结构，合并成同一套口径。 */
+.ui-kpi-strip,
+.dcs-ops-metrics {
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0;
+  margin-top: 16px;
+  overflow: hidden;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-card-radius);
+}
+
+.ui-kpi,
+.dcs-ops-metric {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--dcs-density-kpi-pad-y) var(--dcs-density-kpi-pad-x);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--app-rule);
+  border-radius: 0;
+}
+
+.ui-kpi:first-child,
+.dcs-ops-metric:first-child {
+  border-left: 0;
+}
+
+/* 旧页头指标卡的 3px 彩色左边条：契约 §2.3 明确删除 */
+.dcs-ops-metric::before {
+  content: none;
+}
+
+.ui-kpi__label,
+.dcs-ops-metric__label {
+  display: block;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+/* KPI 数字永远是主文字色：红/黄/绿只留给状态药丸 */
+.ui-kpi__value,
+.dcs-ops-metric__value {
+  display: block;
+  margin: 6px 0 0;
+  color: var(--app-text);
+  font-size: var(--dcs-kpi-size);
+  font-weight: var(--dcs-kpi-weight);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-kpi__hint,
+.dcs-ops-metric__hint {
+  display: block;
+  margin-top: 5px;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.4;
+}
+
+.ui-kpi__delta {
+  display: block;
+  margin-top: 2px;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+/* ============================ 筛选条 ============================ */
+/* 与表格同宽、可换行；控件高 36；底部 1px 分隔与表格同卡时压线 */
+.ui-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: var(--dcs-density-toolbar-pad-y) var(--dcs-density-toolbar-pad-x);
+  background: transparent;
+  border-bottom: 1px solid var(--app-rule);
+  --el-component-size: var(--dcs-density-control-h);
+}
+
+.ui-toolbar .el-button:not(.is-text):not(.is-link):not(.is-circle):not(.el-button--small):not(.el-button--large) {
+  height: var(--dcs-density-control-h);
+}
+
+/* ============================ 表格 ============================ */
+/* 表头 12px 灰、无底带；行高 44；行线 1px；禁斑马。数字列加 `.ui-num`。 */
+.ui-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-table.el-table {
+  color: var(--app-muted);
+  font-size: var(--dcs-font-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-table th.el-table__cell {
+  height: 40px;
+  background-color: transparent;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  font-weight: 400;
+  border-bottom: 1px solid var(--app-rule);
+}
+
+.ui-table td.el-table__cell {
+  height: var(--dcs-density-row-h);
+  padding: 0;
+  border-bottom: 1px solid var(--app-rule);
+}
+
+/* 页面即使误传 stripe 也不出现斑马纹。
+   Element 自己的选择器是 `.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell`
+   （权重 0,4,2），只写 .ui-table 后代会被它压掉——这里补满层级才真的生效 */
+.ui-table.el-table .el-table__body tr.el-table__row--striped > td.el-table__cell,
+.ui-table.el-table .el-table__body tr.el-table__row--striped:hover > td.el-table__cell,
+.ui-table.el-table .el-table__body tr.el-table__row--striped.hover-row > td.el-table__cell {
+  background-color: transparent;
+}
+
+.ui-table .is-right,
+.ui-table .ui-num {
+  text-align: right;
+}
+
+.ui-table .ui-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================ 状态药丸 ============================ */
+.ui-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dcs-pill-radius);
+  background: var(--dcs-pill-off-bg);
+  color: var(--dcs-pill-off-ink);
+  font-size: var(--dcs-font-xs);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ui-pill--pos {
+  background: var(--dcs-pill-pos-bg);
+  color: var(--dcs-pill-pos-ink);
+}
+
+.ui-pill--warn {
+  background: var(--dcs-pill-warn-bg);
+  color: var(--dcs-pill-warn-ink);
+}
+
+.ui-pill--neg {
+  background: var(--dcs-pill-neg-bg);
+  color: var(--dcs-pill-neg-ink);
+}
+
+.ui-pill--info {
+  background: var(--dcs-pill-info-bg);
+  color: var(--dcs-pill-info-ink);
+}
+
+.ui-pill--muted {
+  background: var(--dcs-pill-off-bg);
+  color: var(--dcs-pill-off-ink);
+}
+
+/* ============================ 空态 ============================ */
+/* 一句中文说明 + 至多一个行动；不引入插画、不用 emoji。 */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.6;
+  text-align: center;
+}
+
+.ui-empty__title {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-md);
+  font-weight: 500;
+}
+
+.ui-empty__hint {
+  margin: 0;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+}
+
+.ui-empty__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ============================ 加载骨架 ============================ */
+/* 契约 §2.8 默认用 v-loading；本类只是需要局部占位时的可选件。
+   不用渐变 / 发光，只做透明度呼吸；尊重 reduced-motion。 */
+.ui-skeleton {
+  display: block;
+  width: 100%;
+  height: var(--dcs-font-sm);
+  border-radius: var(--app-control-radius);
+  background: var(--app-raised);
+  animation: ui-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.ui-skeleton--title {
+  width: 40%;
+  height: var(--dcs-page-head-size);
+}
+
+.ui-skeleton--row {
+  height: var(--dcs-row-h);
+  border-radius: var(--app-card-radius);
+}
+
+.ui-skeleton + .ui-skeleton {
+  margin-top: 8px;
+}
+
+@keyframes ui-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ============================ 数字列 ============================ */
+.ui-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ============================ 共用页头细节补偿 ============================ */
+/* DcsOperationsPageHeader 结构不动（18+ 处共用），只在本文件补：
+    eyebrow 12/400 faint、标题 20/600、副题 13/muted 且不再限宽；
+    KPI 带已在上面与 `.ui-kpi-strip` 合并成同一套口径。 */
+.dcs-ops-header__eyebrow {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  font-weight: 400;
+}
+
+.dcs-ops-header__title {
+  color: var(--app-text);
+  font-size: var(--dcs-font-page);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.dcs-ops-header__subtitle {
+  max-width: none;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-md);
+  line-height: 1.6;
+}
+
+/* ============================ 断点 ============================ */
+@media (max-width: 992px) {
+  .ui-page {
+    padding: 14px;
+  }
+
+  .ui-page-head {
+    flex-direction: column;
+  }
+
+  /* 列方向下 flex-basis 会变成高度：320px 会撑出一大段空白，这里回到内容高 */
+  .ui-page-head__main {
+    flex: 0 0 auto;
+  }
+
+  .ui-page-head__actions {
+    width: 100%;
+  }
+
+  /* KPI 带两列，奇数格末格占满整行；竖线只画第二列，横线画第二行起 */
+  .ui-kpi-strip,
+  .dcs-ops-metrics {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    margin-top: 14px;
+  }
+
+  .ui-kpi,
+  .dcs-ops-metric {
+    padding: 12px 14px;
+    border-top: 1px solid var(--app-rule);
+  }
+
+  .ui-kpi:nth-child(odd),
+  .dcs-ops-metric:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .ui-kpi:nth-child(-n + 2),
+  .dcs-ops-metric:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .ui-kpi:last-child:nth-child(odd),
+  .dcs-ops-metric:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .ui-kpi__label,
+  .dcs-ops-metric__label {
+    font-size: var(--dcs-font-sm);
+  }
+
+  .ui-kpi__value,
+  .dcs-ops-metric__value {
+    margin-top: 4px;
+    font-size: var(--dcs-kpi-size);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton {
+    animation: none;
+  }
+}
