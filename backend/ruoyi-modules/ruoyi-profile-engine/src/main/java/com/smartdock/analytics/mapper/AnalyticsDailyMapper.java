@@ -29,6 +29,15 @@ public interface AnalyticsDailyMapper extends BaseMapperPlus<AnalyticsDaily, Ana
                     @Param("from") Date from,
                     @Param("to") Date to);
 
+    /** R2-5 项11: 事件归档水位以下的日汇总行同步清理(口径与 session 水位一致)。 */
+    @Delete("""
+        DELETE FROM analytics_daily
+        WHERE tenant_id = #{tenantId} AND source = #{source} AND stat_date < #{watermark}
+        """)
+    int deleteBeforeWatermark(@Param("tenantId") String tenantId,
+                              @Param("source") String source,
+                              @Param("watermark") Date watermark);
+
     @Insert("""
         INSERT INTO analytics_daily
             (daily_id, tenant_id, source, stat_date, pv, uv, visits, events,

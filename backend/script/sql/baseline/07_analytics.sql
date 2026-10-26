@@ -120,13 +120,16 @@ ON CONFLICT DO NOTHING;
 -- 菜单与权限
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES
 (11986, '数据分析', 12000, 6, 'profile-analytics', 'dcs/profile/analytics', '', '1', '0', 'C', '0', '0', 'analytics:center:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '流量/页面/漏斗/留存/访问明细/数据导入'),
-(11987, '数据分析编辑', 11986, 14, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:center:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '重建汇总/导入/漏斗维护')
+(11987, '数据分析编辑', 11986, 14, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:center:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '重建汇总/导入/漏斗维护'),
+(11988, '数据分析导出', 11986, 15, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:center:export', '#', 103, 1, '2026-10-25 00:00:00', NULL, NULL, '访问明细/自定义分析 CSV 导出')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO public.sys_role_menu (role_id, menu_id)
 SELECT 1, 11986 WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 1 AND menu_id = 11986);
 INSERT INTO public.sys_role_menu (role_id, menu_id)
 SELECT 1, 11987 WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 1 AND menu_id = 11987);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 1, 11988 WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 1 AND menu_id = 11988);
 INSERT INTO public.sys_role_menu (role_id, menu_id)
 SELECT 6, 11986 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
   AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 11986);

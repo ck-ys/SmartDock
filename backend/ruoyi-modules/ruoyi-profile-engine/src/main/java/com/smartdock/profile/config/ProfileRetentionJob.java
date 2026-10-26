@@ -44,6 +44,8 @@ public class ProfileRetentionJob {
     private final ProfileEventMapper eventMapper;
     private final AnalyticsRebuildLogMapper rebuildLogMapper;
     private final ProfileEngineConfigMapper configMapper;
+    private final com.smartdock.analytics.mapper.AnalyticsSessionMapper sessionMapper;
+    private final com.smartdock.analytics.mapper.AnalyticsDailyMapper dailyMapper;
 
     /** 保留天数; 0 = 关闭清理 */
     @Value("${profile.event.retention-days:730}")
@@ -111,6 +113,16 @@ public class ProfileRetentionJob {
                 : eventMapper.deleteExpiredBatch(tenantId, source, cutoff, BATCH_LIMIT));
             deleted += rows;
         } while (rows >= BATCH_LIMIT && ++rounds < MAX_ROUNDS); // 单源封顶 100 轮防失控
+        // R2-5 项11: 先出账事件、再清派生表窗口(顺序不可倒)——总览/趋势(读 session/daily)
+        // 与漏斗/路径(直查事件)两套数字从此不分叉; 每次进入本源清理都补一刀, 上轮中断也能自愈
+        int sessions = TenantHelper.dynamic(tenantId, () ->
+            sessionMapper.deleteBeforeWatermark(tenantId, source, cutoff));
+        int dailyRows = TenantHelper.dynamic(tenantId, () ->
+            dailyMapper.deleteBeforeWatermark(tenantId, source, cutoff));
+        if (sessions > 0 || dailyRows > 0) {
+            log.info("[Profile] retention derived cleanup tenant={} source={} sessions={} dailyRows={} watermark={}",
+                tenantId, source, sessions, dailyRows, cutoff);
+        }
         return deleted;
     }
 

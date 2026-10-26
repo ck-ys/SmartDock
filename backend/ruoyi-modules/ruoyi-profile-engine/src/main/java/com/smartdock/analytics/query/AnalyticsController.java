@@ -185,4 +185,40 @@ public class AnalyticsController {
     public R<Map<String, Object>> crossSource(@RequestParam(defaultValue = "30") int days) {
         return R.ok(analyticsService.crossSource(days));
     }
+
+    // ---------------------------------------------------------------- R2-5 项10: 报表 CSV 导出
+
+    /**
+     * 访问明细 CSV 导出: 默认脱敏(搜索词始终打码); 明文走 masked=false(审计行留痕)。
+     * 行数上限 5 万, 超限报错引导缩窗。POST+表单与前端 download() 管道对齐。
+     */
+    @SaCheckPermission("analytics:center:export")
+    @Log(title = "分析明细导出", businessType = BusinessType.EXPORT)
+    @RepeatSubmit
+    @PostMapping("/export/sessions")
+    public void exportSessions(AnalyticsSessionQuery query,
+                               @RequestParam(required = false, defaultValue = "true") boolean masked,
+                               jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        byte[] csv = analyticsService.exportSessions(query, !masked);
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader("Content-Disposition",
+            "attachment; filename=analytics-sessions-" + query.getSource() + ".csv");
+        response.getOutputStream().write(csv);
+        response.getOutputStream().flush();
+    }
+
+    /** 自定义分析结果 CSV 导出(聚合值, 无主体级 PII)。 */
+    @SaCheckPermission("analytics:center:export")
+    @Log(title = "自定义分析导出", businessType = BusinessType.EXPORT)
+    @RepeatSubmit
+    @PostMapping("/export/custom")
+    public void exportCustom(AnalyticsCustomBo bo,
+                             jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        byte[] csv = analyticsService.exportCustom(bo);
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader("Content-Disposition",
+            "attachment; filename=analytics-custom-" + (bo == null ? "" : bo.getSource()) + ".csv");
+        response.getOutputStream().write(csv);
+        response.getOutputStream().flush();
+    }
 }

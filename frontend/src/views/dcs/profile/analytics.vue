@@ -443,6 +443,9 @@
             </el-select>
             <el-button type="primary" @click="searchSessions">查询</el-button>
             <el-button @click="resetSessions">重置</el-button>
+            <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportSessionsCsv">
+              导出 CSV
+            </el-button>
           </div>
 
           <el-table class="ui-table" :data="sessions" v-loading="sessionLoading">
@@ -515,6 +518,9 @@
               <el-radio-button :value="50">Top 50</el-radio-button>
             </el-radio-group>
             <el-button type="primary" :loading="customLoading" @click="loadCustom">运行</el-button>
+            <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportCustomCsv">
+              导出 CSV
+            </el-button>
           </div>
           <v-chart class="custom-chart" :option="customOption" autoresize v-loading="customLoading" />
           <el-table :data="customRows" class="ui-table custom-table">
@@ -1077,6 +1083,41 @@ const resetSessions = () => {
 const openSession = async (row: AnalyticsSession) => {
   sessionDetail.value = await getAnalyticsSession(row.sessionId);
   sessionDrawer.value = true;
+};
+
+// ---------------------------------------------------------------- R2-5: 报表 CSV 导出(默认脱敏; 明文需编辑权限)
+const exporting = ref(false);
+
+const exportSessionsCsv = async () => {
+  exporting.value = true;
+  try {
+    const date = new Date().toISOString().slice(0, 10);
+    await download(
+      '/analytics/export/sessions',
+      { ...sessionQuery, source: source.value, days: days.value, masked: 'true' },
+      `访问明细-${source.value}-${date}.csv`
+    );
+  } catch {
+    // download 内部已提示
+  } finally {
+    exporting.value = false;
+  }
+};
+
+const exportCustomCsv = async () => {
+  exporting.value = true;
+  try {
+    const date = new Date().toISOString().slice(0, 10);
+    await download(
+      '/analytics/export/custom',
+      { source: source.value, days: days.value, ...customForm },
+      `自定义分析-${source.value}-${date}.csv`
+    );
+  } catch {
+    // download 内部已提示
+  } finally {
+    exporting.value = false;
+  }
 };
 
 // ---------------------------------------------------------------- 自定义分析

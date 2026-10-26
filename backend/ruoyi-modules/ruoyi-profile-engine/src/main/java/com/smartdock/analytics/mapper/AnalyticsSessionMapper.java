@@ -33,6 +33,18 @@ public interface AnalyticsSessionMapper extends BaseMapperPlus<AnalyticsSession,
                     @Param("from") Date from,
                     @Param("to") Date to);
 
+    /**
+     * R2-5 项11: 事件过保留期出账后同步清对应窗口会话——
+     * 保留期边界起, 总览/趋势(读 session/daily)与漏斗/路径(直查事件)两套数字不再分叉。
+     */
+    @Delete("""
+        DELETE FROM analytics_session
+        WHERE tenant_id = #{tenantId} AND source = #{source} AND started_at < #{watermark}
+        """)
+    int deleteBeforeWatermark(@Param("tenantId") String tenantId,
+                              @Param("source") String source,
+                              @Param("watermark") Date watermark);
+
     /** 回放对账(批10 Q3): 窗口内会话数/浏览量/跳出数。 */
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
