@@ -24,7 +24,9 @@ import Layout from '@/layout/index.vue';
 export const ASSISTANT_ADMIN_PATH = '/ai/assistant-admin';
 
 // 404 兜底路由 path（批一 P0-3：permission.ts 守卫按它识别「未命中任何路由」，
-// 抽常量防两处字面量漂移后守卫静默失效——收口复审席位A P2-1）
+// 抽常量防两处字面量漂移后守卫静默失效——收口复审席位A P2-1。
+// 顺序约束：本常量必须声明在下方 constantRoutes 数组（:31 起）之前——数组字面量求值时
+// 即引用它，挪到数组之后会在模块加载期抛 TDZ ReferenceError 整站白屏（终审席位④ P2-2）
 export const NOT_FOUND_ROUTE_PATH = '/:pathMatch(.*)*';
 
 // 公共路由
@@ -81,7 +83,9 @@ export const constantRoutes: RouteRecordRaw[] = [
       {
         path: '',
         component: () => import('@/views/error/403.vue'),
-        meta: { title: '无访问权限' }
+        // 与 403.vue 正文同口径：前端无法区分「无权」与「不存在」，页头不做确定性断言
+        //（终审席位④ P2-1：旧值「无访问权限」与双口径正文打架，AI 助手浮层还会复述页头）
+        meta: { title: '页面不可用' }
       }
     ]
   },
