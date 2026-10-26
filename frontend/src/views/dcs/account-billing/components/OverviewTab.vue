@@ -17,7 +17,7 @@
     </div>
 
     <div class="ui-table-wrap">
-      <el-table v-loading="loading" :data="walletList" class="ui-table" :row-class-name="walletRowClass">
+      <el-table v-loading="loading" :data="walletList" class="ui-table dcs-table-only" :row-class-name="walletRowClass">
         <el-table-column label="钱包" min-width="150">
           <template #default="{ row }">
             <span :title="`钱包ID ${row.walletId}`" class="dcs-ops-id">{{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
@@ -76,6 +76,39 @@
           </div>
         </template>
       </el-table>
+    </div>
+
+    <!-- U-09：≤992 钱包表格改卡片（9 列约 1230px） -->
+    <div class="dcs-mobile-list">
+      <div v-if="walletList.length === 0" class="ui-empty">
+        <p class="ui-empty__title">暂无钱包</p>
+        <p class="ui-empty__hint">初始化钱包后，这里会显示租户钱包的余额、冻结与阈值状态。</p>
+      </div>
+      <div v-for="row in walletList" :key="row.walletId" class="dcs-mobile-card">
+        <div class="dcs-card-head">
+          <span class="dcs-card-title">租户 {{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
+          <span class="dcs-card-badge"
+            ><span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span></span
+          >
+        </div>
+        <div class="dcs-card-meta">
+          <span class="ui-pill" :class="row.walletType === 'MAIN' ? 'ui-pill--pos' : 'ui-pill--muted'">{{ walletTypeLabel(row.walletType) }}</span>
+          <span>余额 {{ money(row.balanceAmount) }}</span>
+          <span :class="{ 'amount-warn': Number(row.frozenAmount || 0) > 0 }">冻结 {{ money(row.frozenAmount) }}</span>
+          <span :class="{ 'amount-danger': Number(row.availableAmount || 0) < 0 }">可用 {{ money(row.availableAmount) }}</span>
+        </div>
+        <div class="dcs-card-foot">
+          <span class="dcs-card-time">阈值 {{ money(row.lowBalanceThreshold) }}</span>
+          <div class="dcs-card-actions">
+            <el-button link type="primary" @click="openRecharge(row)">充值</el-button>
+            <el-button link class="ui-row-action" @click="openThreshold(row)">调阈值</el-button>
+            <el-button link class="ui-row-action" @click="onMoreCommand('deduct', row)">扣减</el-button>
+            <el-button v-if="row.status !== 'DISABLED'" link class="ui-row-action" @click="onMoreCommand('toggle', row)">
+              {{ row.status === 'ACTIVE' ? '冻结' : '解冻' }}
+            </el-button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />

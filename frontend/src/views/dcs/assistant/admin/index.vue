@@ -2811,18 +2811,11 @@ onMounted(() => {
   padding: 8px 0;
 }
 .fb-rate-num {
-  font-size: 34px;
+  /* U-15：KPI 收 26 档 + 契约「数字不染色」——good/mid/bad 语义染色删除，统一正文墨色 */
+  font-size: var(--dcs-kpi-size);
   font-weight: 700;
   line-height: 1.2;
-}
-.fb-rate-num.good {
-  color: var(--el-color-success);
-}
-.fb-rate-num.mid {
-  color: var(--el-color-warning);
-}
-.fb-rate-num.bad {
-  color: var(--el-color-danger);
+  color: var(--app-text);
 }
 .fb-rate-lbl {
   font-size: 12px;
@@ -2951,10 +2944,11 @@ onMounted(() => {
       }
 
       .num {
-        font-size: 28px;
+        /* U-15：KPI 收 26 档 + 数字不染色（primary → 正文墨色） */
+        font-size: var(--dcs-kpi-size);
         font-weight: 600;
         line-height: 1.2;
-        color: var(--el-color-primary);
+        color: var(--app-text);
         font-variant-numeric: tabular-nums;
       }
       .lbl {

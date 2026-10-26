@@ -240,20 +240,7 @@ onMounted(getList);
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.page-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-.page-subtitle {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 4px;
-}
+/* U-14：页头已并基座 DcsOperationsPageHeader（页题 20px/副题令牌色），自绘页头死样式连同 EP 旧灰一并删除 */
 .search-form {
   margin-bottom: 8px;
 }

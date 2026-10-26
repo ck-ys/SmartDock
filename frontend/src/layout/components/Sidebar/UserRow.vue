@@ -360,9 +360,9 @@ onMounted(load);
   box-shadow: 0 12px 32px rgba(15, 30, 40, 0.14);
 }
 
+/* U-11：面板底/边/分块底色全走令牌（--app-border/--app-surface/--app-raised 随主题翻转），
+   暗色不再整条覆盖——底座调档一处生效；仅阴影按暗色习惯加深保留 */
 html.dark .sidebar-user-panel-popper.el-popper {
-  border-color: #2e2e33;
-  background: #161616;
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7);
 }
 
@@ -376,16 +376,12 @@ html.dark .sidebar-user-panel-popper.el-popper {
   list-style: none;
 }
 
-/* 段间细线：1px rule，一段一件事 */
+/* 段间细线：1px rule，一段一件事（--app-rule 已随主题翻转，无暗色覆盖——U-10） */
 .el-dropdown-menu .sidebar-user__hr {
   height: 1px;
   margin: 6px 8px;
   background: var(--app-rule);
   list-style: none;
-}
-
-html.dark .el-dropdown-menu .sidebar-user__hr {
-  background: #232323;
 }
 
 /* 加载/提示行 */
@@ -437,10 +433,6 @@ html.dark .el-dropdown-menu .sidebar-user__hr {
   list-style: none;
 }
 
-html.dark .el-dropdown-menu .sidebar-user__search {
-  background: #1d1d1d;
-}
-
 .el-dropdown-menu .sidebar-user__search-ic {
   flex: none;
   color: var(--app-faint);
@@ -479,10 +471,6 @@ html.dark .el-dropdown-menu .sidebar-user__search {
   list-style: none;
 }
 
-html.dark .el-dropdown-menu .sidebar-user__current {
-  background: #1d1d1d;
-}
-
 .el-dropdown-menu .sidebar-user__current-name {
   min-width: 0;
   flex: 1 1 auto;
@@ -517,11 +505,6 @@ html.dark .el-dropdown-menu .sidebar-user__current {
   }
 }
 
-html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__item:hover,
-html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__item:not(.is-disabled):focus-visible {
-  background: #1d1d1d;
-}
-
 .el-dropdown-menu .sidebar-user__opt {
   min-width: 0;
   flex: 1 1 auto;
@@ -554,11 +537,6 @@ html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__item:not(.is-d
     background: var(--app-raised);
     color: var(--app-text);
   }
-}
-
-html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__manage:hover,
-html.dark .el-dropdown-menu .el-dropdown-menu__item.sidebar-user__manage:not(.is-disabled):focus-visible {
-  background: #1d1d1d;
 }
 
 /* 退出登录：独立分区的警示红，与顶栏头像菜单同一口径 */

@@ -932,7 +932,7 @@ onMounted(() => {
   margin-bottom: 6px;
 }
 .ledger-num {
-  font-size: 22px;
+  font-size: var(--dcs-kpi-size);
   font-weight: 600;
   color: var(--app-text);
   margin-bottom: 8px;
@@ -980,7 +980,7 @@ onMounted(() => {
   font-weight: 600;
 }
 .plan-price {
-  font-size: 24px;
+  font-size: var(--dcs-kpi-size);
   font-weight: 700;
   margin: 8px 0 10px;
   color: var(--app-text);

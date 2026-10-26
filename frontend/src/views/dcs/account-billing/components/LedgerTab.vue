@@ -38,7 +38,7 @@
       </div>
 
       <div class="ui-table-wrap">
-        <el-table v-loading="loading" :data="ledgerList" class="ui-table">
+        <el-table v-loading="loading" :data="ledgerList" class="ui-table dcs-table-only">
           <el-table-column label="流水ID" prop="ledgerId" min-width="172" align="center">
             <template #default="{ row }"
               ><span class="dcs-ops-id">{{ row.ledgerId }}</span></template
@@ -93,6 +93,32 @@
           </template>
         </el-table>
       </div>
+
+      <!-- U-09：≤992 钱包流水表格改卡片（9 列约 1360px） -->
+      <div class="dcs-mobile-list">
+        <div v-if="ledgerList.length === 0" class="ui-empty">
+          <p class="ui-empty__title">暂无钱包流水</p>
+          <p class="ui-empty__hint">调整筛选条件后再试，或等待资金操作产生流水。</p>
+        </div>
+        <div v-for="row in ledgerList" :key="row.ledgerId" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title">{{ row.serviceCodeLabel || serviceCodeLabel(row.serviceCode) }}</span>
+            <span class="dcs-card-badge"
+              ><span class="ui-pill" :class="row.direction === 'IN' ? 'ui-pill--pos' : 'ui-pill--neg'">{{ directionLabel(row.direction) }}</span></span
+            >
+          </div>
+          <div class="dcs-card-meta">
+            <span class="ui-pill">{{ bizTypeLabel(row.bizType) }}</span>
+            <span :class="row.direction === 'IN' ? 'amount-in' : 'amount-out'">
+              {{ row.direction === 'IN' ? '+' : '-' }}{{ money(row.amount) }}
+            </span>
+            <span>余额 {{ money(row.balanceBefore) }} → {{ money(row.balanceAfter) }}</span>
+          </div>
+          <div class="dcs-card-foot">
+            <span class="dcs-card-time">{{ row.createTime }} · 钱包 {{ row.walletId }}</span>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- 积分账（分）：与积分套餐页流水同源同口径（bizTag/sceneLabel 等显示逻辑保持一致） -->
@@ -122,7 +148,7 @@
       </div>
 
       <div class="ui-table-wrap">
-        <el-table v-loading="creditLoading" :data="creditRows" class="ui-table">
+        <el-table v-loading="creditLoading" :data="creditRows" class="ui-table dcs-table-only">
           <el-table-column label="时间" prop="createTime" width="170" />
           <el-table-column label="操作人" width="110" show-overflow-tooltip>
             <template #default="{ row }">
@@ -166,6 +192,37 @@
             </div>
           </template>
         </el-table>
+      </div>
+
+      <!-- U-09：≤992 积分流水表格改卡片 -->
+      <div class="dcs-mobile-list">
+        <div v-if="creditRows.length === 0" class="ui-empty">
+          <p class="ui-empty__title">暂无积分流水</p>
+          <p class="ui-empty__hint">产生订阅、加油包或对话消耗后，这里会出现对应流水。</p>
+        </div>
+        <div v-for="row in creditRows" :key="row.id" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title">{{ row.operatorName || '--' }}</span>
+            <span class="dcs-card-badge"
+              ><span class="ui-pill" :class="bizTag(row.bizType).pill">{{ bizTag(row.bizType).label }}</span></span
+            >
+          </div>
+          <div class="dcs-card-meta">
+            <span v-if="row.bizType === 'DEDUCT'" class="amount-out">-{{ fmt(row.credits) }}</span>
+            <span v-else-if="row.bizType === 'SUBSCRIBE' && subscribeAmountOf(row)" class="amount-in">
+              +{{ fmt(subscribeAmountOf(row)!.perWeek) }}<span class="add-sub"> ×{{ subscribeAmountOf(row)!.weeks }}周</span>
+            </span>
+            <span v-else-if="row.credits > 0" class="amount-in">+{{ fmt(row.credits) }}</span>
+            <span v-else class="add-none">—</span>
+            <span class="dcs-ops-id">{{ sceneLabel(row) }}</span>
+          </div>
+          <div v-if="row.bizType === 'DEDUCT' && row.credits > 0" class="dcs-card-meta">
+            <span>{{ row.tankCredits > 0 ? `周池 ${fmt(row.weeklyCredits)} · 加油包 ${fmt(row.tankCredits)}` : `周池 ${fmt(row.weeklyCredits)}` }}</span>
+          </div>
+          <div class="dcs-card-foot">
+            <span class="dcs-card-time">{{ row.createTime }} · {{ row.remark || (row.bizType === 'DEDUCT' ? '助手对话消耗' : '--') }}</span>
+          </div>
+        </div>
       </div>
     </template>
 

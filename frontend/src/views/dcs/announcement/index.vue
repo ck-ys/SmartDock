@@ -277,7 +277,7 @@ onMounted(load);
     background: var(--app-raised);
 
     .an-card__title {
-      font-size: 22px;
+      font-size: var(--dcs-font-page);
       line-height: 1.4;
       letter-spacing: -0.015em;
       -webkit-line-clamp: 3;
@@ -408,7 +408,7 @@ onMounted(load);
 .an-article__title {
   margin: 6px 0 0;
   max-width: 30em;
-  font-size: 24px;
+  font-size: var(--dcs-font-page);
   line-height: 1.35;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -584,7 +584,7 @@ onMounted(load);
   }
 
   .an-article__title {
-    font-size: 22px;
+    font-size: var(--dcs-font-page);
   }
 
   .an-article__body {

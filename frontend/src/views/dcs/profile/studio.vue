@@ -1779,15 +1779,14 @@ onMounted(async () => {
 .delta-down {
   color: var(--el-color-danger);
 }
-@media (max-width: 1200px) {
+/* U-08：断点收敛 992 一档（原 1200/900 两档归并） */
+@media (max-width: 992px) {
   .rule-layout {
     grid-template-columns: minmax(0, 1fr);
   }
   .preview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-@media (max-width: 900px) {
   .form-grid {
     grid-template-columns: minmax(0, 1fr);
   }

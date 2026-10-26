@@ -206,7 +206,8 @@
   padding: 4px 16px 12px;
 }
 
-@media (max-width: 960px) {
+/* U-08：断点收敛 992 一档（与壳层 dcs-responsive.scss 同源）——961-992 不再是「壳已手机形、页仍桌面距」的断层 */
+@media (max-width: 992px) {
   .dcs-ops-page {
     padding: 14px;
   }

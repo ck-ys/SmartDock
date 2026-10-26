@@ -1307,7 +1307,7 @@ onMounted(() => {
   gap: 4px;
 }
 .drawer-score strong {
-  font-size: 22px;
+  font-size: var(--dcs-kpi-size);
   font-variant-numeric: tabular-nums;
 }
 .drawer-desc {

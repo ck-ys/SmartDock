@@ -329,8 +329,9 @@ onMounted(() => {
         vertical-align: -3px;
       }
       &:hover {
+        /* U-12：底/字走令牌随主题翻转——--app-text 与 --app-control 在明暗两肤都保住叉号对比 */
         background-color: var(--app-control);
-        color: var(--app-sheet-bg);
+        color: var(--app-text);
         width: 12px !important;
         height: 12px !important;
       }

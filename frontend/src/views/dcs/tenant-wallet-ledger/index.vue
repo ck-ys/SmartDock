@@ -38,7 +38,7 @@
       </div>
 
       <div class="ui-table-wrap">
-        <el-table v-loading="loading" :data="ledgerList" class="ui-table">
+        <el-table v-loading="loading" :data="ledgerList" class="ui-table dcs-table-only">
           <el-table-column label="流水ID" prop="ledgerId" min-width="172" align="center">
             <template #default="{ row }"
               ><span class="dcs-ops-id">{{ row.ledgerId }}</span></template
@@ -93,6 +93,32 @@
             </div>
           </template>
         </el-table>
+      </div>
+
+      <!-- U-09：≤992 流水表改卡片（9 列约 1360px，手机上不再整表横滑） -->
+      <div class="dcs-mobile-list">
+        <div v-if="ledgerList.length === 0" class="ui-empty">
+          <p class="ui-empty__title">暂无钱包流水</p>
+          <p class="ui-empty__hint">调整筛选条件后再试，或等待资金操作产生流水。</p>
+        </div>
+        <div v-for="row in ledgerList" :key="row.ledgerId" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title">{{ row.serviceCodeLabel || serviceCodeLabel(row.serviceCode) }}</span>
+            <span class="dcs-card-badge"
+              ><span class="ui-pill" :class="row.direction === 'IN' ? 'ui-pill--pos' : 'ui-pill--neg'">{{ directionLabel(row.direction) }}</span></span
+            >
+          </div>
+          <div class="dcs-card-meta">
+            <span class="ui-pill">{{ bizTypeLabel(row.bizType) }}</span>
+            <span :class="row.direction === 'IN' ? 'amount-in' : 'amount-out'">
+              {{ row.direction === 'IN' ? '+' : '-' }}{{ money(row.amount) }}
+            </span>
+            <span>余额 {{ money(row.balanceBefore) }} → {{ money(row.balanceAfter) }}</span>
+          </div>
+          <div class="dcs-card-foot">
+            <span class="dcs-card-time">{{ row.createTime }} · 钱包 {{ row.walletId }}</span>
+          </div>
+        </div>
       </div>
 
       <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />

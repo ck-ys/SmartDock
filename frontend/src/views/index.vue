@@ -374,7 +374,7 @@ onMounted(loadAll);
   flex-wrap: wrap;
   h1 {
     margin: 0;
-    font-size: 22px;
+    font-size: var(--dcs-font-page);
     line-height: 1.25;
     font-weight: 600;
     letter-spacing: -0.01em;
@@ -415,7 +415,7 @@ onMounted(loadAll);
   .v {
     display: block;
     margin-top: 4px;
-    font-size: 28px;
+    font-size: var(--dcs-kpi-size);
     line-height: 1.15;
     font-weight: 400;
     color: var(--app-text);

@@ -563,7 +563,8 @@ watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
   flex-direction: column;
   gap: 2px;
 }
-@media (max-width: 1100px) {
+/* U-08：断点收敛 992（原 1100 自定档） */
+@media (max-width: 992px) {
   .chart-grid,
   .bottom-grid {
     grid-template-columns: 1fr;

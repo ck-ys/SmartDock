@@ -956,7 +956,8 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 1200px) {
+/* U-08：断点收敛 992（原 1200 自定档；640 为手机档内细分保留） */
+@media (max-width: 992px) {
   .banner-row {
     grid-template-columns: 1fr;
   }

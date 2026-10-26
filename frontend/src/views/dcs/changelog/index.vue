@@ -417,7 +417,7 @@ onMounted(load);
   }
 
   .cl-ver {
-    font-size: 22px;
+    font-size: var(--dcs-font-page);
     letter-spacing: -0.02em;
   }
 

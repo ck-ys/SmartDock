@@ -11,7 +11,7 @@
     </dcs-operations-page-header>
 
     <el-row :gutter="12">
-      <el-col :xs="24" :lg="12">
+      <el-col :xs="24" :md="12">
         <el-card shadow="never" class="block-card">
           <template #header>
             <div class="panel-head">
@@ -54,7 +54,7 @@
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :lg="12">
+      <el-col :xs="24" :md="12">
         <el-card shadow="never" class="block-card">
           <template #header>
             <div class="panel-head">
@@ -461,7 +461,8 @@ onMounted(() => {
 .del-form :deep(.el-form-item) {
   margin-bottom: 8px;
 }
-@media (max-width: 1199px) {
+/* U-08：断点收敛 992——与上方 el-col :md(≥992 双栏) 配对，≤992 纵排时补卡距 */
+@media (max-width: 992px) {
   .compliance-page :deep(.el-col:first-child) .block-card {
     margin-bottom: 12px;
   }

@@ -35,7 +35,7 @@
     />
 
     <div class="ui-table-wrap">
-      <el-table v-loading="loading" :data="orderList" class="ui-table">
+      <el-table v-loading="loading" :data="orderList" class="ui-table dcs-table-only">
         <el-table-column label="订单号" prop="orderNo" min-width="200" show-overflow-tooltip />
         <el-table-column label="租户ID" prop="tenantId" min-width="150" show-overflow-tooltip />
         <el-table-column label="钱包ID" prop="walletId" min-width="172" align="center">
@@ -83,6 +83,36 @@
           </div>
         </template>
       </el-table>
+    </div>
+
+    <!-- U-09：≤992 充值订单表格改卡片（9 列约 1370px） -->
+    <div class="dcs-mobile-list">
+      <div v-if="orderList.length === 0" class="ui-empty">
+        <p class="ui-empty__title">暂无充值订单</p>
+        <p class="ui-empty__hint">可先创建一笔手工充值订单，再在列表中跟踪支付状态。</p>
+        <div class="ui-empty__actions">
+          <el-button :icon="Plus" @click="openCreate">创建首笔订单</el-button>
+        </div>
+      </div>
+      <div v-for="row in orderList" :key="row.orderId" class="dcs-mobile-card">
+        <div class="dcs-card-head">
+          <span class="dcs-card-title">{{ row.orderNo }}</span>
+          <span class="dcs-card-badge"
+            ><span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span></span
+          >
+        </div>
+        <div class="dcs-card-meta">
+          <span class="ui-pill">{{ channelLabel(row.channel) }}</span>
+          <span class="amount">{{ money(row.amount) }}</span>
+          <span>租户 {{ row.tenantId }}</span>
+        </div>
+        <div class="dcs-card-foot">
+          <span class="dcs-card-time">创建 {{ row.createTime }} · 支付 {{ row.payTime || '—' }}<template v-if="row.remark"> · {{ row.remark }}</template></span>
+          <div v-if="row.status === 'PENDING'" class="dcs-card-actions">
+            <el-button v-hasPermi="['dcs:payment-order:close']" link type="danger" @click="onClose(row)">关闭</el-button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />

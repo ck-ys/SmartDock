@@ -41,7 +41,7 @@
             </div>
           </template>
           <div class="usage-table-wrap">
-            <el-table v-loading="loading" :data="usageList" class="ui-table">
+            <el-table v-loading="loading" :data="usageList" class="ui-table dcs-table-only">
               <el-table-column label="时间" prop="createTime" width="170" />
               <el-table-column label="调用方" width="120">
                 <template #default="{ row }">
@@ -116,6 +116,37 @@
                 </div>
               </template>
             </el-table>
+          </div>
+          <!-- U-09：≤992 调用明细表改卡片（12 列 min-width 1610px，手机上不再整表横滑） -->
+          <div class="dcs-mobile-list">
+            <div v-if="usageList.length === 0" class="ui-empty">
+              <p class="ui-empty__title">当前筛选下没有调用明细</p>
+              <p class="ui-empty__hint">换个调用方或清空筛选后再看；有调用发生后这里会逐条列出 Token 与成本</p>
+            </div>
+            <div v-for="row in usageList" :key="row.usageId" class="dcs-mobile-card">
+              <div class="dcs-card-head">
+                <span class="dcs-card-title">{{ sceneLabel(row.scene) }}</span>
+                <span class="dcs-card-badge"
+                  ><span class="ui-pill" :class="row.success === '1' ? 'ui-pill--pos' : 'ui-pill--neg'">{{ row.success === '1' ? '成功' : '失败' }}</span></span
+                >
+              </div>
+              <div class="dcs-card-meta">
+                <span class="ui-pill ui-pill--muted">{{ callerLabel(row.caller) }}</span>
+                <span>{{ row.modelName || '--' }}</span>
+                <span>{{ billingModeLabel(row.billingMode) }}</span>
+              </div>
+              <div class="dcs-card-meta">
+                <span>Token {{ tokenText(row) }}</span>
+                <span>{{ row.latencyMs }}ms</span>
+                <span :class="{ 'cost-zero': Number(row.costAmount || 0) === 0 }">消耗 {{ money(row.costAmount, row.currency) }}</span>
+              </div>
+              <div v-if="row.errorMsg" class="dcs-card-foot">
+                <span class="dcs-card-time" :title="row.errorMsg">错误：{{ humanizeAiError(row.errorMsg).title }}</span>
+              </div>
+              <div class="dcs-card-foot">
+                <span class="dcs-card-time">{{ row.createTime }}</span>
+              </div>
+            </div>
           </div>
           <pagination
             v-show="total > 0"

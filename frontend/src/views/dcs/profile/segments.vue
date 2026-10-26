@@ -1212,7 +1212,8 @@ onMounted(loadAll);
   color: var(--el-text-color-secondary);
   line-height: 1.35;
 }
-@media (max-width: 900px) {
+/* U-08：断点收敛 992（原 900 自定档） */
+@media (max-width: 992px) {
   .segment-grid {
     grid-template-columns: 1fr;
   }

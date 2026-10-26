@@ -190,55 +190,9 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-.setting-drawer-title {
-  margin-bottom: 12px;
-  color: rgba(0, 0, 0, 0.85);
-  line-height: 22px;
-  font-weight: bold;
-  .drawer-title {
-    font-size: 14px;
-  }
-}
-.setting-drawer-block-checbox {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  margin-top: 10px;
-  margin-bottom: 20px;
-
-  .setting-drawer-block-checbox-item {
-    position: relative;
-    margin-right: 16px;
-    border-radius: 2px;
-    cursor: pointer;
-
-    img {
-      width: 48px;
-      height: 48px;
-    }
-
-    .custom-img {
-      width: 48px;
-      height: 38px;
-      border-radius: 5px;
-      box-shadow: 1px 1px 2px #898484;
-    }
-
-    .setting-drawer-block-checbox-selectIcon {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 100%;
-      height: 100%;
-      padding-top: 15px;
-      padding-left: 24px;
-      color: #1890ff;
-      font-weight: 700;
-      font-size: 14px;
-    }
-  }
-}
-
+/* U-13：主题预览块（setting-drawer-block-checbox 系）已随 U-24 外观抽屉（DcsAppearanceDrawer）下线，
+   模板零引用的死样式连同其中灰阴影 / Ant 旧蓝对勾 / rgba 近黑标题三处字面量一并删除；
+   旧嵌套的 .setting-drawer-title .drawer-title 选择器本就不命中现役 h3.drawer-title（无样式变化） */
 .drawer-item {
   padding: 12px 0;
   font-size: 14px;
