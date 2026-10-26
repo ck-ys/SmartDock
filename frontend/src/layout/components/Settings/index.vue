@@ -36,24 +36,6 @@
     </div>
 
     <div class="drawer-item">
-      <span>数据强调色</span>
-      <span class="comp-style">
-        <el-tooltip
-          :content="settingsStore.dark ? '纯黑夜固定使用青柠强调色，切回框架纸后再调整' : '图表与数据标记的强调色'"
-          placement="left"
-        >
-          <span>
-            <el-color-picker
-              v-model="accent"
-              :predefine="predefineColors"
-              :disabled="settingsStore.dark"
-              @change="accentChange"
-            />
-          </span>
-        </el-tooltip>
-      </span>
-    </div>
-    <div class="drawer-item">
       <span>纯黑夜主题</span>
       <span class="comp-style">
         <el-switch :model-value="settingsStore.dark" class="drawer-switch" @change="onDarkChange" />
@@ -126,12 +108,10 @@ const settingsStore = useSettingsStore();
 const permissionStore = usePermissionStore();
 
 const showSettings = ref(false);
-const accent = ref(settingsStore.accent);
 const storeSettings = computed(() => settingsStore);
-const predefineColors = ref(['#1b6c80', '#1d5fbf', '#b8336a', '#2e7d5b', '#a86f0c', '#5b5f66']);
 const navType = ref(settingsStore.navType);
 const radiusBase = ref(settingsStore.radiusBase);
-// 外观状态唯一入口在 store：切换时同步 html.dark、localStorage 与主色
+// 外观状态唯一入口在 store：切换时同步 html.dark、localStorage；皮肤与强调色由皮肤令牌固定（U-24）
 const onDarkChange = (value: boolean | string | number) => {
   settingsStore.setDark(Boolean(value));
 };
@@ -163,9 +143,6 @@ const dynamicTitleChange = () => {
   useDynamicTitle();
 };
 
-const accentChange = (val: string | null) => {
-  settingsStore.setAccent(val || '#1b6c80');
-};
 const radiusBaseChange = (val: number) => {
   settingsStore.radiusBase = val;
   const el = document.documentElement;

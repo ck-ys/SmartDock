@@ -2,13 +2,10 @@
   <div class="sidebar-logo-container" :class="{ collapse: collapse }">
     <transition :enter-active-class="proxy?.animate.logoAnimate.enter" mode="out-in">
       <router-link v-if="collapse" key="collapse" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
-        <h1 v-else class="sidebar-title">
-          {{ title }}
-        </h1>
+        <i class="dcs-mark sidebar-logo-mark" aria-hidden="true">S</i>
       </router-link>
       <router-link v-else key="expand" class="sidebar-logo-link" to="/">
-        <img v-if="logo" :src="logo" class="sidebar-logo" />
+        <i class="dcs-mark sidebar-logo-mark" aria-hidden="true">S</i>
         <h1 class="sidebar-title">
           {{ title }}
         </h1>
@@ -18,11 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import variables from '@/assets/styles/variables.module.scss';
-import logo from '@/assets/logo/logo.png';
-import { useSettingsStore } from '@/store/modules/settings';
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
-import { NavTypeEnum } from '@/enums/NavTypeEnum';
 
 defineProps({
   collapse: {
@@ -32,30 +25,6 @@ defineProps({
 });
 
 const title = import.meta.env.VITE_APP_LOGO_TITLE;
-const settingsStore = useSettingsStore();
-const sideTheme = computed(() => settingsStore.sideTheme);
-
-// 获取Logo背景色
-const getLogoBackground = computed(() => {
-  if (settingsStore.dark) {
-    return variables.menuBackground;
-  }
-  if (settingsStore.navType == NavTypeEnum.TOP) {
-    return variables.menuLightBackground;
-  }
-  return sideTheme.value === 'theme-dark' ? variables.menuBackground : variables.menuLightBackground;
-});
-
-// 获取Logo文字颜色
-const getLogoTextColor = computed(() => {
-  if (settingsStore.dark) {
-    return variables.menuColor;
-  }
-  if (settingsStore.navType == NavTypeEnum.TOP) {
-    return variables.logoLightTitleColor;
-  }
-  return sideTheme.value === 'theme-dark' ? variables.logoTitleColor : variables.logoLightTitleColor;
-});
 </script>
 
 <style lang="scss" scoped>
@@ -72,26 +41,28 @@ const getLogoTextColor = computed(() => {
   position: relative;
   height: var(--app-topbar-h);
   line-height: var(--app-topbar-h);
-  background: v-bind(getLogoBackground);
+  /* 顶栏模式Logo坐在壳层上，底色交给容器（sheet/frame），不再按明暗各自取色 */
+  background: transparent;
   text-align: center;
   overflow: hidden;
 
   & .sidebar-logo-link {
     height: 100%;
     width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
 
-    & .sidebar-logo {
+    & .sidebar-logo-mark {
       width: 26px;
       height: 26px;
-      vertical-align: middle;
-      margin-right: 9px;
-      margin-left: 12px;
     }
 
     & .sidebar-title {
       display: inline-block;
       margin: 0;
-      color: v-bind(getLogoTextColor);
+      color: var(--app-text);
       font-weight: 600;
       line-height: var(--app-topbar-h);
       font-size: 14px;
@@ -106,7 +77,7 @@ const getLogoTextColor = computed(() => {
   }
 
   &.collapse {
-    .sidebar-logo {
+    .sidebar-logo-mark {
       margin-right: 0px;
     }
   }

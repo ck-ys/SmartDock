@@ -1,39 +1,51 @@
-// 处理主题样式
-export const handleThemeStyle = (theme: string) => {
-  document.documentElement.style.setProperty('--el-color-primary', theme);
-  for (let i = 1; i <= 9; i++) {
-    document.documentElement.style.setProperty(`--el-color-primary-light-${i}`, `${getLightColor(theme, i / 10)}`);
-  }
-  for (let i = 1; i <= 9; i++) {
-    document.documentElement.style.setProperty(`--el-color-primary-dark-${i}`, `${getDarkColor(theme, i / 10)}`);
+// 处理主题样式（U-24 双主题版）
+//
+// 皮肤与主色全部由 theme-framed.scss 的 4 套令牌（data-skin × html.dark）声明，
+// 本文件不再向 :root 写内联主色/强调色——内联值会压过样式表里的皮肤令牌，
+// 旧实现（handleThemeStyle 算色阶 + 浅色写内联 acc）已随双主题批退役。
+// 残留的色阶计算函数保留：页面里还有按品牌色算 hover 档的调用方。
+export const DEFAULT_ACCENT = '#2f6feb';
+export const DARK_STORAGE_KEY = 'useDarkKey';
+export const SKIN_STORAGE_KEY = 'app-skin';
+export type AppSkin = 't1' | 't7';
+
+export const normalizeSkin = (v: unknown): AppSkin => (v === 't7' ? 't7' : 't1');
+
+/** 读本机持久化的皮肤（t1/t7；缺失或非法一律回 t1） */
+export const readStoredSkin = (): AppSkin => {
+  try {
+    return normalizeSkin(localStorage.getItem(SKIN_STORAGE_KEY));
+  } catch {
+    return 't1';
   }
 };
 
-/** 框架纸（浅）的主操作色；纯黑夜（深）由 html.dark 的样式接管主色 */
-export const LIGHT_PRIMARY = '#1d1f20';
-export const DEFAULT_ACCENT = '#1b6c80';
-export const DARK_STORAGE_KEY = 'useDarkKey';
+/** 应用皮肤：html[data-skin]（样式表据此选 4 套令牌之一；写属性即生效，无需算色阶） */
+export const applySkin = (skin: AppSkin) => {
+  document.documentElement.setAttribute('data-skin', skin);
+};
+
+/** boot 早期应用皮肤：main.ts 模块求值阶段同步调用，赶在首帧前把 data-skin 挂上 html，
+ *  避免刷新时先按 T1 渲染再跳 T7 的闪变 */
+export const applyInitialSkin = () => {
+  applySkin(readStoredSkin());
+};
 
 /**
- * 应用外观：切换 html.dark，并写入/清除内联主色。
+ * 应用明暗：切换 html.dark 并持久化。
  *
- * 深浅必须分开写：浅色由 handleThemeStyle 算色阶（写内联变量）；
- * 深色若继续内联，会压过 html.dark 里的白色主色与色阶，所以深色先清掉内联。
+ * 明暗与皮肤正交：深浅的全部色值（含 EP 主色阶梯）都在样式表按组合声明，
+ * 这里只搬类名与存储，不写任何内联颜色。
  */
-export const applyThemeMode = (dark: boolean, accent: string = DEFAULT_ACCENT) => {
+export const applyThemeMode = (dark: boolean) => {
   const root = document.documentElement;
   root.classList.toggle('dark', dark);
-  if (dark) {
-    root.style.removeProperty('--el-color-primary');
-    for (let i = 1; i <= 9; i++) {
-      root.style.removeProperty(`--el-color-primary-light-${i}`);
-      root.style.removeProperty(`--el-color-primary-dark-${i}`);
-    }
-    // 深色的数据色是设计固定的青柠，不接受自定义强调色
-    root.style.removeProperty('--app-accent');
-  } else {
-    handleThemeStyle(LIGHT_PRIMARY);
-    root.style.setProperty('--app-accent', accent || DEFAULT_ACCENT);
+  // 清掉旧版本遗留的内联主色/强调色（若有）：它们会压过皮肤令牌
+  root.style.removeProperty('--el-color-primary');
+  root.style.removeProperty('--app-accent');
+  for (let i = 1; i <= 9; i++) {
+    root.style.removeProperty(`--el-color-primary-light-${i}`);
+    root.style.removeProperty(`--el-color-primary-dark-${i}`);
   }
   try {
     localStorage.setItem(DARK_STORAGE_KEY, dark ? 'dark' : 'light');
@@ -66,7 +78,7 @@ export const rgbToHex = (r: string, g: string, b: string) => {
 };
 
 // 变浅颜色值
-export const getLightColor = (color: string, level: number) => {
+export const getLightColor = (color: string, level: number): string => {
   const rgb = hexToRgb(color);
   for (let i = 0; i < 3; i++) {
     const s = (255 - Number(rgb[i])) * level + Number(rgb[i]);
@@ -76,7 +88,7 @@ export const getLightColor = (color: string, level: number) => {
 };
 
 // 变深颜色值
-export const getDarkColor = (color: string, level: number) => {
+export const getDarkColor = (color: string, level: number): string => {
   const rgb = hexToRgb(color);
   for (let i = 0; i < 3; i++) {
     rgb[i] = String(Math.floor(Number(rgb[i]) * (1 - level)));

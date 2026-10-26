@@ -5,20 +5,8 @@
 
     <header class="scene-brand">
       <div class="scene-brand__lockup">
-        <span class="scene-brand__mark" aria-hidden="true">
-          <svg viewBox="0 0 32 32" focusable="false">
-            <defs>
-              <linearGradient id="brand-mark" x1="0" y1="0" x2="1" y2="1">
-                <stop stop-color="#5b8ff0" />
-                <stop offset="1" stop-color="#3ddad7" />
-              </linearGradient>
-            </defs>
-            <rect width="32" height="32" rx="9" fill="url(#brand-mark)" />
-            <rect x="8" y="17" width="4" height="8" rx="2" fill="#fff" opacity="0.92" />
-            <rect x="14" y="12" width="4" height="13" rx="2" fill="#fff" opacity="0.92" />
-            <rect x="20" y="7" width="4" height="18" rx="2" fill="#fff" opacity="0.92" />
-          </svg>
-        </span>
+        <!-- U-24 皮肤批：旧渐变方标退役，改单色几何字母标（与侧栏/顶栏同款，颜色随皮肤 mark 令牌） -->
+        <i class="scene-brand__mark dcs-mark" aria-hidden="true">S</i>
         <div class="scene-brand__word">SmartDock</div>
       </div>
       <p class="scene-brand__tagline">用户画像与 AI 助手的工作台</p>
@@ -191,16 +179,10 @@
   flex: none;
   width: 36px;
   height: 36px;
-  overflow: hidden;
-  border-radius: 11px;
-  box-shadow:
-    0 12px 28px rgba(61, 218, 215, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  svg {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
+  /* 皮肤批：颜色全走 mark 令牌；去青色辉光环，留一层安静投影把标从场景底上托起 */
+  font-size: 19px;
+  border-radius: 9px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
 .scene-brand__word {
   font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;

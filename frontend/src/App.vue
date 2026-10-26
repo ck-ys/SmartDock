@@ -11,9 +11,9 @@ import { useAppStore } from '@/store/modules/app';
 
 const appStore = useAppStore();
 
-// 初始化外观：框架纸（浅）/ 纯黑夜（深），同时把主色与数据强调色落到 :root。
+// 初始化外观：明暗由这里同步（皮肤 skin 在 main.ts 更早的 applyInitialSkin 已挂好）。
 // 必须在 setup 顶层同步执行——放到 onMounted 会晚于子组件的 useChartTokens() 求值，
 // computed 缓存了 :root 默认色，刷新后图表会停在默认强调色（界面已换色、图没换）
 const settingsStore = useSettingsStore();
-applyThemeMode(settingsStore.dark, settingsStore.accent);
+applyThemeMode(settingsStore.dark);
 </script>

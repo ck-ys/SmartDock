@@ -9,6 +9,11 @@ import App from './App.vue';
 import store from './store';
 import router from './router';
 
+// 皮肤（U-24 双主题）：样式表按 html[data-skin] 选 4 套令牌之一。
+// 必须在 createApp/mount 之前、首帧之前同步执行——晚了会先按默认 T1 渲染再跳所选皮肤（闪变）
+import { applyInitialSkin } from '@/utils/theme';
+applyInitialSkin();
+
 // 自定义指令
 import directive from './directive';
 

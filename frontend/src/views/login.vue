@@ -63,16 +63,19 @@ const agreementHref = (path: string) => router.resolve(path).href;
 
 <style lang="scss" scoped>
 .login-page {
-  --login-navy: #08184f;
-  --el-color-primary: var(--login-navy);
-  --el-color-primary-light-3: #344474;
-  --el-color-primary-light-5: #737e9c;
-  --el-color-primary-light-9: #f0f2f7;
-  --el-color-primary-dark-2: #06123d;
-  --el-text-color-primary: var(--login-navy);
-  --el-text-color-regular: #344164;
-  --el-text-color-placeholder: #6b7590;
-  --el-border-color: #cdd3e1;
+  /* U-24 皮肤批：登录页随肤——文字/主色吃「外观」皮肤的浅色令牌（theme-framed.scss 常亮页钉值），
+     左场景的品牌字与强调点也不再固定藏青 */
+  --login-navy: var(--app-text);
+  --login-acc: var(--app-accent);
+  --el-color-primary: var(--login-acc);
+  --el-color-primary-light-3: color-mix(in srgb, var(--login-acc) 70%, #ffffff);
+  --el-color-primary-light-5: color-mix(in srgb, var(--login-acc) 50%, #ffffff);
+  --el-color-primary-light-9: var(--app-accent-soft);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--login-acc) 80%, #000000);
+  --el-text-color-primary: var(--app-text);
+  --el-text-color-regular: var(--app-muted);
+  --el-text-color-placeholder: var(--app-faint);
+  --el-border-color: var(--app-border);
   --el-fill-color-blank: #fff;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(420px, 38%);
@@ -81,8 +84,8 @@ const agreementHref = (path: string) => router.resolve(path).href;
   height: 100svh;
   min-height: 0;
   overflow: hidden;
-  background: linear-gradient(180deg, #f7f9fd, #eef2f9);
-  color: var(--login-navy);
+  background: var(--app-frame);
+  color: var(--app-text);
   font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
 }
 .login-page__scene {
@@ -91,7 +94,8 @@ const agreementHref = (path: string) => router.resolve(path).href;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: #061126;
+  /* 场景底随肤：T1 深蓝（=T1 暗壳 #16202c）；T7 由 theme-framed.scss 覆写为 #101010 */
+  background: var(--login-scene, #16202c);
 }
 .login-panel {
   position: relative;
@@ -103,16 +107,15 @@ const agreementHref = (path: string) => router.resolve(path).href;
   box-sizing: border-box;
   overflow: hidden;
   padding: 28px 30px 20px;
-  background:
-    radial-gradient(420px 240px at 0% 100%, rgba(61, 218, 215, 0.05), transparent 65%),
-    radial-gradient(520px 260px at 100% 0%, rgba(59, 130, 246, 0.08), transparent 62%), linear-gradient(180deg, #ffffff, #f8fafd);
-  border-left: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: -28px 0 70px rgba(3, 10, 28, 0.32);
+  /* 皮肤批：去青/蓝装饰渐变，纸面走令牌、分界走 rule */
+  background: var(--app-surface);
+  border-left: 1px solid var(--app-rule);
+  box-shadow: -14px 0 40px rgba(3, 10, 28, 0.12);
   &::before {
     content: '';
     position: absolute;
     inset: 0;
-    background-image: radial-gradient(rgba(8, 24, 79, 0.05) 1px, transparent 1px);
+    background-image: radial-gradient(color-mix(in srgb, var(--app-text) 6%, transparent) 1px, transparent 1px);
     background-size: 26px 26px;
     mask-image: radial-gradient(75% 70% at 60% 45%, #000 0%, transparent 78%);
     -webkit-mask-image: radial-gradient(75% 70% at 60% 45%, #000 0%, transparent 78%);
@@ -164,14 +167,13 @@ const agreementHref = (path: string) => router.resolve(path).href;
   width: 100%;
   max-width: 396px;
   padding: 26px 26px 22px;
-  border: 1px solid transparent;
-  border-radius: 18px;
-  background:
-    linear-gradient(#fff, #fff) padding-box,
-    linear-gradient(140deg, rgba(47, 95, 208, 0.3), rgba(61, 218, 215, 0.18)) border-box;
+  /* 皮肤批：渐变描边卡改安静实线边（U-17/口感径），底走纸面 */
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-control-radius);
+  background: var(--app-surface);
   box-shadow:
     0 1px 2px rgba(8, 24, 79, 0.04),
-    0 18px 46px rgba(8, 24, 79, 0.09);
+    0 14px 36px rgba(8, 24, 79, 0.07);
 }
 .login-panel__heading {
   display: flex;
@@ -182,10 +184,8 @@ const agreementHref = (path: string) => router.resolve(path).href;
 .login-panel__logo {
   display: none;
   margin-bottom: 10px;
-  background: linear-gradient(120deg, #0b1f5c, #2f5fd0);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  /* 皮肤批：去品牌渐变字，字色随皮肤（与登录场景字母标同源的纯文字品牌行） */
+  color: var(--app-text);
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 0.06em;

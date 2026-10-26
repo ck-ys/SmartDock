@@ -1,37 +1,62 @@
 /**
- * 框架纸（A，浅色） / 纯黑夜（D，深色）
+ * 双主题皮肤（U-24，2026-10-26）：T1 深蓝稳重（默认）/ T7 TDesign 蓝 × 明/暗 = 4 套令牌
  *
- * 两个方向共用一套结构 token，只换值：
- *   A：浅青灰 L 框 + 内缩白纸，唯一数据色墨青 #1b6c80，主按钮近黑。
- *   D：纯黑地面 + 亮度分层的卡片，唯一数据色青柠 #c6f24e，主按钮反相白。
+ * 令牌逐值来自 .workshop/tmp/20261025-ui-audit/themes.mjs 的 THEMES[T1|T7].light|dark
+ * （bg/shell/sheet/rule/raised/text/mut/faint/acc/accSoft/c1c2c3/fab/sideText/activeBg/
+ *   activeText/activeBar/rad/shadow/markBg/markFg），EP 主色阶梯与 hover/active 衍生档
+ * 由 acc 按固定比例派生（浅色向白混、深色向黑压），不引入第二套色感。
  *
- * 页面不再各自写色：这里把 --app-* 映射到 --el-*，旧页面自动继承。
- * 覆盖顺序：本文件在 index.scss 最后 @use，晚于 ruoyi/element-ui/sidebar。
+ * 组合规则：html[data-skin='t7'] 覆盖 :root（T1 浅），html[data-skin='t7'].dark 覆盖
+ * html.dark（T1 深）；未设置 data-skin 时按 T1 渲染。业务页只认 --app-* 老令牌名，零改动换肤。
+ *
+ * 覆盖顺序：本文件在 index.scss 倒数第二 @use，晚于 ruoyi/element-ui/sidebar（dcs-ui-kit 在其后但不写色值）。
  */
 
-/* ============================ A · 浅色 ============================ */
+/* ============================ T1 · 浅色（默认） ============================ */
 :root {
   color-scheme: light;
-  /* 结构 */
-  --app-frame: #eef4f6;
+  /* 结构（spec T1.light：bg #eef1f6 / shell #1e2a38 / sheet #fff / rule #dce3ec / raised #f4f6fa） */
+  --app-frame: #eef1f6;
   --app-sheet-bg: #ffffff;
-  --app-ground: #f9fbfc;
+  --app-ground: #eef1f6;
   --app-surface: #ffffff;
-  --app-raised: #f4f6f8;
-  --app-active: #ebedee;
-  --app-border: #e8eaec;
-  --app-rule: #f0f1f2;
-  --app-control: #cdced1;
-  --app-text: #131416;
-  --app-muted: #5d5f60;
-  --app-faint: #6b6b6b;
+  --app-raised: #f4f6fa;
+  --app-active: #e8f0fe; /* 内容面选中底 = accSoft；侧栏选中另有 side-active-* 令牌 */
+  --app-border: #dce3ec;
+  --app-rule: #dce3ec;
+  --app-control: #dce3ec;
+  --app-text: #14202d;
+  --app-muted: #5f7083;
+  --app-faint: #8494a6;
 
-  /* 数据与主操作 */
-  --app-accent: #1b6c80;
-  --app-primary: #1d1f20;
+  /* 数据与主操作（acc #2f6feb；主按钮即 acc，墨色 accFg） */
+  --app-accent: #2f6feb;
+  --app-accent-soft: #e8f0fe;
+  --app-primary: #2f6feb;
   --app-primary-ink: #ffffff;
-  --app-primary-hover: #333638;
-  --app-primary-active: #000000;
+  --app-primary-hover: #4983ed;
+  --app-primary-active: #2a64d4;
+
+  /* 图表三色（c1/c2/c3）与 FAB（fab/fabFg/fabBorder） */
+  --app-chart-1: #2f6feb;
+  --app-chart-2: #64748b;
+  --app-chart-3: #a9b6c4;
+  --app-fab: #1e2a38;
+  --app-fab-fg: #ffffff;
+  --app-fab-border: transparent;
+
+  /* 侧栏一族（shell/sideText/activeBg/activeText/activeBar；hover 档在 shell 与 activeBg 之间取） */
+  --app-shell: #1e2a38;
+  --app-side-text: #c7d2de;
+  --app-side-hover: #263545;
+  --app-side-active-bg: #2a3a4c;
+  --app-side-active-text: #ffffff;
+  --app-side-active-bar: #4a8cf7;
+
+  /* 品牌字母标（markBg/markFg，两主题同款、颜色随令牌） */
+  --app-mark-bg: #eef2f7;
+  --app-mark-fg: #1e2a38;
+  --app-ava: #8fa0b3;
 
   /* 草稿/待确认的暖色卡片（AI 助手确认卡一族）在深色下也要保持“暖”语义 */
   --app-warm-bg: #fffcf5;
@@ -43,12 +68,12 @@
   /* 暖卡里的字段名（深褐）：深色暖底上要换成亮砂色，不能沿用同一个褐 */
   --app-warm-ink: #6b5900;
 
-  /* 度量 */
+  /* 度量（rad=8px；阴影走 spec shadow） */
   --app-sidebar-w: 256px;
   --app-topbar-h: 64px;
-  --app-sheet-radius: 16px;
+  --app-sheet-radius: 8px;
   --app-sheet-inset: 8px;
-  --app-card-radius: 10px;
+  --app-card-radius: 8px;
   --app-control-radius: 8px;
   --app-nav-radius: 8px; // 导航药丸专用：不跟控件圆角走
   /* 导航行：行高比 shadcn 的 32 大一档（中文字面更矮），左右留 6px 让药丸不顶边 */
@@ -57,7 +82,7 @@
   --app-nav-inset: 6px;
   --app-nav-icon: 18px;
   --app-card-border: 1px solid var(--app-border);
-  --app-card-shadow: none;
+  --app-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
   --app-shadow-sm: none;
   --app-shadow-md: none;
   --app-shadow-lg: none;
@@ -74,14 +99,14 @@
   --el-text-color-primary: var(--app-text);
   --el-text-color-regular: var(--app-muted);
   --el-text-color-secondary: var(--app-faint);
-  --el-text-color-placeholder: #9a9c9d;
+  --el-text-color-placeholder: #9aa6b4;
   --el-border-color: var(--app-border);
   --el-border-color-light: var(--app-border);
   --el-border-color-lighter: var(--app-rule);
   --el-border-color-extra-light: var(--app-rule);
-  --el-fill-color: #f1f3f4;
+  --el-fill-color: #edf1f6;
   --el-fill-color-light: var(--app-raised);
-  --el-fill-color-lighter: #f7f8f9;
+  --el-fill-color-lighter: #f4f6fa;
   --el-fill-color-blank: var(--app-surface);
   --el-border-radius-base: var(--app-card-radius);
   --el-border-radius-small: var(--app-control-radius);
@@ -90,7 +115,7 @@
   --el-color-success: #1e7b4f;
   --el-color-warning: #92400e;
   --el-color-danger: #c4242a;
-  --el-color-info: #5d5f60;
+  --el-color-info: #5f7083;
   --el-menu-bg-color: transparent;
   --el-menu-text-color: var(--app-muted);
   --el-menu-hover-bg-color: var(--app-raised);
@@ -102,40 +127,43 @@
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
 
-  /* 首屏前的主色兜底（App 挂载后由 handleThemeStyle 写成同样的值，避免闪一下蓝） */
-  --el-color-primary: #1d1f20;
-  --el-color-primary-light-3: #606262;
-  --el-color-primary-light-5: #8e8f8f;
-  --el-color-primary-light-7: #bbbcbc;
-  --el-color-primary-light-8: #d2d2d2;
-  --el-color-primary-light-9: #e8e9e9;
-  --el-color-primary-dark-2: #17191a;
+  /* EP 主色 = 皮肤 acc 及其衍生档（acc #2f6feb；浅色阶梯向白混 N*10%） */
+  --el-color-primary: #2f6feb;
+  --el-color-primary-light-3: #6d9af1;
+  --el-color-primary-light-5: #97b7f5;
+  --el-color-primary-light-7: #c0d3f9;
+  --el-color-primary-light-8: #d5e2fb;
+  --el-color-primary-light-9: #eaf0fd;
+  --el-color-primary-dark-2: #2558bc;
 }
 
 /* ============================ 常亮页：登录 / 注册 / 协议 / 助手抽屉 ============================ */
-/* 这几处自带一套品牌浅色外观（并覆盖了 --el-color-primary）。把 --app-* 也钉回浅色口径，
-   否则深色主题残留时，全局规则会把它们的输入框/卡片刷成黑面 */
+/* 这几处自带一套浅色外观（登录页随肤：钉在皮肤的「浅色」口径上，深色开关不影响它们；
+   深色主题残留时，全局规则会把它们的输入框/卡片刷成深面，所以仍要整套钉回浅色值） */
 :is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper, .tenant-picker) {
   color-scheme: light;
-  --app-frame: #eef4f6;
+  --app-frame: #eef1f6;
   --app-sheet-bg: #ffffff;
-  --app-ground: #f9fbfc;
+  --app-ground: #eef1f6;
   --app-surface: #ffffff;
-  --app-raised: #f4f6f8;
-  --app-active: #ebedee;
-  --app-border: #e8eaec;
-  --app-rule: #f0f1f2;
-  --app-control: #cdced1;
-  --app-text: #131416;
-  --app-muted: #5d5f60;
-  --app-faint: #6b6b6b;
-  --app-accent: #1b6c80;
-  --app-primary: #1d1f20;
+  --app-raised: #f4f6fa;
+  --app-active: #e8f0fe;
+  --app-border: #dce3ec;
+  --app-rule: #dce3ec;
+  --app-control: #dce3ec;
+  --app-text: #14202d;
+  --app-muted: #5f7083;
+  --app-faint: #8494a6;
+  --app-accent: #2f6feb;
+  --app-accent-soft: #e8f0fe;
+  --app-primary: #2f6feb;
   --app-primary-ink: #ffffff;
-  --app-primary-hover: #333537;
-  --app-primary-active: #0b0c0d;
-  --app-card-radius: 12px;
-  --app-sheet-radius: 16px;
+  --app-primary-hover: #4983ed;
+  --app-primary-active: #2a64d4;
+  --app-mark-bg: #eef2f7;
+  --app-mark-fg: #1e2a38;
+  --app-card-radius: 8px;
+  --app-sheet-radius: 8px;
   --app-control-radius: 8px;
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
@@ -147,6 +175,54 @@
   --app-warm-done-border: #c2e7b0;
   /* 暖卡里的字段名（深褐）：深色暖底上要换成亮砂色，不能沿用同一个褐 */
   --app-warm-ink: #6b5900;
+  /* 登录家族控件的主色阶梯：皮肤 acc（T1 档） */
+  --el-color-primary: #2f6feb;
+  --el-color-primary-light-3: #6d9af1;
+  --el-color-primary-light-5: #97b7f5;
+  --el-color-primary-light-7: #c0d3f9;
+  --el-color-primary-light-8: #d5e2fb;
+  --el-color-primary-light-9: #eaf0fd;
+  --el-color-primary-dark-2: #2558bc;
+}
+
+/* T7 皮肤下，常亮页整体换成 T7 浅色口径（含主色阶梯） */
+html[data-skin='t7'] :is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper, .tenant-picker) {
+  --app-frame: #f3f5f8;
+  --app-sheet-bg: #ffffff;
+  --app-ground: #f3f5f8;
+  --app-surface: #ffffff;
+  --app-raised: #f5f7fa;
+  --app-active: #e8f3ff;
+  --app-border: #e3e6eb;
+  --app-rule: #e3e6eb;
+  --app-control: #e3e6eb;
+  --app-text: #181818;
+  --app-muted: #5e6d82;
+  --app-faint: #8996a8;
+  --app-accent: #0052d9;
+  --app-accent-soft: #e8f3ff;
+  --app-primary: #0052d9;
+  --app-primary-ink: #ffffff;
+  --app-primary-hover: #1a63dd;
+  --app-primary-active: #004ac3;
+  --app-mark-bg: #0052d9;
+  --app-mark-fg: #ffffff;
+  --app-card-radius: 4px;
+  --app-sheet-radius: 4px;
+  --app-control-radius: 4px;
+  --el-color-primary: #0052d9;
+  --el-color-primary-light-3: #4c85e4;
+  --el-color-primary-light-5: #7fa8ec;
+  --el-color-primary-light-7: #b2cbf3;
+  --el-color-primary-light-8: #ccdcf7;
+  --el-color-primary-light-9: #e5edfb;
+  --el-color-primary-dark-2: #0041ad;
+}
+
+/* T7 登录页左场景底色：T1 用深蓝壳（login.vue 的 --login-scene 默认值），
+   T7 的气质是中性蓝黑，取其暗档 bg #101010；场景内的蓝色光晕两肤通用 */
+html[data-skin='t7'] .login-page {
+  --login-scene: #101010;
 }
 
 /* 助手抽屉复用的是 --dcs-* 派生变量：它们在 :root 已按当时的主题解析成具体色，
@@ -206,41 +282,68 @@
 }
 
 /* 登录家族的弹窗会被 teleport 到 body，脱离 .login-page 的主色作用域，
-   必须单独把 EP 主色阶梯钉回产品藏青；否则深色下 --el-color-primary=白，
-   下拉选中行（白底 + 白字）和对勾整个隐形。助手抽屉由自身 scoped 样式钉近黑，不含在内 */
+   必须单独把 EP 主色阶梯钉回皮肤 acc；否则深色下主色被全局换肤后，
+   下拉选中行和对勾与皮肤脱节。助手抽屉由自身 scoped 样式管理，不含在内 */
 :is(.forgot-pwd, .login-tenant-popper, .tenant-picker) {
-  --el-color-primary: #08184f;
-  --el-color-primary-light-3: #344474;
-  --el-color-primary-light-5: #737e9c;
-  --el-color-primary-light-9: #f0f2f7;
-  --el-color-primary-dark-2: #06123d;
+  --el-color-primary: #2f6feb;
+  --el-color-primary-light-3: #6d9af1;
+  --el-color-primary-light-5: #97b7f5;
+  --el-color-primary-light-9: #eaf0fd;
+  --el-color-primary-dark-2: #2558bc;
+}
+
+html[data-skin='t7'] :is(.forgot-pwd, .login-tenant-popper, .tenant-picker) {
+  --el-color-primary: #0052d9;
+  --el-color-primary-light-3: #4c85e4;
+  --el-color-primary-light-5: #7fa8ec;
+  --el-color-primary-light-9: #e5edfb;
+  --el-color-primary-dark-2: #0041ad;
 }
 
 html.dark {
-  /* ============================ D · 深色 ============================ */
-  /* 让原生滚动条 / 日期选择 / 下拉框跟随深色，否则黑底上挂一条浅灰滚动条 */
+  /* ============================ T1 · 深色 ============================ */
+  /* 让原生滚动条 / 日期选择 / 下拉框跟随深色，否则深底上挂一条浅灰滚动条 */
   color-scheme: dark;
-  --app-frame: #000000;
-  --app-sheet-bg: #000000;
-  --app-ground: #000000;
-  --app-surface: #111111;
-  --app-raised: #1d1d1d;
-  --app-active: transparent;
-  --app-border: #1a1a1a;
-  /* 表格行线/分隔线：原来的 #161616 压在 #111 卡面上对比只有 1.03:1，整张表糊成一块；
-     壳层留档批 题3A：#232323 实测深浅差仅约 7%（刻意注视才可见），提一档到 #2a2a2a（差约 10%）——
-     扫到即知界在哪，仍守住"安静边框"不抢戏 */
-  --app-rule: #2a2a2a;
-  --app-control: #4a4a50;
-  --app-text: #ffffff;
-  --app-muted: #b4b4b4;
-  --app-faint: #949494;
+  /* spec T1.dark：bg #0c1117 / shell #16202c / sheet #131a23 / rule #212b36 / raised #1a2430 */
+  --app-frame: #0c1117;
+  --app-sheet-bg: #131a23;
+  --app-ground: #0c1117;
+  --app-surface: #131a23;
+  --app-raised: #1a2430;
+  --app-active: #16283f; /* accSoft 做内容面选中底 */
+  --app-border: #212b36;
+  --app-rule: #212b36;
+  /* 控件描边比 rule 提一档：#131a23 卡面上 #212b36 的差约 6%，输入框描边要扫到即知 */
+  --app-control: #33414f;
+  --app-text: #e4ecf4;
+  --app-muted: #8fa0b3;
+  --app-faint: #6f8094;
 
-  --app-accent: #c6f24e;
-  --app-primary: #ffffff;
-  --app-primary-ink: #000000;
-  --app-primary-hover: #e6e6e6;
-  --app-primary-active: #cfcfcf;
+  /* acc #4a8cf7，主按钮墨色取 accFg #061426 */
+  --app-accent: #4a8cf7;
+  --app-accent-soft: #16283f;
+  --app-primary: #4a8cf7;
+  --app-primary-ink: #061426;
+  --app-primary-hover: #5e9af8;
+  --app-primary-active: #4380de;
+
+  --app-chart-1: #4a8cf7;
+  --app-chart-2: #7e8fa2;
+  --app-chart-3: #55636f;
+  --app-fab: #eef2f7;
+  --app-fab-fg: #16202c;
+  --app-fab-border: transparent;
+
+  --app-shell: #16202c;
+  --app-side-text: #aebdcb;
+  --app-side-hover: #1c2836;
+  --app-side-active-bg: #22303f;
+  --app-side-active-text: #ffffff;
+  --app-side-active-bar: #4a8cf7;
+
+  --app-mark-bg: #eef2f7;
+  --app-mark-fg: #16202c;
+  --app-ava: #8fa0b3;
 
   --app-warm-bg: #1c1810;
   --app-warm-bg-top: #221d13;
@@ -250,49 +353,222 @@ html.dark {
   --app-warm-done-border: #2c4a28;
   --app-warm-ink: #f0d08a;
 
-  --app-card-radius: 10px;
-  --app-sheet-radius: 20px;
+  --app-card-radius: 8px;
+  --app-sheet-radius: 8px;
   --app-control-radius: 8px;
   --app-nav-radius: 8px;
-  --app-card-border: 0;
+  --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
   --app-surface-bg: var(--app-surface);
   --app-surface-border: var(--app-border);
 
-  --el-color-primary: #ffffff;
-  /* 主色在深色下是白底，Element 里凡是「主色填充 + 白字」的地方（分页当前页、
-     勾选框对勾、单选圆点、开关滑块）都靠这个变量取反相墨色，否则白底白字消失 */
-  --el-color-white: #000000;
-  --el-color-primary-light-3: #d6d6d6;
-  --el-color-primary-light-5: #a8a8a8;
-  --el-color-primary-light-7: #7a7a7a;
-  --el-color-primary-light-8: #4d4d4d;
-  --el-color-primary-light-9: #2a2a2a;
-  --el-color-primary-dark-2: #cccccc;
+  /* EP 主色 = acc #4a8cf7；深色阶梯向黑压（light-8/9 用 accSoft 做暗底选中面） */
+  --el-color-primary: #4a8cf7;
+  /* 主色填充上的字/对勾/滑块取反相墨色（accFg），否则蓝底蓝字消失 */
+  --el-color-white: var(--app-primary-ink);
+  --el-color-primary-light-3: #3e75cf;
+  --el-color-primary-light-5: #305ca3;
+  --el-color-primary-light-7: #234376;
+  --el-color-primary-light-8: #16283f;
+  --el-color-primary-light-9: #16283f;
+  --el-color-primary-dark-2: #396dc0;
   --el-color-success: #7ed6a5;
   --el-color-success-light-9: #10251a;
   --el-color-warning: #f0c060;
   --el-color-warning-light-9: #2a2110;
   --el-color-danger: #f08585;
   --el-color-danger-light-9: #2a1414;
-  --el-color-info: #a8a8a8;
-  --el-bg-color-page: #000000;
-  --el-bg-color: #111111;
-  --el-bg-color-overlay: #111111;
-  --el-text-color-primary: #ffffff;
-  --el-text-color-regular: #b4b4b4;
-  --el-text-color-secondary: #949494;
-  --el-text-color-placeholder: #7a7a7a;
-  --el-border-color: #1a1a1a;
-  --el-border-color-light: #1a1a1a;
-  --el-border-color-lighter: #161616;
-  --el-border-color-extra-light: #161616;
-  --el-fill-color: #222222;
-  --el-fill-color-light: #1d1d1d;
-  --el-fill-color-lighter: #161616;
-  --el-fill-color-blank: #111111;
+  --el-color-info: #8fa0b3;
+  --el-bg-color-page: #0c1117;
+  --el-bg-color: #131a23;
+  --el-bg-color-overlay: #131a23;
+  --el-text-color-primary: #e4ecf4;
+  --el-text-color-regular: #8fa0b3;
+  --el-text-color-secondary: #6f8094;
+  --el-text-color-placeholder: #6f8094;
+  --el-border-color: #212b36;
+  --el-border-color-light: #212b36;
+  --el-border-color-lighter: #1c2530;
+  --el-border-color-extra-light: #1c2530;
+  --el-fill-color: #1a2430;
+  --el-fill-color-light: #1a2430;
+  --el-fill-color-lighter: #17202a;
+  --el-fill-color-blank: #131a23;
   --el-mask-color: rgba(0, 0, 0, 0.72);
-  --el-table-row-hover-bg-color: #161616;
+  --el-table-row-hover-bg-color: #1a2430;
+}
+
+/* ============================ T7 · 浅色（白侧栏通用中台） ============================ */
+/* 与 html.dark 同特异性（0,1,1），靠本文件在后声明胜出；T7 的深色再由下方组合块覆盖 */
+html[data-skin='t7'] {
+  color-scheme: light;
+  /* spec T7.light：bg #f3f5f8 / shell #ffffff / sheet #ffffff / rule #e3e6eb / raised #f5f7fa */
+  --app-frame: #f3f5f8;
+  --app-sheet-bg: #ffffff;
+  --app-ground: #f3f5f8;
+  --app-surface: #ffffff;
+  --app-raised: #f5f7fa;
+  --app-active: #e8f3ff;
+  --app-border: #e3e6eb;
+  --app-rule: #e3e6eb;
+  --app-control: #e3e6eb;
+  --app-text: #181818;
+  --app-muted: #5e6d82;
+  --app-faint: #8996a8;
+
+  --app-accent: #0052d9;
+  --app-accent-soft: #e8f3ff;
+  --app-primary: #0052d9;
+  --app-primary-ink: #ffffff;
+  --app-primary-hover: #1a63dd;
+  --app-primary-active: #004ac3;
+
+  --app-chart-1: #0052d9;
+  --app-chart-2: #5e6d82;
+  --app-chart-3: #b6c2d1;
+  --app-fab: #0052d9;
+  --app-fab-fg: #ffffff;
+  --app-fab-border: transparent;
+
+  --app-shell: #ffffff;
+  --app-side-text: #333d4b;
+  --app-side-hover: #f5f7fa;
+  --app-side-active-bg: #e8f3ff;
+  --app-side-active-text: #0052d9;
+  --app-side-active-bar: #0052d9;
+
+  --app-mark-bg: #0052d9;
+  --app-mark-fg: #ffffff;
+  --app-ava: #9aa8bd;
+
+  /* 暖卡族沿用浅色口径（与皮肤正交的常量族） */
+  --app-warm-bg: #fffcf5;
+  --app-warm-bg-top: #fffdf8;
+  --app-warm-border: #f3d19e;
+  --app-warm-rule: #f7ecd4;
+  --app-warm-done-bg: #f6fceb;
+  --app-warm-done-border: #c2e7b0;
+  --app-warm-ink: #6b5900;
+
+  --app-card-radius: 4px;
+  --app-sheet-radius: 4px;
+  --app-control-radius: 4px;
+  --app-nav-radius: 4px;
+  --app-card-shadow: none;
+
+  --el-color-primary: #0052d9;
+  --el-color-white: #ffffff;
+  --el-color-primary-light-3: #4c85e4;
+  --el-color-primary-light-5: #7fa8ec;
+  --el-color-primary-light-7: #b2cbf3;
+  --el-color-primary-light-8: #ccdcf7;
+  --el-color-primary-light-9: #e5edfb;
+  --el-color-primary-dark-2: #0041ad;
+  --el-color-info: #5e6d82;
+  --el-bg-color-page: #f3f5f8;
+  --el-bg-color: #ffffff;
+  --el-bg-color-overlay: #ffffff;
+  --el-text-color-primary: #181818;
+  --el-text-color-regular: #5e6d82;
+  --el-text-color-secondary: #8996a8;
+  --el-text-color-placeholder: #98a3b2;
+  --el-border-color: #e3e6eb;
+  --el-border-color-light: #e3e6eb;
+  --el-border-color-lighter: #e9ecf0;
+  --el-border-color-extra-light: #e9ecf0;
+  --el-fill-color: #eef1f5;
+  --el-fill-color-light: #f5f7fa;
+  --el-fill-color-lighter: #f7f9fb;
+  --el-fill-color-blank: #ffffff;
+  --el-mask-color: rgba(0, 0, 0, 0.72);
+  --el-table-row-hover-bg-color: #f5f7fa;
+}
+
+/* ============================ T7 · 深色 ============================ */
+html[data-skin='t7'].dark {
+  color-scheme: dark;
+  /* spec T7.dark：bg #101010 / shell #1a1a1a / sheet #242424 / rule #333 / raised #2b2b2b */
+  --app-frame: #101010;
+  --app-sheet-bg: #242424;
+  --app-ground: #101010;
+  --app-surface: #242424;
+  --app-raised: #2b2b2b;
+  --app-active: #1b2b45;
+  --app-border: #333333;
+  --app-rule: #333333;
+  --app-control: #454545;
+  --app-text: #e7e7e7;
+  --app-muted: #a0a0a0;
+  --app-faint: #7d7d7d;
+
+  --app-accent: #4583ff;
+  --app-accent-soft: #1b2b45;
+  --app-primary: #4583ff;
+  --app-primary-ink: #ffffff;
+  --app-primary-hover: #5890ff;
+  --app-primary-active: #3e76e6;
+
+  --app-chart-1: #4583ff;
+  --app-chart-2: #93a4bb;
+  --app-chart-3: #5c6b7d;
+  --app-fab: #4583ff;
+  --app-fab-fg: #ffffff;
+  --app-fab-border: transparent;
+
+  --app-shell: #1a1a1a;
+  --app-side-text: #b9b9b9;
+  --app-side-hover: #262626;
+  --app-side-active-bg: #1b2b45;
+  --app-side-active-text: #7aa8ff;
+  --app-side-active-bar: #4583ff;
+
+  --app-mark-bg: #4583ff;
+  --app-mark-fg: #ffffff;
+  --app-ava: #5c6b7d;
+
+  --app-warm-bg: #1c1810;
+  --app-warm-bg-top: #221d13;
+  --app-warm-border: #57431f;
+  --app-warm-rule: #3a2e19;
+  --app-warm-done-bg: #121c11;
+  --app-warm-done-border: #2c4a28;
+  --app-warm-ink: #f0d08a;
+
+  --app-card-radius: 4px;
+  --app-sheet-radius: 4px;
+  --app-control-radius: 4px;
+  --app-nav-radius: 4px;
+  --app-card-border: 1px solid var(--app-border);
+  --app-card-shadow: none;
+  --app-surface-bg: var(--app-surface);
+  --app-surface-border: var(--app-border);
+
+  --el-color-primary: #4583ff;
+  --el-color-white: var(--app-primary-ink);
+  --el-color-primary-light-3: #3a6ed6;
+  --el-color-primary-light-5: #2d56a8;
+  --el-color-primary-light-7: #213e7a;
+  --el-color-primary-light-8: #1b2b45;
+  --el-color-primary-light-9: #1b2b45;
+  --el-color-primary-dark-2: #3566c6;
+  --el-color-info: #a0a0a0;
+  --el-bg-color-page: #101010;
+  --el-bg-color: #242424;
+  --el-bg-color-overlay: #242424;
+  --el-text-color-primary: #e7e7e7;
+  --el-text-color-regular: #a0a0a0;
+  --el-text-color-secondary: #7d7d7d;
+  --el-text-color-placeholder: #7d7d7d;
+  --el-border-color: #333333;
+  --el-border-color-light: #333333;
+  --el-border-color-lighter: #2c2c2c;
+  --el-border-color-extra-light: #2c2c2c;
+  --el-fill-color: #2b2b2b;
+  --el-fill-color-light: #2b2b2b;
+  --el-fill-color-lighter: #262626;
+  --el-fill-color-blank: #242424;
+  --el-mask-color: rgba(0, 0, 0, 0.72);
+  --el-table-row-hover-bg-color: #2b2b2b;
 }
 
 /* ============================ 基础排版 ============================ */
@@ -326,12 +602,13 @@ body {
 }
 
 #app .sidebar-container {
-  background-color: var(--app-frame) !important;
+  background-color: var(--app-shell) !important;
   box-shadow: none !important;
-  border-right: 0;
+  border-right: 1px solid var(--app-rule);
 }
 
-/* 侧栏菜单：行高/行距/内缩走 --app-nav-* 令牌，与左上品牌、左下用户行同一套节奏 */
+/* 侧栏菜单：行高/行距/内缩走 --app-nav-* 令牌，与左上品牌、左下用户行同一套节奏；
+   文字一律 sideText（深蓝侧栏与白侧栏共用一套令牌，暗色靠亮度分层） */
 #app .sidebar-container .el-menu {
   background: transparent !important;
   padding: 6px 0;
@@ -349,48 +626,38 @@ body {
   margin: 0 var(--app-nav-inset) !important;
   border-radius: var(--app-nav-radius) !important;
   font-size: 14px;
-  color: var(--app-muted);
+  color: var(--app-side-text);
 }
 
-/* 顶层条目是分组标题：墨色 + 500；二级条目保持灰字 400，层级靠缩进与字色区分
+/* 顶层条目是分组标题：加重到 500；层级靠字重与缩进区分，颜色仍走 sideText
    （Element 把 li 包在 <a>/<div> 里，所以按 el-menu--vertical 这一层认顶层，别用 > li；
-   叶子菜单实测路径是 ul > div > a > li，四条都要写齐，漏一条顶层叶子就掉回灰字 400） */
+   叶子菜单实测路径是 ul > div > a > li，四条都要写齐，漏一条顶层叶子就掉回 400） */
 #app .sidebar-container .el-menu--vertical > .el-menu-item,
 #app .sidebar-container .el-menu--vertical > a > .el-menu-item,
 #app .sidebar-container .el-menu--vertical > div > a > .el-menu-item,
 #app .sidebar-container .el-menu--vertical > .el-sub-menu > .el-sub-menu__title,
 #app .sidebar-container .el-menu--vertical > div > .el-sub-menu > .el-sub-menu__title {
-  color: var(--app-text);
+  color: var(--app-side-text);
   font-weight: 500;
-}
-
-/* 深色靠亮度分层（非当前项灰、当前项白），顶层条目不能跟着变白，否则看不出当前页 */
-html.dark #app .sidebar-container .el-menu--vertical > .el-menu-item,
-html.dark #app .sidebar-container .el-menu--vertical > a > .el-menu-item,
-html.dark #app .sidebar-container .el-menu--vertical > div > a > .el-menu-item,
-html.dark #app .sidebar-container .el-menu--vertical > .el-sub-menu > .el-sub-menu__title,
-html.dark #app .sidebar-container .el-menu--vertical > div > .el-sub-menu > .el-sub-menu__title {
-  color: var(--app-muted);
 }
 
 #app .sidebar-container .el-menu-item:hover,
 #app .sidebar-container .el-sub-menu__title:hover {
-  background-color: var(--app-raised) !important;
-  color: var(--app-text) !important;
+  background-color: var(--app-side-hover) !important;
+  color: var(--app-side-text) !important;
 }
 
+/* 当前页药丸：spec activeBg/activeText + 左缘 3px activeBar（T1 深蓝药丸 / T7 蓝底蓝字同一条规则） */
 #app .sidebar-container .el-menu-item.is-active,
 #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
-  /* 浅色下用纸面白做当前页：侧栏是青灰框，灰药丸(#ebedee)贴在上面几乎看不出 */
-  background-color: var(--app-surface) !important;
-  color: var(--app-text) !important;
+  background-color: var(--app-side-active-bg) !important;
+  color: var(--app-side-active-text) !important;
   font-weight: 500;
+  box-shadow: inset 3px 0 0 var(--app-side-active-bar);
 }
 
-html.dark #app .sidebar-container .el-menu-item.is-active,
-html.dark #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
-  /* 底色（药丸 raised）由下方「区域优化批」的规则统一给，这里只留文字色 */
-  color: #ffffff !important;
+#app .sidebar-container .el-menu-item.is-active .svg-icon {
+  color: var(--app-side-active-text);
 }
 
 #app .sidebar-container .svg-icon {
@@ -613,7 +880,7 @@ html.dark .el-card {
 
 html.dark .el-switch {
   --el-switch-off-color: #3a3a3e;
-  --el-switch-on-color: #ffffff;
+  --el-switch-on-color: var(--app-primary);
 }
 
 /* ============================ 表格 ============================ */
@@ -785,7 +1052,8 @@ html.dark .el-switch .el-switch__action {
 }
 
 html.dark .el-switch.is-checked .el-switch__action {
-  background-color: #000000;
+  /* 开态轨道是皮肤 acc（蓝），滑块取 accFg 墨色，蓝底蓝球等于消失 */
+  background-color: var(--app-primary-ink);
 }
 
 html.dark .el-slider__button {
@@ -826,24 +1094,10 @@ html.dark .el-popper.is-dark {
 }
 
 /* ============================ 区域优化批（2026-10-24 七题全 A）· 左栏/顶栏 ============================ */
-/* 题1-① 暗色侧栏右边界：#000 栏贴 #000 地，1px 缝把两块分开（浅色靠纸面白已分层，不动）；
-   留档批 题3A：原硬编码 #262626 收编 var(--app-rule)——全站深色分界线归一处变量管，调档只动一行 */
-html.dark #app .sidebar-container {
-  border-right: 1px solid var(--app-rule);
-}
+/* 侧栏右边界：基础段的 #app .sidebar-container 已统一 1px var(--app-rule)（四套皮肤同一条），
+   深色不再需要单独提亮 */
 
-/* 题1-② 暗色当前页药丸：raised 底 + 白字 + 图标按暗色主色提亮（浅色白药丸不变） */
-html.dark #app .sidebar-container .el-menu-item.is-active,
-html.dark #app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
-  background-color: var(--app-raised) !important;
-  color: #ffffff !important;
-}
-
-/* 图标提亮取纯白：暗色 --app-accent 是亮绿 #c6f24e（theme-framed.scss html.dark 块），
-   落在 #1d1d1d 药丸上可用但抢眼，选中态要的是"认出位置"不是"高亮口号"——白最稳 */
-html.dark #app .sidebar-container .el-menu-item.is-active .svg-icon {
-  color: #ffffff;
-}
+/* 图标跟随当前页药丸文字色（side-active-text），由基础段统一规则负责 */
 
 /* 题3-③ 折叠态子菜单浮层：限高可滚（矮屏不再溢出视口） */
 .el-menu--popup {
@@ -851,12 +1105,12 @@ html.dark #app .sidebar-container .el-menu-item.is-active .svg-icon {
   overflow-y: auto;
 }
 
-/* 题1-③ 暗色浮层描边+投影：数值沿用已上线的单位切换卡片。
+/* 题1-③ 深色浮层描边+投影：底走皮肤 surface、描边走 rule，两套深肤共用。
    用 SidebarItem 上的 popper-class 钩子选浮层，不依赖 :has()（浏览器矩阵只到 Chrome 87/Safari 14，
    :has() 要 105/15.4，声明支持的浏览器上一半拿不到效果） */
 html.dark .el-popper.dcs-sidebar-popper {
-  background: #161616;
-  border: 1px solid #2e2e33;
+  background: var(--app-surface);
+  border: 1px solid var(--app-rule);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.7);
 }
 
@@ -878,13 +1132,9 @@ html.dark .el-menu--popup .el-sub-menu__title {
   bottom: 8px;
   width: 2px;
   border-radius: 1px;
-  /* 视觉席位像素实测：--app-rule（浅 #f0f1f2 / 暗 #232323）与菜单底色灰阶差只有 2~3，
-     1:1 视距几乎不可见——改按主题钉"看得见但不抢"的中性线 */
-  background: rgba(19, 20, 22, 0.16);
-}
-
-html.dark #app .sidebar-container .nest-menu .el-menu-item::before {
-  background: rgba(255, 255, 255, 0.14);
+  /* 深蓝侧栏（T1 浅）上原来按内容面配的深灰线几乎不可见——改吃 sideText 的透明混色，
+     四套皮肤（深蓝底/白底/两套深底）都能"看得见但不抢" */
+  background: color-mix(in srgb, var(--app-side-text) 24%, transparent);
 }
 
 /* 题1-⑦ 悬停过渡统一 140ms（原 Element 默认 0.3s 与零过渡混用，忽轻忽重） */
@@ -903,9 +1153,9 @@ html.dark #app .sidebar-container .nest-menu .el-menu-item::before {
   left: 24px;
 }
 
-/* 题6-① 顶栏暗色底边界：顶栏与内容区同为 #000 时 1px 缝把顶栏「托」起来；
-   留档批 题3A：同侧栏收编 var(--app-rule)，避免第二处分界线色值各自漂 */
-html.dark #app .fixed-header {
+/* 题6-① 顶栏底边界：顶栏与内容区同底色时 1px rule 把顶栏「托」起来（四套皮肤同一条，
+   rule 即分界线令牌，不再只在深色出现） */
+#app .fixed-header {
   border-bottom: 1px solid var(--app-rule);
 }
 
@@ -921,4 +1171,48 @@ html.dark #app .fixed-header {
 
 #app .mobile.openSidebar .sidebar-container {
   visibility: visible;
+}
+
+/* ============================ U-24 皮肤批（2026-10-26）============================ */
+
+/* 品牌字母标（两主题同款、颜色随令牌）：圆角方 + 800 字重单字母，
+   左上侧栏、顶栏 Logo、登录页三处共用同一形态；旧彩色风车 logo.png 退役 */
+.dcs-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: var(--app-mark-bg);
+  color: var(--app-mark-fg);
+  border-radius: 6px;
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  user-select: none;
+}
+
+/* 右下 AI 悬浮球走皮肤令牌（fab/fabFg/fabBorder）：
+   FloatingBall 组件属 AI 助手禁改区，只在主题层重着色——
+   球身去渐变高光改纯色 fab，字形 fabFg，呼吸光环按「无辉光」口径整体隐藏。
+   scoped 样式带 [data-v] 属性选择器（0,3,0）压得过普通全局规则，必须 !important；
+   .gray（租户未配模型）是状态语义，排除在外保持灰球 */
+body .dcs-fab:not(.gray) .fab-core {
+  color: var(--app-fab-fg) !important;
+  background: var(--app-fab) !important;
+  border: 1px solid var(--app-fab-border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+
+  svg {
+    filter: none !important;
+  }
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
+}
+
+body .dcs-fab .fab-halo {
+  display: none !important;
 }

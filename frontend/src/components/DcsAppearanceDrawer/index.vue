@@ -1,36 +1,38 @@
 <template>
-  <el-drawer
-    v-model="visible"
-    title="外观"
-    direction="rtl"
-    size="min(360px, 92vw)"
-    append-to-body
-    class="dcs-appearance-drawer"
-  >
+  <el-drawer v-model="visible" title="外观" direction="rtl" size="min(360px, 92vw)" append-to-body class="dcs-appearance-drawer">
     <div class="dcs-appearance">
-      <section class="dcs-appearance__section" aria-labelledby="dcs-appearance-theme">
-        <h3 id="dcs-appearance-theme" class="dcs-appearance__title">主题</h3>
-        <p class="dcs-appearance__hint">浅色是框架纸，深色是纯黑夜，切换后立即生效。</p>
-        <div class="dcs-appearance__options">
+      <section class="dcs-appearance__section" aria-labelledby="dcs-appearance-skin">
+        <h3 id="dcs-appearance-skin" class="dcs-appearance__title">皮肤</h3>
+        <p class="dcs-appearance__hint">整套界面的配色骨架，与浅色/深色开关正交，切换后立即生效。</p>
+        <div class="dcs-appearance__skin-options">
           <button
+            v-for="item in skinOptions"
+            :key="item.value"
             type="button"
-            class="dcs-appearance__option"
-            :class="{ 'is-active': !dark }"
-            :aria-pressed="!dark"
-            @click="setTheme(false)"
+            class="dcs-appearance__skin"
+            :class="{ 'is-active': skin === item.value }"
+            :aria-pressed="skin === item.value"
+            @click="setSkin(item.value)"
           >
-            <el-icon class="dcs-appearance__icon"><Sunny /></el-icon>
-            <span class="dcs-appearance__label">浅色 · 框架纸</span>
+            <span class="dcs-appearance__skin-preview" :style="item.preview"> <i class="bar" /><i class="body" /> </span>
+            <span class="dcs-appearance__skin-name">{{ item.label }}</span>
+            <span class="dcs-appearance__skin-desc">{{ item.desc }}</span>
+            <span v-if="skin === item.value" class="dcs-appearance__skin-on">当前</span>
           </button>
-          <button
-            type="button"
-            class="dcs-appearance__option"
-            :class="{ 'is-active': dark }"
-            :aria-pressed="dark"
-            @click="setTheme(true)"
-          >
+        </div>
+      </section>
+
+      <section class="dcs-appearance__section" aria-labelledby="dcs-appearance-theme">
+        <h3 id="dcs-appearance-theme" class="dcs-appearance__title">明暗</h3>
+        <p class="dcs-appearance__hint">浅色看表省力，深色夜间护眼；只换明暗，不动皮肤。</p>
+        <div class="dcs-appearance__options">
+          <button type="button" class="dcs-appearance__option" :class="{ 'is-active': !dark }" :aria-pressed="!dark" @click="setTheme(false)">
+            <el-icon class="dcs-appearance__icon"><Sunny /></el-icon>
+            <span class="dcs-appearance__label">浅色</span>
+          </button>
+          <button type="button" class="dcs-appearance__option" :class="{ 'is-active': dark }" :aria-pressed="dark" @click="setTheme(true)">
             <el-icon class="dcs-appearance__icon"><Moon /></el-icon>
-            <span class="dcs-appearance__label">深色 · 纯黑夜</span>
+            <span class="dcs-appearance__label">深色</span>
           </button>
         </div>
       </section>
@@ -117,6 +119,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSettingsStore } from '@/store/modules/settings';
 import { useAppStore } from '@/store/modules/app';
+import type { AppSkin } from '@/utils/theme';
 
 type DensityMode = 'comfortable' | 'compact';
 type SizeMode = 'large' | 'default' | 'small';
@@ -129,8 +132,25 @@ const appStore = useAppStore();
 const { locale } = useI18n();
 const visible = ref(false);
 const dark = computed(() => settingsStore.dark);
+const skin = computed(() => settingsStore.skin);
 const language = computed(() => appStore.language);
 const size = computed(() => appStore.size);
+
+/* 皮肤卡缩略图：色值即 themes.mjs（T1/T7.light）的 shell/bg/acc，只做展示，不参与渲染 */
+const skinOptions: { value: AppSkin; label: string; desc: string; preview: Record<string, string> }[] = [
+  {
+    value: 't1',
+    label: 'T1 深蓝稳重',
+    desc: '深色导航 + 亮色内容，政企数据平台骨架',
+    preview: { '--pv-shell': '#1e2a38', '--pv-bg': '#eef1f6', '--pv-acc': '#2f6feb' }
+  },
+  {
+    value: 't7',
+    label: 'T7 通用蓝',
+    desc: '白侧栏 + 亮蓝主色，通用中台范式',
+    preview: { '--pv-shell': '#ffffff', '--pv-bg': '#f3f5f8', '--pv-acc': '#0052d9' }
+  }
+];
 
 const sizeOptions: { label: string; value: SizeMode }[] = [
   { label: '较大', value: 'large' },
@@ -159,6 +179,10 @@ const setTheme = (nextDark: boolean) => {
   settingsStore.setDark(nextDark);
 };
 
+const setSkin = (next: AppSkin) => {
+  settingsStore.setSkin(next);
+};
+
 const setDensity = (mode: DensityMode) => {
   density.value = mode;
   applyDensity(mode);
@@ -182,8 +206,9 @@ const setSize = (next: SizeMode) => {
   appStore.setSize(next);
 };
 
-// 一键回到出厂外观：浅色 + 舒适 + 中文 + 默认字号（四项都在本机 Storage，刷新后仍生效）
+// 一键回到出厂外观：T1 + 浅色 + 舒适 + 中文 + 默认字号（各项都在本机 Storage，刷新后仍生效）
 const resetAll = () => {
+  setSkin('t1');
   setTheme(false);
   setDensity('comfortable');
   setLanguage('zh_CN');
@@ -249,6 +274,101 @@ defineExpose({ open });
     &--three {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+  }
+
+  /* 皮肤两卡：缩略图（侧栏条 + 内容面 + 强调点）+ 名称 + 一句人话；
+     选中态 = 安静边框 + 文字徽章，无辉光无渐变（U-17/U-24 口径） */
+  &__skin-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  &__skin {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-control-radius);
+    background: transparent;
+    color: var(--app-muted);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 0.15s ease,
+      background 0.15s ease,
+      color 0.15s ease;
+
+    &:hover {
+      border-color: var(--app-control);
+      color: var(--app-text);
+    }
+
+    &.is-active {
+      border-color: var(--app-accent);
+      background: var(--app-accent-soft);
+      color: var(--app-text);
+    }
+  }
+
+  &__skin-preview {
+    display: flex;
+    width: 100%;
+    height: 34px;
+    overflow: hidden;
+    border: 1px solid var(--app-rule);
+    border-radius: 4px;
+
+    .bar {
+      flex: 0 0 26%;
+      background: var(--pv-shell);
+    }
+
+    .body {
+      position: relative;
+      flex: 1;
+      background: var(--pv-bg);
+
+      /* 内容面右下角一个强调色小方点，代表该皮肤的 acc */
+      &::after {
+        content: '';
+        position: absolute;
+        right: 5px;
+        bottom: 5px;
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        background: var(--pv-acc);
+      }
+    }
+  }
+
+  &__skin-name {
+    color: var(--app-text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  &__skin-desc {
+    color: var(--app-faint);
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  &__skin-on {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 1px 6px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    color: var(--app-accent);
+    font-size: 10px;
+    line-height: 1.5;
   }
 
   &__option {

@@ -329,8 +329,8 @@ onMounted(() => {
         vertical-align: -3px;
       }
       &:hover {
-        background-color: #b4bccc;
-        color: #fff;
+        background-color: var(--app-control);
+        color: var(--app-sheet-bg);
         width: 12px !important;
         height: 12px !important;
       }

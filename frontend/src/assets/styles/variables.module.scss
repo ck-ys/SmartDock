@@ -1,14 +1,14 @@
 // 全局SCSS变量
 :root {
-  --menuBg: var(--app-frame);
-  --menuColor: var(--app-muted);
-  --menuActiveText: var(--app-text);
-  --menuHover: var(--app-raised);
+  --menuBg: var(--app-shell);
+  --menuColor: var(--app-side-text);
+  --menuActiveText: var(--app-side-active-text);
+  --menuHover: var(--app-side-hover);
 
-  --subMenuBg: var(--app-frame);
-  --subMenuActiveText: var(--app-text);
-  --subMenuHover: var(--app-raised);
-  --subMenuTitleHover: var(--app-raised);
+  --subMenuBg: var(--app-shell);
+  --subMenuActiveText: var(--app-side-active-text);
+  --subMenuHover: var(--app-side-hover);
+  --subMenuTitleHover: var(--app-side-hover);
 
   // 菜单栏缩进
   --el-menu-base-level-padding: 12px;
@@ -43,17 +43,17 @@
 }
 
 html.dark {
-  --menuBg: #000000;
-  --menuColor: var(--app-muted);
-  --menuActiveText: #ffffff;
-  --menuHover: #1d1d1d;
+  --menuBg: var(--app-shell);
+  --menuColor: var(--app-side-text);
+  --menuActiveText: var(--app-side-active-text);
+  --menuHover: var(--app-side-hover);
 
-  --subMenuBg: #000000;
-  --subMenuActiveText: #ffffff;
-  --subMenuHover: #1d1d1d;
-  --subMenuTitleHover: #1d1d1d;
+  --subMenuBg: var(--app-shell);
+  --subMenuActiveText: var(--app-side-active-text);
+  --subMenuHover: var(--app-side-hover);
+  --subMenuTitleHover: var(--app-side-hover);
 
-  --fixedHeaderBg: #000000;
+  --fixedHeaderBg: var(--app-frame);
   --tableHeaderBg: var(--el-bg-color);
   --tableHeaderTextColor: var(--el-text-color);
 

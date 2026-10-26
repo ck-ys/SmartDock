@@ -52,33 +52,37 @@ export function alpha(hex: string, a: number): string {
 
 export function readChartTokens(): ChartTokens {
   const root = getComputedStyle(document.documentElement);
-  const accent = cssVar(root, '--app-accent', '#1b6c80');
-  const muted = cssVar(root, '--app-muted', '#5d5f60');
-  const faint = cssVar(root, '--app-faint', '#6b6b6b');
+  /* 皮肤批（U-24）：主线三色走 --app-chart-1/2/3（= themes.mjs T1/T7 的 c1/c2/c3），
+     --app-accent 即 c1；两套皮肤 × 明暗四个组合都在 theme-framed.scss 里声明 */
+  const c1 = cssVar(root, '--app-chart-1', cssVar(root, '--app-accent', '#2f6feb'));
+  const c2 = cssVar(root, '--app-chart-2', cssVar(root, '--app-muted', '#64748b'));
+  const c3 = cssVar(root, '--app-chart-3', '#a9b6c4');
+  const muted = cssVar(root, '--app-muted', '#5f7083');
+  const faint = cssVar(root, '--app-faint', '#8494a6');
   return {
-    accent,
-    ink: cssVar(root, '--app-text', '#131416'),
+    accent: c1,
+    ink: cssVar(root, '--app-text', '#14202d'),
     muted,
     faint,
-    rule: cssVar(root, '--app-rule', '#f0f1f2'),
-    border: cssVar(root, '--app-border', '#e8eaec'),
+    rule: cssVar(root, '--app-rule', '#dce3ec'),
+    border: cssVar(root, '--app-border', '#dce3ec'),
     surface: cssVar(root, '--app-sheet-bg', '#ffffff'),
-    success: cssVar(root, '--el-color-success', '#2e7d5b'),
-    warning: cssVar(root, '--el-color-warning', '#a86f0c'),
-    danger: cssVar(root, '--el-color-danger', '#b8333a'),
-    series: [accent, alpha(accent, 0.55), muted, faint, alpha(accent, 0.3)],
-    ramp: [1, 0.8, 0.62, 0.46, 0.3, 0.16].map((a) => alpha(accent, a))
+    success: cssVar(root, '--el-color-success', '#1e7b4f'),
+    warning: cssVar(root, '--el-color-warning', '#92400e'),
+    danger: cssVar(root, '--el-color-danger', '#c4242a'),
+    series: [c1, c2, c3, alpha(c1, 0.38), muted],
+    ramp: [1, 0.8, 0.62, 0.46, 0.3, 0.16].map((a) => alpha(c1, a))
   };
 }
 
-/** 主题切换后自动失效的取色器 */
+/** 主题/皮肤切换后自动失效的取色器 */
 export function useChartTokens() {
   const settings = useSettingsStore();
   return computed<ChartTokens>(() => {
-    // 显式依赖主题与强调色：html.dark 的类名由 applyThemeMode 同步切完，再让 computed 重算；
-    // 浅色下改「数据强调色」只写内联 --app-accent，不声明依赖的话 canvas 会一直停在旧色
+    // 显式依赖明暗与皮肤：html.dark / html[data-skin] 的类与属性切换完成后让 computed 重算；
+    // 页面里的 option 引用本 computed，vue-echarts 监听 option 变化自动 setOption 换色
     void settings.dark;
-    void settings.accent;
+    void settings.skin;
     return readChartTokens();
   });
 }

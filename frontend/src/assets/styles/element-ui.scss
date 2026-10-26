@@ -189,12 +189,14 @@
     background-color 0.2s ease;
 }
 
+// 焦点反馈（U-17 禁辉光口径）：不用 primary-light-8 的大柔光环，
+// 改 1px acc 内描边——与 theme-framed.scss 的输入框焦点同一条语言
 .el-input__wrapper.is-focus,
 .el-textarea__inner:focus,
-.el-select__wrapper.is-focus,
+.el-select__wrapper.is-focused,
 .el-date-editor.is-focus,
 .el-range-editor.is-focus {
-  box-shadow: 0 0 0 2px var(--el-color-primary-light-8);
+  box-shadow: 0 0 0 1px var(--app-accent) inset;
 }
 
 // Buttons
