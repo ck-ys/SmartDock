@@ -127,7 +127,7 @@
                 v-hasPermi="['dcs:aicredit:subscribe']"
                 class="plan-buy"
                 :type="summary.planCode === p.planCode ? 'success' : 'primary'"
-                :plain="summary.planCode === p.planCode"
+                :plain="summary.planCode !== p.planCode && p.planCode !== recommendedPlanCode"
                 :disabled="p.enabled === '0'"
                 :loading="busy === p.planCode"
                 @click="onSubscribe(p)"
@@ -161,7 +161,8 @@
         </div>
         <span class="boost-desc">{{ boostPlan.description || '池尽顶上，不受窗口限制' }}</span>
         <div class="boost-actions">
-          <el-button v-hasPermi="['dcs:aicredit:subscribe']" type="warning" :loading="busy === 'boost'" @click="onBoost(false)">
+          <!-- U-23：一屏只留一个实心主钮（推荐档）；加油包改 warning 描边，不再与订阅钮抢实心 -->
+          <el-button v-hasPermi="['dcs:aicredit:subscribe']" type="warning" plain :loading="busy === 'boost'" @click="onBoost(false)">
             购买 · 扣钱包 ¥{{ Number(boostPlan.priceYuan).toFixed(0) }}
           </el-button>
           <el-button v-hasPermi="['dcs:aicredit:plan-edit']" size="small" text type="primary" @click="onBoost(true)">赠送</el-button>

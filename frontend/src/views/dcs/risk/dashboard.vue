@@ -669,13 +669,13 @@ onUnmounted(() => {
   flex: 1;
   min-width: 0;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   background: var(--app-raised);
   overflow: hidden;
 }
 .source-bar {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   background: var(--app-accent);
   transition: width 0.3s ease;
 }

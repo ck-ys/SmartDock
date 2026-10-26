@@ -2858,7 +2858,7 @@ onMounted(() => {
 .fb-reason-bar {
   flex: 1;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   background: var(--el-fill-color-light);
   overflow: hidden;
 }
@@ -2933,7 +2933,7 @@ onMounted(() => {
       padding: 18px 20px 16px;
       background: var(--el-bg-color);
       border: 1px solid var(--el-border-color-light);
-      border-radius: 8px;
+      border-radius: var(--app-card-radius);
       transition:
         border-color 0.2s,
         box-shadow 0.2s;
@@ -2960,7 +2960,7 @@ onMounted(() => {
   }
 
   .adm-card {
-    border-radius: 10px;
+    border-radius: var(--app-card-radius);
 
     /* 稳流② Q8②：运行健康卡（统计条下、页签上）——chips 与统计卡同视觉语系 */
     &.health-card {
@@ -2996,7 +2996,7 @@ onMounted(() => {
         align-items: baseline;
         gap: 6px;
         padding: 4px 10px;
-        border-radius: 6px;
+        border-radius: var(--app-control-radius);
         font-size: 12px;
         border: 1px solid var(--el-border-color-light);
         color: var(--dcs-text-secondary);
@@ -3075,7 +3075,7 @@ onMounted(() => {
   }
   .moved-slot-note {
     padding: 6px 10px;
-    border-radius: 6px;
+    border-radius: var(--app-control-radius);
     background: var(--el-fill-color-lighter);
     font-size: 12px;
     line-height: 1.7;
@@ -3179,7 +3179,7 @@ onMounted(() => {
     }
     :deep(.el-collapse-item__wrap) {
       background: var(--el-fill-color-light);
-      border-radius: 8px;
+      border-radius: var(--app-card-radius);
       margin-bottom: 4px;
     }
     :deep(.el-collapse-item__content) {
@@ -3200,7 +3200,7 @@ onMounted(() => {
     .prompt-seg {
       margin-bottom: 14px;
       border: 1px solid var(--dcs-border-color-light);
-      border-radius: 6px;
+      border-radius: var(--app-control-radius);
       overflow: hidden;
 
       .seg-head {
@@ -3375,7 +3375,7 @@ onMounted(() => {
     align-items: baseline;
     gap: 10px;
     background: var(--el-color-primary-light-9);
-    border-radius: 6px;
+    border-radius: var(--app-control-radius);
     padding: 8px 14px;
     .q-preview-k {
       font-size: 12px;
@@ -3416,7 +3416,7 @@ onMounted(() => {
     gap: 2px;
     padding: 8px 14px;
     background: var(--el-fill-color-light);
-    border-radius: 6px;
+    border-radius: var(--app-control-radius);
     min-width: 96px;
   }
   .qo-tenant {
@@ -3473,7 +3473,7 @@ onMounted(() => {
     font-size: 12.5px;
     color: var(--dcs-text-secondary);
     padding: 2px 4px;
-    border-radius: 5px;
+    border-radius: var(--app-control-radius);
 
     /* Q8 深化①：值为 0 的行整体标红——关停态一眼可见，不只靠输入框里的数字 */
     &.qo-danger {
@@ -3499,7 +3499,7 @@ onMounted(() => {
     align-items: baseline;
     gap: 10px;
     background: var(--el-color-primary-light-9);
-    border-radius: 6px;
+    border-radius: var(--app-control-radius);
     padding: 8px 14px;
     .q-preview-k {
       font-size: 12px;
@@ -3548,14 +3548,14 @@ onMounted(() => {
   .q-usage-bar {
     width: 64px;
     height: 4px;
-    border-radius: 2px;
-    background: var(--el-fill-color-darker, #e4e7ed);
+    border-radius: var(--dcs-radius-xs);
+    background: var(--el-fill-color-darker);
     overflow: hidden;
     flex: none;
     i {
       display: block;
       height: 100%;
-      border-radius: 2px;
+      border-radius: var(--dcs-radius-xs);
       transition: width 0.3s;
       &.t-blue {
         background: var(--el-color-primary);
@@ -3584,7 +3584,7 @@ onMounted(() => {
 /* ===== 工具开关页签（批1 Q1=B）===== */
 .tg-group {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   padding: 8px 12px;
   margin-bottom: 10px;
 }
@@ -3635,7 +3635,7 @@ onMounted(() => {
   margin-top: 4px;
   background: var(--el-fill-color-light);
   border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
 }
 .tg-save {
   display: flex;

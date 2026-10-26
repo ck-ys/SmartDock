@@ -502,7 +502,7 @@ onMounted(loadAll);
   }
   .tick text {
     fill: var(--app-faint);
-    font-size: 10.5px;
+    font-size: var(--dcs-font-xs);
     font-family: var(--el-font-family);
   }
   .line {
@@ -666,6 +666,14 @@ onMounted(loadAll);
     &:nth-last-child(-n + 2) {
       border-bottom: 0;
     }
+  }
+  /* U-21：奇数格时末格跨满整行（复用 dcs-ui-kit 的 :last-child:nth-child(odd) 方案），右侧不再落空 */
+  .ov-kpi:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  /* 末格跨满后它独占末行：倒数第二格回到上一行，需要恢复行底分隔线（偶数总数时该格是奇数位，不会命中） */
+  .ov-kpi:nth-last-child(2):nth-child(even) {
+    border-bottom: 1px solid var(--app-rule);
   }
   .ov-head__actions {
     width: 100%;

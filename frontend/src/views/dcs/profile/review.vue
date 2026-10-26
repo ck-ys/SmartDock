@@ -557,7 +557,7 @@ onMounted(loadAll);
   padding: 12px 14px;
   margin-bottom: 14px;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--app-card-radius);
   background: var(--el-fill-color-lighter);
 }
 .action-summary > div {

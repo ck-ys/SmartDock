@@ -3632,7 +3632,7 @@ onUnmounted(() => {
 .official-price-panel {
   padding: 14px 14px 4px;
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   background: var(--el-fill-color-extra-light);
 }
 
@@ -3701,7 +3701,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
   margin: -4px 0 12px 110px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   background: var(--el-fill-color-lighter);
   border: 1px dashed var(--el-border-color);
 

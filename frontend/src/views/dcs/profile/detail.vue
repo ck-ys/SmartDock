@@ -513,7 +513,7 @@ watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
 .evidence-box pre {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   background: var(--el-fill-color-light);
   font-size: 12px;
   line-height: 1.55;

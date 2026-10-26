@@ -1337,7 +1337,7 @@ onMounted(() => {
 }
 .delta-chip {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 999px;
+  border-radius: var(--dcs-pill-radius);
   padding: 2px 12px;
   font-size: 12px;
   font-variant-numeric: tabular-nums;

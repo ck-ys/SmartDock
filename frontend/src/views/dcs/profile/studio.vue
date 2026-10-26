@@ -1538,7 +1538,7 @@ onMounted(async () => {
 }
 .rule-card {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--app-card-radius);
   padding: 14px;
   background: var(--el-fill-color-blank);
 }
@@ -1553,7 +1553,7 @@ onMounted(async () => {
 .rule-remark {
   margin-top: 8px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   background: var(--el-fill-color-light);
   color: var(--el-text-color-regular);
   font-size: 12px;
@@ -1586,7 +1586,7 @@ onMounted(async () => {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--dcs-pill-radius);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   border: 1px solid transparent;
@@ -1608,7 +1608,7 @@ onMounted(async () => {
 .draft-create,
 .draft-panel {
   border: 1px dashed var(--el-border-color);
-  border-radius: 10px;
+  border-radius: var(--app-card-radius);
   padding: 14px;
 }
 .compact-form :deep(.el-form-item) {
@@ -1675,7 +1675,7 @@ onMounted(async () => {
 }
 .bucket-editor {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   padding: 10px 12px;
 }
 .bucket-head {
@@ -1717,7 +1717,7 @@ onMounted(async () => {
 }
 .preview-stat {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
@@ -1736,7 +1736,7 @@ onMounted(async () => {
 .json-block {
   margin-top: 10px;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   background: var(--el-fill-color-light);
   font-size: 12px;
   max-height: 220px;
@@ -1763,7 +1763,7 @@ onMounted(async () => {
   width: 100%;
   font-size: 13px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
 }
 .result-line.error {
   color: var(--el-color-danger);

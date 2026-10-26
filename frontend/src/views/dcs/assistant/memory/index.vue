@@ -138,7 +138,7 @@ onMounted(load);
   .mt-sub {
     margin: 0;
     font-size: 13px;
-    color: var(--dcs-text-secondary, #909399);
+    color: var(--dcs-text-secondary);
     line-height: 1.7;
   }
   .mem-body {
@@ -150,7 +150,7 @@ onMounted(load);
     gap: 12px;
     padding: 10px 12px;
     border: 1px solid var(--dcs-border-color);
-    border-radius: 8px;
+    border-radius: var(--app-card-radius);
     margin-bottom: 8px;
     background: var(--el-bg-color);
 
@@ -168,7 +168,7 @@ onMounted(load);
       gap: 10px;
       margin-top: 4px;
       font-size: 12px;
-      color: var(--dcs-text-secondary, #909399);
+      color: var(--dcs-text-secondary);
     }
   }
   .mem-empty {
@@ -178,7 +178,7 @@ onMounted(load);
   .mem-foot {
     margin: 14px 0 0;
     font-size: 12.5px;
-    color: var(--dcs-text-secondary, #909399);
+    color: var(--dcs-text-secondary);
   }
 }
 </style>

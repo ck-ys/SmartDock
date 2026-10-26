@@ -1143,7 +1143,7 @@ onMounted(loadAll);
 }
 .reach-stat {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--app-card-radius);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;

@@ -1899,6 +1899,12 @@ onMounted(async () => {
 .muted {
   color: var(--el-text-color-secondary);
 }
+/* U-22：次要指标（跳出/停留/页次/事件）并入趋势卡头部的小字行 */
+.trend-sub {
+  font-weight: 400;
+  font-size: var(--dcs-font-sm);
+  white-space: normal;
+}
 .small {
   font-size: 12px;
 }
@@ -1948,7 +1954,7 @@ onMounted(async () => {
 }
 .funnel-step {
   border: 1px solid var(--el-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--app-card-radius);
   padding: 12px 14px;
 }
 .funnel-step-head {
@@ -1988,13 +1994,13 @@ onMounted(async () => {
 }
 .funnel-bar {
   height: 8px;
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   background: var(--el-fill-color-light);
   overflow: hidden;
 }
 .funnel-bar-inner {
   height: 100%;
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   background: var(--app-accent);
   transition: width 0.35s ease;
 }
@@ -2010,7 +2016,7 @@ onMounted(async () => {
   color: var(--el-text-color-secondary);
 }
 .retention-cell {
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   padding: 5px 4px;
   display: flex;
   flex-direction: column;
@@ -2031,7 +2037,7 @@ onMounted(async () => {
 .retention-legend__swatch {
   width: 14px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: var(--dcs-radius-xs);
   display: inline-block;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
@@ -2127,7 +2133,7 @@ onMounted(async () => {
 .realtime-pulse i {
   flex: 1;
   min-height: 3px;
-  border-radius: 2px 2px 0 0;
+  border-radius: var(--dcs-radius-xs) var(--dcs-radius-xs) 0 0;
   background: var(--app-accent);
   opacity: 0.7;
   transition: height 0.4s ease;

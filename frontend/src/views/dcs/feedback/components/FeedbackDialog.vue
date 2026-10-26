@@ -306,7 +306,7 @@ const submit = async () => {
     margin-top: 7px;
     border-radius: 50%;
     background: var(--el-color-primary);
-    box-shadow: 0 0 0 4px var(--el-color-primary-light-9);
+    /* U-17：去 4px 辉光环（契约禁辉光），标题圆点保持安静实心 */
   }
 
   &__title {
@@ -336,7 +336,7 @@ const submit = async () => {
   &__badge {
     min-width: 18px;
     padding: 0 5px;
-    border-radius: 999px;
+    border-radius: var(--dcs-pill-radius);
     background: var(--el-color-danger);
     color: var(--el-color-white);
     font-size: 11px;
@@ -369,7 +369,7 @@ const submit = async () => {
   gap: 6px;
   margin: 2px 0 0;
   padding: 9px 11px;
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   background: var(--el-fill-color-lighter);
   font-size: 12px;
   line-height: 1.65;
@@ -391,7 +391,7 @@ const submit = async () => {
   &__item {
     padding: 9px 6px;
     border: 1px solid var(--dcs-border-color-lighter);
-    border-radius: 9px;
+    border-radius: var(--app-control-radius);
     background: var(--el-bg-color);
     cursor: pointer;
     transition:
@@ -418,7 +418,8 @@ const submit = async () => {
     }
 
     &.is-active {
-      border-color: var(--el-color-primary-light-3);
+      /* U-17：选中态 = 1px accent 边 + 轻底（契约口径），不用辉光环 */
+      border-color: var(--el-color-primary);
       background: var(--el-color-primary-light-9);
 
       b {
@@ -438,7 +439,7 @@ const submit = async () => {
 .fd-item {
   padding: 12px 14px;
   border: 1px solid var(--dcs-border-color-lighter);
-  border-radius: 10px;
+  border-radius: var(--app-card-radius);
 
   & + & {
     margin-top: 10px;
@@ -487,7 +488,7 @@ const submit = async () => {
 .fd-status {
   flex: none;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--dcs-pill-radius);
   font-size: 11px;
   line-height: 18px;
 }
@@ -537,7 +538,7 @@ const submit = async () => {
 .fd-reply {
   margin-top: 9px;
   padding: 9px 11px;
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   background: var(--el-color-primary-light-9);
   border-left: 3px solid var(--el-color-primary-light-5);
 

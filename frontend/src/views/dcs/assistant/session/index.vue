@@ -942,7 +942,7 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     border: 1px solid var(--dcs-border-color-lighter);
-    border-radius: 8px;
+    border-radius: var(--app-card-radius);
     background: var(--el-bg-color);
     overflow: hidden;
 
@@ -976,10 +976,10 @@ onUnmounted(() => {
     font-size: 11.5px;
     color: var(--dcs-text-placeholder);
     .g-badge {
-      font-size: 10px;
+      font-size: var(--dcs-font-xs);
       line-height: 1;
       padding: 2px 6px;
-      border-radius: 8px;
+      border-radius: var(--app-card-radius);
       background: var(--el-fill-color);
       color: var(--dcs-text-secondary);
     }
@@ -1010,7 +1010,7 @@ onUnmounted(() => {
     align-items: center;
     gap: 6px;
     padding: 8px 8px 8px 10px;
-    border-radius: 8px;
+    border-radius: var(--app-card-radius);
     cursor: pointer;
     position: relative;
 
@@ -1031,7 +1031,7 @@ onUnmounted(() => {
       top: 8px;
       bottom: 8px;
       width: 3px;
-      border-radius: 2px;
+      border-radius: var(--dcs-radius-xs);
       background: var(--el-color-primary);
     }
     &.archived {
@@ -1078,7 +1078,7 @@ onUnmounted(() => {
       font: inherit;
       font-size: 13px;
       border: 1px solid var(--el-color-primary);
-      border-radius: 4px;
+      border-radius: var(--dcs-radius-sm);
       padding: 1px 4px;
       color: var(--dcs-text-primary);
       outline: none;
@@ -1100,7 +1100,7 @@ onUnmounted(() => {
         cursor: pointer;
         font-size: 12px;
         padding: 2px;
-        border-radius: 4px;
+        border-radius: var(--dcs-radius-sm);
 
         &:hover {
           background: var(--el-fill-color);
@@ -1148,7 +1148,7 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     border: 1px solid var(--dcs-border-color-lighter);
-    border-radius: 8px;
+    border-radius: var(--app-card-radius);
     background: var(--el-bg-color);
     overflow: hidden;
     /* Q8/Q9/三反馈② 廊位：StatPanel 按容器宽解算（fills P+4 / capped 2P+956-W / 0 贴列）写

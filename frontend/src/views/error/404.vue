@@ -196,7 +196,7 @@ const message = computed(() => {
       width: 110px;
       height: 36px;
       background: var(--el-color-primary);
-      border-radius: 100px;
+      border-radius: var(--dcs-pill-radius);
       text-align: center;
       color: var(--app-primary-ink);
       opacity: 0;

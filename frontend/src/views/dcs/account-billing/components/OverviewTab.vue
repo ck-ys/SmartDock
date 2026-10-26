@@ -17,7 +17,7 @@
     </div>
 
     <div class="ui-table-wrap">
-      <el-table v-loading="loading" :data="walletList" class="ui-table dcs-table-only" :row-class-name="walletRowClass">
+      <el-table v-loading="loading" :data="walletList" class="ui-table dcs-table-only">
         <el-table-column label="钱包" min-width="150">
           <template #default="{ row }">
             <span :title="`钱包ID ${row.walletId}`" class="dcs-ops-id">{{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
@@ -41,9 +41,12 @@
             <span :class="{ 'amount-danger': Number(row.availableAmount || 0) < 0 }">{{ money(row.availableAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column label="状态" width="150" align="center">
           <template #default="{ row }">
-            <span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
+            <span class="ab-status-cell">
+              <span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
+              <span v-if="isLowBalance(row)" class="ui-pill ui-pill--warn">低于阈值</span>
+            </span>
           </template>
         </el-table-column>
         <el-table-column label="低余额阈值" width="120" align="right">
@@ -88,7 +91,8 @@
         <div class="dcs-card-head">
           <span class="dcs-card-title">租户 {{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
           <span class="dcs-card-badge"
-            ><span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span></span
+            ><span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
+            <span v-if="isLowBalance(row)" class="ui-pill ui-pill--warn">低于阈值</span></span
           >
         </div>
         <div class="dcs-card-meta">
@@ -245,10 +249,10 @@ const money = (value?: number) => `¥${Number(value || 0).toLocaleString('zh-CN'
 
 const shortId = (id?: number | string) => String(id || '').slice(-4);
 
-/** 余额低于阈值 → 整行浅橙预警（样式见 .ab-row-low 的 :deep 规则） */
-const walletRowClass = ({ row }: { row: TenantWalletVO }) => {
+/** 余额低于阈值 → 状态列补「低于阈值」warn 药丸（U-18：撤整行彩底+左缘彩条，状态色只上药丸） */
+const isLowBalance = (row: TenantWalletVO) => {
   const th = Number(row.lowBalanceThreshold || 0);
-  return th > 0 && Number(row.balanceAmount || 0) < th ? 'ab-row-low' : '';
+  return th > 0 && Number(row.balanceAmount || 0) < th;
 };
 
 const emitMetrics = () => {
@@ -488,11 +492,12 @@ onMounted(reloadAll);
   font-size: 10px;
   margin-left: 2px;
 }
-/* 低于阈值整行浅橙预警 + 首格左缘 3px 竖条（深色下用 --el-color-warning-light-9 的暗底） */
-:deep(.ab-row-low td) {
-  background: var(--el-color-warning-light-9);
-}
-:deep(.ab-row-low td:first-child) {
-  box-shadow: inset 3px 0 0 var(--el-color-warning);
+/* U-18：状态列双药丸并排（正常 + 低于阈值预警），预警不再刷整行彩底 */
+.ab-status-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 </style>

@@ -1275,7 +1275,7 @@ onMounted(() => {
   .file-review-thumb {
     width: 38px;
     height: 38px;
-    border-radius: 6px;
+    border-radius: var(--app-control-radius);
   }
 
   .file-review-name-rejected {

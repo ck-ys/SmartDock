@@ -290,13 +290,13 @@ const beforeClose = (done: () => void) => {
   margin-bottom: 16px;
   padding: 10px 12px;
   background: var(--el-fill-color-light);
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
 }
 
 .level-label {
   flex: none;
   padding: 3px 9px;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   color: var(--el-color-white);
   font-size: 13px;
   font-weight: 700;
@@ -353,7 +353,7 @@ const beforeClose = (done: () => void) => {
   padding: 8px;
   overflow: hidden;
   border: 1px solid var(--el-border-color);
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   background: var(--dcs-bg-card);
 }
 
