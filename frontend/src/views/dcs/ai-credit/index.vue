@@ -878,6 +878,15 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
 }
+/* 壳层留档批 题1A：手机档卡头竖排——横排时标题与「消费方式」开关抢宽，
+   「当前状态」「消费方式」双双断字成「当前状/态」「消费方/式」；竖排后标题一行读完、开关整行挪下 */
+@media (max-width: 760px) {
+  .card-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
 /* 业务批8 Q7 丁：消费方式开关（radio 非受控回弹——取消确认时 model-value 未变自动回显旧档） */
 .mode-switch {
   display: flex;

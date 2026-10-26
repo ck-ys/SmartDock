@@ -227,8 +227,10 @@ html.dark {
   --app-raised: #1d1d1d;
   --app-active: transparent;
   --app-border: #1a1a1a;
-  /* 表格行线/分隔线：原来的 #161616 压在 #111 卡面上对比只有 1.03:1，整张表糊成一块 */
-  --app-rule: #232323;
+  /* 表格行线/分隔线：原来的 #161616 压在 #111 卡面上对比只有 1.03:1，整张表糊成一块；
+     壳层留档批 题3A：#232323 实测深浅差仅约 7%（刻意注视才可见），提一档到 #2a2a2a（差约 10%）——
+     扫到即知界在哪，仍守住"安静边框"不抢戏 */
+  --app-rule: #2a2a2a;
   --app-control: #4a4a50;
   --app-text: #ffffff;
   --app-muted: #b4b4b4;
@@ -824,9 +826,10 @@ html.dark .el-popper.is-dark {
 }
 
 /* ============================ 区域优化批（2026-10-24 七题全 A）· 左栏/顶栏 ============================ */
-/* 题1-① 暗色侧栏右边界：#000 栏贴 #000 地，1px #262626 缝把两块分开（浅色靠纸面白已分层，不动） */
+/* 题1-① 暗色侧栏右边界：#000 栏贴 #000 地，1px 缝把两块分开（浅色靠纸面白已分层，不动）；
+   留档批 题3A：原硬编码 #262626 收编 var(--app-rule)——全站深色分界线归一处变量管，调档只动一行 */
 html.dark #app .sidebar-container {
-  border-right: 1px solid #262626;
+  border-right: 1px solid var(--app-rule);
 }
 
 /* 题1-② 暗色当前页药丸：raised 底 + 白字 + 图标按暗色主色提亮（浅色白药丸不变） */
@@ -900,9 +903,10 @@ html.dark #app .sidebar-container .nest-menu .el-menu-item::before {
   left: 24px;
 }
 
-/* 题6-① 顶栏暗色底边界：顶栏与内容区同为 #000 时 1px 缝把顶栏「托」起来 */
+/* 题6-① 顶栏暗色底边界：顶栏与内容区同为 #000 时 1px 缝把顶栏「托」起来；
+   留档批 题3A：同侧栏收编 var(--app-rule)，避免第二处分界线色值各自漂 */
 html.dark #app .fixed-header {
-  border-bottom: 1px solid #262626;
+  border-bottom: 1px solid var(--app-rule);
 }
 
 /* 题3-⑥ 手机抽屉关闭后键盘不可聚焦：收起时藏掉侧栏，隐藏延迟到滑出动画结束。
