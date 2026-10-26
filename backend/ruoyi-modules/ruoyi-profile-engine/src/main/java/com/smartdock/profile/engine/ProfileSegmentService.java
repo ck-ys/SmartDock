@@ -69,18 +69,22 @@ public class ProfileSegmentService {
         return out;
     }
 
-    /** 批4A: 补最近一次 run 状态(SKIPPED/FAILED 徽标原料, 一次批量查询非逐分群)。 */
+    /**
+     * 批4A: 补「最近一条 run」状态(SKIPPED/FAILED 徽标原料, 一次 DISTINCT ON 批量查非逐分群)。
+     * 注意不能走 last_run_id——超限 SKIPPED 刻意不更新分群统计, 走它徽标永远不亮。
+     */
     private void fillLastRunStatus(List<ProfileSegment> segments) {
-        List<Long> runIds = segments.stream()
-            .map(ProfileSegment::getLastRunId).filter(java.util.Objects::nonNull).toList();
-        if (runIds.isEmpty()) {
+        List<Long> ids = segments.stream().map(ProfileSegment::getSegmentId).toList();
+        if (ids.isEmpty()) {
             return;
         }
         Map<Long, String> statusById = new LinkedHashMap<>();
-        for (ProfileSegmentRun run : runMapper.selectBatchIds(runIds)) {
-            statusById.put(run.getRunId(), run.getStatus());
+        for (Map<String, Object> row : runMapper.selectLatestStatus(currentTenant(), ids)) {
+            // Map 结果不吃 mapUnderscoreToCamelCase, 列标签就是 snake_case, 驼峰取键恒 null
+            statusById.put(Long.parseLong(String.valueOf(row.get("segment_id"))),
+                String.valueOf(row.get("status")));
         }
-        segments.forEach(s -> s.setLastRunStatus(statusById.get(s.getLastRunId())));
+        segments.forEach(s -> s.setLastRunStatus(statusById.get(s.getSegmentId())));
     }
 
     public ProfileSegment get(Long segmentId) {
