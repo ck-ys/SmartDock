@@ -1,6 +1,7 @@
 package com.smartdock.profile.domain;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -57,4 +58,8 @@ public class ProfileSegment extends BaseEntity {
     private String builtin;
 
     private Integer revision;
+
+    /** 最近一次 run 的状态(DONE/FAILED/SKIPPED; 批4A 超限跳过信号, 非表列) */
+    @TableField(exist = false)
+    private String lastRunStatus;
 }

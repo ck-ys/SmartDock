@@ -47,6 +47,12 @@
           <div>
             <span>最近评估</span>
             <strong class="metric-time">{{ segment.lastEvalTime || '从未' }}</strong>
+            <el-tag v-if="segment.lastRunStatus === 'SKIPPED'" size="small" type="warning" class="run-status-tag">
+              超限跳过
+            </el-tag>
+            <el-tag v-else-if="segment.lastRunStatus === 'FAILED'" size="small" type="danger" class="run-status-tag">
+              上次失败
+            </el-tag>
           </div>
         </div>
 
@@ -1065,6 +1071,10 @@ onMounted(loadAll);
 .metric-time {
   font-size: 13px !important;
   font-weight: 600;
+}
+/* 批4A: 最近 run 状态徽标(超限跳过/上次失败), 与时间同行不换行 */
+.run-status-tag {
+  margin-left: 6px;
 }
 .segment-rule {
   margin: 10px 0;

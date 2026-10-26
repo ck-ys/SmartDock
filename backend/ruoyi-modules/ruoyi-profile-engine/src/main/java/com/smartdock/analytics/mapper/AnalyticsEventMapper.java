@@ -87,6 +87,28 @@ public interface AnalyticsEventMapper {
                                                     @Param("to") Date to,
                                                     @Param("anchorEvent") String anchorEvent);
 
+    /**
+     * 批4A 规模护栏: 与 selectEventsByNames 同过滤口径的轻量先行 COUNT——
+     * 漏斗/路径在载入前先数一下, 超阈值明确报错而非全量载入后吃满堆。
+     */
+    @Select("""
+        <script>
+        SELECT count(*) FROM profile_event
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND occurred_time &gt;= #{from} AND occurred_time &lt; #{to}
+          AND del_flag = '0'
+          <if test="names != null and names.size() > 0">
+          AND event_name IN
+          <foreach collection="names" item="name" open="(" separator="," close=")">#{name}</foreach>
+          </if>
+        </script>
+        """)
+    long countEventsByNames(@Param("tenantId") String tenantId,
+                            @Param("source") String source,
+                            @Param("from") Date from,
+                            @Param("to") Date to,
+                            @Param("names") List<String> names);
+
     /** 该源最新落库时间(双实例去重: 上次重建已晚于它则本次触发无需重建)。 */
     @Select("""
         SELECT max(create_time) FROM profile_event

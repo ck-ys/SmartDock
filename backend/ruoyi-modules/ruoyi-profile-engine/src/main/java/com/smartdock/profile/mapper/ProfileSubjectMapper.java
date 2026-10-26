@@ -203,6 +203,15 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
                                                     @Param("source") String source);
 
     /**
+     * 批4A 规模护栏: 该源主体总数——分群候选/模型全量运行的前置轻量 COUNT。
+     */
+    @Select("""
+        SELECT count(*) FROM profile_subject
+        WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+        """)
+    long countBySource(@Param("tenantId") String tenantId, @Param("source") String source);
+
+    /**
      * 每个主体最新维度快照(复核扫描用)。
      */
     @Select("""

@@ -73,6 +73,8 @@ public class ProfileScoreModelService {
     private final org.springframework.transaction.support.TransactionTemplate txTemplate;
     /** 批10 R1: 模型运行互斥(publish/rollback/run/回放共用), 封死 RUNNING 可见性窗口 */
     private final org.redisson.api.RedissonClient redisson;
+    /** 批4A 规模护栏: 全量载入主体前的轻量 COUNT(默认 2 万, 审计安全区下沿) */
+    private final ProfileScaleGuard scaleGuard;
 
     private final Map<String, CachedModelData> populationCache = new ConcurrentHashMap<>();
 
@@ -257,6 +259,8 @@ public class ProfileScoreModelService {
         if (!errors.isEmpty()) {
             throw new ServiceException("模型配置不合法: " + String.join("; ", errors));
         }
+        // 批4A 护栏: 全量运行前主体轻量 COUNT, 超阈值在载入前报错(不写 SKIPPED——人工入口)
+        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
         List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
             .eq(ProfileSubject::getTenantId, model.getTenantId())
             .eq(ProfileSubject::getSource, model.getSource())
@@ -348,6 +352,9 @@ public class ProfileScoreModelService {
 
     public Map<String, Object> overview(Long modelId) {
         ProfileScoreModel model = get(modelId);
+        // 批4A 护栏: overview 是第 4 个全量读面(selectLatestAll 全量载入后 Java 聚合,
+        // rfm 页首屏即调), 主体超阈值先报错——subjectPage 走分页不拦
+        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
         List<ProfileModelSubjectRow> rows = snapshotMapper.selectLatestAll(
             model.getTenantId(), model.getSource(), model.getModelCode(), model.getModelVersion());
         Map<String, Object> out = new LinkedHashMap<>();
@@ -445,6 +452,10 @@ public class ProfileScoreModelService {
         ProfileScoreModel model = get(modelId);
         ProfileModelRun runA = requireDoneRun(model, runAId);
         ProfileModelRun runB = requireDoneRun(model, runBId);
+        // 批4A 护栏: 对比将载入两份 run 快照, 行数=run 落库总量(存档值, 免二次扫表)
+        scaleGuard.checkModelSubjectsCount(Math.max(
+            runA.getTotalSubjects() == null ? 0L : runA.getTotalSubjects(),
+            runB.getTotalSubjects() == null ? 0L : runB.getTotalSubjects()));
         List<ProfileModelCompare.SubjectVersion> a = subjectVersionsOfRun(model.getTenantId(), runA);
         List<ProfileModelCompare.SubjectVersion> b = subjectVersionsOfRun(model.getTenantId(), runB);
         Map<String, Object> out = ProfileModelCompare.compare(a, b, 20);
@@ -468,6 +479,8 @@ public class ProfileScoreModelService {
         if (!errors.isEmpty()) {
             throw new ServiceException("模型配置不合法: " + String.join("; ", errors));
         }
+        // 批4A 护栏: 试算与全量运行同一全量载入模式, 同阈值前置
+        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
         List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
             .eq(ProfileSubject::getTenantId, model.getTenantId())
             .eq(ProfileSubject::getSource, model.getSource())

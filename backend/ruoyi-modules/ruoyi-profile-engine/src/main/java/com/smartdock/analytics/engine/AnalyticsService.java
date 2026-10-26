@@ -17,7 +17,12 @@ import com.smartdock.analytics.query.AnalyticsFunnelBo;
 import com.smartdock.analytics.query.AnalyticsImportBo;
 import com.smartdock.analytics.query.AnalyticsSessionQuery;
 import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.domain.ProfileEngineConfig;
+import com.smartdock.profile.domain.ProfileExportLog;
+import com.smartdock.profile.engine.ProfileScaleGuard;
 import com.smartdock.profile.event.ProfileEventBo;
+import com.smartdock.profile.mapper.ProfileEngineConfigMapper;
+import com.smartdock.profile.mapper.ProfileExportLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
@@ -75,6 +80,19 @@ public class AnalyticsService {
     private final AnalyticsSessionizer sessionizer;
     /** ObjectProvider 打破 AnalyticsService → 事件发布器 → 自动汇总触发器 的构造环 */
     private final ObjectProvider<ProfileEventPublisher> eventPublisherProvider;
+    /** 批4A 规模护栏: 大窗口(漏斗/路径/流失)载入前的前置信号 */
+    private final ProfileScaleGuard scaleGuard;
+    /** R2-5 项11: 保留期水位拦截要读每源 eventRetentionDays 覆盖值 */
+    private final ProfileEngineConfigMapper engineConfigMapper;
+    /** R2-5 项10: 导出审计(复用画像侧 profile_export_log) */
+    private final ProfileExportLogMapper exportLogMapper;
+
+    /** 事件保留期全局默认(R2-5 项11 水位口径, 与 ProfileRetentionJob 同键; 0=不清理无水位) */
+    @org.springframework.beans.factory.annotation.Value("${profile.event.retention-days:730}")
+    private int defaultEventRetentionDays;
+
+    /** 报表级 CSV 导出行数上限(学 Mixpanel 限流姿态; 原始事件全量导出走异步任务候补) */
+    private static final int EXPORT_MAX_ROWS = 50_000;
 
     /**
      * 事务模板: 锁必须包住事务的提交边界。@Transactional 代理是"先开事务再进方法体拿锁",
@@ -108,6 +126,9 @@ public class AnalyticsService {
      */
     public Map<String, Object> rebuildRange(String tenantId, String source, Date from, Date to,
                                             boolean rebuildSessions, String kind) {
+        // R2-5 项11: 窗口起点早于该源归档水位直接拒绝——按现存事件 deleteRange 后重算
+        // 会把已归档窗口的会话/日汇总清零且无法从归档恢复(不可逆抹零, 手滑 rebuild 也进不来)
+        guardRebuildWatermark(tenantId, source, from);
         org.redisson.api.RLock lock = redisson.getLock(
             com.smartdock.profile.engine.ProfileLocks.rebuild(tenantId, source));
         lock.lock(com.smartdock.profile.engine.ProfileLocks.REBUILD_LEASE_MINUTES, TimeUnit.MINUTES);
@@ -537,6 +558,8 @@ public class AnalyticsService {
         for (Map<String, Object> step : steps) {
             names.add(String.valueOf(step.get("eventName")));
         }
+        // 批4A 护栏: 载入前轻量 COUNT, 超阈值(默认 10 万)明确报错不进堆
+        scaleGuard.checkAnalysisWindow(currentTenant(), source, from, to, names);
         // 批10 Q7: 事件名过滤下推——只拉步进相关行, 口径与全量载入后 Java 过滤完全等价
         List<AnalyticsEventRow> events = eventMapper.selectEventsByNames(currentTenant(), source, from, to, names);
         Map<String, List<AnalyticsEventRow>> byVisitor = new LinkedHashMap<>();
@@ -789,6 +812,8 @@ public class AnalyticsService {
         int clampedDays = Math.min(Math.max(days, 1), 90);
         Date from = startOfDaysAgo(clampedDays);
         Date to = startOfTomorrow();
+        // 批4A 护栏: 载入前轻量 COUNT(同页面浏览事件口径)
+        scaleGuard.checkAnalysisWindow(currentTenant(), source, from, to, List.of("page_view", "pageview", "pv"));
         // 批10 Q7: 只拉页面浏览事件(路径只用得上它们), 口径不变
         List<AnalyticsEventRow> events = eventMapper.selectEventsByNames(
             currentTenant(), source, from, to, List.of("page_view", "pageview", "pv"));
@@ -841,6 +866,8 @@ public class AnalyticsService {
         for (Map<String, Object> step : steps) {
             names.add(String.valueOf(step.get("eventName")));
         }
+        // 批4A 护栏: 与漏斗预览同一计数口径——预览被拦则下钻同拦, 不出现"预览过、下钻炸"
+        scaleGuard.checkAnalysisWindow(currentTenant(), source, from, to, names);
         // 批10 Q7: 下钻只需要"碰过第一步"的访客(没碰过的本就不进任何步进统计),
         // 半连接收敛后大窗口不再全量载入内存
         List<AnalyticsEventRow> events = eventMapper.selectEventsForVisitors(
@@ -1057,6 +1084,149 @@ public class AnalyticsService {
             }
         }
         return event.getEventName();
+    }
+
+    // ---------------------------------------------------------------- R2-5: 保留期水位 + 报表导出
+
+    /** R2-5 项11: 该源事件保留期天数(源配置覆盖全局默认; ≤0 = 不清理, 无水位限制)。 */
+    private int eventRetentionDaysOf(String tenantId, String source) {
+        return TenantHelper.ignore(() -> {
+            ProfileEngineConfig config = engineConfigMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProfileEngineConfig>()
+                    .eq(ProfileEngineConfig::getTenantId, tenantId)
+                    .eq(ProfileEngineConfig::getSource, source)
+                    .last("LIMIT 1"))
+                .stream().findFirst().orElse(null);
+            return config == null || config.getEventRetentionDays() == null
+                ? defaultEventRetentionDays : config.getEventRetentionDays();
+        });
+    }
+
+    private void guardRebuildWatermark(String tenantId, String source, Date from) {
+        int days = eventRetentionDaysOf(tenantId, source);
+        if (days <= 0) {
+            return;
+        }
+        Date watermark = new Date(System.currentTimeMillis() - TimeUnit.DAYS.toMillis(days));
+        if (from.before(watermark)) {
+            java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat("yyyy-MM-dd");
+            throw new ServiceException("重建窗口起点 " + fmt.format(from) + " 早于该源事件保留期水位 "
+                + fmt.format(watermark) + "（保留 " + days + " 天）：该窗口事件已出账，重建会把派生表清零且无法恢复，"
+                + "请缩小重建窗口或调整该源保留期配置");
+        }
+    }
+
+    /**
+     * R2-5 项10: 访问明细 CSV 导出(默认脱敏; 搜索词始终按 PII 规则打码, 与页面同口径)。
+     * 行数上限 5 万, 超限明确报错引导缩窗——报表级导出不做全量事件导出。
+     */
+    public byte[] exportSessions(AnalyticsSessionQuery query, boolean plain) {
+        requireSource(query.getSource());
+        Date[] range = resolveRange(query.getDays(), query.getFromDate(), query.getToDate());
+        Page<AnalyticsSession> page = new Page<>(1, EXPORT_MAX_ROWS + 1);
+        page.setOptimizeCountSql(false);
+        IPage<AnalyticsSession> rows = sessionMapper.selectSessionPage(
+            page, currentTenant(), query.getSource(), range[0], range[1], query);
+        if (rows.getRecords().size() > EXPORT_MAX_ROWS) {
+            throw new ServiceException("匹配会话 " + rows.getTotal() + " 条超过导出上限 "
+                + EXPORT_MAX_ROWS + "，请缩小时间范围或筛选条件后再导出");
+        }
+        StringBuilder csv = new StringBuilder("\uFEFF"); // Excel 兼容 BOM
+        csv.append("会话ID,访客ID,主体类型,主体ID,新访客,开始时间,最后事件,时长秒,页面浏览,事件数,跳出,")
+            .append("进入页,退出页,来源渠道,活动,设备,系统,浏览器,地域,搜索词\r\n");
+        for (AnalyticsSession s : rows.getRecords()) {
+            csv.append(csvCell(string(s.getSessionId()))).append(',')
+                .append(csvCell(plain ? string(s.getVisitorId()) : mask(string(s.getVisitorId())))).append(',')
+                .append(csvCell(nullSafe(s.getSubjectType()))).append(',')
+                .append(csvCell(plain ? nullSafe(s.getSubjectId()) : mask(nullSafe(s.getSubjectId())))).append(',')
+                .append(csvCell("1".equals(s.getIsNewVisitor()) ? "是" : "否")).append(',')
+                .append(csvCell(string(s.getStartedAt()))).append(',')
+                .append(csvCell(string(s.getLastEventAt()))).append(',')
+                .append(csvCell(string(s.getDurationSeconds()))).append(',')
+                .append(csvCell(string(s.getPageViews()))).append(',')
+                .append(csvCell(string(s.getEventCount()))).append(',')
+                .append(csvCell("1".equals(s.getIsBounce()) ? "是" : "否")).append(',')
+                .append(csvCell(nullSafe(s.getEntryPage()))).append(',')
+                .append(csvCell(nullSafe(s.getExitPage()))).append(',')
+                .append(csvCell(nullSafe(s.getSourceChannel()))).append(',')
+                .append(csvCell(nullSafe(s.getCampaign()))).append(',')
+                .append(csvCell(nullSafe(s.getDeviceType()))).append(',')
+                .append(csvCell(nullSafe(s.getOs()))).append(',')
+                .append(csvCell(nullSafe(s.getBrowser()))).append(',')
+                .append(csvCell(geoOf(s))).append(',')
+                .append(csvCell(piiService.maskValueForKey("search_term", s.getSearchTerm()))).append("\r\n");
+        }
+        byte[] bytes = csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        writeExportAudit(query.getSource(), "分析中心-访问明细导出", rows.getRecords().size(), !plain, bytes);
+        return bytes;
+    }
+
+    /** R2-5 项10: 自定义分析结果 CSV 导出(聚合值, 无主体级 PII)。 */
+    public byte[] exportCustom(AnalyticsCustomBo bo) {
+        Map<String, Object> result = custom(bo);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> points = (List<Map<String, Object>>) result.get("points");
+        StringBuilder csv = new StringBuilder("\uFEFF");
+        csv.append("排名,标签,数值\r\n");
+        int rank = 1;
+        for (Map<String, Object> point : points) {
+            csv.append(rank++).append(',')
+                .append(csvCell(String.valueOf(point.get("label")))).append(',')
+                .append(csvCell(String.valueOf(point.get("value")))).append("\r\n");
+        }
+        byte[] bytes = csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        writeExportAudit(bo.getSource(), "分析中心-自定义分析导出", points.size(), true, bytes);
+        return bytes;
+    }
+
+    /** 导出审计行(复用画像侧 profile_export_log, 合规页可见); 写失败即失败——审计不许静默丢。 */
+    private void writeExportAudit(String source, String title, int rowCount, boolean masked, byte[] bytes) {
+        ProfileExportLog logRow = new ProfileExportLog();
+        logRow.setTenantId(currentTenant());
+        logRow.setSource(source);
+        logRow.setSegmentName(title);
+        logRow.setRowCount((long) rowCount);
+        logRow.setMasked(masked ? "1" : "0");
+        logRow.setFileHash(cn.hutool.crypto.digest.DigestUtil.sha256Hex(bytes).substring(0, 16));
+        logRow.setExportBy(currentUser());
+        logRow.setExportAt(new Date());
+        exportLogMapper.insert(logRow);
+    }
+
+    private String geoOf(AnalyticsSession s) {
+        String geo = java.util.stream.Stream.of(s.getCountry(), s.getProvince(), s.getCity())
+            .filter(StringUtils::isNotBlank).collect(java.util.stream.Collectors.joining(" / "));
+        return geo.isEmpty() ? "" : geo;
+    }
+
+    private String nullSafe(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String string(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private String mask(String value) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        if (value.length() <= 4) {
+            return value.charAt(0) + "***";
+        }
+        return value.substring(0, 3) + "***" + value.substring(value.length() - 2);
+    }
+
+    private String csvCell(String value) {
+        String v = value == null ? "" : value;
+        // CSV 公式注入防御(对齐画像侧批11 口径): =/+/-/@/TAB/CR 开头前置单引号
+        if (!v.isEmpty() && "=+-@\t\r".indexOf(v.charAt(0)) >= 0) {
+            v = "'" + v;
+        }
+        if (v.contains(",") || v.contains("\"") || v.contains("\n")) {
+            return '"' + v.replace("\"", "\"\"") + '"';
+        }
+        return v;
     }
 
     // ---------------------------------------------------------------- 内部工具

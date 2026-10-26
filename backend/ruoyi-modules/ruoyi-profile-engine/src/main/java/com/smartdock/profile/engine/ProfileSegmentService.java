@@ -56,13 +56,31 @@ public class ProfileSegmentService {
     private final ProfileSegmentRunMapper runMapper;
     private final ProfileSegmentMemberMapper memberMapper;
     private final ProfileSubjectMapper subjectMapper;
+    /** 批4A 规模护栏: 候选集载入前的轻量 COUNT(默认 5 万) */
+    private final ProfileScaleGuard scaleGuard;
 
     public List<ProfileSegment> list(String source) {
         requireSource(source);
-        return segmentMapper.selectList(new LambdaQueryWrapper<ProfileSegment>()
+        List<ProfileSegment> out = segmentMapper.selectList(new LambdaQueryWrapper<ProfileSegment>()
             .eq(ProfileSegment::getSource, source)
             .orderByDesc(ProfileSegment::getBuiltin)
             .orderByAsc(ProfileSegment::getSegmentName));
+        fillLastRunStatus(out);
+        return out;
+    }
+
+    /** 批4A: 补最近一次 run 状态(SKIPPED/FAILED 徽标原料, 一次批量查询非逐分群)。 */
+    private void fillLastRunStatus(List<ProfileSegment> segments) {
+        List<Long> runIds = segments.stream()
+            .map(ProfileSegment::getLastRunId).filter(java.util.Objects::nonNull).toList();
+        if (runIds.isEmpty()) {
+            return;
+        }
+        Map<Long, String> statusById = new LinkedHashMap<>();
+        for (ProfileSegmentRun run : runMapper.selectBatchIds(runIds)) {
+            statusById.put(run.getRunId(), run.getStatus());
+        }
+        segments.forEach(s -> s.setLastRunStatus(statusById.get(s.getLastRunId())));
     }
 
     public ProfileSegment get(Long segmentId) {
@@ -149,6 +167,8 @@ public class ProfileSegmentService {
         if (!errors.isEmpty()) {
             throw new ServiceException("分群规则不合法: " + String.join("; ", errors));
         }
+        // 批4A 护栏: 预览也是全量载入候选集的读面, 与评估同阈值
+        scaleGuard.checkSegmentCandidates(currentTenant(), bo.getSource());
         List<ProfileSubjectRow> candidates = segmentCandidates(bo.getSource());
         List<Map<String, Object>> sample = new ArrayList<>();
         int matched = 0;
@@ -202,6 +222,19 @@ public class ProfileSegmentService {
         if (!errors.isEmpty()) {
             throw new ServiceException("分群规则不合法: " + String.join("; ", errors));
         }
+        String normalizedTrigger = StringUtils.isBlank(trigger) ? "MANUAL" : trigger.trim().toUpperCase();
+        // 批4A 护栏: 候选集载入前轻量 COUNT。定时保鲜超限不抛错(抛了只进 log.warn,
+        // UI 永远无信号)——写 SKIPPED run 留痕且不动 lastEvalTime, 保鲜窗口持续到期、
+        // 每小时重试保持信号; 人工路径明确报错含实际数量
+        long candidateCount = scaleGuard.countSegmentCandidates(segment.getTenantId(), segment.getSource());
+        if (scaleGuard.exceedsSegmentCandidates(candidateCount)) {
+            if ("SCHEDULE".equals(normalizedTrigger)) {
+                log.warn("[GUARD-BLOCKED] segment {} candidates={} over threshold {}, skip scheduled refresh",
+                    segment.getSegmentId(), candidateCount, scaleGuard.maxSegmentCandidates());
+                return writeSkippedRun(segment, candidateCount);
+            }
+            throw new ServiceException(ProfileScaleGuard.segmentMessage(candidateCount, scaleGuard.maxSegmentCandidates()));
+        }
         List<ProfileSubjectRow> candidates = segmentCandidates(segment.getSource());
         List<MemberDraft> matched = new ArrayList<>();
         String reason = StringUtils.substring(rule.summary(), 0, 500);
@@ -211,7 +244,7 @@ public class ProfileSegmentService {
                     row.getDisplayName(), reason));
             }
         }
-        ProfileSegmentRun run = writeRun(segment, StringUtils.isBlank(trigger) ? "MANUAL" : trigger.trim().toUpperCase(), candidates.size(), matched);
+        ProfileSegmentRun run = writeRun(segment, normalizedTrigger, candidates.size(), matched);
         pruneRuns(segment);
         return run;
     }
@@ -232,6 +265,8 @@ public class ProfileSegmentService {
             throw new ServiceException("导入名单不能为空");
         }
         String typeFilter = bo.getSubjectType() == null ? null : bo.getSubjectType().trim();
+        // 批4A 护栏: 名单导入同样全量载入候选集做 ID 匹配, 同阈值前置
+        scaleGuard.checkSegmentCandidates(segment.getTenantId(), segment.getSource());
         List<ProfileSubjectRow> candidates = segmentCandidates(segment.getSource());
         Map<String, ProfileSubjectRow> byId = new LinkedHashMap<>();
         for (ProfileSubjectRow row : candidates) {
@@ -303,11 +338,20 @@ public class ProfileSegmentService {
     /** 只保留最近 30 个 run 的成员明细(批9 Q2-A 防膨胀; run 头记录保留, 成员行清理)。 */
     private void pruneRuns(ProfileSegment segment) {
         try {
+            // 批4A: 保留窗口只数真实评估(DONE/FAILED/…)——超限期的 SKIPPED 不占名额,
+            // 否则连续撞线一小时一条会把 30 窗口挤满, 最后一次成功评估的成员明细被误清
             List<ProfileSegmentRun> keep = runMapper.selectList(new LambdaQueryWrapper<ProfileSegmentRun>()
                 .eq(ProfileSegmentRun::getSegmentId, segment.getSegmentId())
                 .eq(ProfileSegmentRun::getTenantId, segment.getTenantId())
+                .ne(ProfileSegmentRun::getStatus, "SKIPPED")
                 .orderByDesc(ProfileSegmentRun::getCreateTime)
                 .last("LIMIT " + KEEP_RUNS));
+            // SKIPPED 只作近期信号, 超 7 天的头记录清掉防膨胀(无成员行, 删除零成本)
+            runMapper.delete(new LambdaQueryWrapper<ProfileSegmentRun>()
+                .eq(ProfileSegmentRun::getSegmentId, segment.getSegmentId())
+                .eq(ProfileSegmentRun::getTenantId, segment.getTenantId())
+                .eq(ProfileSegmentRun::getStatus, "SKIPPED")
+                .lt(ProfileSegmentRun::getCreateTime, new Date(System.currentTimeMillis() - 7L * 86_400_000L)));
             Long total = runMapper.selectCount(new LambdaQueryWrapper<ProfileSegmentRun>()
                 .eq(ProfileSegmentRun::getSegmentId, segment.getSegmentId()));
             if (total == null || total <= KEEP_RUNS || keep.isEmpty()) {
@@ -373,6 +417,29 @@ public class ProfileSegmentService {
             run.setFinishedAt(new Date());
             runMapper.updateById(run);
         }
+        return run;
+    }
+
+    /**
+     * 批4A: 超限定时评估的跳过留痕——不写成员、不动分群统计与 lastEvalTime
+     * (保鲜窗口持续到期, 每小时重试保持信号)。status 列为 varchar, SKIPPED 无需 DDL。
+     */
+    private ProfileSegmentRun writeSkippedRun(ProfileSegment segment, long candidateCount) {
+        ProfileSegmentRun run = new ProfileSegmentRun();
+        run.setRunId(IdWorker.getId());
+        run.setTenantId(segment.getTenantId());
+        run.setSource(segment.getSource());
+        run.setSegmentId(segment.getSegmentId());
+        run.setTriggerType("SCHEDULE");
+        run.setStatus("SKIPPED");
+        run.setTotalCandidates((int) Math.min(candidateCount, Integer.MAX_VALUE));
+        run.setMemberCount(0);
+        run.setStartedAt(new Date());
+        run.setFinishedAt(new Date());
+        run.setErrorMsg(StringUtils.substring(
+            "GUARD:候选 " + candidateCount + " 超阈值 " + scaleGuard.maxSegmentCandidates(), 0, 2000));
+        run.setCreateBy(currentUser());
+        runMapper.insert(run);
         return run;
     }
 
