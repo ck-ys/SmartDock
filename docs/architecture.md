@@ -4,6 +4,13 @@
 
 ## 1. 全局分层
 
+![SmartDock 技术架构](images/architecture.svg)
+
+上图是模块级视图（两条引擎 + 内置 demo + 平台件 + 数据与外部服务）；[README](../README.md)
+里的简版架构图（`images/architecture-overview.svg`）只画主干，读代码时以这张为准。
+
+下面是同一套分层在仓库里的落点：
+
 ```
 ┌─ frontend (Vue3 + Element Plus)
 │    views/dcs/{mission,todo,audit,notice,dashboard,profile}   ← 微核心页面族
@@ -35,6 +42,10 @@
 - `dcs_notice`：站内通知。`dedup_key` + 部分唯一索引（`uk_dcs_notice_dedup`）实现幂等投递。
 
 ### 2.2 状态机与关键不变量
+
+![内置 demo：任务与提交状态机](images/business-flow.svg)
+
+下面是同一套状态机的文字版（精确迁移条件以代码为准）：
 
 ```
 任务: DRAFT ──publish──▶ COLLECTING ──close(需在途提交审毕)──▶ CLOSED
