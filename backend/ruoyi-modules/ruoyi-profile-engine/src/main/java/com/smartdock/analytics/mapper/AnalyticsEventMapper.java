@@ -247,6 +247,17 @@ public interface AnalyticsEventMapper {
                              @Param("to") Date to);
 
     /**
+     * 批5B 日汇总兜底: 近窗口内有事件的 (租户, 源) 对——跨租户巡检, SQL 自带租户条件。
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT DISTINCT tenant_id AS "tenantId", source
+        FROM profile_event
+        WHERE occurred_time >= #{from} AND del_flag = '0'
+        """)
+    List<Map<String, Object>> selectActivePairsSince(@Param("from") Date from);
+
+    /**
      * 活跃口径（批8）：天 × 访客 去重对（DAU/WAU/MAU 滚动窗口的原料）。
      */
     @Select("""

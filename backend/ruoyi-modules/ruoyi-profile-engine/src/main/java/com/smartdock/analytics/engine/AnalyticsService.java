@@ -176,6 +176,74 @@ public class AnalyticsService {
         return out;
     }
 
+    /**
+     * 批5B 日汇总兜底: 为指定自然日(空=昨日)跨租户重跑会话+日汇总。
+     *
+     * <p>根因(板批5B运行时实锤): 日汇总唯一写入链=事件落库触发的 rebuildRecent,
+     * 链路断档的天不会再有人补行, 四个既有定时任务无一兜底。每日凌晨的
+     * {@code AnalyticsDailyBackfillJob} 与手工触发(AdminController)走本方法同一入口,
+     * 幂等性由 rebuildRange 保证(deleteRange 后重算, 会话边界锚点前的旧行跳过保留)。</p>
+     */
+    public Map<String, Object> backfillDaily(String day) {
+        LocalDate target = parseBackfillDay(day);
+        Date from = Date.from(target.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date to = Date.from(target.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        // 候选(租户,源): 目标日前一天起有事件——与 rebuildRecent"最近两天"口径一致
+        Date pairsSince = new Date(from.getTime() - 24L * 3600_000L);
+        List<Map<String, Object>> pairs = TenantHelper.ignore(() ->
+            eventMapper.selectActivePairsSince(pairsSince));
+        // 手工触发可能来自已切换租户的超管线程: dynamic 尾部 clearDynamic 会删全局切换态, 先存后还
+        String prevDynamic = TenantHelper.getDynamic();
+        int ok = 0;
+        List<String> failed = new ArrayList<>();
+        try {
+            for (Map<String, Object> pair : pairs) {
+                String tenantId = String.valueOf(pair.get("tenantId"));
+                String source = String.valueOf(pair.get("source"));
+                try {
+                    TenantHelper.dynamic(tenantId, () -> {
+                        rebuildRange(tenantId, source, from, to, true, "BACKFILL");
+                        return null;
+                    });
+                    ok++;
+                } catch (Exception e) {
+                    // 单源失败不拖垮整轮(如 R2-5 水位拦截=窗口已归档, 属预期跳过)
+                    log.warn("[Analytics] daily backfill skipped tenant={} source={} day={} err={}",
+                        tenantId, source, target, e.getMessage());
+                    failed.add(source);
+                }
+            }
+        } finally {
+            if (prevDynamic != null) {
+                TenantHelper.setDynamic(prevDynamic, true);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("day", target.toString());
+        out.put("pairs", pairs.size());
+        out.put("ok", ok);
+        out.put("failed", failed);
+        return out;
+    }
+
+    /** 批5B: 兜底目标日解析——空=昨日; 非法格式/未来日拒绝(单测锁口径)。 */
+    static LocalDate parseBackfillDay(String day) {
+        LocalDate target;
+        if (StringUtils.isBlank(day)) {
+            target = LocalDate.now().minusDays(1);
+        } else {
+            try {
+                target = LocalDate.parse(day.trim());
+            } catch (Exception e) {
+                throw new ServiceException("日期格式应为 YYYY-MM-DD: " + day);
+            }
+            if (target.isAfter(LocalDate.now())) {
+                throw new ServiceException("补数日期不能是未来: " + day);
+            }
+        }
+        return target;
+    }
+
     private void writeRebuildLog(String tenantId, String source, String kind, long durationMs, int sessions,
                                  Date readWatermark) {
         try {

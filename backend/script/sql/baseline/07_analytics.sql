@@ -197,7 +197,7 @@ CREATE TABLE IF NOT EXISTS public.analytics_rebuild_log (
     finished_at timestamp   NOT NULL,
     read_watermark timestamp,
     CONSTRAINT pk_analytics_rebuild_log PRIMARY KEY (log_id),
-    CONSTRAINT ck_analytics_rebuild_kind CHECK (kind IN ('RECENT', 'MANUAL', 'REPLAY', 'UNMERGE', 'DELETION'))
+    CONSTRAINT ck_analytics_rebuild_kind CHECK (kind IN ('RECENT', 'MANUAL', 'REPLAY', 'UNMERGE', 'DELETION', 'BACKFILL'))
 );
 CREATE INDEX IF NOT EXISTS idx_analytics_rebuild_log_source
     ON public.analytics_rebuild_log USING btree (tenant_id, source, finished_at DESC);

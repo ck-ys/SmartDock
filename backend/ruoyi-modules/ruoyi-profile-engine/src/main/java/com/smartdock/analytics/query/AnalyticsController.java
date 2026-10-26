@@ -128,6 +128,17 @@ public class AnalyticsController {
     }
 
     /**
+     * 批5B 日汇总兜底: 跨租户补指定自然日(空=昨日)的会话+日汇总, 与凌晨定时任务同入口。
+     */
+    @SaCheckPermission("analytics:center:edit")
+    @Log(title = "分析中心-补日汇总", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
+    @PostMapping("/backfill-daily")
+    public R<Map<String, Object>> backfillDaily(@RequestParam(required = false) String day) {
+        return R.ok(analyticsService.backfillDaily(day));
+    }
+
+    /**
      * 批8 路径分析：页面桑基（start 为空 = 入口视角；非空 = 从该页出发）。
      */
     @SaCheckPermission("analytics:center:query")

@@ -30,7 +30,7 @@ public class AnalyticsRebuildLog {
 
     private String source;
 
-    /** RECENT(事件后自动) / MANUAL(手动) / REPLAY(回放) / UNMERGE(身份拆分) */
+    /** RECENT(事件后自动) / MANUAL(手动) / REPLAY(回放) / UNMERGE(身份拆分) / DELETION(删除清理) / BACKFILL(批5B每日兜底) */
     private String kind;
 
     private Long durationMs;
