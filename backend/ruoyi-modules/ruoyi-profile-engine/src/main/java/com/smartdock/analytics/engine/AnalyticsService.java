@@ -1184,6 +1184,8 @@ public class AnalyticsService {
         ProfileExportLog logRow = new ProfileExportLog();
         logRow.setTenantId(currentTenant());
         logRow.setSource(source);
+        // 表列 NOT NULL 且无默认; 分析中心导出不挂分群, 0=全源/非分群哨兵
+        logRow.setSegmentId(0L);
         logRow.setSegmentName(title);
         logRow.setRowCount((long) rowCount);
         logRow.setMasked(masked ? "1" : "0");
