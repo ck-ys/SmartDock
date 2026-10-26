@@ -9,11 +9,23 @@
         <el-select v-model="source" class="source-select" @change="onSourceChange">
           <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
-        <el-select v-model="days" class="days-select" @change="onDaysChange">
-          <el-option label="近 7 天" :value="7" />
-          <el-option label="近 30 天" :value="30" />
-          <el-option label="近 90 天" :value="90" />
+        <el-select v-model="daysMode" class="days-select" @change="onDaysModeChange">
+          <el-option label="近 7 天" value="7" />
+          <el-option label="近 30 天" value="30" />
+          <el-option label="近 90 天" value="90" />
+          <el-option label="自定义" value="custom" />
         </el-select>
+        <el-input-number
+          v-if="daysMode === 'custom'"
+          v-model="days"
+          :min="1"
+          :max="365"
+          :step="1"
+          size="default"
+          controls-position="right"
+          style="width: 110px; margin-left: 8px"
+          @change="onDaysChange"
+        />
         <el-button v-hasPermi="['analytics:center:edit']" :loading="rebuilding" @click="rebuild"> 重建汇总 </el-button>
         <el-button :loading="loading" @click="reloadCurrent">刷新</el-button>
       </template>
@@ -754,9 +766,20 @@ ensureSources();
 
 use([CanvasRenderer, LineChart, BarChart, SankeyChart, GridComponent, LegendComponent, TooltipComponent]);
 
-const source = ref('web');
-const days = ref(30);
-const tab = ref('overview');
+const route = useRoute();
+/** 批3A: 筛选状态落 URL(source/days/tab), 刷新/分享链接恢复同视图 */
+const source = ref(String(route.query.source || 'web'));
+const days = ref(Math.min(Math.max(Number(route.query.days) || 30, 1), 365));
+const PRESET_DAYS = new Set([7, 30, 90]);
+const daysMode = ref(PRESET_DAYS.has(days.value) ? String(days.value) : 'custom');
+const syncQuery = () => {
+  const q: Record<string, string> = {};
+  if (source.value && source.value !== 'web') q.source = source.value;
+  if (days.value !== 30) q.days = String(days.value);
+  if (tab.value && tab.value !== 'overview') q.tab = tab.value;
+  router.replace({ query: q }).catch(() => undefined);
+};
+const tab = ref(String(route.query.tab || 'overview'));
 const loading = ref(false);
 const rebuilding = ref(false);
 /** 图表色随主题切换（A 墨青 / D 青柠），切深色时 SVG 画布自动重算 */
@@ -1421,10 +1444,22 @@ const onSourceChange = async () => {
   sessionQuery.source = source.value;
   funnelId.value = '';
   funnelResult.value = null;
+  syncQuery();
   await reloadCurrent();
 };
 
+/** 批3A: 预设档直切; 「自定义」档保持当前天数等用户输入 */
+const onDaysModeChange = async () => {
+  if (daysMode.value !== 'custom') {
+    days.value = Number(daysMode.value) || 30;
+    syncQuery();
+    await reloadCurrent();
+  }
+};
+
 const onDaysChange = async () => {
+  days.value = Math.min(Math.max(Number(days.value) || 30, 1), 365);
+  syncQuery();
   await reloadCurrent();
 };
 
@@ -1464,6 +1499,7 @@ const onTabChange = async () => {
   if (tab.value !== 'realtime') {
     stopRealtime();
   }
+  syncQuery();
   await reloadCurrent();
 };
 
