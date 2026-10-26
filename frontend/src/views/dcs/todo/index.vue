@@ -82,7 +82,7 @@ const router = useRouter();
 const loading = ref(false);
 const rows = ref<(DcsTaskRow & { myStatus: string })[]>([]);
 const total = ref(0);
-const query = reactive<any>({ pageNum: 1, pageSize: 20 });
+const query = reactive<any>({ pageNum: 1, pageSize: 20, todoOnly: true });
 const rejectedCount = computed(() => rows.value.filter((r) => r.mySubmissionStatus === 'REJECTED').length);
 
 // 被退回的跳转带上 action=revise-reason, 详情页据此高亮退回意见(全审 P1-4)
@@ -95,10 +95,12 @@ const load = async () => {
   loading.value = true;
   try {
     const res = await myTasks(query);
-    // 后端 my 已回填 mySubmissionStatus(回修A), 本页只留「未提交/被退回」, 不再逐任务 getTask(全审 P1: N+1)
-    rows.value = (res.rows || [])
-      .filter((t) => t.status === 'COLLECTING' && (!t.mySubmissionStatus || t.mySubmissionStatus === 'REJECTED'))
-      .map((t) => ({ ...t, myStatus: t.mySubmissionStatus === 'REJECTED' ? '被退回(可重提)' : '未提交' }));
+    // 待办口径(未提交/被退回)由后端 todoOnly 服务端过滤(U-03 口径对齐): 行列表与 total 同口径,
+    // 不再前端滤行而计数不滤——否则 KPI/分页说有 N 条、表体却是空态。后端 my 已回填 mySubmissionStatus(回修A)。
+    rows.value = (res.rows || []).map((t) => ({
+      ...t,
+      myStatus: t.mySubmissionStatus === 'REJECTED' ? '被退回(可重提)' : '未提交'
+    }));
     total.value = res.total;
   } finally {
     loading.value = false;

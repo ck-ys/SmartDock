@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -78,11 +79,11 @@ public class DcsTaskController extends BaseController {
         return R.ok(taskService.fieldsOf(id));
     }
 
-    /** 成员: 我的任务 */
+    /** 成员: 我的任务(todoOnly=true 只留待办: 未提交或被退回, 行列表与 total 同口径, U-03) */
     @SaCheckPermission("dcs:submission:submit")
     @GetMapping("/my")
-    public TableDataInfo<DcsTask> my(PageQuery pq) {
-        return taskService.myTasks(pq, LoginHelper.getUserId());
+    public TableDataInfo<DcsTask> my(PageQuery pq, @RequestParam(defaultValue = "false") boolean todoOnly) {
+        return taskService.myTasks(pq, LoginHelper.getUserId(), todoOnly);
     }
 
     /** 详情: 任务 + 字段 + 我的最新提交状态 */

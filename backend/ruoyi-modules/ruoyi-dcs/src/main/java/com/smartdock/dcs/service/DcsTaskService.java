@@ -9,6 +9,7 @@ import com.smartdock.dcs.domain.DcsTaskField;
 import com.smartdock.dcs.domain.bo.DcsTaskBo;
 import com.smartdock.dcs.mapper.DcsTaskFieldMapper;
 import com.smartdock.dcs.domain.DcsSubmission;
+import com.smartdock.dcs.domain.DcsTodoPolicy;
 import com.smartdock.dcs.mapper.DcsSubmissionMapper;
 import com.smartdock.dcs.mapper.DcsTaskMapper;
 import com.smartdock.dcs.statemachine.DcsTaskStateMachine;
@@ -31,6 +32,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 任务服务: 建/改(DRAFT 期)/发布/关闭/查询。
@@ -220,10 +222,25 @@ public class DcsTaskService {
         return TableDataInfo.build(page);
     }
 
-    /** 成员: 我的任务(被指派且在收集中的)。
-     *  全审回修(UI 席 P1): 回填 mySubmissionStatus(本人最新提交态), 前端待办页不再逐任务拉详情 */
+    /** 成员: 我的任务(被指派且在收集中的)。 */
     public TableDataInfo<DcsTask> myTasks(PageQuery pq, Long userId) {
-        Page<DcsTask> page = taskMapper.selectPage(pq.build(), collectedByMe(userId)
+        return myTasks(pq, userId, false);
+    }
+
+    /** 成员: 我的任务(被指派且在收集中的)。
+     *  全审回修(UI 席 P1): 回填 mySubmissionStatus(本人最新提交态), 前端待办页不再逐任务拉详情。
+     *  todoOnly=true 按待办口径(未提交或被退回)服务端过滤, 行列表与 total 同口径——
+     *  U-03 修复: 前端滤行而计数不滤, 会出「KPI/共 N 条却说暂无待办」的自相矛盾 */
+    public TableDataInfo<DcsTask> myTasks(PageQuery pq, Long userId, boolean todoOnly) {
+        LambdaQueryWrapper<DcsTask> wrapper = collectedByMe(userId);
+        if (todoOnly) {
+            Set<Long> notTodo = DcsTodoPolicy.notTodoTaskIds(submissionMapper.selectList(
+                new LambdaQueryWrapper<DcsSubmission>().eq(DcsSubmission::getSubmitterUserId, userId)));
+            if (!notTodo.isEmpty()) {
+                wrapper.notIn(DcsTask::getId, notTodo);
+            }
+        }
+        Page<DcsTask> page = taskMapper.selectPage(pq.build(), wrapper
             .orderByDesc(DcsTask::getId));
         if (!page.getRecords().isEmpty()) {
             List<Long> taskIds = page.getRecords().stream().map(DcsTask::getId).toList();
