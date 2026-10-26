@@ -211,3 +211,26 @@ CREATE TABLE IF NOT EXISTS public.analytics_visitor_first_seen (
     first_seen  timestamp    NOT NULL,
     CONSTRAINT pk_analytics_visitor_first_seen PRIMARY KEY (tenant_id, source, visitor_key)
 );
+
+-- ---------------------------------------------------------------- analytics_custom_report
+-- R2-4 自定义分析视图: 分析中心「保存当前视图」落库, 按租户+创建人隔离。
+CREATE TABLE IF NOT EXISTS public.analytics_custom_report (
+    report_id    bigint       NOT NULL,
+    tenant_id    varchar(20)  NOT NULL DEFAULT '000000',
+    report_name  varchar(100) NOT NULL,
+    source       varchar(50)  NOT NULL,
+    dimension    varchar(50)  NOT NULL DEFAULT 'day',
+    metric       varchar(20)  NOT NULL DEFAULT 'pv',
+    days         integer      NOT NULL DEFAULT 30,
+    limit_rows   integer      NOT NULL DEFAULT 20,
+    create_by    bigint,
+    create_time  timestamp,
+    update_by    bigint,
+    update_time  timestamp,
+    CONSTRAINT pk_analytics_custom_report PRIMARY KEY (report_id),
+    CONSTRAINT uk_analytics_custom_report UNIQUE (tenant_id, create_by, report_name)
+);
+COMMENT ON TABLE public.analytics_custom_report IS '分析中心-自定义分析视图(R2-4 保存当前视图)';
+COMMENT ON COLUMN public.analytics_custom_report.report_name IS '视图名(同租户同人唯一, 重名保存=覆盖)';
+COMMENT ON COLUMN public.analytics_custom_report.dimension IS '维度: day/page/channel/campaign/device/browser/os/geo/entry/exit/search/event';
+COMMENT ON COLUMN public.analytics_custom_report.metric IS '指标: pv/uv/visits/events';

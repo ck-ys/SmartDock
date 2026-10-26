@@ -3,6 +3,7 @@ package com.smartdock.analytics.engine;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.smartdock.analytics.domain.AnalyticsCustomReport;
 import com.smartdock.analytics.domain.AnalyticsDaily;
 import com.smartdock.analytics.domain.AnalyticsFunnel;
 import com.smartdock.analytics.domain.AnalyticsSession;
@@ -15,6 +16,7 @@ import com.smartdock.analytics.query.AnalyticsCustomBo;
 import com.smartdock.analytics.query.AnalyticsEventRow;
 import com.smartdock.analytics.query.AnalyticsFunnelBo;
 import com.smartdock.analytics.query.AnalyticsImportBo;
+import com.smartdock.analytics.query.AnalyticsReportSaveBo;
 import com.smartdock.analytics.query.AnalyticsSessionQuery;
 import com.smartdock.profile.ProfileEventPublisher;
 import com.smartdock.profile.domain.ProfileEngineConfig;
@@ -75,6 +77,7 @@ public class AnalyticsService {
     private final AnalyticsFunnelMapper funnelMapper;
     private final com.smartdock.analytics.mapper.AnalyticsRebuildLogMapper rebuildLogMapper;
     private final com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper;
+    private final com.smartdock.analytics.mapper.AnalyticsCustomReportMapper reportMapper;
     private final com.smartdock.profile.engine.ProfilePiiService piiService;
     private final org.redisson.api.RedissonClient redisson;
     private final AnalyticsSessionizer sessionizer;
@@ -887,6 +890,84 @@ public class AnalyticsService {
         out.put("days", days);
         out.put("points", points);
         return out;
+    }
+
+    // ---------------------------------------------------------------- R2-4 自定义分析视图
+
+    /** 我的视图列表(租户+创建人隔离)。 */
+    public List<AnalyticsCustomReport> listReports() {
+        Long userId = LoginHelper.getUserId();
+        return reportMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AnalyticsCustomReport>()
+            .eq(AnalyticsCustomReport::getTenantId, currentTenant())
+            .eq(AnalyticsCustomReport::getCreateBy, userId)
+            .orderByDesc(AnalyticsCustomReport::getCreateTime)
+            .last("LIMIT 100"));
+    }
+
+    /** 保存视图: reportId 或同名命中=覆盖更新, 否则新建。返回视图 id。 */
+    public Long saveReport(AnalyticsReportSaveBo bo) {
+        if (bo == null || StringUtils.isBlank(bo.getSource())) {
+            throw new ServiceException("source 不能为空");
+        }
+        requireSource(bo.getSource());
+        String name = AnalyticsReportValidator.normalizeName(bo.getReportName());
+        String dimension = AnalyticsReportValidator.normalizeDimension(bo.getDimension());
+        String metric = AnalyticsReportValidator.normalizeMetric(bo.getMetric());
+        int days = AnalyticsReportValidator.clampDays(bo.getDays());
+        int limit = AnalyticsReportValidator.clampLimit(bo.getLimitRows());
+        Long userId = LoginHelper.getUserId();
+        String tenantId = currentTenant();
+        AnalyticsCustomReport target = null;
+        boolean update;
+        if (bo.getReportId() != null) {
+            AnalyticsCustomReport exist = reportMapper.selectById(bo.getReportId());
+            if (exist == null || !userId.equals(exist.getCreateBy()) || !tenantId.equals(exist.getTenantId())) {
+                throw new ServiceException("视图不存在或不属于当前用户");
+            }
+            target = exist;
+            update = true;
+        } else {
+            // 同名保存=覆盖(uk 租户+人+名)
+            target = reportMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AnalyticsCustomReport>()
+                    .eq(AnalyticsCustomReport::getTenantId, tenantId)
+                    .eq(AnalyticsCustomReport::getCreateBy, userId)
+                    .eq(AnalyticsCustomReport::getReportName, name)
+                    .last("LIMIT 1"))
+                .stream().findFirst().orElse(null);
+            update = target != null;
+        }
+        if (target == null) {
+            target = new AnalyticsCustomReport();
+            target.setReportId(com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());
+            target.setTenantId(tenantId);
+            target.setCreateBy(userId);
+        }
+        Date now = new Date();
+        target.setReportName(name);
+        target.setSource(bo.getSource());
+        target.setDimension(dimension);
+        target.setMetric(metric);
+        target.setDays(days);
+        target.setLimitRows(limit);
+        target.setUpdateBy(userId);
+        target.setUpdateTime(now);
+        target.setCreateTime(target.getCreateTime() == null ? now : target.getCreateTime());
+        if (update) {
+            reportMapper.updateById(target);
+        } else {
+            reportMapper.insert(target);
+        }
+        return target.getReportId();
+    }
+
+    /** 删除自己的视图。 */
+    public void removeReport(Long reportId) {
+        Long userId = LoginHelper.getUserId();
+        AnalyticsCustomReport exist = reportMapper.selectById(reportId);
+        if (exist == null || !userId.equals(exist.getCreateBy()) || !currentTenant().equals(exist.getTenantId())) {
+            throw new ServiceException("视图不存在或不属于当前用户");
+        }
+        reportMapper.deleteById(reportId);
     }
 
     // ---------------------------------------------------------------- CSV 导入

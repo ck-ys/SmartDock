@@ -140,6 +140,33 @@ public class AnalyticsController {
         return R.ok(analyticsService.backfillDaily(day));
     }
 
+    // ---------------------------------------------------------------- R2-4 自定义分析视图
+
+    /** 我的视图列表(当前用户) */
+    @SaCheckPermission("analytics:report:query")
+    @GetMapping("/report/list")
+    public R<List<com.smartdock.analytics.domain.AnalyticsCustomReport>> reportList() {
+        return R.ok(analyticsService.listReports());
+    }
+
+    /** 保存视图(同名=覆盖), 返回视图 id */
+    @SaCheckPermission("analytics:report:save")
+    @Log(title = "分析中心-保存视图", businessType = BusinessType.INSERT)
+    @RepeatSubmit
+    @PostMapping("/report/save")
+    public R<Long> reportSave(@RequestBody AnalyticsReportSaveBo bo) {
+        return R.ok(analyticsService.saveReport(bo));
+    }
+
+    /** 删除自己的视图 */
+    @SaCheckPermission("analytics:report:remove")
+    @Log(title = "分析中心-删除视图", businessType = BusinessType.DELETE)
+    @PostMapping("/report/{reportId}/remove")
+    public R<Void> reportRemove(@PathVariable Long reportId) {
+        analyticsService.removeReport(reportId);
+        return R.ok();
+    }
+
     /**
      * 批8 路径分析：页面桑基（start 为空 = 入口视角；非空 = 从该页出发）。
      */

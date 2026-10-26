@@ -148,10 +148,10 @@
               <template #header>
                 <div class="panel-head">
                   <span>{{ block.title }}</span>
-                  <span class="muted">{{ block.hint }}</span>
+                  <span class="muted">{{ block.hint }} · 点击行下钻访问明细</span>
                 </div>
               </template>
-              <el-table class="ui-table" :data="breakdowns[block.type] || []" :show-header="true">
+              <el-table class="ui-table drill-table" :data="breakdowns[block.type] || []" :show-header="true" @row-click="(row: AnalyticsBreakdownRow) => drillToSessions(block.type, row)">
                 <el-table-column prop="label" :label="block.label" min-width="140" show-overflow-tooltip />
                 <el-table-column prop="pv" label="PV" width="76" align="right" />
                 <el-table-column prop="uv" label="UV" width="76" align="right" />
@@ -536,6 +536,17 @@
               <el-option label="是" value="1" />
               <el-option label="否" value="0" />
             </el-select>
+            <el-date-picker
+              v-model="sessionRange"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              style="width: 230px"
+              :clearable="true"
+              @change="onSessionRangeChange"
+            />
             <el-button type="primary" @click="searchSessions">查询</el-button>
             <el-button @click="resetSessions">重置</el-button>
             <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportSessionsCsv"> 导出 CSV </el-button>
@@ -616,6 +627,12 @@
             </el-radio-group>
             <el-button type="primary" :loading="customLoading" @click="loadCustom">运行</el-button>
             <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportCustomCsv"> 导出 CSV </el-button>
+            <el-divider direction="vertical" />
+            <el-select v-model="myReportId" placeholder="我的视图" clearable style="width: 190px" @change="applyMyReport">
+              <el-option v-for="rep in myReports" :key="rep.reportId" :label="rep.reportName" :value="rep.reportId" />
+            </el-select>
+            <el-button v-hasPermi="['analytics:report:save']" @click="openSaveReport">保存当前视图</el-button>
+            <el-button v-if="myReportId" v-hasPermi="['analytics:report:remove']" type="danger" plain @click="removeMyReport">删除视图</el-button>
           </div>
           <el-alert v-if="loadErrors.custom" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
           <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
@@ -795,7 +812,10 @@ import {
   getAnalyticsTrend,
   importAnalyticsCsv,
   listAnalyticsFunnels,
+  listAnalyticsReports,
   pageAnalyticsSessions,
+  removeAnalyticsReport,
+  saveAnalyticsReport,
   previewAnalyticsFunnel,
   rebuildAnalytics,
   runAnalyticsCustom,
@@ -809,6 +829,7 @@ import {
   type AnalyticsAttribution,
   type AnalyticsActivity,
   type AnalyticsCrossSource,
+  type AnalyticsCustomReport,
   type AnalyticsFunnelLoss,
   type AnalyticsPaths,
   type AnalyticsRealtime,
@@ -940,6 +961,27 @@ const onRetentionGranularityChange = () => {
 };
 const retentionLoading = ref(false);
 
+// R2-4 下钻: 渠道/设备/浏览器/地域 四表行点击 → 访问明细带筛选直达
+const sessionRange = ref<[string, string] | null>(null);
+const drillToSessions = (type: string, row: AnalyticsBreakdownRow) => {
+  tab.value = 'sessions';
+  Object.assign(sessionQuery, {
+    keyword: '', channel: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1
+  });
+  sessionRange.value = null;
+  sessionQuery.fromDate = undefined;
+  sessionQuery.toDate = undefined;
+  if (type === 'channel') sessionQuery.channel = row.label;
+  if (type === 'device') sessionQuery.deviceType = row.label;
+  if (type === 'browser') sessionQuery.browser = row.label;
+  if (type === 'geo') sessionQuery.country = row.label.split(' / ')[0].trim();
+  loadSessions();
+};
+const onSessionRangeChange = (range: [string, string] | null) => {
+  sessionQuery.fromDate = range?.[0] || undefined;
+  sessionQuery.toDate = range?.[1] || undefined;
+  searchSessions();
+};
 const sessionQuery = reactive<AnalyticsSessionQuery>({
   source: 'web',
   days: 30,
@@ -957,6 +999,60 @@ const sessionDrawer = ref(false);
 const sessionDetail = ref<AnalyticsSessionDetail | null>(null);
 
 const customForm = reactive({ dimension: 'channel', metric: 'visits', limit: 20 });
+// R2-4 我的视图: 保存/打开/删除
+const myReports = ref<AnalyticsCustomReport[]>([]);
+const myReportId = ref('');
+const loadMyReports = async () => {
+  try {
+    myReports.value = await listAnalyticsReports();
+  } catch {
+    myReports.value = [];
+  }
+};
+const applyMyReport = (id?: string) => {
+  const rep = myReports.value.find((x) => x.reportId === id);
+  if (!rep) return;
+  customForm.dimension = rep.dimension;
+  customForm.metric = rep.metric;
+  customForm.limit = rep.limitRows;
+  if (rep.days && rep.days !== days.value) {
+    days.value = rep.days;
+    daysMode.value = PRESET_DAYS.has(rep.days) ? String(rep.days) : 'custom';
+  }
+  loadCustom();
+};
+const openSaveReport = async () => {
+  try {
+    const { value } = await ElMessageBox.prompt('给当前分析条件起个名字(同名保存=覆盖)', '保存当前视图', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputPattern: /^\s*\S.{0,99}\s*$/,
+      inputErrorMessage: '视图名 1-100 字'
+    });
+    await saveAnalyticsReport({
+      reportName: value.trim(),
+      source: source.value,
+      dimension: customForm.dimension,
+      metric: customForm.metric,
+      days: days.value,
+      limitRows: customForm.limit
+    });
+    ElMessage.success('视图已保存');
+    await loadMyReports();
+  } catch (e) {
+    if (e !== 'cancel' && (e as { toString: () => string })?.toString?.().includes('cancel')) return;
+    if (e !== 'cancel') throw e;
+  }
+};
+const removeMyReport = async () => {
+  const rep = myReports.value.find((x) => x.reportId === myReportId.value);
+  if (!rep) return;
+  await ElMessageBox.confirm(`确定删除视图「${rep.reportName}」？`, '删除视图', { type: 'warning' });
+  await removeAnalyticsReport(rep.reportId);
+  myReportId.value = '';
+  ElMessage.success('已删除');
+  await loadMyReports();
+};
 const customRows = ref<{ label: string; value: number }[]>([]);
 const customLoading = ref(false);
 
@@ -1665,6 +1761,8 @@ const deltaTone = (key: string) => {
 
 onMounted(async () => {
   await Promise.all([loadOverview(), loadBreakdowns()]);
+  // R2-4 我的视图: 无权限(403)时静默为空列表, 下拉只显示占位
+  loadMyReports();
 });
 </script>
 

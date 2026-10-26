@@ -286,6 +286,28 @@ export const getAnalyticsRetention = (source: string, days = 30, window = 7, gra
 
 export const runAnalyticsCustom = (data: AnalyticsCustomBo) => r<AnalyticsCustomResult>({ url: `${BASE}/custom`, method: 'post', data });
 
+// ---------------------------------------------------------------- R2-4 我的视图
+
+export interface AnalyticsCustomReport {
+  reportId: string;
+  reportName: string;
+  source: string;
+  dimension: string;
+  metric: string;
+  days: number;
+  limitRows: number;
+  createTime?: string;
+}
+
+export const listAnalyticsReports = () =>
+  r<AnalyticsCustomReport[]>({ url: `${BASE}/report/list`, method: 'get' });
+
+export const saveAnalyticsReport = (data: Partial<AnalyticsCustomReport>) =>
+  r<string>({ url: `${BASE}/report/save`, method: 'post', data });
+
+export const removeAnalyticsReport = (reportId: string) =>
+  r<void>({ url: `${BASE}/report/${reportId}/remove`, method: 'post' });
+
 export const importAnalyticsCsv = (source: string, csv: string) =>
   r<AnalyticsImportResult>({ url: `${BASE}/import`, method: 'post', data: { source, csv } });
 
