@@ -221,7 +221,7 @@ defineExpose({
     cursor: pointer;
     width: 56px;
     height: 48px;
-    border-radius: 4px;
+    border-radius: var(--dcs-radius-sm);
     /* 缩略图跟随主题：深色下不能还画成亮灰底 + 藏青块 */
     background: var(--app-raised);
     border: 2px solid transparent;
@@ -239,12 +239,12 @@ defineExpose({
       position: absolute;
       height: 100%;
       top: 0;
-      border-radius: 4px 0 0 4px;
+      border-radius: var(--dcs-radius-sm) 0 0 var(--dcs-radius-sm);
     }
   }
   .mix {
     b:first-child {
-      border-radius: 4px 4px 0 0;
+      border-radius: var(--dcs-radius-sm) var(--dcs-radius-sm) 0 0;
       display: block;
       height: 30%;
       background: var(--app-text);
@@ -254,7 +254,7 @@ defineExpose({
       background: var(--app-text);
       position: absolute;
       height: 70%;
-      border-radius: 0 0 0 4px;
+      border-radius: 0 0 0 var(--dcs-radius-sm);
     }
   }
   .top {
@@ -262,7 +262,7 @@ defineExpose({
       display: block;
       height: 30%;
       background: var(--app-text);
-      border-radius: 4px 4px 0 0;
+      border-radius: var(--dcs-radius-sm) var(--dcs-radius-sm) 0 0;
     }
   }
 }

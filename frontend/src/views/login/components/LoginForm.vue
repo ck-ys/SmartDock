@@ -406,7 +406,7 @@ onMounted(() => {
   margin-right: -6px;
   padding: 7px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   background: transparent;
   color: #77819d;
   cursor: pointer;
@@ -443,7 +443,7 @@ onMounted(() => {
   :deep(.el-select__wrapper) {
     min-height: 50px;
     padding: 1px 14px;
-    border-radius: 10px;
+    border-radius: var(--app-control-radius);
     background: #fbfcff;
     box-shadow: 0 0 0 1px #d3daea inset;
     transition:
@@ -479,7 +479,7 @@ onMounted(() => {
   :deep(.el-checkbox__inner) {
     width: 16px;
     height: 16px;
-    border-radius: 3px;
+    border-radius: var(--dcs-radius-sm);
   }
   // 注意: 不得给 ::after 覆盖 left/top——EP2.13.5 对勾靠 left:50%/top:50% 百分比自居中，
   // 绝对值覆盖会让 translate(-45%,-60%) 把勾平移出 16px 盒外(2026-09-17 业务反馈#4: 勾选后只见深色方块)
@@ -503,7 +503,7 @@ onMounted(() => {
   padding: 0;
   overflow: hidden;
   border: 1px solid #cbd2e1;
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   background: #fff;
   cursor: pointer;
   &:focus-visible {
@@ -602,7 +602,7 @@ onMounted(() => {
   gap: 10px;
   padding: 12px 14px;
   border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border-radius: var(--app-card-radius);
   background: #fff;
   cursor: pointer;
   text-align: left;
@@ -691,7 +691,7 @@ onMounted(() => {
     margin: 0;
     padding: 0;
     border: 1px solid #cbd2e1;
-    border-radius: 6px;
+    border-radius: var(--app-control-radius);
     background: #fff;
     color: #202127;
     font-size: 25px;
@@ -706,7 +706,7 @@ onMounted(() => {
   width: 100%;
   height: 52px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--app-control-radius);
   background: linear-gradient(120deg, #0b1f5c, #2f5fd0);
   box-shadow: 0 10px 24px rgba(11, 31, 92, 0.24);
   font-size: 17px;

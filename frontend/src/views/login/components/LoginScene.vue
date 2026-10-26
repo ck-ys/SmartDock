@@ -181,7 +181,7 @@
   height: 36px;
   /* 皮肤批：颜色全走 mark 令牌；去青色辉光环，留一层安静投影把标从场景底上托起 */
   font-size: 19px;
-  border-radius: 9px;
+  border-radius: var(--app-control-radius);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
 }
 .scene-brand__word {
@@ -236,7 +236,7 @@
   height: 100%;
   overflow: hidden;
   border: 1px solid rgba(180, 215, 255, 0.35);
-  border-radius: 12px;
+  border-radius: var(--app-card-radius);
   background: #fff;
   box-shadow:
     0 44px 90px -34px rgba(0, 0, 0, 0.78),
@@ -300,7 +300,7 @@
   margin-left: auto;
   padding: 2px 8px;
   border: 1px solid #e2e9f5;
-  border-radius: 999px;
+  border-radius: var(--dcs-pill-radius);
   color: #9aa4b8;
   font-size: 7.5px;
 }
@@ -344,7 +344,7 @@
     gap: 5px;
     margin-bottom: 2px;
     padding: 4px 6px;
-    border-radius: 4px;
+    border-radius: var(--dcs-radius-sm);
     &.is-on {
       background: #eef4ff;
       color: #2b56a8;
@@ -423,7 +423,7 @@
     i {
       margin-left: 3px;
       padding: 0 3px;
-      border-radius: 3px;
+      border-radius: var(--dcs-radius-xs);
       background: #e8f7ef;
       color: #167a54;
       font-size: 6.5px;
@@ -440,7 +440,7 @@
   i {
     padding: 1px 6px;
     border: 1px solid #dbe6f7;
-    border-radius: 999px;
+    border-radius: var(--dcs-pill-radius);
     background: #fff;
     color: #33507f;
     font-size: 7.5px;
@@ -461,7 +461,7 @@
   min-height: 0;
   padding: 9px;
   border: 1px solid #e6ecf7;
-  border-radius: 7px;
+  border-radius: var(--app-control-radius);
   background: #fff;
 }
 .pw-panel__title {
@@ -499,7 +499,7 @@
   background-image: repeating-linear-gradient(to top, rgba(8, 24, 79, 0.06) 0 1px, transparent 1px 25%);
   i {
     flex: 1;
-    border-radius: 2px 2px 0 0;
+    border-radius: var(--dcs-radius-xs) var(--dcs-radius-xs) 0 0;
     background: linear-gradient(180deg, #4d86e8, #2f5fd0);
     opacity: 0.85;
     &:nth-child(2n) {
@@ -576,7 +576,7 @@
   width: min(300px, 40%);
   padding: 12px 13px;
   border: 1px solid rgba(150, 195, 255, 0.28);
-  border-radius: 11px;
+  border-radius: var(--app-card-radius);
   background: rgba(9, 27, 53, 0.93);
   box-shadow:
     0 26px 55px -22px rgba(0, 0, 0, 0.85),
@@ -623,7 +623,7 @@
 .assistant-float__msg {
   margin-top: 8px;
   padding: 5px 8px;
-  border-radius: 6px;
+  border-radius: var(--app-control-radius);
   font-size: 9.5px;
   line-height: 1.5;
   &.is-user {
@@ -644,7 +644,7 @@
   b {
     flex: 1;
     padding: 4px 0;
-    border-radius: 4px;
+    border-radius: var(--dcs-radius-sm);
     text-align: center;
     font-size: 8.5px;
   }
@@ -740,7 +740,6 @@
   .scene-brand__mark {
     width: 40px;
     height: 40px;
-    border-radius: 12px;
   }
   .scene-brand__word {
     font-size: 44px;
@@ -768,7 +767,6 @@
   .scene-brand__mark {
     width: 30px;
     height: 30px;
-    border-radius: 9px;
   }
   .scene-brand__word {
     font-size: 32px;
@@ -818,7 +816,6 @@
   .scene-brand__mark {
     width: 26px;
     height: 26px;
-    border-radius: 8px;
   }
   .scene-brand__word {
     font-size: 28px;

@@ -277,7 +277,7 @@ onMounted(load);
   width: 32px;
   height: 32px;
   flex: none;
-  border-radius: 10px;
+  border-radius: var(--app-control-radius);
   object-fit: cover;
   background: var(--app-raised);
 }
@@ -355,7 +355,7 @@ onMounted(load);
   overflow-y: auto;
   padding: 8px;
   border: 1px solid var(--app-border);
-  border-radius: 12px;
+  border-radius: var(--app-card-radius);
   background: var(--app-surface);
   box-shadow: 0 12px 32px rgba(15, 30, 40, 0.14);
 }
@@ -413,7 +413,7 @@ html.dark .sidebar-user-panel-popper.el-popper {
   width: 24px;
   height: 24px;
   flex: none;
-  border-radius: 7px;
+  border-radius: var(--app-control-radius);
   font-size: 12px;
   font-weight: 600;
   line-height: 1;
@@ -427,7 +427,7 @@ html.dark .sidebar-user-panel-popper.el-popper {
   margin: 2px 4px 8px;
   padding: 0 10px;
   height: 36px;
-  border-radius: 9px;
+  border-radius: var(--app-control-radius);
   background: var(--app-raised);
   cursor: default;
   list-style: none;
@@ -462,7 +462,7 @@ html.dark .sidebar-user-panel-popper.el-popper {
   height: 42px;
   margin: 2px 4px 4px;
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: var(--app-control-radius);
   background: var(--app-raised);
   color: var(--app-text);
   font-size: 13.5px;
@@ -495,7 +495,7 @@ html.dark .sidebar-user-panel-popper.el-popper {
   height: 42px;
   margin: 0 4px;
   padding: 0 10px;
-  border-radius: 10px;
+  border-radius: var(--app-control-radius);
   font-size: 13.5px;
 
   &:hover,
@@ -528,7 +528,7 @@ html.dark .sidebar-user-panel-popper.el-popper {
   height: 34px;
   margin: 2px 4px 0;
   padding: 0 10px;
-  border-radius: 9px;
+  border-radius: var(--app-control-radius);
   color: var(--app-muted);
   font-size: 12.5px;
 

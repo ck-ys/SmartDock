@@ -141,7 +141,7 @@ const agreementHref = (path: string) => router.resolve(path).href;
   min-height: 32px;
   padding: 4px 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   background: transparent;
   color: var(--login-navy);
   font: inherit;
@@ -260,7 +260,6 @@ const agreementHref = (path: string) => router.resolve(path).href;
   }
   .login-panel__content {
     padding: 14px 18px 16px;
-    border-radius: 14px;
   }
   .login-panel__toolbar {
     min-height: 28px;
@@ -316,7 +315,6 @@ const agreementHref = (path: string) => router.resolve(path).href;
   }
   .login-panel__content {
     padding: 18px 18px 16px;
-    border-radius: 16px;
   }
   // hero 占高后表单可能长于剩余空间(801-836px 高度档/全面屏首屏)——顶对齐+内部滚动兜底
   .login-panel__body {

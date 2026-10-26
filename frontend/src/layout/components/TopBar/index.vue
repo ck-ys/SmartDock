@@ -73,10 +73,14 @@ onMounted(() => {
   margin: 0 10px !important;
 }
 
-.el-sub-menu.is-active .svg-icon,
-.el-menu-item.is-active .svg-icon + span,
-.el-sub-menu.is-active .svg-icon + span,
-.el-sub-menu.is-active .el-sub-menu__title span {
+/* 激活项 icon+文字用主文本色——必须限定在 .topbar-menu 内：
+   全局裸写 .el-sub-menu.is-active … 会命中侧栏激活组内所有叶子项（svg-icon+span 结构相同），
+   T1 浅色档侧栏是深蓝壳，把兄弟菜单染成 --app-text 深墨字等于不可见（2026-10-26 U-24 回归）。
+   水平菜单弹层（teleport 到 body）的激活色由 el-menu 的 active-text-color prop 负责，不走这条 CSS */
+.topbar-menu .el-sub-menu.is-active .svg-icon,
+.topbar-menu .el-menu-item.is-active .svg-icon + span,
+.topbar-menu .el-sub-menu.is-active .svg-icon + span,
+.topbar-menu .el-sub-menu.is-active .el-sub-menu__title span {
   color: var(--app-text);
 }
 

@@ -381,7 +381,7 @@ onMounted(() => {
   min-height: 32px;
   padding: 4px 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   background: transparent;
   color: var(--register-navy);
   font: inherit;
@@ -472,7 +472,7 @@ onMounted(() => {
   padding: 12px 16px;
   margin-bottom: 16px;
   border-left: 3px solid var(--register-navy);
-  border-radius: 6px;
+  border-radius: var(--app-card-radius);
   background: var(--el-color-primary-light-9);
 
   .register-invite-banner__main {
@@ -505,7 +505,7 @@ onMounted(() => {
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--dcs-radius-sm);
   background: transparent;
   color: #828ba3;
   cursor: pointer;
@@ -534,7 +534,7 @@ onMounted(() => {
       display: block;
       width: 108px;
       height: 40px;
-      border-radius: 4px;
+      border-radius: var(--dcs-radius-sm);
     }
   }
 }
