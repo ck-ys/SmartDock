@@ -330,6 +330,61 @@ export const triggerRecalc = (source: string): Promise<ProfileRecalcBatch> =>
 export const resumeRecalcBatch = (batchId: string): Promise<ProfileRecalcBatch> =>
   r<ProfileRecalcBatch>({ url: `${BASE}/recalc/${batchId}/resume`, method: 'post' });
 
+export const getRecalcBatch = (batchId: string): Promise<ProfileRecalcBatch> =>
+  r<ProfileRecalcBatch>({ url: `${BASE}/recalc/${batchId}`, method: 'get' });
+
+// ---------------------------------------------------------------- R2-2 引擎管理页: 灌数 / 协议 / Schema (12 端点收口)
+
+/** POST /profile/event/publish 批量灌数回执 */
+export const publishProfileEvents = (events: unknown[]): Promise<Record<string, unknown>> =>
+  r<Record<string, unknown>>({ url: `${BASE}/event/publish`, method: 'post', data: events });
+
+export interface ProfileProtocol {
+  protocolId?: string;
+  source?: string;
+  version?: string;
+  status?: string;
+  manifest?: string | Record<string, unknown>;
+  publishedBy?: number | string;
+  publishedAt?: string;
+  [k: string]: unknown;
+}
+
+export const getProtocolCurrent = (source: string): Promise<ProfileProtocol> =>
+  r<ProfileProtocol>({ url: `${BASE}/protocol/${source}`, method: 'get' });
+
+export const getProtocolExport = (source: string): Promise<Record<string, unknown>> =>
+  r<Record<string, unknown>>({ url: `${BASE}/protocol/${source}/export`, method: 'get' });
+
+export const validateProtocol = (manifest: Record<string, unknown>): Promise<{ valid: boolean; errors: string[] }> =>
+  r<{ valid: boolean; errors: string[] }>({ url: `${BASE}/protocol/any/validate`, method: 'post', data: manifest });
+
+export const publishProtocol = (source: string, manifest: Record<string, unknown>, version?: string): Promise<ProfileProtocol> =>
+  r<ProfileProtocol>({ url: `${BASE}/protocol/${source}/publish`, method: 'post', params: { version }, data: manifest });
+
+export interface ProfileSchemaRegistry {
+  schemaId?: string;
+  source?: string;
+  eventName?: string;
+  schemaVersion?: string | number;
+  propsSchema?: string | Record<string, unknown>;
+  contextSchema?: string | Record<string, unknown>;
+  traitsSchema?: string | Record<string, unknown>;
+  status?: string;
+  updatedBy?: number | string;
+  updateTime?: string;
+  [k: string]: unknown;
+}
+
+export const listEventSchemas = (source: string): Promise<ProfileSchemaRegistry[]> =>
+  r<ProfileSchemaRegistry[]>({ url: `${BASE}/schema/${source}`, method: 'get' });
+
+export const registerEventSchema = (source: string, bo: Record<string, unknown>): Promise<ProfileSchemaRegistry> =>
+  r<ProfileSchemaRegistry>({ url: `${BASE}/schema/${source}`, method: 'post', data: bo });
+
+export const validateEventSchema = (source: string, bo: Record<string, unknown>): Promise<{ valid: boolean; errors: string[] }> =>
+  r<{ valid: boolean; errors: string[] }>({ url: `${BASE}/schema/${source}/validate`, method: 'post', data: bo });
+
 // ---------------------------------------------------------------- 评分模型 / RFM
 
 export interface ProfileScoreModel {

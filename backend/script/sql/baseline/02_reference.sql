@@ -951,6 +951,11 @@ INSERT INTO public.dcs_changelog (log_id, version, title, items, target_tenants,
   '1', '2026-09-24 12:00:00', '0', '2026-09-24 12:00:00')
 ON CONFLICT (version) WHERE (del_flag = '0'::bpchar) DO NOTHING;
 
+
+-- R2-2 引擎管理页(12000 画像与分析下): 全量重算/协议与Schema/演示灌数的完整运维口
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11989, '引擎管理', 12000, 9, 'engine-admin', 'dcs/profile/admin', '', '1', '0', 'C', '0', '0', 'profile:engine:query', 'setting', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '画像引擎运维: 重算/协议/Schema/灌数(写操作复用 11971-11976 按钮位)');
+INSERT INTO public.sys_role_menu (role_id, menu_id) VALUES (1, 11989);
+
 --
 -- PostgreSQL database dump complete
 --
