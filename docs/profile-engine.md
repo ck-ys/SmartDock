@@ -61,6 +61,44 @@
 }
 ```
 
+事件信封字段一览（`ProfileEventBo`，发布接口与 CSV 导入共用同一套语义）：
+
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `source` | ✅ | 业务源标识，与协议登记一致；维度 / 模型 / 分群 / 保留期按它隔离 |
+| `eventName` | ✅ | 事件名，点分命名（`order.paid` / `page_view`） |
+| `eventUid` | 发布必填 | 幂等键：`(tenant, source, eventUid)` 重复投递返回 `false` 不报错；CSV 留空自动生成 `csv-<uuid>` |
+| `subjectType` / `subjectId` | ✅ | 主体类型（默认 `user`）与 ID；分析优先认登录主体 |
+| `anonymousId` | 匿名事件必填 | 未登录访客 ID；与登录主体自动归并，绝不互搬身份 |
+| `sessionId` | 建议 | 显式会话 ID（`s-` 前缀）；缺省按 30 分钟无操作切分 |
+| `occurredTime` | 建议 | 事件发生时间；缺省取落库时间 |
+| `schemaVersion` | 可选 | Schema 版本号（如 `1-0-0`），配合轻校验 |
+| `props` / `context` / `traits` | 可选 | 业务属性 / 页面上下文 / 主体标签，均为 JSON 对象；派生属性（响应时长、质量分）由业务算好放 `props` |
+
+Java 侧接入只依赖一个门面 Bean（Spring Boot 业务工程引 `ruoyi-profile-engine` 模块即可）：
+
+```java
+@RequiredArgsConstructor
+@Service
+public class OrderEventReporter {
+
+    private final ProfileEventPublisher eventPublisher;   // 引擎门面, 幂等追加
+
+    public void onOrderPaid(Order order) {
+        ProfileEventBo event = new ProfileEventBo();
+        event.setSource("order");                          // 与协议登记的 source 一致
+        event.setEventName("order.paid");
+        event.setEventUid("order:paid:" + order.getOrderNo()); // 幂等键: 重放/重试只写一次
+        event.setSubjectType("order");
+        event.setSubjectId(order.getOrderNo());
+        event.setOccurredTime(order.getPaidAt());
+        event.getProps().put("amount", order.getAmount());
+        event.getProps().put("channel", order.getChannel());
+        eventPublisher.publish(event);                     // 返回 false = eventUid 重复, 已幂等跳过
+    }
+}
+```
+
 - **身份归并**：同一 `anonymousId` 先产生匿名事件，登录后带 `userId`（`subjectType=user`）的事件
   会把身份链写入 `profile_identity_link`；分析会话优先采用归并后的登录主体。
 - **Schema 轻校验**：只检查必填键和基础类型；未注册 Schema 的事件直接放行，保证旧接入零破坏。
@@ -125,8 +163,20 @@ profile_event
 - **内部业务系统走事件协议**：服务端调用 `ProfileEventPublisher` 门面发布
   `ProfileEventBo`（事件名/主体/会话/上下文/属性），事件按 `eventUid` 幂等，
   大批量建议分批发布。
-- **离线数据走 CSV 导入**：管理台「数据分析 → 数据导入」粘贴 CSV（最多 5000 行），
+- **离线数据走 CSV 导入**：管理台「数据分析 → 数据导入」粘贴 CSV（最多 5000 行、5MB），
   事件同样走 Schema 校验与幂等写入。
+
+  CSV 细则：
+
+  | 规则 | 说明 |
+  |---|---|
+  | 必填列 | `eventName`（或 `event_name`）——唯一必填列，其余全可省 |
+  | 幂等列 | `eventUid`——留空自动生成 `csv-<uuid>`；同一份文件重复导入想不重复计数，**必须自带稳定的 eventUid** |
+  | 主体列 | `subjectType`（缺省 `user`）、`subjectId`、`anonymousId`、`subjectName` |
+  | 会话/时间列 | `sessionId`、`occurredTime`（或 `time`，支持常见格式） |
+  | 属性列 | `props` / `properties` / `context` 为 JSON 字符串；`pageUrl`、`keyword`、`referrer`、`channel`（或 `sourceChannel`）、`campaign`、`deviceType`、`os` 可作独立列，导入时自动并入 `context` |
+  | 编码 | Excel/Windows 导出的首列 BOM 会自动剥掉；换行与引号按标准 CSV 转义 |
+  | 演示数据 | 官方合成演示脚本写入的数据带 `demo-` 前缀 eventUid；跨天重播前先按前缀清旧数据，否则叠加 |
 
 分析页面在「画像与分析 → 数据分析」，包含数据导入、流量概览、页面与搜索、
 路径分析、转化漏斗、留存分析、活跃分析、访问明细、自定义分析和实时看板十个页签。

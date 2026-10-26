@@ -88,6 +88,12 @@ SmartDock 是一套**通用智能体引擎**与**用户画像引擎**的参考�
 
 ## 快速开始
 
+> **只想最快看到第一张图？** 按下面「方式一」起好后端与前端（约 5 分钟），
+> 跑一次造数脚本、点一次「重建汇总」，然后直达
+> **「画像与分析 → 数据分析」**——流量概览、漏斗、留存、明细十张表全部有数
+> （531 事件 / 135 会话 / 40 UV 的演示口径）。协议字段表与 Java 接入示例见
+> [docs/profile-engine.md](docs/profile-engine.md#2-通用接入协议)。
+
 ### 前置条件
 
 - JDK 21、Maven 3.8+
@@ -245,7 +251,7 @@ docker compose ps        # 五个服务应为 running / healthy
 
 ### 用户画像
 
-1. 业务系统通过 `ProfileEventPublisher` 发送事件；
+1. 业务系统通过 `ProfileEventPublisher` 发送事件（[Java 接入示例与协议字段表](docs/profile-engine.md#2-通用接入协议)）；
 2. 在「画像工作室」配置维度、权重与覆盖度；
 3. 触发重算，查看主体画像与历史快照。
 
