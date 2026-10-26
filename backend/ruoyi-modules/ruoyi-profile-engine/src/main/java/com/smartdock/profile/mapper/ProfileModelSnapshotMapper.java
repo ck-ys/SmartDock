@@ -22,9 +22,14 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
     /**
      * 批10 Q2: 快照链事务级库锁。必须在事务内调用; 事务提交/回滚时自动释放,
      * 崩溃不留死锁。语义=「取前链+写快照」在数据库层面不可分割, 链分叉结构上不可能。
+     *
+     * <p>返回类型必须是引用类型(对齐 ProfileIdentityLinkMapper 同款): pg_advisory_xact_lock
+     * 虽返回 void, 但 MyBatis 对 @Select 的结果映射要求可构造类型——声明成 void 会在
+     * 执行期抛 "No constructor found in void", 模型全量 run/发布/回滚/增量写快照整链
+     * (2026-10-25 批4A 活体验证实锤, 批10 落地后从未真实跑通过)。</p>
      */
     @Select("SELECT pg_advisory_xact_lock(hashtext(#{key}))")
-    void advisoryXactLock(@Param("key") String key);
+    String advisoryXactLock(@Param("key") String key);
 
     @Insert("""
         INSERT INTO profile_model_snapshot

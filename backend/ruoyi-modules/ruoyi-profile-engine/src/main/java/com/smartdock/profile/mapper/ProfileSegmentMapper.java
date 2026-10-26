@@ -18,13 +18,13 @@ public interface ProfileSegmentMapper extends BaseMapperPlus<ProfileSegment, Pro
     @Insert("""
         INSERT INTO profile_segment
             (segment_id, tenant_id, source, segment_code, segment_name, segment_type, status,
-             rule_config, description, member_count, last_run_id, last_eval_time, builtin,
-             revision, create_by, create_time)
+             rule_config, description, member_count, last_run_id, last_eval_time, refresh_mode,
+             builtin, revision, create_by, create_time)
         VALUES
             (#{s.segmentId}, #{s.tenantId}, #{s.source}, #{s.segmentCode}, #{s.segmentName},
              #{s.segmentType}, #{s.status}, #{s.ruleConfig}::jsonb, #{s.description},
-             #{s.memberCount}, #{s.lastRunId}, #{s.lastEvalTime}, #{s.builtin},
-             #{s.revision}, #{s.createBy}, CURRENT_TIMESTAMP)
+             #{s.memberCount}, #{s.lastRunId}, #{s.lastEvalTime}, #{s.refreshMode},
+             #{s.builtin}, #{s.revision}, #{s.createBy}, CURRENT_TIMESTAMP)
         """)
     int insertJsonb(@Param("s") ProfileSegment s);
 
@@ -33,8 +33,8 @@ public interface ProfileSegmentMapper extends BaseMapperPlus<ProfileSegment, Pro
         SET segment_name = #{s.segmentName}, segment_type = #{s.segmentType}, status = #{s.status},
             rule_config = #{s.ruleConfig}::jsonb, description = #{s.description},
             member_count = #{s.memberCount}, last_run_id = #{s.lastRunId},
-            last_eval_time = #{s.lastEvalTime}, revision = #{s.revision},
-            update_by = #{s.updateBy}, update_time = CURRENT_TIMESTAMP
+            last_eval_time = #{s.lastEvalTime}, refresh_mode = #{s.refreshMode},
+            revision = #{s.revision}, update_by = #{s.updateBy}, update_time = CURRENT_TIMESTAMP
         WHERE segment_id = #{s.segmentId} AND tenant_id = #{s.tenantId} AND del_flag = '0'
         """)
     int updateJsonb(@Param("s") ProfileSegment s);
