@@ -25,6 +25,9 @@ public class ProfileModelDefinition implements Serializable {
     /** GENERIC / RFM; RFM 会额外产出八类客户分层 */
     private String preset = "GENERIC";
 
+    /** 批5A: RFM 八类分层的高低分界(1~5 分制), 缺省 3.5 与历史行为一致 */
+    private BigDecimal rfmMid;
+
     /** 维度定义(顺序即展示顺序) */
     private List<ModelDimension> dimensions = new ArrayList<>();
 

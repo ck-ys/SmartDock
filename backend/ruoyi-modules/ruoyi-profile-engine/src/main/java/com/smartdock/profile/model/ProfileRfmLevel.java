@@ -15,9 +15,17 @@ public final class ProfileRfmLevel {
     }
 
     public static String of(BigDecimal r, BigDecimal f, BigDecimal m) {
-        boolean rHigh = r != null && r.compareTo(MID) >= 0;
-        boolean fHigh = f != null && f.compareTo(MID) >= 0;
-        boolean mHigh = m != null && m.compareTo(MID) >= 0;
+        return of(r, f, m, MID);
+    }
+
+    /**
+     * 批5A: 分层阈值随模型 JSON 可配(mid 缺省 3.5 与旧行为逐位一致)。
+     */
+    public static String of(BigDecimal r, BigDecimal f, BigDecimal m, BigDecimal mid) {
+        BigDecimal cut = mid == null ? MID : mid;
+        boolean rHigh = r != null && r.compareTo(cut) >= 0;
+        boolean fHigh = f != null && f.compareTo(cut) >= 0;
+        boolean mHigh = m != null && m.compareTo(cut) >= 0;
         if (rHigh && fHigh && mHigh) {
             return "重要价值客户";
         }

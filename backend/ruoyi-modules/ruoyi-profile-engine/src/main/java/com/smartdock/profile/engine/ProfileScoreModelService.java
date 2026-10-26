@@ -809,7 +809,7 @@ public class ProfileScoreModelService {
             BigDecimal f = scores.get("F");
             BigDecimal m = scores.get("M");
             if (r != null && f != null && m != null) {
-                return ProfileRfmLevel.of(r, f, m);
+                return ProfileRfmLevel.of(r, f, m, def.getRfmMid());
             }
         }
         return ProfileRfmLevel.generic(normalized);
@@ -1016,6 +1016,19 @@ public class ProfileScoreModelService {
         if (bo.getScoreMax() == null || bo.getScoreMax().signum() <= 0
             || bo.getScoreMax().compareTo(MAX_SCORE_MAX) > 0) {
             throw new ServiceException("scoreMax 必须在 1~1000 之间");
+        }
+        // 批5A: RFM 分层阈值可配, 非法值拦截(1~5 分制开区间)
+        Object mid = bo.getConfig() == null ? null : bo.getConfig().get("rfmMid");
+        if (mid != null) {
+            BigDecimal rfmMid;
+            try {
+                rfmMid = new BigDecimal(String.valueOf(mid));
+            } catch (NumberFormatException e) {
+                throw new ServiceException("rfmMid 必须是数字(1~5 之间, 缺省 3.5)");
+            }
+            if (rfmMid.compareTo(BigDecimal.ONE) <= 0 || rfmMid.compareTo(BigDecimal.valueOf(5)) >= 0) {
+                throw new ServiceException("rfmMid 必须在 1~5 之间(不含端点, 缺省 3.5)");
+            }
         }
         if (StringUtils.isNotBlank(bo.getModelVersion()) && bo.getModelVersion().trim().length() > 32) {
             throw new ServiceException("modelVersion 不能超过 32 个字符");
