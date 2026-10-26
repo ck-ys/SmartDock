@@ -1,7 +1,9 @@
 package com.smartdock.profile.query;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartdock.analytics.mapper.AnalyticsEventMapper;
 import com.smartdock.profile.engine.ProfileQueryService;
+import com.smartdock.profile.mapper.ProfileSubjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -27,6 +29,8 @@ import java.util.Map;
 public class ProfileQueryController {
 
     private final ProfileQueryService queryService;
+    private final ProfileSubjectMapper subjectMapper;
+    private final AnalyticsEventMapper eventMapper;
 
     /**
      * 主体分页(带最新快照与筛选/排序)。
@@ -39,6 +43,19 @@ public class ProfileQueryController {
         out.put("mediumMin", ProfileQueryService.RISK_MEDIUM);
         out.put("highBelow", ProfileQueryService.RISK_MEDIUM);
         out.put("lowMin", ProfileQueryService.RISK_HIGH);
+        return R.ok(out);
+    }
+
+    /**
+     * 批2 列源: 画像系(有主体)/分析系(有事件)两份源清单, 前端各页源下拉单源化。
+     * 登录即可见(下拉原料非敏感), 不挂权限注解。
+     */
+    @GetMapping("/source/list")
+    public R<Map<String, Object>> sourceList() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        String tenantId = String.valueOf(org.dromara.common.satoken.utils.LoginHelper.getTenantId());
+        out.put("subjectSources", subjectMapper.selectSubjectSources(tenantId));
+        out.put("eventSources", eventMapper.selectEventSources(tenantId));
         return R.ok(out);
     }
 

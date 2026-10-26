@@ -298,4 +298,14 @@ public interface AnalyticsEventMapper {
                                                 @Param("sessionId") String sessionId,
                                                 @Param("from") Date from,
                                                 @Param("to") Date to);
+
+    /**
+     * 批2 列源: 有事件的源清单(分析系下拉用), 附事件数。
+     */
+    @Select("""
+        SELECT source, count(*) AS events FROM profile_event
+        WHERE tenant_id = #{tenantId} AND del_flag = '0'
+        GROUP BY source ORDER BY source
+        """)
+    List<java.util.Map<String, Object>> selectEventSources(@Param("tenantId") String tenantId);
 }

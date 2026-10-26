@@ -7,7 +7,7 @@
     >
       <template #actions>
         <el-select v-model="source" class="source-select" @change="loadAll">
-          <el-option v-for="s in sourceOptions" :key="s" :label="s" :value="s" />
+          <el-option v-for="s in sourceOptions" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-button v-hasPermi="['profile:replay:edit']" type="primary" @click="openCreate">发起回放</el-button>
         <el-button :loading="loading" @click="loadAll">刷新</el-button>
@@ -208,10 +208,19 @@ import {
   type ProfileReplayTask,
   type ProfileIdentityMerge
 } from '@/api/dcs/core/profile';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
-const sourceOptions = ['web', 'order', 'supply', 'dcs', 'risk'];
-const source = ref('web');
+const { list: sourceOptions, ensureSources } = useSourceOptions('event', [
+  { label: 'web', value: 'web' },
+  { label: 'order', value: 'order' },
+  { label: 'supply', value: 'supply' },
+  { label: 'dcs', value: 'dcs' },
+  { label: 'risk', value: 'risk' }
+]);
+ensureSources();
+const route = useRoute();
+const source = ref(String(route.query.source || 'web'));
 const loading = ref(false);
 const tasks = ref<ProfileReplayTask[]>([]);
 const mergeLoading = ref(false);

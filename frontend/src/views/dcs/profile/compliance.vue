@@ -65,8 +65,7 @@
           <el-form inline label-width="70px" class="del-form">
             <el-form-item label="业务源">
               <el-select v-model="delForm.source" style="width: 130px">
-                <el-option label="dcs 数据采集" value="dcs" />
-                <el-option label="risk 风控" value="risk" />
+                <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
               </el-select>
             </el-form-item>
             <el-form-item label="主体类型">
@@ -242,7 +241,10 @@ import {
   listExportLogs
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
+ensureSources();
 
 defineOptions({ name: 'ProfileCompliance' });
 

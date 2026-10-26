@@ -3,8 +3,7 @@
     <dcs-operations-page-header eyebrow="画像引擎" title="画像工作室" subtitle="配置指标口径与权重版本：维度改口径，规则改权重，发布后再重算生效。">
       <template #actions>
         <el-select v-model="source" class="source-select" @change="onSourceChange">
-          <el-option label="dcs 数据采集" value="dcs" />
-          <el-option label="risk 风控" value="risk" />
+          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-button @click="goBack">返回画像</el-button>
         <el-button :loading="loading" @click="loadAll">刷新</el-button>
@@ -688,7 +687,10 @@ import {
   type ProfileRuleTemplate,
   type ProfileRuleValidation
 } from '@/api/dcs/core/profile';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
+ensureSources();
 
 const router = useRouter();
 

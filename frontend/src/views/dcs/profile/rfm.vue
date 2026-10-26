@@ -8,8 +8,7 @@
     >
       <template #actions>
         <el-select v-model="source" class="source-select" @change="onSourceChange">
-          <el-option label="dcs 数据采集" value="dcs" />
-          <el-option label="risk 风控" value="risk" />
+          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-select v-model="modelId" placeholder="选择模型" class="model-select" @change="loadModelData">
           <el-option v-for="m in models" :key="m.modelId" :label="`${m.modelName} · ${m.modelVersion}`" :value="m.modelId">
@@ -599,7 +598,10 @@ import {
   type ProfileModelTrendPoint,
   type ProfileScoreModel
 } from '@/api/dcs/core/profile';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
+ensureSources();
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 

@@ -830,8 +830,15 @@ export interface ProfileSubjectSummary {
   dimensionDetail?: Record<string, ProfileDimensionDetail>;
 }
 
-export const getRiskBands = (): Promise<ProfileRiskBands> =>
-  r<ProfileRiskBands>({ url: `${BASE}/risk-bands`, method: 'get' });
+export const getRiskBands = (): Promise<ProfileRiskBands> => r<ProfileRiskBands>({ url: `${BASE}/risk-bands`, method: 'get' });
+
+/** 批2 列源: 画像系(有主体)/分析系(有事件)两份源清单(行键为 snake 原名) */
+export interface ProfileSourceSummary {
+  subjectSources: { source: string; subjects: number | string }[];
+  eventSources: { source: string; events: number | string }[];
+}
+
+export const listProfileSources = (): Promise<ProfileSourceSummary> => r<ProfileSourceSummary>({ url: `${BASE}/source/list`, method: 'get' });
 
 export const getSubjectSummary = (subjectId: string, subjectType = 'user', source?: string): Promise<ProfileSubjectSummary> =>
   r<ProfileSubjectSummary>({ url: `${BASE}/subject/summary`, method: 'get', params: { subjectId, subjectType, source: source || undefined } });
@@ -862,12 +869,7 @@ export const listReplayTasks = (source?: string): Promise<ProfileReplayTask[]> =
 export const getReplayTask = (replayId: string): Promise<ProfileReplayTask> =>
   r<ProfileReplayTask>({ url: `/analytics/replay/${replayId}`, method: 'get' });
 
-export const startReplay = (data: {
-  source: string;
-  fromDate: string;
-  toDate: string;
-  chains: string[];
-}): Promise<ProfileReplayTask> =>
+export const startReplay = (data: { source: string; fromDate: string; toDate: string; chains: string[] }): Promise<ProfileReplayTask> =>
   r<ProfileReplayTask>({ url: '/analytics/replay', method: 'post', data });
 
 export const resumeReplay = (replayId: string): Promise<ProfileReplayTask> =>
@@ -967,8 +969,7 @@ export interface ProfileExportLogRow {
   exportAt: string;
 }
 
-export const listPiiFields = (): Promise<ProfilePiiField[]> =>
-  r<ProfilePiiField[]>({ url: `${BASE}/pii/fields`, method: 'get' });
+export const listPiiFields = (): Promise<ProfilePiiField[]> => r<ProfilePiiField[]>({ url: `${BASE}/pii/fields`, method: 'get' });
 
 export const savePiiField = (data: ProfilePiiField): Promise<ProfilePiiField> =>
   r<ProfilePiiField>({ url: `${BASE}/pii/fields`, method: 'post', data });
@@ -979,11 +980,13 @@ export const deletePiiField = (fieldKey: string): Promise<void> =>
 export const previewDeletion = (source: string, subjectType: string, subjectId: string): Promise<ProfileDeletionPreview> =>
   r<ProfileDeletionPreview>({ url: `${BASE}/deletion/preview`, method: 'get', params: { source, subjectType, subjectId } });
 
-export const executeDeletion = (data: { source: string; subjectType: string; subjectId: string; confirmText: string }): Promise<Record<string, any>> =>
-  r<Record<string, any>>({ url: `${BASE}/deletion/execute`, method: 'post', data });
+export const executeDeletion = (data: {
+  source: string;
+  subjectType: string;
+  subjectId: string;
+  confirmText: string;
+}): Promise<Record<string, any>> => r<Record<string, any>>({ url: `${BASE}/deletion/execute`, method: 'post', data });
 
-export const listDeletionLogs = (): Promise<ProfileDeletionLogRow[]> =>
-  r<ProfileDeletionLogRow[]>({ url: `${BASE}/deletion/logs`, method: 'get' });
+export const listDeletionLogs = (): Promise<ProfileDeletionLogRow[]> => r<ProfileDeletionLogRow[]>({ url: `${BASE}/deletion/logs`, method: 'get' });
 
-export const listExportLogs = (): Promise<ProfileExportLogRow[]> =>
-  r<ProfileExportLogRow[]>({ url: `${BASE}/export/logs`, method: 'get' });
+export const listExportLogs = (): Promise<ProfileExportLogRow[]> => r<ProfileExportLogRow[]>({ url: `${BASE}/export/logs`, method: 'get' });

@@ -7,10 +7,7 @@
     >
       <template #actions>
         <el-select v-model="source" class="source-select" @change="onSourceChange">
-          <el-option label="web 演示站点" value="web" />
-          <el-option label="dcs 数据采集" value="dcs" />
-          <el-option label="order 订单" value="order" />
-          <el-option label="supply 供应链" value="supply" />
+          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-select v-model="days" class="days-select" @change="onDaysChange">
           <el-option label="近 7 天" :value="7" />
@@ -502,9 +499,10 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="90" fixed="right">
+            <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" @click="openSession(row)">详情</el-button>
+                <el-button link type="primary" :disabled="!row.subjectId" @click="goProfile(row.subjectType, row.subjectId)"> 看画像 </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -620,6 +618,17 @@
           <el-descriptions-item label="离开页">{{ sessionDetail.session.exitPage || '—' }}</el-descriptions-item>
         </el-descriptions>
 
+        <div style="margin: 10px 0 4px">
+          <el-button
+            size="small"
+            type="primary"
+            :disabled="!sessionDetail.session.subjectId"
+            @click="goProfile(sessionDetail.session.subjectType, sessionDetail.session.subjectId)"
+          >
+            看该主体画像
+          </el-button>
+          <span v-if="!sessionDetail.session.subjectId" class="muted small" style="margin-left: 8px">匿名会话未关联登录主体，无画像可看</span>
+        </div>
         <div class="drawer-section-title">事件时间线</div>
         <el-alert
           v-if="sessionDetail.behaviorBlocked"
@@ -732,7 +741,16 @@ import {
   type AnalyticsTrendPoint
 } from '@/api/dcs/core/analytics';
 import { download } from '@/utils/request';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+const { list: sourceOpts, ensureSources } = useSourceOptions('event');
+const router = useRouter();
+/** 批2 看画像: 会话行/抽屉直达画像详情页; 匿名行(无 subjectId)按钮禁用 */
+const goProfile = (subjectType?: string, subjectId?: string) => {
+  if (!subjectId) return;
+  router.push(`/insight/profile-detail/${source.value}/${subjectId}?subjectType=${encodeURIComponent(subjectType || 'user')}`);
+};
+ensureSources();
 
 use([CanvasRenderer, LineChart, BarChart, SankeyChart, GridComponent, LegendComponent, TooltipComponent]);
 

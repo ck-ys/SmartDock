@@ -8,8 +8,7 @@
     >
       <template #actions>
         <el-select v-model="source" class="source-select" @change="onSourceChange">
-          <el-option label="dcs 数据采集" value="dcs" />
-          <el-option label="risk 风控" value="risk" />
+          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-button @click="goStudio">画像工作室</el-button>
         <el-button type="primary" @click="loadAll">刷新</el-button>
@@ -80,12 +79,7 @@
               </template>
             </el-table-column>
             <template v-for="dim in dimensions" :key="dim.dimCode">
-              <el-table-column
-                v-if="canSeeScore && isSubjectColumnVisible('dim:' + dim.dimCode)"
-                :label="dim.dimName"
-                width="120"
-                align="right"
-              >
+              <el-table-column v-if="canSeeScore && isSubjectColumnVisible('dim:' + dim.dimCode)" :label="dim.dimName" width="120" align="right">
                 <template #default="{ row }">
                   <span :class="dimScoreClass(row, dim.dimCode)">{{ dimScore(row, dim.dimCode) }}</span>
                 </template>
@@ -240,7 +234,10 @@ import {
   type ProfileSubjectSummary
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
+ensureSources();
 import DcsTableColumnSettings from '@/components/DcsTableColumnSettings/index.vue';
 import { readHiddenColumns, type TableColumnOption } from '@/components/DcsTableColumnSettings/table-columns';
 

@@ -8,8 +8,7 @@
     >
       <template #actions>
         <el-select v-model="source" class="source-select" @change="loadAll">
-          <el-option label="dcs 数据采集" value="dcs" />
-          <el-option label="risk 风控" value="risk" />
+          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-button v-hasPermi="['profile:segment:edit']" type="primary" @click="openCreate">新建分群</el-button>
         <el-button :loading="loading" @click="loadAll">刷新</el-button>
@@ -242,6 +241,11 @@
             ><span class="muted">{{ row.reason || '—' }}</span></template
           >
         </el-table-column>
+        <el-table-column label="操作" width="90" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="goProfile(row.subjectType, row.subjectId)">看画像</el-button>
+          </template>
+        </el-table-column>
         <el-table-column label="最近事件" width="170">
           <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
         </el-table-column>
@@ -471,7 +475,17 @@ import {
   type ProfileSegmentPreview,
   type ProfileSegmentRun
 } from '@/api/dcs/core/profile';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
+const router = useRouter();
+/** 批2 看画像: 成员行直达画像详情页(成员必有主体, 无需禁用态) */
+const goProfile = (subjectType: string, subjectId: string) => {
+  router.push(
+    `/insight/profile-detail/${activeSegment.value?.source || source.value}/${subjectId}?subjectType=${encodeURIComponent(subjectType || 'user')}`
+  );
+};
+ensureSources();
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 

@@ -212,6 +212,16 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
     long countBySource(@Param("tenantId") String tenantId, @Param("source") String source);
 
     /**
+     * 批2 列源: 有主体的源清单(画像系下拉用), 附主体数。
+     */
+    @Select("""
+        SELECT source, count(*) AS subjects FROM profile_subject
+        WHERE tenant_id = #{tenantId} AND del_flag = '0'
+        GROUP BY source ORDER BY source
+        """)
+    List<java.util.Map<String, Object>> selectSubjectSources(@Param("tenantId") String tenantId);
+
+    /**
      * 每个主体最新维度快照(复核扫描用)。
      */
     @Select("""
