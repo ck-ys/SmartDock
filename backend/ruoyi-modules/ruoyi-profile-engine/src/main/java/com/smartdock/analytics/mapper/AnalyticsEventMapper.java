@@ -233,18 +233,18 @@ public interface AnalyticsEventMapper {
                                                     @Param("to") Date to);
 
     /**
-     * 实时看板（批8）：窗口内去重访客键列表（跨分钟去重在 Java 侧 size 完成）。
+     * 批4B: 窗口去重访客数下推 COUNT(DISTINCT), 不再拉列表进 Java 数 size。
+     * 访客键口径不变: COALESCE(NULLIF(anonymous_id,''), subject_id)。
      */
     @Select("""
-        SELECT DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey"
-        FROM profile_event
+        SELECT count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id)) FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
         """)
-    List<Map<String, Object>> selectWindowVisitors(@Param("tenantId") String tenantId,
-                                                    @Param("source") String source,
-                                                    @Param("from") Date from,
-                                                    @Param("to") Date to);
+    long countWindowVisitors(@Param("tenantId") String tenantId,
+                             @Param("source") String source,
+                             @Param("from") Date from,
+                             @Param("to") Date to);
 
     /**
      * 活跃口径（批8）：天 × 访客 去重对（DAU/WAU/MAU 滚动窗口的原料）。

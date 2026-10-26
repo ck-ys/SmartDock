@@ -1052,7 +1052,7 @@ public class AnalyticsService {
             events += longValue(bucket.get("events"));
             pv += longValue(bucket.get("pv"));
         }
-        int visitors = eventMapper.selectWindowVisitors(tenantId, source, from, now).size();
+        long visitors = eventMapper.countWindowVisitors(tenantId, source, from, now);
         // 批10 Q7: 新访客直查首见物化表(只数窗口内首见的行), 不再全表行进 Java 过滤
         long newVisitors = firstSeenMapper.countSince(tenantId, source, from);
         Map<String, Object> summary = new LinkedHashMap<>();

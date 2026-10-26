@@ -74,20 +74,4 @@ public interface AnalyticsDailyMapper extends BaseMapperPlus<AnalyticsDaily, Ana
                                           @Param("source") String source,
                                           @Param("from") Date from,
                                           @Param("to") Date to);
-
-    @Select("""
-        SELECT coalesce(sum(pv), 0) AS "pv", coalesce(sum(uv), 0) AS "uv",
-               coalesce(sum(visits), 0) AS "visits", coalesce(sum(events), 0) AS "events",
-               coalesce(sum(new_visitors), 0) AS "newVisitors",
-               coalesce(sum(returning_visitors), 0) AS "returningVisitors",
-               coalesce(sum(bounces), 0) AS "bounces",
-               coalesce(sum(duration_seconds), 0) AS "durationSeconds"
-        FROM analytics_daily
-        WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND stat_date BETWEEN #{from} AND #{to}
-        """)
-    Map<String, Object> selectTotals(@Param("tenantId") String tenantId,
-                                     @Param("source") String source,
-                                     @Param("from") Date from,
-                                     @Param("to") Date to);
 }

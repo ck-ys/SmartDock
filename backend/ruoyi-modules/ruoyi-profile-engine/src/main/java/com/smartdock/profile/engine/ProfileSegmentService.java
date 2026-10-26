@@ -58,6 +58,8 @@ public class ProfileSegmentService {
     private final ProfileSubjectMapper subjectMapper;
     /** 批4A 规模护栏: 候选集载入前的轻量 COUNT(默认 5 万) */
     private final ProfileScaleGuard scaleGuard;
+    /** 批4B: run+成员+分群统计同事务——中途异常整批回滚, 不留半截成员 */
+    private final org.springframework.transaction.support.TransactionTemplate txTemplate;
 
     public List<ProfileSegment> list(String source) {
         requireSource(source);
@@ -387,39 +389,45 @@ public class ProfileSegmentService {
         run.setMemberCount(0);
         run.setStartedAt(new Date());
         run.setCreateBy(currentUser());
-        runMapper.insert(run);
         try {
-            int inserted = 0;
-            for (MemberDraft draft : members) {
-                ProfileSegmentMember member = new ProfileSegmentMember();
-                member.setMemberId(IdWorker.getId());
-                member.setTenantId(segment.getTenantId());
-                member.setSource(segment.getSource());
-                member.setSegmentId(segment.getSegmentId());
-                member.setRunId(run.getRunId());
-                member.setSubjectType(draft.subjectType());
-                member.setSubjectId(draft.subjectId());
-                member.setDisplayName(StringUtils.substring(draft.displayName(), 0, 128));
-                member.setReason(StringUtils.substring(draft.reason(), 0, 500));
-                member.setCreateBy(currentUser());
-                memberMapper.insert(member);
-                inserted++;
-            }
-            run.setStatus("DONE");
-            run.setMemberCount(inserted);
-            run.setFinishedAt(new Date());
-            runMapper.updateById(run);
-            segmentMapper.updateRunStats(segment.getSegmentId(), segment.getTenantId(), inserted,
-                run.getRunId(), run.getFinishedAt(), currentUser());
-            segment.setMemberCount(inserted);
+            // 批4B: 同类自调用 @Transactional 失效, 走编程式事务(先例 AnalyticsService)——
+            // run 行+全部成员行+分群统计一体成败, 中途异常整批回滚
+            Integer inserted = txTemplate.execute(tx -> {
+                runMapper.insert(run);
+                int n = 0;
+                for (MemberDraft draft : members) {
+                    ProfileSegmentMember member = new ProfileSegmentMember();
+                    member.setMemberId(IdWorker.getId());
+                    member.setTenantId(segment.getTenantId());
+                    member.setSource(segment.getSource());
+                    member.setSegmentId(segment.getSegmentId());
+                    member.setRunId(run.getRunId());
+                    member.setSubjectType(draft.subjectType());
+                    member.setSubjectId(draft.subjectId());
+                    member.setDisplayName(StringUtils.substring(draft.displayName(), 0, 128));
+                    member.setReason(StringUtils.substring(draft.reason(), 0, 500));
+                    member.setCreateBy(currentUser());
+                    memberMapper.insert(member);
+                    n++;
+                }
+                run.setStatus("DONE");
+                run.setMemberCount(n);
+                run.setFinishedAt(new Date());
+                runMapper.updateById(run);
+                segmentMapper.updateRunStats(segment.getSegmentId(), segment.getTenantId(), n,
+                    run.getRunId(), run.getFinishedAt(), currentUser());
+                return n;
+            });
+            segment.setMemberCount(inserted == null ? 0 : inserted);
             segment.setLastRunId(run.getRunId());
             segment.setLastEvalTime(run.getFinishedAt());
         } catch (Exception e) {
             log.error("[Profile] segment evaluate failed segment={} : {}", segment.getSegmentId(), e.getMessage(), e);
+            // 事务已回滚(run/成员/统计全清), 补一条 FAILED 留痕行
             run.setStatus("FAILED");
             run.setErrorMsg(StringUtils.substring(String.valueOf(e.getMessage()), 0, 2000));
             run.setFinishedAt(new Date());
-            runMapper.updateById(run);
+            runMapper.insert(run);
         }
         return run;
     }

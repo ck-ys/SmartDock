@@ -1635,6 +1635,9 @@ CREATE TABLE public.profile_engine_config (
 CREATE TABLE public.profile_event_archive (LIKE public.profile_event INCLUDING DEFAULTS);
 ALTER TABLE public.profile_event_archive ADD CONSTRAINT pk_profile_event_archive PRIMARY KEY (event_id);
 CREATE INDEX idx_profile_event_archive_source ON public.profile_event_archive USING btree (tenant_id, source, occurred_time DESC);
+-- 批4B: 归档表查询索引——主体维度回溯 + 匿名 ID 反查(部分索引, 空 ID 不入)
+CREATE INDEX idx_profile_event_archive_subject ON public.profile_event_archive USING btree (tenant_id, source, subject_type, subject_id);
+CREATE INDEX idx_profile_event_archive_anon ON public.profile_event_archive (tenant_id, source, anonymous_id) WHERE anonymous_id IS NOT NULL;
 
 CREATE UNIQUE INDEX uk_profile_engine_config
     ON public.profile_engine_config USING btree (tenant_id, source)
