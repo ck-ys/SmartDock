@@ -549,6 +549,14 @@ onMounted(loadData);
   margin-top: 0;
   background: var(--app-rule);
 }
+/* U-06(2026-10-26 拍板A)：≤992 跟 ui-kpi-strip 同步两列。scoped auto-fit(窄档算出 3 列) 会撞上
+   全局「奇数末项拉满整行」规则——第 3 项被拽到第二行满宽，首行第三格露出 1px 缝底色的灰块；
+   两列 + 拉满规则对 3/4 项都不留空格（3=2+1 满宽、4=2+2） */
+@media (max-width: 992px) {
+  .caller-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .caller-strip .ui-kpi {
   border: 0;
   background: var(--app-surface);

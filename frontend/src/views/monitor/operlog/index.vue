@@ -73,7 +73,8 @@
           @sort-change="handleSortChange"
         >
           <el-table-column type="selection" width="50" align="center" />
-          <el-table-column label="日志编号" align="center" prop="operId" />
+          <!-- U-05(2026-10-26 拍板A)：19 位雪花 ID 原来无 width 只分到 ~85px 折 3 行撑高行高；定宽+省略+悬浮看全文 -->
+          <el-table-column label="日志编号" align="center" prop="operId" width="160" :show-overflow-tooltip="true" />
           <el-table-column label="系统模块" align="center" prop="title" :show-overflow-tooltip="true" />
           <el-table-column label="操作类型" align="center" prop="businessType">
             <template #default="scope">

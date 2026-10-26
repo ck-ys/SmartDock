@@ -402,19 +402,22 @@ const upload = reactive<ImportOption>({
   url: import.meta.env.VITE_APP_BASE_API + '/system/user/importData'
 });
 // 列显隐信息
+// U-04(2026-10-26 拍板A)：表格可用宽 ≈ (视口-侧栏-页边距)×20/24，全列最小合计约 920px，1440 才勉强放下；
+// 更窄档手机号码列会被固定操作列的 sticky 浮层盖成 ~51px 窄条，故 <1440 默认收起 部门/角色/级别 三个低优先列（列设置里可随时开回）
+const narrowViewport = window.innerWidth < 1440;
 const columns = ref<FieldOption[]>([
   { key: 0, label: `用户编号`, visible: false, children: [] },
   { key: 1, label: `登录账号`, visible: true, children: [] },
   { key: 2, label: `用户昵称`, visible: true, children: [] },
-  { key: 3, label: `部门`, visible: true, children: [] },
+  { key: 3, label: `部门`, visible: !narrowViewport, children: [] },
   { key: 4, label: `手机号码`, visible: true, children: [] },
-  { key: 5, label: `级别`, visible: true, children: [] },
+  { key: 5, label: `级别`, visible: !narrowViewport, children: [] },
   { key: 6, label: `状态`, visible: true, children: [] },
   // 默认收起：1440 下内容区只有 920px，这一列会把操作列挤出卡片（列设置里可随时打开）
   { key: 7, label: `创建时间`, visible: false, children: [] },
   // 业务批9 Q6(2026-10-14 拍板A): 角色列——列表直判谁是管理员/发布人/成员(原只能点编辑弹窗看);
   // 后端分页已按 userIds 聚合 roles; 追加在数组尾部避免重排既有下标绑定
-  { key: 8, label: `角色`, visible: true, children: [] }
+  { key: 8, label: `角色`, visible: !narrowViewport, children: [] }
 ]);
 
 const deptTreeRef = ref<ElTreeInstance>();

@@ -505,8 +505,11 @@ onMounted(loadAll);
   gap: 8px;
 }
 .config-label {
+  /* U-07(2026-10-26 拍板A)：标签是 flex 可收缩项，375 下被同行输入框挤到 42.8px 折成「合并窗/口」孤字断行——不收缩不折行 */
+  flex: none;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .table-card :deep(.el-card__body) {
   padding-top: 16px;

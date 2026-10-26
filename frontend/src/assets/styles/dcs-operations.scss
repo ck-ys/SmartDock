@@ -19,11 +19,13 @@
   font-weight: 500;
 }
 
+/* U-02(2026-10-26 拍板A) 页头两行式：标题+描述独占一行满宽，动作条换行到下方。
+   原横排 space-between 下动作条 flex:none 不换行，RFM 等 2 下拉+9 按钮的页会把标题挤成 42px 竖排字。 */
 .dcs-ops-header__title-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
 }
 
 .dcs-ops-header__title {
@@ -45,6 +47,7 @@
 .dcs-ops-header__actions {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -208,13 +211,7 @@
     padding: 14px;
   }
 
-  .dcs-ops-header__title-row {
-    flex-direction: column;
-  }
-
-  .dcs-ops-header__actions {
-    width: 100%;
-  }
+  /* 页头两行式后 __title-row 常态即纵排、__actions 随父级 stretch 满宽，此处无需再覆写 */
 }
 
 @media (prefers-reduced-motion: reduce) {
