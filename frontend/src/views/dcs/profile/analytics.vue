@@ -81,7 +81,10 @@
       </el-tab-pane>
       <!-- ---------------------------------------------------------- 流量概览 -->
       <el-tab-pane label="流量概览" name="overview">
-        <div v-loading="overviewLoading" class="ui-kpi-strip analytics-kpi">
+        <el-alert v-if="loadErrors.overview" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <div v-loading="overviewLoading" class="ui-kpi-strip analytics-kpi">
           <div class="ui-kpi">
             <span class="ui-kpi__label">浏览量 PV</span>
             <strong class="ui-kpi__value">{{ formatNumber(overview.current?.pv) }}</strong>
@@ -138,7 +141,10 @@
 
         <el-row :gutter="14" class="breakdown-row">
           <el-col v-for="block in breakdownBlocks" :key="block.type" :xs="24" :lg="12">
-            <el-card shadow="never" class="panel-card" v-loading="breakdownLoading">
+            <el-alert v-if="loadErrors.breakdowns" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <el-card shadow="never" class="panel-card" v-loading="breakdownLoading">
               <template #header>
                 <div class="panel-head">
                   <span>{{ block.title }}</span>
@@ -170,7 +176,10 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 页面与搜索 -->
-      <el-tab-pane label="页面与搜索" name="page" lazy>
+      <el-alert v-if="loadErrors.page" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <el-tab-pane label="页面与搜索" name="page" lazy>
         <el-row :gutter="14">
           <el-col :xs="24" :lg="14">
             <el-card shadow="never" class="panel-card" v-loading="pageLoading">
@@ -248,7 +257,10 @@
       <!-- ---------------------------------------------------------- 转化漏斗 -->
       <!-- ---------------------------------------------------------- 路径分析（批8） -->
       <el-tab-pane label="路径分析" name="paths" lazy>
-        <el-card shadow="never" class="panel-card" v-loading="pathsLoading">
+        <el-alert v-if="loadErrors.paths" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <el-card shadow="never" class="panel-card" v-loading="pathsLoading">
           <template #header>
             <div class="panel-head">
               <span>用户路径</span>
@@ -271,6 +283,10 @@
       </el-tab-pane>
 
       <el-tab-pane label="转化漏斗" name="funnel" lazy>
+        <el-alert v-if="loadErrors.funnels || loadErrors.funnelResult" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="panel-head">
@@ -348,7 +364,10 @@
           </div>
         </el-card>
 
-        <el-card shadow="never" class="panel-card" v-loading="attributionLoading">
+        <el-alert v-if="loadErrors.attribution" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <el-card shadow="never" class="panel-card" v-loading="attributionLoading">
           <template #header>
             <div class="panel-head">
               <span>渠道归因</span>
@@ -383,7 +402,10 @@
 
       <!-- ---------------------------------------------------------- 留存 -->
       <el-tab-pane label="留存分析" name="retention" lazy>
-        <el-card shadow="never" class="panel-card" v-loading="retentionLoading">
+        <el-alert v-if="loadErrors.retention" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <el-card shadow="never" class="panel-card" v-loading="retentionLoading">
           <template #header>
             <div class="panel-head">
               <span>访客留存</span>
@@ -426,7 +448,10 @@
       <!-- ---------------------------------------------------------- 访问明细 -->
       <!-- ---------------------------------------------------------- 活跃分析（批8） -->
       <el-tab-pane label="活跃分析" name="activity" lazy>
-        <el-card shadow="never" class="panel-card" v-loading="activityLoading">
+        <el-alert v-if="loadErrors.activity" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <el-card shadow="never" class="panel-card" v-loading="activityLoading">
           <template #header>
             <div class="panel-head">
               <span>活跃用户</span>
@@ -481,7 +506,10 @@
             <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportSessionsCsv"> 导出 CSV </el-button>
           </div>
 
-          <el-table class="ui-table" :data="sessions" v-loading="sessionLoading">
+          <el-alert v-if="loadErrors.sessions" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <el-table class="ui-table" :data="sessions" v-loading="sessionLoading">
             <template #empty>
               <div class="ui-empty">
                 <p class="ui-empty__title">当前筛选下没有访问记录</p>
@@ -554,7 +582,10 @@
             <el-button type="primary" :loading="customLoading" @click="loadCustom">运行</el-button>
             <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportCustomCsv"> 导出 CSV </el-button>
           </div>
-          <v-chart class="custom-chart" :option="customOption" autoresize v-loading="customLoading" />
+          <el-alert v-if="loadErrors.custom" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
+  <v-chart class="custom-chart" :option="customOption" autoresize v-loading="customLoading" />
           <el-table :data="customRows" class="ui-table custom-table">
             <template #empty>
               <div class="ui-empty">
@@ -963,7 +994,7 @@ const trendOption = computed<any>(() => ({
   ]
 }));
 
-const loadOverview = async () => {
+let loadOverview = async () => {
   overviewLoading.value = true;
   try {
     const [ov, tr] = await Promise.all([getAnalyticsOverview(source.value, days.value), getAnalyticsTrend(source.value, days.value)]);
@@ -974,7 +1005,7 @@ const loadOverview = async () => {
   }
 };
 
-const loadBreakdowns = async () => {
+let loadBreakdowns = async () => {
   breakdownLoading.value = true;
   try {
     const results = await Promise.all(breakdownBlocks.map((block) => getAnalyticsBreakdown(source.value, days.value, block.type, 10)));
@@ -986,7 +1017,7 @@ const loadBreakdowns = async () => {
   }
 };
 
-const loadPageAnalysis = async () => {
+let loadPageAnalysis = async () => {
   pageLoading.value = true;
   try {
     const [page, search, event] = await Promise.all([
@@ -1003,7 +1034,7 @@ const loadPageAnalysis = async () => {
 };
 
 // ---------------------------------------------------------------- 漏斗
-const loadFunnels = async () => {
+let loadFunnels = async () => {
   funnels.value = await listAnalyticsFunnels(source.value);
   if (!funnels.value.some((f) => f.funnelId === funnelId.value)) {
     funnelId.value = funnels.value[0]?.funnelId || '';
@@ -1011,7 +1042,7 @@ const loadFunnels = async () => {
   await loadFunnelResult();
 };
 
-const loadFunnelResult = async () => {
+let loadFunnelResult = async () => {
   if (!funnelId.value) {
     funnelResult.value = null;
     funnelLoss.value = null;
@@ -1111,7 +1142,7 @@ const parseSteps = (raw: string | AnalyticsFunnelStepDef[] | undefined): Analyti
 };
 
 // ---------------------------------------------------------------- 留存
-const loadRetention = async () => {
+let loadRetention = async () => {
   retentionLoading.value = true;
   try {
     retention.value = await getAnalyticsRetention(source.value, days.value, retentionWindow.value);
@@ -1128,7 +1159,7 @@ const retentionStyle = (cell?: { visitors: number; rate: number | string }) => {
 };
 
 // ---------------------------------------------------------------- 访问明细
-const loadSessions = async () => {
+let loadSessions = async () => {
   sessionLoading.value = true;
   try {
     const res = await pageAnalyticsSessions({ ...sessionQuery, source: source.value, days: days.value });
@@ -1218,7 +1249,7 @@ const customOption = computed<any>(() => {
   };
 });
 
-const loadCustom = async () => {
+let loadCustom = async () => {
   customLoading.value = true;
   try {
     const res = await runAnalyticsCustom({
@@ -1238,7 +1269,7 @@ const loadCustom = async () => {
 const pathsData = ref<AnalyticsPaths | null>(null);
 const pathsLoading = ref(false);
 const pathStart = ref('');
-const loadPaths = async () => {
+let loadPaths = async () => {
   pathsLoading.value = true;
   try {
     pathsData.value = await getAnalyticsPaths(source.value, days.value, pathStart.value || undefined);
@@ -1278,7 +1309,7 @@ const conversionEventOptions = [
   { label: '转化事件：order_submit', value: 'order_submit' },
   { label: '转化事件：pay_success', value: 'pay_success' }
 ];
-const loadAttribution = async () => {
+let loadAttribution = async () => {
   attributionLoading.value = true;
   try {
     attributionData.value = await getAnalyticsAttribution(source.value, days.value, conversionEvent.value);
@@ -1289,7 +1320,7 @@ const loadAttribution = async () => {
 
 const activityData = ref<AnalyticsActivity | null>(null);
 const activityLoading = ref(false);
-const loadActivity = async () => {
+let loadActivity = async () => {
   activityLoading.value = true;
   try {
     activityData.value = await getAnalyticsActivity(source.value, days.value);
@@ -1348,7 +1379,7 @@ const activityOption = computed<any>(() => ({
 const realtimeData = ref<AnalyticsRealtime | null>(null);
 const realtimeAuto = ref(true);
 let realtimeTimer: number | null = null;
-const loadRealtime = async () => {
+let loadRealtime = async () => {
   realtimeData.value = await getAnalyticsRealtime(source.value);
 };
 const startRealtime = () => {
@@ -1379,7 +1410,7 @@ const pulseHeight = (pv: number) => {
 
 const crossData = ref<AnalyticsCrossSource | null>(null);
 const crossLoading = ref(false);
-const loadCross = async () => {
+let loadCross = async () => {
   crossLoading.value = true;
   try {
     crossData.value = await getAnalyticsCrossSource(30);
@@ -1439,6 +1470,33 @@ const rebuild = async () => {
     rebuilding.value = false;
   }
 };
+
+/** 批3B: 报错≠没数据——加载失败置位错误条+可重试; 空数据源仍显示正常空态 */
+const loadErrors = reactive<Record<string, boolean>>({});
+const wrapLoad =
+  (key: string, fn: () => Promise<unknown>): (() => Promise<void>) =>
+  async () => {
+    loadErrors[key] = false;
+    try {
+      await fn();
+    } catch {
+      loadErrors[key] = true;
+    }
+  };
+loadOverview = wrapLoad('overview', loadOverview);
+loadBreakdowns = wrapLoad('breakdowns', loadBreakdowns);
+loadPageAnalysis = wrapLoad('page', loadPageAnalysis);
+loadFunnels = wrapLoad('funnels', loadFunnels);
+loadFunnelResult = wrapLoad('funnelResult', loadFunnelResult);
+loadRetention = wrapLoad('retention', loadRetention);
+loadSessions = wrapLoad('sessions', loadSessions);
+loadCustom = wrapLoad('custom', loadCustom);
+loadPaths = wrapLoad('paths', loadPaths);
+loadAttribution = wrapLoad('attribution', loadAttribution);
+loadActivity = wrapLoad('activity', loadActivity);
+loadRealtime = wrapLoad('realtime', loadRealtime);
+loadCross = wrapLoad('cross', loadCross);
+const retryFailed = () => reloadCurrent();
 
 const onSourceChange = async () => {
   sessionQuery.source = source.value;
@@ -1564,7 +1622,10 @@ onMounted(async () => {
   .source-select {
     width: 150px;
   }
-  .days-select {
+  .load-error {
+  margin-bottom: 10px;
+}
+.days-select {
     width: 120px;
   }
 }
