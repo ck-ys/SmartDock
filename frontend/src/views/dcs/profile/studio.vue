@@ -81,7 +81,16 @@
               <template #default="{ row }">
                 <el-button v-hasPermi="['profile:dimension:edit']" link type="primary" @click="openEditDimension(row)">编辑</el-button>
                 <el-button link type="primary" @click="openPreview(row)">试算</el-button>
-                <el-button v-hasPermi="['profile:dimension:edit']" v-if="row.enabled === '1'" link type="danger" :disabled="row.builtin === '1'" @click="disableDim(row)"> 停用 </el-button>
+                <el-button
+                  v-hasPermi="['profile:dimension:edit']"
+                  v-if="row.enabled === '1'"
+                  link
+                  type="danger"
+                  :disabled="row.builtin === '1'"
+                  @click="disableDim(row)"
+                >
+                  停用
+                </el-button>
                 <el-button v-hasPermi="['profile:dimension:edit']" v-else link type="success" @click="openEditDimension(row)">启用</el-button>
               </template>
             </el-table-column>
@@ -241,9 +250,15 @@
             </el-table-column>
             <el-table-column label="操作" width="190" fixed="right">
               <template #default="{ row }">
-                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status === 'DRAFT'" link type="primary" @click="focusDraft">继续编辑</el-button>
-                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status !== 'DRAFT'" link type="primary" @click="copyAsDraft(row)">复制为草稿</el-button>
-                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status === 'PUBLISHED'" link type="warning" @click="archiveRule(row)">归档</el-button>
+                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status === 'DRAFT'" link type="primary" @click="focusDraft"
+                  >继续编辑</el-button
+                >
+                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status !== 'DRAFT'" link type="primary" @click="copyAsDraft(row)"
+                  >复制为草稿</el-button
+                >
+                <el-button v-hasPermi="['profile:rule:edit']" v-if="row.status === 'PUBLISHED'" link type="warning" @click="archiveRule(row)"
+                  >归档</el-button
+                >
               </template>
             </el-table-column>
           </el-table>
@@ -252,7 +267,7 @@
     </el-card>
 
     <!-- 维度编辑 -->
-    <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="780px" top="4vh" destroy-on-close>
+    <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="min(780px, 94%)" top="4vh" destroy-on-close>
       <el-form label-width="108px" class="dim-form">
         <el-collapse v-model="formSections" class="dim-sections">
           <el-collapse-item name="src">
@@ -378,7 +393,12 @@
 
             <template v-else>
               <el-form-item label="Bean">
-                <el-select v-model="dimForm.strategyBean" placeholder="选择已注册的 DimensionStrategy" style="width: 100%" @change="onStrategyBeanChange">
+                <el-select
+                  v-model="dimForm.strategyBean"
+                  placeholder="选择已注册的 DimensionStrategy"
+                  style="width: 100%"
+                  @change="onStrategyBeanChange"
+                >
                   <el-option
                     v-for="bean in capabilities.strategyBeans"
                     :key="bean.bean"
@@ -404,7 +424,14 @@
             <el-form-item label="高级 JSON">
               <div class="advanced-block">
                 <el-switch v-model="dimForm.advanced" active-text="直接编辑 calc_config" />
-                <el-input v-if="dimForm.advanced" v-model="dimForm.advancedJson" type="textarea" :rows="9" class="mono" placeholder="calc_config JSON" />
+                <el-input
+                  v-if="dimForm.advanced"
+                  v-model="dimForm.advancedJson"
+                  type="textarea"
+                  :rows="9"
+                  class="mono"
+                  placeholder="calc_config JSON"
+                />
                 <p v-if="dimForm.advanced" class="muted small">开启后保存以这段 JSON 为准；关闭则按上面的结构化表单生成。</p>
               </div>
             </el-form-item>
@@ -422,7 +449,7 @@
     </el-dialog>
 
     <!-- 试算 -->
-    <el-dialog v-model="previewVisible" title="维度试算（不落快照）" width="620px" destroy-on-close>
+    <el-dialog v-model="previewVisible" title="维度试算（不落快照）" width="min(620px, 94%)" destroy-on-close>
       <el-form label-width="92px">
         <el-form-item label="主体类型">
           <el-select v-model="previewForm.subjectType" style="width: 100%">
@@ -474,7 +501,7 @@
     </el-dialog>
 
     <!-- 发布 -->
-    <el-dialog v-model="publishVisible" title="发布权重版本" width="520px" destroy-on-close>
+    <el-dialog v-model="publishVisible" title="发布权重版本" width="min(520px, 94%)" destroy-on-close>
       <el-form label-width="88px">
         <el-form-item label="版本号">
           <el-input v-model="publishForm.version" maxlength="32" placeholder="如 v2026.10.19" />
@@ -496,7 +523,7 @@
     </el-dialog>
 
     <!-- 规则校验 / 对比 / 影响 -->
-    <el-dialog v-model="resultVisible" :title="resultTitle" width="720px" destroy-on-close>
+    <el-dialog v-model="resultVisible" :title="resultTitle" width="min(720px, 94%)" destroy-on-close>
       <template v-if="resultMode === 'validate'">
         <el-alert
           :type="validation?.valid ? 'success' : 'error'"
@@ -574,26 +601,49 @@
           </el-tag>
           <span v-if="!impactResult?.changedDimensions?.length" class="muted">没有权重变化</span>
         </div>
-        <el-alert type="info" :closable="false" show-icon title="发布本身不重算历史快照；发布后可在下方触发重算，新权重将生效于用户画像列表与详情页（RFM 模型页分数需在模型页另行运行）。" />
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          title="发布本身不重算历史快照；发布后可在下方触发重算，新权重将生效于用户画像列表与详情页（RFM 模型页分数需在模型页另行运行）。"
+        />
         <!-- 批1 重算闭环: 发布结果弹窗内直接触发经典链重算, 终点=画像列表/详情页 -->
         <div v-if="recalcAvailable && canRecalc" class="recalc-panel">
           <el-button v-if="!recalcBatch" type="primary" :loading="recalcLoading" @click="runRecalc">触发重算</el-button>
           <template v-else-if="recalcBatch.status === 'DONE'">
-            <el-alert type="success" :closable="false" show-icon
-              :title="`重算完成：${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0} 个主体已按新权重出新快照`" />
+            <el-alert
+              type="success"
+              :closable="false"
+              show-icon
+              :title="`重算完成：${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0} 个主体已按新权重出新快照`"
+            />
           </template>
           <template v-else-if="recalcBatch.status === 'FAILED'">
-            <el-alert type="error" :closable="false" show-icon
+            <el-alert
+              type="error"
+              :closable="false"
+              show-icon
               :title="`重算失败：已完成 ${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0}`"
-              :description="recalcBatch.errorMsg" />
+              :description="recalcBatch.errorMsg"
+            />
             <el-button type="warning" plain :loading="recalcLoading" @click="resumeRecalc">断点续跑</el-button>
           </template>
-          <el-alert v-else type="info" :closable="false" show-icon
-            :title="`重算进行中：${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0}`" />
+          <el-alert
+            v-else
+            type="info"
+            :closable="false"
+            show-icon
+            :title="`重算进行中：${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0}`"
+          />
           <p v-if="recalcBatch" class="muted small">完成后到「用户画像」列表与详情页查看新分数与画像依据（RFM 模型页不受影响）。</p>
         </div>
-        <el-alert v-else-if="recalcAvailable" type="warning" :closable="false" show-icon
-          title="当前账号没有重算权限，如需按新权重重算历史主体，请联系管理员操作。" />
+        <el-alert
+          v-else-if="recalcAvailable"
+          type="warning"
+          :closable="false"
+          show-icon
+          title="当前账号没有重算权限，如需按新权重重算历史主体，请联系管理员操作。"
+        />
       </template>
 
       <template #footer>
@@ -1331,7 +1381,9 @@ const diffResult = ref<ProfileRuleDiff | null>(null);
 const impactResult = ref<ProfileRuleImpact | null>(null);
 const resultVisible = ref(false);
 const resultMode = ref<'validate' | 'diff' | 'impact'>('validate');
-const resultTitle = computed(() => (resultMode.value === 'validate' ? '草稿校验' : resultMode.value === 'diff' ? '权重对比' : recalcAvailable.value ? '发布结果' : '影响评估'));
+const resultTitle = computed(() =>
+  resultMode.value === 'validate' ? '草稿校验' : resultMode.value === 'diff' ? '权重对比' : recalcAvailable.value ? '发布结果' : '影响评估'
+);
 const diffRows = computed(() => Object.entries(diffResult.value?.changes || {}).map(([code, change]) => ({ code, ...change })));
 const publishVisible = ref(false);
 const publishForm = reactive({ version: '', note: '' });

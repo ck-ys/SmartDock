@@ -83,18 +83,40 @@
             </el-form-item>
           </el-form>
 
-          <el-alert v-if="preview && !preview.deletable" type="warning" :closable="false" show-icon
-            :title="preview.warning || '该主体无数据'" style="margin-bottom: 10px" />
+          <el-alert
+            v-if="preview && !preview.deletable"
+            type="warning"
+            :closable="false"
+            show-icon
+            :title="preview.warning || '该主体无数据'"
+            style="margin-bottom: 10px"
+          />
           <template v-if="preview && preview.deletable">
             <div class="impact-grid">
-              <div class="impact"><span>事件</span><strong>{{ preview.events }}</strong></div>
-              <div class="impact"><span>归档</span><strong>{{ preview.archives }}</strong></div>
-              <div class="impact"><span>会话</span><strong>{{ preview.sessions }}</strong></div>
-              <div class="impact"><span>身份链接</span><strong>{{ preview.links }}</strong></div>
-              <div class="impact"><span>评分快照</span><strong>{{ preview.snapshots }}</strong></div>
-              <div class="impact"><span>分群成员</span><strong>{{ preview.members }}</strong></div>
-              <div class="impact"><span>复核项</span><strong>{{ preview.reviews }}</strong></div>
-              <div class="impact"><span>重算天数</span><strong>{{ preview.rebuildDays }}</strong></div>
+              <div class="impact">
+                <span>事件</span><strong>{{ preview.events }}</strong>
+              </div>
+              <div class="impact">
+                <span>归档</span><strong>{{ preview.archives }}</strong>
+              </div>
+              <div class="impact">
+                <span>会话</span><strong>{{ preview.sessions }}</strong>
+              </div>
+              <div class="impact">
+                <span>身份链接</span><strong>{{ preview.links }}</strong>
+              </div>
+              <div class="impact">
+                <span>评分快照</span><strong>{{ preview.snapshots }}</strong>
+              </div>
+              <div class="impact">
+                <span>分群成员</span><strong>{{ preview.members }}</strong>
+              </div>
+              <div class="impact">
+                <span>复核项</span><strong>{{ preview.reviews }}</strong>
+              </div>
+              <div class="impact">
+                <span>重算天数</span><strong>{{ preview.rebuildDays }}</strong>
+              </div>
             </div>
             <div v-if="preview.visitorKeys && preview.visitorKeys.length > 1" class="muted small" style="margin: 6px 0 10px">
               含 {{ preview.visitorKeys.length - 1 }} 个匿名标识的匿名期数据（共享浏览器会一并波及，请核对）
@@ -165,7 +187,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="piiDialog" :title="editingPii ? '编辑 PII 字段' : '新增 PII 字段'" width="460px">
+    <el-dialog v-model="piiDialog" :title="editingPii ? '编辑 PII 字段' : '新增 PII 字段'" width="min(460px, 94%)">
       <el-form :model="piiForm" label-width="80px">
         <el-form-item label="键名" required>
           <el-input v-model="piiForm.fieldKey" :disabled="editingPii" placeholder="如 phone / search_term" maxlength="64" />
@@ -188,10 +210,18 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="confirmDialog" title="确认删除主体" width="440px">
-      <el-alert type="error" :closable="false" show-icon title="此操作不可撤销"
-        description="将删除该主体的全部事件（含归档与匿名期）、会话、身份链接、评分快照、分群成员与复核项，并重算派生数据。" style="margin-bottom: 12px" />
-      <p style="margin: 0 0 8px">请输入主体 ID <strong>{{ delForm.subjectId }}</strong> 以确认：</p>
+    <el-dialog v-model="confirmDialog" title="确认删除主体" width="min(440px, 94%)">
+      <el-alert
+        type="error"
+        :closable="false"
+        show-icon
+        title="此操作不可撤销"
+        description="将删除该主体的全部事件（含归档与匿名期）、会话、身份链接、评分快照、分群成员与复核项，并重算派生数据。"
+        style="margin-bottom: 12px"
+      />
+      <p style="margin: 0 0 8px">
+        请输入主体 ID <strong>{{ delForm.subjectId }}</strong> 以确认：
+      </p>
       <el-input v-model="confirmText" placeholder="回显主体 ID" />
       <template #footer>
         <el-button @click="confirmDialog = false">取消</el-button>
@@ -203,8 +233,13 @@
 
 <script setup lang="ts">
 import {
-  listPiiFields, savePiiField, deletePiiField,
-  previewDeletion, executeDeletion, listDeletionLogs, listExportLogs
+  listPiiFields,
+  savePiiField,
+  deletePiiField,
+  previewDeletion,
+  executeDeletion,
+  listDeletionLogs,
+  listExportLogs
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';

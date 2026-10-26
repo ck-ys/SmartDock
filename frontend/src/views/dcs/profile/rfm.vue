@@ -196,7 +196,7 @@
     </template>
 
     <!-- 模型新建/编辑 -->
-    <el-dialog v-model="modelDialogVisible" :title="modelForm.modelId ? '编辑评分模型' : '新建评分模型'" width="760px" destroy-on-close>
+    <el-dialog v-model="modelDialogVisible" :title="modelForm.modelId ? '编辑评分模型' : '新建评分模型'" width="min(760px, 94%)" destroy-on-close>
       <el-form label-width="96px">
         <el-row :gutter="12">
           <el-col :span="12">
@@ -521,7 +521,7 @@
     </el-drawer>
 
     <!-- 配置历史（发布存档 + 回滚） -->
-    <el-dialog v-model="snapshotsVisible" title="配置版本历史" width="680px" destroy-on-close>
+    <el-dialog v-model="snapshotsVisible" title="配置版本历史" width="min(680px, 94%)" destroy-on-close>
       <el-table v-loading="snapshotsLoading" class="ui-table" :data="snapshots">
         <template #empty>
           <div class="ui-empty">
@@ -556,7 +556,7 @@
     </el-dialog>
 
     <!-- 存档配置查看 -->
-    <el-dialog v-model="snapshotConfigVisible" :title="`配置 JSON · ${activeSnapshotVersion}`" width="680px" destroy-on-close>
+    <el-dialog v-model="snapshotConfigVisible" :title="`配置 JSON · ${activeSnapshotVersion}`" width="min(680px, 94%)" destroy-on-close>
       <el-input :model-value="activeSnapshotJson" type="textarea" :rows="18" readonly class="mono config-area" spellcheck="false" />
     </el-dialog>
   </div>

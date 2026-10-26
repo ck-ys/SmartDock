@@ -35,7 +35,9 @@
             <div class="panel-head"><span>CSV 补录</span><span class="muted">离线事件导入 · 最多 5000 行</span></div>
           </template>
           <p class="muted small">
-            表头需包含 <code>eventName</code>，可选列：eventUid、subjectType、subjectId、anonymousId、sessionId、occurredTime、pageUrl、keyword、referrer、channel、deviceType、os、browser、country、province、city、props。
+            表头需包含
+            <code>eventName</code
+            >，可选列：eventUid、subjectType、subjectId、anonymousId、sessionId、occurredTime、pageUrl、keyword、referrer、channel、deviceType、os、browser、country、province、city、props。
           </p>
           <el-input
             v-model="csvText"
@@ -119,7 +121,10 @@
               <span>流量趋势</span>
             </div>
           </template>
-          <v-chart class="trend-chart" :option="trendOption" autoresize />
+          <v-chart v-if="hasOverviewData" class="trend-chart" :option="trendOption" autoresize />
+          <el-empty v-else :image-size="60" description="该源在窗口期内还没有事件数据">
+            <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
+          </el-empty>
         </el-card>
 
         <el-row :gutter="14" class="breakdown-row">
@@ -144,7 +149,11 @@
                     </div>
                   </template>
                 </el-table-column>
-                <template #empty><el-empty :image-size="50" description="暂无数据" /></template>
+                <template #empty>
+                  <el-empty :image-size="50" description="暂无数据">
+                    <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
+                  </el-empty>
+                </template>
               </el-table>
             </el-card>
           </el-col>
@@ -193,7 +202,11 @@
                 <el-table-column prop="share" label="占比" width="86" align="right">
                   <template #default="{ row }">{{ formatPercent(row.share) }}</template>
                 </el-table-column>
-                <template #empty><el-empty :image-size="50" description="暂无搜索事件" /></template>
+                <template #empty>
+                  <el-empty :image-size="50" description="暂无搜索事件">
+                    <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
+                  </el-empty>
+                </template>
               </el-table>
             </el-card>
           </el-col>
@@ -231,22 +244,19 @@
             <div class="panel-head">
               <span>用户路径</span>
               <div class="head-actions">
-                <el-select
-                  v-model="pathStart"
-                  placeholder="从哪页出发（默认入口视角）"
-                  clearable
-                  style="width: 240px"
-                  @change="loadPaths"
-                >
+                <el-select v-model="pathStart" placeholder="从哪页出发（默认入口视角）" clearable style="width: 240px" @change="loadPaths">
                   <el-option v-for="e in pathsData?.entries || []" :key="e.page" :label="`${e.page}（${e.visitors} 人）`" :value="e.page" />
                 </el-select>
               </div>
             </div>
           </template>
           <v-chart v-if="pathsData?.links?.length" class="path-chart" :option="pathsOption" autoresize />
-          <el-empty v-else :image-size="60" description="窗口期内没有可分析的页面路径" />
+          <el-empty v-else :image-size="60" description="窗口期内没有可分析的页面路径">
+            <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
+          </el-empty>
           <p class="muted small">
-            口径与转化漏斗一致：每位访客只取首次顺序走过的路径，连续重复页折叠为一步；线越粗走的人越多，鼠标悬停节点可看它通向哪里。带 ·2/·3 的节点表示该页在第 2/3 步被再次到达（按步分层，回访不会成环）。
+            口径与转化漏斗一致：每位访客只取首次顺序走过的路径，连续重复页折叠为一步；线越粗走的人越多，鼠标悬停节点可看它通向哪里。带 ·2/·3
+            的节点表示该页在第 2/3 步被再次到达（按步分层，回访不会成环）。
           </p>
         </el-card>
       </el-tab-pane>
@@ -275,7 +285,9 @@
             </div>
           </template>
 
-          <el-empty v-if="!funnels.length" :image-size="60" description="当前业务源还没有漏斗" />
+          <el-empty v-if="!funnels.length" :image-size="60" description="当前业务源还没有漏斗">
+            <el-button v-hasPermi="['analytics:center:edit']" type="primary" link @click="openFunnelDialog()">去新建漏斗</el-button>
+          </el-empty>
 
           <template v-else-if="funnelResult">
             <div class="funnel-meta">
@@ -321,9 +333,7 @@
               <el-tag size="small" type="danger" effect="plain">流失 {{ step.lost }} 人</el-tag>
             </div>
             <div v-if="step.next?.length" class="loss-next">
-              <el-tag v-for="n in step.next" :key="n.label" size="small" effect="plain" class="loss-tag">
-                {{ n.label }} · {{ n.count }}
-              </el-tag>
+              <el-tag v-for="n in step.next" :key="n.label" size="small" effect="plain" class="loss-tag"> {{ n.label }} · {{ n.count }} </el-tag>
             </div>
             <div v-else class="muted small">本步无流失</div>
           </div>
@@ -333,9 +343,7 @@
           <template #header>
             <div class="panel-head">
               <span>渠道归因</span>
-              <span class="muted">
-                转化事件 {{ attributionData?.conversionEvent || '—' }} · 共 {{ attributionData?.conversions ?? 0 }} 次
-              </span>
+              <span class="muted"> 转化事件 {{ attributionData?.conversionEvent || '—' }} · 共 {{ attributionData?.conversions ?? 0 }} 次 </span>
             </div>
           </template>
           <el-table v-if="attributionData?.rows?.length" class="ui-table" :data="attributionData.rows">
@@ -345,7 +353,9 @@
             <el-table-column prop="linear" label="线性" width="80" align="right" />
             <el-table-column prop="visitors" label="触达访客" width="90" align="right" />
           </el-table>
-          <el-empty v-else :image-size="50" description="窗口期内没有转化事件，无法归因" />
+          <el-empty v-else :image-size="50" description="窗口期内没有转化事件，无法归因">
+            <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
+          </el-empty>
           <p class="muted small">首次=最早带来的渠道记功；末次=临门一脚记功；线性=沿途触点平分。只统计转化发生之前的访问。</p>
         </el-card>
 
@@ -372,19 +382,30 @@
               </div>
             </div>
           </template>
-          <el-table v-if="retention.cohorts?.length" class="ui-table retention-table" :data="retention.cohorts">
-            <el-table-column prop="cohort" label="首次访问" width="120" fixed />
-            <el-table-column prop="total" label="新增访客" width="96" align="right" />
-            <el-table-column v-for="i in retention.window" :key="i" :label="`第 ${i - 1} 天`" min-width="78" align="center">
-              <template #default="{ row }">
-                <div class="retention-cell" :style="retentionStyle(row.cells[i - 1])">
-                  <strong>{{ row.cells[i - 1]?.visitors ?? 0 }}</strong>
-                  <span>{{ formatPercent(row.cells[i - 1]?.rate) }}</span>
-                </div>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-empty v-else :image-size="60" description="暂无留存数据" />
+          <template v-if="retention.cohorts?.length">
+            <el-table class="ui-table retention-table" :data="retention.cohorts">
+              <el-table-column prop="cohort" label="首次访问" width="120" fixed />
+              <el-table-column prop="total" label="新增访客" width="96" align="right" />
+              <el-table-column v-for="i in retention.window" :key="i" :label="`第 ${i - 1} 天`" min-width="78" align="center">
+                <template #default="{ row }">
+                  <div class="retention-cell" :style="retentionStyle(row.cells[i - 1])">
+                    <strong>{{ row.cells[i - 1]?.visitors ?? 0 }}</strong>
+                    <span>{{ formatPercent(row.cells[i - 1]?.rate) }}</span>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="retention-legend muted small">
+              <span>回访率</span>
+              <span class="retention-legend__swatch" :style="{ background: alpha(ct.accent, 0.12) }" />
+              <span class="retention-legend__swatch" :style="{ background: alpha(ct.accent, 0.35) }" />
+              <span class="retention-legend__swatch" :style="{ background: alpha(ct.accent, 0.85) }" />
+              <span>越高色越深（无回访不着色）</span>
+            </div>
+          </template>
+          <el-empty v-else :image-size="60" description="暂无留存数据">
+            <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
+          </el-empty>
         </el-card>
       </el-tab-pane>
 
@@ -443,9 +464,7 @@
             </el-select>
             <el-button type="primary" @click="searchSessions">查询</el-button>
             <el-button @click="resetSessions">重置</el-button>
-            <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportSessionsCsv">
-              导出 CSV
-            </el-button>
+            <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportSessionsCsv"> 导出 CSV </el-button>
           </div>
 
           <el-table class="ui-table" :data="sessions" v-loading="sessionLoading">
@@ -518,9 +537,7 @@
               <el-radio-button :value="50">Top 50</el-radio-button>
             </el-radio-group>
             <el-button type="primary" :loading="customLoading" @click="loadCustom">运行</el-button>
-            <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportCustomCsv">
-              导出 CSV
-            </el-button>
+            <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportCustomCsv"> 导出 CSV </el-button>
           </div>
           <v-chart class="custom-chart" :option="customOption" autoresize v-loading="customLoading" />
           <el-table :data="customRows" class="ui-table custom-table">
@@ -580,7 +597,6 @@
           <p class="muted small">更新于 {{ realtimeData?.now || '—' }}（按分钟的浏览量脉冲条，条越高那一分钟越热闹）</p>
         </el-card>
       </el-tab-pane>
-
     </el-tabs>
 
     <!-- 会话详情抽屉 -->
@@ -625,7 +641,7 @@
     </el-drawer>
 
     <!-- 漏斗编辑 -->
-    <el-dialog v-model="funnelDialog" :title="funnelForm.funnelId ? '编辑漏斗' : '新建漏斗'" width="620px">
+    <el-dialog v-model="funnelDialog" :title="funnelForm.funnelId ? '编辑漏斗' : '新建漏斗'" width="min(620px, 94%)">
       <el-form :model="funnelForm" label-width="96px">
         <el-form-item label="漏斗名称">
           <el-input v-model="funnelForm.funnelName" placeholder="例如：官网访问转化" />
@@ -725,6 +741,12 @@ const ct = useChartTokens();
 
 const overview = ref<Partial<AnalyticsOverview>>({});
 const trend = ref<AnalyticsTrendPoint[]>([]);
+/** 空源判定：窗口期事件/会话/PV 全 0 时趋势图换空态引导，不再渲染全 0 假曲线 */
+const hasOverviewData = computed(() => {
+  const c = overview.value?.current;
+  if (!c) return false;
+  return Number(c.events ?? 0) > 0 || Number(c.visits ?? 0) > 0 || Number(c.pv ?? 0) > 0;
+});
 const overviewLoading = ref(false);
 const breakdownLoading = ref(false);
 
@@ -1109,11 +1131,7 @@ const exportCustomCsv = async () => {
   exporting.value = true;
   try {
     const date = new Date().toISOString().slice(0, 10);
-    await download(
-      '/analytics/export/custom',
-      { source: source.value, days: days.value, ...customForm },
-      `自定义分析-${source.value}-${date}.csv`
-    );
+    await download('/analytics/export/custom', { source: source.value, days: days.value, ...customForm }, `自定义分析-${source.value}-${date}.csv`);
   } catch {
     // download 内部已提示
   } finally {
@@ -1131,9 +1149,7 @@ const customOption = computed<any>(() => {
     xAxis: {
       type: 'category',
       data: customRows.value.map((p) => p.label),
-      axisLabel: isDay
-        ? { rotate: 0, color: ct.value.faint }
-        : { rotate: 35, interval: 0, overflow: 'truncate', width: 90, color: ct.value.faint },
+      axisLabel: isDay ? { rotate: 0, color: ct.value.faint } : { rotate: 35, interval: 0, overflow: 'truncate', width: 90, color: ct.value.faint },
       axisLine: { lineStyle: { color: ct.value.border } }
     },
     yAxis: {
@@ -1230,7 +1246,7 @@ const loadActivity = async () => {
 const activityOption = computed<any>(() => ({
   color: ct.value.series,
   tooltip: { trigger: 'axis' },
-  legend: { bottom: 0, icon: 'circle', itemWidth: 8 },
+  legend: { bottom: 0, icon: 'circle', itemWidth: 8, data: ['DAU 日活', 'WAU 周活', 'MAU 月活'] },
   grid: { left: 52, right: 24, top: 30, bottom: 44 },
   xAxis: {
     type: 'category',
@@ -1245,7 +1261,15 @@ const activityOption = computed<any>(() => ({
     splitLine: { lineStyle: { color: ct.value.rule } }
   },
   series: [
-    { name: 'DAU 日活', type: 'line', smooth: true, symbolSize: 4, data: activityData.value?.dau || [], itemStyle: { color: ct.value.accent }, lineStyle: { color: ct.value.accent } },
+    {
+      name: 'DAU 日活',
+      type: 'line',
+      smooth: true,
+      symbolSize: 4,
+      data: activityData.value?.dau || [],
+      itemStyle: { color: ct.value.accent },
+      lineStyle: { color: ct.value.accent }
+    },
     {
       name: 'WAU 周活',
       type: 'line',
@@ -1709,6 +1733,19 @@ onMounted(async () => {
 .retention-cell strong {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+.retention-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.retention-legend__swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 .filter-bar {
   display: flex;

@@ -34,9 +34,7 @@
           </template>
         </el-table-column>
         <el-table-column label="窗口" width="200">
-          <template #default="{ row }">
-            {{ day(row.fromDay) }} ~ {{ day(row.toDay) }}
-          </template>
+          <template #default="{ row }"> {{ day(row.fromDay) }} ~ {{ day(row.toDay) }} </template>
         </el-table-column>
         <el-table-column label="链" width="180">
           <template #default="{ row }">
@@ -49,7 +47,11 @@
               :percentage="row.daysTotal ? Math.round((row.daysDone / row.daysTotal) * 100) : 0"
               :status="row.status === 'FAILED' ? 'exception' : row.status === 'DONE' ? 'success' : undefined"
             />
-            <span class="muted small">{{ row.daysDone }}/{{ row.daysTotal }} 天<template v-if="row.currentDay && row.status !== 'DONE'"> · 断点 {{ day(row.currentDay) }}</template></span>
+            <span class="muted small"
+              >{{ row.daysDone }}/{{ row.daysTotal }} 天<template v-if="row.currentDay && row.status !== 'DONE'">
+                · 断点 {{ day(row.currentDay) }}</template
+              ></span
+            >
           </template>
         </el-table-column>
         <el-table-column label="状态" width="100">
@@ -60,7 +62,10 @@
         <el-table-column label="对账（前 → 后）" min-width="220">
           <template #default="{ row }">
             <template v-if="row.status === 'DONE'">
-              <span class="small">会话 {{ stat(row.statsBefore, 'sessions') }} → {{ stat(row.statsAfter, 'sessions') }}；PV {{ stat(row.statsBefore, 'pageViews') }} → {{ stat(row.statsAfter, 'pageViews') }}</span>
+              <span class="small"
+                >会话 {{ stat(row.statsBefore, 'sessions') }} → {{ stat(row.statsAfter, 'sessions') }}；PV {{ stat(row.statsBefore, 'pageViews') }} →
+                {{ stat(row.statsAfter, 'pageViews') }}</span
+              >
             </template>
             <span v-else-if="row.errorMsg" class="small err">{{ row.errorMsg }}</span>
             <span v-else class="muted small">—</span>
@@ -68,8 +73,18 @@
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 'RUNNING'" v-hasPermi="['profile:replay:edit']" link type="warning" size="small" @click="pause(row)">暂停</el-button>
-            <el-button v-if="row.status === 'PAUSED' || row.status === 'FAILED'" v-hasPermi="['profile:replay:edit']" link type="primary" size="small" @click="resume(row)">续跑</el-button>
+            <el-button v-if="row.status === 'RUNNING'" v-hasPermi="['profile:replay:edit']" link type="warning" size="small" @click="pause(row)"
+              >暂停</el-button
+            >
+            <el-button
+              v-if="row.status === 'PAUSED' || row.status === 'FAILED'"
+              v-hasPermi="['profile:replay:edit']"
+              link
+              type="primary"
+              size="small"
+              @click="resume(row)"
+              >续跑</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -85,7 +100,14 @@
       <div class="config-row" v-loading="configLoading">
         <div class="config-item">
           <span class="config-label">保留天数</span>
-          <el-input-number v-model="retention.eventRetentionDays" :min="0" :max="36500" controls-position="right" style="width: 150px" :placeholder="'默认 ' + 730" />
+          <el-input-number
+            v-model="retention.eventRetentionDays"
+            :min="0"
+            :max="36500"
+            controls-position="right"
+            style="width: 150px"
+            :placeholder="'默认 ' + 730"
+          />
           <span class="muted small">天（热数据）</span>
         </div>
         <div class="config-item">
@@ -132,13 +154,15 @@
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="!row.reversedAt" v-hasPermi="['profile:identity:edit']" link type="danger" size="small" @click="confirmUnmerge(row)">拆分</el-button>
+            <el-button v-if="!row.reversedAt" v-hasPermi="['profile:identity:edit']" link type="danger" size="small" @click="confirmUnmerge(row)"
+              >拆分</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-dialog v-model="createVisible" title="发起回放" width="480px">
+    <el-dialog v-model="createVisible" title="发起回放" width="min(480px, 94%)">
       <el-form label-width="90px">
         <el-form-item label="业务源">
           <el-input v-model="source" disabled style="width: 200px" />
@@ -182,7 +206,7 @@ import {
   listIdentityMerges,
   unmergeIdentity,
   type ProfileReplayTask,
-  type ProfileIdentityMerge,
+  type ProfileIdentityMerge
 } from '@/api/dcs/core/profile';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
@@ -201,7 +225,7 @@ const configLoading = ref(false);
 const savingConfig = ref(false);
 const retention = ref<{ eventRetentionDays?: number | null; eventArchive?: string }>({
   eventRetentionDays: null,
-  eventArchive: '1',
+  eventArchive: '1'
 });
 
 const shortId = (id: string) => (id ? 'RP-' + id.slice(-4) : '');
@@ -209,9 +233,13 @@ const day = (v?: string) => (v ? String(v).slice(0, 10) : '—');
 const fmt = (v?: string) => (v ? String(v).replace('T', ' ').slice(0, 19) : '—');
 
 const statusType = (s: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' =>
-  (({ RUNNING: 'primary', PAUSED: 'warning', DONE: 'success', FAILED: 'danger' }) as Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'>)[s] || 'info';
-const statusLabel = (s: string) =>
-  ({ RUNNING: '执行中', PAUSED: '已暂停', DONE: '完成', FAILED: '失败' })[s] || s;
+  (
+    ({ RUNNING: 'primary', PAUSED: 'warning', DONE: 'success', FAILED: 'danger' }) as Record<
+      string,
+      'primary' | 'success' | 'warning' | 'info' | 'danger'
+    >
+  )[s] || 'info';
+const statusLabel = (s: string) => ({ RUNNING: '执行中', PAUSED: '已暂停', DONE: '完成', FAILED: '失败' })[s] || s;
 
 const stat = (json: string | undefined, key: string) => {
   try {
@@ -314,7 +342,7 @@ const saveRetention = async () => {
       source: source.value,
       // 0 或清空都显式传 0: 后端 0=清自定义回到继承全局(不传字段才是不动现值)
       eventRetentionDays: retention.value.eventRetentionDays ?? 0,
-      eventArchive: retention.value.eventArchive,
+      eventArchive: retention.value.eventArchive
     });
     ElMessage.success('保留期配置已保存（每日 03:30 生效）');
   } finally {
@@ -393,13 +421,42 @@ onMounted(loadAll);
 .ops-page :deep(.el-card__body) {
   min-width: 0;
 }
-.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.muted { color: var(--el-text-color-secondary); }
-.small { font-size: 12px; }
-.mono { font-family: Consolas, monospace; font-size: 12px; }
-.err { color: var(--el-color-danger); }
-.chain-tag { margin-right: 4px; }
-.config-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
-.config-item { display: flex; align-items: center; gap: 8px; }
-.config-label { font-size: 13px; color: var(--el-text-color-regular); }
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.muted {
+  color: var(--el-text-color-secondary);
+}
+.small {
+  font-size: 12px;
+}
+.mono {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+}
+.err {
+  color: var(--el-color-danger);
+}
+.chain-tag {
+  margin-right: 4px;
+}
+.config-row {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.config-label {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
 </style>

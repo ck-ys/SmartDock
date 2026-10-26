@@ -36,7 +36,15 @@
         </div>
         <div class="config-item">
           <span class="config-label">复核阈值</span>
-          <el-input-number :model-value="Number(config.reviewThreshold)" :min="0" :max="100" :precision="2" controls-position="right" style="width: 130px" @update:model-value="(v: number) => (config.reviewThreshold = v)" />
+          <el-input-number
+            :model-value="Number(config.reviewThreshold)"
+            :min="0"
+            :max="100"
+            :precision="2"
+            controls-position="right"
+            style="width: 130px"
+            @update:model-value="(v: number) => (config.reviewThreshold = v)"
+          />
           <span class="muted small">低于该总分入队</span>
         </div>
         <div class="config-item">
@@ -139,7 +147,7 @@
     </el-card>
 
     <!-- 复核处理 -->
-    <el-dialog v-model="actionVisible" :title="actionMode === 'confirm' ? '确认低分' : '驳回复核'" width="520px" destroy-on-close>
+    <el-dialog v-model="actionVisible" :title="actionMode === 'confirm' ? '确认低分' : '驳回复核'" width="min(520px, 94%)" destroy-on-close>
       <div v-if="activeReview" class="action-summary">
         <div>
           <span class="muted">主体</span>
@@ -178,7 +186,12 @@
       />
       <template #footer>
         <el-button @click="actionVisible = false">取消</el-button>
-        <el-button v-hasPermi="['profile:review:edit']" :type="actionMode === 'confirm' ? 'success' : 'warning'" :loading="actionSaving" @click="submitAction">
+        <el-button
+          v-hasPermi="['profile:review:edit']"
+          :type="actionMode === 'confirm' ? 'success' : 'warning'"
+          :loading="actionSaving"
+          @click="submitAction"
+        >
           {{ actionMode === 'confirm' ? '确认低分' : '驳回' }}
         </el-button>
       </template>

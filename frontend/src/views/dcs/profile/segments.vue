@@ -47,12 +47,8 @@
           <div>
             <span>最近评估</span>
             <strong class="metric-time">{{ segment.lastEvalTime || '从未' }}</strong>
-            <el-tag v-if="segment.lastRunStatus === 'SKIPPED'" size="small" type="warning" class="run-status-tag">
-              超限跳过
-            </el-tag>
-            <el-tag v-else-if="segment.lastRunStatus === 'FAILED'" size="small" type="danger" class="run-status-tag">
-              上次失败
-            </el-tag>
+            <el-tag v-if="segment.lastRunStatus === 'SKIPPED'" size="small" type="warning" class="run-status-tag"> 超限跳过 </el-tag>
+            <el-tag v-else-if="segment.lastRunStatus === 'FAILED'" size="small" type="danger" class="run-status-tag"> 上次失败 </el-tag>
           </div>
         </div>
 
@@ -95,7 +91,7 @@
     </div>
 
     <!-- 新建/编辑 -->
-    <el-dialog v-model="dialogVisible" :title="form.segmentId ? '编辑分群' : '新建分群'" width="780px" destroy-on-close>
+    <el-dialog v-model="dialogVisible" :title="form.segmentId ? '编辑分群' : '新建分群'" width="min(780px, 94%)" destroy-on-close>
       <el-form label-width="92px">
         <el-row :gutter="12">
           <el-col :span="12">
@@ -190,7 +186,7 @@
     </el-dialog>
 
     <!-- 静态名单导入 -->
-    <el-dialog v-model="importVisible" title="导入分群名单" width="560px" destroy-on-close>
+    <el-dialog v-model="importVisible" title="导入分群名单" width="min(560px, 94%)" destroy-on-close>
       <el-form label-width="88px">
         <el-form-item label="导入方式">
           <el-radio-group v-model="importForm.mode">
@@ -290,7 +286,7 @@
     </el-drawer>
 
     <!-- 发通知向导（预览 → 发送） -->
-    <el-dialog v-model="reachVisible" :title="`发通知 · ${reachSegment?.segmentName || ''}`" width="620px" destroy-on-close>
+    <el-dialog v-model="reachVisible" :title="`发通知 · ${reachSegment?.segmentName || ''}`" width="min(620px, 94%)" destroy-on-close>
       <div v-loading="reachPreviewLoading" class="drawer-body">
         <template v-if="reachPreviewData">
           <div class="reach-summary">
@@ -307,7 +303,13 @@
               <strong>{{ reachPreviewData.skippedNonUser }}</strong>
             </div>
           </div>
-          <el-alert type="info" :closable="false" show-icon class="reach-alert" :title="`发送时冻结当前成员快照，逐人去重（同一人只收一次）；渠道：站内信`" />
+          <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+            class="reach-alert"
+            :title="`发送时冻结当前成员快照，逐人去重（同一人只收一次）；渠道：站内信`"
+          />
           <el-form label-width="80px">
             <el-form-item label="标题">
               <el-input v-model="reachForm.title" maxlength="100" placeholder="如：低分预警周报" />
@@ -362,7 +364,9 @@
                   </template>
                 </el-table-column>
                 <el-table-column prop="errorMsg" label="失败原因" min-width="140">
-                  <template #default="{ row: item }"><span class="muted">{{ item.errorMsg || '—' }}</span></template>
+                  <template #default="{ row: item }"
+                    ><span class="muted">{{ item.errorMsg || '—' }}</span></template
+                  >
                 </el-table-column>
                 <el-table-column prop="sentTime" label="发送时间" width="160">
                   <template #default="{ row: item }">{{ item.sentTime || '—' }}</template>
@@ -413,7 +417,7 @@
     </el-drawer>
 
     <!-- 导出成员 -->
-    <el-dialog v-model="exportVisible" :title="`导出成员 · ${activeSegment?.segmentName || ''}`" width="480px" destroy-on-close>
+    <el-dialog v-model="exportVisible" :title="`导出成员 · ${activeSegment?.segmentName || ''}`" width="min(480px, 94%)" destroy-on-close>
       <el-form label-width="100px">
         <el-form-item label="脱敏导出">
           <el-switch v-model="exportForm.masked" active-text="隐藏中间字符" inactive-text="明文（会记审计）" />
@@ -905,7 +909,8 @@ const loadRecords = async () => {
 };
 const reachStatusType = (status?: string) =>
   status === 'DONE' ? ('success' as const) : status === 'FAILED' ? ('danger' as const) : ('warning' as const);
-const reachStatusLabel = (status?: string) => (status === 'DONE' ? '完成' : status === 'PARTIAL' ? '部分成功' : status === 'FAILED' ? '失败' : '进行中');
+const reachStatusLabel = (status?: string) =>
+  status === 'DONE' ? '完成' : status === 'PARTIAL' ? '部分成功' : status === 'FAILED' ? '失败' : '进行中';
 
 /** 展开行时加载该批次逐人明细 */
 const loadItems = async (row: ProfileReachBatch) => {
