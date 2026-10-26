@@ -34,3 +34,4 @@ Thumbs.db
 # 助手工作区运行产物（workspace.db 索引，误提交风险）
 backend/data/
 backend/ruoyi-admin/data/
+frontend/data/

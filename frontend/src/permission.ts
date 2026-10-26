@@ -1,5 +1,5 @@
 import { to as tos } from 'await-to-js';
-import router from './router';
+import router, { NOT_FOUND_ROUTE_PATH } from './router';
 import NProgress from 'nprogress';
 import 'nprogress/nprogress.css';
 import { getToken } from '@/utils/auth';
@@ -63,6 +63,17 @@ router.beforeEach(async (to) => {
         // hack方法 确保addRoutes已完成：以 replace 重放当前导航
         return { path: to.path, replace: true, params: to.params, query: to.query, hash: to.hash, name: to.name as string };
       } else {
+        // 批一 P0-3：有登录但导航只命中 404 兜底通配（NOT_FOUND_ROUTE_PATH，与 router/index.ts
+        // 共享常量），说明动态路由表里没有这条路径。后端 getRouters 按权限过滤菜单，前端拿不到
+        // 全量菜单清单，无法区分「系统有但本人无权」与「真不存在」——统一进 /403 说明页
+        // （壳层保留，比整屏 404 温和），页面文案按「不存在或无权」双口径给指引；
+        // 该落地取舍记入施工计划批一节（2026-10-26 施工修订）：计划原文「真不存在仍 404」
+        // 在纯前端约束下不可判定，撤销该半句
+        const last = to.matched[to.matched.length - 1];
+        if (last && last.path === NOT_FOUND_ROUTE_PATH) {
+          NProgress.done();
+          return { path: '/403', replace: true };
+        }
         return true;
       }
     }

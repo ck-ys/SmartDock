@@ -19,6 +19,14 @@ import Layout from '@/layout/index.vue';
  * }
  */
 
+// 助手菜单路由常量（批一 P0-1：路径从菜单里取，不手写——对应 sys_menu 11930「AI 助手」path=ai
+// 下 11927「AI助手管理」path=assistant-admin；菜单挂载位置若调整，只改这里）
+export const ASSISTANT_ADMIN_PATH = '/ai/assistant-admin';
+
+// 404 兜底路由 path（批一 P0-3：permission.ts 守卫按它识别「未命中任何路由」，
+// 抽常量防两处字面量漂移后守卫静默失效——收口复审席位A P2-1）
+export const NOT_FOUND_ROUTE_PATH = '/:pathMatch(.*)*';
+
 // 公共路由
 export const constantRoutes: RouteRecordRaw[] = [
   {
@@ -62,6 +70,20 @@ export const constantRoutes: RouteRecordRaw[] = [
     path: '/401',
     component: () => import('@/views/error/401.vue'),
     hidden: true
+  },
+  // 403 说明页（批一 P0-3）：Layout 包裹保壳层（菜单/顶栏）在——区别于 401/404 整屏页；
+  // 不取 name，TagsView.addTags 按 route.name 门控，错误页不留页签
+  {
+    path: '/403',
+    component: Layout,
+    hidden: true,
+    children: [
+      {
+        path: '',
+        component: () => import('@/views/error/403.vue'),
+        meta: { title: '无访问权限' }
+      }
+    ]
   },
   {
     path: '',
@@ -178,7 +200,7 @@ export const constantRoutes: RouteRecordRaw[] = [
 
   // 404 兜底必须放最后
   {
-    path: '/:pathMatch(.*)*',
+    path: NOT_FOUND_ROUTE_PATH,
     component: () => import('@/views/error/404.vue'),
     hidden: true
   }

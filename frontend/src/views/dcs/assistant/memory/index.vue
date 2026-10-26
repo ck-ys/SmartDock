@@ -53,6 +53,7 @@
  */
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { ASSISTANT_ADMIN_PATH } from '@/router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { checkPermi } from '@/utils/permission';
 import { getAssistantStatus } from '@/api/dcs/assistant';
@@ -105,7 +106,9 @@ async function onRemove(m: AssistantMemoryRow) {
 }
 
 function goAdmin() {
-  router.push('/assistant-admin');
+  // 批一 P0-1：路由常量在 src/router/index.ts（对应菜单 11927 挂 11930「AI 助手」下），
+  // 不再手写死路径——旧值 '/assistant-admin' 缺父级目录段，动态路由匹配不上必落 404
+  router.push(ASSISTANT_ADMIN_PATH);
 }
 
 onMounted(load);

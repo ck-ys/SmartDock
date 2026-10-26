@@ -20,8 +20,8 @@
 
       <div class="side-body">
         <el-empty
-          v-if="!loading && grouped.length === 0 && archivedExpanded.length === 0"
-          description="还没有会话——点「新会话」或右下角悬浮球开始"
+          v-if="!loading && grouped.length === 0 && archived.length === 0"
+          description="还没有会话——点「新会话」开始"
           :image-size="64"
         />
         <!-- R4 二改(2026-10-10)：分组头带计数徽标（置顶组配 pin 图标）；「更早」收成折叠条
