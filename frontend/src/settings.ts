@@ -11,8 +11,11 @@ const setting: DefaultSettings = {
 
   /**
    * 数据强调色（只给图表与数据标记，不给按钮/导航）
+   * 双主题批（U-24）起实际渲染色由皮肤令牌 --app-accent/--app-chart-1 决定；
+   * 此默认值仅随 layout-setting 初始对象落 localStorage，与 utils/theme.ts 的
+   * DEFAULT_ACCENT 对齐，旧薄荷死配置已清
    */
-  accent: '#1b6c80',
+  accent: '#2f6feb',
 
   /**
    * 侧边栏主题 深色主题theme-dark，浅色主题theme-light

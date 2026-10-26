@@ -256,13 +256,15 @@ onMounted(load);
   border: 0;
   border-radius: var(--app-nav-radius);
   background: transparent;
-  color: var(--app-text);
+  /* 行坐在侧栏底色上，文字/悬停一律走侧栏令牌族（同 BrandRow.vue）：
+     T1 浅档侧栏是深蓝 #1e2a38，误用内容区 --app-text(#14202d) 会近乎隐形（实测 1.13:1） */
+  color: var(--app-side-text);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
 
   &:hover {
-    background: var(--app-raised);
+    background: var(--app-side-hover);
   }
 
   &:focus-visible {
