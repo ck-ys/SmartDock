@@ -307,6 +307,29 @@ export const archiveRule = (ruleId: string): Promise<ProfileRule> => r<ProfileRu
 
 export const deleteRuleDraft = (ruleId: string): Promise<boolean> => r<boolean>({ url: `${BASE}/rule/${ruleId}/delete`, method: 'post' });
 
+// ---------------------------------------------------------------- 全量重算(经典评分链)
+
+export interface ProfileRecalcBatch {
+  batchId: string;
+  source: string;
+  /** RUNNING / DONE / FAILED */
+  status: string;
+  totalSubjects: number;
+  doneSubjects: number;
+  errorMsg?: string;
+}
+
+/**
+ * 触发经典评分链全量重算: 发布新权重后让历史主体按新权重出新快照,
+ * 生效于用户画像列表/详情页(RFM 模型页是另一条模型快照链, 不受影响)。
+ */
+export const triggerRecalc = (source: string): Promise<ProfileRecalcBatch> =>
+  r<ProfileRecalcBatch>({ url: `${BASE}/recalc/${source}`, method: 'post' });
+
+/** 失败批次从游标断点续跑 */
+export const resumeRecalcBatch = (batchId: string): Promise<ProfileRecalcBatch> =>
+  r<ProfileRecalcBatch>({ url: `${BASE}/recalc/${batchId}/resume`, method: 'post' });
+
 // ---------------------------------------------------------------- 评分模型 / RFM
 
 export interface ProfileScoreModel {
@@ -559,6 +582,8 @@ export interface ProfileSegment {
   memberCount: number;
   lastRunId?: string;
   lastEvalTime?: string;
+  /** 最近一次 run 状态(DONE/FAILED/SKIPPED; 批4A 超限跳过信号) */
+  lastRunStatus?: string;
   builtin: string;
   revision: number;
 }

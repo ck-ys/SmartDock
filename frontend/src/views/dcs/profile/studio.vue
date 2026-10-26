@@ -574,7 +574,26 @@
           </el-tag>
           <span v-if="!impactResult?.changedDimensions?.length" class="muted">没有权重变化</span>
         </div>
-        <el-alert type="info" :closable="false" show-icon title="发布本身不重算历史快照；需要到重算入口触发后，新权重才生效。" />
+        <el-alert type="info" :closable="false" show-icon title="发布本身不重算历史快照；发布后可在下方触发重算，新权重将生效于用户画像列表与详情页（RFM 模型页分数需在模型页另行运行）。" />
+        <!-- 批1 重算闭环: 发布结果弹窗内直接触发经典链重算, 终点=画像列表/详情页 -->
+        <div v-if="recalcAvailable && canRecalc" class="recalc-panel">
+          <el-button v-if="!recalcBatch" type="primary" :loading="recalcLoading" @click="runRecalc">触发重算</el-button>
+          <template v-else-if="recalcBatch.status === 'DONE'">
+            <el-alert type="success" :closable="false" show-icon
+              :title="`重算完成：${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0} 个主体已按新权重出新快照`" />
+          </template>
+          <template v-else-if="recalcBatch.status === 'FAILED'">
+            <el-alert type="error" :closable="false" show-icon
+              :title="`重算失败：已完成 ${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0}`"
+              :description="recalcBatch.errorMsg" />
+            <el-button type="warning" plain :loading="recalcLoading" @click="resumeRecalc">断点续跑</el-button>
+          </template>
+          <el-alert v-else type="info" :closable="false" show-icon
+            :title="`重算进行中：${recalcBatch.doneSubjects ?? 0} / ${recalcBatch.totalSubjects ?? 0}`" />
+          <p v-if="recalcBatch" class="muted small">完成后到「用户画像」列表与详情页查看新分数与画像依据（RFM 模型页不受影响）。</p>
+        </div>
+        <el-alert v-else-if="recalcAvailable" type="warning" :closable="false" show-icon
+          title="当前账号没有重算权限，如需按新权重重算历史主体，请联系管理员操作。" />
       </template>
 
       <template #footer>
@@ -586,6 +605,7 @@
 
 <script setup name="DcsProfileStudio" lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { checkPermi } from '@/utils/permission';
 import {
   archiveRule as archiveRuleApi,
   createDimension,
@@ -602,6 +622,8 @@ import {
   listDimensions,
   previewDimension,
   publishRule,
+  resumeRecalcBatch,
+  triggerRecalc,
   updateDimension,
   updateRuleDraft,
   validateRule,
@@ -609,6 +631,7 @@ import {
   type ProfileDimensionCapabilities,
   type ProfileDimensionCoverage,
   type ProfileDimensionPreview,
+  type ProfileRecalcBatch,
   type ProfileRule,
   type ProfileRuleDiff,
   type ProfileRuleImpact,
@@ -1190,6 +1213,7 @@ const showImpact = async () => {
   await saveDraft(true);
   impactResult.value = await impactRule(String(draft.value.ruleId));
   resultMode.value = 'impact';
+  recalcAvailable.value = false;
   resultVisible.value = true;
 };
 
@@ -1213,16 +1237,50 @@ const publishDraft = async () => {
   }
   ruleActionLoading.value = true;
   try {
+    // 发布前抓影响面(发布后草稿即失效, impact 无从对比), 发布成功后回显在结果弹窗
+    const impact = await impactRule(String(draft.value.ruleId));
     await publishRule(String(draft.value.ruleId), {
       version: publishForm.version.trim(),
       note: publishForm.note || undefined,
       revision: draft.value.revision
     });
     publishVisible.value = false;
-    ElMessage.success('已发布，重算后新权重生效');
+    ElMessage.success('已发布，可在弹窗内触发重算让新权重生效');
     await loadRules();
+    impactResult.value = impact;
+    resultMode.value = 'impact';
+    recalcAvailable.value = true;
+    recalcBatch.value = null;
+    resultVisible.value = true;
   } finally {
     ruleActionLoading.value = false;
+  }
+};
+
+// ---------------------------------------------------------------- 批1: 发布→重算闭环(经典链)
+
+const canRecalc = checkPermi(['profile:recalc:run']);
+const recalcAvailable = ref(false);
+const recalcLoading = ref(false);
+const recalcBatch = ref<ProfileRecalcBatch | null>(null);
+
+const runRecalc = async () => {
+  await ElMessageBox.confirm('按新权重重算该源全部历史主体？量级大时需稍候。', '触发重算', { type: 'warning' });
+  recalcLoading.value = true;
+  try {
+    recalcBatch.value = await triggerRecalc(source.value);
+  } finally {
+    recalcLoading.value = false;
+  }
+};
+
+const resumeRecalc = async () => {
+  if (!recalcBatch.value) return;
+  recalcLoading.value = true;
+  try {
+    recalcBatch.value = await resumeRecalcBatch(String(recalcBatch.value.batchId));
+  } finally {
+    recalcLoading.value = false;
   }
 };
 
@@ -1273,7 +1331,7 @@ const diffResult = ref<ProfileRuleDiff | null>(null);
 const impactResult = ref<ProfileRuleImpact | null>(null);
 const resultVisible = ref(false);
 const resultMode = ref<'validate' | 'diff' | 'impact'>('validate');
-const resultTitle = computed(() => (resultMode.value === 'validate' ? '草稿校验' : resultMode.value === 'diff' ? '权重对比' : '影响评估'));
+const resultTitle = computed(() => (resultMode.value === 'validate' ? '草稿校验' : resultMode.value === 'diff' ? '权重对比' : recalcAvailable.value ? '发布结果' : '影响评估'));
 const diffRows = computed(() => Object.entries(diffResult.value?.changes || {}).map(([code, change]) => ({ code, ...change })));
 const publishVisible = ref(false);
 const publishForm = reactive({ version: '', note: '' });
@@ -1635,6 +1693,17 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: 6px;
   margin: 12px 0;
+}
+/* 批1: 发布结果弹窗内的重算操作区 */
+.recalc-panel {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.recalc-panel .el-alert {
+  flex: 1 1 100%;
 }
 .result-line {
   width: 100%;
