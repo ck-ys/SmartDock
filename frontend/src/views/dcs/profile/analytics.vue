@@ -710,6 +710,7 @@ import {
   type AnalyticsSessionQuery,
   type AnalyticsTrendPoint
 } from '@/api/dcs/core/analytics';
+import { download } from '@/utils/request';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 use([CanvasRenderer, LineChart, BarChart, SankeyChart, GridComponent, LegendComponent, TooltipComponent]);
