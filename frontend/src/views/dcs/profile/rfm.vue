@@ -581,6 +581,7 @@ import {
   getModelTrend,
   listModelConfigSnapshots,
   listModelRuns,
+  getRiskBands,
   listModels,
   pageModelSubjects,
   publishModel,
@@ -634,7 +635,10 @@ const rfmMetrics = computed(() => [
   { label: '平均标准分', value: formatScore(overview.value.avgNormalizedScore) },
   { label: '分层数', value: overview.value.levels?.length ?? '—' }
 ]);
-const scoreColor = (value: number) => (value >= 75 ? 'var(--el-color-success)' : value >= 60 ? 'var(--el-color-warning)' : 'var(--el-color-danger)');
+/** R2-1: 档位阈值接 /profile/risk-bands 单源, 不再硬编码 75/60 */
+const riskBands = reactive({ lowMin: 75, highBelow: 60 });
+const scoreColor = (value: number) =>
+  value >= riskBands.lowMin ? 'var(--el-color-success)' : value >= riskBands.highBelow ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
 const scoreClass = (value: number) => (value >= 75 ? 'score-good' : value >= 60 ? 'score-mid' : 'score-low');
 
 const levelTagType = (level?: string) => {
@@ -1069,7 +1073,15 @@ const rollbackTo = async (row: ProfileModelConfigSnapshot) => {
   await loadAll();
 };
 
-onMounted(loadAll);
+onMounted(() => {
+  loadAll();
+  getRiskBands()
+    .then((b) => {
+      riskBands.lowMin = Number(b.lowMin);
+      riskBands.highBelow = Number(b.highBelow);
+    })
+    .catch(() => undefined);
+});
 </script>
 
 <style scoped>

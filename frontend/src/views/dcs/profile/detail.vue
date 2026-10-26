@@ -190,7 +190,7 @@ import { LineChart, RadarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 import { useChartTokens, alpha } from '@/utils/chart-theme';
-import { getScore, type ProfileDetail, type ProfileDimensionRow } from '@/api/dcs/core/profile';
+import { getRiskBands, getScore, type ProfileDetail, type ProfileDimensionRow } from '@/api/dcs/core/profile';
 
 use([CanvasRenderer, LineChart, RadarChart, GridComponent, LegendComponent, TooltipComponent]);
 
@@ -313,8 +313,10 @@ const ruleWeights = computed(() => {
 
 const back = () => router.back();
 const clamp = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+/** R2-1: 档位阈值接 /profile/risk-bands 单源, 不再硬编码 75/60 */
+const riskBands = reactive({ lowMin: 75, highBelow: 60 });
 const scoreColor = (value: number) =>
-  value >= 75 ? 'var(--el-color-success)' : value >= 60 ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
+  value >= riskBands.lowMin ? 'var(--el-color-success)' : value >= riskBands.highBelow ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
 const formatScore = (value?: number | string | null) => {
   if (value === null || value === undefined || value === '') return '—';
   const n = Number(value);
@@ -365,7 +367,15 @@ const load = async () => {
   }
 };
 
-onMounted(load);
+onMounted(() => {
+  load();
+  getRiskBands()
+    .then((b) => {
+      riskBands.lowMin = Number(b.lowMin);
+      riskBands.highBelow = Number(b.highBelow);
+    })
+    .catch(() => undefined);
+});
 watch([source, subjectId, subjectType], ([s, i, t], [os, oi, ot]) => {
   if (s !== os || i !== oi || t !== ot) load();
 });

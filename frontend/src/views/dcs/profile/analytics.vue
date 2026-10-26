@@ -343,7 +343,12 @@
           <template #header>
             <div class="panel-head">
               <span>渠道归因</span>
-              <span class="muted"> 转化事件 {{ attributionData?.conversionEvent || '—' }} · 共 {{ attributionData?.conversions ?? 0 }} 次 </span>
+              <div class="head-actions attribution-head">
+                <el-select v-model="conversionEvent" style="width: 160px" @change="loadAttribution">
+                  <el-option v-for="ev in conversionEventOptions" :key="ev.value" :label="ev.label" :value="ev.value" />
+                </el-select>
+                <span class="muted">共 {{ attributionData?.conversions ?? 0 }} 次转化</span>
+              </div>
             </div>
           </template>
           <el-table v-if="attributionData?.rows?.length" class="ui-table" :data="attributionData.rows">
@@ -1224,10 +1229,18 @@ const pathsOption = computed<any>(() => ({
 const funnelLoss = ref<AnalyticsFunnelLoss | null>(null);
 const attributionData = ref<AnalyticsAttribution | null>(null);
 const attributionLoading = ref(false);
+/* R2-1: 归因转化事件可选(后端本就支持 event 参数, 默认 signup), 换事件即重算 */
+const conversionEvent = ref('signup');
+const conversionEventOptions = [
+  { label: '转化事件：signup', value: 'signup' },
+  { label: '转化事件：login', value: 'login' },
+  { label: '转化事件：order_submit', value: 'order_submit' },
+  { label: '转化事件：pay_success', value: 'pay_success' }
+];
 const loadAttribution = async () => {
   attributionLoading.value = true;
   try {
-    attributionData.value = await getAnalyticsAttribution(source.value, days.value);
+    attributionData.value = await getAnalyticsAttribution(source.value, days.value, conversionEvent.value);
   } finally {
     attributionLoading.value = false;
   }

@@ -451,6 +451,7 @@ import {
   deleteSegment,
   evaluateSegment,
   importSegmentMembers,
+  listDimensions,
   listSegmentRuns,
   listSegments,
   pageSegmentMembers,
@@ -461,6 +462,7 @@ import {
   reachRetry,
   reachSend,
   updateSegment,
+  type ProfileDimension,
   type ProfileReachBatch,
   type ProfileReachItem,
   type ProfileReachPreview,
@@ -528,6 +530,7 @@ const loadAll = async () => {
   } finally {
     loading.value = false;
   }
+  loadDimensionFields();
 };
 
 const evaluate = async (segment: ProfileSegment) => {
@@ -557,17 +560,28 @@ const dialogVisible = ref(false);
 const saving = ref(false);
 const previewing = ref(false);
 const previewResult = ref<ProfileSegmentPreview | null>(null);
-const fieldOptions = [
+/** 引擎级基础字段(任何源都有) */
+const baseFieldOptions = [
   { label: '总分', value: 'totalScore' },
   { label: '事件数', value: 'eventCount' },
   { label: '最近事件天数', value: 'lastEventDays' },
   { label: '主体类型', value: 'subjectType' },
   { label: '主体 ID', value: 'subjectId' },
-  { label: '显示名称', value: 'displayName' },
-  { label: '维度分：完成率', value: 'dimension.completion' },
-  { label: '维度分：响应时效', value: 'dimension.response' },
-  { label: '维度分：填报质量', value: 'dimension.quality' }
+  { label: '显示名称', value: 'displayName' }
 ];
+/** R2-1: 维度字段随源生成(listDimensions), 只列该源真实启用的维度, 死分群杜绝 */
+const dimensionFields = ref<{ label: string; value: string }[]>([]);
+const fieldOptions = computed(() => [...baseFieldOptions, ...dimensionFields.value]);
+const loadDimensionFields = async () => {
+  try {
+    const dims = await listDimensions(source.value);
+    dimensionFields.value = (dims || [])
+      .filter((d) => d.enabled === '1')
+      .map((d) => ({ label: '维度分：' + d.dimName, value: 'dimension.' + d.dimCode }));
+  } catch {
+    dimensionFields.value = [];
+  }
+};
 const opOptions = [
   { label: '等于', value: 'EQ' },
   { label: '不等于', value: 'NEQ' },

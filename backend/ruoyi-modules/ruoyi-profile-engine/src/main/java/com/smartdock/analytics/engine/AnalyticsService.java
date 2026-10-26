@@ -1008,17 +1008,33 @@ public class AnalyticsService {
         Map<String, Object> out = ActivityCalculator.compute(activeDays, 30);
         List<Map<String, Object>> trend = dailyMapper.selectTrend(tenantId, source,
             new java.sql.Date(from.getTime()), new java.sql.Date(to.getTime()));
-        Map<String, Object> mix = new LinkedHashMap<>();
-        if (!trend.isEmpty()) {
-            Map<String, Object> last = trend.get(trend.size() - 1);
-            mix.put("statDate", last.get("statDate"));
-            mix.put("newVisitors", longValue(last.get("newVisitors")));
-            mix.put("returningVisitors", longValue(last.get("returningVisitors")));
-        }
-        out.put("newVsReturning", mix);
+        out.put("newVsReturning", lastActiveMix(trend));
         out.put("source", source);
         out.put("days", clampedDays);
         return out;
+    }
+
+    /**
+     * R2-1: 最新日新老构成与 DAU 同锚——DAU 卡取事件表最后有数据天, 构成卡原取趋势尾行,
+     * 会被 rebuild 补写的全 0 行顶位(0/0 观感缺陷)。跳过尾部全 0 行, 取最后一个有会话的天。
+     */
+    static Map<String, Object> lastActiveMix(List<Map<String, Object>> trend) {
+        Map<String, Object> mix = new LinkedHashMap<>();
+        for (int i = trend.size() - 1; i >= 0; i--) {
+            Map<String, Object> row = trend.get(i);
+            if (toLong(row.get("newVisitors")) + toLong(row.get("returningVisitors")) <= 0) {
+                continue;
+            }
+            mix.put("statDate", row.get("statDate"));
+            mix.put("newVisitors", toLong(row.get("newVisitors")));
+            mix.put("returningVisitors", toLong(row.get("returningVisitors")));
+            break;
+        }
+        return mix;
+    }
+
+    private static long toLong(Object v) {
+        return v instanceof Number n ? n.longValue() : 0L;
     }
 
     /**
