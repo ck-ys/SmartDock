@@ -634,30 +634,18 @@ public class AnalyticsService {
         for (AnalyticsEventRow event : events) {
             byVisitor.computeIfAbsent(event.getVisitorKey(), key -> new ArrayList<>()).add(event);
         }
+        // R2-3: 每访客先各自走一遍漏斗(整体与拆解组共用, 不重复遍历)
+        long windowMs = windowDays * 24L * 3600L * 1000L;
+        Map<String, FunnelWalk> walks = new LinkedHashMap<>();
+        for (Map.Entry<String, List<AnalyticsEventRow>> entry : byVisitor.entrySet()) {
+            walks.put(entry.getKey(), walkFunnel(entry.getValue(), names, windowMs));
+        }
         long[] counts = new long[names.size()];
         double[] seconds = new double[names.size()];
-        long windowMs = windowDays * 24L * 3600L * 1000L;
-        for (List<AnalyticsEventRow> list : byVisitor.values()) {
-            list.sort(Comparator.comparing(AnalyticsEventRow::getOccurredTime));
-            int step = 0;
-            Date prev = null;
-            for (AnalyticsEventRow event : list) {
-                if (step >= names.size()) {
-                    break;
-                }
-                if (!names.get(step).equals(event.getEventName())) {
-                    continue;
-                }
-                if (step == 0) {
-                    counts[0]++;
-                    prev = event.getOccurredTime();
-                    step = 1;
-                } else if (event.getOccurredTime().getTime() - prev.getTime() <= windowMs) {
-                    counts[step]++;
-                    seconds[step] += (event.getOccurredTime().getTime() - prev.getTime()) / 1000.0;
-                    prev = event.getOccurredTime();
-                    step++;
-                }
+        for (FunnelWalk walk : walks.values()) {
+            for (int i = 0; i < counts.length; i++) {
+                counts[i] += walk.counts()[i];
+                seconds[i] += walk.seconds()[i];
             }
         }
         List<Map<String, Object>> outSteps = new ArrayList<>();
@@ -680,51 +668,182 @@ public class AnalyticsService {
         out.put("visitors", byVisitor.size());
         out.put("steps", outSteps);
         out.put("overallRate", percent(counts.length == 0 ? 0 : counts[counts.length - 1], counts.length == 0 ? 0 : counts[0]));
+        // R2-3 拆解维度: 按访客首步事件 context 分组再各走漏斗, Top10 之外并「其他」;
+        // 各组首步人数之和恒等于整体首步人数(加权守恒), 非法维度直接拒绝
+        String breakdownDim = normalizeBreakdown(bo == null ? null : bo.getBreakdown());
+        if (breakdownDim != null && !byVisitor.isEmpty()) {
+            String contextKey = BREAKDOWN_CONTEXT_KEYS.get(breakdownDim);
+            record GroupRow(String label, long[] gc, int visitors) {
+            }
+            Map<String, GroupRow> groupIndex = new LinkedHashMap<>();
+            for (Map.Entry<String, List<AnalyticsEventRow>> entry : byVisitor.entrySet()) {
+                String label = firstStepContextValue(entry.getValue(), names.get(0), contextKey);
+                long[] walkCounts = walks.get(entry.getKey()).counts();
+                GroupRow row = groupIndex.get(label);
+                if (row == null) {
+                    long[] gc = new long[names.size()];
+                    for (int i = 0; i < names.size(); i++) {
+                        gc[i] = walkCounts[i];
+                    }
+                    groupIndex.put(label, new GroupRow(label, gc, 1));
+                } else {
+                    for (int i = 0; i < names.size(); i++) {
+                        row.gc()[i] += walkCounts[i];
+                    }
+                    groupIndex.put(label, new GroupRow(label, row.gc(), row.visitors() + 1));
+                }
+            }
+            List<GroupRow> groupRows = new ArrayList<>(groupIndex.values());
+            groupRows.sort(Comparator.comparingLong((GroupRow row) -> row.gc()[0]).reversed()
+                .thenComparing(GroupRow::label));
+            List<Map<String, Object>> groups = new ArrayList<>();
+            int kept = Math.min(10, groupRows.size());
+            long[] othersCounts = new long[names.size()];
+            int othersVisitors = 0;
+            for (int i = 0; i < groupRows.size(); i++) {
+                GroupRow row = groupRows.get(i);
+                if (i < kept) {
+                    groups.add(breakdownGroupItem(row.label(), row.gc(), row.visitors(), steps, names));
+                } else {
+                    for (int j = 0; j < names.size(); j++) {
+                        othersCounts[j] += row.gc()[j];
+                    }
+                    othersVisitors += row.visitors();
+                }
+            }
+            if (othersVisitors > 0) {
+                groups.add(breakdownGroupItem("其他", othersCounts, othersVisitors, steps, names));
+            }
+            out.put("breakdown", breakdownDim);
+            out.put("breakdownGroups", groups);
+        }
         return out;
     }
 
-    public Map<String, Object> retention(String source, int days, int window) {
+    /** R2-3 拆解维度 → 首步事件 context 键(渠道/设备/系统/浏览器)。 */
+    private static final Map<String, String> BREAKDOWN_CONTEXT_KEYS = Map.of(
+        "channel", "sourceChannel", "device", "deviceType", "os", "os", "browser", "browser");
+
+    private static String normalizeBreakdown(String breakdown) {
+        if (StringUtils.isBlank(breakdown)) {
+            return null;
+        }
+        String dim = breakdown.trim().toLowerCase();
+        if (!BREAKDOWN_CONTEXT_KEYS.containsKey(dim)) {
+            throw new ServiceException("拆解维度只支持 channel / device / os / browser");
+        }
+        return dim;
+    }
+
+    /** 访客首步事件(最早命中的第 1 步事件)的 context 取值; 缺键/解析失败 → "(未知)"。入参须已按时间排序。
+     * 解析用裸 Jackson(静态), 不走 JsonUtils——后者依赖 Spring 容器, 纯函数单测进不来。 */
+    static String firstStepContextValue(List<AnalyticsEventRow> sorted, String stepOneName, String contextKey) {
+        for (AnalyticsEventRow event : sorted) {
+            if (!stepOneName.equals(event.getEventName())) {
+                continue;
+            }
+            try {
+                com.fasterxml.jackson.databind.JsonNode ctx = BREAKDOWN_JSON.readTree(event.getContext());
+                if (ctx != null && ctx.isObject()) {
+                    com.fasterxml.jackson.databind.JsonNode value = ctx.get(contextKey);
+                    if (value != null && !value.isNull() && StringUtils.isNotBlank(value.asText())) {
+                        return value.asText();
+                    }
+                }
+            } catch (Exception ignored) {
+                // context 非法 JSON 归入 (未知)
+            }
+            return "(未知)";
+        }
+        return "(未知)";
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper BREAKDOWN_JSON =
+        new com.fasterxml.jackson.databind.ObjectMapper();
+
+    private Map<String, Object> breakdownGroupItem(String label, long[] gc, int visitors,
+                                                   List<Map<String, Object>> steps, List<String> names) {
+        List<Map<String, Object>> groupSteps = new ArrayList<>();
+        for (int i = 0; i < names.size(); i++) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("eventName", names.get(i));
+            item.put("name", steps.get(i).get("name") == null ? names.get(i) : steps.get(i).get("name"));
+            item.put("count", gc[i]);
+            item.put("rate", percent(gc[i], gc[0]));
+            groupSteps.add(item);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("label", label);
+        out.put("visitors", visitors);
+        out.put("steps", groupSteps);
+        out.put("overallRate", percent(names.isEmpty() ? 0 : gc[names.size() - 1], names.isEmpty() ? 0 : gc[0]));
+        return out;
+    }
+
+    /** 单访客漏斗推进结果: counts=到达各步人数, seconds=步间耗时秒累计。 */
+    record FunnelWalk(long[] counts, double[] seconds) {
+    }
+
+    /** 单访客事件序列按「首满足顺序」推进漏斗步(纯函数); 超窗不累计, 跨会话回访不超过窗口天数。 */
+    static FunnelWalk walkFunnel(List<AnalyticsEventRow> list, List<String> names, long windowMs) {
+        long[] counts = new long[names.size()];
+        double[] seconds = new double[names.size()];
+        list.sort(Comparator.comparing(AnalyticsEventRow::getOccurredTime).thenComparing(AnalyticsEventRow::getEventId));
+        int step = 0;
+        Date prev = null;
+        for (AnalyticsEventRow event : list) {
+            if (step >= names.size()) {
+                break;
+            }
+            if (!names.get(step).equals(event.getEventName())) {
+                continue;
+            }
+            if (step == 0) {
+                counts[0]++;
+                prev = event.getOccurredTime();
+                step = 1;
+            } else if (event.getOccurredTime().getTime() - prev.getTime() <= windowMs) {
+                counts[step]++;
+                seconds[step] += (event.getOccurredTime().getTime() - prev.getTime()) / 1000.0;
+                prev = event.getOccurredTime();
+                step++;
+            }
+        }
+        return new FunnelWalk(counts, seconds);
+    }
+
+    public Map<String, Object> retention(String source, int days, int window, String granularity, boolean cumulative) {
         requireSource(source);
+        // R2-3: 粒度白名单 day/week/month, 周期=date_trunc 自然对齐(ISO 周/自然月, 不做滚动 30 天)
+        String gran = "week".equals(granularity) || "month".equals(granularity) ? granularity : "day";
         int span = Math.min(Math.max(days, 1), 180);
-        int win = Math.min(Math.max(window, 1), 30);
+        int maxWin = switch (gran) {
+            case "week" -> 26;
+            case "month" -> 24;
+            default -> 30;
+        };
+        int win = Math.min(Math.max(window, 1), maxWin);
         Date from = startOfDaysAgo(span);
         Date to = startOfTomorrow();
         List<Map<String, Object>> rows = sessionMapper.selectRetention(currentTenant(), source,
-            new java.sql.Date(from.getTime()), new java.sql.Date(to.getTime()));
-        Map<String, Map<Integer, Long>> byCohort = new LinkedHashMap<>();
+            new java.sql.Date(from.getTime()), new java.sql.Date(to.getTime()), gran);
+        List<RetentionPeriodCalculator.VisitorPeriod> periods = new ArrayList<>();
         for (Map<String, Object> row : rows) {
-            String cohort = String.valueOf(row.get("cohort"));
-            int offset = (int) longValue(row.get("dayOffset"));
-            if (offset < 0 || offset >= win) {
-                continue;
+            Object cohort = row.get("cohortDate");
+            Object visitor = row.get("visitorId");
+            Object period = row.get("periodDate");
+            if (cohort instanceof java.sql.Date c && period instanceof java.sql.Date p && visitor != null) {
+                periods.add(new RetentionPeriodCalculator.VisitorPeriod(
+                    c.toLocalDate(), String.valueOf(visitor), p.toLocalDate()));
             }
-            byCohort.computeIfAbsent(cohort, key -> new LinkedHashMap<>())
-                .put(offset, longValue(row.get("visitors")));
         }
-        List<Map<String, Object>> cohorts = new ArrayList<>();
-        for (Map.Entry<String, Map<Integer, Long>> entry : byCohort.entrySet()) {
-            long total = entry.getValue().getOrDefault(0, 0L);
-            List<Map<String, Object>> cells = new ArrayList<>();
-            for (int i = 0; i < win; i++) {
-                long visitors = entry.getValue().getOrDefault(i, 0L);
-                Map<String, Object> cell = new LinkedHashMap<>();
-                cell.put("day", i);
-                cell.put("visitors", visitors);
-                cell.put("rate", percent(visitors, total));
-                cells.add(cell);
-            }
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("cohort", entry.getKey());
-            item.put("total", total);
-            item.put("cells", cells);
-            cohorts.add(item);
-        }
-        cohorts.sort(Comparator.comparing(item -> String.valueOf(item.get("cohort"))));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("source", source);
         out.put("days", span);
         out.put("window", win);
-        out.put("cohorts", cohorts);
+        out.put("granularity", gran);
+        out.put("cumulative", cumulative);
+        out.put("cohorts", RetentionPeriodCalculator.compute(periods, win, gran, cumulative));
         return out;
     }
 

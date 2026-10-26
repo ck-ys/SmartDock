@@ -161,26 +161,26 @@ public interface AnalyticsSessionMapper extends BaseMapperPlus<AnalyticsSession,
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
         WITH first_seen AS (
-            SELECT visitor_id, min(started_at::date) AS cohort
+            SELECT visitor_id, date_trunc(#{granularity}, min(started_at))::date AS cohort
             FROM analytics_session
             WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
             GROUP BY visitor_id
         )
-        SELECT to_char(f.cohort, 'YYYY-MM-DD') AS "cohort",
-               (s.started_at::date - f.cohort) AS "dayOffset",
-               count(DISTINCT s.visitor_id) AS "visitors"
+        SELECT f.cohort AS "cohortDate", s.visitor_id AS "visitorId",
+               date_trunc(#{granularity}, s.started_at)::date AS "periodDate"
         FROM analytics_session s
         JOIN first_seen f ON f.visitor_id = s.visitor_id
         WHERE s.tenant_id = #{tenantId} AND s.source = #{source} AND s.del_flag = '0'
           AND f.cohort >= #{from}::date AND f.cohort <= #{to}::date
           AND s.started_at::date <= #{to}::date
-        GROUP BY 1, 2
-        ORDER BY 1, 2
+        GROUP BY 1, 2, 3
+        ORDER BY 1, 3
         """)
     List<Map<String, Object>> selectRetention(@Param("tenantId") String tenantId,
                                               @Param("source") String source,
                                               @Param("from") Date from,
-                                              @Param("to") Date to);
+                                              @Param("to") Date to,
+                                              @Param("granularity") String granularity);
 
     /**
      * 归因触点（批8）：访客的每次带渠道来源的访问，按时间升序。

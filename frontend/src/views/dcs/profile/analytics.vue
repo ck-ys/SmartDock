@@ -295,6 +295,13 @@
                 <el-select v-model="funnelId" placeholder="选择漏斗" style="width: 220px" @change="loadFunnelResult">
                   <el-option v-for="f in funnels" :key="f.funnelId" :label="`${f.funnelName} · ${f.windowDays}天`" :value="f.funnelId" />
                 </el-select>
+                <el-select v-model="funnelBreakdown" style="width: 132px" @change="loadFunnelResult">
+                  <el-option label="整体口径" value="" />
+                  <el-option label="按渠道拆解" value="channel" />
+                  <el-option label="按设备拆解" value="device" />
+                  <el-option label="按系统拆解" value="os" />
+                  <el-option label="按浏览器拆解" value="browser" />
+                </el-select>
                 <el-button v-hasPermi="['analytics:center:edit']" type="primary" @click="openFunnelDialog()">新建漏斗</el-button>
                 <el-button v-if="currentFunnel" v-hasPermi="['analytics:center:edit']" @click="openFunnelDialog(currentFunnel)">编辑</el-button>
                 <el-button
@@ -341,6 +348,27 @@
                 </div>
               </div>
             </div>
+            <template v-if="funnelResult.breakdownGroups?.length">
+              <el-table class="ui-table" :data="funnelResult.breakdownGroups" style="margin-top: 14px">
+                <el-table-column prop="label" label="拆解组" min-width="120" fixed />
+                <el-table-column prop="visitors" label="首步人数" width="96" align="right" />
+                <el-table-column v-for="(gs, gi) in funnelResult.steps" :key="`bg-${gi}`" min-width="104" align="center">
+                  <template #header>
+                    <span>第{{ gi + 1 }}步 {{ gs.name || gs.eventName }}</span>
+                  </template>
+                  <template #default="{ row }">
+                    <span>{{ row.steps?.[gi]?.count ?? 0 }}</span>
+                    <span class="muted small">（{{ formatPercent(row.steps?.[gi]?.rate) }}）</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="整体转化" width="100" align="right">
+                  <template #default="{ row }">{{ formatPercent(row.overallRate) }}</template>
+                </el-table-column>
+              </el-table>
+              <div class="muted small" style="margin-top: 6px">
+                拆解口径: 按访客首步事件的「{{ funnelBreakdownLabel }}」取值分组(Top10 之外并入「其他」), 各组首步人数之和 = 整体首步人数。
+              </div>
+            </template>
           </template>
         </el-card>
 
@@ -410,11 +438,18 @@
             <div class="panel-head">
               <span>访客留存</span>
               <div class="head-actions">
-                <el-select v-model="retentionWindow" style="width: 130px" @change="loadRetention">
-                  <el-option label="7 天窗口" :value="7" />
-                  <el-option label="14 天窗口" :value="14" />
-                  <el-option label="30 天窗口" :value="30" />
+                <el-select v-model="retentionGranularity" style="width: 92px" @change="onRetentionGranularityChange">
+                  <el-option label="按日" value="day" />
+                  <el-option label="按周" value="week" />
+                  <el-option label="按月" value="month" />
                 </el-select>
+                <el-select v-model="retentionWindow" style="width: 118px" @change="loadRetention">
+                  <el-option v-for="w in retentionWindowOptions" :key="w.value" :label="w.label" :value="w.value" />
+                </el-select>
+                <el-radio-group v-model="retentionCumulative" size="small" @change="loadRetention">
+                  <el-radio-button :value="false">恰好第N{{ retentionUnit }}</el-radio-button>
+                  <el-radio-button :value="true">该期或之后</el-radio-button>
+                </el-radio-group>
               </div>
             </div>
           </template>
@@ -422,7 +457,7 @@
             <el-table class="ui-table retention-table" :data="retention.cohorts">
               <el-table-column prop="cohort" label="首次访问" width="120" fixed />
               <el-table-column prop="total" label="新增访客" width="96" align="right" />
-              <el-table-column v-for="i in retention.window" :key="i" :label="`第 ${i - 1} 天`" min-width="78" align="center">
+              <el-table-column v-for="i in retention.window" :key="i" :label="`第 ${i - 1} ${retentionUnit}`" min-width="78" align="center">
                 <template #default="{ row }">
                   <div class="retention-cell" :style="retentionStyle(row.cells[i - 1])">
                     <strong>{{ row.cells[i - 1]?.visitors ?? 0 }}</strong>
@@ -872,9 +907,37 @@ const funnelForm = reactive<{
   ]
 });
 const currentFunnel = computed(() => funnels.value.find((f) => f.funnelId === funnelId.value));
+// R2-3: 漏斗拆解维度(整体/渠道/设备/系统/浏览器)
+const funnelBreakdown = ref('');
+const funnelBreakdownLabel = computed(() => ({ channel: '渠道', device: '设备', os: '系统', browser: '浏览器' }[funnelBreakdown.value] || '整体'));
 
 const retention = ref<Partial<AnalyticsRetention>>({ cohorts: [], window: 7, days: 30 });
 const retentionWindow = ref(7);
+// R2-3: 留存粒度(日/周/月自然对齐) + 恰好/累计两种口径
+const retentionGranularity = ref('day');
+const retentionCumulative = ref(false);
+const retentionUnit = computed(() => ({ day: '天', week: '周', month: '月' }[retentionGranularity.value] || '天'));
+const retentionWindowOptions = computed(() => ({
+  day: [
+    { label: '7 天窗口', value: 7 },
+    { label: '14 天窗口', value: 14 },
+    { label: '30 天窗口', value: 30 }
+  ],
+  week: [
+    { label: '4 周窗口', value: 4 },
+    { label: '8 周窗口', value: 8 },
+    { label: '12 周窗口', value: 12 }
+  ],
+  month: [
+    { label: '3 月窗口', value: 3 },
+    { label: '6 月窗口', value: 6 },
+    { label: '12 月窗口', value: 12 }
+  ]
+}[retentionGranularity.value] || []));
+const onRetentionGranularityChange = () => {
+  retentionWindow.value = retentionWindowOptions.value[0]?.value || 7;
+  loadRetention();
+};
 const retentionLoading = ref(false);
 
 const sessionQuery = reactive<AnalyticsSessionQuery>({
@@ -1049,7 +1112,7 @@ let loadFunnelResult = async () => {
     return;
   }
   const [result, loss] = await Promise.all([
-    previewAnalyticsFunnel({ funnelId: funnelId.value, days: days.value }),
+    previewAnalyticsFunnel({ funnelId: funnelId.value, days: days.value, breakdown: funnelBreakdown.value || undefined }),
     getAnalyticsFunnelLoss({ funnelId: funnelId.value, days: days.value })
   ]);
   funnelResult.value = result;
@@ -1145,7 +1208,7 @@ const parseSteps = (raw: string | AnalyticsFunnelStepDef[] | undefined): Analyti
 let loadRetention = async () => {
   retentionLoading.value = true;
   try {
-    retention.value = await getAnalyticsRetention(source.value, days.value, retentionWindow.value);
+    retention.value = await getAnalyticsRetention(source.value, days.value, retentionWindow.value, retentionGranularity.value, retentionCumulative.value);
   } finally {
     retentionLoading.value = false;
   }

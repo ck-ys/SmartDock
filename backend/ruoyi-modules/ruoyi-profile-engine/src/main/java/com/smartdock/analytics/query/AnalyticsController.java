@@ -100,8 +100,10 @@ public class AnalyticsController {
     @GetMapping("/retention")
     public R<Map<String, Object>> retention(@RequestParam String source,
                                             @RequestParam(defaultValue = "30") int days,
-                                            @RequestParam(defaultValue = "7") int window) {
-        return R.ok(analyticsService.retention(source, days, window));
+                                            @RequestParam(defaultValue = "7") int window,
+                                            @RequestParam(defaultValue = "day") String granularity,
+                                            @RequestParam(defaultValue = "false") boolean cumulative) {
+        return R.ok(analyticsService.retention(source, days, window, granularity, cumulative));
     }
 
     @SaCheckPermission("analytics:center:query")

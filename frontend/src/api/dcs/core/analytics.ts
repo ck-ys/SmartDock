@@ -169,6 +169,13 @@ export interface AnalyticsFunnelStepResult extends AnalyticsFunnelStepDef {
   avgSeconds: number | string;
 }
 
+export interface AnalyticsFunnelBreakdownGroup {
+  label: string;
+  visitors: number;
+  steps: { eventName: string; name?: string; count: number; rate: number | string }[];
+  overallRate: number | string;
+}
+
 export interface AnalyticsFunnelResult {
   funnelId?: string;
   source: string;
@@ -177,6 +184,9 @@ export interface AnalyticsFunnelResult {
   visitors: number;
   steps: AnalyticsFunnelStepResult[];
   overallRate: number | string;
+  /** R2-3 拆解维度 channel/device/os/browser, 空=整体口径 */
+  breakdown?: string;
+  breakdownGroups?: AnalyticsFunnelBreakdownGroup[];
 }
 
 export interface AnalyticsFunnelSaveBo {
@@ -206,6 +216,10 @@ export interface AnalyticsRetention {
   source: string;
   days: number;
   window: number;
+  /** R2-3 粒度 day/week/month(自然周=ISO 周一, 自然月) */
+  granularity?: string;
+  /** R2-3 口径: false=恰好第N期, true=该期或之后 */
+  cumulative?: boolean;
   cohorts: AnalyticsRetentionCohort[];
 }
 
@@ -264,11 +278,11 @@ export const saveAnalyticsFunnel = (data: AnalyticsFunnelSaveBo) => r<AnalyticsF
 
 export const deleteAnalyticsFunnel = (funnelId: string) => r<boolean>({ url: `${BASE}/funnel/${funnelId}/delete`, method: 'post' });
 
-export const previewAnalyticsFunnel = (data: AnalyticsFunnelSaveBo & { funnelId?: string; days?: number }) =>
+export const previewAnalyticsFunnel = (data: AnalyticsFunnelSaveBo & { funnelId?: string; days?: number; breakdown?: string }) =>
   r<AnalyticsFunnelResult>({ url: `${BASE}/funnel/preview`, method: 'post', data });
 
-export const getAnalyticsRetention = (source: string, days = 30, window = 7) =>
-  r<AnalyticsRetention>({ url: `${BASE}/retention`, method: 'get', params: { source, days, window } });
+export const getAnalyticsRetention = (source: string, days = 30, window = 7, granularity = 'day', cumulative = false) =>
+  r<AnalyticsRetention>({ url: `${BASE}/retention`, method: 'get', params: { source, days, window, granularity, cumulative } });
 
 export const runAnalyticsCustom = (data: AnalyticsCustomBo) => r<AnalyticsCustomResult>({ url: `${BASE}/custom`, method: 'post', data });
 

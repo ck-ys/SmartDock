@@ -40,5 +40,8 @@ public class AnalyticsFunnelBo implements Serializable {
     /** 预览用：临时步骤/窗口，不落库 */
     private Boolean preview;
 
+    /** R2-3 拆解维度: channel/device/os/browser(按访客首步事件 context 取值), 空=整体口径 */
+    private String breakdown;
+
     private Integer days = 30;
 }

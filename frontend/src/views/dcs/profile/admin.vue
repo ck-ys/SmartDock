@@ -207,7 +207,7 @@ const resuming = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 
 const statusText = (s?: string) => (({ RUNNING: '重算中', DONE: '完成', FAILED: '失败' }) as Record<string, string>)[s || ''] || s || '—';
-const statusTone = (s?: string) => (({ RUNNING: 'info', DONE: 'success', FAILED: 'danger' }) as Record<string, string>)[s || ''] || 'info';
+const statusTone = (s?: string): 'info' | 'success' | 'danger' => (({ RUNNING: 'info', DONE: 'success', FAILED: 'danger' }) as Record<string, 'info' | 'success' | 'danger'>)[s || ''] || 'info';
 
 const pollBatch = () => {
   if (pollTimer) clearInterval(pollTimer);
