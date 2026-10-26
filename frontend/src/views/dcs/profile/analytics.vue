@@ -105,32 +105,17 @@
             <strong class="ui-kpi__value">{{ formatPercent(overview.current?.newRate) }}</strong>
             <span class="ui-kpi__hint">新 {{ overview.current?.newVisitors ?? 0 }} / 回访 {{ overview.current?.returningVisitors ?? 0 }}</span>
           </div>
-          <div class="ui-kpi">
-            <span class="ui-kpi__label">跳出率</span>
-            <strong class="ui-kpi__value">{{ formatPercent(overview.current?.bounceRate) }}</strong>
-            <span class="ui-kpi__hint delta" :class="deltaTone('bounceRate')">{{ deltaText('bounceRate') }}</span>
-          </div>
-          <div class="ui-kpi">
-            <span class="ui-kpi__label">平均停留</span>
-            <strong class="ui-kpi__value">{{ formatDuration(overview.current?.avgDuration) }}</strong>
-            <span class="ui-kpi__hint delta" :class="deltaTone('avgDuration')">{{ deltaText('avgDuration') }}</span>
-          </div>
-          <div class="ui-kpi">
-            <span class="ui-kpi__label">每次访问页数</span>
-            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.pagesPerVisit, 2) }}</strong>
-            <span class="ui-kpi__hint delta" :class="deltaTone('pagesPerVisit')">{{ deltaText('pagesPerVisit') }}</span>
-          </div>
-          <div class="ui-kpi">
-            <span class="ui-kpi__label">事件数</span>
-            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.events) }}</strong>
-            <span class="ui-kpi__hint">会话 {{ formatNumber(overview.current?.visits) }} 次</span>
-          </div>
+          <!-- U-22：跳出/停留/页次/事件数四个次要指标降级，并入下方流量趋势卡头部小字（8 格收 4 格） -->
         </div>
 
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="panel-head">
               <span>流量趋势</span>
+              <span class="muted trend-sub" v-if="overview.current">
+                跳出 {{ formatPercent(overview.current?.bounceRate) }} · 停留 {{ formatDuration(overview.current?.avgDuration) }} · 页次
+                {{ formatNumber(overview.current?.pagesPerVisit, 2) }} · 事件 {{ formatNumber(overview.current?.events) }}
+              </span>
             </div>
           </template>
           <v-chart v-if="hasOverviewData" class="trend-chart" :option="trendOption" autoresize />
@@ -964,6 +949,8 @@ const retentionLoading = ref(false);
 // R2-4 下钻: 渠道/设备/浏览器/地域 四表行点击 → 访问明细带筛选直达
 const sessionRange = ref<[string, string] | null>(null);
 const drillToSessions = (type: string, row: AnalyticsBreakdownRow) => {
+  // 三审 P2: 「(未知)」是库里空值的展示兜底, 按它当筛选条件必然查空——不下钻
+  if (!row.label || row.label === '(未知)') return;
   tab.value = 'sessions';
   Object.assign(sessionQuery, {
     keyword: '', channel: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1
@@ -1012,6 +999,10 @@ const loadMyReports = async () => {
 const applyMyReport = (id?: string) => {
   const rep = myReports.value.find((x) => x.reportId === id);
   if (!rep) return;
+  // 三审 P2: 视图存了哪套源就切回哪套源, 否则保存的是 order、打开时还查着 web
+  if (rep.source && rep.source !== source.value) {
+    source.value = rep.source;
+  }
   customForm.dimension = rep.dimension;
   customForm.metric = rep.metric;
   customForm.limit = rep.limitRows;
@@ -1019,6 +1010,7 @@ const applyMyReport = (id?: string) => {
     days.value = rep.days;
     daysMode.value = PRESET_DAYS.has(rep.days) ? String(rep.days) : 'custom';
   }
+  syncQuery();
   loadCustom();
 };
 const openSaveReport = async () => {
@@ -1335,7 +1327,12 @@ const searchSessions = () => {
 };
 
 const resetSessions = () => {
-  Object.assign(sessionQuery, { keyword: '', channel: '', deviceType: '', bounce: '', pageNum: 1 });
+  // 三审 P2(dsflash): browser/country/fromDate/toDate 是下钻写入的隐藏筛选, 重置必须一并清掉,
+  // 否则用户点完重置仍被看不见的条件过滤
+  sessionRange.value = null;
+  sessionQuery.fromDate = undefined;
+  sessionQuery.toDate = undefined;
+  Object.assign(sessionQuery, { keyword: '', channel: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1 });
   loadSessions();
 };
 
@@ -1760,7 +1757,9 @@ const deltaTone = (key: string) => {
 };
 
 onMounted(async () => {
-  await Promise.all([loadOverview(), loadBreakdowns()]);
+  // 三审 P2: 按 URL 恢复的 tab 首挂就要有数据——reloadCurrent 覆盖全部页签,
+  // overview 默认态与原 Promise.all 完全等价, 不会多拉
+  await reloadCurrent();
   // R2-4 我的视图: 无权限(403)时静默为空列表, 下拉只显示占位
   loadMyReports();
 });

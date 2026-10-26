@@ -131,8 +131,9 @@ public class AnalyticsController {
 
     /**
      * 批5B 日汇总兜底: 跨租户补指定自然日(空=昨日)的会话+日汇总, 与凌晨定时任务同入口。
+     * 三审 P1: 独立权限位——该操作遍历全部租户, 不能复用租户级的分析编辑权限。
      */
-    @SaCheckPermission("analytics:center:edit")
+    @SaCheckPermission("analytics:backfill:run")
     @Log(title = "分析中心-补日汇总", businessType = BusinessType.UPDATE)
     @RepeatSubmit
     @PostMapping("/backfill-daily")

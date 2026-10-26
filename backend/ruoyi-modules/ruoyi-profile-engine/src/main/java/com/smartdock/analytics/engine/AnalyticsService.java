@@ -33,6 +33,7 @@ import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -218,7 +219,8 @@ public class AnalyticsService {
                     // 单源失败不拖垮整轮(如 R2-5 水位拦截=窗口已归档, 属预期跳过)
                     log.warn("[Analytics] daily backfill skipped tenant={} source={} day={} err={}",
                         tenantId, source, target, e.getMessage());
-                    failed.add(source);
+                    // 三审 P2: 失败名单带租户前缀——多租户轮里只有源名分不清是谁家的
+                    failed.add(tenantId + ":" + source);
                 }
             }
         } finally {
@@ -824,7 +826,9 @@ public class AnalyticsService {
         requireSource(source);
         // R2-3: 粒度白名单 day/week/month, 周期=date_trunc 自然对齐(ISO 周/自然月, 不做滚动 30 天)
         String gran = "week".equals(granularity) || "month".equals(granularity) ? granularity : "day";
-        int span = Math.min(Math.max(days, 1), 180);
+        // 三审 P2(dsflash): span 上限对齐前端 1-365 天档——原 180 静默截断,
+        // 用户选 365 天留存拿到 180 天还不自知; 月粒度 12 周期窗口也依赖 365 天
+        int span = Math.min(Math.max(days, 1), 365);
         int maxWin = switch (gran) {
             case "week" -> 26;
             case "month" -> 24;
@@ -958,9 +962,29 @@ public class AnalyticsService {
         target.setUpdateTime(now);
         target.setCreateTime(target.getCreateTime() == null ? now : target.getCreateTime());
         if (update) {
-            reportMapper.updateById(target);
+            // 三审 P2: 更新 0 行=并发期被删, 静默假成功比报错更误导
+            if (reportMapper.updateById(target) == 0) {
+                throw new ServiceException("视图已被删除, 请刷新后重试");
+            }
         } else {
-            reportMapper.insert(target);
+            try {
+                reportMapper.insert(target);
+            } catch (DuplicateKeyException e) {
+                // 三审 P2: 双开窗口同名并发保存撞 uk(租户+人+名)——重查命中行转覆盖更新
+                AnalyticsCustomReport winner = reportMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AnalyticsCustomReport>()
+                            .eq(AnalyticsCustomReport::getTenantId, tenantId)
+                            .eq(AnalyticsCustomReport::getCreateBy, userId)
+                            .eq(AnalyticsCustomReport::getReportName, name)
+                            .last("LIMIT 1"))
+                    .stream().findFirst().orElse(null);
+                if (winner == null) {
+                    throw new ServiceException("保存冲突, 请重试");
+                }
+                target.setReportId(winner.getReportId());
+                target.setCreateTime(winner.getCreateTime());
+                reportMapper.updateById(target);
+            }
         }
         return target.getReportId();
     }
@@ -985,7 +1009,8 @@ public class AnalyticsService {
             throw new ServiceException("CSV 内容不能为空");
         }
         // 内存防线: 5000 行限制要在解析前拦住超大输入, 否则先全量解析已把内存吃满
-        if (bo.getCsv().length() > 5_000_000) {
+        // 三审 P2(dsflash): 按 UTF-8 字节数判——length() 数的是 UTF-16 字符, 中文 CSV 能放行到约 15MB
+        if (bo.getCsv().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 5 * 1024 * 1024) {
             throw new ServiceException("CSV 内容过大(>5MB), 请分批导入");
         }
         List<List<String>> rows = parseCsv(bo.getCsv());

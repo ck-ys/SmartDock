@@ -427,7 +427,14 @@ public class ProfileSegmentService {
             run.setStatus("FAILED");
             run.setErrorMsg(StringUtils.substring(String.valueOf(e.getMessage()), 0, 2000));
             run.setFinishedAt(new Date());
-            runMapper.insert(run);
+            // 三审 P2: 事务内已把 memberCount 改成 n, 回滚后实际成员=0, 留痕行不能带脏值
+            run.setMemberCount(0);
+            try {
+                runMapper.insert(run);
+            } catch (Exception ex) {
+                // 留痕行自身失败不能吃掉原始异常(如库已不可用)
+                log.error("[Profile] segment FAILED 留痕行写入失败 segment={} : {}", segment.getSegmentId(), ex.getMessage());
+            }
         }
         return run;
     }

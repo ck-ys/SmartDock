@@ -958,7 +958,9 @@ INSERT INTO public.sys_role_menu (role_id, menu_id) VALUES (1, 11989);
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11992, '分析报表查询', 11986, 15, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:report:query', '#', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '自定义分析视图列表');
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11993, '分析报表保存', 11986, 16, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:report:save', '#', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '保存/覆盖自定义分析视图');
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11994, '分析报表删除', 11986, 17, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:report:remove', '#', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '删除自定义分析视图');
-INSERT INTO public.sys_role_menu (role_id, menu_id) VALUES (1, 11992), (1, 11993), (1, 11994);
+-- 三审 P1: 跨租户补数是运维级操作, 独立权限位, 只授超管
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (11995, '日汇总补数', 11986, 18, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:backfill:run', '#', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '手工触发跨租户日汇总补数(遍历所有租户)');
+INSERT INTO public.sys_role_menu (role_id, menu_id) VALUES (1, 11992), (1, 11993), (1, 11994), (1, 11995);
 INSERT INTO public.sys_role_menu (role_id, menu_id)
 SELECT 6, m.menu_id FROM (VALUES (11992), (11993), (11994)) AS m(menu_id)
 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)

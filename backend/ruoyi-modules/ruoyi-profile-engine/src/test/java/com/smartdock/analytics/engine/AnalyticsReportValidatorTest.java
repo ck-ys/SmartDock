@@ -23,10 +23,16 @@ class AnalyticsReportValidatorTest {
     }
 
     @Test
-    void dimensionDefaultsToDay() {
+    void dimensionDefaultsToDayAndWhitelisted() {
         assertEquals("day", AnalyticsReportValidator.normalizeDimension(null));
         assertEquals("channel", AnalyticsReportValidator.normalizeDimension(" Channel "));
+        // 三审 P2: 白名单口径与 custom() 一致——12 个合法维度全过, 其余一律拒
+        for (String dim : AnalyticsReportValidator.DIMENSIONS) {
+            assertEquals(dim, AnalyticsReportValidator.normalizeDimension(dim));
+        }
         assertThrows(ServiceException.class, () -> AnalyticsReportValidator.normalizeDimension("d".repeat(51)));
+        assertThrows(ServiceException.class, () -> AnalyticsReportValidator.normalizeDimension("evil_injection"));
+        assertThrows(ServiceException.class, () -> AnalyticsReportValidator.normalizeDimension("DAY;drop"));
     }
 
     @Test

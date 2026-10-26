@@ -47,11 +47,13 @@ public interface AnalyticsRebuildLogMapper extends BaseMapperPlus<AnalyticsRebui
                                                    @Param("source") String source,
                                                    @Param("from") Date from);
 
-    /** 上次成功重建的完成时间(算积压: 此后写入的事件都还算"未被重建消化")。 */
+    /** 上次成功重建的完成时间(算积压: 此后写入的事件都还算"未被重建消化")。
+     * 三审 P2: 排除 BACKFILL——每日兜底只补昨日一天, 若计入会掩盖 RECENT 链停摆的真积压。 */
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
         SELECT max(finished_at) FROM analytics_rebuild_log
         WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND kind <> 'BACKFILL'
         """)
     Date selectLastFinishedAt(@Param("tenantId") String tenantId, @Param("source") String source);
 

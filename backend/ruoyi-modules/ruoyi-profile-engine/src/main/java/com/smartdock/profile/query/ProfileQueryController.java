@@ -53,7 +53,8 @@ public class ProfileQueryController {
     @GetMapping("/source/list")
     public R<Map<String, Object>> sourceList() {
         Map<String, Object> out = new LinkedHashMap<>();
-        String tenantId = String.valueOf(org.dromara.common.satoken.utils.LoginHelper.getTenantId());
+        // 三审 P2: 取当前生效租户(超管动态切换后下拉要跟着走), 登录租户在切换态下是错的
+        String tenantId = String.valueOf(org.dromara.common.tenant.helper.TenantHelper.getTenantId());
         out.put("subjectSources", subjectMapper.selectSubjectSources(tenantId));
         out.put("eventSources", eventMapper.selectEventSources(tenantId));
         return R.ok(out);

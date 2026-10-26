@@ -171,7 +171,10 @@ public interface AnalyticsSessionMapper extends BaseMapperPlus<AnalyticsSession,
         FROM analytics_session s
         JOIN first_seen f ON f.visitor_id = s.visitor_id
         WHERE s.tenant_id = #{tenantId} AND s.source = #{source} AND s.del_flag = '0'
-          AND f.cohort >= #{from}::date AND f.cohort <= #{to}::date
+          -- 三审 P2(dsflash): from 先按粒度截断再比较——from 是任意日期, 周/月粒度下
+          -- 首个不完整周期的 cohort(如 days=30 从 09-27 起, 9 月首访者 cohort=09-01)
+          -- 若不截断会被 >= from 整段排除, 丢掉一批真实首访者
+          AND f.cohort >= date_trunc(#{granularity}, #{from}::date) AND f.cohort <= #{to}::date
           AND s.started_at::date <= #{to}::date
         GROUP BY 1, 2, 3
         ORDER BY 1, 3

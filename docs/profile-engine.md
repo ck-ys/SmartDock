@@ -67,10 +67,10 @@
 |---|---|---|
 | `source` | ✅ | 业务源标识，与协议登记一致；维度 / 模型 / 分群 / 保留期按它隔离 |
 | `eventName` | ✅ | 事件名，点分命名（`order.paid` / `page_view`） |
-| `eventUid` | 发布必填 | 幂等键：`(tenant, source, eventUid)` 重复投递返回 `false` 不报错；CSV 留空自动生成 `csv-<uuid>` |
-| `subjectType` / `subjectId` | ✅ | 主体类型（默认 `user`）与 ID；分析优先认登录主体 |
-| `anonymousId` | 匿名事件必填 | 未登录访客 ID；与登录主体自动归并，绝不互搬身份 |
-| `sessionId` | 建议 | 显式会话 ID（`s-` 前缀）；缺省按 30 分钟无操作切分 |
+| `eventUid` | 发布必填 | 幂等键（≤128 字符）：`(tenant, source, eventUid)` 重复投递返回 `false` 不报错；CSV 留空自动生成 `csv-<uuid>` |
+| `subjectType` / `subjectId` | `subjectId` 必填 | 主体 ID 必填；`subjectType` 可空回落 `user`；分析优先认登录主体 |
+| `anonymousId` | 建议 | 未登录访客 ID（匿名事件建议携带）；与登录主体自动归并，绝不互搬身份 |
+| `sessionId` | 建议 | 显式会话 ID；缺省按 30 分钟无操作切分 |
 | `occurredTime` | 建议 | 事件发生时间；缺省取落库时间 |
 | `schemaVersion` | 可选 | Schema 版本号（如 `1-0-0`），配合轻校验 |
 | `props` / `context` / `traits` | 可选 | 业务属性 / 页面上下文 / 主体标签，均为 JSON 对象；派生属性（响应时长、质量分）由业务算好放 `props` |

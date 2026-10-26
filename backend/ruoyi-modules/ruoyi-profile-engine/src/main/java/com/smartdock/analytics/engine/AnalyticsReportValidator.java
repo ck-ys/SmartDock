@@ -18,6 +18,11 @@ public final class AnalyticsReportValidator {
     /** 指标白名单与 custom() 运行口径一致 */
     public static final Set<String> METRICS = Set.of("pv", "uv", "visits", "events");
 
+    /** 维度白名单与 custom()/breakdown() 运行口径一致(day 走趋势, 其余走拆解) */
+    public static final Set<String> DIMENSIONS = Set.of(
+        "day", "channel", "device", "browser", "os", "geo", "entry", "exit", "campaign",
+        "page", "search", "event");
+
     public static String normalizeName(String name) {
         if (StringUtils.isBlank(name)) {
             throw new ServiceException("视图名不能为空");
@@ -34,8 +39,9 @@ public final class AnalyticsReportValidator {
             return "day";
         }
         String trimmed = dimension.trim().toLowerCase();
-        if (trimmed.length() > 50) {
-            throw new ServiceException("维度名非法");
+        // 三审 P2: 收敛为白名单——原长度校验只挡超长, 任意串会存进视图、打开时才炸
+        if (!DIMENSIONS.contains(trimmed)) {
+            throw new ServiceException("维度只支持 day / channel / device / browser / os / geo / entry / exit / campaign / page / search / event");
         }
         return trimmed;
     }
