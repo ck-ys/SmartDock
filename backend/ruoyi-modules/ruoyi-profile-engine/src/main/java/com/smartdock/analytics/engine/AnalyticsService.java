@@ -190,7 +190,12 @@ public class AnalyticsService {
     public Map<String, Object> backfillDaily(String day) {
         LocalDate target = parseBackfillDay(day);
         Date from = Date.from(target.atStartOfDay(ZoneId.systemDefault()).toInstant());
-        Date to = Date.from(target.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        // 三审 P1-2 回修: 右界多放宽一天(封顶明天零点)——只到 D+1 零点会读不到跨零点会话
+        // 落在次日的事件, 重插的会话行被截断、昨天的 PV/跳出/时长跟着改坏; 放宽后与
+        // rebuildRecent「最近两天」同窗, 跨零点会话完整重算, 顺带把今天的行也幂等刷一遍。
+        Date twoDaysLater = Date.from(target.plusDays(2).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date tomorrow = startOfTomorrow();
+        Date to = twoDaysLater.after(tomorrow) ? tomorrow : twoDaysLater;
         // 候选(租户,源): 目标日前一天起有事件——与 rebuildRecent"最近两天"口径一致
         Date pairsSince = new Date(from.getTime() - 24L * 3600_000L);
         List<Map<String, Object>> pairs = TenantHelper.ignore(() ->

@@ -20,9 +20,12 @@ import java.util.Map;
 @Mapper
 public interface AnalyticsDailyMapper extends BaseMapperPlus<AnalyticsDaily, AnalyticsDaily> {
 
+    /** 三审 P1-1 回修: 半开区间 [from, to)——BETWEEN 双端含会把窗口右界那天(to)的行
+     *  删掉而不重算(datesBetween 左闭右开), backfill [D, D+1) 曾误删 D+1 行。 */
     @Delete("""
         DELETE FROM analytics_daily
-        WHERE tenant_id = #{tenantId} AND source = #{source} AND stat_date BETWEEN #{from} AND #{to}
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND stat_date >= #{from} AND stat_date < #{to}
         """)
     int deleteRange(@Param("tenantId") String tenantId,
                     @Param("source") String source,
