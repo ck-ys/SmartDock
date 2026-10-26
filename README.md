@@ -39,7 +39,7 @@ SmartDock 是一套**通用智能体引擎**与**用户画像引擎**的参考�
   <a href="docs/profile-engine.md">画像引擎</a>
 </p>
 
-<sub>截图更新于 v1.0.0；界面数据由 `backend/script/demo/seed-analytics-demo.js` 生成的合成演示数据，不含真实个人信息。</sub>
+<sub>截图更新于 v3.28.1（双主题默认 T1 深蓝稳重）；界面数据由 `backend/script/demo/seed-analytics-demo.js` 生成的合成演示数据，不含真实个人信息。</sub>
 
 ## 目录
 
