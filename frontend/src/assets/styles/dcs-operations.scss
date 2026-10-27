@@ -59,6 +59,10 @@
   margin-top: 18px;
 }
 
+/* 2026-10-27 重构批4：四张指标卡去掉左侧 3px 彩条（原来四格同色蓝条纯装饰，
+   和首页 KPI 条「一个容器切格、只留 1px 分隔」是两套写法）。
+   现在指标卡与首页同一口径：安静的白卡 + 墨色数字，颜色只留给真正要人动手的状态。
+   tone 变体保留在 API 上不删（页面传参不受影响），只是不再染色条 */
 .dcs-ops-metric {
   position: relative;
   min-height: 92px;
@@ -67,24 +71,6 @@
   background: var(--el-bg-color);
   border: 1px solid var(--app-border, var(--el-border-color-lighter));
   border-radius: var(--app-card-radius, 10px);
-}
-
-/* 四个指标条统一用唯一数据色：状态色留给真正的状态标签，不做装饰。
-   tone 在这一层只管装饰条，不管数字：数字染色是页面自己的决定（哪些数算「要人动手」）。
-   若在此处按 --warning/--danger 统一染数字，所有复用页头的页面会被一起染上 */
-.dcs-ops-metric::before {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--app-accent);
-  content: '';
-}
-
-.dcs-ops-metric--success::before,
-.dcs-ops-metric--warning::before,
-.dcs-ops-metric--danger::before,
-.dcs-ops-metric--neutral::before {
-  background: var(--app-accent);
 }
 
 .dcs-ops-metric__label,
