@@ -702,29 +702,27 @@ onMounted(() => {
     }
   }
 }
+/* 2026-10-27 重构批5：登录按钮原来是「藏青→蓝渐变 + 24px 投影 + 2px 字距」，
+   产品内所有主按钮都是纯色无投影——首屏最显眼的按钮不该是另一套语言。
+   改纯色 var(--app-primary)，去投影去字距，字号落到六档里的 15 */
 .login-submit {
   width: 100%;
-  height: 52px;
+  height: 48px;
   border: 0;
   border-radius: var(--app-control-radius);
-  background: linear-gradient(120deg, #0b1f5c, #2f5fd0);
-  box-shadow: 0 10px 24px rgba(11, 31, 92, 0.24);
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  transition:
-    transform 0.16s ease,
-    box-shadow 0.16s ease,
-    filter 0.16s ease;
+  background: var(--app-primary);
+  box-shadow: none;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  transition: filter 0.16s ease;
 
   &:hover:not(.is-disabled) {
     filter: brightness(1.06);
-    transform: translateY(-1px);
-    box-shadow: 0 14px 28px rgba(11, 31, 92, 0.28);
   }
 
   &:active:not(.is-disabled) {
-    transform: translateY(0);
+    filter: brightness(0.96);
   }
 }
 .login-form__register {

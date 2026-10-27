@@ -193,13 +193,15 @@ const agreementHref = (path: string) => router.resolve(path).href;
   text-align: center;
   user-select: none;
 }
+/* 2026-10-27 重构批5：30px + 2px 字距是全站最大的字，六档刻度顶格是 26；
+   首屏标题收到 26 并去掉字距，和页头一级标题同一口径 */
 .login-panel__title {
   margin: 0;
   color: var(--login-navy);
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 600;
   line-height: 1.35;
-  letter-spacing: 2px;
+  letter-spacing: 0;
   text-align: center;
 }
 .login-panel__footer {
@@ -248,7 +250,8 @@ const agreementHref = (path: string) => router.resolve(path).href;
     margin-bottom: 14px;
   }
   .login-panel__title {
-    font-size: 30px;
+    /* 批5：小高度档原来是 30px（比基准档还大），同步收到 26 */
+    font-size: 26px;
   }
   .login-panel__footer {
     margin-top: 24px;
