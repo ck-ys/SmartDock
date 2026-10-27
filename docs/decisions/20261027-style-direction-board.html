@@ -1,161 +1,801 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>界面风格方向拍板 · 2026-10-27</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SmartDock 界面风格拍板（方向 + 六道细节题）</title>
 <style>
-  :root { --ink:#1f2329; --sub:#5a6472; --line:#e4e7ec; --bg:#f6f7f9; --card:#fff; --accent:#2b6cf0; --warn:#c4453c; --ok:#2f9e60; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font:15px/1.75 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:var(--bg); padding:28px 16px 64px; }
-  .wrap { max-width:1280px; margin:0 auto; }
-  header h1 { font-size:22px; margin-bottom:8px; }
-  header p { color:var(--sub); font-size:13.5px; }
-  .badge { display:inline-block; font-size:11.5px; font-weight:700; border:1px solid currentColor; border-radius:4px; padding:1px 7px; letter-spacing:.3px; }
-  .badge.fixed { color:var(--ok); }
-  .badge.rec { color:var(--accent); }
-  .badge.wait { color:#8a6d1f; }
-  nav.toc { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 20px; margin:18px 0; }
-  nav.toc b { font-size:13px; }
-  nav.toc ol { margin:6px 0 0 22px; font-size:13.5px; }
-  nav.toc a { color:var(--accent); text-decoration:none; }
-  nav.toc a:hover { text-decoration:underline; }
-  section.block { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px 22px; margin-top:16px; }
-  section.block h2 { font-size:16.5px; margin-bottom:10px; display:flex; align-items:center; gap:10px; }
-  section.block h3 { font-size:14.5px; margin:14px 0 6px; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:10px; }
-  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:10px; }
-  figure { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
-  figure img { display:block; width:100%; height:auto; }
-  figcaption { font-size:12.5px; color:var(--sub); padding:7px 10px; border-top:1px solid var(--line); }
-  ol.diag { margin:8px 0 0 20px; font-size:14px; }
-  ol.diag li { margin:7px 0; }
-  ol.diag b { color:var(--warn); }
-  .opt { border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-top:14px; background:#fbfcfe; }
-  .opt.rec { border-color:var(--accent); background:#f2f7ff; }
-  .opt h3 { display:flex; align-items:center; gap:10px; margin:0 0 8px; }
-  .opt .why { font-size:13.5px; }
-  .opt .meta { font-size:12.5px; color:var(--sub); margin-top:8px; }
-  .opt .risk { color:#8a4b1f; }
-  table.cmp { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
-  table.cmp th, table.cmp td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
-  table.cmp th { background:#f1f4f9; font-weight:600; }
-  .flow { margin:8px 0 0 20px; font-size:13.5px; }
-  .flow li { margin:5px 0; }
-  footer { margin-top:22px; font-size:12.5px; color:var(--sub); line-height:1.9; }
-  .kpi-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  @media (max-width:900px){ .grid2,.grid3,.kpi-pair{grid-template-columns:1fr;} }
+  /* 版式取自 tasteskill 的 page 口径：靠留白与底色分区，不用细线；
+     一个字号族 4-9 级；颜色只给状态与数据，页面本身保持墨色。 */
+  :root {
+    --ink: #12171e;
+    --ink-2: #3c4653;
+    --muted: #5a6675;
+    --faint: #8b95a3;
+    --ground: #eff2f5;
+    --surface: #ffffff;
+    --tone: #f6f8fa;
+    --accent: #2f6feb;
+    --warn-bg: #fdf3e3;
+    --warn-ink: #7d5102;
+    --danger-bg: #fceceb;
+    --danger-ink: #9c272c;
+    --good-bg: #e9f5ee;
+    --good-ink: #1a6540;
+    --r: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.68;
+    letter-spacing: 0.01em;
+  }
+  img { display: block; max-width: 100%; height: auto; background: var(--tone); }
+  a { color: var(--accent); text-decoration: none; }
+
+  .shell { max-width: 1200px; margin: 0 auto; padding: 0 32px 96px; }
+
+  .head { padding: 72px 0 44px; }
+  .head h1 {
+    margin: 0 0 18px;
+    max-width: 15em;
+    font-size: clamp(30px, 4.2vw, 52px);
+    line-height: 1.14;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+  }
+  .nb { white-space: nowrap; }
+  .head .lede { max-width: 780px; margin: 0; font-size: 19px; line-height: 1.66; color: var(--ink-2); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+  .chip {
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .chip--hold { background: var(--warn-bg); color: var(--warn-ink); }
+  .chip--done { background: var(--good-bg); color: var(--good-ink); }
+
+  .layout { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 56px; align-items: start; }
+  .rail { position: sticky; top: 32px; }
+  .rail p { margin: 0 0 12px; font-size: 13px; color: var(--faint); }
+  .rail ol { margin: 0; padding: 0; list-style: none; counter-reset: q; }
+  .rail li { margin-bottom: 6px; counter-increment: q; }
+  .rail a {
+    display: block;
+    padding: 7px 10px 7px 34px;
+    position: relative;
+    border-radius: 9px;
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.4;
+    transition: background-color .16s ease, color .16s ease;
+  }
+  .rail a::before {
+    position: absolute;
+    left: 10px;
+    color: var(--faint);
+    content: counter(q);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .rail a:hover { background: var(--surface); color: var(--ink); }
+  .rail a.is-here { background: var(--accent); color: #fff; }
+  .rail a.is-here::before { color: rgba(255,255,255,.72); }
+
+  section { margin-bottom: 76px; scroll-margin-top: 24px; }
+  h2 {
+    margin: 0 0 10px;
+    font-size: 30px;
+    line-height: 1.26;
+    font-weight: 620;
+    letter-spacing: -0.01em;
+  }
+  h3 { margin: 34px 0 10px; font-size: 19px; font-weight: 600; }
+  p { margin: 0 0 14px; }
+  .sub { color: var(--muted); font-size: 15px; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+  .fig { margin: 0; }
+  .fig img { border-radius: 10px; }
+  .fig figcaption { margin-top: 9px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .fig figcaption b { color: var(--ink-2); font-weight: 600; }
+  .wide { margin: 0; }
+  .wide figcaption { margin-top: 9px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .wide figcaption b { color: var(--ink-2); font-weight: 600; }
+  .duo {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    gap: 30px;
+    align-items: start;
+  }
+  .duo figcaption { font-size: 15px; color: var(--muted); }
+  .duo figcaption b { display: block; margin-bottom: 6px; color: var(--ink-2); font-weight: 600; }
+  .duo figcaption p { margin: 0 0 14px; }
+
+  .rates { margin: 0; padding: 0; list-style: none; }
+  .rates li {
+    display: grid;
+    grid-template-columns: 14px 80px minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    font-size: 14px;
+  }
+  .rates li + li { border-top: 1px solid rgba(18,23,30,.07); } /* taste-skill-ignore */
+  .rate-swatch { width: 14px; height: 14px; border-radius: 4px; }
+  .rates b { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .rates .ok { color: var(--good-ink); }
+  .rates .bad { color: var(--danger-ink); }
+
+  /* 六题一览：真数据表（表格允许横线；其余装饰仍按白名单） */
+  .sum-wrap { margin: 20px 0 0; }
+  .sum { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+  .sum th {
+    padding: 0 16px 10px 0;
+    text-align: left;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .sum td { padding: 14px 16px 14px 0; vertical-align: top; color: var(--muted); line-height: 1.55; }
+  .sum tr + tr td { border-top: 1px solid rgba(18,23,30,.07); } /* taste-skill-ignore */
+  .sum td:first-child { color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+  .sum .pick { display: block; color: var(--accent); font-weight: 600; white-space: nowrap; }
+  .sum .num { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .sum .ev { font-size: 13px; color: var(--faint); }
+  @media (max-width: 760px) {
+    .sum, .sum tbody, .sum tr, .sum td { display: block; width: 100%; }
+    .sum thead { display: none; }
+    .sum tr { padding: 16px 0; }
+    .sum tr + tr { border-top: 1px solid rgba(18,23,30,.07); } /* taste-skill-ignore */
+    .sum td { padding: 0 0 7px; border: 0; }
+    .sum td::before { content: attr(data-th) '：'; margin-right: 8px; color: var(--faint); font-size: 12.5px; }
+    .sum td:first-child { font-size: 16px; margin-bottom: 8px; }
+    .sum td:first-child::before { content: none; }
+  }
+
+  .faults { margin: 0; padding: 0; list-style: none; }
+  .faults li { padding: 18px 0 18px 22px; position: relative; }
+  .faults li::before {
+    position: absolute; left: 0; top: 28px;
+    width: 8px; height: 8px; border-radius: 2px; background: var(--accent); content: '';
+  }
+  .faults li + li { border-top: 1px solid rgba(18,23,30,.07); } /* taste-skill-ignore */
+  .faults b { display: block; font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .faults span { color: var(--muted); font-size: 15px; }
+
+  .st {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    font-weight: 600;
+    vertical-align: 2px;
+  }
+  .st--done { background: var(--good-bg); color: var(--good-ink); }
+  .st--open { background: var(--warn-bg); color: var(--warn-ink); }
+
+  .settled { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+  .settled li {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .settled .tag { color: var(--faint); font-size: 13px; padding-top: 2px; }
+  .settled b { font-weight: 620; }
+  .settled p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+
+  .revises { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+  .revises li { background: var(--surface); border-radius: 12px; padding: 20px 22px; }
+  .revises .was { color: var(--faint); font-size: 14px; }
+  .revises .now { margin-top: 8px; font-size: 15px; color: var(--ink-2); }
+  .revises .now b { font-weight: 620; }
+
+  .q { background: var(--surface); border-radius: var(--r); padding: 30px; margin-bottom: 26px; }
+  .q__head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .q__no {
+    padding: 3px 10px; border-radius: 8px;
+    background: var(--tone); color: var(--muted);
+    font-size: 13px; font-weight: 600; white-space: nowrap;
+  }
+  .q h2 { font-size: 25px; margin: 0; }
+  .badge {
+    padding: 3px 10px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  }
+  .badge--pick { background: var(--good-bg); color: var(--good-ink); }
+
+  .opts { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+  .opt { border-radius: 12px; padding: 18px 20px; background: var(--tone); }
+  .opt--pick { background: #eef3fe; }
+  .opt__top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .opt__name { font-size: 16px; font-weight: 620; }
+  .opt p { margin: 0; font-size: 15px; color: var(--ink-2); }
+  .opt p + p { margin-top: 7px; }
+  .opt .risk { color: var(--warn-ink); }
+  .opt .risk b, .opt .why b { font-weight: 600; }
+
+  .footnote { margin-top: 14px; padding: 14px 16px; border-radius: 10px; background: var(--tone); font-size: 14.5px; color: var(--ink-2); }
+  .footnote b { font-weight: 620; }
+
+  .steps { margin: 18px 0 0; padding: 0; list-style: none; }
+  .steps li { padding: 14px 0; display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 18px; }
+  .steps li + li { border-top: 1px solid rgba(18,23,30,.07); } /* taste-skill-ignore */
+  .steps .when { color: var(--faint); font-size: 13px; font-variant-numeric: tabular-nums; padding-top: 3px; }
+  .steps .what b { display: block; font-weight: 600; }
+
+  footer { color: var(--faint); font-size: 13.5px; }
+  footer p { margin: 0 0 6px; }
+
+  @media (max-width: 900px) {
+    .shell { padding: 0 20px 72px; }
+    .head { padding: 40px 0 28px; }
+    .layout { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .rail { position: static; }
+    .rail ol { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .grid2 { grid-template-columns: minmax(0, 1fr); }
+    .duo { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .rates li { grid-template-columns: 14px 76px minmax(0, 1fr); }
+    .rates li > span:last-child { grid-column: 2 / -1; }
+    .settled li { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .q { padding: 22px 18px; }
+    .steps li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    h2 { font-size: 24px; }
+    section { margin-bottom: 56px; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-<header>
-  <h1>界面风格方向拍板（2026-10-27）</h1>
-  <p>起因：您反馈「当前 UI 跟之前的 DCS 比总感觉不搭、看着累」。本页把「哪里不一样」逐条拍到图里，并给出三个方向供您拍板。白条问题<span class="badge fixed">已修复</span>（提交 0a2da1d，更新日志 v3.29.1）。</p>
-</header>
+<div class="shell">
 
-<nav class="toc">
-  <b>问题清单（点击直达）</b>
-  <ol>
-    <li><a href="#diag">诊断：到底哪里「诡异」（五条，均附真机截图）</a></li>
-    <li><a href="#q1">Q1 壳层方向：甲 全面对齐 DCS 骨架（推荐） / 乙 保留浮卡补对比 / 丙 最小矫正</a></li>
-    <li><a href="#q2">Q2 关键数字要不要上色：A 学 DCS 上语义色（推荐） / B 保持灰阶</a></li>
-    <li><a href="#flow">执行流程与验收方式</a></li>
-  </ol>
-</nav>
-
-<section class="block" id="diag">
-  <h2>诊断：五条「诡异感」的来源（真机对比）</h2>
-  <ol class="diag">
-    <li><b>全白糊成一片</b>：您当前用的是浅色皮肤——侧栏、画布、卡片全是白的，分区只剩 1px 细线，眼睛要费力找边界；DCS 是「深色侧栏 + 浅灰画布 + 白卡片」三层明暗差，边界天然清楚。</li>
-    <li><b>导航没有锚点</b>：DCS 选中的菜单是实心蓝块、白字；我们的是浅蓝药丸、深蓝字，视觉重量弱一档，扫视时找不到「我在哪」。</li>
-    <li><b>整页像浮起来的一张纸</b>：我们的壳是 8px 悬空外卡 + 14px 大圆角 + 双层阴影，1920 宽屏下四周一圈缝很像「没放正的纸」；DCS 内容区贴边、直角、通高。</li>
-    <li><b>底部悬空空白带</b>：<span class="badge fixed">已修复</span> 起因是为可拖拽的悬浮球预留 80px；悬浮球本来就哪都能拖（您已把它拖到右侧中部），预留带没有意义，已恢复通高贴底。</li>
-    <li><b>重点信息没有颜色</b>：DCS 的待办 20 用蓝、待审核 91 用橙、待修改 1 用红，扫一眼就知道轻重；我们的关键数字统一深灰，得逐字读。</li>
-  </ol>
-  <div class="grid2">
-    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/local-t7-afterfix-1920.png" alt="现状"><figcaption>现状（您的浅色皮肤原样，含已修的底部白条）</figcaption></figure>
-    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/dcs-home-1920.png" alt="DCS 首页"><figcaption>DCS 真机（192.168.3.12 实拍）：深色栏 + 灰画布 + 走边通高</figcaption></figure>
-    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/sd-01-系统管理.png" alt="我们的用户管理"><figcaption>我们：用户管理（白侧栏 + 浅蓝药丸 + 浮卡）</figcaption></figure>
-    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/dcs-01-系统管理.png" alt="DCS 用户管理"><figcaption>DCS：用户管理（深侧栏 + 实心蓝选中块 + 灰画布）</figcaption></figure>
-    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/sd-07-画像与分析.png" alt="我们的用户画像"><figcaption>我们：用户画像（整页白色、数字全灰）</figcaption></figure>
-    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/dcs-09-评分与画像.png" alt="DCS 用户画像"><figcaption>DCS：用户画像（关注块带彩色竖条与彩数字）</figcaption></figure>
-  </div>
-</section>
-
-<section class="block" id="q1">
-  <h2>Q1 壳层方向：三案 <span class="badge wait">待您拍板</span></h2>
-  <table class="cmp">
-    <tr><th>方案</th><th>改什么</th><th>改完的观感</th><th>代价 / 风险</th></tr>
-    <tr><td><b>甲（推荐）</b></td><td>深色侧栏 + 实心蓝选中块 + 灰画布贴边通高（去掉浮卡、大圆角、阴影），卡片圆角统一 12</td><td>与 DCS 同一骨架，最接近您觉得顺眼的观感</td><td>壳层 4-5 个文件；等于推翻 10-26 的「外卡悬空」拍板，需要您明说</td></tr>
-    <tr><td>乙</td><td>保留浮卡，但换深侧栏 + 实心蓝选中 + 加深画布让白卡浮起来 + 圆角收到 10</td><td>层次清楚很多，但「浮纸」本身还在</td><td>改动约为甲的一半；不推翻原结构</td></tr>
-    <tr><td>丙</td><td>侧栏保持浅色，只把选中改实心蓝 + 画布微灰 + 圆角 12</td><td>比现在舒服，但「全白」只是缓解</td><td>改动最小，1 小时内</td></tr>
-  </table>
-
-  <div class="opt rec">
-    <h3>甲 · 全面对齐 DCS 骨架 <span class="badge rec">推荐</span></h3>
-    <p class="why">您的原话是「DCS 看着顺眼」。顺眼的根本原因是它的三层明暗（深栏/灰布/白卡）+ 走边通高 + 实心蓝选中块，这一案就是把它搬回来；同时保留我们自己的令牌体系，以后想换色只动令牌。</p>
-    <p class="meta">代价：改壳层样式与两套皮肤同步，半天内；风险：与上轮「外卡悬空」拍板相反，需您明确同意推翻。</p>
-    <div class="grid2">
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-jia-dcs-parity-1920.png" alt="甲模拟"><figcaption>甲 · 真实页面 CSS 模拟（落地即真机）</figcaption></figure>
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/dcs-home-1920.png" alt="DCS 参考"><figcaption>DCS 真机参考</figcaption></figure>
+  <header class="head">
+    <h1>界面风格<br />从方向到细节，一次拍完</h1>
+    <p class="lede">你反馈「跟以前的 DCS 比总感觉不搭、看着累」。方向已经定下并落地了一部分，这一页把剩下的分歧拆成六道能直接改代码的选择题，每题都配真机前后对照。先看图，再看问法。</p>
+    <p class="lede" style="margin-top:12px"><b>状态：</b>这一页的六道题已全部按推荐项落地（提交 fcbb4e6 / changelog v3.30.0），落地过程中被多席审查挖出 8 处问题并已回修。逐项前后对照见 <b>20261027-style-landing-before-after.html</b>。</p>
+    <div class="chips">
+      <span class="chip chip--done">方向已落地三项</span>
+      <span class="chip chip--done">六题已全部落地</span>
+      <span class="chip chip--done">四席审查 + 回修 8 处</span>
+      <span class="chip chip--done">前后对比页已出</span>
+      <span class="chip chip--done">真机实拍</span>
+      <span class="chip">我先推翻了自己四处</span>
+      <span class="chip chip--done">改动量已逐条核过</span>
+      <span class="chip">2026-10-27</span>
     </div>
-  </div>
+    <p class="lede" style="margin-top:14px"><b>这页的图怎么看：</b>每张对比图都裁到只留要判断的那一两行，<b style="color:#ce2046">红框</b>圈住的就是这次会变的那块；红线引到右侧的文字，是那句说明。<b>「现在」</b>是仓库里正在跑的版本，<b>「试装」</b>是我临时改了几行样式抓的图（代码已回滚，只用于看效果）。</p>
+  </header>
 
-  <div class="opt">
-    <h3>乙 · 保留浮卡，补对比</h3>
-    <p class="why">不动外卡结构，只把导航换回深色 + 选中实心蓝 + 画布加深，让白卡能「浮起来」。</p>
-    <p class="meta risk">风险：浮卡的「纸感」与四周缝隙还在，1920 宽屏下仍可能与 DCS 观感有差距。</p>
-    <div class="grid2">
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-yi-flyingcard-plus-1920.png" alt="乙模拟"><figcaption>乙 · 模拟（保留浮卡 + 深导航 + 加深画布）</figcaption></figure>
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/local-t7-afterfix-1920.png" alt="现状"><figcaption>现状对照</figcaption></figure>
-    </div>
-  </div>
+  <div class="layout">
+    <aside class="rail">
+      <p>本页清单（可点）</p>
+      <ol>
+        <li><a href="#summary">六题一览（先看这个）</a></li>
+        <li><a href="#diag">诊断：八条落差</a></li>
+        <li><a href="#settled">已经定下的事</a></li>
+        <li><a href="#revise">我推翻了自己四处</a></li>
+        <li><a href="#now">当前基线</a></li>
+        <li><a href="#q1">浅色档选中态</a></li>
+        <li><a href="#q2">深色档选中态</a></li>
+        <li><a href="#q3">父分组怎么显示</a></li>
+        <li><a href="#q4">卡片圆角</a></li>
+        <li><a href="#q5">外卡那道缝</a></li>
+        <li><a href="#q6">关键数字上色</a></li>
+        <li><a href="#plan">落地顺序与验收</a></li>
+      </ol>
+    </aside>
 
-  <div class="opt">
-    <h3>丙 · 最小矫正</h3>
-    <p class="why">侧栏仍是浅色，只改三处：选中实心蓝、画布微灰、圆角 12。改动最小、当天可回滚。</p>
-    <p class="meta risk">风险：「侧栏无深色锚点」这一主因仍在，观感改善有限。</p>
-    <div class="grid2">
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-bing-1920.png" alt="丙模拟"><figcaption>丙 · 模拟（浅侧栏 + 实心蓝选中 + 微灰画布）</figcaption></figure>
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/local-t7-afterfix-1920.png" alt="现状"><figcaption>现状对照</figcaption></figure>
-    </div>
-  </div>
-</section>
+    <main>
 
-<section class="block" id="q2">
-  <h2>Q2 关键数字要不要上色 <span class="badge wait">待您拍板</span></h2>
-  <div class="opt rec">
-    <h3>A · 关键数字用语义色（学 DCS）<span class="badge rec">推荐</span></h3>
-    <p class="why">只给「关键数字与风险状态」上色：蓝=常规重点、橙=待处理、红=风险。不是把全站撒成彩色，只让眼睛先看到该看的。</p>
-    <p class="meta">代价：KPI 与风险表两处样式；风险：颜色用多了会花，需限定在白名单组件内。</p>
-    <div class="kpi-pair">
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-kpi-color-crop.png" alt="上色样张"><figcaption>A · 上色后（蓝 / 橙 对照）</figcaption></figure>
-      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-kpi-gray-crop.png" alt="灰阶样张"><figcaption>现状 · 灰阶</figcaption></figure>
-    </div>
-  </div>
-  <div class="opt">
-    <h3>B · 保持灰阶</h3>
-    <p class="why">靠字号与字重分层，整体更「安静」。但与 DCS 的观感差距会保留一部分。</p>
-    <p class="meta risk">风险：重点信息扫描速度慢，与您「看着累」的反馈方向相反。</p>
-  </div>
-</section>
+      <section id="summary">
+        <h2>六题一览：选什么、改多少、证据到哪一步</h2>
+        <p class="sub">这六题一屏看完。改动量这一列我逐条回代码里核过（上一版第 5 题的改动量是估的，核完发现判错了，所以这次全部重核）。</p>
 
-<section class="block" id="flow">
-  <h2>执行流程与验收方式</h2>
-  <ol class="flow">
-    <li>您在对话里直接回复「甲A」这类组合（答案只认对话明说，不点按钮也算超过期）。</li>
-    <li>我按方向改壳层样式（两套皮肤同步）；动工前截真机「改前」，改完截「改后」。</li>
-    <li>逐页回归：首页 + 系统管理 + 任务中心 + 画像与分析 + AI 助手等 8 个菜单页，另加 375 手机档。</li>
-    <li>出前后对比页（双写归档）→ build:prod → 更新日志 → 提交推送。</li>
-  </ol>
-  <p class="meta" style="font-size:12.5px;color:var(--sub);margin-top:10px">附：逐菜单对比原图共 22 张，在 .workshop/evidence/20261027-menucompare/（dcs-* 为 DCS 实拍，sd-* 为我们）。</p>
-</section>
+        <div class="sum-wrap">
+          <table class="sum">
+            <thead>
+              <tr><th>题</th><th>推荐</th><th>要改什么（人话）</th><th>改动量（已核）</th><th>证据</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td data-th="题">第 1 题</td>
+                <td data-th="推荐"><span class="pick">甲 · 实心主色块</span></td>
+                <td data-th="要改什么">四套皮肤各配一对「选中底色 + 白字」，侧栏五处选中态统一走这对令牌；左缘那 3px 色条撤掉</td>
+                <td data-th="改动量"><span class="num">theme-framed.scss ＋ sidebar.scss，约 15 行</span></td>
+                <td data-th="证据" class="ev">真机模拟 ＋ 真机实拍</td>
+              </tr>
+              <tr>
+                <td data-th="题">第 2 题</td>
+                <td data-th="推荐"><span class="pick">甲 · 实心块压深一档</span></td>
+                <td data-th="要改什么">深色两套皮肤各加一个选中块色，浅色档不动</td>
+                <td data-th="改动量"><span class="num">theme-framed.scss，2 个令牌值</span></td>
+                <td data-th="证据" class="ev">真机模拟；对比度 4.57 / 5.24（计算值）</td>
+              </tr>
+              <tr>
+                <td data-th="题">第 3 题</td>
+                <td data-th="推荐"><span class="pick">甲 · 父级只给轻底</span></td>
+                <td data-th="要改什么">父分组那条的底色从实心块改成悬停档，实心块只给叶子</td>
+                <td data-th="改动量"><span class="num">theme-framed.scss，1 条规则</span></td>
+                <td data-th="证据" class="ev">真机实拍（第一版 vs 修正版）</td>
+              </tr>
+              <tr>
+                <td data-th="题">第 4 题</td>
+                <td data-th="推荐"><span class="pick">甲 · 四皮肤 8px</span></td>
+                <td data-th="要改什么">白侧栏两套皮肤的卡片、控件圆角都从 4 提到 8（导航药丸建议一起）</td>
+                <td data-th="改动量"><span class="num">theme-framed.scss，4 到 6 个令牌值</span></td>
+                <td data-th="证据" class="ev">真机实拍（放大 4 倍 ＋ 1:1）</td>
+              </tr>
+              <tr>
+                <td data-th="题">第 5 题</td>
+                <td data-th="推荐"><span class="pick">丙 · 整片灰画布</span></td>
+                <td data-th="要改什么">外卡、顶栏两处底色改灰画布；8px 缝、14px 外卡圆角、外卡阴影归零</td>
+                <td data-th="改动量"><span class="num">2 个文件，6 处</span></td>
+                <td data-th="证据" class="ev">14 页 × 4 皮肤，23 张实拍</td>
+              </tr>
+              <tr>
+                <td data-th="题">第 6 题</td>
+                <td data-th="推荐"><span class="pick">甲 · 只给要动的数</span></td>
+                <td data-th="要改什么">两处指标带各加一个修饰类：首页「低分主体」、用户画像页「关注 / 高风险」</td>
+                <td data-th="改动量"><span class="num">views/index.vue ＋ dcs/profile/index.vue，约 12 行</span></td>
+                <td data-th="证据" class="ev">真机模拟</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-<footer>
-  修订记录：<br>
-  2026-10-27 v1 初版：白条修复已随本板上线（0a2da1d）；诊断五条 + Q1/Q2 两题三案；DCS 真机图为 192.168.3.12 登录实拍；甲/乙/丙均为真实页面 CSS 覆盖模拟（非手绘），落地即真机效果。
-</footer>
+        <p class="sub" style="margin-top:18px">六题全选推荐：动 5 个文件，不新增页面，不改后端，不碰 AI 助手对话区。改动集中在样式令牌和两处指标带，页面结构只动第 5 题那一处画布。</p>
+        <p class="sub" style="margin-top:10px"><b>证据分三种，别看混：</b><b>真机实拍</b>＝在跑着的系统上截下来的像素；<b>真机模拟</b>＝临时改几行样式抓的图，代码已回滚，用来给你看效果；<b>计算值</b>＝按对比度公式算出来的数字，不是肉眼判断。</p>
+      </section>
+
+      <section id="diag">
+        <h2>诊断：八条落差，三条已经补上</h2>
+        <p class="sub">把我们的页面和 DCS 并排看，骨架已经一样了（深侧栏、灰底、白卡、通高贴底）。下面八条是全部落差；前三条已经在提交里落地，后五条是这一轮要拍的。</p>
+        <ul class="faults">
+          <li>
+            <b>整页像浮起来的一张纸<span class="st st--done">已落地</span></b>
+            <span>外卡原来是 8px 悬空、14px 大圆角、双层阴影，1920 宽下四周一圈缝，读起来像「没放正的纸」。现在外卡通高贴底，顶栏与页签收进卡内。</span>
+          </li>
+          <li>
+            <b>底部一条悬空白带<span class="st st--done">已落地</span></b>
+            <span>这条灰带原本是给悬浮球让位的 80px 预留，但悬浮球本身可以拖到任意位置，预留的前提不成立。现在外卡通高贴底，球浮在内容之上。</span>
+          </li>
+          <li>
+            <b>全白糊成一片<span class="st st--done">已落地</span></b>
+            <span>原来是「浅色侧栏 + 画布 + 卡片」全白，分区只剩 1px 细线。现在侧栏压深、中间垫出一层灰底，侧栏和内容区靠明暗分开。但内容区本身还是一整张白纸，卡又在白纸里（这一层就是第 5 题要拿掉的）。</span>
+          </li>
+          <li>
+            <b>导航没有锚点<span class="st st--open">待拍板</span></b>
+            <span>当前页底色 #2a3a4c，悬停底色 #263545，只差 4%，扫一眼找不到自己在哪。这一条对应第 1、2 题。</span>
+          </li>
+          <li>
+            <b>同一屏两块蓝<span class="st st--open">待拍板</span></b>
+            <span>展开二级菜单时，父分组和子项都刷了底色，看着像同时选中了两个菜单。这一条对应第 3 题。</span>
+          </li>
+          <li>
+            <b>卡片太方<span class="st st--open">待拍板</span></b>
+            <span>卡片圆角 8px，白侧栏那套皮肤只有 4px，而外框是 14px，一屏里三种「硬」的程度。这一条对应第 4 题。</span>
+          </li>
+          <li>
+            <b>重点没有颜色<span class="st st--open">待拍板</span></b>
+            <span>一屏数字全是同一个墨色，「1 个要复核」和「3 个主体」看起来同等重要。这一条对应第 6 题。</span>
+          </li>
+          <li>
+            <b>和 DCS 差一层结构：那道缝<span class="st st--open">待拍板</span></b>
+            <span>侧栏和内容之间还留着 8px 灰缝，内容区像一张浮在灰底上的白纸；DCS 是齐平的。上一版六题漏了这一条，这一轮补成第 5 题。</span>
+          </li>
+        </ul>
+      </section>
+
+      <section id="settled">
+        <h2>已经定下的事</h2>
+        <p class="sub">这两条不需要再拍，记在这里是为了后面六题有前提，也免得下次又从头讨论一遍。</p>
+        <ul class="settled">
+          <li>
+            <span class="tag">方向一</span>
+            <div>
+              <b>壳层对齐 DCS 骨架<span class="st st--done">已实现</span></b>
+              <p>深色侧栏、浅灰画布、白卡片、外卡通高贴底、顶栏与页签收进卡内。当时比较过「保留浮卡补对比」和「最小矫正」两案，选了改动最彻底、和 DCS 最一致的那一版。</p>
+            </div>
+          </li>
+          <li>
+            <span class="tag">方向二</span>
+            <div>
+              <b>关键数字给语义色<span class="st st--open">改成更细的问法</span></b>
+              <p>方向是要上色，但「要不要上色」这个问法太粗，真正的分歧在「给哪个数上色、一屏上几个」。这一轮第 6 题按更细的口径重问。</p>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <section id="revise">
+        <h2>我先推翻了自己四处</h2>
+        <p class="sub">上一版我给了六道题的推荐。这一轮回头自查，发现三条站不住已经改掉，一题干脆并进了别的题；后来又发现第四条（第 5 题的理由是估的），一并记在这里。</p>
+        <ul class="revises">
+          <li>
+            <span class="was">原来推荐：卡片圆角四皮肤统一 12px，对齐 DCS</span>
+            <div class="now">
+              <b>改成：四皮肤统一 8px。</b>
+              真机把 8 和 12 摆一起对照，1440 宽下几乎看不出差别；为这 4px 还要引入「控件圆角得从卡片圆角上解耦」这么一条新规则，不划算。真正要解决的只是「白侧栏那套是 4px、跟别的不一致」；把 4 提到 8，改动更小，收益（四皮肤一致）完全一样，还少一条规则。
+            </div>
+          </li>
+          <li>
+            <span class="was">原来单独列了一题：圆角放大后，输入框和按钮要不要跟着变圆</span>
+            <div class="now">
+              <b>这题作废。</b>
+              既然圆角停在 8px，而控件圆角本来就是 8px，两者天然一致，不存在「跟着变圆」的问题。上一版把它当成一个独立选项，是我把因果搞反了。
+            </div>
+          </li>
+          <li>
+            <span class="was">原来打算建议：深色档别铺高饱和蓝块，改用「比侧栏亮一档」的深灰蓝（这是深色界面的通行做法）</span>
+            <div class="now">
+              <b>真机模拟之后否掉了。</b>
+              按这个思路做出来（第 2 题左边那张就是），选中项和相邻未选中行几乎分不出来，等于把「三秒找到自己在哪」又丢了。深色档继续用实心块，只把蓝压深一档保住白字对比度。这条我试过，不行，写在这里免得以后再讨论一遍。
+            </div>
+          </li>
+          <li>
+            <span class="was">原来推荐：第 5 题选「甲 · 缝先留着」，理由是换成灰画布「牵扯每个页面、要全站回归」</span>
+            <div class="now">
+              <b>这条理由是估的，实测推翻。</b>
+              我把丙案真机做出来，跑了 14 个页面、四套皮肤共 23 张实拍（含深色、白侧栏深色、手机档），实际只需要改 6 处：外卡和顶栏两处底色，外加三个尺寸令牌。页面写法一行都不用动，因为各页内容本来就在白卡里。改动量比「乙」还小，而它一次解决了缝、纸上加纸、卡片没底三个问题。第 5 题已改成推荐丙。
+            </div>
+          </li>
+        </ul>
+        <p class="sub" style="margin-top:20px">另外补了一题。原来六题全在讨论「选中态怎么画、圆角多大」这类细节，漏了一个更靠结构的问题：外卡四周那道 8px 的缝。它才是我们和 DCS 之间剩下的最大结构差异，见第 5 题。</p>
+      </section>
+
+      <section id="now">
+        <h2>当前基线（真机，四皮肤）</h2>
+        <p class="sub">下面是仓库里现在跑的版本，六道题都建立在它之上。后面的「试装」图是在这一版之上临时改 CSS 抓的，代码已回滚。</p>
+        <figure class="wide">
+          <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/full-t1-light.jpg" alt="当前版本首页（默认皮肤）" />
+          <figcaption><b>默认皮肤 · 首页</b>：深侧栏已经就位，内容区是一整张白纸；选中项只比旁边深一点点。</figcaption>
+        </figure>
+        <div class="grid2" style="margin-top:20px">
+          <figure class="fig">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/full-t1-dark.jpg" alt="当前版本深色档首页" />
+            <figcaption><b>深色档</b>：侧栏和内容面都是深色，层次靠 1px 线撑着。</figcaption>
+          </figure>
+          <figure class="fig">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/full-t7-light.jpg" alt="当前版本白侧栏皮肤首页" />
+            <figcaption><b>白侧栏皮肤</b>：卡片圆角只有 4px，比默认皮肤更方一档。</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section id="q1">
+        <div class="q">
+          <div class="q__head">
+            <span class="q__no">第 1 题</span>
+            <h2>浅色档的「当前页」怎么标出来</h2>
+            <span class="badge badge--pick">推荐：实心主色块 · 已落地</span>
+          </div>
+          <p class="sub">判断标准只有一个：换一个人第一次进来，能不能在三秒内指出「我现在在哪一页」。深色档单独见第 2 题，因为两者该不该一个做法，值得分开判。</p>
+
+          <div class="grid2" style="margin-top:20px">
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-t1-before.jpg" alt="当前版本侧栏（红框标出选中行）" />
+              <figcaption><b>现在</b>：红框里就是「当前页」这一行：它只比上下邻行深一点点，几乎看不出被选中；左缘那条蓝线是唯一的线索。</figcaption>
+            </figure>
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-t1-after.jpg" alt="试装：选中项实心主色块（红框标出）" />
+              <figcaption><b>试装</b>：同一行改成整行刷主色、字变白，左缘色条撤掉。红框框住的就是变化的那一块。</figcaption>
+            </figure>
+          </div>
+
+          <ul class="opts">
+            <li class="opt opt--pick">
+              <div class="opt__top"><span class="opt__name">甲 · 整行实心主色块 + 白字</span><span class="badge badge--pick">推荐 · 已落地</span></div>
+              <p class="why"><b>为什么：</b>和 DCS 一致；色块是整条侧栏里唯一的实心面，扫视时眼睛直接被吸过去，找位置不费劲。左缘那 3px 色条同时撤掉：块面本身就是强调，再叠一条是重复。</p>
+              <p class="risk"><b>代价与风险：</b>每屏出现一块高饱和蓝，所以其他地方不能再出现同强度的色块（按钮、图表色要错开档位）。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">乙 · 保留现在的深药丸 + 左缘色条</span></div>
+              <p class="why"><b>为什么：</b>最安静，不给页面加重量。</p>
+              <p class="risk"><b>代价与风险：</b>对比只有 4%，等于没标；色条是第二重强调，属于冗余装饰。这一条正是「找不到自己在哪」的直接原因。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">丙 · 只把文字提亮到纯白，不加底色</span></div>
+              <p class="why"><b>为什么：</b>不加任何色块，页面最轻。</p>
+              <p class="risk"><b>代价与风险：</b>悬停时文字本来也会提亮，两种状态分不开；菜单一长，纯文字差异比色块难扫得多。</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="q2">
+        <div class="q">
+          <div class="q__head">
+            <span class="q__no">第 2 题</span>
+            <h2>深色档的选中态，要不要跟浅色档一个做法</h2>
+            <span class="badge badge--pick">推荐：一样用实心块，但蓝压深一档 · 已落地</span>
+          </div>
+          <p class="sub">深色界面里大面积高饱和色块容易发眩，所以这里单独判一次。我按「深色界面通行的提亮档」把第四案真做出来了，结论是它太弱，看下面的对照。</p>
+
+          <div class="grid2" style="margin-top:20px">
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-dark-lifted.jpg" alt="深色档提亮档模拟（红框标出选中行）" />
+              <figcaption><b>丁案模拟（提亮一档，不铺蓝）</b>：红框那一行已经额外加了蓝色左条和蓝色图标，可跟相邻行比，还是几乎看不出区别。</figcaption>
+            </figure>
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-dark-solid.jpg" alt="深色档实心主色块（红框标出选中行）" />
+              <figcaption><b>甲案（实心块，蓝压深一档）</b>：同样是红框那一行，整块刷深蓝、字变白，一眼就能指出来。代价是页面多一块亮面。</figcaption>
+            </figure>
+          </div>
+
+          <figure class="duo" style="margin-top:24px">
+            <div>
+              <ul class="rates">
+                <li><span class="rate-swatch" style="background:#2f6feb"></span><b>#2f6feb</b><span>默认皮肤选中块</span><span class="ok">白字 4.6:1 达标</span></li>
+                <li><span class="rate-swatch" style="background:#2b66d9"></span><b>#2b66d9</b><span>白侧栏皮肤选中块</span><span class="ok">白字 5.2:1 达标</span></li>
+                <li><span class="rate-swatch" style="background:#4a8cf7"></span><b>#4a8cf7</b><span>默认皮肤主色</span><span class="bad">白字 3.3:1 不达标</span></li>
+                <li><span class="rate-swatch" style="background:#4583ff"></span><b>#4583ff</b><span>白侧栏皮肤主色</span><span class="bad">白字 3.5:1 不达标</span></li>
+              </ul>
+            </div>
+            <figcaption>
+              <b>为什么不能直接用皮肤自己的亮蓝</b>
+              <p>深色皮肤的主色本身偏亮，直接拿它铺底再写白字，两条都过不了无障碍的 4.5 门槛。所以选中块单独取一个压深一档的蓝，和按钮、链接用的亮蓝分工。</p>
+            </figcaption>
+          </figure>
+
+          <ul class="opts">
+            <li class="opt opt--pick">
+              <div class="opt__top"><span class="opt__name">甲 · 实心块 + 蓝压深一档（#2f6feb / #2b66d9）</span><span class="badge badge--pick">推荐 · 已落地</span></div>
+              <p class="why"><b>为什么：</b>白字对比 4.6:1 和 5.2:1 都过门槛；和浅色档同一个行为，换肤时不用重新学。</p>
+              <p class="risk"><b>代价与风险：</b>深色档会出现两个蓝（选中块偏深、按钮和链接偏亮），这个分工要接受，不能混用。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">乙 · 直接用皮肤亮蓝 + 白字</span></div>
+              <p class="why"><b>为什么：</b>色值最少，不用记两套。</p>
+              <p class="risk"><b>代价与风险：</b>3.3:1 和 3.5:1 不到门槛，属于硬指标不达标，不是口味问题。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">丙 · 亮蓝底 + 深色字</span></div>
+              <p class="why"><b>为什么：</b>对比度最容易算过。</p>
+              <p class="risk"><b>代价与风险：</b>深色侧栏里突然一块「亮底深字」，比周围都亮，更像提示条而不是选中。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">丁 · 不铺蓝，只把行提亮一档（深色界面通行的做法）</span></div>
+              <p class="why"><b>为什么：</b>最不刺眼，理论上暗色主题就该这么做。</p>
+              <p class="risk"><b>代价与风险：</b>真机做出来（左边第一张）几乎看不出选中，加左条和彩色图标也救不回来。这一案我亲自否掉了。</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="q3">
+        <div class="q">
+          <div class="q__head">
+            <span class="q__no">第 3 题</span>
+            <h2>父分组（装着一个当前页的那一行）怎么画</h2>
+            <span class="badge badge--pick">推荐：只给轻底 · 已落地</span>
+          </div>
+          <p class="sub">这是试装时真机才暴露的问题：父子两行都刷了底色，视觉上等于「同时选中两个菜单」。</p>
+
+          <div class="grid2" style="margin-top:20px">
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-parent-before.jpg" alt="父子两行都刷实心块（红框分别标出父级与子项）" />
+              <figcaption><b>试装第一版（已弃）</b>：上面红框是父级「画像与分析」，下面红框是当前页「用户画像」，两块蓝上下叠着，看上去像同时选中了两个菜单。</figcaption>
+            </figure>
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-parent-after.jpg" alt="父级轻底、子项实心块（红框分别标出）" />
+              <figcaption><b>试装修正版</b>：同样的两行，父级只剩一层浅底（框里几乎同色），实心块只留给当前页那一行。</figcaption>
+            </figure>
+          </div>
+
+          <ul class="opts">
+            <li class="opt opt--pick">
+              <div class="opt__top"><span class="opt__name">甲 · 父级轻底 + 灰白文字，实心块只给叶子</span><span class="badge badge--pick">推荐 · 已落地</span></div>
+              <p class="why"><b>为什么：</b>父行只表达「我这一组是开着的、里面有当前页」，不表达「我是当前页」。实心块全站只出现在一个地方，锚点才唯一。</p>
+              <p class="risk"><b>代价与风险：</b>父子两行的底色差得不多，分组关系靠缩进和展开状态读；缩进如果被压缩到看不见，需要补一点左内距。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">乙 · 父子都刷实心块</span></div>
+              <p class="why"><b>为什么：</b>省事，一套规则管到底。</p>
+              <p class="risk"><b>代价与风险：</b>就是左边那张图，视觉上的双选中，是这一轮最刺眼的一处。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">丙 · 父级只把文字变白，不加底色</span></div>
+              <p class="why"><b>为什么：</b>比甲更干净，一点底色都不加。</p>
+              <p class="risk"><b>代价与风险：</b>白侧栏那套皮肤下白字看不见，得按皮肤各写一套；而且「这组里有没有当前页」这个信息基本丢了。</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="q4">
+        <div class="q">
+          <div class="q__head">
+            <span class="q__no">第 4 题</span>
+            <h2>卡片圆角定多大</h2>
+            <span class="badge badge--pick">推荐：四皮肤统一 8px · 已落地</span>
+          </div>
+          <p class="sub">这一题的推荐我改过一次。原来推荐统一 12px（对齐 DCS），把 8 和 12 摆在一起看之后改成统一 8px，理由在下面。</p>
+
+          <figure class="wide" style="margin-top:20px">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-radius-pair.jpg" alt="同一张对话框，圆角 8px 与 12px 的实拍对比（上排放大 4 倍，下排 1:1 实际大小）" />
+            <figcaption><b>这是真机拍的同一张「新增用户」对话框</b>，只是圆角值不同，左边 8px、右边 12px。上排为了看清弧线放大了 4 倍，此时能看出右边更圆一点；下排是 1:1 实际大小，也就是你在屏幕上真正看到的尺寸，两个小方块里的弧线几乎分不出来。差别总共就 4 个像素。</figcaption>
+          </figure>
+
+          <ul class="opts">
+            <li class="opt opt--pick">
+              <div class="opt__top"><span class="opt__name">甲 · 四皮肤统一 8px（白侧栏的卡片和控件都从 4 提到 8）</span><span class="badge badge--pick">推荐 · 已落地</span></div>
+              <p class="why"><b>为什么：</b>真正的问题是四皮肤不一致，不是 8 太小。白侧栏那两套皮肤现在是「卡片 4 / 控件 4 / 导航药丸 4」，默认皮肤是「8 / 8 / 8」；把这三个令牌都提到 8，四套皮肤就一个口径了。改动是纯数值，不动任何写法。</p>
+              <p class="risk"><b>代价与风险：</b>和 DCS 的 12 不完全一样。但 DCS 的块面之所以松弛，主要来自更大的内边距和行距，不靠这 4px。</p><p class="risk"><b>这里我上一版写错过一次：</b>当时说「只动两个令牌、控件圆角本来就是 8」，回代码里核完发现白侧栏的控件圆角也是 4px。所以必须连控件一起提到 8，否则会留下「卡片 8、控件 4」这种新的不一致。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">乙 · 四皮肤统一 12px（对齐 DCS）</span></div>
+              <p class="why"><b>为什么：</b>和 DCS 的卡一致，块面更松弛。</p>
+              <p class="risk"><b>代价与风险：</b>Element Plus 的默认圆角现在认的是卡片令牌（样式表里 --el-border-radius-base 那一行），所以动卡片会连带把输入框、按钮也拉成 12px。要让它们保持 8，得把那一行改成认控件令牌——一行的事，但这是新引入的一条约定。收益方面，上面那组 1:1 对比已经说明：肉眼几乎看不出来。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">丙 · 统一 14px，跟外框完全一致</span></div>
+              <p class="why"><b>为什么：</b>一个圆角走到底，最省心。</p>
+              <p class="risk"><b>代价与风险：</b>14px 配 20px 内边距偏圆，接近胶囊感；卡里嵌表格时四角会切到表头文字。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">丁 · 完全不动</span></div>
+              <p class="why"><b>为什么：</b>零风险。</p>
+              <p class="risk"><b>代价与风险：</b>白侧栏那套继续是 4px，换肤时块面的「硬」会跟着变，这个不稳定会一直被读成「不对劲」。</p>
+            </li>
+          </ul>
+
+          <div class="footnote">
+            <b>上一版的第 6 题（圆角放大后，输入框和按钮要不要跟着变圆）已经并进这里。</b>
+            选甲的话，卡片和控件一起提到 8px，两者仍然一致，不需要额外规则；只有圆角继续往上走（乙 12px、丙 14px）才需要动 Element Plus 那一行映射。
+          <br /><br /><b>另外这题的代价我上一版写错了：</b>原话是「只动白侧栏两个令牌，控件圆角本来就是 8」。回代码核过才发现，白侧栏两套皮肤的控件圆角、导航药丸圆角也都是 4px，所以这一题要连控件一起改。改动量那一列已经按核实后的数改了。</div>
+        </div>
+      </section>
+
+      <section id="q5">
+        <div class="q">
+          <div class="q__head">
+            <span class="q__no">第 5 题</span>
+            <h2>外卡四周那道 8px 的缝，留不留</h2>
+            <span class="badge badge--pick">推荐：丙 · 整片灰画布 · 已落地</span>
+          </div>
+          <p class="sub">这是上一版六题里漏掉的、也是最靠结构的一条，而且我上一版的判断是错的。原来我推荐「先留着」，理由是「换成灰画布牵扯每个页面，要全站回归」。这次我把三个方向都真机做出来才发现：那个理由是估的，没验过，真实改动只有 6 处。下面是同一台机器、同一个视口拍的两组对照。</p>
+
+          <figure class="wide" style="margin-top:20px">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-before-home.jpg" alt="现在：内容区是一整张白纸，四周露出 8px 灰边" />
+            <figcaption><b>现在（首页）</b>：注意内容区是一整张白纸，只在四周露出一圈 8px 的灰。卡片放在这张白纸上，所以只能靠 1px 细线区分，这就是「浮卡纸感」的来源。</figcaption>
+          </figure>
+          <figure class="wide" style="margin-top:16px">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-after-home.jpg" alt="丙案：灰画布铺满，白卡浮在上面" />
+            <figcaption><b>丙案（首页）</b>：同一页，白纸没有了，整片是浅灰画布，白卡直接浮在灰上。顶栏和图签也一起并进灰底，不再单独一条白带。卡片有底、页面有层次。</figcaption>
+          </figure>
+
+          <div class="grid2" style="margin-top:16px">
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-before-analytics.jpg" alt="现在：分析页也是纸上放卡" />
+              <figcaption><b>现在（分析页）</b>：不是首页特例，分析页一样是「白纸里放卡」。</figcaption>
+            </figure>
+            <figure class="fig">
+              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-after-analytics.jpg" alt="丙案：分析页同样是灰画布加白卡" />
+              <figcaption><b>丙案（分析页）</b>：同一套改动，分析页的指标带和图表卡自然浮在灰上。</figcaption>
+            </figure>
+          </div>
+
+          <ul class="opts">
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">甲 · 先留着（现状）</span></div>
+              <p class="why"><b>为什么：</b>零改动、零风险；这一批其他五题已经够改一轮了。</p>
+              <p class="risk"><b>代价与风险：</b>保留「纸上加纸」：内容区是一张白纸，卡又在白纸里，这正是你说的「浮卡纸感」；和 DCS 的结构永远差这一层，下一批还得再讨论一次。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">乙 · 只去缝去圆角，内容区仍然是白的</span></div>
+              <p class="why"><b>为什么：</b>结构上先向 DCS 靠一步，改动比丙还少。</p>
+              <p class="risk"><b>代价与风险：</b>我上一版模拟过这个组合，结果是退步：白纸贴边以后整屏发白，卡和纸同一个颜色，只剩 1px 线分得开，比现在更平。所以乙不能单独做，要做就得连画布一起改（也就是丙）。</p>
+            </li>
+            <li class="opt opt--pick">
+              <div class="opt__top"><span class="opt__name">丙 · 去缝去圆角 + 内容区改整片灰画布</span><span class="badge badge--pick">推荐 · 已落地</span></div>
+              <p class="why"><b>为什么：</b>一步到 DCS 的结构：灰画布上浮白卡，卡有底、页有层次，也不再是「一张纸」。而且实测改动量比乙还小得多：乙要额外解决「白纸贴边后卡没底」，丙是让灰底自然接管，问题自己消失。</p>
+              <p class="risk"><b>代价与风险：</b>约 6 处改动，两个文件：外卡和顶栏两处底色，外加三个尺寸令牌（8px 缝归零、14px 外卡圆角归零、外卡阴影去掉）。页面写法一行都不用动，因为各页内容本来就装在白色卡片里。<br /><b>验证到什么程度：</b>51 个菜单里抽了 14 个（首页、列表、表单、图表、会话、日志、文件管理八类都有），四套皮肤加 390 手机档共 23 张实拍，全部无破版。<b>还没验的：</b>另外 37 个菜单没逐个点（缓存、定时任务、菜单管理这类低频页），所以落地后仍要按菜单扫一遍，这一步写进了落地第四步。</p>
+            </li>
+          </ul>
+
+          <div class="footnote">
+            <b>我为什么改口：</b>上一版把「改起来多大」当成主要依据，但那个数是估的，没有验。真机跑完才看清：丙的改动量反而是三案里最小的（它让一个原本要单独处理的问题自然消失），而它解决的问题最多：那道缝、纸上加纸、卡片没底，一次全清。这是这一轮我第四次推翻自己的判断，记在上面「我推翻了自己四处」那一节里。
+          </div>
+        </div>
+      </section>
+
+      <section id="q6">
+        <div class="q">
+          <div class="q__head">
+            <span class="q__no">第 6 题</span>
+            <h2>关键数字要不要上颜色</h2>
+            <span class="badge badge--pick">推荐：只给「要人动手」的数 · 已落地</span>
+          </div>
+          <p class="sub">代码里现在写着「KPI 数字永远是主文字色，红黄绿只留给状态药丸」。第一轮问的是「要不要上色」，这一轮问「给哪个数上色、一屏上几个」。</p>
+
+          <figure class="wide" style="margin-top:20px">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-kpi-before.jpg" alt="当前首页指标带：全部墨色（红框标出低分主体）" />
+            <figcaption><b>现在</b>：红框框住「低分主体 1」，它和旁边的 3、119、65.6 完全同一个颜色、同一个字号，扫一眼看不出它是「有事要处理」的那个。</figcaption>
+          </figure>
+          <figure class="wide" style="margin-top:16px">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-kpi-after.jpg" alt="试装：低分主体用琥珀色（红框标出）" />
+            <figcaption><b>试装（首页）</b>：还是红框那一格，现在数字变成琥珀色。其余三个数保持墨色不变，它是这一屏唯一需要人动手的数。</figcaption>
+          </figure>
+          <figure class="wide" style="margin-top:16px">
+            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-kpi-risk.jpg" alt="试装：关注黄、高风险红（红框分别标出）" />
+            <figcaption><b>试装（用户画像页）</b>：两个红框分别是「关注」和「高风险」：关注用琥珀、高风险用红，形成一条严重度阶梯；旁边的主体数和平均分仍是墨色。</figcaption>
+          </figure>
+
+          <ul class="opts">
+            <li class="opt opt--pick">
+              <div class="opt__top"><span class="opt__name">甲 · 只给「要人动手」的数上色，且一屏至多一处</span><span class="badge badge--pick">推荐 · 已落地</span></div>
+              <p class="why"><b>为什么：</b>眼睛有落点，扫一眼就知道「有没有事要做」；颜色保住「好／坏」的语义，不是按数值大小自动刷。</p>
+              <p class="risk"><b>代价与风险：</b>需要逐页判断「哪个数才算要人动手」，不能全局自动；判断错了会误导优先级，所以要写成显式声明而不是自动规则。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">乙 · 全部保持中性（维持现有口径）</span></div>
+              <p class="why"><b>为什么：</b>最克制，管理台该有的安静。</p>
+              <p class="risk"><b>代价与风险：</b>「1 个高风险」和「3 个主体」看起来同权，用户还是得自己读标签才知道哪个要管。</p>
+            </li>
+            <li class="opt">
+              <div class="opt__top"><span class="opt__name">丙 · 每个指标一个颜色</span></div>
+              <p class="why"><b>为什么：</b>视觉上最热闹，一眼能看到四个不同的数。</p>
+              <p class="risk"><b>代价与风险：</b>四个色块排一行就是彩虹，颜色彻底失去「好／坏」的含义，也不再能指示优先级。</p>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="plan">
+        <h2>若全按推荐，落地顺序与验收</h2>
+        <p class="sub">六题都选推荐时，改动集中在四套皮肤令牌、五处菜单状态，再加一处画布底色；不新增页面、不改页面写法。唯一动到「结构」的是第 5 题（外卡去缝 + 内容区改灰画布），它单独排成第四步，做完要按菜单扫一遍。</p>
+        <ol class="steps">
+          <li><span class="when">第一步</span><span class="what"><b>改四套皮肤的令牌</b>选中块颜色（浅色用皮肤主色、深色压深一档），白侧栏的卡片圆角 4→8，一次改完。</span></li>
+          <li><span class="when">第二步</span><span class="what"><b>收编侧栏五处选中态</b>二级菜单子项、折叠态、移动抽屉，全部走同一组令牌，不再各写一套浅蓝底；父级只给轻底。</span></li>
+          <li><span class="when">第三步</span><span class="what"><b>关键数字上色</b>给指标组件加两个显式修饰类，首页只标「低分主体」，用户画像页标「关注／高风险」，其余不动。</span></li>
+          <li><span class="when">第四步</span><span class="what"><b>换成灰画布（第 5 题丙案）</b>外卡与顶栏两处底色改走灰画布，8px 缝、14px 外卡圆角、外卡阴影三个令牌归零；顶栏底部那条 1px 线保留。改完按菜单把每个页面点一遍，重点看监控/缓存/定时任务/文件管理这几个还没抽测过的。</span></li>
+          <li><span class="when">第五步</span><span class="what"><b>真机四皮肤逐项核</b>默认／深色／白侧栏／白侧栏深色，各看「选中、悬停、父级」三种状态；再开折叠态和手机抽屉。</span></li>
+          <li><span class="when">第六步</span><span class="what"><b>出前后对比页并记一笔</b>四皮肤真机对照 + 计算值断言，更新日志补一条人话。</span></li>
+        </ol>
+        <h3>验收看这几条硬指标</h3>
+        <p class="sub">选中项底色等于皮肤主色（深色档用压深那一档），白字对比不低于 4.5:1；四皮肤卡片圆角都是 8px，控件圆角仍是 8px；一屏之内实心主色块只有一处；外卡与顶栏底色都等于灰画布、四周不再有缝；390 宽抽屉打开后仍是「子项实心、父级轻底」；生产构建通过；超管和普通用户两个视角都看一遍。</p>
+      </section>
+
+      <footer>
+        <p>状态：六题等你在对话里回执，回「全按推荐」或逐题指定都可以。</p>
+        <p>本轮代码零改动；试装补丁单独存在临时目录，回执后按你的选择重新落地。</p>
+        <p>修订记录 · 2026-10-27：第一版只问方向；第二版把方向之后的细节拆成六题；本版合并为一页，并自查推翻三处推荐（圆角改成统一 8、独立题作废、深色提亮档真机否掉），另补「外卡那道缝」一题。2026-10-27 补记：第 5 题从「甲 · 先留着」改成「丙 · 整片灰画布」。原判断的改动量是估的，真机跑完 14 个页面、四套皮肤共 23 张实拍后推翻，改动仅 6 处。</p>
+      </footer>
+
+    </main>
+  </div>
 </div>
+
+<script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+    var targets = links.map(function (a) { return document.querySelector(a.getAttribute('href')); });
+    if (!('IntersectionObserver' in window)) return;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var i = targets.indexOf(e.target);
+        if (i < 0) return;
+        links.forEach(function (l) { l.classList.remove('is-here'); });
+        links[i].classList.add('is-here');
+      });
+    }, { rootMargin: '-15% 0px -70% 0px' });
+    targets.forEach(function (t) { if (t) io.observe(t); });
+  })();
+</script>
 </body>
 </html>
