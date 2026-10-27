@@ -178,6 +178,33 @@ const main = async () => {
       await shot(page, '06-assistant.png');
     }
 
+    if (want('07')) {
+      await goto(page, '/insight/profile-analytics', '数据分析中心', 1500);
+      const funnelTab = page.locator('.el-tabs__item', { hasText: '转化漏斗' }).first();
+      if (await funnelTab.count()) {
+        await funnelTab.click();
+        await page.waitForTimeout(2200);
+      } else {
+        log('warn: 未找到「转化漏斗」页签');
+      }
+      await shot(page, '07-analytics-funnel.png');
+    }
+
+    if (want('08')) {
+      await goto(page, '/insight/profile-segments', '标签分群', 1600);
+      await shot(page, '08-profile-segments.png');
+    }
+
+    if (want('09')) {
+      await goto(page, '/insight/profile-review', '低分复核', 1600);
+      await shot(page, '09-profile-review.png');
+    }
+
+    if (want('10')) {
+      await goto(page, '/insight/compliance', '合规中心', 1600);
+      await shot(page, '10-compliance.png');
+    }
+
     log('done ->', OUT);
   } finally {
     await browser.close();

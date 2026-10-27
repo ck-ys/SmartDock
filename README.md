@@ -49,6 +49,7 @@ SmartDock 是一套**通用智能体引擎**与**用户画像引擎**的参考�
 - [快速开始](#快速开始)
 - [核心模块](#核心模块)
 - [使用说明](#使用说明)
+- [更多界面](#更多界面)
 - [扩展指南](#扩展指南)
 - [技术栈](#技术栈)
 - [安全与上线前检查](#安全与上线前检查)
@@ -276,6 +277,21 @@ docker compose ps        # 五个服务应为 running / healthy
 
 执行基线 `05_demo_data.optional.sql` 后可直接看到一条演示任务；跳过时 Demo 页为空，可自行创建任务体验。
 任务与提交的状态机见 [docs/architecture.md](docs/architecture.md)。
+
+## 更多界面
+
+四张图来自同一套演示数据，分别证明分析深度、画像运营与企业合规：
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/screenshots/07-analytics-funnel.png" alt="转化漏斗"><br><sub>转化漏斗：40 位访客 → 16 次站内搜索 → 2 次注册（5%），下方是每一步的流失去向</sub></td>
+<td width="50%"><img src="docs/images/screenshots/08-profile-segments.png" alt="标签分群"><br><sub>标签分群：规则只写一次，成员按最新快照实时求值，运行记录可追溯</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/images/screenshots/09-profile-review.png" alt="低分复核"><br><sub>低分复核：低于阈值自动入队；确认或驳回后，分数没有继续下降就不再重复打扰</sub></td>
+<td width="50%"><img src="docs/images/screenshots/10-compliance.png" alt="合规中心"><br><sub>合规中心：敏感字段打码规则、主体级删除、导出审计，一页管齐并全部留痕</sub></td>
+</tr>
+</table>
 
 ## 扩展指南
 
