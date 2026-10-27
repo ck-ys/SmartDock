@@ -133,6 +133,12 @@ public class AssistantConfigService {
         for (String name : org.dromara.assistant.core.ToolRegistry.allToolNames()) {
             closed.put(name, "off");
         }
+        // B 批三审回修 P2-1：技能行一并 off——污染态下技能侧同样 fail-closed，
+        // 否则管理员已关的技能会借坏 JSON 静默复活（与工具行同族漏洞）
+        for (org.dromara.assistant.core.SkillAssets.LoadedSkill sk
+            : org.dromara.assistant.core.SkillAssets.skills()) {
+            closed.put("skill:" + sk.id(), "off");
+        }
         closed.put(POISONED_GATE_SENTINEL, "off");
         return closed;
     }

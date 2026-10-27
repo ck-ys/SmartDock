@@ -49,7 +49,9 @@ public final class ToolRegistry {
         org.dromara.assistant.core.AssistantTodoSignal todoSignal,
         org.dromara.assistant.service.AssistantConversationService conversationService,
         org.dromara.assistant.limiter.AssistantWebSearchQuota webSearchQuota,
-        org.dromara.assistant.service.AssistantUserQuotaService quotaService
+        org.dromara.assistant.service.AssistantUserQuotaService quotaService,
+        /** 三审回修 P1-1：view_skill 自取过闸用的租户矩阵快照 */
+        java.util.Map<String, String> toolGate
     ) {
     }
 
@@ -109,7 +111,7 @@ public final class ToolRegistry {
         // 技能自取（五需求批 R1，2026-10-13）：全角色注册；目录按角色裁剪+体内 minRole 兜底
         new ToolSpec(Set.of("view_skill"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
-            (id, d) -> new org.dromara.assistant.tools.SkillTools(id), null)
+            (id, d) -> new org.dromara.assistant.tools.SkillTools(id, d.toolGate()), null)
     );
 
     /** 权限通配三态口径单点(批2 glm53 P2-8 收敛): null 拒; 裸 * / *:*:* / 精确串 放行。

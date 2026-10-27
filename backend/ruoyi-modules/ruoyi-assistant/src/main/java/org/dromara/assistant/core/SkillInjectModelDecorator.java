@@ -26,11 +26,15 @@ public class SkillInjectModelDecorator implements Model {
     private final Model delegate;
     private final String aguiThreadId;
     private final int roleLevel;
+    /** 三审回修 P1-1：建会话时刻的租户矩阵快照——注入前过闸，封陈旧胶囊/触发词旁路 */
+    private final java.util.Map<String, String> toolGate;
 
-    public SkillInjectModelDecorator(Model delegate, String aguiThreadId, int roleLevel) {
+    public SkillInjectModelDecorator(Model delegate, String aguiThreadId, int roleLevel,
+                                     java.util.Map<String, String> toolGate) {
         this.delegate = delegate;
         this.aguiThreadId = aguiThreadId;
         this.roleLevel = roleLevel;
+        this.toolGate = toolGate;
     }
 
     @Override
@@ -39,9 +43,15 @@ public class SkillInjectModelDecorator implements Model {
         if (skillId == null) {
             return delegate.stream(messages, tools, options);
         }
+        // 三审回修 P1-1：矩阵 off/提档的技能不再注入（陈旧 localStorage 胶囊同拦）
+        if (!AssistantSkillGateMiddleware.visibleTo(skillId, roleLevel, toolGate)) {
+            log.debug("[AssistantSkill] 技能 {} 不可用（未知/角色不达标/租户已关闭），本轮不注入 thread={}",
+                skillId, aguiThreadId);
+            return delegate.stream(messages, tools, options);
+        }
         String body = SkillAssets.body(skillId, roleLevel);
         if (body == null) {
-            log.debug("[AssistantSkill] 技能 {} 不可用（未知或角色不达标），本轮不注入 thread={}",
+            log.debug("[AssistantSkill] 技能 {} 正文缺失，本轮不注入 thread={}",
                 skillId, aguiThreadId);
             return delegate.stream(messages, tools, options);
         }

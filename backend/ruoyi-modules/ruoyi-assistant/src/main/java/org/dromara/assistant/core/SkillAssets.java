@@ -10,7 +10,7 @@ import java.util.List;
  *
  * <p><b>现状</b>：装载已迁 {@link AssistantSkillSource}（官方 AgentSkillRepository 分层栈：
  * classpath /skills → config/skills，官方 YAML frontmatter 格式）。本类保留原公共 API
- * （{@link #skills()}/{@link #catalog(int)}/{@link #body}/{@link #exists}）做兼容门面，
+ * （{@link #skills()}/{@link #body}/{@link #exists}）做兼容门面，
  * 目录端点/注入装饰器/view_skill/Holder 零签名改动。内嵌常量表 {@link #SKILLS} 退役为
  * 零漂移护栏单测（SkillOfficialFormatZeroDiffUnitTest）的对照源，不再参与运行时装载。</p>
  *

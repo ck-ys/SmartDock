@@ -104,6 +104,28 @@ class AssistantSkillGateMiddlewareUnitTest {
             "create-template", "urge-wording");
     }
 
+    @Test
+    @Tag("dev")
+    void visibleToGatesInjectionAndSelfFetchPaths() {
+        // 三审回修 P1-1 锚点：off/提档技能在注入装饰器与 view_skill 自取两条通道同样不可见
+        Map<String, String> off = Map.of("skill:data-reading", "off");
+        assertThat(AssistantSkillGateMiddleware.visibleTo("data-reading",
+            ToolIdentity.LEVEL_ADMIN, off)).isFalse();
+        assertThat(AssistantSkillGateMiddleware.visibleTo("data-reading",
+            ToolIdentity.LEVEL_MEMBER, null)).isTrue();
+        // 提档 admin：发布人不可见、管理员可见（只升不降同构）
+        Map<String, String> raised = Map.of("skill:urge-wording", "admin");
+        assertThat(AssistantSkillGateMiddleware.visibleTo("urge-wording",
+            ToolIdentity.LEVEL_PUBLISHER, raised)).isFalse();
+        assertThat(AssistantSkillGateMiddleware.visibleTo("urge-wording",
+            ToolIdentity.LEVEL_ADMIN, raised)).isTrue();
+        // 未知/空白 id 一律不可见
+        assertThat(AssistantSkillGateMiddleware.visibleTo("bogus",
+            ToolIdentity.LEVEL_ADMIN, null)).isFalse();
+        assertThat(AssistantSkillGateMiddleware.visibleTo("  ",
+            ToolIdentity.LEVEL_ADMIN, null)).isFalse();
+    }
+
     private static List<AgentSkill> mergeViews() {
         // AssistantSkillSource.all() 是合并后的视图；重建 AgentSkill 仅为喂 filterVisibleImpl
         List<AgentSkill> out = new ArrayList<>();

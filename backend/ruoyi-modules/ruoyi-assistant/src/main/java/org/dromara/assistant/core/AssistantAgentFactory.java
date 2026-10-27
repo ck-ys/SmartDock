@@ -155,7 +155,8 @@ public class AssistantAgentFactory {
             capabilityService.matchCapability(user.getTenantId(), cfg.getProvider(), cfg.getModelName()));
         // 五需求批 R1：技能当轮注入装饰器——用户选中技能的那几轮把正文以 system 消息追加
         // （每次模型调用现读 holder，不进会话记忆，摘掉即无）；链位在思考档外/记忆内
-        innermost = new SkillInjectModelDecorator(innermost, aguiThreadId, identity.getRoleLevel());
+        innermost = new SkillInjectModelDecorator(innermost, aguiThreadId, identity.getRoleLevel(),
+            tenantCfg.toolGate());
         // Q8（2026-10-15 拍板A）：当前日期锚点——每轮尾部追加「今天是 …」（模型此前
         // 没有「今天」，日期类问题靠时间戳倒猜）。装饰器一律尾部追加且外层先追加，
         // 装配 Skill→Date→Memory 后实际消息序 [原文…, 记忆段, 日期段, 技能段]（选中
@@ -185,7 +186,7 @@ public class AssistantAgentFactory {
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
                 planSignal, memoryService, memoryOn, aguiThreadId, user.getTenantId(),
-                todoSignal, conversationService, webSearchQuota, quotaService), pb,
+                todoSignal, conversationService, webSearchQuota, quotaService, tenantCfg.toolGate()), pb,
             // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
             // 管理员改完下一轮建会话即生效（注册面即时消失）
             tenantCfg.toolGate());

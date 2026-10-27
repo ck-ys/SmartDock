@@ -68,7 +68,8 @@ public class AssistantStatusController extends BaseController {
         java.util.Map<String, String> gate = configService.effective(identity.getTenantId()).toolGate();
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
         for (org.dromara.assistant.core.SkillAssets.LoadedSkill s : org.dromara.assistant.core.SkillAssets.skills()) {
-            String key = "skill:" + s.id();
+            // P2-8 回修：行键与判定键同源（AssistantSkillGateMiddleware.gateKey 单一真相）
+            String key = org.dromara.assistant.core.AssistantSkillGateMiddleware.gateKey(s.id());
             int effective = org.dromara.assistant.core.ToolRegistry.effectiveMinRoleSingle(
                 key, s.minRole(), gate.get(key));
             if (effective < 0 || level < effective) {
@@ -78,7 +79,8 @@ public class AssistantStatusController extends BaseController {
             row.put("id", s.id());
             row.put("name", s.name());
             row.put("desc", s.description());
-            row.put("minRole", s.minRole() == 0 ? "member" : "publisher");
+            // 三审回修 P2（dsflash）：admin 档如实透出（旧二元映射会把 admin 压成 publisher）
+            row.put("minRole", s.minRole() == 0 ? "member" : s.minRole() == 2 ? "admin" : "publisher");
             row.put("triggers", s.triggers());
             out.add(row);
         }

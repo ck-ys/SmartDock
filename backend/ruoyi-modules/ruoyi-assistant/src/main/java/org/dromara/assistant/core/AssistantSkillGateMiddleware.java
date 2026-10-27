@@ -29,10 +29,16 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
     private final int roleLevel;
     private final Map<String, String> toolGate;
 
-    /** 仓分层栈取 {@link AssistantSkillSource}（进程级共享，FileSystem 记忆化才生效） */
+    /**
+     * 仓分层栈取 {@link AssistantSkillSource}（进程级共享，FileSystem 记忆化才生效）。
+     * 三审回修 P1-3：共享稳定 workDir——基类每实例 mkdtemp+挂 shutdown hook，会话级
+     * 实例化下 /tmp 目录与 hook 无界增长；传共享目录后两者只发生一次（caller-supplied
+     * root 不挂 hook），进程级清理由 AssistantSkillSource 静态块兜底。
+     */
     public AssistantSkillGateMiddleware(Toolkit toolkit, int roleLevel,
                                         Map<String, String> toolGate) {
-        super(AssistantSkillSource.repositories(), toolkit);
+        super(AssistantSkillSource.repositories(), toolkit, null, false,
+            AssistantSkillSource.sharedSkillWorkDir());
         this.roleLevel = roleLevel;
         this.toolGate = toolGate;
     }
@@ -45,6 +51,11 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
     /**
      * 纯函数判定（@Tag dev 单测锚点）：按 minRole + 矩阵行过滤可见技能。
      * 静态可测——不经框架运行时，正反例直接构造 AgentSkill 断言。
+     *
+     * <p><b>护栏约束（三审 glm53 P2-3）</b>：本方法<b>禁抛异常、禁引入可失败 IO/查库</b>——
+     * 官方基类对 filterVisible 的异常按 pass-through 全量放行处理，本方法是「谁能用哪个
+     * 技能」的唯一判定层，未来扩展只允许纯内存计算；矩阵快照在构造时取得，一切可失败
+     * 读取必须发生在构造路径（失败即建会话失败=关闭面）而非判定路径。</p>
      */
     static List<AgentSkill> filterVisibleImpl(List<AgentSkill> raw, int roleLevel,
                                               Map<String, String> toolGate) {
@@ -61,8 +72,28 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
         return out;
     }
 
-    /** 矩阵行键：技能名加 skill: 前缀，与工具名/mcp: 行互不撞名 */
-    static String gateKey(String skillName) {
+    /** 矩阵行键：技能名加 skill: 前缀，与工具名/mcp: 行互不撞名（id 型消费方共用） */
+    public static String gateKey(String skillName) {
         return "skill:" + skillName;
+    }
+
+    /**
+     * id 型可见性判定单一真相（三审回修 P1-1，dspro/dsflash 两席共识）：注入装饰器/
+     * view_skill 取正文前过同一道闸——矩阵 off/提档后，陈旧 localStorage 胶囊、触发词
+     * 自动挂载、模型自取三条旁路一并封死（与模型侧目录段、/skills 端点同口径）。
+     */
+    public static boolean visibleTo(String skillId, int roleLevel, Map<String, String> toolGate) {
+        if (skillId == null || skillId.isBlank()) {
+            return false;
+        }
+        for (SkillAssets.LoadedSkill s : SkillAssets.skills()) {
+            if (s.id().equals(skillId.trim())) {
+                int effective = ToolRegistry.effectiveMinRoleSingle(
+                    gateKey(s.id()), s.minRole(),
+                    toolGate == null ? null : toolGate.get(gateKey(s.id())));
+                return effective >= 0 && roleLevel >= effective;
+            }
+        }
+        return false;
     }
 }

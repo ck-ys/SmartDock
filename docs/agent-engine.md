@@ -98,15 +98,16 @@ ReActAgent agent = ReActAgent.builder()
 
 ## 4. 技能与提示词资产
 
-**技能库（渐进披露）**：
+**技能库（渐进披露，B 批起官方框架装载）**：
 
-- 技能正文放在 `prompts/skills/<id>.md`（可带 frontmatter 作编辑提示）；`id/name/description/minRole` 以内嵌技能表为准，外部文件只覆写正文，改文案不会改变权限语义；
-- 系统提示词只注入**技能目录**（id + 名称 + 一句话描述），目录预算 **600 字符**；
-- 正文只在两种时机进入上下文：用户当轮选中技能，或模型调用 `view_skill` 自取；
-- 单技能正文上限 **6000 字符**，超出截断并告警；
-- 加载三级兜底：外部 `config/prompts/skills/` → classpath → 内嵌常量；
-- 外部目录相对启动进程工作目录（本地 `cd backend` 启动即 `backend/config/prompts/`）；进程内缓存不过期，变更后需重启，容器部署需自行挂载该目录；
-- 目录按 `minRole` 裁剪；`view_skill` 再按角色兜底。
+- 技能资产为官方 **SKILL.md 格式**：`resources/skills/<技能名>/SKILL.md`，YAML frontmatter（`name/description/version/displayName/minRole/triggers`）+ 正文；
+- 装载走官方 **AgentSkillRepository 分层仓**（`AssistantSkillSource`）：classpath `/skills`（内置）→ `config/skills/<技能名>/SKILL.md`（部署期覆写/增删，后层同名胜出）；旧 `config/prompts/skills/*.md` 平铺覆写路径已废弃；
+- 系统提示词的技能目录段由官方 **DynamicSkillMiddleware** 每次调用动态重组（我们子类 `AssistantSkillGateMiddleware` 管可见性）；
+- 正文进入上下文的三条路都过同一道闸（frontmatter `minRole` + 租户工具开关矩阵 `skill:<技能名>` 行，off=剔除、member/admin=只升不降）：模型调官方 `load_skill_through_path` 自取、用户当轮选中注入（`SkillInjectModelDecorator`）、`view_skill` 工具兜底自取；
+- 开关矩阵改动经装配面指纹使缓存会话失效，**下一轮新会话生效**，进行中的对话不腰斩；
+- 单技能正文上限 **6000 字符**（自研通道），超出截断并告警；
+- 外部目录相对启动进程工作目录；进程内缓存不过期，变更后需重启（模型侧目录随官方仓 mtime 记忆化即时变，两条通道重启对齐）；容器部署需自行挂载 `config/skills`；
+- 旧内嵌技能常量表（`SkillAssets.SKILLS`）退役为零漂移护栏单测的对照源。
 
 内置示例技能：`create-mission`（创建任务）、`create-template`（创建模板）、
 `data-reading`（数据解读）、`urge-wording`（催办话术，仅起草文案，不发送）。

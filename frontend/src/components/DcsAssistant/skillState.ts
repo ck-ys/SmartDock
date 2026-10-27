@@ -6,8 +6,9 @@
  * 「内部路径不丢参」模式）三处共用。选中技能的正文由后端 SkillInjectModelDecorator
  * 当轮注入（不进会话记忆），前端只负责选哪个——正文永不下发前端，token 省在服务端。
  *
- * 前端目录与后端 SkillAssets.SKILLS 同源人工同步（id/名称/一句话描述/最低角色）；
- * minRole 口径与 roleOf 对齐：member=成员可见，publisher=发布人/管理员可见。
+ * 前端目录为编译期兜底：远端 /dcs/assistant/skills（B 批起读官方技能仓，且同过租户
+ * 开关矩阵）正常时以远端为准；此处静态四技能仅在网络空/异常时兜底。
+ * minRole 口径与 roleOf 对齐：member=成员可见，publisher=发布人/管理员，admin=仅管理员。
  * create-template 已随 R4a act_create_template 同批上（后端同款纪律）。
  */
 
@@ -23,8 +24,8 @@ export interface SkillCatalogItem {
   id: string;
   name: string;
   desc: string;
-  /** 最低角色：'member'=全员，'publisher'=发布人/管理员（与 roleOf 的 RoleKey 对齐） */
-  minRole: 'member' | 'publisher';
+  /** 最低角色：'member'=全员，'publisher'=发布人/管理员，'admin'=仅管理员（三审回修：admin 档如实透出） */
+  minRole: 'member' | 'publisher' | 'admin';
   tile: string;
   /** 能力① Q7：触发词（输入命中任一 → 前端自动挂载，可撤销）；来自后端目录，兜底目录常配 */
   triggers?: string[];
@@ -48,7 +49,7 @@ export interface RemoteSkillRow {
   id: string;
   name: string;
   desc: string;
-  minRole: 'member' | 'publisher';
+  minRole: 'member' | 'publisher' | 'admin';
   triggers?: string[];
 }
 
@@ -64,7 +65,7 @@ export function applyRemoteCatalog(rows: RemoteSkillRow[] | null | undefined): v
       id: r.id,
       name: r.name || fallback.get(r.id)?.name || r.id,
       desc: r.desc || fallback.get(r.id)?.desc || '',
-      minRole: r.minRole === 'member' ? 'member' : 'publisher',
+      minRole: r.minRole === 'member' ? 'member' : r.minRole === 'admin' ? 'admin' : 'publisher',
       tile: fallback.get(r.id)?.tile || (r.name || r.id).slice(0, 1),
       triggers: Array.isArray(r.triggers) ? r.triggers.filter((t) => typeof t === 'string' && t) : []
     }));

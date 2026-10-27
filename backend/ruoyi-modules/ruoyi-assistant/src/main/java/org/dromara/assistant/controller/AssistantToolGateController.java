@@ -80,7 +80,8 @@ public class AssistantToolGateController extends BaseController {
         // 行数据经 AssistantSkillSource 官方仓视图；effective 与工具行共用单键档位核心
         for (org.dromara.assistant.core.SkillAssets.LoadedSkill sk :
             org.dromara.assistant.core.SkillAssets.skills()) {
-            String key = "skill:" + sk.id();
+            // P2-8 回修：行键同源 gateKey()
+            String key = org.dromara.assistant.core.AssistantSkillGateMiddleware.gateKey(sk.id());
             rows.add(new ToolGateRow(
                 List.of(key), "技能：" + sk.name(), "技能",
                 sk.minRole() <= org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER ? ""
