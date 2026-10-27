@@ -218,7 +218,7 @@ class TodoAndTitleUnitTest {
             new org.dromara.assistant.core.AssistantTodoSignal.TodoItem("查未交名单", "completed", "high"),
             new org.dromara.assistant.core.AssistantTodoSignal.TodoItem("发催办", "in_progress", "medium")));
         org.dromara.assistant.core.AssistantEventEnricher enricher =
-            new org.dromara.assistant.core.AssistantEventEnricher(null, null, null, null, signal, null, null);
+            new org.dromara.assistant.core.AssistantEventEnricher(null, null, null, null, signal, null, null, null);
         List<AguiEvent> events = List.of(new AguiEvent.TextMessageContent("th-1", "run-1", "m1", "推进中"));
         List<AguiEvent> out = enricher.enrich(null, events, ctx("th-1", "run-1"));
         assertEquals(2, out.size(), "原 1 帧+todo 帧=2");

@@ -155,6 +155,15 @@ export interface AguiTurnHandle {
   done: Promise<'finished' | 'error' | 'stopped' | 'disconnected'>;
 }
 
+/** attach（题5 续看）一次重连的结果；未命中缓冲（JSON 错误体零帧）也收口 'error'，调用方静默回退轮询兜底 */
+export type AguiAttachResult = 'finished' | 'error' | 'stopped';
+export interface AguiAttachHandle {
+  /** 停止（幂等） */
+  stop: () => void;
+  /** 终态 promise（永不 reject） */
+  done: Promise<AguiAttachResult>;
+}
+
 export function createAguiClient(options: AguiClientOptions = {}) {
   const url = options.url ?? `${import.meta.env.VITE_APP_BASE_API}/agui/run/dcs-assistant`;
   const maxRetries = options.maxRetries ?? 5;
@@ -418,5 +427,63 @@ export function createAguiClient(options: AguiClientOptions = {}) {
     };
   }
 
-  return { startTurn };
+  /**
+   * 题5 续看：把页面刷新/断线时正在生成的一轮重新挂上（POST attach 端点）。
+   * 与 startTurn 的差异：只读不重发（重放由服务端缓冲提供；重连兜底归外层轮询），
+   * 读流即收口——未命中缓冲（本轮已结束/服务重启过/非本人会话）服务端回 JSON 错误体，
+   * 零 data: 帧 → 'error' 收口（不触发 onRunError，降级话术由轮询 watcher 的既有路径给出）。
+   */
+  function attach(threadId: string, handlers: AguiHandlers): AguiAttachHandle {
+    const controller = new AbortController();
+    let settle: (r: AguiAttachResult) => void;
+    const done = new Promise<AguiAttachResult>((resolve) => {
+      settle = resolve;
+    });
+    (async () => {
+      if (controller.signal.aborted) {
+        settle!('stopped');
+        return;
+      }
+      let response: Response;
+      try {
+        response = await fetch(`${import.meta.env.VITE_APP_BASE_API}/dcs/assistant/conversation/attach?threadId=${encodeURIComponent(threadId)}`, {
+          method: 'POST',
+          headers: {
+            Accept: 'text/event-stream',
+            Authorization: 'Bearer ' + getToken(),
+            clientid: import.meta.env.VITE_APP_CLIENT_ID as string
+          },
+          signal: controller.signal
+        });
+      } catch {
+        settle!(controller.signal.aborted ? 'stopped' : 'error');
+        return;
+      }
+      if (response.status === 401) {
+        options.onAuthFailure?.('HTTP 401');
+        settle!('error');
+        return;
+      }
+      if (!response.ok) {
+        settle!('error');
+        return;
+      }
+      // 本栈 SSE 的 content-type 头不可靠（主端点 /agui/run 一贯回 application/json 头+
+      // 流正文，attach 实测还出现 json+event-stream 双值头）——与 requestOnce 同口径：
+      // HTTP 200 一律按 SSE 流读。未命中缓冲的 JSON 错误体（本轮已结束/重启过）没有
+      // data: 帧，流读到尾零终态 → readStream 收口 'error'，调用方静默交还轮询兜底
+      try {
+        const r = await readStream(response, handlers, controller.signal);
+        settle!(r);
+      } catch {
+        settle!(controller.signal.aborted ? 'stopped' : 'error');
+      }
+    })();
+    return {
+      stop: () => controller.abort(),
+      done
+    };
+  }
+
+  return { startTurn, attach };
 }

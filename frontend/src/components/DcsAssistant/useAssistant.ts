@@ -437,6 +437,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
   }
   let handle: AguiTurnHandle | null = null;
+  // 题5 续看：attach 流控制器（单槽——新 attach 顶旧 attach；runTurn 发起时主动断开）
+  let attachCtl: AbortController | null = null;
   let wasStopped = false;
   let qDrained = 0;
   let pendingIdSeq = 1;
@@ -855,6 +857,59 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     };
   }
 
+  /** 题5 续看（B批甲案）：刷新/断线后把正在生成的一轮重挂真流——命中服务端进程缓冲则
+   *  打字机续播（重放已生成帧+续播到终态），未命中/失败静默回退 3s 轮询兜底（终态后由
+   *  watcher 重开会话拉持久化真历史）。只负责「看得到」：不置 sending、不写 history
+   *  镜像、不发取消；用户发起新回合时 attachCtl 断开让位。由持有 remoteWatch 锁的
+   *  watcher 在占位翻 thinking 后调用一次（抽屉/会话页互斥，不会双流）。
+   *  已知取舍：sending=false 期间到达的 todo CUSTOM 帧会被 handlers 的防串写守卫丢弃
+   *  （刷新恢复场景任务清单待重开会话补齐，不影响消息本体）。 */
+  function attachRunning(turn: AssistantTurn): boolean {
+    if (!state.threadId || !client.attach) {
+      return false;
+    }
+    attachCtl?.abort();
+    const ctl = new AbortController();
+    attachCtl = ctl;
+    // 续看流停滞（600s 无帧）不弹用户裁决框——断开交还轮询兜底，刷新后的恢复保持静默
+    client.attach(state.threadId, { ...handlers(turn), onStall: () => 'stop' }).done
+      .then((r) => {
+        if (attachCtl === ctl) {
+          attachCtl = null;
+        }
+        // 防御：流收口但终态帧缺失（半截回放）——按完成收尾，轮询随即将重开拉全量
+        if (r === 'finished' && !['done', 'waiting', 'error', 'stopped'].includes(turn.phase)) {
+          turn.phase = 'done';
+          turn.streamDone = true;
+          ensureTypingLoop();
+        }
+      })
+      .catch(() => {
+        if (attachCtl === ctl) {
+          attachCtl = null;
+        }
+      });
+    return true;
+  }
+
+  /** 题5 续看：在途回合占位翻转——尾回合换成新空回合（保留问题与压缩标记）并挂真流。
+   *  返回新占位（不满足条件返回 null：空会话/尾回合非 done）。在途回合占位有两种
+   *  形态：纯问题无文字，或已分段落库的部分正文（N-05 侧车分段，重载时尾回合常带
+   *  半篇回答）。后者直接 attach 会把重放帧追加成重复文本，必须清零由重放从零重建。
+   *  判错的兜底：未命中缓冲回 JSON → 轮询 3s 内重开重建，自愈。 */
+  function resumeStreamingPlaceholder(): AssistantTurn | null {
+    const tail = state.turns[state.turns.length - 1] ?? null;
+    if (!tail || tail.phase !== 'done') {
+      return null;
+    }
+    const fresh = reactive(emptyTurn(tail.question));
+    fresh.compactedBefore = tail.compactedBefore ?? null;
+    fresh.compactedBlockedBefore = tail.compactedBlockedBefore ?? null;
+    state.turns[state.turns.length - 1] = fresh;
+    attachRunning(fresh);
+    return fresh;
+  }
+
   /** 思考链路批(1008 用户报障)：thinkTier 单一真源注入——档位存于 Composer 的
    *  dcs:assistant:thinkLevel:{userId}（与 persistKey 同源派生）。此前只有 Composer
    *  正常发送链带 thinkTier，快捷提问/欢迎卡/队列补发/须知门放行/resume 等内部路径
@@ -938,6 +993,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // must-cover 全等）——入口即扫，防「弃卡改问后新回合又挂 interrupt」双待确认卡同屏
     sweepStaleHitlCards(turn);
     state.sending = true;
+    // 题5：新回合发起即断开续看流（旧 run 仍在服务端跑，其结果下次重开可见——与轮询兜底同口径）
+    attachCtl?.abort();
     state.newbieUse += 1;
     history.push({ id: 'u' + seq, role: 'user', content: q });
     if (persistKey) {
@@ -1865,6 +1922,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     cur,
     send,
     stop,
+    attachRunning,
+    resumeStreamingPlaceholder,
     removeElicitationCard,
     resumeSay,
     resolveHitl,

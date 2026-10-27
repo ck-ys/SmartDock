@@ -53,6 +53,79 @@ public class AssistantConversationController extends BaseController {
      *  ConversationService↔RunRecorder 循环依赖） */
     private final org.dromara.assistant.persist.AssistantRunRecorder runRecorder;
     private final org.dromara.assistant.mapper.AssistantRunMapper runMapper;
+    /** B 批题5「续看」：进行中 run 事件广播汇 */
+    private final org.dromara.assistant.core.AssistantRunStreamHub runStreamHub;
+
+    /**
+     * B 批题5「续看」（2026-10-27 拍板 甲案）：刷新/掉线后重新挂上进行中的回答流。
+     *
+     * <p>机制：该 thread 最新 run 仍 RUNNING 时，订阅 {@link org.dromara.assistant.core.AssistantRunStreamHub}
+     * 的 replay 汇——先重放保留窗内全部已出网事件（重建进行中回答），再续播实时流直到终局帧。
+     * 帧格式与 /agui/run 完全同源（同一出网最终视图、同一 JSON 形态），前端复用同一帧分发器。</p>
+     *
+     * <p>回退：run 不在跑/汇已逐出（终局超 5 分钟/进程重启过）→ 返回 JSON 业务错——
+     * 前端回退到既有「轮询等终态再重放历史」路径，能力不倒退。保留窗溢出（超长单轮）
+     * 时首帧补 dcs-resume-truncated 提示帧（头部内容稍后从历史消息看全文）。</p>
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @PostMapping(value = "/conversation/attach")
+    public org.springframework.http.ResponseEntity<?> attach(@RequestParam String threadId) {
+        String tenantId = TenantHelper.getTenantId();
+        Long userId = LoginHelper.getUserId();
+        java.util.List<org.dromara.assistant.domain.DcsAssistantRun> latest =
+            runMapper.selectByThread(tenantId, threadId, userId, 1);
+        boolean running = !latest.isEmpty() && "RUNNING".equals(latest.get(0).getStatus());
+        if (!running) {
+            return org.springframework.http.ResponseEntity.ok(
+                R.fail("本轮已结束，刷新消息列表即可看到全文"));
+        }
+        String runId = latest.get(0).getRunId();
+        var fluxOpt = runStreamHub.attach(runId);
+        if (fluxOpt.isEmpty()) {
+            return org.springframework.http.ResponseEntity.ok(
+                R.fail("本轮不可续看（服务重启过或已超保留窗），稍后自动接终态"));
+        }
+        final org.dromara.assistant.domain.DcsAssistantRun run = latest.get(0);
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+            new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(0L);
+        reactor.core.Disposable[] disposable = new reactor.core.Disposable[1];
+        emitter.onCompletion(() -> { if (disposable[0] != null) disposable[0].dispose(); });
+        emitter.onTimeout(() -> { if (disposable[0] != null) disposable[0].dispose(); emitter.complete(); });
+        try {
+            reactor.core.publisher.Flux<io.agentscope.core.agui.event.AguiEvent> flux = fluxOpt.get();
+            if (runStreamHub.fedCount(runId) > org.dromara.assistant.core.AssistantRunStreamHub.RING) {
+                flux = flux.startWith(new io.agentscope.core.agui.event.AguiEvent.Custom(
+                    threadId, runId,
+                    org.dromara.assistant.core.AssistantRunStreamHub.TRUNCATED_FRAME,
+                    java.util.Map.of("hint", "本回合内容较长，续看从中间开始；完整回答稍后在历史消息里")));
+            }
+            disposable[0] = flux.subscribe(
+                event -> {
+                    try {
+                        emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter
+                            .event().data(OBJECT_MAPPER.writeValueAsString(event)));
+                    } catch (Exception e) {
+                        // 客户端已断开——停订阅（汇继续留驻给下一次 attach）
+                        if (disposable[0] != null) {
+                            disposable[0].dispose();
+                        }
+                    }
+                },
+                err -> {
+                    log.warn("[AssistantAttach] run {} 续看流异常: {}", runId, err.getMessage());
+                    emitter.completeWithError(err);
+                },
+                emitter::complete);
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.ok(R.fail("续看通道建立失败：" + e.getMessage()));
+        }
+        log.info("[AssistantAttach] run {} 续看挂载 tenant={} user={}", runId, tenantId, userId);
+        // 显式 text/event-stream：ResponseEntity 裸包 SseEmitter 时 Spring 会落到默认
+        // application/json 头（8090 实测），前端按 content-type 分流会把真流误判成 JSON 降级
+        return org.springframework.http.ResponseEntity.ok()
+            .contentType(org.springframework.http.MediaType.TEXT_EVENT_STREAM)
+            .body(emitter);
+    }
 
     /** 会话列表（180 天语义=清理 job 保证；perm=use；status=ACTIVE/ARCHIVED/ALL，默认 ACTIVE） */
     @SaCheckPermission("dcs:assistant:use")

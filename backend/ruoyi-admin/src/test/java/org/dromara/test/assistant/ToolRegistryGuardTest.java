@@ -66,7 +66,7 @@ class ToolRegistryGuardTest {
     private static ToolRegistry.ToolDeps readyDeps(Boolean memoryEnabled, String threadId) {
         return new ToolRegistry.ToolDeps(
             KEY_CONFIG, null, null,
-            null, null, memoryEnabled, threadId, "000000", null, null, null, null);
+            null, null, memoryEnabled, threadId, "000000", null, null, null, null, null);
     }
 
     /** ①清单完整：全局名字无重复，与预期全集全等；每条 spec 字段齐。 */

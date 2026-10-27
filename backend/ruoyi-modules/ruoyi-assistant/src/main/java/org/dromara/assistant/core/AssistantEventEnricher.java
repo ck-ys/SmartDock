@@ -54,6 +54,8 @@ public class AssistantEventEnricher implements AguiEventEnricher {
     private final org.dromara.assistant.service.AssistantActionService actionService;
     /** G3-A1：MCP elicitation 反问卡——桥里挂起的卡信号在本批事件前转发 CUSTOM 帧 */
     private final AssistantElicitationBridge elicitationBridge;
+    /** B 批题5「续看」：进行中 run 事件广播汇——出网最终视图（闸后）喂汇，供刷新后 attach 重放 */
+    private final AssistantRunStreamHub runStreamHub;
 
     @Override
     public List<AguiEvent> enrich(AgentEvent rawEvent, List<AguiEvent> events,
@@ -164,12 +166,23 @@ public class AssistantEventEnricher implements AguiEventEnricher {
             }
         }
         // gate 可空守卫（纯逻辑单测直构 null=视为开闸透传；生产由 Spring 注入恒非空）
-        if (gate == null || gate.isEnabled()) {
-            return out;
+        List<AguiEvent> finalOut = out;
+        if (gate != null && !gate.isEnabled()) {
+            finalOut = out.stream()
+                .filter(e -> !REASONING_CONTENT_TYPES.contains(e.getType()))
+                .toList();
         }
-        return out.stream()
-            .filter(e -> !REASONING_CONTENT_TYPES.contains(e.getType()))
-            .toList();
+        // B 批题5「续看」：出网最终视图喂广播汇（闸后=重挂重放的就是客户端本该看到的）；
+        // RUN_FINISHED/RUN_ERROR 由汇侧 complete+定时逐出。喂汇失败不连坐主流（accept 内自吞）。
+        if (runStreamHub != null && context != null && context.getRunId() != null) {
+            try {
+                runStreamHub.accept(context.getRunId(), finalOut);
+            } catch (Exception e) {
+                log.warn("[AssistantResume] run {} 事件入汇失败（续看降级轮询，不连坐主流）：{}",
+                    context.getRunId(), e.getMessage());
+            }
+        }
+        return finalOut;
     }
 
     /**

@@ -29,7 +29,7 @@ class A3ReasoningFilterTest {
     private static final String RUN = "run-a3";
 
     private final AssistantReasoningGate gate = new AssistantReasoningGate();
-    private final AssistantEventEnricher enricher = new AssistantEventEnricher(gate, null, null, null, null, null, null);
+    private final AssistantEventEnricher enricher = new AssistantEventEnricher(gate, null, null, null, null, null, null, null);
 
     private List<AguiEventType> typesOf(List<AguiEvent> events) {
         return events.stream().map(AguiEvent::getType).toList();

@@ -838,10 +838,9 @@ function watchRemoteRun(c: { id: number | string; threadId: string; status?: str
   if (!tryAcquireRemoteWatch(c.threadId)) {
     return;
   }
-  const placeholder = state.turns[state.turns.length - 1] ?? null;
-  if (placeholder && placeholder.phase === 'done' && !placeholder.bufText) {
-    placeholder.phase = 'thinking';
-  }
+  // 题5 续看：尾回合换新空占位并挂真流（重放从零重建，含已分段落库的部分正文场景）；
+  // 未命中/失败静默走下方 3s 轮询兜底，终态后重放一次把生成结果接上
+  const placeholder = resumeStreamingPlaceholder();
   const mySeq = fpOpenSeq;
   let ticks = 0;
   // step5 FE-5：慢网在途守卫——上一轮请求未 resolve 时本轮直接跳过（防重复并发+重复写
@@ -970,6 +969,7 @@ const {
   cur,
   send,
   stop,
+  resumeStreamingPlaceholder,
   resumeSay,
   resolveHitl,
   setAutoLevel,
