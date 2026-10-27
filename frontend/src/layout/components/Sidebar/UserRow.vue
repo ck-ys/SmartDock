@@ -236,7 +236,9 @@ onMounted(load);
   flex: none;
   display: flex;
   padding: 8px 0;
-  border-top: 1px solid var(--app-rule);
+  /* 挂在侧栏底色上，按侧栏文字令牌派生柔线（2026-10-27 P1 拍板A）：
+     亮档不再刺眼、暗档重新可见，四皮肤自动翻转 */
+  border-top: 1px solid color-mix(in srgb, var(--app-side-text) 18%, transparent);
   box-sizing: border-box;
 }
 

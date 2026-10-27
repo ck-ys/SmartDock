@@ -4,7 +4,8 @@
       <!-- 部门树 -->
       <el-col :lg="4" :xs="24" style="">
         <el-card shadow="hover">
-          <el-input v-model="deptName" placeholder="请输入部门名称" prefix-icon="Search" clearable />
+          <!-- P3(2026-10-27 拍板A)：6 字提示在 90px 可用宽被切半截，改 4 字短文案零布局风险 -->
+          <el-input v-model="deptName" placeholder="搜索部门" prefix-icon="Search" clearable />
           <el-tree
             ref="deptTreeRef"
             class="mt-2"

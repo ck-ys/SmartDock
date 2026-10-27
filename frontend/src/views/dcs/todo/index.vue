@@ -113,7 +113,9 @@ onMounted(load);
 <style scoped>
 .todo-card :deep(.el-card__body) {
   min-width: 0;
-  padding: 16px;
+  /* P6(2026-10-27 拍板B)：表格贴边、去掉卡片内缩，与反馈中心口径归一；overflow 裁直角跟卡片圆角 */
+  padding: 0;
+  overflow: hidden;
 }
 
 .todo-table {
@@ -124,6 +126,9 @@ onMounted(load);
   --el-table-row-hover-bg-color: var(--app-raised);
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
+  /* 空态时表格根自带的上/左半框（右/下无线）呈「卡中框」假象，贴边后清掉，只留行分隔线 */
+  border: none;
+  border-radius: 0;
 }
 
 .todo-title-link {

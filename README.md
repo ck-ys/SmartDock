@@ -150,6 +150,8 @@ npm run dev
 
 访问 http://localhost:5188，使用 `admin / admin123` 登录。端口冲突时，前端改 `frontend/.env.development` 的 `VITE_APP_PORT`，后端用 `--server.port=` 覆盖。
 
+> 需要浏览器里的 Vue 调试面板时（默认关闭，避免向页面注入调试浮层）：`VITE_DEVTOOLS=1 npm run dev`（Windows PowerShell：`$env:VITE_DEVTOOLS='1'; npm run dev`）。
+
 **4. 造一份演示数据（可选）**
 
 空库也能跑，但界面没数据。想快速看到截图里的效果：

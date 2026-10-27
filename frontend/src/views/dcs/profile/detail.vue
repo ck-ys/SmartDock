@@ -35,7 +35,7 @@
       </div>
       <div class="ui-kpi">
         <span class="ui-kpi__label">维度覆盖</span>
-        <strong class="ui-kpi__value">{{ detail.dataQuality?.coverageRate ?? '—' }}%</strong>
+        <strong class="ui-kpi__value">{{ detail.dataQuality ? formatPercent(detail.dataQuality.coverageRate, 1) + '%' : '—' }}</strong>
         <span class="ui-kpi__hint">{{ detail.dataQuality?.coveredCount ?? 0 }}/{{ detail.dataQuality?.dimensionCount ?? 0 }} 维有证据</span>
       </div>
       <div class="ui-kpi">
@@ -190,6 +190,7 @@ import { LineChart, RadarChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 import { useChartTokens, alpha } from '@/utils/chart-theme';
+import { formatScore, formatPercent } from '@/utils/score';
 import { getRiskBands, getScore, type ProfileDetail, type ProfileDimensionRow } from '@/api/dcs/core/profile';
 
 use([CanvasRenderer, LineChart, RadarChart, GridComponent, LegendComponent, TooltipComponent]);
@@ -317,11 +318,7 @@ const clamp = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value
 const riskBands = reactive({ lowMin: 75, highBelow: 60 });
 const scoreColor = (value: number) =>
   value >= riskBands.lowMin ? 'var(--el-color-success)' : value >= riskBands.highBelow ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
-const formatScore = (value?: number | string | null) => {
-  if (value === null || value === undefined || value === '') return '—';
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(1) : String(value);
-};
+/* P2(2026-10-27 拍板A)：分数口径收敛到共享 formatScore，本地副本移除 */
 const formatTime = (value?: string | null) => {
   if (!value) return '—';
   return String(value).replace('T', ' ').slice(5, 16);

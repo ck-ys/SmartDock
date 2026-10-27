@@ -74,7 +74,7 @@
               <div v-for="item in overview.levels" :key="item.level" class="level-row">
                 <div class="level-head">
                   <el-tag :type="levelTagType(item.level)" effect="light">{{ item.level }}</el-tag>
-                  <span class="level-count">{{ item.count }} 个 · {{ formatScore(item.rate) }}%</span>
+                  <span class="level-count">{{ item.count }} 个 · {{ formatPercent(item.rate) }}%</span>
                 </div>
                 <el-progress :percentage="clamp(Number(item.rate))" :show-text="false" :stroke-width="8" :color="levelColor(item.level)" />
               </div>
@@ -342,10 +342,10 @@
               </template>
             </el-table-column>
             <el-table-column label="当前" width="100" align="right">
-              <template #default="{ row }">{{ row.baseCount }}（{{ formatScore(row.baseRate) }}%）</template>
+              <template #default="{ row }">{{ row.baseCount }}（{{ formatPercent(row.baseRate) }}%）</template>
             </el-table-column>
             <el-table-column label="草稿试算" width="100" align="right">
-              <template #default="{ row }">{{ row.candCount }}（{{ formatScore(row.candRate) }}%）</template>
+              <template #default="{ row }">{{ row.candCount }}（{{ formatPercent(row.candRate) }}%）</template>
             </el-table-column>
             <el-table-column label="人数变化" width="100" align="right">
               <template #default="{ row }">
@@ -465,10 +465,10 @@
               </template>
             </el-table-column>
             <el-table-column label="版本 A" width="120" align="right">
-              <template #default="{ row }">{{ row.baseCount }}（{{ formatScore(row.baseRate) }}%）</template>
+              <template #default="{ row }">{{ row.baseCount }}（{{ formatPercent(row.baseRate) }}%）</template>
             </el-table-column>
             <el-table-column label="版本 B" width="120" align="right">
-              <template #default="{ row }">{{ row.candCount }}（{{ formatScore(row.candRate) }}%）</template>
+              <template #default="{ row }">{{ row.candCount }}（{{ formatPercent(row.candRate) }}%）</template>
             </el-table-column>
             <el-table-column label="人数变化" width="100" align="right">
               <template #default="{ row }">
@@ -568,6 +568,7 @@ import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 import { useChartTokens } from '@/utils/chart-theme';
+import { formatScore, formatPercent } from '@/utils/score';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   compareModelRuns,
@@ -627,11 +628,7 @@ const query = reactive({ pageNum: 1, pageSize: 20, level: '', keyword: '' });
 const currentModel = computed(() => models.value.find((m) => m.modelId === modelId.value) || null);
 
 const clamp = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
-const formatScore = (value?: number | string | null) => {
-  if (value === null || value === undefined || value === '') return '—';
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(2) : String(value);
-};
+/* P2(2026-10-27 拍板A)：分数口径收敛到共享 formatScore（分数一位）；占比调用点改 formatPercent（两位），本地副本移除 */
 const rfmMetrics = computed(() => [
   { label: '已评分主体', value: overview.value.scoredCount ?? '—' },
   { label: '平均标准分', value: formatScore(overview.value.avgNormalizedScore) },

@@ -41,7 +41,7 @@
             :max="100"
             :precision="2"
             controls-position="right"
-            style="width: 130px"
+            style="width: 140px"
             @update:model-value="(v: number) => (config.reviewThreshold = v)"
           />
           <span class="muted small">低于该总分入队</span>
@@ -53,7 +53,7 @@
         </div>
         <div class="config-item">
           <span class="config-label">复核 SLA</span>
-          <el-input-number v-model="config.reviewSlaDays" :min="1" :max="365" controls-position="right" style="width: 120px" />
+          <el-input-number v-model="config.reviewSlaDays" :min="1" :max="365" controls-position="right" style="width: 140px" />
           <span class="muted small">天，超时每天 09:10 提醒管理员</span>
         </div>
         <el-button v-hasPermi="['profile:review:edit']" :loading="configSaving" @click="saveConfig">保存策略</el-button>
@@ -226,6 +226,7 @@ import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
 ensureSources();
+import { formatScore } from '@/utils/score';
 import {
   confirmReview,
   dismissReview,
@@ -253,11 +254,7 @@ const reviewMetrics = computed(() => [
 ]);
 const query = reactive({ pageNum: 1, pageSize: 20, status: 'PENDING', riskLevel: '', keyword: '' });
 
-const formatScore = (value?: number | string | null) => {
-  if (value === null || value === undefined || value === '') return '—';
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(2) : String(value);
-};
+/* P2(2026-10-27 拍板A)：分数口径收敛到共享 formatScore（两位→一位，与列表/详情同口径），本地副本移除 */
 const scoreClass = (value: number) => (value >= 60 ? 'score-mid' : 'score-low');
 const statusTagType = (status?: string) => {
   if (status === 'PENDING') return 'warning' as const;

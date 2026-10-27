@@ -41,7 +41,8 @@
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <el-button @click="reload">查询</el-button>
-        <el-button text @click="resetFilters">重置</el-button>
+        <!-- P8③(2026-10-27 拍板A)：重置掉成纯文本样式与别页描边款漂移，去 text 恢复统一 -->
+        <el-button @click="resetFilters">重置</el-button>
       </div>
 
       <div class="dcs-ops-table-wrap">

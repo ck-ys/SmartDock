@@ -1,6 +1,6 @@
 <template>
-  <el-drawer v-model="showSettings" :with-header="false" direction="rtl" size="300px" close-on-click-modal>
-    <h3 class="drawer-title">菜单导航设置</h3>
+  <!-- P7(2026-10-27 拍板A)：补标题头+右上关闭钮，与「外观」抽屉关闭动线一致（原先无头无 X 只能点遮罩） -->
+  <el-drawer v-model="showSettings" title="菜单导航设置" direction="rtl" size="300px" close-on-click-modal>
     <div class="nav-wrap">
       <el-tooltip content="左侧菜单" placement="bottom">
         <div

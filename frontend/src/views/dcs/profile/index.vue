@@ -234,6 +234,7 @@ import {
   type ProfileSubjectSummary
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
+import { formatScore } from '@/utils/score';
 import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
@@ -300,11 +301,7 @@ const loadRiskBands = async () => {
 };
 
 const clamp = (value: number) => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
-const formatScore = (value?: number | string | null) => {
-  if (value === null || value === undefined || value === '') return '—';
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(1) : String(value);
-};
+/* P2(2026-10-27 拍板A)：分数口径收敛到共享 formatScore（一位小数），本地副本移除 */
 const scoreColor = (value: number) =>
   value >= riskBands.lowMin ? 'var(--el-color-success)' : value >= riskBands.highBelow ? 'var(--el-color-warning)' : 'var(--el-color-danger)';
 const scoreClass = (value: number) => (value >= riskBands.lowMin ? 'dim-good' : value >= riskBands.highBelow ? 'dim-mid' : 'dim-low');
@@ -526,6 +523,12 @@ onMounted(loadAll);
   align-items: center;
   gap: 8px;
   margin-left: auto;
+}
+/* P8⑤(2026-10-27 拍板A)：窄屏筛选项换行后动作组独占一行，不再被 auto 推右悬空 */
+@media (max-width: 992px) {
+  .filter-actions {
+    margin-left: 0;
+  }
 }
 .subject-cell {
   display: flex;

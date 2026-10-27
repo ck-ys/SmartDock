@@ -181,6 +181,8 @@ h6 {
   margin-bottom: -1px;
   padding: 11px 0px;
   font-size: 13px;
+  /* P4(2026-10-27 拍板A)：值过长换行时 float 不撑行高、文字骑到分隔线上，flow-root 让行高自包裹 */
+  display: flow-root;
 }
 
 .pull-right {

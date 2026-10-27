@@ -33,7 +33,7 @@
     <div class="meta-line">
       <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
       <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
-      <span class="muted">口径：PV=页面浏览 · UV=去重访客 · 访问次数=去重会话 · 跳出=只看一页</span>
+      <span class="muted">口径：<span class="trend-seg">PV=页面浏览</span> · <span class="trend-seg">UV=去重访客</span> · <span class="trend-seg">访问次数=去重会话</span> · <span class="trend-seg">跳出=只看一页</span></span>
     </div>
 
     <el-tabs v-model="tab" class="analytics-tabs" @tab-change="onTabChange">
@@ -116,8 +116,11 @@
             <div class="panel-head">
               <span>流量趋势</span>
               <span class="muted trend-sub" v-if="overview.current">
-                跳出 {{ formatPercent(overview.current?.bounceRate) }} · 停留 {{ formatDuration(overview.current?.avgDuration) }} · 页次
-                {{ formatNumber(overview.current?.pagesPerVisit, 2) }} · 事件 {{ formatNumber(overview.current?.events) }}
+                <!-- P8④(2026-10-27 拍板A)：按「·」分段 nowrap，窄屏整段换行、段内不断，不再拆出「531」孤行 -->
+                <span class="trend-seg">跳出 {{ formatPercent(overview.current?.bounceRate) }}</span> ·
+                <span class="trend-seg">停留 {{ formatDuration(overview.current?.avgDuration) }}</span> ·
+                <span class="trend-seg">页次 {{ formatNumber(overview.current?.pagesPerVisit, 2) }}</span> ·
+                <span class="trend-seg">事件 {{ formatNumber(overview.current?.events) }}</span>
               </span>
             </div>
           </template>
@@ -1961,6 +1964,10 @@ onMounted(async () => {
   font-weight: 400;
   font-size: var(--dcs-font-sm);
   white-space: normal;
+}
+/* P8④：段内不断行——窄屏整段换行，标签与数字不拆散 */
+.trend-seg {
+  white-space: nowrap;
 }
 .small {
   font-size: 12px;
