@@ -743,6 +743,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           if (items.length > 0 && state.sending) {
             state.todoItems = items;
           }
+        } else if (name === 'dcs-resume-truncated') {
+          // 题5 续看溢出提示帧（后端 attach 首帧）：单轮事件超保留窗 4096——重放从中间
+          // 开始，头部内容稍后从历史消息看全文（终态后轮询重开拉全量）
+          toast('本回合内容较长，续看从中间开始，开头稍后可在历史消息看全文', 'info');
         }
       },
       onStall: async () => {
@@ -1311,6 +1315,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
    * remember=true 且批准 → 工具名入 state.autoApproved（本会话同工具不再逐次确认）。
    */
   async function resolveHitl(approved: boolean, remember = false, edits?: HitlEdits) {
+    // 题5：resume 起新流（后端同 runId 换汇）——旧续看流若还挂着先断开让位
+    attachCtl?.abort();
+    attachCtl = null;
     // 波 0.1（多审 P1-B）：确认卡可能不属于最后一个回合——H2 确认轮失败回滚 pending 后，
     // cur() 是失败的 resume 回合（hitl 为空），盲取会让停靠区唯一可见的确认/取消静默失效。
     // 取卡口径与停靠区同源：优先最近一张 pending 卡，取不到再回退 cur()；
@@ -1552,6 +1559,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
 
   function resetForNewSession() {
     convGen += 1;
+    // 题5：续看流随会话重置断开让位（旧回合占位即将被清/换，attach 不得再写任何 turn）
+    attachCtl?.abort();
+    attachCtl = null;
     // k3 P1-1 回修：切会话/新会话即清任务清单——旧会话清单不得残留到新面板
     // （loadTodo 晚归响应被上面的代数守卫拦下，不会回填旧值）
     state.todoItems = [];

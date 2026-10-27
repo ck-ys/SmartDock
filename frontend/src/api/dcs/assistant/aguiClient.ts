@@ -471,9 +471,11 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       // 本栈 SSE 的 content-type 头不可靠（主端点 /agui/run 一贯回 application/json 头+
       // 流正文，attach 实测还出现 json+event-stream 双值头）——与 requestOnce 同口径：
       // HTTP 200 一律按 SSE 流读。未命中缓冲的 JSON 错误体（本轮已结束/重启过）没有
-      // data: 帧，流读到尾零终态 → readStream 收口 'error'，调用方静默交还轮询兜底
+      // data: 帧，流读到尾零终态 → readStream 收口 'error'，调用方静默交还轮询兜底。
+      // 深审 P1-B 回修：readStream 尾部 JSON 分支会调 onRunError——未命中时不得把
+      // 「本轮已结束」人话错标成本回合失败（污染在途占位），attach 侧剥掉该回调
       try {
-        const r = await readStream(response, handlers, controller.signal);
+        const r = await readStream(response, { ...handlers, onRunError: undefined }, controller.signal);
         settle!(r);
       } catch {
         settle!(controller.signal.aborted ? 'stopped' : 'error');

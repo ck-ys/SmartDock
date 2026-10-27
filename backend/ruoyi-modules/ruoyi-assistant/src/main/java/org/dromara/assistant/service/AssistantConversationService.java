@@ -573,6 +573,17 @@ public class AssistantConversationService {
             throw new ServiceException("检测到重复请求（网络重连触发），已拦截以防重复扣费。"
                 + "上一轮可能仍在处理，稍候刷新对话查看；若未收到回答请重新发送", 409);
         }
+        // 题5 深审 P1-1 回修（dspro/glm53 共识，2026-10-28）：断连不拆链桥接上线后，框架
+        // resume 闩会随 HTTP 断开提前释放（doFinally 挂在汇热流上）而原链仍在跑——此时同
+        // thread 再发新消息=双流并发写同一 AgentSession（框架明确不支持态；recorder 步骤/
+        // 思考缓冲也依赖同 thread 单活跃 run）。DB 真源兜底：同 (租户,用户,thread) 存在
+        // 其它 RUNNING run 即 409 人话拒绝（新 run 行由 registerRun 刚插入，按 runId 排除）。
+        List<DcsAssistantRun> inflight = runMapper.selectByThread(tenantId, threadId, userId, 2);
+        for (DcsAssistantRun r : inflight) {
+            if ("RUNNING".equals(r.getStatus()) && !r.getRunId().equals(runId)) {
+                throw new ServiceException("上一轮回答还在生成中，稍候再发；刷新页面即可接着看这一轮回答", 409);
+            }
+        }
         if (content != null && !content.isBlank()) {
             appendUserMessage(tenantId, conversationId, userId, content);
         }

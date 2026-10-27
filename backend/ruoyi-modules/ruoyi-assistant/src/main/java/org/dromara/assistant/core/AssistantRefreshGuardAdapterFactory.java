@@ -8,6 +8,7 @@ import io.agentscope.core.agui.adapter.AguiAgentAdapterFactory;
 import io.agentscope.core.agui.event.AguiEvent;
 import io.agentscope.core.agui.model.RunAgentInput;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -26,11 +27,19 @@ import reactor.core.publisher.Flux;
  * <p><b>口径</b>：无 runId 的请求（协议外）不接管原样透传；同 runId 重入
  * （断线重试/HITL resume 复用 runId）由 bridge 弃旧链换新汇。</p>
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AssistantRefreshGuardAdapterFactory implements AguiAgentAdapterFactory {
 
     private final AssistantRunStreamHub runStreamHub;
+
+    /** 启动即见：桥接工厂是否真的接管（starter 自动配置让位给本 bean），未接管时
+     *  断连拆链静默回归——日志是唯一现场证据（深审回修补） */
+    @jakarta.annotation.PostConstruct
+    void logBridgeActive() {
+        log.info("[run-hub] bridge factory active——AguiAgentAdapterFactory 已由本件接管，断连不拆链生效");
+    }
 
     @Override
     public AguiAgentAdapter create(Agent agent, AguiAdapterConfig config) {

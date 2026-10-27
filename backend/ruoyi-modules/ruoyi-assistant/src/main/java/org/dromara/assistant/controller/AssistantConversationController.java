@@ -91,6 +91,9 @@ public class AssistantConversationController extends BaseController {
         reactor.core.Disposable[] disposable = new reactor.core.Disposable[1];
         emitter.onCompletion(() -> { if (disposable[0] != null) disposable[0].dispose(); });
         emitter.onTimeout(() -> { if (disposable[0] != null) disposable[0].dispose(); emitter.complete(); });
+        // 深审回修：send 之外的应用层异常（序列化/容器错）也 dispose——漏挂会让观众计数
+        // 不减、孤儿判定失真（viewers 永不为零，弃链兜底被废）
+        emitter.onError(ex -> { if (disposable[0] != null) disposable[0].dispose(); });
         try {
             reactor.core.publisher.Flux<io.agentscope.core.agui.event.AguiEvent> flux = fluxOpt.get();
             if (runStreamHub.fedCount(runId) > org.dromara.assistant.core.AssistantRunStreamHub.RING) {
