@@ -193,6 +193,14 @@ defineExpose({
 /* U-13：主题预览块（setting-drawer-block-checbox 系）已随 U-24 外观抽屉（DcsAppearanceDrawer）下线，
    模板零引用的死样式连同其中灰阴影 / Ant 旧蓝对勾 / rgba 近黑标题三处字面量一并删除；
    旧嵌套的 .setting-drawer-title .drawer-title 选择器本就不命中现役 h3.drawer-title（无样式变化） */
+/* P7 补刀(四席复审 P2-6)：裸 h3 落浏览器默认（1.17em+1em 边距）比抽屉标题还大——层级倒挂；
+   收到 13px/600 并对齐外观抽屉小节标题 */
+.drawer-title {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text, var(--el-text-color-primary));
+}
 .drawer-item {
   padding: 12px 0;
   font-size: 14px;

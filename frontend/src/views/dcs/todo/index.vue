@@ -118,6 +118,11 @@ onMounted(load);
   overflow: hidden;
 }
 
+/* ≤992 表格改卡片列表（dcs-mobile-list），贴边后卡片贴死外卡边框——按反馈页 fb-mobile 范式补内距（四席复审 P1-5） */
+.todo-card :deep(.dcs-mobile-list) {
+  padding: 12px 16px 0;
+}
+
 .todo-table {
   --el-table-header-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);

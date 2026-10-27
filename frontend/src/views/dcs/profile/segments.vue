@@ -165,7 +165,7 @@
             type="success"
             :closable="false"
             show-icon
-            :title="`预览命中 ${previewResult.matched} / ${previewResult.totalCandidates}（${formatScore(previewResult.rate)}%）：${previewResult.summary}`"
+            :title="`预览命中 ${previewResult.matched} / ${previewResult.totalCandidates}（${formatPercent(previewResult.rate)}%）：${previewResult.summary}`"
           />
         </template>
         <el-alert
@@ -448,6 +448,7 @@ import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 import { useChartTokens } from '@/utils/chart-theme';
+import { formatScore, formatPercent } from '@/utils/score';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { download } from '@/utils/request';
 import {
@@ -510,12 +511,6 @@ const refreshModeLabel = (mode?: string) => {
   if (mode === 'HOURLY') return '自动·每小时';
   if (mode === 'DAILY') return '自动·每天';
   return '';
-};
-
-const formatScore = (value?: number | string | null) => {
-  if (value === null || value === undefined || value === '') return '—';
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(2) : String(value);
 };
 
 const parseRule = (segment: ProfileSegment): { match?: string; conditions?: { field: string; op: string; value?: any }[] } => {

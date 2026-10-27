@@ -33,7 +33,7 @@
     <div class="meta-line">
       <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
       <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
-      <span class="muted">口径：<span class="trend-seg">PV=页面浏览</span> · <span class="trend-seg">UV=去重访客</span> · <span class="trend-seg">访问次数=去重会话</span> · <span class="trend-seg">跳出=只看一页</span></span>
+      <span class="muted">口径：<span class="trend-seg">PV=页面浏览 ·</span> <span class="trend-seg">UV=去重访客 ·</span> <span class="trend-seg">访问次数=去重会话 ·</span> <span class="trend-seg">跳出=只看一页</span></span>
     </div>
 
     <el-tabs v-model="tab" class="analytics-tabs" @tab-change="onTabChange">
@@ -116,10 +116,11 @@
             <div class="panel-head">
               <span>流量趋势</span>
               <span class="muted trend-sub" v-if="overview.current">
-                <!-- P8④(2026-10-27 拍板A)：按「·」分段 nowrap，窄屏整段换行、段内不断，不再拆出「531」孤行 -->
-                <span class="trend-seg">跳出 {{ formatPercent(overview.current?.bounceRate) }}</span> ·
-                <span class="trend-seg">停留 {{ formatDuration(overview.current?.avgDuration) }}</span> ·
-                <span class="trend-seg">页次 {{ formatNumber(overview.current?.pagesPerVisit, 2) }}</span> ·
+                <!-- P8④(2026-10-27 拍板A)：按「·」分段 nowrap，窄屏整段换行、段内不断，不再拆出「531」孤行；
+                     分隔符随上一段走（并进 span），避免折行后「·」孤悬行首（四席复审 P1-4） -->
+                <span class="trend-seg">跳出 {{ formatPercent(overview.current?.bounceRate) }} ·</span>
+                <span class="trend-seg">停留 {{ formatDuration(overview.current?.avgDuration) }} ·</span>
+                <span class="trend-seg">页次 {{ formatNumber(overview.current?.pagesPerVisit, 2) }} ·</span>
                 <span class="trend-seg">事件 {{ formatNumber(overview.current?.events) }}</span>
               </span>
             </div>
@@ -1105,7 +1106,9 @@ const trendOption = computed<any>(() => ({
   color: ct.value.series,
   tooltip: { trigger: 'axis' },
   legend: { data: ['PV', 'UV', '访问次数'], left: 'center', top: 0, itemWidth: 14, itemHeight: 8 },
-  grid: { left: 52, right: 74, top: 34, bottom: 32 },
+  /* top 52：右轴名「UV / 访问」贴着轴顶（52-16≈36 带），与 0 带的居中图例在 375 档同横带叠字——
+     下压网格顶界让轴名带（30-42）与图例带（0-14）垂直分开（四席复审 medium，二修） */
+  grid: { left: 52, right: 74, top: 52, bottom: 32 },
   xAxis: {
     type: 'category',
     boundaryGap: false,
