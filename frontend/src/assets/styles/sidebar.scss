@@ -308,3 +308,27 @@
     border-radius: var(--app-radius-sm);
   }
 }
+
+/* 2026-10-27 重构拍板 Q4=甲：导航选中的“位置信号”由整块主色改成左侧 2px 蓝短条。
+   短条用 ::before 绝对定位，不占布局宽度（图标与文字不横移）；父级分组只留浅底当路标，
+   短条只挂真正所在的页，避免父级和子级两条短条叠着喊 */
+#app .sidebar-container .el-menu-item.is-active {
+  position: relative;
+}
+/* 二级菜单有一条 2px 的树脊线（.nest-menu .el-menu-item::before，left:10px、24% 白），
+   它和选中的短条同权重、且写在后面，会把短条整条压掉——这里多带一级 .nest-menu 把「当前页」抢回来：
+   当前页只显示蓝短条，树脊线在这一行让位，否则两条 2px 线并排 4px，糊成一条 */
+#app .sidebar-container .nest-menu .el-menu-item.is-active::before,
+#app .sidebar-container .el-menu-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  bottom: auto;
+  width: 2px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 1px;
+  background: var(--app-side-active-bar, var(--app-accent));
+  pointer-events: none;
+}

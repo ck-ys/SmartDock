@@ -52,19 +52,7 @@
 
     <h3 class="drawer-title">系统布局配置</h3>
 
-    <div class="drawer-item">
-      <span>开启 Tags-Views</span>
-      <span class="comp-style">
-        <el-switch v-model="settingsStore.tagsView" class="drawer-switch" />
-      </span>
-    </div>
-
-    <div class="drawer-item">
-      <span>显示页签图标</span>
-      <span class="comp-style">
-        <el-switch v-model="settingsStore.tagsIcon" :disabled="!settingsStore.tagsView" class="drawer-switch" />
-      </span>
-    </div>
+    <!-- 2026-10-27 重构拍板 Q6=乙：页签栏已整行下线，这里的两只开关一并撤掉（留着就是死控件） -->
 
     <div class="drawer-item">
       <span>固定 Header</span>

@@ -24,7 +24,7 @@
 
   /* 密度 */
   --dcs-control-h: 36px; // 控件高（按钮 / 输入 / 下拉）
-  --dcs-row-h: 44px; // 表格行高（契约 44-46 取下沿）
+  --dcs-row-h: 46px; // 表格行高（2026-10-27 重构拍板 Q5=甲：44 → 46，和 13px 正文＋上下 13px 对齐）
   --dcs-pill-radius: 999px; // 药丸圆角
 
   /* 密度档位（外观抽屉切 html.density-compact）：默认值与既有视觉完全一致，
@@ -59,7 +59,8 @@ html.dark {
   --dcs-kpi-size: 26px;
   --dcs-kpi-weight: 600;
   --dcs-control-h: 36px;
-  --dcs-row-h: 44px;
+  /* 尺寸令牌亮暗必须同值：这里漏改过一次，深色行高会偷偷退回 44（2026-10-27 Q5=甲） */
+  --dcs-row-h: 46px;
   --dcs-pill-radius: 999px;
 
   /* 颜色别名重绑定：目标变量已在 html.dark 内换值，这里显式声明深色口径 */

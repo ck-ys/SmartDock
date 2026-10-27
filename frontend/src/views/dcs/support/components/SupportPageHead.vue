@@ -1,7 +1,8 @@
 <template>
   <header class="sp-head">
     <div class="sp-head__main">
-      <div v-if="eyebrow" class="sp-head__eyebrow">{{ eyebrow }}</div>
+      <!-- 2026-10-27 重构拍板 Q6=乙：眉标下线（与 DcsOperationsPageHeader 同口径） -->
+      <div v-if="false" class="sp-head__eyebrow">{{ eyebrow }}</div>
       <h1 class="sp-head__title">{{ title }}</h1>
       <p v-if="description" class="sp-head__desc">{{ description }}</p>
     </div>

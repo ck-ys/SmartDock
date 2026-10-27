@@ -15,19 +15,20 @@
 /* ============================ T1 · 浅色（默认） ============================ */
 :root {
   color-scheme: light;
-  /* 结构（spec T1.light：bg #eef1f6 / shell #1e2a38 / sheet #fff / rule #dce3ec / raised #f4f6fa） */
-  --app-frame: #eef1f6;
+  /* 结构（2026-10-27 重构拍板 Q2=甲：画布 #f2f4f7 / 卡 #fff / 线 #e2e5ea / 不投阴影） */
+  --app-frame: #f2f4f7;
   --app-sheet-bg: #ffffff;
-  --app-ground: #eef1f6;
+  --app-ground: #f2f4f7;
   --app-surface: #ffffff;
   --app-raised: #f4f6fa;
   --app-active: #e8f0fe; /* 内容面选中底 = accSoft；侧栏选中另有 side-active-* 令牌 */
-  --app-border: #dce3ec;
-  --app-rule: #dce3ec;
-  --app-control: #dce3ec;
+  --app-border: #e2e5ea;
+  --app-rule: #e2e5ea;
+  --app-control: #e2e5ea;
   --app-text: #14202d;
   --app-muted: #5f7083;
-  --app-faint: #8494a6;
+  /* 2026-10-27 重构 Q5=甲：原 #8494a6 在 11–12px 上只有 3.10:1，压到 4.76:1（仍比 muted 浅一档） */
+  --app-faint: #64748b;
 
   /* 数据与主操作（acc #2f6feb；主按钮即 acc，墨色 accFg） */
   --app-accent: #2f6feb;
@@ -45,14 +46,30 @@
   --app-fab-fg: #ffffff;
   --app-fab-border: transparent;
 
-  /* 侧栏一族（shell/sideText/activeBg/activeText；hover 档在 shell 与 activeBg 之间取）
-     2026-10-27 风格方向（拍板 Q1=甲）：选中项＝实心主色块＋白字，对齐用户认可的 DCS 导航锚点；
-     原来的左缘 3px 色条（activeBar）退场——实心块本身就是唯一选中信号，再叠条是双重强调 */
+  /* 侧栏一族（shell/sideText/activeBg/activeText/activeBar；hover 档在 shell 与 activeBg 之间取）
+     2026-10-27 重构（拍板 Q1=乙 + Q4=甲）：侧栏保持深色锚点，但选中不再是整块主色——
+     改成「浅一档底 + 白字 + 左侧 2px 蓝短条」。整块蓝是整屏面积最大的彩色块，
+     和主按钮抢同一块注意力；短条足够回答“我在哪”，把蓝色留给操作 */
   --app-shell: #1e2a38;
   --app-side-text: #c7d2de;
   --app-side-hover: #263545;
-  --app-side-active-bg: var(--app-accent);
+  --app-side-active-bg: #2c3b4d;
   --app-side-active-text: #ffffff;
+  --app-side-active-bar: var(--app-accent);
+
+  /* ---- 刻度（2026-10-27 重构 Q5=甲）：字号只留六档、圆角只留三档 ----
+     全站原来的 37 个字号值收敛到这里；新页面一律引用令牌，不再写裸 px */
+  --app-fs-1: 12px; /* 表头 / 标签 / 辅助说明 */
+  --app-fs-2: 13px; /* 表格正文 / 段落说明 */
+  --app-fs-3: 14px; /* 正文 / 导航 / 表单 */
+  --app-fs-4: 15px; /* 区块小标题 */
+  --app-fs-5: 20px; /* 页面标题 */
+  --app-fs-6: 26px; /* 指标大数 */
+  --app-radius-s: 6px;
+  --app-radius-m: 8px;
+  --app-radius-l: 10px;
+  --app-table-row-h: 46px;
+  --app-table-head-h: 44px;
 
   /* 品牌字母标（markBg/markFg，两主题同款、颜色随令牌） */
   --app-mark-bg: #eef2f7;
@@ -151,18 +168,18 @@
    深色主题残留时，全局规则会把它们的输入框/卡片刷成深面，所以仍要整套钉回浅色值） */
 :is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper, .tenant-picker) {
   color-scheme: light;
-  --app-frame: #eef1f6;
+  --app-frame: #f2f4f7;
   --app-sheet-bg: #ffffff;
-  --app-ground: #eef1f6;
+  --app-ground: #f2f4f7;
   --app-surface: #ffffff;
   --app-raised: #f4f6fa;
   --app-active: #e8f0fe;
-  --app-border: #dce3ec;
-  --app-rule: #dce3ec;
-  --app-control: #dce3ec;
+  --app-border: #e2e5ea;
+  --app-rule: #e2e5ea;
+  --app-control: #e2e5ea;
   --app-text: #14202d;
   --app-muted: #5f7083;
-  --app-faint: #8494a6;
+  --app-faint: #64748b;
   --app-accent: #2f6feb;
   --app-accent-soft: #e8f0fe;
   --app-primary: #2f6feb;
@@ -314,20 +331,21 @@ html.dark {
   /* ============================ T1 · 深色 ============================ */
   /* 让原生滚动条 / 日期选择 / 下拉框跟随深色，否则深底上挂一条浅灰滚动条 */
   color-scheme: dark;
-  /* spec T1.dark：bg #0c1117 / shell #16202c / sheet #131a23 / rule #212b36 / raised #1a2430 */
-  --app-frame: #0c1117;
-  --app-sheet-bg: #131a23;
-  --app-ground: #0c1117;
-  --app-surface: #131a23;
-  --app-raised: #1a2430;
-  --app-active: #16283f; /* accSoft 做内容面选中底 */
-  --app-border: #212b36;
-  --app-rule: #212b36;
-  /* 控件描边比 rule 提一档：#131a23 卡面上 #212b36 的差约 6%，输入框描边要扫到即知 */
-  --app-control: #33414f;
+  /* 2026-10-27 重构拍板 Q3=甲：画布 #0a0c10 / 卡 #1b2027 / raised #242a32 / 线 #2f3641
+     （画布↔卡 1.20、卡↔raised 1.13、卡↔线 1.34；原配方只有 1.083，卡片几乎浮不起来） */
+  --app-frame: #0a0c10;
+  --app-sheet-bg: #1b2027;
+  --app-ground: #0a0c10;
+  --app-surface: #1b2027;
+  --app-raised: #242a32;
+  --app-active: #1d2a3d; /* accSoft 做内容面选中底 */
+  --app-border: #2f3641;
+  --app-rule: #2f3641;
+  /* 控件描边比 rule 提一档：#1b2027 卡面上 #2f3641 只有 1.34，输入框描边要扫到即知 */
+  --app-control: #414a57;
   --app-text: #e4ecf4;
   --app-muted: #8fa0b3;
-  --app-faint: #6f8094;
+  --app-faint: #8b9aab;
 
   /* acc #4a8cf7，主按钮墨色取 accFg #061426 */
   --app-accent: #4a8cf7;
@@ -344,12 +362,13 @@ html.dark {
   --app-fab-fg: #16202c;
   --app-fab-border: transparent;
 
-  --app-shell: #16202c;
+  --app-shell: #10151b;
   --app-side-text: #aebdcb;
-  --app-side-hover: #1c2836;
-  /* 深色下 accent(#4a8cf7) 偏亮，白字对比只有 3.3:1 不够 4.5；选中块改用同族深一档 #2f6feb（4.6:1） */
-  --app-side-active-bg: #2f6feb;
+  --app-side-hover: #1a212a;
+  /* 选中与亮色同口径：浅一档底 + 白字 + 2px 蓝短条（深色下“浅一档”= 比 shell 亮） */
+  --app-side-active-bg: #243040;
   --app-side-active-text: #ffffff;
+  --app-side-active-bar: #4a8cf7;
 
   --app-mark-bg: #eef2f7;
   --app-mark-fg: #16202c;
@@ -920,14 +939,19 @@ html.dark .el-switch {
 .el-table th.el-table__cell {
   background-color: transparent !important;
   color: var(--app-faint) !important;
-  font-size: 12px;
+  font-size: var(--app-fs-1);
   font-weight: 400;
-  height: 40px !important;
+  height: var(--app-table-head-h) !important;
   border-bottom: 1px solid var(--app-rule) !important;
 }
 
+/* 行高 46 = 20px 行盒 + 上下各 13px（2026-10-27 重构 Q5=甲）；
+   必须带 `.el-table--default`——Element 自己的 `.el-table--default .el-table__cell{padding:8px 0}`
+   是 (0,2,0)，只写 `.el-table td.el-table__cell` (0,1,2) 会被它压住，行高会停在 44 */
+.el-table--default td.el-table__cell,
 .el-table td.el-table__cell {
-  padding: 12px 0;
+  padding: 13px 0;
+  line-height: 20px;
   border-bottom: 1px solid var(--app-rule) !important;
 }
 

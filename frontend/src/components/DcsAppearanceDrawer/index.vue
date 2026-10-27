@@ -1,7 +1,10 @@
 <template>
   <el-drawer v-model="visible" title="外观" direction="rtl" size="min(360px, 92vw)" append-to-body class="dcs-appearance-drawer">
     <div class="dcs-appearance">
-      <section class="dcs-appearance__section" aria-labelledby="dcs-appearance-skin">
+      <!-- 2026-10-27 重构拍板 Q8=甲：皮肤入口先隐藏，整套界面只留「一套设计语言 × 明暗两态」。
+           T7 的令牌与切换函数全部保留（老用户 localStorage 里存着 t7 的仍按 t7 渲染，不闪不崩），
+           只是不再对外提供第二个入口——验收范围由此从四组降到两组 -->
+      <section v-if="false" class="dcs-appearance__section" aria-labelledby="dcs-appearance-skin">
         <h3 id="dcs-appearance-skin" class="dcs-appearance__title">皮肤</h3>
         <p class="dcs-appearance__hint">整套界面的配色骨架，与浅色/深色开关正交，切换后立即生效。</p>
         <div class="dcs-appearance__skin-options">

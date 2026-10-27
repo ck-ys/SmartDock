@@ -2,7 +2,7 @@
   <div :class="classObj" class="app-wrapper" :style="{ '--current-color': theme }">
     <div v-if="device === 'mobile' && sidebar.opened" class="drawer-bg" @click="handleClickOutside" />
     <side-bar v-if="!sidebar.hide" class="sidebar-container" @set-layout="setLayout" @feedback="openFeedback" />
-    <div :class="{ hasTagsView: needTagsView, sidebarHide: sidebar.hide }" class="main-container">
+    <div :class="{ sidebarHide: sidebar.hide }" class="main-container">
       <!-- <el-scrollbar>
         <div :class="{ 'fixed-header': fixedHeader }">
           <navbar ref="navbarRef" @setLayout="setLayout" />
@@ -13,10 +13,9 @@
       </el-scrollbar> -->
       <div :class="{ 'fixed-header': fixedHeader }">
         <navbar @set-layout="setLayout" @feedback="openFeedback" />
-        <!-- 波 0.1（多审 P2）：手机用 v-show 而非 v-if——addView（visitedViews/cachedViews 的唯一写入点）
-             在 TagsView 内部 watch 路由，v-if 卸载后手机 keep-alive 整体失效（返回丢筛选/滚动）；
-             保留挂载只藏 DOM，设置关掉页签时仍彻底卸载 -->
-        <tags-view v-if="settingsStore.tagsView" v-show="needTagsView" />
+        <!-- 2026-10-27 重构拍板 Q6=乙：页签整行下线（省 34px），面包屑保留并承担“你在哪”。
+             keep-alive 依赖的 addView 已挪到本组件 setup 里的路由 watch——它是 cachedViews 的唯一写入点，
+             不能跟着页签组件一起消失 -->
       </div>
       <app-main />
       <settings ref="settingRef" />
@@ -32,7 +31,7 @@
 
 <script setup lang="ts">
 import SideBar from './components/Sidebar/index.vue';
-import { AppMain, Navbar, Settings, TagsView } from './components';
+import { AppMain, Navbar, Settings } from './components';
 import FeedbackDialog from '@/views/dcs/feedback/components/FeedbackDialog.vue';
 // S-38：悬浮球仅壳常驻，抽屉主体在组件内 dynamic import
 const DcsAssistant = defineAsyncComponent(() => import('@/components/DcsAssistant/index.vue'));
@@ -40,6 +39,7 @@ const DcsAssistant = defineAsyncComponent(() => import('@/components/DcsAssistan
 const DcsCommandPalette = defineAsyncComponent(() => import('@/components/DcsCommandPalette/index.vue'));
 import { useAppStore } from '@/store/modules/app';
 import { useSettingsStore } from '@/store/modules/settings';
+import { useTagsViewStore } from '@/store/modules/tagsView';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import { initWebSocket } from '@/utils/websocket';
 import { initSSE } from '@/utils/sse';
@@ -48,11 +48,25 @@ const settingsStore = useSettingsStore();
 const theme = computed(() => settingsStore.theme);
 const sidebar = computed(() => useAppStore().sidebar);
 const device = computed(() => useAppStore().device);
-// 波 0：手机不显示页签栏（50px 竖向空间让给内容），仍尊重「显示页签」设置；
-// 组件本体仍挂载（v-show），否则 addView 停摆、手机 keep-alive 失效——见模板内注释
-const needTagsView = computed(() => settingsStore.tagsView && device.value !== 'mobile');
 const fixedHeader = computed(() => settingsStore.fixedHeader);
 const layout = computed(() => settingsStore.navType);
+
+// 2026-10-27 重构拍板 Q6=乙：页签栏下线后，cachedViews / visitedViews 的唯一写入点迁到这里。
+// 必须在 layout（父组件）里同步执行——它早于 AppMain 的 router-view 渲染，keep-alive 才能在第一
+// 次进入页面时就拿到组件名；漏掉这一步的表现是“切走再回来，筛选条件和滚动位置全丢”，且不报错
+const currentRoute = useRoute();
+const tagsViewStore = useTagsViewStore();
+watch(
+  () => currentRoute.fullPath,
+  () => {
+    if (!currentRoute.name) return;
+    if (currentRoute.query.title) {
+      currentRoute.meta.title = currentRoute.query.title as string;
+    }
+    tagsViewStore.addView(currentRoute as any);
+  },
+  { immediate: true }
+);
 
 // 根据布局模式判断是否显示侧边栏
 const showSidebar = computed(() => {

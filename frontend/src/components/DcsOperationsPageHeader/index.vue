@@ -1,7 +1,8 @@
 <template>
   <section class="dcs-ops-header" :aria-labelledby="headingId">
     <div class="dcs-ops-header__intro">
-      <div class="dcs-ops-header__eyebrow">{{ eyebrow }}</div>
+      <!-- 2026-10-27 重构拍板 Q6=乙：眉标（“DCS 运营工作台 / 钱包与计费”这一行）下线。
+           它只重复标题已经说了的模块名，却固定占掉约 20px；prop 与默认值保留，避免调用方类型报错 -->
       <div class="dcs-ops-header__title-row">
         <div>
           <h1 :id="headingId" class="dcs-ops-header__title">{{ title }}</h1>
