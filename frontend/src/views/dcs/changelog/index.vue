@@ -91,6 +91,7 @@
               collapse-tags-tooltip
               placeholder="选择能看到这条日志的单位"
               class="cl-tenants__select"
+              :no-data-text="tenantError ? '单位列表暂时取不到' : '没有匹配的单位'"
             >
               <el-option
                 v-for="tenant in tenantOptions"
@@ -101,8 +102,10 @@
             </el-select>
             <el-button text @click="selectAllTenants">全选</el-button>
             <el-button text @click="form.targetTenantList = []">清空</el-button>
+            <el-button v-if="tenantError" text type="primary" @click="loadTenants">重试</el-button>
           </div>
-          <p class="cl-form__hint">发布前至少选一家；发布时会给所选单位的管理员发一条站内通知。</p>
+          <p v-if="tenantError" class="cl-form__hint is-error">单位列表暂时取不到，这里选不了人，点上面「重试」。</p>
+          <p v-else class="cl-form__hint">发布前至少选一家；发布时会给所选单位的管理员发一条站内通知。</p>
         </el-form-item>
 
         <el-form-item label="更新条目（每条一句话，说用户能感知到的变化）">
@@ -207,6 +210,8 @@ const saving = ref(false);
 const editing = ref<ChangelogRow | null>(null);
 const formRef = ref<FormInstance>();
 const tenantOptions = ref<TenantVO[]>([]);
+/** 单位名单取不到时下拉是空的、等于没法发布；必须说清是取不到，别让人以为没单位可选 */
+const tenantError = ref(false);
 const form = reactive<ChangelogSaveBody>({
   version: '',
   title: '',
@@ -230,8 +235,10 @@ const loadTenants = async () => {
   try {
     const { data } = await getTenantList(true);
     tenantOptions.value = data.voList || [];
+    tenantError.value = false;
   } catch {
     tenantOptions.value = [];
+    tenantError.value = true;
   }
 };
 
@@ -576,6 +583,10 @@ onMounted(load);
     font-size: 12px;
     line-height: 1.6;
     color: var(--app-faint);
+
+    &.is-error {
+      color: var(--el-color-warning);
+    }
   }
 }
 

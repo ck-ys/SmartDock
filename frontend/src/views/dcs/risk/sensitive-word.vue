@@ -299,6 +299,8 @@ const drawerTitle = ref('新增敏感词');
 const total = ref(0);
 const wordList = ref<SensitiveWordVO[]>([]);
 const stats = ref<{ total: number; enabled: number; actionMask: number; actionBlock: number; actionReview: number } | null>(null);
+/** 词条统计取不到时四格只剩「—」，必须说明是没取到而不是还没配词条 */
+const statsError = ref(false);
 const formRef = ref();
 
 const queryParams = reactive<SensitiveWordQuery>({
@@ -362,8 +364,9 @@ const editingBuiltin = computed(() => form.builtin === '1');
 /** 页头指标带：全量口径（旧版只算当前页有误导），数字统一主文字色 */
 const headerMetrics = computed<DcsOperationsMetric[]>(() => {
   const s = stats.value;
+  const totalHint = statsError.value ? '词条统计暂时取不到，点右上角「刷新」重试' : '全量口径，非当前页';
   return [
-    { label: '词条总数', value: s?.total ?? '—', hint: '全量口径，非当前页' },
+    { label: '词条总数', value: s?.total ?? '—', hint: totalHint },
     { label: '启用规则', value: s?.enabled ?? '—', hint: '当前参与检测的词条' },
     { label: '阻断规则', value: s?.actionBlock ?? '—', hint: '命中即拒绝提交' },
     { label: '转人工复核', value: s?.actionReview ?? '—', hint: '命中后进入人工复核' }
@@ -407,8 +410,10 @@ const loadStats = async () => {
   try {
     const res: any = await getSensitiveWordStats();
     stats.value = res.data || null;
+    statsError.value = false;
   } catch {
     stats.value = null;
+    statsError.value = true;
   }
 };
 
