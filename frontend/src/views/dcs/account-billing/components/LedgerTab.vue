@@ -131,9 +131,18 @@
             </el-select>
           </el-form-item>
           <el-form-item label="操作人">
-            <el-select v-model="creditQuery.userId" clearable filterable placeholder="全部（近90天）" style="width: 170px" @change="handleQuery">
+            <el-select
+              v-model="creditQuery.userId"
+              clearable
+              filterable
+              placeholder="全部（近90天）"
+              style="width: 170px"
+              :no-data-text="ledgerUsersError ? '用户列表暂时取不到' : '没有匹配的用户'"
+              @change="handleQuery"
+            >
               <el-option v-for="u in ledgerUsers" :key="u.userId" :label="u.nickName" :value="u.userId" />
             </el-select>
+            <el-button v-if="ledgerUsersError" link type="primary" style="margin-left: 8px" @click="loadLedgerUsers">重试</el-button>
           </el-form-item>
           <el-form-item>
             <el-checkbox v-model="creditQuery.onlyMine" label="只看我的" @change="handleQuery" />
@@ -360,6 +369,8 @@ const creditLoading = ref(false);
 const creditRows = ref<CreditLedgerVO[]>([]);
 const creditTotal = ref(0);
 const ledgerUsers = ref<Array<{ userId: number; nickName: string }>>([]);
+/** 操作人下拉取不到时不能呈现成「没有匹配的用户」——那会让人以为这段没人操作过 */
+const ledgerUsersError = ref(false);
 const creditQuery = reactive({
   pageNum: 1,
   pageSize: 20,
@@ -459,8 +470,10 @@ const loadLedgerUsers = async () => {
   try {
     const res: any = await listLedgerUsers();
     ledgerUsers.value = res.data || [];
+    ledgerUsersError.value = false;
   } catch {
     ledgerUsers.value = [];
+    ledgerUsersError.value = true;
   }
 };
 
