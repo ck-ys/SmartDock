@@ -72,11 +72,13 @@
           <!-- 没有助手权限的账号，这行只会常亮「待配置」误导人，索性不摆 -->
           <li v-if="canAsk">
             <span class="k">AI 助手</span>
-            <span class="v" :class="{ 'is-warn': !assistantReady }">{{ assistantReady ? '就绪' : '待配置' }}</span>
+            <span class="v" :class="{ 'is-warn': !assistantReady }">{{ assistantError ? '状态未知' : assistantReady ? '就绪' : '待配置' }}</span>
           </li>
           <li>
             <span class="k">画像引擎</span>
-            <span class="v">{{ profile ? `最近计算 ${relTime(profile.lastCalcTime)}` : '暂无数据' }}</span>
+            <span class="v" :class="{ 'is-warn': profileError }">{{
+              profileError ? '最近计算时间取不到' : profile ? `最近计算 ${relTime(profile.lastCalcTime)}` : '暂无数据'
+            }}</span>
           </li>
           <li>
             <span class="k">数据源</span>
@@ -141,7 +143,8 @@
             <p>{{ entry.itemList?.[0]?.text }}</p>
           </div>
         </article>
-        <p v-if="recentLogs.length === 0" class="ov-empty">暂无更新记录</p>
+        <p v-if="logsError" class="ov-empty is-error">更新日志暂时取不到，点右上角刷新重试。</p>
+        <p v-else-if="recentLogs.length === 0" class="ov-empty">暂无更新记录</p>
       </div>
     </section>
   </div>
@@ -164,6 +167,7 @@ const { width: viewportWidth } = useWindowSize();
 const stats = ref<DcsStatsOverview | null>(null);
 const statsError = ref(false);
 const profile = ref<ProfileOverview | null>(null);
+const profileError = ref(false);
 const pulse = ref<AnalyticsOverview['current'] | null>(null);
 const pulseError = ref(false);
 const trend = ref<AnalyticsTrendPoint[]>([]);
@@ -171,6 +175,8 @@ const trend = ref<AnalyticsTrendPoint[]>([]);
 const pulseSource = ref('web');
 const profileSource = ref('dcs');
 const assistantReady = ref(false);
+const assistantError = ref(false);
+const logsError = ref(false);
 const askText = ref('');
 const refreshing = ref(false);
 const updatedAt = ref('');
@@ -340,8 +346,11 @@ async function loadAssistant() {
     const res: any = await getAssistantStatus();
     const d = res?.data ?? res;
     assistantReady.value = !!(d?.enabled && d?.modelConfigured);
+    assistantError.value = false;
   } catch {
+    // 取不到 ≠ 没配置：状态行必须能区分「待配置」和「这次没问出来」
     assistantReady.value = false;
+    assistantError.value = true;
   }
 }
 
@@ -359,7 +368,13 @@ async function loadProfile() {
   if (!canProfile.value) {
     return;
   }
-  profile.value = await getOverview(profileSource.value).catch(() => null);
+  try {
+    profile.value = await getOverview(profileSource.value);
+    profileError.value = false;
+  } catch {
+    profile.value = null;
+    profileError.value = true;
+  }
 }
 
 async function loadPulse() {
@@ -387,8 +402,10 @@ async function loadLogs() {
   try {
     const res: any = await listChangelog({ pageNum: 1, pageSize: 2 });
     recentLogs.value = res.rows || [];
+    logsError.value = false;
   } catch {
     recentLogs.value = [];
+    logsError.value = true;
   }
 }
 
