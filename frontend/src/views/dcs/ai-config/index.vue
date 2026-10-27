@@ -388,6 +388,7 @@
             <el-option v-for="t in keysTenantOptions" :key="t.tenantId" :label="tenantLabel(t)" :value="t.tenantId" />
           </el-select>
           <span class="keys-summary">{{ keysSummary }}</span>
+          <el-button v-if="keysError" link type="primary" @click="reloadKeysView()">重试</el-button>
           <div class="keys-toolbar-actions">
             <el-button v-hasPermi="['dcs:ai:edit']" type="primary" icon="Plus" @click="onAddKeyForm()">新增钥匙</el-button>
             <el-button :loading="balanceRefreshingAll" @click="onRefreshAllBalances">全部查余额</el-button>
@@ -456,7 +457,14 @@
               </template>
             </el-table-column>
             <template #empty>
-              <div class="ui-empty">
+              <div v-if="keysError" class="ui-empty is-error">
+                <p class="ui-empty__title">钥匙列表暂时取不到</p>
+                <p class="ui-empty__hint">这不是「还没有钥匙」，是这次没取到——重试一下，还不行看右上角网络或后端。</p>
+                <div class="ui-empty__actions">
+                  <el-button link type="primary" @click="reloadKeysView()">重试</el-button>
+                </div>
+              </div>
+              <div v-else class="ui-empty">
                 <p class="ui-empty__title">还没有配置钥匙</p>
                 <p class="ui-empty__hint">{{ keysEmptyText }}</p>
               </div>
@@ -1254,6 +1262,8 @@ const balanceResults = ref<DcsAiBalanceMap>({});
 let balanceTimer: ReturnType<typeof setInterval> | undefined;
 // AI 用量统计
 const usageSummary = ref<any>(null);
+/** 用量汇总取不到时不能显示成 0 次调用——那等于告诉用户「没人用过」 */
+const usageError = ref(false);
 const headerMetrics = computed(() => [
   { label: '配置总数', value: total.value, hint: '当前筛选范围内的模型配置', tone: 'primary' as const },
   { label: '已启用', value: configList.value.filter((item) => item.enabled === '1').length, hint: '当前页可参与业务调用', tone: 'success' as const },
@@ -1263,16 +1273,23 @@ const headerMetrics = computed(() => [
     hint: '当前页覆盖的供应商',
     tone: 'neutral' as const
   },
-  { label: '累计调用', value: usageSummary.value?.totalCalls || 0, hint: '来自 AI 用量汇总', tone: 'warning' as const }
+  {
+    label: '累计调用',
+    value: usageError.value ? '—' : usageSummary.value?.totalCalls || 0,
+    hint: usageError.value ? '用量汇总暂时取不到' : '来自 AI 用量汇总',
+    tone: 'warning' as const
+  }
 ]);
 const goUsageDetail = () => proxy.$router.push('/tenant/ai-usage');
-// 加载 AI 用量汇总(累计调用次数等), 用于头部指标卡; 失败静默兜底, 不影响列表加载
+// 加载 AI 用量汇总(累计调用次数等), 用于头部指标卡; 失败标记成「取不到」, 不影响列表加载
 const loadUsageSummary = async () => {
   try {
     const res: any = await getDcsAiUsageSummary();
     usageSummary.value = res.data || null;
+    usageError.value = false;
   } catch {
     usageSummary.value = null;
+    usageError.value = true;
   }
 };
 const probeLoading = reactive({
@@ -1389,6 +1406,8 @@ const loadAccessState = async () => {
 // ===== AI 缺口批 Q8（2026-10-14）：钥匙池状态 =====
 /** 钥匙列表（掩码+启停+主钥匙标记+余额快照） */
 const keyList = ref<DcsAiProviderAccessVO[]>([]);
+/** 钥匙列表取不到 ≠ 没有钥匙：失败时摘要与空态都走「暂时取不到」，不许写成「共 0 把」 */
+const keysError = ref(false);
 const balanceRefreshingId = ref<number | string | null>(null);
 /** Q8 补遗：表单处于「添加新钥匙」形态（无 id 也可能是编辑主钥匙的批B 兼容态，靠它区分） */
 const accessAddMode = ref(false);
@@ -1408,6 +1427,9 @@ const keysTenantOptions = computed<TenantVO[]>(() => {
 });
 /** Q5：池摘要行——几把/几启用/主钥匙是谁/探测健康度 */
 const keysSummary = computed(() => {
+  if (keysError.value && !keyList.value.length) {
+    return '钥匙列表暂时取不到';
+  }
   if (!keyList.value.length) {
     return '还没有钥匙';
   }
@@ -1416,7 +1438,8 @@ const keysSummary = computed(() => {
   const failed = enabled.filter((k) => k.balanceStatus === 'FAILED').length;
   const health = failed ? `探测异常 ${failed}` : '探测正常';
   const scope = keysTenantId.value === KEYS_ALL_TENANTS ? `（跨 ${new Set(keyList.value.map((k) => String(k.tenantId))).size} 个租户）` : '';
-  return `共 ${keyList.value.length} 把${scope} · 启用 ${enabled.length} · 主钥匙：${primary?.label || primary?.apiKeyMask || '—'} · ${health}`;
+  const partial = keysError.value ? ' · 有租户没取到，数字不全' : '';
+  return `共 ${keyList.value.length} 把${scope} · 启用 ${enabled.length} · 主钥匙：${primary?.label || primary?.apiKeyMask || '—'} · ${health}${partial}`;
 });
 
 /** 钥匙列表总览条（2026-10-15 视觉批）：不开弹窗就能看出几把、几把在用 */
@@ -1439,8 +1462,10 @@ const loadKeyList = async (tenantId: string, provider: string) => {
   try {
     const res: any = await listDcsAiProviderAccessKeys({ tenantId, provider });
     keyList.value = (res?.data ?? []) as DcsAiProviderAccessVO[];
+    keysError.value = false;
   } catch {
     keyList.value = [];
+    keysError.value = true;
   } finally {
     keysLoading.value = false;
   }
@@ -1522,6 +1547,7 @@ const reloadKeysView = async () => {
   if (keysTenantId.value === KEYS_ALL_TENANTS) {
     const tenants = keysTenantOptions.value.map((t) => String(t.tenantId)).filter(Boolean);
     keysLoading.value = true;
+    let failed = 0;
     try {
       const lists = await Promise.all(
         tenants.map(async (tid) => {
@@ -1529,12 +1555,15 @@ const reloadKeysView = async () => {
             const res: any = await listDcsAiProviderAccessKeys({ tenantId: tid, provider: String(keysProvider.value) });
             return (res?.data ?? []) as DcsAiProviderAccessVO[];
           } catch {
+            failed += 1;
             return [] as DcsAiProviderAccessVO[];
           }
         })
       );
       const mine = myTenantId.value;
       keyList.value = lists.flat().sort((a, b) => (String(a.tenantId) === mine ? -1 : String(b.tenantId) === mine ? 1 : 0));
+      // 任一租户失败都算不完整：列表里少的那几把钥匙会让人误删/误加
+      keysError.value = failed > 0;
     } finally {
       keysLoading.value = false;
     }
