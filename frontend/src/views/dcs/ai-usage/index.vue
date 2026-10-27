@@ -26,6 +26,11 @@
               </div>
             </div>
           </el-card>
+          <!-- 汇总失败时整张卡会消失，像这个模块不存在；留一张说明卡，别让版面无声塌掉 -->
+          <el-card v-else-if="summaryError" shadow="never" class="caller-overview-card">
+            <template #header><span>调用方成本分布</span></template>
+            <p class="ui-error">调用方成本暂时取不到，点右上角「刷新数据」重试。</p>
+          </el-card>
         </div>
 
         <el-card shadow="never" class="dcs-ops-table-card">
@@ -228,13 +233,25 @@ const loading = ref(false);
 const usageList = ref<DcsAiUsageVO[]>([]);
 const total = ref(0);
 const summary = ref<any>(null);
+/** 汇总取不到时页头三格不能写 0——「0 次调用 / ¥0.0000 / 0.0%」会被读成「这套模型没人用过」 */
+const summaryError = ref(false);
 const headerMetrics = computed(() => [
-  { label: '累计调用', value: summary.value?.totalCalls || 0, hint: '全部模型调用次数', tone: 'primary' as const },
-  { label: '累计消耗', value: `¥${Number(summary.value?.totalCost || 0).toFixed(4)}`, hint: '基础成本与服务费合计', tone: 'warning' as const },
+  {
+    label: '累计调用',
+    value: summaryError.value ? '—' : summary.value?.totalCalls || 0,
+    hint: summaryError.value ? '用量汇总暂时取不到，点右上角刷新重试' : '全部模型调用次数',
+    tone: 'primary' as const
+  },
+  {
+    label: '累计消耗',
+    value: summaryError.value ? '—' : `¥${Number(summary.value?.totalCost || 0).toFixed(4)}`,
+    hint: summaryError.value ? '' : '基础成本与服务费合计',
+    tone: 'warning' as const
+  },
   {
     label: '成功率',
-    value: `${Number(summary.value?.successRate || 0).toFixed(1)}%`,
-    hint: `${summary.value?.successCalls || 0} 次成功`,
+    value: summaryError.value ? '—' : `${Number(summary.value?.successRate || 0).toFixed(1)}%`,
+    hint: summaryError.value ? '' : `${summary.value?.successCalls || 0} 次成功`,
     tone: 'success' as const
   },
   { label: '当前结果', value: total.value, hint: '符合筛选条件的调用明细', tone: 'neutral' as const }
@@ -334,8 +351,10 @@ const loadSummary = async () => {
   try {
     const res: any = await getDcsAiUsageSummary();
     summary.value = res.data || null;
+    summaryError.value = false;
   } catch {
     summary.value = null;
+    summaryError.value = true;
   }
 };
 
