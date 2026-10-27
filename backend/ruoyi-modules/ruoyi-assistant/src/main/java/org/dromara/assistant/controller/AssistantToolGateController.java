@@ -76,6 +76,22 @@ public class AssistantToolGateController extends BaseController {
                 org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER,
                 override, effective, false, "0".equals(s.getReadOnly())));
         }
+        // B 批题4（2026-10-27）：技能并入同一矩阵（每技能一行，键 skill:<name>）——
+        // 行数据经 AssistantSkillSource 官方仓视图；effective 与工具行共用单键档位核心
+        for (org.dromara.assistant.core.SkillAssets.LoadedSkill sk :
+            org.dromara.assistant.core.SkillAssets.skills()) {
+            String key = "skill:" + sk.id();
+            rows.add(new ToolGateRow(
+                List.of(key), "技能：" + sk.name(), "技能",
+                sk.minRole() <= org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER ? ""
+                    : "内置档：发布人及以上可用",
+                sk.minRole(),
+                gate.get(key),
+                org.dromara.assistant.core.ToolRegistry.effectiveMinRoleSingle(
+                    key, sk.minRole(), gate.get(key)),
+                sk.minRole() >= org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN,
+                false));
+        }
         return R.ok(rows);
     }
 
@@ -84,6 +100,9 @@ public class AssistantToolGateController extends BaseController {
     @PostMapping
     public R<Void> save(@RequestBody Map<String, String> gate) {
         Set<String> known = ToolRegistry.allToolNames();
+        Set<String> skillIds = org.dromara.assistant.core.SkillAssets.skills().stream()
+            .map(org.dromara.assistant.core.SkillAssets.LoadedSkill::id)
+            .collect(java.util.stream.Collectors.toSet());
         Set<String> mcpServers;
         try {
             mcpServers = mcpPilotService.allServerNames();
@@ -93,8 +112,11 @@ public class AssistantToolGateController extends BaseController {
         for (Map.Entry<String, String> e : gate.entrySet()) {
             String k = e.getKey();
             boolean isMcp = k != null && k.startsWith("mcp:");
-            if (isMcp ? !mcpServers.contains(k.substring(4)) : !known.contains(k)) {
-                throw new org.dromara.common.core.exception.ServiceException("未知工具：" + k);
+            boolean isSkill = k != null && k.startsWith("skill:");
+            if (isMcp ? !mcpServers.contains(k.substring(4))
+                : isSkill ? !skillIds.contains(k.substring(6))
+                : !known.contains(k)) {
+                throw new org.dromara.common.core.exception.ServiceException("未知工具或技能：" + k);
             }
             String v = e.getValue();
             if (!"off".equals(v) && !"member".equals(v) && !"admin".equals(v)) {
