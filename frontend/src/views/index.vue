@@ -599,7 +599,7 @@ onMounted(loadAll);
   font-size: 12.5px;
   color: var(--app-faint);
   &.is-error {
-    color: var(--el-color-warning-dark-2);
+    color: var(--el-color-warning);
   }
 }
 

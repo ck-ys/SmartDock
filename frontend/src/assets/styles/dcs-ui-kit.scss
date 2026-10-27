@@ -397,6 +397,23 @@ html.density-compact {
   margin-top: 4px;
 }
 
+/* 三态里最容易混的两个：空是「确实没有数据」，错是「没取到」。
+   2026-10-27 批3：统一两种写法——页面级用 .ui-error 横条，卡片内用 .ui-empty.is-error 换色 */
+.ui-error {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--app-radius-m);
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning);
+  font-size: var(--dcs-font-sm);
+}
+
+.ui-empty.is-error,
+.ui-empty.is-error .ui-empty__title,
+.ui-empty.is-error .ui-empty__hint {
+  color: var(--el-color-warning);
+}
+
 /* ============================ 数字列 ============================ */
 .ui-num {
   font-variant-numeric: tabular-nums;
