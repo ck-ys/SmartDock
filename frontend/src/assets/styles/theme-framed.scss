@@ -930,10 +930,32 @@ html.dark .el-switch {
 }
 
 /* ============================ 表格 ============================ */
+/* 2026-10-27 重构 Q7=甲：表格正文用墨色（--app-text），辅助信息才降一档灰。
+   原来整张表都是 #5f7083 的中灰，数字和标签一个重量，扫读时找不到落点 */
 .el-table {
-  color: var(--app-muted);
+  color: var(--app-text);
   font-size: 13px;
   background: transparent;
+}
+
+/* 表格里的次要信息（ID、时间、备注）用这个类降一档 */
+.ui-muted {
+  color: var(--app-muted);
+}
+
+/* 2026-10-27 重构 Q7=甲：表格里的“状态”一律用胶囊——无边、浅底、22px、999 圆角。
+   只作用于表内，弹窗/表单里的 el-tag 保持原样（那里需要描边区分可点区域）。
+   底色按自身文字色取 12% 调和：plain 版默认底色是白的，去掉描边后只剩「一行蓝字」，
+   完全看不出是个标签；color-mix 让角色/成功/警告各 type 自动拿到同族浅底 */
+.el-table .el-tag {
+  height: 22px;
+  line-height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .el-table th.el-table__cell {
