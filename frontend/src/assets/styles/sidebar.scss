@@ -5,11 +5,13 @@
      main-container 从「留左边距的平面」升级为一张四周 8px、圆角 14、双层软阴影的外卡；
      顶栏/页签/内容纸都在卡内（fixed-header 见 layout/index.vue），纸中纸结构由 AppMain 退位 */
   .main-container {
-    /* U-01 让位不回退：外卡底缘整体上抬到悬浮球之上（桌面 80px；手机 84px+安全区见 .mobile 段） */
+    /* U-01 悬浮球让位：2026-10-27 用户两度否决「底部悬空灰带」——外卡恢复通高贴底（与 DCS 原生同骨架），
+       悬浮球改为浮于内容之上（本就是可拖拽 fixed 组件，位置不固定，预留带前提不成立）；
+       --app-fab-yield 仍保留定义：仅供 AppMain 的 --session-chrome 算式消费（助手会话页高度不变） */
     --app-fab-yield: 80px;
-    height: calc(100% - var(--app-sheet-inset, 8px) * 2 - var(--app-fab-yield));
+    height: calc(100% - var(--app-sheet-inset, 8px) * 2);
     transition: margin 0.28s;
-    margin: var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) calc(var(--app-sheet-inset, 8px) + var(--app-fab-yield)) calc(#{$base-sidebar-width} + var(--app-sheet-inset, 8px));
+    margin: var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) calc(#{$base-sidebar-width} + var(--app-sheet-inset, 8px));
     position: relative;
     background: var(--app-sheet-bg, var(--el-bg-color));
     border-radius: var(--app-shell-radius, 14px);
@@ -257,10 +259,10 @@
   // mobile responsive
   .mobile {
     .main-container {
-      /* U-01 手机档：球 60px + 贴边 24px + 手势条安全区（含 8px 呼吸位） */
+      /* 手机档同口径：通高贴底，悬浮球浮于内容上（--app-fab-yield 仅留给 --session-chrome 算式） */
       --app-fab-yield: calc(84px + env(safe-area-inset-bottom, 0px));
-      margin: var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) calc(var(--app-sheet-inset, 8px) + var(--app-fab-yield));
-      height: calc(100% - var(--app-sheet-inset, 8px) * 2 - var(--app-fab-yield));
+      margin: var(--app-sheet-inset, 8px);
+      height: calc(100% - var(--app-sheet-inset, 8px) * 2);
     }
 
     .sidebar-container {
