@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>审计收尾拍板板 · 8 题 · v2 真机版</title>
+<style>
+  :root{
+    --ground:#f7f8fa; --card:#ffffff; --ink:#1c2126; --sub:#5b6470; --faint:#8b949e;
+    --line:#e6eaee; --rowline:#eef1f4; --band:#f3f5f7; --edge:#d9dfe5;
+    --accent:#1d55c8; --accent-soft:#e9f0fc; --accent-line:#ccdcf5;
+    --bad-bg:#fdecec; --bad-ink:#a1332b; --bad-line:#f3c9c5; --bad:#d92d20;
+    --warn-bg:#fff6e2; --warn-ink:#8a5800; --warn-line:#efd8a8;
+    --ok-bg:#e7f4ec; --ok-ink:#1d6b44; --ok-line:#c6e3d1;
+    --primary:#24292f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    font-size:14px; line-height:1.6;
+    font-variant-numeric:tabular-nums;
+  }
+  .wrap{max-width:1140px; margin:0 auto; padding:28px 20px 60px}
+
+  header.top{padding:6px 0 4px}
+  header.top .meta{font-size:12px; color:var(--sub)}
+  h1{font-size:24px; font-weight:600; line-height:1.35; margin:6px 0 4px}
+  header.top .finding{font-size:15px; color:var(--sub); margin:2px 0 10px; max-width:62em}
+  .howto{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 14px; font-size:13px; color:var(--sub); margin:14px 0 0}
+  .howto b{color:var(--ink); font-weight:600}
+
+  .pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:12px; line-height:1.5; white-space:nowrap; vertical-align:1px}
+  .p-warn{background:var(--warn-bg); color:var(--warn-ink); border:1px solid var(--warn-line)}
+  .p-low{background:var(--band); color:var(--sub); border:1px solid var(--line)}
+  .p-ok{background:var(--ok-bg); color:var(--ok-ink); border:1px solid var(--ok-line)}
+  .p-bad{background:var(--bad-bg); color:var(--bad-ink); border:1px solid var(--bad-line)}
+  .p-acc{background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line); font-weight:500}
+
+  .kpi{display:grid; grid-template-columns:repeat(6,1fr); background:var(--card); border:1px solid var(--line); border-radius:10px; margin:18px 0 0; overflow:hidden}
+  .kpi>div{padding:12px 14px 10px; border-left:1px solid var(--rowline)}
+  .kpi>div:nth-child(6n+1){border-left:none}
+  .kpi .k{font-size:12px; color:var(--sub)}
+  .kpi .v{font-size:24px; font-weight:600; margin-top:2px}
+  .kpi .s{font-size:11.5px; color:var(--faint); line-height:1.45; margin-top:1px}
+
+  section{margin-top:34px}
+  h2{font-size:18px; font-weight:600; margin:0 0 4px}
+  .lede{font-size:13px; color:var(--sub); margin:0 0 12px; max-width:64em}
+
+  table{width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; table-layout:fixed}
+  .tscroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+  th{font-size:12px; font-weight:400; color:var(--sub); text-align:left; padding:9px 12px; border-bottom:1px solid var(--line)}
+  td{font-size:13px; padding:9px 12px; border-bottom:1px solid var(--rowline); vertical-align:top; overflow-wrap:anywhere}
+  tr:last-child td{border-bottom:none}
+  td .path, .path{font-size:12px; color:var(--sub)}
+  .tnote{font-size:12px; color:var(--faint); margin:6px 2px 0}
+
+  .q{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 18px 16px; margin-top:16px}
+  .q h3{font-size:16px; font-weight:600; margin:0 0 6px; line-height:1.45}
+  .q .bg{font-size:13.5px; color:var(--ink); margin:0 0 12px}
+  .q .bg .path{display:block; margin-top:4px}
+  .pick{background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:10px; padding:10px 14px; margin:12px 0 0; font-size:13.5px}
+  .pick .t{font-weight:600; color:var(--accent)}
+  .pick .why{margin:4px 0 0}
+  .pick .risk{color:var(--sub); margin:2px 0 0}
+
+  /* ---------- 真机截图流程 ---------- */
+  .flow{border:1px solid var(--line); border-radius:10px; background:#fbfcfd; padding:12px 12px 10px; margin-top:14px}
+  .flow input{position:absolute; opacity:0; pointer-events:none}
+  .labrow{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px}
+  .chip{display:inline-block; padding:4px 12px; border-radius:999px; border:1px solid var(--edge); background:#fff; color:var(--sub); font-size:12.5px; cursor:pointer}
+  .steps{display:flex; flex-wrap:wrap; gap:6px; margin:2px 0 10px}
+  .sc{display:none}
+  .stage .win{display:none}
+  .where{font-size:12.5px; color:var(--sub); background:var(--band); border:1px solid var(--line); border-radius:8px; padding:6px 12px; margin:0 0 10px}
+  .where b{color:var(--ink); font-weight:600}
+  .win{position:relative; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff}
+  .win img{width:100%; display:block}
+  .say{font-size:12.5px; color:var(--sub); margin-top:10px}
+  .say b{color:var(--ink); font-weight:600}
+  .cap{font-size:12px; color:var(--faint); margin:8px 2px 0}
+
+  /* 叠加标注 */
+  .mk{position:absolute; border:2px solid var(--bad); border-radius:6px; pointer-events:none}
+  .mkg{position:absolute; border:2px solid var(--ok-ink); border-radius:6px; pointer-events:none}
+  .mk i,.mkg i{position:absolute; top:-24px; left:-2px; font-style:normal; font-size:11.5px; padding:2px 8px; border-radius:4px; color:#fff; white-space:nowrap}
+  .mk i{background:var(--bad)}
+  .mkg i{background:var(--ok-ink)}
+  .pt{position:absolute; background:#fff; border:1.5px dashed #98a1aa; border-radius:6px; color:#8b949e; font-size:11px; display:flex; align-items:center; justify-content:center; text-align:center; pointer-events:none}
+  .tag{position:absolute; background:rgba(28,33,38,.92); color:#fff; font-size:11.5px; line-height:1.5; padding:4px 10px; border-radius:6px; max-width:260px; pointer-events:none}
+  .tag.g{background:rgba(29,107,68,.95)}
+  .evd{border:1px solid var(--line); border-left:3px solid var(--bad); background:#fff; border-radius:8px; padding:9px 12px; font-size:12.5px; color:var(--sub); margin-top:10px}
+  .evd b{color:var(--ink)}
+  .evd code{font-family:Consolas,"Courier New",monospace; font-size:11.5px; background:#f1f3f5; padding:1px 5px; border-radius:4px; overflow-wrap:anywhere}
+  .simrow{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; padding:10px; border:1px dashed var(--edge); border-radius:8px; background:#fff}
+  .simrow .lab{font-size:11.5px; color:var(--faint); margin-right:2px}
+  .btn{display:inline-block; font-size:13px; padding:5px 13px; border-radius:6px; border:1px solid #cfd6dd; background:#fff; color:#333a42}
+  .btn-pri{background:var(--primary); border-color:var(--primary); color:#fff}
+  .btn-off{background:#f3f5f7; border-color:#e2e7ec; color:#9aa2ab}
+
+  /* 场景与步骤选中态 */
+  #q1a:checked ~ .labrow label[for="q1a"], #q1b:checked ~ .labrow label[for="q1b"], #q1c:checked ~ .labrow label[for="q1c"],
+  #q2a:checked ~ .labrow label[for="q2a"], #q2b:checked ~ .labrow label[for="q2b"],
+  #q3a:checked ~ .labrow label[for="q3a"], #q3b:checked ~ .labrow label[for="q3b"],
+  #q7a:checked ~ .labrow label[for="q7a"], #q7b:checked ~ .labrow label[for="q7b"],
+  .sc input:checked ~ .steps label{background:var(--primary); border-color:var(--primary); color:#fff}
+  #q1a:checked ~ .sc[data-sc="q1a"], #q1b:checked ~ .sc[data-sc="q1b"], #q1c:checked ~ .sc[data-sc="q1c"],
+  #q2a:checked ~ .sc[data-sc="q2a"], #q2b:checked ~ .sc[data-sc="q2b"],
+  #q3a:checked ~ .sc[data-sc="q3a"], #q3b:checked ~ .sc[data-sc="q3b"],
+  #q7a:checked ~ .sc[data-sc="q7a"], #q7b:checked ~ .sc[data-sc="q7b"]{display:block}
+  #q1a1:checked ~ .stage .win:nth-of-type(1), #q1a2:checked ~ .stage .win:nth-of-type(2), #q1a3:checked ~ .stage .win:nth-of-type(3),
+  #q1b1:checked ~ .stage .win:nth-of-type(1), #q1b2:checked ~ .stage .win:nth-of-type(2),
+  #q1c1:checked ~ .stage .win:nth-of-type(1),
+  #q2a1:checked ~ .stage .win:nth-of-type(1), #q2a2:checked ~ .stage .win:nth-of-type(2),
+  #q2b1:checked ~ .stage .win:nth-of-type(1),
+  #q3a1:checked ~ .stage .win:nth-of-type(1), #q3a2:checked ~ .stage .win:nth-of-type(2), #q3a3:checked ~ .stage .win:nth-of-type(3),
+  #q3b1:checked ~ .stage .win:nth-of-type(1),
+  #q7a1:checked ~ .stage .win:nth-of-type(1), #q7a2:checked ~ .stage .win:nth-of-type(2), #q7a3:checked ~ .stage .win:nth-of-type(3),
+  #q7b1:checked ~ .stage .win:nth-of-type(1){display:block}
+
+  .files{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-top:12px}
+  .files h4{font-size:13.5px; font-weight:600; margin:0 0 6px}
+  .files ul{margin:0; padding-left:18px}
+  .files li{font-size:12.5px; color:var(--sub); overflow-wrap:anywhere; line-height:1.7}
+
+  .combo{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-top:12px; font-size:13.5px}
+  .rev{font-size:12.5px; color:var(--sub); margin-top:26px; border-top:1px solid var(--line); padding-top:12px}
+  footer{font-size:12px; color:var(--faint); margin-top:14px}
+
+  @media (max-width:760px){
+    .wrap{padding:20px 14px 48px}
+    .kpi{grid-template-columns:repeat(2,1fr)}
+    .kpi>div{border-left:none; border-top:1px solid var(--rowline)}
+    .kpi>div:nth-child(-n+2){border-top:none}
+    .kpi>div:nth-child(2n){border-left:1px solid var(--rowline)}
+    th,td{padding:8px 9px; font-size:12.5px}
+    th{font-size:11.5px}
+    .tscroll table{min-width:620px}
+    .q{padding:14px 13px}
+    .tag{max-width:200px; font-size:11px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="meta">拍板板 v2 · 2026-10-27 · 来源：<a href="./20261026-full-audit-boards-menus.md">全仓深度审查报告</a>（82 条发现，全部经换人独立复核）</div>
+  <h1>审计收尾：遗漏业务与菜单缺失，接下来怎么修</h1>
+  <p class="finding">结论：没有「被遗忘没做的大功能」；要处理的是 <b>4 个点了就坏的入口</b> 和 <b>15 处账本停更、承诺与实际不符</b>。本板把需要你拍板的 8 题放上桌；修法已定、只等开工的不占题，列在第三节。</p>
+  <div class="howto"><b>怎么答：</b>回到对话里直接说即可，例如「全按推荐」，或逐题指派「题1 案B，其余推荐」。<b>界面真实性：</b>所有「修复前」均为<b>真机截图</b>（2026-10-27 实拍于本机 5188 演示环境，admin 与 user001 双视角，共 12 张）；「修复后」为真机底图上的<b>叠加模拟</b>，标注了「模拟」字样，落地后换真机复拍。</div>
+</header>
+
+<section id="s0">
+  <h2>一页看懂：数字总账</h2>
+  <div class="kpi">
+    <div><div class="k">审计发现</div><div class="v">82</div><div class="s">条，全部换人复核</div></div>
+    <div><div class="k">坐实</div><div class="v">77</div><div class="s">= 中危 19 + 低危 58</div></div>
+    <div><div class="k">推翻销账</div><div class="v">5</div><div class="s">旧账其实已完成</div></div>
+    <div><div class="k">中危</div><div class="v">19</div><div class="s">入口 4 + 账实不符 15</div></div>
+    <div><div class="k">低危</div><div class="v">58</div><div class="s">业务 33 + 菜单权限 25</div></div>
+    <div><div class="k">拍板文件盘点</div><div class="v">107</div><div class="s">收官 91 / 待施工 14 / 待拍 2</div></div>
+  </div>
+  <p class="tnote">口径自检：82 = 业务 48 + 菜单权限 29 + 推翻 5；77 = 19 + 58；107 = 91 + 14 + 2。全表见报告第二节、第三节。</p>
+</section>
+
+<section id="s1">
+  <h2>四个「点了就坏」的入口（中危，全部坐实）</h2>
+  <p class="lede">这四处是用户界面上看得见、点了却用不了或到不了的地方，也是本次审计最要紧的产出。逐条证据在报告第二节，本板第三节附真机截图流程。</p>
+  <div class="tscroll"><table>
+    <colgroup><col style="width:34%"><col style="width:44%"><col style="width:12%"><col style="width:10%"></colgroup>
+    <tr><th>问题</th><th>证据锚点</th><th>级别</th><th>归题</th></tr>
+    <tr><td>「邀请注册」整个功能是死的：后端四个接口（生成/列表/撤销/角色）整套不存在，角色下拉永远空的、列表永远「暂无」，生成永远被拦</td><td><span class="path">system/user/index.vue:100；api/system/inviteLink/index.ts:27-42；实测 GET /dcs/inviteLink/list 与 /roles 均返回 code:404「请求地址不存在」</span></td><td><span class="pill p-bad">点了就卡死</span></td><td>题1</td></tr>
+    <tr><td>文件管理「预览开关」按钮挂的权限串全系统没人持有：非超管永远看不到，而按钮实际调用的接口看的是另一个权限串</td><td><span class="path">system/oss/index.vue:55 ↔ SysConfigController.java:110</span></td><td><span class="pill p-warn">中危</span></td><td>题2</td></tr>
+    <tr><td>AI 助手管理页没绑给任何常规角色：租户管理员进不去</td><td><span class="path">baseline/04_role_menu.sql 对 11925/11927 零匹配；活库仅一个雪花角色持有</span></td><td><span class="pill p-warn">中危</span></td><td>题3</td></tr>
+    <tr><td>演示库菜单落后于 SQL 权威口径：库缺 11972，11971 还挂着旧名字旧权限串</td><td><span class="path">实查 smartdock_shots：缺 11972；SQL 新态在 02_reference.sql:581/582</span></td><td><span class="pill p-warn">中危</span></td><td>题3</td></tr>
+  </table></div>
+</section>
+
+<section id="s2">
+  <h2>不用拍板的：已定案照做清单</h2>
+  <p class="lede">这些在审计前就有归属和修法，审计只是再次坐实「还没做」。列出仅备忘，不占题。</p>
+  <div class="tscroll"><table>
+    <colgroup><col style="width:44%"><col style="width:34%"><col style="width:22%"></colgroup>
+    <tr><th>事项</th><th>证据锚点</th><th>归属</th></tr>
+    <tr><td>401 页 375 真溢出（313px 插画撑破两栏）</td><td><span class="path">401.vue:16 仍为 313 未改</span></td><td>批四（修法已定）</td></tr>
+    <tr><td>助手批二 + 批三待修 19 条（搜索空态文案、徽标圆角令牌、错误卡等）</td><td><span class="path">基线提交 6913e76</span></td><td>等开工，答案已锁定</td></tr>
+    <tr><td>dcs 深改名（78 张表 + 69 个权限串 + 模块/包/目录）</td><td><span class="path">需协调助手窗口</span></td><td>批11B</td></tr>
+    <tr><td>四段式权限串 11 个（风控 6 + 助手 4 + 菜单 11900）</td><td><span class="path">深改名时权限串整体归一，天然覆盖</span></td><td>随批11B</td></tr>
+    <tr><td>空转按钮 9 个、孤儿视图 2 个（ai-doc-domain、tenant-wallet 死页）</td><td><span class="path">删除属业务动作，随深改名前专项清可少改一批文件</span></td><td>建议随批11B</td></tr>
+    <tr><td>低危业务 33 条（各批留档池：PII 四条、批10 七项、backfill 宕机缺口等）</td><td><span class="path">报告第二节留档池</span></td><td>按原登记等触发</td></tr>
+    <tr><td>复核推翻的 5 条（22 题等回执、批9 清账、清空哨兵、CHAT 闸、登录页 V5）</td><td><span class="path">报告第二节末节已载提交锚点</span></td><td>直接销账</td></tr>
+  </table></div>
+
+  <div class="files">
+    <h4>拍板 / 计划文件盘点（107 份）：<span class="pill p-ok">已收官 91</span> <span class="pill p-warn">已拍板待施工 14</span> <span class="pill p-bad">待拍板 2</span></h4>
+    <ul>
+      <li><b>待拍板 2 份（等你回执）：</b>20261026-readme-deepopt-board.html（8 题待回执）｜20261027-presentation-r2-board.html（呈现层第二轮，等回执）</li>
+      <li><b>已拍板待施工 14 份：</b>20261021-ability2-master-plan.md、20261023-assistant-ui-decision-board.html、20261023-batch-newreq-plan.md、20261023-phase2-final-dev-plan.md、20261026-ability2-skill-b-plan.md、20261026-assistant-pages-plan.md、20261026-batch11b-12-plan.md、20261026-execution-master-plan.md、20261026-shell-wave1-plan.md、20261026-window-consolidated-board.html、batch11b-12-decision-board.html、phase2-development-plan.html、phase2-execution-prompt.md、phase2-master-plan.md</li>
+      <li>按类型：拍板 HTML 34 · 计划 MD 23 · 前后对比 22 · 验收提示词 8 · 审计报告 5 · 原型 5 · 研究 4 · 其它 6（合计 107）。已收官 91 份中 16 份仍带未决注记，逐文件全表见报告第三节。</li>
+    </ul>
+  </div>
+</section>
+
+<section id="s3">
+  <h2>八题拍板</h2>
+  <p class="lede">每题给出 2-3 个方案，按「首次见到的变化 / 日常使用 / 防呆 / 适合 / 代价」五个维度对比。涉前端的题附修复前后流程：修复前＝真机截图，修复后＝真机底图叠加模拟（红框/白补丁/黑标签均为板内标注，不是页面原生内容）。</p>
+
+  <!-- ============ 题1 ============ -->
+  <div class="q">
+    <h3>题1 · 「邀请注册」死功能怎么处理 <span class="pill p-bad">点了就卡死</span> <span class="pill p-low">涉前端</span></h3>
+    <p class="bg">按钮和弹窗都完整，但后端四个接口（生成/列表/撤销/角色）整套不存在。<b>2026-10-27 活体实测的卡死路径：</b>弹窗里「注册后角色」下拉永远是空的（取角色的接口 404）→ 表单填不完 →「生成邀请链接」永远被「请选择注册后角色」拦住；已有链接列表也永远「暂无邀请链接」（列表接口 404 被悄悄吞掉，用户只当是没数据）。
+      <span class="path">user/index.vue:100；api/system/inviteLink/index.ts:27-42；全后端仅 SysTenantLoginChecker.java:12 的注释提及该类名</span></p>
+
+    <div class="flow" data-ui>
+      <input type="radio" id="q1a" name="q1sc" checked><input type="radio" id="q1b" name="q1sc"><input type="radio" id="q1c" name="q1sc">
+      <div class="labrow"><label class="chip" for="q1a">修复前（真机实拍）</label><label class="chip" for="q1b">修复后 · 案A 摘除（模拟）</label><label class="chip" for="q1c">修复后 · 案B 补齐后端（示意）</label></div>
+
+      <div class="sc" data-sc="q1a">
+        <input type="radio" id="q1a1" name="q1at" checked><input type="radio" id="q1a2" name="q1at"><input type="radio" id="q1a3" name="q1at">
+        <div class="steps"><label class="chip" for="q1a1">1 找到这个页面</label><label class="chip" for="q1a2">2 点开弹窗</label><label class="chip" for="q1a3">3 卡死点实测</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q1-user-page.png" alt="用户管理页真机截图，红框标出工具栏的邀请注册按钮">
+            <span class="mk" style="left:45.9%;top:30.4%;width:8.6%;height:5.4%"><i>就是这个按钮</i></span>
+          </div>
+          <p class="say">真机截图（超管登录）。<b>在哪找：</b>顶部菜单「系统管理 → 用户管理」，工具栏<b>「更多」右侧</b>的「邀请注册」。它看起来和其他按钮一样正常。</p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q1-invite-dialog.png" alt="邀请注册弹窗真机截图">
+            <span class="tag" style="left:50%;top:12%;transform:translateX(-50%)">弹窗能打开，表单齐全，看着一切正常</span>
+          </div>
+          <p class="say">真机截图：目标单位 / 注册后角色 / 有效期（7 天·30 天·永久）/ 生成邀请链接，下方还有「已有链接」列表。直到这里，没人能看出问题。</p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q1-invite-error.png" alt="邀请注册弹窗，角色下拉为空、列表为暂无">
+            <span class="tag" style="left:50%;top:10%;transform:translateX(-50%)">角色下拉是空的；列表永远「暂无邀请链接」</span>
+          </div>
+          <div class="evd"><b>接口实测（2026-10-27，弹窗打开即触发）：</b><br>
+            GET <code>/dcs/inviteLink/roles</code> → <code>{"code":404,"msg":"请求地址不存在"}</code><br>
+            GET <code>/dcs/inviteLink/list?pageNum=1&amp;pageSize=10</code> → <code>{"code":404,"msg":"请求地址不存在"}</code><br>
+            点「生成邀请链接」→ 前端提示<b>「请选择注册后角色」</b>（角色接口死了选不了，永远过不去）。</div>
+          <p class="say"><b>卡死闭环：</b>角色拉不出来 → 表单填不完 → 生成永远被拦；报错被吞掉，用户只当「还没有邀请记录」。功能等于不存在，但界面上一直挂着。</p>
+        </div>
+      </div>
+
+      <div class="sc" data-sc="q1b">
+        <input type="radio" id="q1b1" name="q1bt" checked><input type="radio" id="q1b2" name="q1bt">
+        <div class="steps"><label class="chip" for="q1b1">1 同页对比（按钮移除）</label><label class="chip" for="q1b2">2 工具栏特写</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q1-user-page.png" alt="用户管理页真机截图，原按钮位置叠加移除模拟">
+            <span class="pt" style="left:45.9%;top:30.4%;width:8.6%;height:5.4%">邀请注册<br>（已移除·模拟）</span>
+          </div>
+          <p class="say">同一张真机截图，在按钮原位叠加<b>移除模拟</b>（白色补丁为板内标注）：工具栏只剩真能用的功能，新增/修改/删除等点击路径零变化。</p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q1-toolbar-closeup.png" alt="用户管理工具栏特写真机截图"></div>
+          <div class="simrow"><span class="lab">摘除后（模拟）：</span><span class="btn btn-pri">新增</span><span class="btn">修改</span><span class="btn">删除</span><span class="btn">更多</span><span class="lab">——「邀请注册」连同弹窗、接口文件、菜单 9181、角色绑定一并清掉</span></div>
+          <p class="say">更新日志记一条「修复 · 移除不可用的邀请注册入口」，账上不再挂假功能。</p>
+        </div>
+      </div>
+
+      <div class="sc" data-sc="q1c">
+        <input type="radio" id="q1c1" name="q1ct" checked>
+        <div class="steps"><label class="chip" for="q1c1">1 补齐后的样子（示意）</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q1-invite-dialog.png" alt="邀请注册弹窗真机截图，叠加补齐后的成功模拟">
+            <span class="tag g" style="left:50%;top:9%;transform:translateX(-50%)">链接已生成：https://…/register?invite=8f3k2（示意）</span>
+            <span class="tag g" style="left:50%;top:62%;transform:translateX(-50%)">列表出现第一条记录，可复制/作废（示意）</span>
+          </div>
+          <p class="say">真机底图叠加示意（未排期）：后端补齐生成/列表/撤销/角色四个接口并新建邀请记录表后，这个弹窗才是真的能用。</p>
+        </div>
+      </div>
+      <p class="cap">修复前＝真机截图（2026-10-27·5188 演示环境）；修复后＝真机底图叠加模拟，落地后换真机复拍。</p>
+    </div>
+
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 整链摘除</th><th>案B 补齐后端</th><th>案C 隐藏不删</th></tr>
+      <tr><td>首次见到的变化</td><td>用户管理页少一个按钮，其余零变化</td><td>按钮变成真能用，可发邀请链接</td><td>按钮消失，代码保留</td></tr>
+      <tr><td>日常使用</td><td>不再有挂着却用不了的假功能</td><td>管理员多一条邀请进人通道</td><td>同案A</td></tr>
+      <tr><td>防呆（坑还在吗）</td><td>坑直接消失，账实一致</td><td>功能闭环</td><td>坑藏起来没消失，下轮审计还报</td></tr>
+      <tr><td>适合</td><td>开源通用版（当前无邀请制需求）</td><td>确有多租户邀请场景的部署</td><td>拿不准要不要留的过渡</td></tr>
+      <tr><td>代价</td><td>约 0.5 天（前端+SQL+日志）</td><td>约 2-3 天 + 安全审查（链接防滥用）</td><td>约 0.1 天</td></tr>
+      <tr><td>风险</td><td>将来要做邀请制需重建（git 可找回）</td><td>为没有用户的需求先付安全成本</td><td>尸代码长期滞留</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 整链摘除</span>
+      <p class="why">项目定位是开源通用平台，邀请注册是内部系统遗留；界面上挂一个永远卡死的功能最伤信任，摘除是最小诚实改动。</p>
+      <p class="risk">风险与对冲：若未来客户点名要邀请制，按案B重做，git 历史里的旧实现可作参考。</p>
+    </div>
+  </div>
+
+  <!-- ============ 题2 ============ -->
+  <div class="q">
+    <h3>题2 · 文件管理「预览开关」按钮权限错位 <span class="pill p-warn">中危</span> <span class="pill p-low">涉前端</span></h3>
+    <p class="bg">按钮显示与否看的是权限串 system:oss:edit——全系统前后端都没有这个串，等于只有超管（万能权限）能看到；而按钮真正调用的保存接口看的是 system:config:edit。结果：有真实权限的管理员看不到开关，界面上「谁能看见」和「谁能用」对不上。
+      <span class="path">oss/index.vue:55 → api/system/config/index.ts:51 → SysConfigController.java:110</span></p>
+
+    <div class="flow" data-ui>
+      <input type="radio" id="q2a" name="q2sc" checked><input type="radio" id="q2b" name="q2sc">
+      <div class="labrow"><label class="chip" for="q2a">修复前（真机实拍）</label><label class="chip" for="q2b">修复后 · 案A 一行对齐（模拟）</label></div>
+
+      <div class="sc" data-sc="q2a">
+        <input type="radio" id="q2a1" name="q2at" checked><input type="radio" id="q2a2" name="q2at">
+        <div class="steps"><label class="chip" for="q2a1">1 超管视角（按钮在这）</label><label class="chip" for="q2a2">2 错位在哪</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q2-oss-page.png" alt="文件管理页真机截图，红框标出预览开关按钮">
+            <span class="mk" style="left:27.5%;top:30.4%;width:9.9%;height:5.4%"><i>预览开关 : 禁用</i></span>
+          </div>
+          <p class="say">真机截图（超管登录）。<b>在哪找：</b>顶部菜单「系统管理 → 文件管理」，工具栏<b>「删除」和「配置管理」之间</b>。超管靠万能权限看得见，所以平时没人发现异常。</p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q2-toolbar-closeup.png" alt="文件管理工具栏特写真机截图">
+            <span class="tag" style="left:50%;top:8%;transform:translateX(-50%)">普通管理员：这个位置根本没有这个按钮</span>
+          </div>
+          <div class="evd"><b>错位证据（全仓三向对账）：</b><br>
+            按钮可见性挂 <code>system:oss:edit</code> → 前端 v-hasPermi / 后端注解 / 菜单 SQL <b>三处 0 命中</b>（没有任何角色能拿到）；<br>
+            按钮实际调用 <code>POST /system/config/updateByKey</code> → 门禁是 <code>system:config:edit</code>（SysConfigController.java:110）。</div>
+          <p class="say"><b>后果：</b>哪怕管理员真有 config:edit（接口其实调得通），也永远看不到这个开关——看得见的人和能用的人不是同一批。</p>
+        </div>
+      </div>
+
+      <div class="sc" data-sc="q2b">
+        <input type="radio" id="q2b1" name="q2bt" checked>
+        <div class="steps"><label class="chip" for="q2b1">1 对齐后（模拟标注）</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q2-toolbar-closeup.png" alt="文件管理工具栏特写真机截图，叠加对齐后的模拟标注">
+            <span class="mkg" style="left:30%;top:6%;width:38%;height:88%"><i>改挂 system:config:edit（模拟）</i></span>
+          </div>
+          <p class="say">真机底图叠加模拟：前端一行把按钮的权限判断改成 <b>system:config:edit</b>（它实际调用的接口门禁），有该权限的管理员即可见可用——看得见＝用得了。</p>
+        </div>
+      </div>
+      <p class="cap">修复前＝真机截图（2026-10-27·5188 演示环境）；修复后＝真机底图叠加模拟，落地后换真机复拍。</p>
+    </div>
+
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 前端一行对齐</th><th>案B 后端单开权限</th><th>案C 维持登记</th></tr>
+      <tr><td>首次见到的变化</td><td>有 config:edit 的管理员第一次看到开关</td><td>同案A</td><td>无变化</td></tr>
+      <tr><td>日常使用</td><td>看得见就等于用得了</td><td>同案A</td><td>非超管永远用不到</td></tr>
+      <tr><td>防呆</td><td>按钮可见性与真实权限一致</td><td>同案A，且权限粒度更细</td><td>账上永远挂一条「权限串孤儿」</td></tr>
+      <tr><td>适合</td><td>小步快修</td><td>要严格区分「改系统配置」与「改文件开关」的多角色租户</td><td>不在乎这条审计项</td></tr>
+      <tr><td>代价</td><td>约 10 分钟 + 双视角回归</td><td>约 1 天（后端接口 + 菜单 SQL 双写）</td><td>0</td></tr>
+      <tr><td>风险</td><td>config:edit 角色多显一个按钮（他们本就有权调用）</td><td>为一个按钮引入新权限串，配置面变宽</td><td>下轮审计重复报</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 前端一行对齐</span>
+      <p class="why">按钮该给谁看，就该跟它真正调用的接口权限一致；一行改动消除「界面说不行、接口说行」的错位。</p>
+      <p class="risk">风险与对冲：将来若要细分权限，届时按案B升级，此改动不冲突。</p>
+    </div>
+  </div>
+
+  <!-- ============ 题3 ============ -->
+  <div class="q">
+    <h3>题3 · 菜单账三件套：现在修，还是等批次 <span class="pill p-warn">中危</span> <span class="pill p-low">涉菜单与前端</span></h3>
+    <p class="bg">三件事：① AI 助手管理页（菜单 11925/11927）在出厂 SQL 里没绑给任何常规角色，租户管理员进不去（批四已定修法＝补授权）；② 演示库的菜单 11971/11972 落后于 SQL 新口径；③ 前端路由文件里一段注释指向不存在的 SQL 文件，误导后人。
+      <span class="path">04_role_menu.sql 对 11925/11927 零匹配；实查 smartdock_shots 缺 11972；router/index.ts:178-179</span></p>
+
+    <div class="flow" data-ui>
+      <input type="radio" id="q3a" name="q3sc" checked><input type="radio" id="q3b" name="q3sc">
+      <div class="labrow"><label class="chip" for="q3a">修复前（真机实拍·双视角）</label><label class="chip" for="q3b">修复后 · 案A 先行止血（模拟）</label></div>
+
+      <div class="sc" data-sc="q3a">
+        <input type="radio" id="q3a1" name="q3at" checked><input type="radio" id="q3a2" name="q3at"><input type="radio" id="q3a3" name="q3at">
+        <div class="steps"><label class="chip" for="q3a1">1 普通成员找入口</label><label class="chip" for="q3a2">2 手输网址直连</label><label class="chip" for="q3a3">3 对照：超管才有</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q3-member-view.png" alt="普通成员 user001 登录后的真机截图">
+            <span class="tag" style="left:50%;top:6%;transform:translateX(-50%)">普通成员（user001 真机）：顶部「AI 助手」组下只有 会话/记忆，没有「AI助手管理」</span>
+          </div>
+          <p class="say">真机截图（user001 登录）。<b>入口在哪：</b>顶部菜单「AI 助手」组——超管这里会多一项「AI助手管理」，成员没有。</p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q3-member-403.png" alt="普通成员直连管理页地址后的 403 页真机截图">
+            <span class="tag" style="left:50%;top:8%;transform:translateX(-50%)">手输 /ai/assistant-admin → 403 页面不可用（真机）</span>
+          </div>
+          <p class="say">真机截图：成员即使知道地址直连，也是「页面不可用」——权限确实没授，死路一条。</p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q3-admin-view.png" alt="超管登录的 AI 助手管理页真机截图">
+            <span class="mkg" style="left:34%;top:2.5%;width:31%;height:5.5%"><i>AI 助手 → AI助手管理（超管可见）</i></span>
+          </div>
+          <p class="say">真机截图（超管）：同一入口、同一页面，功能是好的——问题只在<b>出厂角色没绑 11925/11927</b>（baseline/04_role_menu.sql 零匹配，活库仅一个雪花角色持有）。</p>
+        </div>
+      </div>
+
+      <div class="sc" data-sc="q3b">
+        <input type="radio" id="q3b1" name="q3bt" checked>
+        <div class="steps"><label class="chip" for="q3b1">1 补授权后（模拟标注）</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q3-admin-view.png" alt="超管的 AI 助手管理页真机截图，叠加补授权后的模拟标注">
+            <span class="tag g" style="left:50%;top:8%;transform:translateX(-50%)">补授 11925/11927 后，授权角色获得同款入口与页面（模拟·图为超管真机）</span>
+          </div>
+          <p class="say">baseline + migration 双写补授后，租户管理员顶部出现「AI助手管理」并进入此页。同一小批顺带：演示库 11971/11972 对齐 SQL 新口径 + 删 router:178 陈旧注释。</p>
+        </div>
+      </div>
+      <p class="cap">修复前＝真机截图（2026-10-27·5188 演示环境·user001 与 admin 双视角）；修复后＝真机底图叠加模拟，落地后换真机复拍。</p>
+    </div>
+
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 先行止血小批</th><th>案B 并入批四</th><th>案C 推到批11B</th></tr>
+      <tr><td>首次见到的变化</td><td>租户管理员立刻能进管理页</td><td>批四开工后才能进</td><td>最晚（深改名批）</td></tr>
+      <tr><td>日常使用</td><td>菜单与库账一致，审计中危先消两条</td><td>同案A，只是晚几天</td><td>同案A，更晚</td></tr>
+      <tr><td>防呆</td><td>错误注释拔掉，不再误导后人</td><td>同案A</td><td>陈旧注释多留一阵</td></tr>
+      <tr><td>适合</td><td>当前「等开工」空档，SQL/注释级低风险</td><td>不想打断排程</td><td>只想一次动完权限串</td></tr>
+      <tr><td>代价</td><td>约半天 + 双视角活体验收</td><td>0 额外（原计划内）</td><td>0 额外</td></tr>
+      <tr><td>风险</td><td>与批四清单小幅交叉，需回刷批四计划</td><td>死入口多存活数周</td><td>止血最晚，审计项挂账最久</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 先行止血小批</span>
+      <p class="why">三件都是 SQL 与注释级低风险改动，不值得让「租户管理员死路」再等排程；批四修法本就已定，先做等于提前兑现。</p>
+      <p class="risk">风险与对冲：批四计划里同步划掉「P1-1 补授权」一项，防止重复施工。</p>
+    </div>
+  </div>
+
+  <!-- ============ 题4 ============ -->
+  <div class="q">
+    <h3>题4 · 四本停更账本与一处错误前提 <span class="pill p-warn">中危</span> <span class="pill p-low">纯文档</span></h3>
+    <p class="bg">四本账停更：phase2 总账批12行还写「待拍板」（实际已拍已建）；UI 总账 §0.3 停在 10-24；缺口底账两题仍标待拍（22 题 10-26 已全锁定）；能力②总账「下批」行过期。另有一处危险错误前提：批11B 施工计划写着「协议/Schema UI 从未建页」——与代码相反，照它去改 AGENTS.md 对照表会删错行。
+      <span class="path">phase2-master-plan.md:18/:52；batch11b-12-plan.md:36；admin.vue:52-126（UI 已建于 025ea12）</span></p>
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 文档专批一次回刷</th><th>案B 只修最危险一处</th><th>案C 登记不动</th></tr>
+      <tr><td>首次见到的变化</td><td>八处账目翻开即现状</td><td>只改「UI从未建页」那行</td><td>无</td></tr>
+      <tr><td>日常使用</td><td>后续会话不再按旧账误判</td><td>删错行的风险解除</td><td>误判风险留存</td></tr>
+      <tr><td>防呆</td><td>错误前提全数拔掉</td><td>部分</td><td>无</td></tr>
+      <tr><td>适合</td><td>多窗口并行纪律</td><td>时间紧</td><td>不在乎账实</td></tr>
+      <tr><td>代价</td><td>约 1-2 小时（.workshop 内文件，不进 git）</td><td>约 10 分钟</td><td>0</td></tr>
+      <tr><td>风险</td><td>无代码风险</td><td>其余账继续误导别的窗口</td><td>账实不符持续累积</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 文档专批一次回刷</span>
+      <p class="why">便宜、零代码风险，且「按错账施工」已经真实发生过一次（错误前提会让人删掉不该删的对照表行）。</p>
+      <p class="risk">风险与对冲：无；顺带补上批9/批10 收官行的真实提交号。</p>
+    </div>
+  </div>
+
+  <!-- ============ 题5 ============ -->
+  <div class="q">
+    <h3>题5 · 「导出审批流」承诺改口怎么了结 <span class="pill p-warn">中危</span> <span class="pill p-low">纯文档或大工程</span></h3>
+    <p class="bg">二期总账两处承诺「CSV 导出接审批流」，批11 收官行被悄悄改写成只做了「导出审计」；代码里确实没有任何审批流实现。属于「承诺了没做、账还改了口」。
+      <span class="path">phase2-master-plan.md:89/:107 对照 :17；全后端 grep「审批」仅两处注释命中</span></p>
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 账对齐现实</th><th>案B 现在补实现</th><th>案C 含糊维持</th></tr>
+      <tr><td>首次见到的变化</td><td>总账如实标注「审批流未实施，已交付审计」</td><td>导出前多一步审批</td><td>无</td></tr>
+      <tr><td>日常使用</td><td>读账的人不再被误导</td><td>导出要走申请→审批→放行</td><td>同现状</td></tr>
+      <tr><td>防呆</td><td>承诺与实际重新对齐</td><td>功能补齐</td><td>账实不符挂账</td></tr>
+      <tr><td>适合</td><td>当前无审批需求</td><td>确有合规要求的客户场景</td><td>——</td></tr>
+      <tr><td>代价</td><td>约 20 分钟 + 登记进待办池</td><td>约 3-5 天（新表+状态机+页面）</td><td>0</td></tr>
+      <tr><td>风险</td><td>承认缺口（本来就没做）</td><td>无人用的流程变维护负担</td><td>下轮审计再报</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 账对齐现实</span>
+      <p class="why">功能没做不丢人，账改口才丢人；先把账写诚实，等真出现审批需求再按案B立项。</p>
+      <p class="risk">风险与对冲：若你其实想要审批流，直接选案B并告知优先级。</p>
+    </div>
+  </div>
+
+  <!-- ============ 题6 ============ -->
+  <div class="q">
+    <h3>题6 · 仓库卫生三件：推送、分支、历史重置 <span class="pill p-warn">中危</span> <span class="pill p-low">git 操作</span></h3>
+    <p class="bg">① 36 个本地提交未推送（含多个窗口的工作，origin 停在 10-25）；② 悬挂分支：docs/readme-slim（落后 106 个提交，精简思路已被主干两轮 README 深度优化取代）与本地 pr-1/pr-1-merge；③ 早期计划「删 .git 重置成单提交」从未执行也没撤销，与已开源的现状矛盾。
+      <span class="path">git log origin/master..master；merge-base 实证 readme-slim 未合并；batch-7.md:25</span></p>
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 清扫 + 正式作废</th><th>案B 留 readme-slim 待评估</th><th>案C 执行历史重置</th></tr>
+      <tr><td>首次见到的变化</td><td>分支列表干净，36 提交上远端</td><td>推送 + 删 pr-1 系列，readme-slim 留着</td><td>整仓变单提交</td></tr>
+      <tr><td>日常使用</td><td>跨窗口不再攒推送债</td><td>同案A，另留一条待办</td><td>历史不可追溯</td></tr>
+      <tr><td>防呆</td><td>矛盾计划正式销账</td><td>矛盾部分销账</td><td>与远端全量历史冲突</td></tr>
+      <tr><td>适合</td><td>开源主干的现状</td><td>仍想保留精简版 README 的可能</td><td>——</td></tr>
+      <tr><td>代价</td><td>推送由你或跨窗协调；删分支约 5 分钟</td><td>同左 + 后续 rebase 评估</td><td>强推覆盖开源仓</td></tr>
+      <tr><td>风险</td><td>readme-slim 有独有内容则丢（审计已核：内容已被取代）</td><td>两套 README 口径并存</td><td>不可取：远端已有全量历史</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 清扫 + 正式作废</span>
+      <p class="why">「历史重置」与已推送的开源仓事实冲突，该正式作废；readme-slim 的使命已被主干深度优化完成，留着只会造成双口径。</p>
+      <p class="risk">风险与对冲：删除前先 git show 抽查 readme-slim 独有内容（审计已做过一轮，均已被取代）。</p>
+    </div>
+  </div>
+
+  <!-- ============ 题7 ============ -->
+  <div class="q">
+    <h3>题7 · Schema「校验」按钮说实话 <span class="pill p-warn">中危</span> <span class="pill p-low">涉前端后端</span></h3>
+    <p class="bg"><b>2026-10-27 活体实测口径（比审计原文更精确）：</b>空着或不是合法 JSON，前端会拦（提示「Schema JSON 不合法」「请先填事件名」）；但只要是一段合法 JSON——哪怕是 <code style="font-family:Consolas,monospace;font-size:12px">{"foo":"bar"}</code> 这种胡写内容——后端一律返回 valid:true，页面亮出绿色「校验通过」。schema 本体根本没进校验：后端只收 props/context/traits 三个字段。
+      <span class="path">admin.vue:117（前端把 schema 发了过去）；ProfileSchemaController.java:53-56（后端没收它）</span></p>
+
+    <div class="flow" data-ui>
+      <input type="radio" id="q7a" name="q7sc" checked><input type="radio" id="q7b" name="q7sc">
+      <div class="labrow"><label class="chip" for="q7a">修复前（真机实拍·含假绿灯实测）</label><label class="chip" for="q7b">修复后 · 案A 校验真验 Schema（模拟）</label></div>
+
+      <div class="sc" data-sc="q7a">
+        <input type="radio" id="q7a1" name="q7at" checked><input type="radio" id="q7a2" name="q7at"><input type="radio" id="q7a3" name="q7at">
+        <div class="steps"><label class="chip" for="q7a1">1 找到这个页面</label><label class="chip" for="q7a2">2 注册区特写</label><label class="chip" for="q7a3">3 假绿灯实测</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q7-schema-page.png" alt="引擎管理页协议与Schema页签真机截图"></div>
+          <p class="say">真机截图（超管登录）。<b>在哪找：</b>顶部菜单「画像与分析 → 引擎管理」→「<b>协议与 Schema</b>」页签。上半部分是接入协议（含「校验当前协议」，那个是真的验协议）。</p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q7-validate-closeup.png" alt="注册更新Schema区特写真机截图"></div>
+          <p class="say">真机特写：页面下方的「注册 / 更新 Schema」区——事件名、版本、「校验」「保存」按钮和 Schema JSON 大输入框。<b>出问题的就是这个区的「校验」。</b></p>
+          <div class="win"><img src="20261026-audit-closeout-shots/q7-false-green.png" alt="胡写的Schema JSON通过校验的真机截图，绿色校验通过提示">
+            <span class="mk" style="left:12%;top:52%;width:76%;height:12%"><i>填的是胡写内容，却亮「校验通过」</i></span>
+          </div>
+          <div class="evd"><b>实测（2026-10-27，真机操作）：</b><br>
+            Schema 框填入 <code>{"foo":"bar","这是胡写的":true}</code> → 点「校验」<br>
+            POST <code>/profile/schema/dcs/validate</code> 返回 <code>{"valid":true,"errors":[]}</code><br>
+            页面在按钮旁亮出绿色<b>「校验通过」</b>——schema 本体一个字都没被验。</div>
+          <p class="say">这不是「没填样本」的问题（空 JSON 有前端护栏），而是<b>校验根本没把 schema 当校验对象</b>：填什么合法 JSON 都绿灯。</p>
+        </div>
+      </div>
+
+      <div class="sc" data-sc="q7b">
+        <input type="radio" id="q7b1" name="q7bt" checked>
+        <div class="steps"><label class="chip" for="q7b1">1 止血后（模拟标注）</label></div>
+        <div class="stage">
+          <div class="win"><img src="20261026-audit-closeout-shots/q7-false-green.png" alt="同一张实测截图，叠加止血后的模拟标注">
+            <span class="tag g" style="left:50%;top:14%;transform:translateX(-50%)">止血后：同一份胡写内容将被拦下，如实报「Schema 不合法：缺少 type/properties 等必要结构」（模拟）</span>
+          </div>
+          <p class="say">真机底图叠加模拟：止血＝让校验<b>真的验 schema 本体</b>（前端本地校验或后端把 schema 字段纳入，约半天），假绿灯当天消失；完整的样本输入重设计仍按留档归批11B。</p>
+        </div>
+      </div>
+      <p class="cap">修复前＝真机截图与真机操作（2026-10-27·5188 演示环境，假绿灯为实拍非模拟）；修复后＝真机底图叠加模拟，落地后换真机复拍。</p>
+    </div>
+
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 校验真验 Schema 本体</th><th>案B 完整样本输入重设计</th><th>案C 只改文案</th></tr>
+      <tr><td>首次见到的变化</td><td>胡写内容被拦，报真实错误原因</td><td>多出样本录入界面</td><td>按钮字样变化</td></tr>
+      <tr><td>日常使用</td><td>绿灯重新可信</td><td>真正校验 schema+样本</td><td>仍可能绿灯说谎</td></tr>
+      <tr><td>防呆</td><td>假绿灯立刻消失</td><td>功能闭环</td><td>坑仍在</td></tr>
+      <tr><td>适合</td><td>等批11B 空档的过渡</td><td>急用 schema 校验的场景</td><td>——</td></tr>
+      <tr><td>代价</td><td>约 0.5 天（前端本地或后端纳入 schema 字段）</td><td>约 2-3 天（前端输入 + 后端校验）</td><td>约 5 分钟</td></tr>
+      <tr><td>风险</td><td>完整版仍欠着（已登记批11B）</td><td>与批11B 深改名窗口撞车</td><td>说谎按钮换个说法继续说谎</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 校验真验 Schema 本体</span>
+      <p class="why">按钮当前只验「是不是合法 JSON」；止血让它验「是不是合法 Schema」，半天成本让绿色「校验通过」重新值钱。</p>
+      <p class="risk">风险与对冲：止血版要在更新日志写明「完整样本校验仍在路上」，避免被当成已修完。</p>
+    </div>
+  </div>
+
+  <!-- ============ 题8 ============ -->
+  <div class="q">
+    <h3>题8 · 总施工顺序：加不加「止血批」 <span class="pill p-warn">排程</span></h3>
+    <p class="bg">审计 19 条中危里，入口类（题1/2/3/7）都可立刻修；其余大多已有归属（批四、批11B、文档批）。既定总控序是：壳层波一 → 助手批二/批三 → B 批 → 批四 → 批11B → 批12。
+      <span class="path">20261026-execution-master-plan.md 施工序</span></p>
+    <table>
+      <colgroup><col style="width:13%"><col style="width:29%"><col style="width:29%"><col style="width:29%"></colgroup>
+      <tr><th>维度</th><th>案A 止血批→回原排程</th><th>案B 全并入批四</th><th>案C 审计专批清 19 条</th></tr>
+      <tr><td>首次见到的变化</td><td>1-2 天内四个入口全部可用/移除</td><td>死入口再存活数周</td><td>中危一次清零</td></tr>
+      <tr><td>日常使用</td><td>其余工作零打扰</td><td>排程最稳</td><td>排程大改</td></tr>
+      <tr><td>防呆</td><td>账实不符同步修（题4/5 文档批顺路）</td><td>账继续旧着</td><td>全修但深改名类本就该等批11B</td></tr>
+      <tr><td>适合</td><td>「先止血后照旧」的节奏</td><td>完全不想加批</td><td>强迫症式一次清账</td></tr>
+      <tr><td>代价</td><td>止血批约 1-2 天</td><td>0 额外</td><td>约 1 周，打乱既定序</td></tr>
+      <tr><td>风险</td><td>批四清单要划掉一项（题3已先行）</td><td>用户继续踩坑</td><td>与助手窗口协调面变大</td></tr>
+    </table>
+    <div class="pick"><span class="t">推荐 · 案A 止血批 → 回原排程</span>
+      <p class="why">止血批 = 题1A + 题2A + 题3A + 题7A + 题4/题5 文档回刷，1-2 天一个独立提交收口；然后按既定总控序继续，互不干扰。</p>
+      <p class="risk">风险与对冲：止血批收口时回刷批四计划与更新日志，划掉已先行项。</p>
+    </div>
+  </div>
+</section>
+
+<section id="s4">
+  <h2>推荐组合速览</h2>
+  <div class="combo">
+    <table style="border:none; table-layout:fixed">
+      <colgroup><col style="width:14%"><col style="width:16%"><col style="width:70%"></colgroup>
+      <tr><th>题</th><th>推荐</th><th>一句话</th></tr>
+      <tr><td>题1 邀请注册</td><td><span class="pill p-acc">案A 摘除</span></td><td>删整条永远卡死的假功能链，更新日志记一条修复</td></tr>
+      <tr><td>题2 预览开关</td><td><span class="pill p-acc">案A 一行对齐</span></td><td>按钮可见性对齐它真实调用的接口权限</td></tr>
+      <tr><td>题3 菜单账</td><td><span class="pill p-acc">案A 先行止血</span></td><td>补授 11925/11927 + 演示库对齐 + 删陈旧注释</td></tr>
+      <tr><td>题4 停更账本</td><td><span class="pill p-acc">案A 一次回刷</span></td><td>八处文档账全改齐，拔掉错误前提</td></tr>
+      <tr><td>题5 审批流</td><td><span class="pill p-acc">案A 账对齐现实</span></td><td>如实标注未实施，登记待办池</td></tr>
+      <tr><td>题6 仓库卫生</td><td><span class="pill p-acc">案A 清扫+作废</span></td><td>协调推送 36 提交、删悬挂分支、作废历史重置</td></tr>
+      <tr><td>题7 校验按钮</td><td><span class="pill p-acc">案A 真验 Schema</span></td><td>让校验把 schema 本体当校验对象，假绿灯消失</td></tr>
+      <tr><td>题8 顺序</td><td><span class="pill p-acc">案A 止血批</span></td><td>1-2 天收口止血批，然后回既定总控序</td></tr>
+    </table>
+    <p class="tnote">说明：八题推荐均为各自最省的诚实解，彼此独立、可混搭（例如题1 选案B 补后端，其余照推荐）；混搭直接在对话里说明即可。止血批（题8A）天然打包题1A/2A/3A/7A 与题4/5 文档。</p>
+  </div>
+</section>
+
+<div class="rev"><b>修订记录</b>：<br>
+  v2.1（2026-10-27）——手机档 390 复检抓到顶部两张宽表末列被裁（nowrap 徽章撑破 fixed 列宽被表级 overflow:hidden 裁掉）：两表包横向滚动容器并在窄屏给 620px 最小宽度，改为可横滑不裁切；题3 大面积白虚线补丁为「移除示意」语义（盖住即消失效果），保留。<br>
+  v2（2026-10-27）——按用户反馈「模拟 UI 太敷衍、看不出功能在哪」全面重做：四个涉前端题的流程改为<b>真机截图底图 + 叠加标注</b>（12 张，实拍于本机 5188 演示环境，admin 与 user001 双视角），每题新增「在哪找」路径行；题1 与题7 的故障口径经活体复测修正——题1 真凶＝角色/列表接口 404 被吞导致表单死锁（生成按钮永远被「请选择注册后角色」拦住）；题7＝空 JSON 有前端护栏，真谎是任意合法 JSON 一律 valid:true（附接口返回原文），案A 由「按钮禁用」改为「校验真验 Schema 本体」。<br>
+  v1（2026-10-26）——依据《遗漏业务与菜单缺失深度审查报告》（82 条发现，77 坐实 / 5 推翻）出题 8 道，每题 3 案五要素对比。</div>
+<footer>修复前＝真机截图（2026-10-27 实拍）｜修复后＝真机底图叠加模拟，落地后换真机复拍 ｜ 拍板板归档：.workshop/plans/20261026-audit-closeout-board.html ｜ 答案唯一通道：在对话里明说</footer>
+
+</div>
+</body>
+</html>
