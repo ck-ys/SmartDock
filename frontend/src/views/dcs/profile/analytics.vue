@@ -75,7 +75,10 @@
               <span class="ui-kpi__hint">访客 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
             </div>
           </div>
-          <el-empty v-else :image-size="50" description="还没有任何业务源写入事件" />
+          <el-alert v-if="loadErrors.cross" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+            <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+          </el-alert>
+          <el-empty v-else-if="!crossData?.sources?.length" :image-size="50" description="还没有任何业务源写入事件" />
           <p class="muted small">画像引擎按统一事件协议接收任意业务源（网站 / 订单 / 供应链…）；每个源独立统计互不混算。</p>
         </el-card>
       </el-tab-pane>
@@ -119,16 +122,17 @@
             </div>
           </template>
           <v-chart v-if="hasOverviewData" class="trend-chart" :option="trendOption" autoresize />
-          <el-empty v-else :image-size="60" description="该源在窗口期内还没有事件数据">
+          <el-empty v-else-if="!loadErrors.overview" :image-size="60" description="该源在窗口期内还没有事件数据">
             <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
           </el-empty>
         </el-card>
 
-        <el-row :gutter="14" class="breakdown-row">
-          <el-col v-for="block in breakdownBlocks" :key="block.type" :xs="24" :lg="12">
-            <el-alert v-if="loadErrors.breakdowns" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+        <!-- 五审回修: 拆解错误条移出 v-for——四张卡只报一条, 不再每卡重复 -->
+        <el-alert v-if="loadErrors.breakdowns" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
           <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
         </el-alert>
+        <el-row :gutter="14" class="breakdown-row">
+          <el-col v-for="block in breakdownBlocks" :key="block.type" :xs="24" :lg="12">
   <el-card shadow="never" class="panel-card" v-loading="breakdownLoading">
               <template #header>
                 <div class="panel-head">
@@ -161,10 +165,10 @@
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 页面与搜索 -->
-      <el-alert v-if="loadErrors.page" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+  <el-tab-pane label="页面与搜索" name="page" lazy>
+        <el-alert v-if="loadErrors.page" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
           <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
         </el-alert>
-  <el-tab-pane label="页面与搜索" name="page" lazy>
         <el-row :gutter="14">
           <el-col :xs="24" :lg="14">
             <el-card shadow="never" class="panel-card" v-loading="pageLoading">
@@ -302,7 +306,7 @@
             </div>
           </template>
 
-          <el-empty v-if="!funnels.length" :image-size="60" description="当前业务源还没有漏斗">
+          <el-empty v-if="!funnels.length && !loadErrors.funnels" :image-size="60" description="当前业务源还没有漏斗">
             <el-button v-hasPermi="['analytics:center:edit']" type="primary" link @click="openFunnelDialog()">去新建漏斗</el-button>
           </el-empty>
 
@@ -336,7 +340,7 @@
             <template v-if="funnelResult.breakdownGroups?.length">
               <el-table class="ui-table" :data="funnelResult.breakdownGroups" style="margin-top: 14px">
                 <el-table-column prop="label" label="拆解组" min-width="120" fixed />
-                <el-table-column prop="visitors" label="首步人数" width="96" align="right" />
+                <el-table-column prop="visitors" label="参与访客" width="96" align="right" />
                 <el-table-column v-for="(gs, gi) in funnelResult.steps" :key="`bg-${gi}`" min-width="104" align="center">
                   <template #header>
                     <span>第{{ gi + 1 }}步 {{ gs.name || gs.eventName }}</span>
@@ -351,7 +355,7 @@
                 </el-table-column>
               </el-table>
               <div class="muted small" style="margin-top: 6px">
-                拆解口径: 按访客首步事件的「{{ funnelBreakdownLabel }}」取值分组(Top10 之外并入「其他」), 各组首步人数之和 = 整体首步人数。
+                拆解口径: 按访客首步事件的「{{ funnelBreakdownLabel }}」取值分组(Top10 之外并入「其他」), 各组参与访客之和 = 整体参与访客(每访客只归一组)。
               </div>
             </template>
           </template>
@@ -399,7 +403,7 @@
             <el-table-column prop="linear" label="线性" width="80" align="right" />
             <el-table-column prop="visitors" label="触达访客" width="90" align="right" />
           </el-table>
-          <el-empty v-else :image-size="50" description="窗口期内没有转化事件，无法归因">
+          <el-empty v-else-if="!loadErrors.attribution" :image-size="50" description="窗口期内没有转化事件，无法归因">
             <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
           </el-empty>
           <p class="muted small">首次=最早带来的渠道记功；末次=临门一脚记功；线性=沿途触点平分。只统计转化发生之前的访问。</p>
@@ -423,6 +427,7 @@
             <div class="panel-head">
               <span>访客留存</span>
               <div class="head-actions">
+                <span v-if="retentionEffectiveDays > days" class="muted small">近 {{ retentionEffectiveDays }} 天</span>
                 <el-select v-model="retentionGranularity" style="width: 92px" @change="onRetentionGranularityChange">
                   <el-option label="按日" value="day" />
                   <el-option label="按周" value="week" />
@@ -459,7 +464,7 @@
               <span>越高色越深（无回访不着色）</span>
             </div>
           </template>
-          <el-empty v-else :image-size="60" description="暂无留存数据">
+          <el-empty v-else-if="!loadErrors.retention" :image-size="60" description="暂无留存数据">
             <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
           </el-empty>
         </el-card>
@@ -532,7 +537,7 @@
               :clearable="true"
               @change="onSessionRangeChange"
             />
-            <el-button type="primary" @click="searchSessions">查询</el-button>
+            <el-button type="primary" :loading="sessionLoading" @click="searchSessions">查询</el-button>
             <el-button @click="resetSessions">重置</el-button>
             <el-button v-hasPermi="['analytics:center:export']" :loading="exporting" @click="exportSessionsCsv"> 导出 CSV </el-button>
           </div>
@@ -641,6 +646,9 @@
 
       <!-- ---------------------------------------------------------- 实时看板（批8） -->
       <el-tab-pane label="实时看板" name="realtime" lazy>
+        <el-alert v-if="loadErrors.realtime" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
+        </el-alert>
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="panel-head">
@@ -805,7 +813,6 @@ import {
   rebuildAnalytics,
   runAnalyticsCustom,
   saveAnalyticsFunnel,
-  type AnalyticsBreakdown,
   type AnalyticsBreakdownRow,
   type AnalyticsFunnel,
   type AnalyticsFunnelResult,
@@ -849,6 +856,13 @@ const syncQuery = () => {
   if (source.value && source.value !== 'web') q.source = source.value;
   if (days.value !== 30) q.days = String(days.value);
   if (tab.value && tab.value !== 'overview') q.tab = tab.value;
+  // 五审回修: 板3A 承诺「配好视图复制链接恢复同视图」——自定义分析条件与明细渠道也是视图的一部分
+  if (tab.value === 'custom') {
+    q.dimension = customForm.dimension;
+    q.metric = customForm.metric;
+    q.limit = String(customForm.limit);
+  }
+  if (tab.value === 'sessions' && sessionQuery.channel) q.channel = sessionQuery.channel;
   router.replace({ query: q }).catch(() => undefined);
 };
 const tab = ref(String(route.query.tab || 'overview'));
@@ -958,14 +972,15 @@ const drillToSessions = (type: string, row: AnalyticsBreakdownRow) => {
   tab.value = 'sessions';
   Object.assign(sessionQuery, {
     keyword: '', channel: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1
-  });
-  sessionRange.value = null;
+  });  sessionRange.value = null;
   sessionQuery.fromDate = undefined;
   sessionQuery.toDate = undefined;
   if (type === 'channel') sessionQuery.channel = row.label;
   if (type === 'device') sessionQuery.deviceType = row.label;
   if (type === 'browser') sessionQuery.browser = row.label;
   if (type === 'geo') sessionQuery.country = row.label.split(' / ')[0].trim();
+  // 五审回修: 程序化切页签也要落 URL, 分享/刷新才能回到下钻后的视图
+  syncQuery();
   loadSessions();
 };
 const onSessionRangeChange = (range: [string, string] | null) => {
@@ -1036,14 +1051,18 @@ const openSaveReport = async () => {
     ElMessage.success('视图已保存');
     await loadMyReports();
   } catch (e) {
-    if (e !== 'cancel' && (e as { toString: () => string })?.toString?.().includes('cancel')) return;
-    if (e !== 'cancel') throw e;
+    // 五审回修: EP 统一 reject('cancel'), 真实失败交给 request 层提示——此处不再向外抛未处理拒绝
+    if (e !== 'cancel') console.warn('保存视图失败', e);
   }
 };
 const removeMyReport = async () => {
   const rep = myReports.value.find((x) => x.reportId === myReportId.value);
   if (!rep) return;
-  await ElMessageBox.confirm(`确定删除视图「${rep.reportName}」？`, '删除视图', { type: 'warning' });
+  try {
+    await ElMessageBox.confirm(`确定删除视图「${rep.reportName}」？`, '删除视图', { type: 'warning' });
+  } catch {
+    return;
+  }
   await removeAnalyticsReport(rep.reportId);
   myReportId.value = '';
   ElMessage.success('已删除');
@@ -1066,7 +1085,8 @@ const dimensionLabels: Record<string, string> = {
   entry: '落地页',
   exit: '离开页',
   search: '搜索词',
-  event: '事件'
+  event: '事件',
+  campaign: '投放活动'
 };
 const metricLabels: Record<string, string> = { pv: 'PV', uv: 'UV', visits: '访问次数', events: '事件数' };
 const dimensionLabel = computed(() => dimensionLabels[customForm.dimension] || customForm.dimension);
@@ -1280,7 +1300,11 @@ const saveFunnel = async () => {
 
 const removeFunnel = async () => {
   if (!currentFunnel.value) return;
-  await ElMessageBox.confirm(`确定删除漏斗「${currentFunnel.value.funnelName}」？`, '删除漏斗', { type: 'warning' });
+  try {
+    await ElMessageBox.confirm(`确定删除漏斗「${currentFunnel.value.funnelName}」？`, '删除漏斗', { type: 'warning' });
+  } catch {
+    return;
+  }
   await deleteAnalyticsFunnel(currentFunnel.value.funnelId);
   ElMessage.success('已删除');
   await loadFunnels();
@@ -1297,12 +1321,20 @@ const parseSteps = (raw: string | AnalyticsFunnelStepDef[] | undefined): Analyti
 };
 
 // ---------------------------------------------------------------- 留存
+let retentionReqSeq = 0;
 let loadRetention = async () => {
+  // 五审回修: 请求序号防竞态——后到的旧响应不回填(周/月列头单位取本地状态, 旧响应会错位)
+  const seq = ++retentionReqSeq;
   retentionLoading.value = true;
   try {
-    retention.value = await getAnalyticsRetention(source.value, retentionEffectiveDays.value, retentionWindow.value, retentionGranularity.value, retentionCumulative.value);
+    const data = await getAnalyticsRetention(source.value, retentionEffectiveDays.value, retentionWindow.value, retentionGranularity.value, retentionCumulative.value);
+    if (seq === retentionReqSeq) {
+      retention.value = data;
+    }
   } finally {
-    retentionLoading.value = false;
+    if (seq === retentionReqSeq) {
+      retentionLoading.value = false;
+    }
   }
 };
 
@@ -1612,7 +1644,10 @@ const submitCsv = async () => {
   importing.value = true;
   try {
     const result = await importAnalyticsCsv(source.value, csvText.value);
-    ElMessage.success(`导入完成：写入 ${result.written} 条，跳过 ${result.skipped} 条`);
+    const droppedNote = (result as { dropped?: number; invalidTime?: number });
+    const extra = (droppedNote.dropped ? `，超限丢弃 ${droppedNote.dropped} 条` : '')
+      + (droppedNote.invalidTime ? `，时间非法 ${droppedNote.invalidTime} 条` : '');
+    ElMessage.success(`导入完成：写入 ${result.written} 条，跳过 ${result.skipped} 条${extra}`);
     await rebuild();
   } finally {
     importing.value = false;
@@ -1658,10 +1693,17 @@ loadRealtime = wrapLoad('realtime', loadRealtime);
 loadCross = wrapLoad('cross', loadCross);
 const retryFailed = () => reloadCurrent();
 
+const clearSessionRange = () => {
+  // 五审回修: 明细日期区间优先级高于天数, 切源/切天数不清区间会让天数控件静默失效
+  sessionRange.value = null;
+  sessionQuery.fromDate = undefined;
+  sessionQuery.toDate = undefined;
+};
 const onSourceChange = async () => {
   sessionQuery.source = source.value;
   funnelId.value = '';
   funnelResult.value = null;
+  clearSessionRange();
   syncQuery();
   await reloadCurrent();
 };
@@ -1677,6 +1719,7 @@ const onDaysModeChange = async () => {
 
 const onDaysChange = async () => {
   days.value = Math.min(Math.max(Number(days.value) || 30, 1), 365);
+  clearSessionRange();
   syncQuery();
   await reloadCurrent();
 };
@@ -1761,9 +1804,19 @@ const deltaTone = (key: string) => {
 };
 
 onMounted(async () => {
+  // 五审回修: URL 带回的自定义分析条件/明细渠道先恢复, 再按恢复后的页签首挂载
+  const q = route.query;
+  if (q.dimension) customForm.dimension = String(q.dimension);
+  if (q.metric) customForm.metric = String(q.metric);
+  if (q.limit) customForm.limit = Number(q.limit) || 20;
+  if (q.channel) sessionQuery.channel = String(q.channel);
   // 三审 P2: 按 URL 恢复的 tab 首挂就要有数据——reloadCurrent 覆盖全部页签,
   // overview 默认态与原 Promise.all 完全等价, 不会多拉
   await reloadCurrent();
+  // 五审回修: 页头「统计区间」取 overview——非 overview 页签直达时也要有区间可示
+  if (tab.value !== 'overview' && !overview.value?.from) {
+    loadOverview().catch(() => undefined);
+  }
   // R2-4 我的视图: 无权限(403)时静默为空列表, 下拉只显示占位
   loadMyReports();
 });

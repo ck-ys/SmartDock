@@ -11,7 +11,7 @@
       </div>
       <div class="ui-page-head__actions">
         <el-select v-model="source" class="source-select" @change="load">
-          <el-option v-for="s in sourceOptions" :key="s" :label="s" :value="s" />
+          <el-option v-for="s in sourceOptions" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-button :loading="loading" @click="load">刷新</el-button>
       </div>
@@ -97,8 +97,17 @@
 
 <script setup lang="ts" name="ProfileHealth">
 import { getEngineHealth, type ProfileHealth } from '@/api/dcs/core/profile';
+import { useSourceOptions } from '@/composables/useProfileSources';
 
-const sourceOptions = ['web', 'order', 'supply', 'dcs', 'risk'];
+// 五审回修: 源下拉接口驱动(批2 承诺八页, 本页漏改)——新源有事件即可选, 拉取失败回退内置清单
+const { list: sourceOptions, ensureSources } = useSourceOptions('event', [
+  { label: 'web', value: 'web' },
+  { label: 'order', value: 'order' },
+  { label: 'supply', value: 'supply' },
+  { label: 'dcs', value: 'dcs' },
+  { label: 'risk', value: 'risk' }
+]);
+ensureSources();
 const source = ref('web');
 const loading = ref(false);
 const health = ref<ProfileHealth | null>(null);

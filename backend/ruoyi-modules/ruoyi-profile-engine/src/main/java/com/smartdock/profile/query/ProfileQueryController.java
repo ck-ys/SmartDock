@@ -54,7 +54,13 @@ public class ProfileQueryController {
     public R<Map<String, Object>> sourceList() {
         Map<String, Object> out = new LinkedHashMap<>();
         // 三审 P2: 取当前生效租户(超管动态切换后下拉要跟着走), 登录租户在切换态下是错的
-        String tenantId = String.valueOf(org.dromara.common.tenant.helper.TenantHelper.getTenantId());
+        String tenantId = org.dromara.common.tenant.helper.TenantHelper.getTenantId();
+        if (tenantId == null || "null".equals(tenantId)) {
+            // 五审回修: 租户上下文缺失时返回空清单, 不拿字面量 "null" 当租户号查库
+            out.put("subjectSources", java.util.List.of());
+            out.put("eventSources", java.util.List.of());
+            return R.ok(out);
+        }
         out.put("subjectSources", subjectMapper.selectSubjectSources(tenantId));
         out.put("eventSources", eventMapper.selectEventSources(tenantId));
         return R.ok(out);

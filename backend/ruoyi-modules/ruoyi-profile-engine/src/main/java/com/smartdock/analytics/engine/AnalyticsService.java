@@ -185,8 +185,8 @@ public class AnalyticsService {
      *
      * <p>根因(板批5B运行时实锤): 日汇总唯一写入链=事件落库触发的 rebuildRecent,
      * 链路断档的天不会再有人补行, 四个既有定时任务无一兜底。每日凌晨的
-     * {@code AnalyticsDailyBackfillJob} 与手工触发(AdminController)走本方法同一入口,
-     * 幂等性由 rebuildRange 保证(deleteRange 后重算, 会话边界锚点前的旧行跳过保留)。</p>
+     * {@code AnalyticsDailyBackfillJob} 与手工触发(AnalyticsController /analytics/backfill-daily)
+     * 走本方法同一入口, 幂等性由 rebuildRange 保证(deleteRange 后重算, 会话边界锚点前的旧行跳过保留)。</p>
      */
     public Map<String, Object> backfillDaily(String day) {
         LocalDate target = parseBackfillDay(day);
@@ -486,6 +486,7 @@ public class AnalyticsService {
 
     public IPage<AnalyticsSession> sessionPage(AnalyticsSessionQuery query) {
         requireSource(query.getSource());
+        escapeLikeKeyword(query);
         Date[] range = resolveRange(query.getDays(), query.getFromDate(), query.getToDate());
         int pageNum = query.getPageNum() == null ? 1 : Math.max(1, query.getPageNum());
         int pageSize = query.getPageSize() == null ? 20 : Math.min(Math.max(1, query.getPageSize()), 200);
@@ -679,15 +680,15 @@ public class AnalyticsService {
         out.put("steps", outSteps);
         out.put("overallRate", percent(counts.length == 0 ? 0 : counts[counts.length - 1], counts.length == 0 ? 0 : counts[0]));
         // R2-3 拆解维度: 按访客首步事件 context 分组再各走漏斗, Top10 之外并「其他」;
-        // 各组首步人数之和恒等于整体首步人数(加权守恒), 非法维度直接拒绝
+        // 各组参与访客之和恒等于整体参与访客(每访客归属唯一组), 非法维度直接拒绝
         String breakdownDim = normalizeBreakdown(bo == null ? null : bo.getBreakdown());
         if (breakdownDim != null && !byVisitor.isEmpty()) {
-            String contextKey = BREAKDOWN_CONTEXT_KEYS.get(breakdownDim);
+            String[] contextKeys = BREAKDOWN_CONTEXT_KEYS.get(breakdownDim);
             record GroupRow(String label, long[] gc, int visitors) {
             }
             Map<String, GroupRow> groupIndex = new LinkedHashMap<>();
             for (Map.Entry<String, List<AnalyticsEventRow>> entry : byVisitor.entrySet()) {
-                String label = firstStepContextValue(entry.getValue(), names.get(0), contextKey);
+                String label = firstStepContextValue(entry.getValue(), names.get(0), contextKeys);
                 long[] walkCounts = walks.get(entry.getKey()).counts();
                 GroupRow row = groupIndex.get(label);
                 if (row == null) {
@@ -730,9 +731,14 @@ public class AnalyticsService {
         return out;
     }
 
-    /** R2-3 拆解维度 → 首步事件 context 键(渠道/设备/系统/浏览器)。 */
-    private static final Map<String, String> BREAKDOWN_CONTEXT_KEYS = Map.of(
-        "channel", "sourceChannel", "device", "deviceType", "os", "os", "browser", "browser");
+    /** R2-3 拆解维度 → 首步事件 context 键链(渠道/设备/系统/浏览器)。
+     * 五审回修: 单键是会话归因链的严格子集, 按 context.channel/utmSource 接入的源拆解全落 (未知)——
+     * 与 AnalyticsSessionizer 的取值链对齐(仅 context 层, 不含 referrer 兜底, 保留 (未知) 语义)。 */
+    private static final Map<String, String[]> BREAKDOWN_CONTEXT_KEYS = Map.of(
+        "channel", new String[]{"sourceChannel", "channel", "utmSource", "utm.source"},
+        "device", new String[]{"deviceType", "device"},
+        "os", new String[]{"os", "osName"},
+        "browser", new String[]{"browser", "browserName"});
 
     private static String normalizeBreakdown(String breakdown) {
         if (StringUtils.isBlank(breakdown)) {
@@ -745,9 +751,9 @@ public class AnalyticsService {
         return dim;
     }
 
-    /** 访客首步事件(最早命中的第 1 步事件)的 context 取值; 缺键/解析失败 → "(未知)"。入参须已按时间排序。
+    /** 访客首步事件(最早命中的第 1 步事件)的 context 取值(按键链回退, utm.source 为两级); 缺键/解析失败 → "(未知)"。入参须已按时间排序。
      * 解析用裸 Jackson(静态), 不走 JsonUtils——后者依赖 Spring 容器, 纯函数单测进不来。 */
-    static String firstStepContextValue(List<AnalyticsEventRow> sorted, String stepOneName, String contextKey) {
+    static String firstStepContextValue(List<AnalyticsEventRow> sorted, String stepOneName, String[] contextKeys) {
         for (AnalyticsEventRow event : sorted) {
             if (!stepOneName.equals(event.getEventName())) {
                 continue;
@@ -755,9 +761,17 @@ public class AnalyticsService {
             try {
                 com.fasterxml.jackson.databind.JsonNode ctx = BREAKDOWN_JSON.readTree(event.getContext());
                 if (ctx != null && ctx.isObject()) {
-                    com.fasterxml.jackson.databind.JsonNode value = ctx.get(contextKey);
-                    if (value != null && !value.isNull() && StringUtils.isNotBlank(value.asText())) {
-                        return value.asText();
+                    for (String key : contextKeys) {
+                        com.fasterxml.jackson.databind.JsonNode value;
+                        if (key.startsWith("utm.")) {
+                            com.fasterxml.jackson.databind.JsonNode utm = ctx.get("utm");
+                            value = utm != null && utm.isObject() ? utm.get(key.substring(4)) : null;
+                        } else {
+                            value = ctx.get(key);
+                        }
+                        if (value != null && !value.isNull() && StringUtils.isNotBlank(value.asText())) {
+                            return value.asText();
+                        }
                     }
                 }
             } catch (Exception ignored) {
@@ -965,8 +979,13 @@ public class AnalyticsService {
         target.setCreateTime(target.getCreateTime() == null ? now : target.getCreateTime());
         if (update) {
             // 三审 P2: 更新 0 行=并发期被删, 静默假成功比报错更误导
-            if (reportMapper.updateById(target) == 0) {
-                throw new ServiceException("视图已被删除, 请刷新后重试");
+            try {
+                if (reportMapper.updateById(target) == 0) {
+                    throw new ServiceException("视图已被删除, 请刷新后重试");
+                }
+            } catch (DuplicateKeyException e) {
+                // 五审回修: reportId 路径改名撞上自己另一视图的名(uk 租户+人+名)
+                throw new ServiceException("已有同名视图, 请换个名字保存");
             }
         } else {
             try {
@@ -985,7 +1004,10 @@ public class AnalyticsService {
                 }
                 target.setReportId(winner.getReportId());
                 target.setCreateTime(winner.getCreateTime());
-                reportMapper.updateById(target);
+                // 五审回修: 该分支同样防 0 行(winner 又被并发删除时不静默假成功)
+                if (reportMapper.updateById(target) == 0) {
+                    throw new ServiceException("视图已被删除, 请刷新后重试");
+                }
             }
         }
         return target.getReportId();
@@ -1418,6 +1440,10 @@ public class AnalyticsService {
         });
     }
 
+    /**
+     * 【条件性 P0】任一源 event_retention_days <= 365 时, 本水位与 rebuild 可达窗口(days<=365)重叠;
+     * 一旦放宽/绕过本拦截, deleteRange 后重算会把已归档窗口的会话/日汇总不可逆抹零(归档表无法回填)。
+     */
     private void guardRebuildWatermark(String tenantId, String source, Date from) {
         int days = eventRetentionDaysOf(tenantId, source);
         if (days <= 0) {
@@ -1438,6 +1464,7 @@ public class AnalyticsService {
      */
     public byte[] exportSessions(AnalyticsSessionQuery query, boolean plain) {
         requireSource(query.getSource());
+        escapeLikeKeyword(query);
         Date[] range = resolveRange(query.getDays(), query.getFromDate(), query.getToDate());
         Page<AnalyticsSession> page = new Page<>(1, EXPORT_MAX_ROWS + 1);
         page.setOptimizeCountSql(false);
@@ -1595,14 +1622,26 @@ public class AnalyticsService {
         };
     }
 
+    /** 五审回修: 会话关键词按字面匹配——%/_ 是用户输入的一部分不是通配符(PG LIKE 默认转义符为反斜杠)。 */
+    private static void escapeLikeKeyword(AnalyticsSessionQuery query) {
+        String kw = query.getKeyword();
+        if (StringUtils.isNotBlank(kw)) {
+            query.setKeyword(kw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_"));
+        }
+    }
+
     private Date[] resolveRange(Integer days, String fromDate, String toDate) {
         if (StringUtils.isNotBlank(fromDate) && StringUtils.isNotBlank(toDate)) {
-            LocalDate from = LocalDate.parse(fromDate);
-            LocalDate to = LocalDate.parse(toDate);
-            return new Date[]{
-                Date.from(from.atStartOfDay(ZoneId.systemDefault()).toInstant()),
-                Date.from(to.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant())
-            };
+            Date from;
+            Date to;
+            try {
+                from = Date.from(LocalDate.parse(fromDate).atStartOfDay(ZoneId.systemDefault()).toInstant());
+                to = Date.from(LocalDate.parse(toDate).plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+            } catch (java.time.format.DateTimeParseException e) {
+                // 五审回修: 非法日期不裸 500
+                throw new ServiceException("日期格式非法, 应为 YYYY-MM-DD");
+            }
+            return new Date[]{from, to};
         }
         return new Date[]{startOfDaysAgo(days == null ? 30 : days), startOfTomorrow()};
     }

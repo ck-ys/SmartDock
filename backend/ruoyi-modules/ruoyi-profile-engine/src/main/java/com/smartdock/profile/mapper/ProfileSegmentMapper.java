@@ -39,11 +39,15 @@ public interface ProfileSegmentMapper extends BaseMapperPlus<ProfileSegment, Pro
         """)
     int updateJsonb(@Param("s") ProfileSegment s);
 
+    /** 分群统计指针单调推进(run_id 雪花天然时序): 并发评估同一分群时后完成的旧 run
+     * 不会倒灌覆盖新 run 的 member_count/last_run_id/last_eval_time——五审回修(m3 仲裁,
+     * 以一行 WHERE 替代分布式锁: 数据本就不损坏, 只是防徽标/指针错位)。 */
     @Update("""
         UPDATE profile_segment
         SET member_count = #{memberCount}, last_run_id = #{lastRunId}, last_eval_time = #{lastEvalTime},
             update_by = #{updateBy}, update_time = CURRENT_TIMESTAMP
         WHERE segment_id = #{segmentId} AND tenant_id = #{tenantId} AND del_flag = '0'
+          AND (last_run_id IS NULL OR last_run_id < #{lastRunId})
         """)
     int updateRunStats(@Param("segmentId") Long segmentId,
                        @Param("tenantId") String tenantId,

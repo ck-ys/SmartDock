@@ -240,6 +240,10 @@ public class AnalyticsController {
     public void exportSessions(AnalyticsSessionQuery query,
                                @RequestParam(required = false, defaultValue = "true") boolean masked,
                                jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        if (!masked) {
+            // 五审回修: 明文导出输出未打码的主体/访客 ID, 属敏感动作——与分群导出同口径再校验编辑权限
+            cn.dev33.satoken.stp.StpUtil.checkPermission("analytics:center:edit");
+        }
         byte[] csv = analyticsService.exportSessions(query, !masked);
         response.setContentType("text/csv;charset=UTF-8");
         response.setHeader("Content-Disposition",

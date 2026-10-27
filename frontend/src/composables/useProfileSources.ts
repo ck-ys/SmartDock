@@ -53,9 +53,10 @@ const ensureSources = (): Promise<void> => {
         subjectOptions.value = toOptions(data.subjectSources, 'subjects');
         eventOptions.value = toOptions(data.eventSources, 'events');
       })
-      .catch(() => {
+      .catch((e) => {
         // 三审 P2: 失败必须放掉 inflight——否则吞错后这份"兜底 promise"被永久缓存,
         // 后续所有页面都拿内置兜底清单, 真实源再也拉不回来(虚列回归)
+        console.warn('[useProfileSources] 源清单拉取失败, 使用兜底清单', e);
         failed = true;
       })
       .finally(() => {

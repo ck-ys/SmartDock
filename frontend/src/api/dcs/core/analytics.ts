@@ -421,7 +421,7 @@ export const getAnalyticsActivity = (source: string, days = 30) =>
   r<AnalyticsActivity>({ url: `${BASE}/activity`, method: 'get', params: { source, days } });
 
 export const getAnalyticsRealtime = (source: string) =>
-  r<AnalyticsRealtime>({ url: `${BASE}/realtime`, method: 'get', params: { source } });
+  r<AnalyticsRealtime>({ url: `${BASE}/realtime`, method: 'get', params: { source }, custom: { silent: true } });
 
 export const getAnalyticsCrossSource = (days = 30) =>
   r<AnalyticsCrossSource>({ url: `${BASE}/cross-source`, method: 'get', params: { days } });

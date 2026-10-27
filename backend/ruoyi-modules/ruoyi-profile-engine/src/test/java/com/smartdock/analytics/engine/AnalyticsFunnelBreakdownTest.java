@@ -66,17 +66,48 @@ class AnalyticsFunnelBreakdownTest {
         List<AnalyticsEventRow> sorted = List.of(
             event(1, "view", 1000L, "{\"os\":\"Windows\",\"sourceChannel\":\"google\"}"),
             event(2, "view", 2000L, "{\"os\":\"macOS\",\"sourceChannel\":\"weibo\"}"));
-        assertEquals("google", AnalyticsService.firstStepContextValue(sorted, "view", "sourceChannel"));
-        assertEquals("Windows", AnalyticsService.firstStepContextValue(sorted, "view", "os"));
+        assertEquals("google", AnalyticsService.firstStepContextValue(sorted, "view", new String[]{"sourceChannel", "channel", "utmSource", "utm.source"}));
+        assertEquals("Windows", AnalyticsService.firstStepContextValue(sorted, "view", new String[]{"os", "osName"}));
+    }
+
+    @Test
+    void firstStepContextValueWalksKeyChain() {
+        // 五审回修: 渠道键链与 AnalyticsSessionizer 对齐——sourceChannel 缺失时回退 channel/utmSource/utm.source
+        List<AnalyticsEventRow> byChannel = List.of(
+            event(1, "view", 1000L, "{\"channel\":\"baidu\"}"));
+        assertEquals("baidu", AnalyticsService.firstStepContextValue(
+            byChannel, "view", new String[]{"sourceChannel", "channel", "utmSource", "utm.source"}));
+        List<AnalyticsEventRow> byUtmSource = List.of(
+            event(1, "view", 1000L, "{\"utmSource\":\"toutiao\"}"));
+        assertEquals("toutiao", AnalyticsService.firstStepContextValue(
+            byUtmSource, "view", new String[]{"sourceChannel", "channel", "utmSource", "utm.source"}));
+        List<AnalyticsEventRow> byUtmMap = List.of(
+            event(1, "view", 1000L, "{\"utm\":{\"source\":\"wx\"}}"));
+        assertEquals("wx", AnalyticsService.firstStepContextValue(
+            byUtmMap, "view", new String[]{"sourceChannel", "channel", "utmSource", "utm.source"}));
     }
 
     @Test
     void firstStepContextValueFallsBackToUnknown() {
         assertEquals("(未知)", AnalyticsService.firstStepContextValue(
-            List.of(event(1, "view", 1000L, "{\"os\":\"Windows\"}")), "view", "sourceChannel"));
+            List.of(event(1, "view", 1000L, "{\"os\":\"Windows\"}")), "view", new String[]{"sourceChannel", "channel", "utmSource", "utm.source"}));
         assertEquals("(未知)", AnalyticsService.firstStepContextValue(
-            List.of(event(1, "view", 1000L, "not-json")), "view", "os"));
+            List.of(event(1, "view", 1000L, "not-json")), "view", new String[]{"os", "osName"}));
         assertEquals("(未知)", AnalyticsService.firstStepContextValue(
-            List.of(event(1, "click", 1000L, "{\"os\":\"Windows\"}")), "view", "os"));
+            List.of(event(1, "click", 1000L, "{\"os\":\"Windows\"}")), "view", new String[]{"os", "osName"}));
+    }
+
+    @Test
+    void walkFunnelDoesNotMutateCallerListOrder() {
+        // 五审回修: 纯函数化锁定——调用后入参集合顺序必须原样(乱序入参也要能走通且不被就地重排)
+        List<AnalyticsEventRow> list = new ArrayList<>(List.of(
+            event(2, "signup", 2000L, null),
+            event(1, "view", 1000L, null),
+            event(3, "pay", 3000L, null)));
+        List<Long> before = list.stream().map(AnalyticsEventRow::getEventId).toList();
+        AnalyticsService.FunnelWalk walk = AnalyticsService.walkFunnel(
+            list, List.of("view", "signup", "pay"), 24L * 3600_000L);
+        assertArrayEquals(new long[]{1, 1, 1}, walk.counts());
+        assertEquals(before, list.stream().map(AnalyticsEventRow::getEventId).toList());
     }
 }
