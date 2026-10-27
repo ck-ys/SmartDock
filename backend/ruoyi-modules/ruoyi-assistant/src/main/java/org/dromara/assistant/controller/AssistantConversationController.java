@@ -88,12 +88,24 @@ public class AssistantConversationController extends BaseController {
         final org.dromara.assistant.domain.DcsAssistantRun run = latest.get(0);
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
             new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(0L);
-        reactor.core.Disposable[] disposable = new reactor.core.Disposable[1];
-        emitter.onCompletion(() -> { if (disposable[0] != null) disposable[0].dispose(); });
-        emitter.onTimeout(() -> { if (disposable[0] != null) disposable[0].dispose(); emitter.complete(); });
+        // 三审回修（dsflash-P2-4）：原子引用替代裸数组——订阅线程/容器回调线程/控制器线程
+        // 三处读写需 happens-before；统一停看入口
+        java.util.concurrent.atomic.AtomicReference<reactor.core.Disposable> watch =
+            new java.util.concurrent.atomic.AtomicReference<>();
+        Runnable stopWatch = () -> {
+            reactor.core.Disposable d = watch.get();
+            if (d != null) {
+                d.dispose();
+            }
+        };
+        emitter.onCompletion(stopWatch);
+        emitter.onTimeout(() -> {
+            stopWatch.run();
+            emitter.complete();
+        });
         // 深审回修：send 之外的应用层异常（序列化/容器错）也 dispose——漏挂会让观众计数
         // 不减、孤儿判定失真（viewers 永不为零，弃链兜底被废）
-        emitter.onError(ex -> { if (disposable[0] != null) disposable[0].dispose(); });
+        emitter.onError(ex -> stopWatch.run());
         try {
             reactor.core.publisher.Flux<io.agentscope.core.agui.event.AguiEvent> flux = fluxOpt.get();
             if (runStreamHub.fedCount(runId) > org.dromara.assistant.core.AssistantRunStreamHub.RING) {
@@ -102,23 +114,26 @@ public class AssistantConversationController extends BaseController {
                     org.dromara.assistant.core.AssistantRunStreamHub.TRUNCATED_FRAME,
                     java.util.Map.of("hint", "本回合内容较长，续看从中间开始；完整回答稍后在历史消息里")));
             }
-            disposable[0] = flux.subscribe(
+            // 三审回修（dsflash-P2-4）：replay 汇订阅即同步重放≤4096 帧（逐帧 Jackson+写响应）
+            // ——移出控制器线程；重放期断连时 subscribe 尚未返回、旧写法引用未就位无法自停
+            flux = flux.subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
+            watch.set(flux.subscribe(
                 event -> {
                     try {
                         emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter
                             .event().data(OBJECT_MAPPER.writeValueAsString(event)));
                     } catch (Exception e) {
-                        // 客户端已断开——停订阅（汇继续留驻给下一次 attach）
-                        if (disposable[0] != null) {
-                            disposable[0].dispose();
-                        }
+                        // 客户端已断开——停订阅并收口响应（汇继续留驻给下一次 attach）；
+                        // Spring sendFailed 后后续 send 静默短路不再抛，必须在此主动收
+                        stopWatch.run();
+                        emitter.complete();
                     }
                 },
                 err -> {
                     log.warn("[AssistantAttach] run {} 续看流异常: {}", runId, err.getMessage());
                     emitter.completeWithError(err);
                 },
-                emitter::complete);
+                emitter::complete));
         } catch (Exception e) {
             return org.springframework.http.ResponseEntity.ok(R.fail("续看通道建立失败：" + e.getMessage()));
         }

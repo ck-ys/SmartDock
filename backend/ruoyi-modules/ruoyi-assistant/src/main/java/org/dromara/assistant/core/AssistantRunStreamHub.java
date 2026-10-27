@@ -98,7 +98,7 @@ public class AssistantRunStreamHub {
         // 深审 P2-1 回修（dspro/glm53）：容量治理移出 computeIfAbsent 映射函数——
         // CHM 契约禁止映射函数改本 map（同 bin 哈希撞 ReservationNode 静默失败），
         // 且 bin 锁内跑 dispose 的取消回调链是持锁副作用面
-        evictIfNeeded();
+        evictIfNeeded(runId);
         RunStream rs = runs.computeIfAbsent(runId, k -> new RunStream());
         rs.lastEventAt = System.currentTimeMillis();
         boolean terminalHere = false;
@@ -132,6 +132,8 @@ public class AssistantRunStreamHub {
         if (runId == null || runId.isBlank() || source == null) {
             return source;
         }
+        // 三审回修（dsflash-P2-1）：bridge 直插 map 不过容量治理——满额时这里也要逐出兜底
+        evictIfNeeded(runId);
         RunStream rs;
         synchronized (this) {
             RunStream old = runs.get(runId);
@@ -148,7 +150,12 @@ public class AssistantRunStreamHub {
         }
         rs.driver = source.subscribe(
             e -> { /* 喂汇由链内 enricher 单点负责；driver 只负责「订阅着」让链活着 */ },
-            err -> completeIfAlive(rs, runId, "链异常"),
+            err -> {
+                // 三审回修（dsflash-P2-6）：链异常留全痕——此前只 debug 一行「链异常」，
+                // 生产日志几乎无迹，排障只能靠收割 WARN 间接发现
+                log.warn("[run-hub] run {} 桥接链异常（收口汇）", runId, err);
+                completeIfAlive(rs, runId, "链异常");
+            },
             () -> completeIfAlive(rs, runId, "链完成"));
         log.debug("[run-hub] run {} 桥接接管（断连不拆链，孤儿 {}s 兜底）", runId, ORPHAN_MS / 1000);
         return watched(rs);
@@ -187,23 +194,40 @@ public class AssistantRunStreamHub {
             long now = System.currentTimeMillis();
             for (Map.Entry<String, RunStream> e : runs.entrySet()) {
                 RunStream rs = e.getValue();
-                if (rs.terminal.get() || rs.driver == null) {
-                    continue;
-                }
-                boolean orphan = rs.viewers.get() == 0 && rs.viewersZeroSince > 0
-                    && now - rs.viewersZeroSince >= ORPHAN_MS;
-                boolean hung = now - rs.lastEventAt >= HANG_MS;
-                if ((orphan || hung) && rs.orphanDisposed.compareAndSet(false, true)) {
-                    reactor.core.Disposable d = rs.driver;
-                    if (d != null && !d.isDisposed()) {
-                        d.dispose();
+                try {
+                    if (rs.terminal.get()) {
+                        continue;
                     }
-                    completeIfAlive(rs, e.getKey(), orphan ? "孤儿弃链" : "停滞弃链");
-                    // 身份移除：防同 runId 换新汇后被本条误摘（深审 P2-2）
-                    runs.remove(e.getKey(), rs);
-                    log.info("[run-hub] run {} {}——弃链收口摘除（{}）", e.getKey(),
-                        orphan ? "零观众 " + (ORPHAN_MS / 1000) + "s" : "事件停滞 " + (HANG_MS / 60000) + "min",
-                        rs.viewers.get() + " 观众");
+                    if (rs.driver == null) {
+                        // 三审回修（dsflash-P2-7）：未桥接（工厂未接管/协议外直喂）且长期零事件
+                        // 的汇也须收口摘除——否则无人清扫只受 MAX_RUNS 兜底，attach 命中会重放后永挂
+                        if (now - rs.lastEventAt >= HANG_MS && rs.orphanDisposed.compareAndSet(false, true)) {
+                            completeIfAlive(rs, e.getKey(), "未桥接停滞收口");
+                            runs.remove(e.getKey(), rs);
+                            log.info("[run-hub] run {} 未桥接且事件停滞 {}min——收口摘除", e.getKey(), HANG_MS / 60000);
+                        }
+                        continue;
+                    }
+                    boolean orphan = rs.viewers.get() == 0 && rs.viewersZeroSince > 0
+                        && now - rs.viewersZeroSince >= ORPHAN_MS;
+                    boolean hung = now - rs.lastEventAt >= HANG_MS;
+                    if ((orphan || hung) && rs.orphanDisposed.compareAndSet(false, true)) {
+                        reactor.core.Disposable d = rs.driver;
+                        if (d != null && !d.isDisposed()) {
+                            d.dispose();
+                        }
+                        completeIfAlive(rs, e.getKey(), orphan ? "孤儿弃链" : "停滞弃链");
+                        // 身份移除：防同 runId 换新汇后被本条误摘（深审 P2-2）
+                        runs.remove(e.getKey(), rs);
+                        log.info("[run-hub] run {} {}——弃链收口摘除（{}）", e.getKey(),
+                            orphan ? "零观众 " + (ORPHAN_MS / 1000) + "s" : "事件停滞 " + (HANG_MS / 60000) + "min",
+                            rs.viewers.get() + " 观众");
+                    }
+                } catch (Exception ex) {
+                    // 三审回修（dsflash-P2-2）：逐条隔离——单条异常不得中断本轮剩余条目；
+                    // 复位弃链标记让下一轮重试（否则 CAS 已置位+动作半途而废=条目永久搁浅）
+                    rs.orphanDisposed.set(false);
+                    log.warn("[run-hub] 清扫 run {} 单条异常（跳过本轮）：{}", e.getKey(), ex.getMessage());
                 }
             }
         } catch (Exception ex) {
@@ -245,12 +269,14 @@ public class AssistantRunStreamHub {
         return runs.size();
     }
 
-    private void evictIfNeeded() {
-        if (runs.size() < MAX_RUNS) {
+    private void evictIfNeeded(String runId) {
+        // 三审回修（dsflash-P2-1/glm53flash-P2-1）：①已存在的 run 的批次不触发逐出——满额时
+        // 牺牲的必须是为新 run 腾位，而不是每个既有 run 的每批事件都可能逐掉一条在途流
+        if (runs.size() < MAX_RUNS || (runId != null && runs.containsKey(runId))) {
             return;
         }
-        // 先逐出最老终局流；全部未终局才逐出最老未终局（防内存无限增长兜底，
-        // 未终局流被逐=该 run 刷新后走轮询回退，不影响主流）
+        // 先逐出最老终局流；全部未终局才逐出最老未终局（防内存无限增长兜底）。
+        // 逐出未终局流=该轮放弃：弃链后事件停，走既有失联收割终局化+退回合（同孤儿弃链语义）
         RunStream oldestTerminal = null;
         String oldestTerminalKey = null;
         RunStream oldest = null;
@@ -268,11 +294,17 @@ public class AssistantRunStreamHub {
         }
         String drop = oldestTerminalKey != null ? oldestTerminalKey : oldestKey;
         if (drop != null) {
-            RunStream rs = runs.remove(drop);
-            if (rs != null && rs.driver != null) {
-                rs.driver.dispose();
+            RunStream rs = runs.get(drop);
+            // 三审回修（dsflash-P2-1）：身份移除（单参 remove 会误杀同 runId 换新汇后的新流）+
+            // 复用弃链标记（与清扫互斥，防双处理）+先收口汇再弃链（在途观众立即断流而非永挂）
+            if (rs != null && rs.orphanDisposed.compareAndSet(false, true)) {
+                if (rs.driver != null && !rs.driver.isDisposed()) {
+                    rs.driver.dispose();
+                }
+                completeIfAlive(rs, drop, "超量逐出");
+                runs.remove(drop, rs);
+                log.warn("[run-hub] 超量逐出 run {}（size 回落 {}）", drop, runs.size());
             }
-            log.warn("[run-hub] 超量逐出 run {}（size 回落 {}）", drop, runs.size());
         }
     }
 

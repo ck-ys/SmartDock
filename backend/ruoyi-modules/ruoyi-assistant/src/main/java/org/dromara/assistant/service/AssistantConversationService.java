@@ -562,6 +562,10 @@ public class AssistantConversationService {
     @Transactional(rollbackFor = Exception.class)
     public void persistUserRound(String tenantId, Long userId, String threadId, String runId,
                                  String title, String content) {
+        // 题5 三审回修（dsflash-P1/glm53-P2 共识）：先取同 thread 发送串行锁再「插行+查在途」
+        // ——否则 READ COMMITTED 下两个并发事务互看不见对方未提交的 RUNNING 行，双双过门
+        // =双流并发写同一 AgentSession（recorder 以 threadId 为键交错+双扣费）。锁事务级自动释放
+        runMapper.acquireThreadSendLock(tenantId, userId, threadId);
         Long conversationId = ensureConversation(tenantId, userId, threadId, title);
         boolean freshRun = registerRun(tenantId, userId, threadId, runId);
         // runId 重放幂等（dsflash P1-3 收尾）+ goal 加固 H1：同主重放=断线重试重发同 runId——

@@ -25,6 +25,18 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
     @Select("SELECT * FROM dcs_assistant_run WHERE run_id=#{runId}")
     DcsAssistantRun selectByRunId(@Param("runId") String runId);
 
+    /** 同 (租户,用户,thread) 发送串行锁（题5 三审 dsflash-P1/glm53-P2：双 RUNNING 门是
+     *  check-then-act，READ COMMITTED 下两个并发事务互看不见对方未提交行可双双过门=双流
+     *  并发写同一 AgentSession/双扣费）。事务级咨询锁：并发第二发阻塞到第一发提交后必然
+     *  看到 RUNNING 行走 409；锁随事务提交/回滚自动释放，不同 thread 互不阻塞，跨实例
+     *  （多实例批后）同库同样生效。注意返回类型必须 String——PG 咨询锁函数返回 void 列、
+     *  JDBC 以空串送达：void 声明走结果构造炸 No constructor found、Long 声明 getLong
+     *  解析空串炸不良类型值（两轮实测，均被 resolver 当 PG 闪断降级=user 消息/run 行全丢）；
+     *  String 映射空串安全，返回值无意义 */
+    @Select("SELECT pg_advisory_xact_lock(hashtextextended(#{tenantId} || ':' || #{userId} || ':' || #{threadId}, 0))")
+    String acquireThreadSendLock(@Param("tenantId") String tenantId, @Param("userId") Long userId,
+        @Param("threadId") String threadId);
+
     /** 终态回写（COMPLETED/FAILED/INTERRUPTED）。批6-#2 加 status='RUNNING' 条件：
      *  失联收割器已把停滞 run 迁 INTERRUPTED 后，迟到的事件流终态不得覆写回去
      *  （历史语义不变——所有真实终态迁移本就是 RUNNING→X） */
