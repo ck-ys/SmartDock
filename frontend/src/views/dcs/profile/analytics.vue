@@ -940,6 +940,10 @@ const retentionWindowOptions = computed(() => ({
     { label: '12 月窗口', value: 12 }
   ]
 }[retentionGranularity.value] || []));
+// 遗漏审查回修(dsflash#3): 周/月 cohort 是自然周期对齐, 天数档不够长时窗口列大量为空——
+// 周期越粗需要的回看天数越多, 留存用"有效天数"取 max(全局天数, 粒度所需的最小回看), 日粒度跟全局
+const RETENTION_MIN_DAYS: Record<string, number> = { day: 0, week: 90, month: 365 };
+const retentionEffectiveDays = computed(() => Math.max(days.value, RETENTION_MIN_DAYS[retentionGranularity.value] || 0));
 const onRetentionGranularityChange = () => {
   retentionWindow.value = retentionWindowOptions.value[0]?.value || 7;
   loadRetention();
@@ -1296,7 +1300,7 @@ const parseSteps = (raw: string | AnalyticsFunnelStepDef[] | undefined): Analyti
 let loadRetention = async () => {
   retentionLoading.value = true;
   try {
-    retention.value = await getAnalyticsRetention(source.value, days.value, retentionWindow.value, retentionGranularity.value, retentionCumulative.value);
+    retention.value = await getAnalyticsRetention(source.value, retentionEffectiveDays.value, retentionWindow.value, retentionGranularity.value, retentionCumulative.value);
   } finally {
     retentionLoading.value = false;
   }

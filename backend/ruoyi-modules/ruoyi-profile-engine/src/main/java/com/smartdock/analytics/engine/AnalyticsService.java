@@ -798,10 +798,12 @@ public class AnalyticsService {
     static FunnelWalk walkFunnel(List<AnalyticsEventRow> list, List<String> names, long windowMs) {
         long[] counts = new long[names.size()];
         double[] seconds = new double[names.size()];
-        list.sort(Comparator.comparing(AnalyticsEventRow::getOccurredTime).thenComparing(AnalyticsEventRow::getEventId));
+        // 遗漏审查回修: 入参是调用方的分组集合, 就地 sort 会改写外部状态——拷贝后排序才是真"纯函数"
+        List<AnalyticsEventRow> ordered = new ArrayList<>(list);
+        ordered.sort(Comparator.comparing(AnalyticsEventRow::getOccurredTime).thenComparing(AnalyticsEventRow::getEventId));
         int step = 0;
         Date prev = null;
-        for (AnalyticsEventRow event : list) {
+        for (AnalyticsEventRow event : ordered) {
             if (step >= names.size()) {
                 break;
             }
