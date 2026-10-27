@@ -599,16 +599,17 @@ import {
   type ProfileModelTrendPoint,
   type ProfileScoreModel
 } from '@/api/dcs/core/profile';
-import { useSourceOptions } from '@/composables/useProfileSources';
+import { useSourceOptions, autoPickSource } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
-ensureSources();
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 
 const router = useRouter();
 
 const source = ref('dcs');
+// 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次加载, 不再双载
+const initialSource = source.value;
 const models = ref<ProfileScoreModel[]>([]);
 const modelId = ref<string>('');
 const overview = ref<Partial<ProfileModelOverview>>({});
@@ -1072,7 +1073,9 @@ const rollbackTo = async (row: ProfileModelConfigSnapshot) => {
   await loadAll();
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await ensureSources();
+  if (source.value === initialSource) autoPickSource(sourceOpts, source);
   loadAll();
   getRiskBands()
     .then((b) => {

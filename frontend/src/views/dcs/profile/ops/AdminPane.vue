@@ -1,16 +1,10 @@
 <template>
-  <div class="app-container engine-admin-page">
-    <dcs-operations-page-header
-      eyebrow="画像引擎"
-      title="引擎管理"
-      subtitle="全量重算、接入协议与事件 Schema、演示灌数——画像引擎的运维入口，全部动作留痕可查。"
-    >
-      <template #actions>
-        <el-select v-model="source" class="source-select" @change="loadAll">
-          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-      </template>
-    </dcs-operations-page-header>
+  <div class="admin-pane">
+    <div class="pane-toolbar">
+      <el-select v-model="source" class="source-select" @change="onSourceChanged">
+        <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+    </div>
 
     <el-tabs v-model="tab" class="engine-tabs">
       <!-- ---------------------------------------------------------- 全量重算 -->
@@ -138,13 +132,13 @@
         </el-card>
       </el-tab-pane>
 
-      <!-- ---------------------------------------------------------- 演示灌数 -->
-      <el-tab-pane label="演示灌数" name="seed" lazy>
+      <!-- ---------------------------------------------------------- 测试发送（原演示灌数） -->
+      <el-tab-pane label="测试发送" name="seed" lazy>
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="panel-head">
               <span>批量发布事件</span>
-              <span class="muted">低频运维动作：粘贴事件数组（事件信封格式），逐条校验幂等</span>
+              <span class="muted">接入调试用：粘贴事件数组（事件信封格式），逐条校验幂等；不要用它造演示数据——产品里每个数字都应来自真实业务操作</span>
             </div>
           </template>
           <div class="filter-bar">
@@ -157,7 +151,7 @@
             :rows="14"
             class="mono"
             spellcheck="false"
-            placeholder='[{"eventName":"...","eventUid":"demo-...","source":"...","subjectType":"user","subjectId":"...","occurredTime":"...","props":{}}]'
+            placeholder='[{"eventName":"...","eventUid":"...","source":"...","subjectType":"user","subjectId":"...","occurredTime":"...","props":{}}]'
           />
           <el-alert
             v-if="seedResult"
@@ -174,7 +168,7 @@
   </div>
 </template>
 
-<script setup name="DcsProfileEngineAdmin" lang="ts">
+<script setup name="DcsProfileAdminPane" lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   getProtocolCurrent,
@@ -191,14 +185,24 @@ import {
   type ProfileRecalcBatch,
   type ProfileSchemaRegistry
 } from '@/api/dcs/core/profile';
-import { useSourceOptions } from '@/composables/useProfileSources';
-import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
+import { useSourceOptions, autoPickSource, invalidateSources } from '@/composables/useProfileSources';
 
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
-ensureSources();
-
-const tab = ref('recalc');
 const source = ref('dcs');
+// 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次 loadAll, 不再双载
+const initialSource = source.value;
+
+// 子 tab 深链: 空态引导的「测试发送」直达 ?sub=seed
+const route = useRoute();
+const tab = ref(route.query.sub === 'seed' ? 'seed' : 'recalc');
+// 三审 dspro P2: keep-alive 下二次导航同路由只变 query, onMounted 不会再跑
+watch(
+  () => route.query.sub,
+  (v) => {
+    const next = v === 'seed' ? 'seed' : 'recalc';
+    if (next !== tab.value) tab.value = next;
+  }
+);
 
 // ---------------- 全量重算 ----------------
 const batch = ref<ProfileRecalcBatch | null>(null);
@@ -209,22 +213,37 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 const statusText = (s?: string) => (({ RUNNING: '重算中', DONE: '完成', FAILED: '失败' }) as Record<string, string>)[s || ''] || s || '—';
 const statusTone = (s?: string): 'info' | 'success' | 'danger' => (({ RUNNING: 'info', DONE: 'success', FAILED: 'danger' }) as Record<string, 'info' | 'success' | 'danger'>)[s || ''] || 'info';
 
-const pollBatch = () => {
+const stopPoll = () => {
   if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+};
+
+const pollBatch = () => {
+  stopPoll();
+  const id = String(batch.value?.batchId ?? '');
+  if (!id) return;
   pollTimer = setInterval(async () => {
-    if (!batch.value?.batchId) return;
+    // 三审 dspro P1: 批次被切源清掉/换成新批次后, 旧轮询立即退场,
+    // 不然旧源的「重算中」状态会一直挂在新源界面上
+    if (!batch.value?.batchId || String(batch.value.batchId) !== id) {
+      stopPoll();
+      return;
+    }
     try {
-      const b = await getRecalcBatch(String(batch.value.batchId));
+      const b = await getRecalcBatch(id);
       batch.value = b;
-      if (b.status !== 'RUNNING' && pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
+      if (b.status !== 'RUNNING') stopPoll();
     } catch {
-      if (pollTimer) clearInterval(pollTimer);
-      pollTimer = null;
+      stopPoll();
     }
   }, 2000);
+};
+
+/** 三审 dspro P1: 切源=换一份配置——旧源的重算批次与轮询不清掉, 新源会挂着旧状态 */
+const onSourceChanged = () => {
+  stopPoll();
+  batch.value = null;
+  loadAll();
 };
 
 const runRecalc = async () => {
@@ -257,12 +276,19 @@ const protocolValidating = ref(false);
 const protocolPublishing = ref(false);
 const protocolValidateResult = ref<{ valid: boolean; errors?: string[] } | null>(null);
 
+let protocolSeq = 0;
 const loadProtocol = async () => {
+  const seq = ++protocolSeq;
   protocol.value = null;
   protocolValidateResult.value = null;
   try {
-    protocol.value = await getProtocolCurrent(source.value);
+    const data = await getProtocolCurrent(source.value);
+    // 三审 dspro P1(请求栅栏): 切源后旧源协议晚到盖进新源界面, 用户点「重新发布」
+    // = 把 A 源的协议发布到 B 源——过期响应连同其 manifest 文本一起丢弃
+    if (seq !== protocolSeq) return;
+    protocol.value = data;
   } catch {
+    if (seq !== protocolSeq) return;
     protocol.value = null;
   }
   protocolManifestText.value = protocol.value?.manifest ? JSON.stringify(protocol.value.manifest, null, 2) : '（该源暂无生效协议）';
@@ -363,14 +389,14 @@ const saveSchema = async () => {
   }
 };
 
-// ---------------- 演示灌数 ----------------
+// ---------------- 测试发送（原演示灌数） ----------------
 const seedText = ref('');
 const seeding = ref(false);
 const seedResult = ref<Record<string, unknown> | null>(null);
 const seedOk = ref(true);
 
 const fillSeedExample = () => {
-  const uid = 'demo-engine-' + Date.now();
+  const uid = 'test-send-' + Date.now();
   seedText.value = JSON.stringify(
     [
       {
@@ -378,9 +404,9 @@ const fillSeedExample = () => {
         eventUid: uid + '-1',
         source: source.value,
         subjectType: 'visitor',
-        subjectId: 'demo-visitor-1',
+        subjectId: 'test-visitor-1',
         occurredTime: new Date().toISOString(),
-        props: { pageUrl: '/demo/engine-admin', title: '引擎管理示例' }
+        props: { pageUrl: '/test/engine-admin', title: '测试发送示例' }
       }
     ],
     null,
@@ -402,6 +428,9 @@ const publishEvents = async () => {
   try {
     seedResult.value = await publishProfileEvents(events);
     seedOk.value = true;
+    // 三审 dspro P1: 测试发送可能带来全新源/首批主体——失效源清单缓存,
+    // 画像页 onActivated 自愈重拉后空态才会解除, 否则旧缓存让空态永远走不出去
+    invalidateSources();
   } catch (e) {
     seedResult.value = { error: String(e) };
     seedOk.value = false;
@@ -418,18 +447,38 @@ const loadAll = () => {
   loadSchemas();
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await ensureSources();
+  if (source.value === initialSource) autoPickSource(sourceOpts, source);
   loadAll();
 });
 
-onBeforeUnmount(() => {
-  if (pollTimer) clearInterval(pollTimer);
+// keep-alive 缓存路由组件, 切菜单不触发 onBeforeUnmount(三审 dspro P1): 离开停轮询, 回页恢复
+onDeactivated(stopPoll);
+onActivated(() => {
+  if (!pollTimer && batch.value?.status === 'RUNNING') pollBatch();
 });
+onBeforeUnmount(stopPoll);
 </script>
 
 <style scoped>
-.engine-admin-page :deep(.el-tabs__content) {
+.admin-pane {
+  min-width: 0;
+}
+.admin-pane :deep(.el-tabs__content) {
   overflow: visible;
+}
+.pane-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+@media (min-width: 993px) {
+  .source-select {
+    width: 150px;
+  }
 }
 .recalc-actions {
   display: flex;

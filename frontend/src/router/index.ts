@@ -152,10 +152,19 @@ export const constantRoutes: RouteRecordRaw[] = [
   // 2026-10-20 菜单 IA：画像域迁入「画像与分析」，旧地址重定向兜底
   // （对端批 8 E2E 若仍用旧地址也不会 404）
   { path: '/dcs/profile', redirect: '/insight/profile', hidden: true },
-  { path: '/dcs/profile-studio', redirect: '/insight/profile-studio', hidden: true },
-  { path: '/dcs/profile-rfm', redirect: '/insight/profile-rfm', hidden: true },
-  { path: '/dcs/profile-segments', redirect: '/insight/profile-segments', hidden: true },
-  { path: '/dcs/profile-review', redirect: '/insight/profile-review', hidden: true },
+  // 2026-10-27 画像方向第一批: 工作室/RFM/分群收进「引擎与运维」折叠组, 旧址(含 insight 前缀)兜底到新址
+  { path: '/dcs/profile-studio', redirect: '/insight/engine-ops/profile-studio', hidden: true },
+  { path: '/insight/profile-studio', redirect: '/insight/engine-ops/profile-studio', hidden: true },
+  { path: '/dcs/profile-rfm', redirect: '/insight/engine-ops/profile-rfm', hidden: true },
+  { path: '/insight/profile-rfm', redirect: '/insight/engine-ops/profile-rfm', hidden: true },
+  { path: '/dcs/profile-segments', redirect: '/insight/engine-ops/profile-segments', hidden: true },
+  { path: '/insight/profile-segments', redirect: '/insight/engine-ops/profile-segments', hidden: true },
+  // 低分复核并入画像页抽屉; 数据运维/引擎健康/引擎管理三页合一为「引擎运维」(tab 深链)
+  { path: '/dcs/profile-review', redirect: '/insight/profile?review=1', hidden: true },
+  { path: '/insight/profile-review', redirect: '/insight/profile?review=1', hidden: true },
+  { path: '/insight/profile-ops', redirect: '/insight/engine-ops/profile-ops', hidden: true },
+  { path: '/insight/profile-health', redirect: '/insight/engine-ops/profile-ops?tab=health', hidden: true },
+  { path: '/insight/engine-admin', redirect: '/insight/engine-ops/profile-ops?tab=admin', hidden: true },
   { path: '/dcs/profile-analytics', redirect: '/insight/profile-analytics', hidden: true },
   {
     path: '/dcs/profile-detail/:source/:subjectId',

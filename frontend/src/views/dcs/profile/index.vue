@@ -7,15 +7,25 @@
       :metrics="overviewMetrics"
     >
       <template #actions>
-        <el-select v-model="source" class="source-select" @change="onSourceChange">
+        <el-select v-if="!noRealSource" v-model="source" class="source-select" @change="onSourceChange">
           <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
-        <el-button @click="goStudio">画像工作室</el-button>
-        <el-button type="primary" @click="loadAll">刷新</el-button>
+        <el-button v-hasPermi="['profile:review:query']" @click="reviewVisible = true">低分复核</el-button>
+        <el-button type="primary" @click="noRealSource ? refreshSources() : loadAll()">刷新</el-button>
       </template>
     </dcs-operations-page-header>
 
-    <el-card shadow="never" class="table-card">
+    <el-card v-if="noRealSource" shadow="never" class="empty-guide">
+      <div class="empty-guide__title">还没有任何数据</div>
+      <p class="empty-guide__text">
+        画像分析的是真实业务操作——在系统里发布/提交/审核任务，或照 dcs 的做法把你的业务数据接进来，这里会自动出现真实的主体与分数。
+      </p>
+      <el-button v-if="canTestSend" type="primary" @click="goTestSend">去引擎运维·测试发送</el-button>
+      <el-button :loading="!sourcesReady" @click="refreshSources">重新检测</el-button>
+      <p v-if="!canTestSend" class="empty-guide__hint">数据接入由管理员在「引擎与运维 → 引擎运维」里配置</p>
+    </el-card>
+
+    <el-card v-if="sourcesReady && !noRealSource" shadow="never" class="table-card">
       <el-tabs v-model="activeTab" @tab-change="onTabChange">
         <el-tab-pane label="主体列表" name="list">
           <div class="filter-bar">
@@ -216,6 +226,9 @@
         </template>
       </div>
     </el-drawer>
+    <el-drawer v-model="reviewVisible" title="低分复核" size="72%" destroy-on-close class="review-drawer">
+      <ReviewPanel :source="source" />
+    </el-drawer>
   </div>
 </template>
 
@@ -236,18 +249,42 @@ import {
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
 import { formatScore } from '@/utils/score';
-import { useSourceOptions } from '@/composables/useProfileSources';
+import { useSourceOptions, useSourceEmpty, autoPickSource, invalidateSources } from '@/composables/useProfileSources';
+import ReviewPanel from './review/ReviewPanel.vue';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
-ensureSources();
+const sourceEmpty = useSourceEmpty('subject');
+const noRealSource = computed(() => sourceEmpty.value);
+// 三态(三审 dspro P2): 源清单没回来前既不渲染空态卡也不渲染主内容
+const sourcesReady = ref(false);
+/** 空态卡「重新检测」/空态下点「刷新」: 强制失效缓存重拉清单(三审 dspro P1), 空态解除则自动选源并加载 */
+const refreshSources = async () => {
+  invalidateSources();
+  sourcesReady.value = false;
+  await ensureSources();
+  sourcesReady.value = true;
+  if (noRealSource.value) return;
+  autoPickSource(sourceOpts, source);
+  loadAll();
+};
+// 低分复核并入画像页(2026-10-27 第一批): 抽屉入口(支持 ?review=1 深链自动打开)
+const reviewVisible = ref(false);
+// 空态引导落点=引擎管理→测试发送(引擎运维页两层 tab, 用 query 深链); 无 12001/11989 权限者隐藏按钮改文字指引
+const canTestSend = checkPermi(['profile:engine:query']);
+const goTestSend = () => router.push('/insight/engine-ops/profile-ops?tab=admin&sub=seed');
 import DcsTableColumnSettings from '@/components/DcsTableColumnSettings/index.vue';
 import { readHiddenColumns, type TableColumnOption } from '@/components/DcsTableColumnSettings/table-columns';
 
 const router = useRouter();
+const route = useRoute();
 // 批11 列级权限: 无 profile:pii:score 权限者不渲染分数/维度/风险三族列(后端同步置空)
 const canSeeScore = checkPermi(['profile:pii:score']);
 
 const source = ref('dcs');
+// 真实数据优先: 清单加载后当前源不在真实清单里就自动切到唯一/首个真实源。
+// 首挂单轮加载(三审 dspro P1): setup 不再"先拉一轮默认源", onMounted 等清单→autoPick→一次 loadAll,
+// 消灭旧源/新源两轮并发、慢响应乱序覆盖的竞态。清单回来前用户已手选过源则不自动改选。
+const initialSource = source.value;
 const activeTab = ref('list');
 const loading = ref(false);
 const overviewLoading = ref(false);
@@ -397,6 +434,7 @@ const loadRanking = async () => {
   }
 };
 const loadAll = async () => {
+  loadedOnce = true;
   await Promise.all([loadOverview(), loadDimensions(), loadList(), loadRiskBands()]);
   if (activeTab.value === 'ranking') await loadRanking();
 };
@@ -424,7 +462,7 @@ const resetQuery = () => {
 };
 const goDetail = (row: ProfileSubjectRow | ProfileRankingRow) =>
   router.push(`/insight/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
-const goStudio = () => router.push('/insight/profile-studio');
+
 
 // ---------------------------------------------------------------- 查看依据（批9）
 const basisVisible = ref(false);
@@ -453,7 +491,36 @@ const openBasis = async (row: ProfileSubjectRow) => {
   }
 };
 
-onMounted(loadAll);
+onMounted(async () => {
+  // 三审 dspro P2(三态): 清单没回来前不渲染主内容, 避免空库先闪一版空表再换空态卡
+  await ensureSources();
+  sourcesReady.value = true;
+  if (source.value === initialSource) autoPickSource(sourceOpts, source);
+  // 三审 glm53 P2: 空库跳过注定为空的请求(诚实空态卡此时已就位), 数据由 onActivated 自愈补拉
+  if (!noRealSource.value) loadAll();
+  // 旧「低分复核」菜单/总览页跳转的深链兜底: ?review=1 自动开抽屉
+  if (route.query.review === '1' && checkPermi(['profile:review:query'])) reviewVisible.value = true;
+});
+
+// 三审 dspro P1(缓存自愈): 源清单是模块级缓存, 测试发送产生新源/失败重试成功后旧缓存不会失效——
+// keep-alive 回页时轻量 ensureSources(缓存有效=共享 promise 空转); 空态解除或源被自动切走时补一轮加载
+let loadedOnce = false;
+onActivated(async () => {
+  const before = source.value;
+  await ensureSources();
+  sourcesReady.value = true;
+  if (noRealSource.value) return;
+  if (source.value === before) autoPickSource(sourceOpts, source);
+  if (source.value !== before || !loadedOnce) onSourceChange();
+});
+
+// 三审 dspro P2: keep-alive 下二次导航同路由只变 query, onMounted/watch 都不会再跑
+watch(
+  () => route.query.review,
+  (v) => {
+    if (v === '1' && checkPermi(['profile:review:query'])) reviewVisible.value = true;
+  }
+);
 </script>
 
 <style scoped>
@@ -614,5 +681,27 @@ onMounted(loadAll);
 .rank-pill {
   min-width: 24px;
   justify-content: center;
+}
+
+.empty-guide {
+  text-align: center;
+  padding: 18px 0 6px;
+}
+.empty-guide__title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.empty-guide__hint {
+  margin: 4px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12.5px;
+}
+.empty-guide__text {
+  max-width: 560px;
+  margin: 0 auto 14px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.7;
 }
 </style>

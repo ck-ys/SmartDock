@@ -476,7 +476,7 @@ import {
   type ProfileSegmentPreview,
   type ProfileSegmentRun
 } from '@/api/dcs/core/profile';
-import { useSourceOptions } from '@/composables/useProfileSources';
+import { useSourceOptions, autoPickSource } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
 const router = useRouter();
@@ -486,11 +486,12 @@ const goProfile = (subjectType: string, subjectId: string) => {
     `/insight/profile-detail/${activeSegment.value?.source || source.value}/${subjectId}?subjectType=${encodeURIComponent(subjectType || 'user')}`
   );
 };
-ensureSources();
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent]);
 
 const source = ref('dcs');
+// 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次 loadAll, 不再双载
+const initialSource = source.value;
 const segments = ref<ProfileSegment[]>([]);
 const loading = ref(false);
 const evaluatingId = ref('');
@@ -980,7 +981,11 @@ const doExport = async () => {
   }
 };
 
-onMounted(loadAll);
+onMounted(async () => {
+  await ensureSources();
+  if (source.value === initialSource) autoPickSource(sourceOpts, source);
+  loadAll();
+});
 </script>
 
 <style scoped>

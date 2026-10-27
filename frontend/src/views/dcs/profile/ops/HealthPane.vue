@@ -1,21 +1,13 @@
 <template>
-  <div class="app-container health-page">
-    <div class="ui-page-head">
-      <div class="ui-page-head__main">
-        <div class="ui-page-head__eyebrow">画像引擎</div>
-        <h1 class="ui-page-head__title">引擎健康</h1>
-        <p class="ui-page-head__sub">
-          事件从采集到可见要过"重建、汇总、重算"几道后台工序——哪道堵了、慢了、悄悄失败了，这里一屏看清；越线自动给管理员发站内告警（每小时
-          :15 巡检）。
-        </p>
-      </div>
-      <div class="ui-page-head__actions">
-        <el-select v-model="source" class="source-select" @change="load">
-          <el-option v-for="s in sourceOptions" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-        <el-button :loading="loading" @click="load">刷新</el-button>
-      </div>
+  <div class="health-pane">
+    <div class="pane-toolbar">
+      <el-select v-model="source" class="source-select" @change="load">
+        <el-option v-for="s in sourceOptions" :key="s.value" :label="s.label" :value="s.value" />
+      </el-select>
+      <el-button :loading="loading" @click="load">刷新</el-button>
     </div>
+
+    <p class="pane-note muted">事件从采集到可见要过「重建、汇总、重算」几道后台工序——哪道堵了、慢了、悄悄失败了，这里一屏看清；越线自动给管理员发站内告警（每小时 :15 巡检）。</p>
 
     <div v-if="health" class="alert-list">
       <template v-if="health.alerts.length">
@@ -95,20 +87,15 @@
   </div>
 </template>
 
-<script setup lang="ts" name="ProfileHealth">
+<script setup lang="ts" name="ProfileHealthPane">
 import { getEngineHealth, type ProfileHealth } from '@/api/dcs/core/profile';
-import { useSourceOptions } from '@/composables/useProfileSources';
+import { useSourceOptions, autoPickSource } from '@/composables/useProfileSources';
 
-// 五审回修: 源下拉接口驱动(批2 承诺八页, 本页漏改)——新源有事件即可选, 拉取失败回退内置清单
-const { list: sourceOptions, ensureSources } = useSourceOptions('event', [
-  { label: 'web', value: 'web' },
-  { label: 'order', value: 'order' },
-  { label: 'supply', value: 'supply' },
-  { label: 'dcs', value: 'dcs' },
-  { label: 'risk', value: 'risk' }
-]);
-ensureSources();
-const source = ref('web');
+// 源下拉接口驱动——新源有事件即可选, 拉取失败回退内置清单(三审: 兜底只留真实内置源 dcs/risk)
+const { list: sourceOptions, ensureSources } = useSourceOptions('event');
+const source = ref('dcs');
+// 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次 load, 不再双载
+const initialSource = source.value;
 const loading = ref(false);
 const health = ref<ProfileHealth | null>(null);
 
@@ -142,34 +129,37 @@ const load = async () => {
   }
 };
 
-onMounted(load);
+onMounted(async () => {
+  await ensureSources();
+  if (source.value === initialSource) autoPickSource(sourceOptions, source);
+  load();
+});
 </script>
 
 <style scoped>
-.health-page {
+.health-pane {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
 }
-.health-page > .ui-page-head {
-  margin-bottom: 4px;
-}
-.health-page .ui-page-head__title {
-  font-size: var(--dcs-font-page);
-}
-.health-page .ui-page-head__sub {
-  font-size: var(--dcs-font-md);
-}
-.health-page .ui-page-head__actions {
+.pane-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
   flex-wrap: wrap;
+}
+.pane-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
 }
 @media (min-width: 993px) {
   .source-select {
     width: 150px;
   }
 }
-.health-page :deep(.el-card__body) {
+.health-pane :deep(.el-card__body) {
   min-width: 0;
 }
 .alert-list {

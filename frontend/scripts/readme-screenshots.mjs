@@ -182,7 +182,7 @@ const main = async () => {
     }
 
     if (want('04')) {
-      await goto(page, '/insight/profile-studio', '画像工作室', 1500);
+      await goto(page, '/insight/engine-ops/profile-studio', '画像工作室', 1500);
       await shot(page, '04-profile-studio.png');
     }
 
@@ -227,12 +227,14 @@ const main = async () => {
     }
 
     if (want('08')) {
-      await goto(page, '/insight/profile-segments', '标签分群', 1600);
+      await goto(page, '/insight/engine-ops/profile-segments', '标签分群', 1600);
       await shot(page, '08-profile-segments.png');
     }
 
     if (want('09')) {
-      await goto(page, '/insight/profile-review', '低分复核', 1600);
+      // 低分复核已并入画像页抽屉(2026-10-27 第一批): ?review=1 深链自动打开
+      await goto(page, '/insight/profile?review=1', '低分复核', 1600);
+      await page.waitForTimeout(800);
       await shot(page, '09-profile-review.png');
     }
 

@@ -24,15 +24,22 @@ const SUBJECT_FALLBACK: SourceOption[] = [
   { label: SOURCE_LABELS.risk, value: 'risk' }
 ];
 
+// 三审(glm53 P2): 兜底清单只保留内置真实业务源——web/order/supply 是演示假源,
+// 数据已清(2026-10-27 零模拟数据), 拉取失败时把它们摆进下拉=可选到死源
 const EVENT_FALLBACK: SourceOption[] = [
-  { label: SOURCE_LABELS.web, value: 'web' },
   { label: SOURCE_LABELS.dcs, value: 'dcs' },
-  { label: SOURCE_LABELS.order, value: 'order' },
-  { label: SOURCE_LABELS.supply, value: 'supply' }
+  { label: SOURCE_LABELS.risk, value: 'risk' }
 ];
 
 const subjectOptions = ref<SourceOption[]>([]);
 const eventOptions = ref<SourceOption[]>([]);
+/**
+ * 真实数据优先(2026-10-27 画像方向重构): 「加载成功但真实清单为空」标记——
+ * true 时页面应显示诚实空态+接入引导, 而不是拿内置兜底清单当真源展示(虚列)。
+ * 拉取失败不置 true(保持兜底行为)。
+ */
+const subjectEmpty = ref(false);
+const eventEmpty = ref(false);
 let inflight: Promise<void> | null = null;
 
 const toOptions = (
@@ -52,6 +59,8 @@ const ensureSources = (): Promise<void> => {
       .then((data) => {
         subjectOptions.value = toOptions(data.subjectSources, 'subjects');
         eventOptions.value = toOptions(data.eventSources, 'events');
+        subjectEmpty.value = subjectOptions.value.length === 0;
+        eventEmpty.value = eventOptions.value.length === 0;
       })
       .catch((e) => {
         // 三审 P2: 失败必须放掉 inflight——否则吞错后这份"兜底 promise"被永久缓存,
@@ -69,6 +78,19 @@ const ensureSources = (): Promise<void> => {
 };
 
 /**
+ * 失效源清单缓存(2026-10-27 三审 dspro P1): 模块态 inflight 成功后永不释放,
+ * 「空库→测试发送→回画像页」会一直拿旧缓存, 空态永远走不出去; 切租户同理。
+ * 测试发送成功/重新检测空态时调用——下一次 ensureSources 会重新拉清单。
+ */
+export function invalidateSources() {
+  inflight = null;
+  subjectOptions.value = [];
+  eventOptions.value = [];
+  subjectEmpty.value = false;
+  eventEmpty.value = false;
+}
+
+/**
  * kind: 'subject' 画像系下拉(有主体的源) / 'event' 分析系下拉(有事件的源)。
  * fallback 可覆盖(如运维页要保留 risk)。
  */
@@ -78,4 +100,25 @@ export function useSourceOptions(kind: 'subject' | 'event', fallback?: SourceOpt
     base.value.length ? base.value : fallback || (kind === 'subject' ? SUBJECT_FALLBACK : EVENT_FALLBACK)
   );
   return { list, ensureSources };
+}
+
+/**
+ * 真实数据优先(2026-10-27 画像方向重构): 源清单加载完成后,
+ * 当前选中的源不在真实清单里(比如默认值写死了假源)就自动切到清单里的第一个——
+ * 只有一个真实源时即「唯一真实源自动选中」。清单为空不动(页面自行显示空态引导)。
+ */
+export function autoPickSource(list: { value: SourceOption[] }, current: { value: string }, onChange?: () => void) {
+  const real = list.value;
+  if (!real.length) return;
+  if (!real.some((o) => o.value === current.value)) {
+    current.value = real[0].value;
+    // 程序改值不触发 el-select 的 @change——切换了源必须让页面重拉数据,
+    // 否则出现「下拉显示真实源、表格还是旧源数据」的三审 P1
+    onChange?.();
+  }
+}
+
+/** 真实清单为空(加载成功): 画像系/分析系各自查, 页面据此显示诚实空态+接入引导 */
+export function useSourceEmpty(kind: 'subject' | 'event') {
+  return kind === 'subject' ? subjectEmpty : eventEmpty;
 }

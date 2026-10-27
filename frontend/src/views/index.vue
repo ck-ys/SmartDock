@@ -7,7 +7,7 @@
         <p>{{ today }} · 近 7 天事件 {{ pulse?.events ?? '—' }} 条，浏览量 {{ pulse?.pv ?? '—' }}</p>
       </div>
       <div class="ov-head__actions">
-        <el-button v-if="canReview" type="primary" @click="go('/insight/profile-review')">查看待复核</el-button>
+        <el-button v-if="canReview" type="primary" @click="go('/insight/profile?review=1')">查看待复核</el-button>
         <el-button v-else-if="canAnalytics" @click="go('/insight/profile-analytics')">打开分析中心</el-button>
         <el-button :icon="Refresh" circle plain aria-label="刷新数据" @click="loadAll" />
       </div>

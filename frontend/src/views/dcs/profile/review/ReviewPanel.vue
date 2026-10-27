@@ -1,19 +1,14 @@
 <template>
-  <div class="app-container review-page">
-    <dcs-operations-page-header
-      eyebrow="画像引擎"
-      title="低分复核"
-      subtitle="重算后低于阈值的主体自动进入队列；人工确认或驳回后，分数没有继续恶化就不再重复打扰。"
-      :metrics="reviewMetrics"
-    >
-      <template #actions>
-        <el-select v-model="source" class="source-select" @change="onSourceChange">
-          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
-        <el-button v-hasPermi="['profile:review:edit']" :loading="scanning" type="primary" @click="scan">扫描当前快照</el-button>
-        <el-button :loading="loading" @click="loadAll">刷新</el-button>
-      </template>
-    </dcs-operations-page-header>
+  <div class="review-panel">
+    <div class="panel-toolbar">
+      <span class="count-strip">
+        待复核 <b>{{ counts.pending }}</b> · 已确认 <b>{{ counts.confirmed }}</b> · 已驳回 <b>{{ counts.dismissed }}</b> · 待复核·高风险 <b class="high">{{ counts.highPending }}</b>
+      </span>
+      <span class="muted small">确认或驳回后，分数没有继续恶化就不再重复打扰</span>
+      <span style="flex: 1"></span>
+      <el-button v-hasPermi="['profile:review:edit']" :loading="scanning" type="primary" size="small" @click="scan">扫描当前快照</el-button>
+      <el-button :loading="loading" size="small" @click="loadAll">刷新</el-button>
+    </div>
 
     <el-card shadow="never" class="config-card">
       <template #header>
@@ -146,7 +141,7 @@
     </el-card>
 
     <!-- 复核处理 -->
-    <el-dialog v-model="actionVisible" :title="actionMode === 'confirm' ? '确认低分' : '驳回复核'" width="min(520px, 94%)" destroy-on-close>
+    <el-dialog v-model="actionVisible" :title="actionMode === 'confirm' ? '确认低分' : '驳回复核'" width="min(520px, 94%)" destroy-on-close append-to-body>
       <div v-if="activeReview" class="action-summary">
         <div>
           <span class="muted">主体</span>
@@ -197,7 +192,7 @@
     </el-dialog>
 
     <!-- 复核详情 -->
-    <el-drawer v-model="detailVisible" title="复核详情" size="560px" destroy-on-close>
+    <el-drawer v-model="detailVisible" title="复核详情" size="560px" destroy-on-close append-to-body>
       <template v-if="activeReview">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="主体">{{ activeReview.displayName || activeReview.subjectId }}</el-descriptions-item>
@@ -220,12 +215,8 @@
   </div>
 </template>
 
-<script setup name="DcsProfileReview" lang="ts">
+<script setup name="DcsProfileReviewPanel" lang="ts">
 import { ElMessage } from 'element-plus';
-import { useSourceOptions } from '@/composables/useProfileSources';
-import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
-const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
-ensureSources();
 import { formatScore } from '@/utils/score';
 import {
   confirmReview,
@@ -238,23 +229,19 @@ import {
   type ProfileReview
 } from '@/api/dcs/core/profile';
 
+// 低分复核并入用户画像页(2026-10-27 画像方向重构第一批): 原 review.vue 独立菜单撤销,
+// 本组件嵌在画像页抽屉里, source 跟随画像页当前选中源联动
+const props = defineProps<{ source: string }>();
+
 const router = useRouter();
 
-const source = ref('dcs');
 const rows = ref<ProfileReview[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const scanning = ref(false);
-const counts = reactive({ pending: 0, confirmed: 0, dismissed: 0, highPending: 0 });
-const reviewMetrics = computed(() => [
-  { label: '待复核', value: counts.pending },
-  { label: '已确认', value: counts.confirmed },
-  { label: '已驳回', value: counts.dismissed },
-  { label: '待复核·高风险', value: counts.highPending }
-]);
 const query = reactive({ pageNum: 1, pageSize: 20, status: 'PENDING', riskLevel: '', keyword: '' });
+const counts = reactive({ pending: 0, confirmed: 0, dismissed: 0, highPending: 0 });
 
-/* P2(2026-10-27 拍板A)：分数口径收敛到共享 formatScore（两位→一位，与列表/详情同口径），本地副本移除 */
 const scoreClass = (value: number) => (value >= 60 ? 'score-mid' : 'score-low');
 const statusTagType = (status?: string) => {
   if (status === 'PENDING') return 'warning' as const;
@@ -283,10 +270,10 @@ const riskLabel = (risk?: string) => {
 
 const loadCounts = async () => {
   const [pending, confirmed, dismissed, highPending] = await Promise.all([
-    pageReviews({ source: source.value, status: 'PENDING', pageNum: 1, pageSize: 1 }),
-    pageReviews({ source: source.value, status: 'CONFIRMED', pageNum: 1, pageSize: 1 }),
-    pageReviews({ source: source.value, status: 'DISMISSED', pageNum: 1, pageSize: 1 }),
-    pageReviews({ source: source.value, status: 'PENDING', riskLevel: 'HIGH', pageNum: 1, pageSize: 1 })
+    pageReviews({ source: props.source, status: 'PENDING', pageNum: 1, pageSize: 1 }),
+    pageReviews({ source: props.source, status: 'CONFIRMED', pageNum: 1, pageSize: 1 }),
+    pageReviews({ source: props.source, status: 'DISMISSED', pageNum: 1, pageSize: 1 }),
+    pageReviews({ source: props.source, status: 'PENDING', riskLevel: 'HIGH', pageNum: 1, pageSize: 1 })
   ]);
   counts.pending = pending.total;
   counts.confirmed = confirmed.total;
@@ -298,7 +285,7 @@ const loadList = async () => {
   loading.value = true;
   try {
     const res = await pageReviews({
-      source: source.value,
+      source: props.source,
       status: query.status || undefined,
       riskLevel: query.riskLevel || undefined,
       keyword: query.keyword || undefined,
@@ -326,7 +313,7 @@ const resetQuery = () => {
 const scan = async () => {
   scanning.value = true;
   try {
-    const result = await scanReviews(source.value);
+    const result = await scanReviews(props.source);
     ElMessage.success(`扫描 ${result.scanned} 个主体，新入队 ${result.created} 个，当前待复核 ${result.pending} 个`);
     await loadAll();
   } finally {
@@ -348,7 +335,7 @@ const config = reactive<Partial<ProfileEngineConfig>>({
 const loadConfig = async () => {
   configLoading.value = true;
   try {
-    const res = await getEngineConfig(source.value);
+    const res = await getEngineConfig(props.source);
     Object.assign(config, {
       autoRecalc: res.autoRecalc,
       reviewEnabled: res.reviewEnabled,
@@ -364,7 +351,7 @@ const saveConfig = async () => {
   configSaving.value = true;
   try {
     await updateEngineConfig({
-      source: source.value,
+      source: props.source,
       autoRecalc: config.autoRecalc,
       reviewEnabled: config.reviewEnabled,
       reviewThreshold: config.reviewThreshold,
@@ -416,39 +403,49 @@ const openDetail = (row: ProfileReview) => {
   detailVisible.value = true;
 };
 const goProfile = (row: ProfileReview) =>
-  router.push(`/insight/profile-detail/${source.value}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
+  router.push(`/insight/profile-detail/${props.source}/${row.subjectId}?subjectType=${encodeURIComponent(row.subjectType || 'user')}`);
 
 const loadAll = async () => {
   await Promise.all([loadConfig(), loadList(), loadCounts()]);
 };
-const onSourceChange = () => {
-  query.pageNum = 1;
-  loadAll();
-};
+
+watch(
+  () => props.source,
+  () => {
+    query.pageNum = 1;
+    loadAll();
+  }
+);
 
 onMounted(loadAll);
 </script>
 
 <style scoped>
-.review-page {
+.review-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
 }
-.review-page :deep(.dcs-ops-header) {
-  margin-bottom: 4px;
-}
-.review-page :deep(.dcs-ops-header__actions) {
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
-@media (min-width: 993px) {
-  .source-select {
-    width: 150px;
-  }
+.count-strip {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+.count-strip b {
+  margin: 0 6px 0 2px;
+  font-size: 14px;
+}
+.count-strip b.high {
+  color: var(--el-color-danger);
 }
 /* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
-.review-page :deep(.el-table) {
+.review-panel :deep(.el-table) {
   --el-table-border-color: var(--app-rule);
   --el-table-header-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);
@@ -458,7 +455,7 @@ onMounted(loadAll);
   --el-table-row-hover-bg-color: var(--app-raised);
 }
 /* 状态药丸：统一浅底深字，形状/字号与 .ui-pill 同口径 */
-.review-page :deep(.el-tag) {
+.review-panel :deep(.el-tag) {
   --el-tag-bg-color: var(--dcs-pill-off-bg);
   --el-tag-text-color: var(--dcs-pill-off-ink);
   --el-tag-border-color: transparent;
@@ -469,15 +466,15 @@ onMounted(loadAll);
   font-size: var(--dcs-font-xs);
   font-weight: 500;
 }
-.review-page :deep(.el-tag--success) {
+.review-panel :deep(.el-tag--success) {
   --el-tag-bg-color: var(--dcs-pill-pos-bg);
   --el-tag-text-color: var(--dcs-pill-pos-ink);
 }
-.review-page :deep(.el-tag--warning) {
+.review-panel :deep(.el-tag--warning) {
   --el-tag-bg-color: var(--dcs-pill-warn-bg);
   --el-tag-text-color: var(--dcs-pill-warn-ink);
 }
-.review-page :deep(.el-tag--danger) {
+.review-panel :deep(.el-tag--danger) {
   --el-tag-bg-color: var(--dcs-pill-neg-bg);
   --el-tag-text-color: var(--dcs-pill-neg-ink);
 }
@@ -502,7 +499,7 @@ onMounted(loadAll);
   gap: 8px;
 }
 .config-label {
-  /* U-07(2026-10-26 拍板A)：标签是 flex 可收缩项，375 下被同行输入框挤到 42.8px 折成「合并窗/口」孤字断行——不收缩不折行 */
+  /* 标签不收缩不折行(375 下被输入框挤折行, 沿用原页面修法) */
   flex: none;
   font-size: 13px;
   font-weight: 600;

@@ -687,14 +687,15 @@ import {
   type ProfileRuleTemplate,
   type ProfileRuleValidation
 } from '@/api/dcs/core/profile';
-import { useSourceOptions } from '@/composables/useProfileSources';
+import { useSourceOptions, autoPickSource } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
-ensureSources();
 
 const router = useRouter();
 
 const source = ref('dcs');
+// 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次加载, 不再双载
+const initialSource = source.value;
 const activeTab = ref('dimension');
 const loading = ref(false);
 const dimensionLoading = ref(false);
@@ -1398,6 +1399,8 @@ onMounted(async () => {
   } catch {
     // 能力清单失败不阻塞页面
   }
+  await ensureSources();
+  if (source.value === initialSource) autoPickSource(sourceOpts, source);
   await loadAll();
 });
 </script>

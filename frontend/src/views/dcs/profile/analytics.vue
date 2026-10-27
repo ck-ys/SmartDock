@@ -6,7 +6,7 @@
       subtitle="事件账本 → 会话重建 → 日汇总 → 漏斗/留存/下钻。同一套采集协议可接官网、订单、供应链、工程等任意业务源。"
     >
       <template #actions>
-        <el-select v-model="source" class="source-select" @change="onSourceChange">
+        <el-select v-if="!noRealSource" v-model="source" class="source-select" @change="onSourceChange">
           <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-select v-model="daysMode" class="days-select" @change="onDaysModeChange">
@@ -30,6 +30,15 @@
         <el-button :loading="loading" @click="reloadCurrent">刷新</el-button>
       </template>
     </dcs-operations-page-header>
+
+    <el-alert
+      v-if="noRealSource"
+      type="info"
+      :closable="false"
+      show-icon
+      title="还没有任何数据"
+      description="分析中心读的是真实业务事件——在系统里发布/提交/审核任务，或照 dcs 的做法把你的业务数据接进来，各面板会自动出现真实数字。"
+    />
     <div class="meta-line">
       <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
       <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
@@ -836,28 +845,30 @@ import {
   type AnalyticsTrendPoint
 } from '@/api/dcs/core/analytics';
 import { download } from '@/utils/request';
-import { useSourceOptions } from '@/composables/useProfileSources';
+import { useSourceOptions, useSourceEmpty, autoPickSource } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('event');
+const eventEmpty = useSourceEmpty('event');
+const noRealSource = computed(() => eventEmpty.value);
 const router = useRouter();
 /** 批2 看画像: 会话行/抽屉直达画像详情页; 匿名行(无 subjectId)按钮禁用 */
 const goProfile = (subjectType?: string, subjectId?: string) => {
   if (!subjectId) return;
   router.push(`/insight/profile-detail/${source.value}/${subjectId}?subjectType=${encodeURIComponent(subjectType || 'user')}`);
 };
-ensureSources();
-
 use([CanvasRenderer, LineChart, BarChart, SankeyChart, GridComponent, LegendComponent, TooltipComponent]);
 
 const route = useRoute();
 /** 批3A: 筛选状态落 URL(source/days/tab), 刷新/分享链接恢复同视图 */
-const source = ref(String(route.query.source || 'web'));
+const source = ref(String(route.query.source || 'dcs'));
+// 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次加载, 不再双载
+const initialSource = source.value;
 const days = ref(Math.min(Math.max(Number(route.query.days) || 30, 1), 365));
 const PRESET_DAYS = new Set([7, 30, 90]);
 const daysMode = ref(PRESET_DAYS.has(days.value) ? String(days.value) : 'custom');
 const syncQuery = () => {
   const q: Record<string, string> = {};
-  if (source.value && source.value !== 'web') q.source = source.value;
+  if (source.value) q.source = source.value;
   if (days.value !== 30) q.days = String(days.value);
   if (tab.value && tab.value !== 'overview') q.tab = tab.value;
   // 五审回修: 板3A 承诺「配好视图复制链接恢复同视图」——自定义分析条件与明细渠道也是视图的一部分
@@ -1816,6 +1827,11 @@ onMounted(async () => {
   if (q.metric) customForm.metric = String(q.metric);
   if (q.limit) customForm.limit = Number(q.limit) || 20;
   if (q.channel) sessionQuery.channel = String(q.channel);
+  // 真实数据优先(三审 dspro P1/P2): 先等源清单→autoPick→按最终源一次加载;
+  // 空库时跳过注定为空的请求(诚实空态横幅已就位)
+  await ensureSources();
+  if (source.value === initialSource) autoPickSource(sourceOpts, source);
+  if (noRealSource.value) return;
   // 三审 P2: 按 URL 恢复的 tab 首挂就要有数据——reloadCurrent 覆盖全部页签,
   // overview 默认态与原 Promise.all 完全等价, 不会多拉
   await reloadCurrent();

@@ -237,3 +237,29 @@ INSERT INTO sys_role_menu (role_id, menu_id) VALUES
 INSERT INTO sys_role_menu (role_id, menu_id) VALUES
   (1, 12010), (1, 12011), (1, 12012), (1, 12013), (1, 12014),
   (1, 12015), (1, 12016), (1, 12017);
+
+-- 画像方向重构第一批: 折叠组目录 12018 授权(超管+member, 与其子菜单一致)
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 1, 12018 WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 1 AND menu_id = 12018);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 12018 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 12018);
+
+-- 画像方向重构第一批(三审 glm53/dspro 回修): 折叠组/宿主补绑与死角色清理,
+-- 与 migration/2026-10-27_direction_b1_menu_collapse.sql 第 7-8 步同构(适配既有绑定)
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12018 FROM public.sys_role_menu rm
+WHERE rm.menu_id IN (11979, 11980, 11981, 12001, 12010, 12002, 11989)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12018);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12001 FROM public.sys_role_menu rm
+WHERE rm.menu_id IN (12002, 11989)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12001);
+-- 低分复核(11982)→用户画像(9070) 宿主保证: 只授过复核没授过画像页的角色补画像页入口
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 9070 FROM public.sys_role_menu rm
+WHERE rm.menu_id = 11982
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 9070);
+DELETE FROM public.sys_role_menu rm
+WHERE rm.menu_id = 12018
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role r WHERE r.role_id = rm.role_id);
