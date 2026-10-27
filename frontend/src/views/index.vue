@@ -52,8 +52,11 @@
             <text class="end" :x="chart.endX + 8" :y="chart.endY + 4">{{ chart.last }}</text>
           </svg>
         </div>
-        <!-- 取数失败不能伪装成「还没有数据」：两条路分开说 -->
+        <!-- 取数失败不能伪装成「还没有数据」：三条路分开说 -->
         <p v-else-if="pulseError" class="ov-empty is-error">统计接口暂时取不到数，点右上角刷新重试。</p>
+        <p v-else-if="!pulseSource" class="ov-empty">
+          {{ eventSourcesEmpty ? '还没有接入任何数据源，接入后这里会出现最近 7 天的流量趋势。' : '数据源清单暂时取不到，点右上角刷新重试。' }}
+        </p>
         <p v-else class="ov-empty">近 7 天还没有汇总数据，事件入库后这里会出现趋势。</p>
         <!-- 底部三项跟着图走：没有趋势时「跳出率 0% / 每次访问 0 页」只是在报空 -->
         <footer v-if="chart.has" class="ov-panel__foot">
@@ -77,12 +80,18 @@
           <li>
             <span class="k">画像引擎</span>
             <span class="v" :class="{ 'is-warn': profileError }">{{
-              profileError ? '最近计算时间取不到' : profile ? `最近计算 ${relTime(profile.lastCalcTime)}` : '暂无数据'
+              profileError
+                ? '最近计算时间取不到'
+                : !profileSource
+                  ? noSourceText(subjectSourcesEmpty)
+                  : profile
+                    ? `最近计算 ${relTime(profile.lastCalcTime)}`
+                    : '暂无数据'
             }}</span>
           </li>
           <li>
             <span class="k">数据源</span>
-            <span class="v">{{ pulseSource }}</span>
+            <span class="v">{{ pulseSourceLabel || noSourceText(eventSourcesEmpty) }}</span>
           </li>
         </ul>
         <footer class="ov-panel__foot">
@@ -159,6 +168,7 @@ import { getAssistantStatus } from '@/api/dcs/assistant';
 import { listChangelog } from '@/api/dcs/changelog';
 import type { ChangelogRow } from '@/api/dcs/changelog/types';
 import { checkPermi } from '@/utils/permission';
+import { autoPickSource, useSourceEmpty, useSourceOptions } from '@/composables/useProfileSources';
 import { useWindowSize } from '@vueuse/core';
 
 const router = useRouter();
@@ -171,9 +181,20 @@ const profileError = ref(false);
 const pulse = ref<AnalyticsOverview['current'] | null>(null);
 const pulseError = ref(false);
 const trend = ref<AnalyticsTrendPoint[]>([]);
-/** 分析口径走事件源，画像口径走主体源——两个源可以不同，格子里必须写明白，否则「3 个主体 / 0 条事件」看着像坏账 */
-const pulseSource = ref('web');
-const profileSource = ref('dcs');
+/** 分析口径走事件源，画像口径走主体源——两个源可以不同，格子里必须写明白，否则「3 个主体 / 0 条事件」看着像坏账
+ *  2026-10-27 收口：不再写死（原来 'web'/'dcs'），改为后端真实清单里自动选中；写死的 'web' 在零模拟数据环境里是已删源 */
+const eventSources = useSourceOptions('event', []);
+const subjectSources = useSourceOptions('subject', []);
+const eventSourcesEmpty = useSourceEmpty('event');
+const subjectSourcesEmpty = useSourceEmpty('subject');
+const pulseSource = ref('');
+const profileSource = ref('');
+const sourceLabelOf = (options: { label: string; value: string }[], value: string) =>
+  options.find((o) => o.value === value)?.label || value || '';
+const pulseSourceLabel = computed(() => sourceLabelOf(eventSources.list.value, pulseSource.value));
+const profileSourceLabel = computed(() => sourceLabelOf(subjectSources.list.value, profileSource.value));
+/** 没有可用的源时要说清是「还没接」还是「这次没拉到」——首页不摆内置兜底清单，避免选到已删的演示源 */
+const noSourceText = (empty: boolean) => (empty ? '还没有接入数据源' : '数据源清单暂时取不到');
 const assistantReady = ref(false);
 const assistantError = ref(false);
 const logsError = ref(false);
@@ -209,14 +230,14 @@ const kpis = computed(() => {
     list.push({
       label: '画像主体',
       value: profile.value?.subjectCount ?? '—',
-      caption: `${profileSource.value} 源 · 累计去重`
+      caption: profileSourceLabel.value ? `${profileSourceLabel.value} · 累计去重` : noSourceText(subjectSourcesEmpty.value)
     });
   }
   if (canAnalytics.value) {
     list.push({
       label: '近 7 天事件',
       value: pulse.value?.events ?? '—',
-      caption: 'web 业务源'
+      caption: pulseSourceLabel.value ? `${pulseSourceLabel.value} · 业务事件` : noSourceText(eventSourcesEmpty.value)
     });
   }
   if (canProfile.value) {
@@ -368,6 +389,12 @@ async function loadProfile() {
   if (!canProfile.value) {
     return;
   }
+  if (!profileSource.value) {
+    // 一个真实主体源都没有：不是「没数据」，是没接——空态由 KPI/面板文案说清
+    profile.value = null;
+    profileError.value = false;
+    return;
+  }
   try {
     profile.value = await getOverview(profileSource.value);
     profileError.value = false;
@@ -381,7 +408,12 @@ async function loadPulse() {
   if (!canAnalytics.value) {
     return;
   }
-  pulseSource.value = 'web';
+  if (!pulseSource.value) {
+    pulse.value = null;
+    trend.value = [];
+    pulseError.value = false;
+    return;
+  }
   try {
     const [overview, trendData] = await Promise.all([
       getAnalyticsOverview(pulseSource.value, 7),
@@ -396,6 +428,13 @@ async function loadPulse() {
     trend.value = [];
     pulseError.value = true;
   }
+}
+
+/** 数据源从后端真实清单里挑（只有一个真实源时自动选中）；拉不到清单就保持空，页面走「未接入」空态 */
+async function resolveSources() {
+  await Promise.all([eventSources.ensureSources(), subjectSources.ensureSources()]);
+  autoPickSource(eventSources.list, pulseSource);
+  autoPickSource(subjectSources.list, profileSource);
 }
 
 async function loadLogs() {
@@ -416,6 +455,8 @@ async function loadAll() {
   refreshing.value = true;
   const started = Date.now();
   try {
+    // 先定源再取数：源清单没回来就发请求，等于拿空源去查（必然 0 条）
+    await resolveSources();
     await Promise.all([loadAssistant(), loadStats(), loadProfile(), loadPulse(), loadLogs()]);
   } finally {
     // 本地接口往往几十毫秒就回，转圈一闪而过=「点了没反应」；补到 320ms 让动作看得见
