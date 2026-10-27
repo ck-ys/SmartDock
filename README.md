@@ -247,6 +247,8 @@ docker compose ps        # 五个服务应为 running / healthy
 - 工具调用可视化（含耗时与来源数）
 - HITL 写操作确认
 
+<p align="center"><img src="docs/images/screenshots/11-assistant-hitl.png" alt="AI 助手：写操作确认卡"><br><sub>要写库之前先停下来问：卡片写明这一步会动真实数据，点「确认执行」才落库；待确认期间输入暂停、草稿保留</sub></p>
+
 > 基线不包含任何 AI Key；没有可用模型配置时，助手会明确提示未配置，不会静默降级到其他租户或平台配置。
 > 工具面之外的问题它会直说「查不到」，不编数字——这一点在上面动图里能看到。
 

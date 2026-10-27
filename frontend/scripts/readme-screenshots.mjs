@@ -29,6 +29,12 @@ const BASE = process.env.SHOTS_BASE || 'http://127.0.0.1:5188';
 const USER = process.env.SHOTS_USER || 'admin';
 const PASS = process.env.SHOTS_PASS || 'admin123';
 const ASK = process.env.SHOTS_ASK || '我发布的任务提交进度怎么样？';
+/** 11 号图用：一条「要写库」的请求，用来让助手弹出操作确认卡（只截卡，不点确认）。 */
+const HITL_ASK =
+  process.env.SHOTS_HITL_ASK ||
+  '帮我建一个任务草稿：任务名「演示文稿评审」，填给 stu001，截止日期 2026-11-05，类型填表，说明：演示用';
+/** 首次使用「三条承诺」须知门按用户持久化；演示超管 admin 的 userId 固定为 1。 */
+const GATE_UIDS = (process.env.SHOTS_GATE_UIDS || '1').split(',').map((s) => s.trim()).filter(Boolean);
 /** SHOTS_ONLY=05 只重拍某几张（改版后补拍用），不填=全拍。 */
 const ONLY = (process.env.SHOTS_ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const want = (code) => ONLY.length === 0 || ONLY.includes(code);
@@ -49,6 +55,16 @@ async function login(page) {
   await page.locator('.login-submit').click();
   await page.waitForFunction(() => !location.pathname.includes('/login'), null, { timeout: 30000 });
   await page.waitForTimeout(1500);
+  // 干净的浏览器上下文每次都会重新弹须知门；用同一把存储键预先放行（见 useAssistant 的 gateOk）
+  await page.evaluate((uids) => {
+    for (const id of uids) {
+      try {
+        localStorage.setItem(`dcs:assistant:gateOk:${id}`, '1');
+      } catch {
+        /* 存储不可用就算了，askNewSession 还会兜底点按钮 */
+      }
+    }
+  }, GATE_UIDS);
   log('login ok:', USER);
 }
 
@@ -111,6 +127,26 @@ async function waitAnswer(page, timeoutMs = 120000) {
     await page.waitForTimeout(1000);
   }
   log('warn: 等回答超时（模型可能不可用），按当前画面出图');
+  return false;
+}
+
+/** 会话页发一条「要写库」的请求，等到操作确认卡出现（不点确认——要的就是卡本身）。 */
+async function startHitl(page, timeoutMs = 150000) {
+  const box = page.locator('textarea').first();
+  await box.waitFor({ state: 'visible', timeout: 15000 });
+  await box.click();
+  await box.fill(HITL_ASK);
+  await box.press('Enter');
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const text = await page.evaluate(() => document.body.innerText || '');
+    if (/确认要执行这个操作吗/.test(text)) {
+      await page.waitForTimeout(1500);
+      return true;
+    }
+    await page.waitForTimeout(1200);
+  }
+  log('warn: 等操作确认卡超时（模型或工具不可用），按当前画面出图');
   return false;
 }
 
@@ -203,6 +239,12 @@ const main = async () => {
     if (want('10')) {
       await goto(page, '/insight/compliance', '合规中心', 1600);
       await shot(page, '10-compliance.png');
+    }
+
+    if (want('11')) {
+      await goto(page, '/ai/assistant', '我的助手会话', 1600);
+      await startHitl(page);
+      await shot(page, '11-assistant-hitl.png');
     }
 
     log('done ->', OUT);
