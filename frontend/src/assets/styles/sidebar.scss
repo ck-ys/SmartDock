@@ -1,16 +1,24 @@
 @use './variables.module.scss' as *;
 
 #app {
+  /* 波一骨架 inset（2026-10-27 拍板 Q1=甲，蓝本 ui/sidebar.tsx:309）：
+     main-container 从「留左边距的平面」升级为一张四周 8px、圆角 14、双层软阴影的外卡；
+     顶栏/页签/内容纸都在卡内（fixed-header 见 layout/index.vue），纸中纸结构由 AppMain 退位 */
   .main-container {
-    height: 100%;
-    transition: margin-left 0.28s;
-    margin-left: $base-sidebar-width;
+    /* U-01 让位不回退：外卡底缘整体上抬到悬浮球之上（桌面 80px；手机 84px+安全区见 .mobile 段） */
+    --app-fab-yield: 80px;
+    height: calc(100% - var(--app-sheet-inset, 8px) * 2 - var(--app-fab-yield));
+    transition: margin 0.28s;
+    margin: var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) calc(var(--app-sheet-inset, 8px) + var(--app-fab-yield)) calc(#{$base-sidebar-width} + var(--app-sheet-inset, 8px));
     position: relative;
-    background: var(--el-bg-color-page);
+    background: var(--app-sheet-bg, var(--el-bg-color));
+    border-radius: var(--app-shell-radius, 14px);
+    box-shadow: var(--app-shell-shadow, none);
+    overflow: hidden;
   }
 
   .sidebarHide {
-    margin-left: 0 !important;
+    margin-left: var(--app-sheet-inset, 8px) !important;
   }
 
   .sidebar-container {
@@ -175,7 +183,7 @@
     }
 
     .main-container {
-      margin-left: 48px;
+      margin-left: calc(48px + var(--app-sheet-inset, 8px));
     }
 
     .sub-menu-title-noDropdown {
@@ -249,7 +257,10 @@
   // mobile responsive
   .mobile {
     .main-container {
-      margin-left: 0px;
+      /* U-01 手机档：球 60px + 贴边 24px + 手势条安全区（含 8px 呼吸位） */
+      --app-fab-yield: calc(84px + env(safe-area-inset-bottom, 0px));
+      margin: var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) calc(var(--app-sheet-inset, 8px) + var(--app-fab-yield));
+      height: calc(100% - var(--app-sheet-inset, 8px) * 2 - var(--app-fab-yield));
     }
 
     .sidebar-container {

@@ -147,6 +147,8 @@ const setLayout = () => {
 
 .app-wrapper {
   @include mixin.clearfix;
+  /* 外卡 margin-top 8px 会穿过非 BFC 父级塌到 body（全站多 8px 整页滚动条）——建 BFC 收住 */
+  display: flow-root;
   position: relative;
   height: 100%;
   width: 100%;
@@ -167,26 +169,36 @@ const setLayout = () => {
   z-index: 999;
 }
 
+/* 波一骨架 inset：顶栏+页签从「贴窗口顶」改为「卡内顶端」——
+   fixed 定位保留（滚动不丢顶栏），用 left/right 收进外卡、带卡顶圆角与卡底色；
+   数值出处=蓝本 layout/header.tsx（64px 在卡内）+ ui/sidebar.tsx:309（卡 inset 8/圆角 14） */
 .fixed-header {
   position: fixed;
-  top: 0;
-  right: 0;
+  top: var(--app-sheet-inset, 8px);
+  left: calc(#{$base-sidebar-width} + var(--app-sheet-inset, 8px));
+  right: var(--app-sheet-inset, 8px);
   z-index: 9;
-  width: calc(100% - #{$base-sidebar-width});
-  transition: width 0.28s;
-  background: var(--app-frame);
+  width: auto;
+  transition: left 0.28s;
+  background: var(--app-sheet-bg, #fff);
+  border-radius: var(--app-shell-radius, 14px) var(--app-shell-radius, 14px) 0 0;
   box-shadow: none;
 }
 
 .hideSidebar .fixed-header {
-  width: calc(100% - 48px);
+  left: calc(48px + var(--app-sheet-inset, 8px));
 }
 
 .sidebarHide .fixed-header {
-  width: 100%;
+  left: var(--app-sheet-inset, 8px);
 }
 
 .mobile .fixed-header {
-  width: 100%;
+  left: var(--app-sheet-inset, 8px);
+}
+
+/* 跨 992 断点时 JS 收侧栏带 withoutAnimation，顶栏 left 过渡须同豁免，否则卡瞬移、顶栏飘 0.28s */
+.withoutAnimation .fixed-header {
+  transition: none;
 }
 </style>

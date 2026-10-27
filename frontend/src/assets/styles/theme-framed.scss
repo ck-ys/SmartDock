@@ -76,14 +76,17 @@
   --app-card-radius: 8px;
   --app-control-radius: 8px;
   --app-nav-radius: 8px; // 导航药丸专用：不跟控件圆角走
-  /* 导航行：行高比 shadcn 的 32 大一档（中文字面更矮），左右留 6px 让药丸不顶边 */
-  --app-nav-row-h: 38px;
+  /* 导航行：波一按蓝本对齐 shadcn 32px（2026-10-27 拍板 Q1=甲），左右留 6px 让药丸不顶边 */
+  --app-nav-row-h: 32px;
   --app-nav-row-gap: 4px;
   --app-nav-inset: 6px;
   --app-nav-icon: 18px;
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
   --app-shadow-sm: none;
+  /* 波一骨架 inset（2026-10-27，蓝本 ui/sidebar.tsx:309）：内容外卡＝四周 8px／圆角 14／双层 1px 软阴影 */
+  --app-shell-radius: 14px;
+  --app-shell-shadow: 0 0 0 1px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 28px -16px rgba(15, 23, 42, 0.14);
   --app-shadow-md: none;
   --app-shadow-lg: none;
   --app-surface-bg: var(--app-surface);
@@ -359,6 +362,9 @@ html.dark {
   --app-nav-radius: 8px;
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
+  /* 波一外卡暗色阴影：线=白 10% 口径，阴影加深不提亮 */
+  --app-shell-radius: 14px;
+  --app-shell-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 28px -16px rgba(0, 0, 0, 0.55);
   --app-surface-bg: var(--app-surface);
   --app-surface-border: var(--app-border);
 
@@ -595,7 +601,9 @@ body {
 
 /* ============================ 壳层 ============================ */
 #app .main-container {
-  background: var(--app-frame);
+  /* 波一 inset（2026-10-27）：main-container 升级为内容外卡，底色从「框」改为「纸」；
+     尺寸/圆角/阴影/让位在 sidebar.scss，皮肤层只管颜色 */
+  background: var(--app-sheet-bg);
   /* 纸面的 margin-top=壳层高度会穿过 height:100% 的容器塌到 body 上，
      把整页顶下去 82px 并多出一条整页滚动条；建立 BFC 把外边距收在容器里 */
   display: flow-root;

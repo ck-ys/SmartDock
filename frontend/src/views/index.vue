@@ -360,6 +360,10 @@ onMounted(loadAll);
 
 <style scoped lang="scss">
 .cockpit {
+  /* 蓝本 shadcn-admin：超宽屏内容封顶 1280 居中（上下 24 / 左右 16 覆写 .app-container 的统一 16） */
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px;
   display: flex;
   flex-direction: column;
   gap: 24px;
