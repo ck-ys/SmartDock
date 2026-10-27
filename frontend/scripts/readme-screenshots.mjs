@@ -247,6 +247,18 @@ const main = async () => {
       await shot(page, '11-assistant-hitl.png');
     }
 
+    if (want('12')) {
+      // 运行健康是进程内累计：先跑两轮正常问答，让「收尾方式」只出现正常完成
+      await goto(page, '/index', '总览', 1200);
+      await openAssistant(page);
+      for (const q of [ASK, '查询待办事项']) {
+        await askNewSession(page, q);
+        await waitAnswer(page);
+      }
+      await goto(page, '/ai/assistant-admin', 'AI 助手管理', 2400);
+      await shot(page, '12-assistant-admin.png');
+    }
+
     log('done ->', OUT);
   } finally {
     await browser.close();
