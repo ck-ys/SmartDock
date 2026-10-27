@@ -4,17 +4,26 @@
     <header class="ov-head">
       <div class="ov-head__main">
         <h1>总览</h1>
-        <p>{{ today }} · 近 7 天事件 {{ pulse?.events ?? '—' }} 条，浏览量 {{ pulse?.pv ?? '—' }}</p>
+        <p>{{ today }}<template v-if="updatedAt"> · 更新于 {{ updatedAt }}</template></p>
       </div>
       <div class="ov-head__actions">
-        <el-button v-if="canReview" type="primary" @click="go('/insight/profile?review=1')">查看待复核</el-button>
+        <!-- 复核入口的数字来自低分主体：队列为空时降成普通按钮，避免整屏最亮的蓝指着一个空队列 -->
+        <el-button v-if="canReview && reviewCount > 0" type="primary" @click="go('/insight/profile?review=1')">
+          查看待复核（{{ reviewCount }}）
+        </el-button>
+        <el-button v-else-if="canReview" @click="go('/insight/profile?review=1')">查看待复核</el-button>
         <el-button v-else-if="canAnalytics" @click="go('/insight/profile-analytics')">打开分析中心</el-button>
-        <el-button :icon="Refresh" circle plain aria-label="刷新数据" @click="loadAll" />
+        <el-button :icon="Refresh" circle plain :loading="refreshing" title="刷新数据" aria-label="刷新数据" @click="loadAll" />
       </div>
     </header>
 
     <!-- KPI 条：一个容器按 1px 分隔，数字右对齐等宽，不给每格配彩色条 -->
-    <section class="ov-kpis" :style="{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }">
+    <!-- 上限按格数算：只有 1-2 个指标时整条不会拉成一张铺满全宽的空卡（低权限账号见过单格撑满） -->
+    <section
+      v-if="kpis.length"
+      class="ov-kpis"
+      :style="{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))`, maxWidth: kpiMaxWidth }"
+    >
       <div v-for="item in kpis" :key="item.label" class="ov-kpi">
         <span class="k">{{ item.label }}</span>
         <b class="v" :class="item.tone ? `is-${item.tone}` : ''">{{ item.value }}</b>
@@ -22,11 +31,11 @@
       </div>
     </section>
 
-    <div class="ov-grid">
+    <div class="ov-grid" :class="{ 'is-single': !canAnalytics }">
       <!-- 主图：近 7 天浏览量（墨青是整屏唯一的数据色） -->
-      <section class="ov-panel">
+      <section v-if="canAnalytics" class="ov-panel">
         <header class="ov-panel__head">
-          <h2>近 7 天浏览量<span>合计 {{ pulse?.pv ?? 0 }}</span></h2>
+          <h2>近 7 天浏览量<span v-if="chart.has">合计 {{ pulse?.pv ?? 0 }}</span></h2>
           <button type="button" class="ov-link" @click="go('/insight/profile-analytics')">分析中心 →</button>
         </header>
         <div v-if="chart.has" class="ov-chart">
@@ -43,22 +52,25 @@
             <text class="end" :x="chart.endX + 8" :y="chart.endY + 4">{{ chart.last }}</text>
           </svg>
         </div>
+        <!-- 取数失败不能伪装成「还没有数据」：两条路分开说 -->
+        <p v-else-if="pulseError" class="ov-empty is-error">统计接口暂时取不到数，点右上角刷新重试。</p>
         <p v-else class="ov-empty">近 7 天还没有汇总数据，事件入库后这里会出现趋势。</p>
-        <footer class="ov-panel__foot">
-          <span>跳出率 {{ pulse?.bounceRate ?? '—' }}%</span>
-          <span>每次访问 {{ pulse?.pagesPerVisit ?? '—' }} 页</span>
+        <!-- 底部三项跟着图走：没有趋势时「跳出率 0% / 每次访问 0 页」只是在报空 -->
+        <footer v-if="chart.has" class="ov-panel__foot">
+          <span>跳出率 {{ fmtBounce }}</span>
+          <span>每次访问 {{ fmtPages }}</span>
           <span>平均停留 {{ avgDuration }}</span>
-          <span class="ov-source">来源 {{ pulseSource }}</span>
         </footer>
       </section>
 
-      <!-- 右栏：引擎与任务状态，每行一条 1px 规则 -->
+      <!-- 右栏：引擎与任务状态，每行一条 1px 规则（不再重复出处已在别处的「待我完成」「来源」） -->
       <section class="ov-panel">
         <header class="ov-panel__head">
-          <h2>引擎与任务<span>实时</span></h2>
+          <h2>引擎与任务</h2>
         </header>
         <ul class="ov-rows">
-          <li>
+          <!-- 没有助手权限的账号，这行只会常亮「待配置」误导人，索性不摆 -->
+          <li v-if="canAsk">
             <span class="k">AI 助手</span>
             <span class="v" :class="{ 'is-warn': !assistantReady }">{{ assistantReady ? '就绪' : '待配置' }}</span>
           </li>
@@ -70,10 +82,6 @@
             <span class="k">数据源</span>
             <span class="v">{{ pulseSource }}</span>
           </li>
-          <li>
-            <span class="k">待我完成</span>
-            <span class="v">{{ stats?.member?.todo ?? 0 }} 件</span>
-          </li>
         </ul>
         <footer class="ov-panel__foot">
           <button type="button" class="ov-link" @click="go('/insight/profile')">用户画像 →</button>
@@ -82,9 +90,9 @@
       </section>
     </div>
 
-    <div class="ov-grid">
-      <!-- AI 入口：保留首页直问能力，收成一张普通面板 -->
-      <section class="ov-panel">
+    <div class="ov-grid" :class="{ 'is-single': !canAsk }">
+      <!-- AI 入口：保留首页直问能力，收成一张普通面板；没有助手权限的账号直接不摆（按钮点了不会有人接） -->
+      <section v-if="canAsk" class="ov-panel">
         <header class="ov-panel__head">
           <h2>问 AI 助手<span>{{ assistantReady ? '已连接' : '未配置模型' }}</span></h2>
         </header>
@@ -105,15 +113,15 @@
         <ul class="ov-rows">
           <li>
             <button type="button" class="k" @click="go('/dcs/todo')">待我完成</button>
-            <span class="v">{{ stats?.member?.todo ?? 0 }}</span>
+            <span class="v">{{ statNum('todo') }}</span>
           </li>
           <li>
             <button type="button" class="k" @click="go('/dcs/todo')">已提交待审</button>
-            <span class="v">{{ stats?.member?.pendingAudit ?? 0 }}</span>
+            <span class="v">{{ statNum('pendingAudit') }}</span>
           </li>
           <li>
             <button type="button" class="k" @click="go('/dcs/notice')">未读消息</button>
-            <span class="v">{{ stats?.member?.unreadNotices ?? 0 }}</span>
+            <span class="v">{{ statNum('unreadNotices') }}</span>
           </li>
         </ul>
       </section>
@@ -154,16 +162,36 @@ const router = useRouter();
 const { width: viewportWidth } = useWindowSize();
 
 const stats = ref<DcsStatsOverview | null>(null);
+const statsError = ref(false);
 const profile = ref<ProfileOverview | null>(null);
 const pulse = ref<AnalyticsOverview['current'] | null>(null);
+const pulseError = ref(false);
 const trend = ref<AnalyticsTrendPoint[]>([]);
+/** 分析口径走事件源，画像口径走主体源——两个源可以不同，格子里必须写明白，否则「3 个主体 / 0 条事件」看着像坏账 */
 const pulseSource = ref('web');
+const profileSource = ref('dcs');
 const assistantReady = ref(false);
 const askText = ref('');
+const refreshing = ref(false);
+const updatedAt = ref('');
 
 const canProfile = computed(() => checkPermi(['profile:score:query']));
 const canAnalytics = computed(() => checkPermi(['analytics:center:query']));
 const canReview = computed(() => checkPermi(['profile:review:query']));
+/** 首页直问是发 window 事件给壳层助手抽屉；没这个权限抽屉不会接，卡片摆出来就是死按钮 */
+const canAsk = computed(() => checkPermi(['dcs:assistant:use']));
+const reviewCount = computed(() => Number(profile.value?.highRisk ?? 0));
+
+/** 取数失败时给破折号，不能悄悄显示成 0（0 是真实业务值，和「没取到」是两回事） */
+function statNum(key: 'todo' | 'pendingAudit' | 'unreadNotices'): string {
+  if (statsError.value) {
+    return '—';
+  }
+  return String(stats.value?.member?.[key] ?? 0);
+}
+
+const fmtBounce = computed(() => (pulse.value?.bounceRate == null ? '—' : `${pulse.value.bounceRate}%`));
+const fmtPages = computed(() => (pulse.value?.pagesPerVisit == null ? '—' : `${pulse.value.pagesPerVisit} 页`));
 
 const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 const prompts = ['近 30 天谁最不活跃？', '本周流量趋势怎么样？', '我有哪些待办？'];
@@ -175,7 +203,7 @@ const kpis = computed(() => {
     list.push({
       label: '画像主体',
       value: profile.value?.subjectCount ?? '—',
-      caption: '累计去重'
+      caption: `${profileSource.value} 源 · 累计去重`
     });
   }
   if (canAnalytics.value) {
@@ -199,11 +227,12 @@ const kpis = computed(() => {
       caption: '满分 100'
     });
   }
-  if (!list.length) {
-    list.push({ label: '近 7 天浏览量', value: pulse.value?.pv ?? '—', caption: 'web 业务源' });
-  }
+  // 画像/分析一个都拿不到的账号不摆假指标：任务数字在右下「任务采集」里，这里空着比摆「—」诚实
   return list;
 });
+
+/** 窄档让 KPI 条吃满宽度（两列排布），宽档按格数封顶，避免 1-2 格拉成一张巨卡 */
+const kpiMaxWidth = computed(() => (viewportWidth.value <= 768 ? 'none' : `${kpis.value.length * 320}px`));
 
 const avgDuration = computed(() => {
   const sec = Number(pulse.value?.avgDuration ?? 0);
@@ -231,7 +260,8 @@ const chart = computed(() => {
   const y = (v: number) => padT + (1 - v / max) * (h - padT - padB);
   const labelIdx = vals.length > 4 ? [0, 2, 4, 6] : vals.map((_, i) => i);
   return {
-    has: vals.length > 0,
+    // 全 0 不画线：一条贴着底轴的平线看着像「有数据但没量」，其实是没数据
+    has: vals.some((v) => v > 0),
     w,
     h,
     padL,
@@ -302,6 +332,10 @@ function ask(text?: string) {
 }
 
 async function loadAssistant() {
+  if (!canAsk.value) {
+    assistantReady.value = false;
+    return;
+  }
   try {
     const res: any = await getAssistantStatus();
     const d = res?.data ?? res;
@@ -312,31 +346,40 @@ async function loadAssistant() {
 }
 
 async function loadStats() {
-  stats.value = await statsOverview().catch(() => null);
+  try {
+    stats.value = await statsOverview();
+    statsError.value = false;
+  } catch {
+    stats.value = null;
+    statsError.value = true;
+  }
 }
 
 async function loadProfile() {
   if (!canProfile.value) {
     return;
   }
-  profile.value = await getOverview('dcs').catch(() => null);
+  profile.value = await getOverview(profileSource.value).catch(() => null);
 }
 
 async function loadPulse() {
   if (!canAnalytics.value) {
     return;
   }
+  pulseSource.value = 'web';
   try {
-    pulseSource.value = 'web';
     const [overview, trendData] = await Promise.all([
-      getAnalyticsOverview(pulseSource.value, 7).catch(() => null),
-      getAnalyticsTrend(pulseSource.value, 7).catch(() => [])
+      getAnalyticsOverview(pulseSource.value, 7),
+      getAnalyticsTrend(pulseSource.value, 7)
     ]);
     pulse.value = overview?.current ?? null;
     trend.value = trendData || [];
+    pulseError.value = false;
   } catch {
+    // 接口挂了与「筛出来是空」必须分开：前者要说取不到，后者才说没数据
     pulse.value = null;
     trend.value = [];
+    pulseError.value = true;
   }
 }
 
@@ -349,12 +392,21 @@ async function loadLogs() {
   }
 }
 
-function loadAll() {
-  loadAssistant();
-  loadStats();
-  loadProfile();
-  loadPulse();
-  loadLogs();
+async function loadAll() {
+  if (refreshing.value) {
+    return;
+  }
+  refreshing.value = true;
+  const started = Date.now();
+  try {
+    await Promise.all([loadAssistant(), loadStats(), loadProfile(), loadPulse(), loadLogs()]);
+  } finally {
+    // 本地接口往往几十毫秒就回，转圈一闪而过=「点了没反应」；补到 320ms 让动作看得见
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, 320 - (Date.now() - started))));
+    // 精确到秒：只到分钟时连点两下文案一模一样，用户会怀疑没刷新
+    updatedAt.value = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    refreshing.value = false;
+  }
 }
 
 onMounted(loadAll);
@@ -444,6 +496,10 @@ onMounted(loadAll);
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
   gap: 24px;
+  /* 右栏消失时（账号没有助手权限）不要留半屏空白 */
+  &.is-single {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .ov-panel {
@@ -533,14 +589,18 @@ onMounted(loadAll);
   }
 }
 
-.ov-source {
-  margin-left: auto;
-}
-
 .ov-empty {
-  margin: 18px 0 6px;
+  /* 图表区空着时面板会被右栏撑高：让这行字在空白里居中，而不是贴着顶边像没加载完 */
+  display: flex;
+  align-items: center;
+  flex: 1;
+  margin: 0;
+  padding: 24px 0;
   font-size: 12.5px;
   color: var(--app-faint);
+  &.is-error {
+    color: var(--el-color-warning-dark-2);
+  }
 }
 
 /* 状态/任务行 */
