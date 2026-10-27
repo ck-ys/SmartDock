@@ -137,7 +137,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | `profile/query/ProfileScoreModelController` | `profile/rfm.vue` |
 | `profile/query/ProfileSegmentController` | `profile/segments.vue` |
 | `profile/query/ProfileReviewController` | `profile/review.vue` |
-| `profile/protocol/ProfileProtocol|SchemaController` | 协议/Schema 管理 UI（批 12 交付） |
+| `profile/protocol/ProfileProtocol|SchemaController` | 画像管理页「协议与 Schema」页签（`profile/admin.vue`） |
 | 采集 demo 任务 Controller（demo 模块内） | `mission/todo` 页 + `core/task.ts` |
 
 ---
