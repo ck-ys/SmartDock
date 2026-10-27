@@ -171,20 +171,12 @@ public final class ToolRegistry {
                 if (v == null) {
                     continue;
                 }
-                switch (v) {
-                    case "off":
-                        anyOff = true;
-                        break;
-                    case "member":
-                        anyHit = true;
-                        strictest = Math.max(strictest, Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_MEMBER));
-                        break;
-                    case "admin":
-                        anyHit = true;
-                        strictest = Math.max(strictest, Math.max(spec.minRoleLevel(), ToolIdentity.LEVEL_ADMIN));
-                        break;
-                    default:
-                        // 非法值忽略——配置面已限下拉，此处兜底不炸链
+                int single = effectiveMinRoleSingle(name, spec.minRoleLevel(), v);
+                if (single < 0) {
+                    anyOff = true;
+                } else {
+                    anyHit = true;
+                    strictest = Math.max(strictest, single);
                 }
             }
             if (anyOff) {
@@ -195,6 +187,24 @@ public final class ToolRegistry {
             }
         }
         return spec.minRoleLevel();
+    }
+
+    /**
+     * 单键档位核心（B 批 2026-10-27 抽出）：off=-1；member/admin 与内置门槛取 max（只升不降）；
+     * 未配置/非法值=内置门槛。工具（矩阵行）与技能（skill:&lt;name&gt; 行）共用此函数=
+     * 两类对象的开关语义单一真相，演进只改这一处。
+     */
+    public static int effectiveMinRoleSingle(String key, int builtinLevel, String override) {
+        if (override == null) {
+            return builtinLevel;
+        }
+        return switch (override) {
+            case "off" -> -1;
+            case "member" -> Math.max(builtinLevel, ToolIdentity.LEVEL_MEMBER);
+            case "admin" -> Math.max(builtinLevel, ToolIdentity.LEVEL_ADMIN);
+            // 非法值忽略——配置面已限下拉，此处兜底不炸链
+            default -> builtinLevel;
+        };
     }
 
     /** 全量工具名（不分角色，守卫测试比对用）。 */

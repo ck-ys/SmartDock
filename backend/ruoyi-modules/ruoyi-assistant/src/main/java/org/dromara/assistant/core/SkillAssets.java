@@ -2,33 +2,31 @@ package org.dromara.assistant.core;
 
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 技能资产（五需求批 R1 / Q1-A+Q2-A，2026-10-13 拍板）：Claude Code 式渐进披露技能库。
+ * 技能资产兼容门面（五需求批 R1 起家；B 批装载替换 2026-10-27 改读官方仓）。
  *
- * <p><b>省 token 核心机制</b>：系统提示词只注入「技能目录」（每技能一行=id+名称+一句话描述，
- * 预算 {@link #CATALOG_BUDGET} 字符，超预算告警并截断）；技能正文（1~4KB）只在两种时机进上下文——
- * ①用户在输入框选中技能（前端 forwardedProps.skillId 上行，{@link SkillInjectModelDecorator}
- * 当轮注入，不进会话记忆）；②模型判断需要时调 view_skill 工具自取。目录与正文永不同时常驻。</p>
+ * <p><b>现状</b>：装载已迁 {@link AssistantSkillSource}（官方 AgentSkillRepository 分层栈：
+ * classpath /skills → config/skills，官方 YAML frontmatter 格式）。本类保留原公共 API
+ * （{@link #skills()}/{@link #catalog(int)}/{@link #body}/{@link #exists}）做兼容门面，
+ * 目录端点/注入装饰器/view_skill/Holder 零签名改动。内嵌常量表 {@link #SKILLS} 退役为
+ * 零漂移护栏单测（SkillOfficialFormatZeroDiffUnitTest）的对照源，不再参与运行时装载。</p>
  *
- * <p><b>技能定义</b>：{@code prompts/skills/<id>.md}，frontmatter 四行
- * （id/name/description/minRole: member|publisher|admin）+ 正文。加载三级兜底与
- * {@link PromptAssets} 同构：外部 {@code config/prompts/skills/}（部署期热覆写，可增删
- * 整个技能文件）→ classpath → 内嵌常量（{@code SKILLS} 与 md 同源生成，零漂移护栏单测对照）。
- * minRole 按角色裁目录：成员只见 member 技能。</p>
+ * <p><b>省 token 核心机制不变</b>：系统提示词只含「技能目录」（每技能一行；B 批起由官方
+ * DynamicSkillMiddleware 每次调用重组，见 {@link AssistantSkillGateMiddleware}）；技能正文
+ * 只在两种时机进上下文——①用户在输入框选中技能（{@link SkillInjectModelDecorator} 当轮注入，
+ * 不进会话记忆）；②模型判断需要时调工具自取（官方 load_skill_through_path / 旧 view_skill
+ * 同源读 {@link #body}）。目录与正文永不同时常驻。</p>
+ *
+ * @deprecated 装载真相在 {@link AssistantSkillSource}；新消费方请直用其
+ *     {@code repositories()}/{@code all()}，本类仅存量门面（后续批次随消费方迁移收敛）。
  */
 @Slf4j
+@Deprecated
 public final class SkillAssets {
 
-    /** 目录字符预算（约 10 个技能；超出=新增技能没做收敛，告警并截到预算内） */
-    static final int CATALOG_BUDGET = 600;
     /** 单技能正文上限（防误放整个说明书进技能；超出截断并告警） */
     static final int BODY_CAP = 6000;
 
@@ -100,7 +98,7 @@ public final class SkillAssets {
 
     private static volatile List<LoadedSkill> cache;
 
-    /** 全量技能（进程内缓存、进程生命周期内不过期——invalidate 仅测试通道；glm53 终审勘误：外部目录变更需重启生效，目录每次 run 都拼，读盘可控） */
+    /** 全量技能（B 批起读 {@link AssistantSkillSource} 合并视图；进程缓存+invalidate 测试通道口径不变——外部目录变更重启生效） */
     public static List<LoadedSkill> skills() {
         List<LoadedSkill> snap = cache;
         if (snap != null) {
@@ -119,28 +117,9 @@ public final class SkillAssets {
         cache = null;
     }
 
-    /** 技能目录段（追加进系统提示词；只含 id+名称+描述，正文永不进目录） */
-    public static String catalog(int roleLevel) {
-        StringBuilder sb = new StringBuilder("\n\n【技能】（用户可在输入框＋号里选技能，选中后其完整指引当轮自动生效；"
-            + "你判断需要时也可调 view_skill 按 skill_id 取全文——只取与当前任务相关的）\n");
-        int used = sb.length();
-        for (LoadedSkill s : skills()) {
-            if (s.minRole() > roleLevel) {
-                continue;
-            }
-            String line = "- " + s.id() + "：" + s.name() + "——" + s.description() + "\n";
-            if (used + line.length() > CATALOG_BUDGET) {
-                log.warn("[skill] 技能目录超出 {} 字符预算，截断（技能数={}, 剩余未入目录={}）",
-                    CATALOG_BUDGET, skills().size(), s.id());
-                break;
-            }
-            sb.append(line);
-            used += line.length();
-        }
-        return sb.toString();
-    }
-
-    /** 技能正文（注入/自取共用）；id 不存在返回 null（调用方自处理） */
+    /** 技能正文（注入/自取共用）；id 不存在返回 null（调用方自处理）。
+     *  B 批起系统提示词的技能目录段由官方中间件组装（AssistantSkillGateMiddleware），
+     *  本门面不再提供 catalog 拼装（旧自研目录段已随装载替换退役）。 */
     public static String body(String skillId, int roleLevel) {
         if (skillId == null || skillId.isBlank()) {
             return null;
@@ -169,72 +148,19 @@ public final class SkillAssets {
         return s.body().substring(0, BODY_CAP);
     }
 
+    /** B 批装载替换：官方仓合并视图 → 兼容 LoadedSkill（外部层同名覆写已由 AssistantSkillSource.mergeAll 完成） */
     private static List<LoadedSkill> loadAll() {
-        List<LoadedSkill> out = new ArrayList<>(SKILLS.size());
-        for (Skill s : SKILLS) {
-            String body = loadExternal(s.id());
-            String source = "external";
-            if (body == null) {
-                body = loadClasspath(s.id());
-                source = "classpath";
-            }
-            if (body == null) {
-                body = s.embeddedBody();
-                source = "embedded";
-            }
-            body = normalize(body);
-            if (body == null) {
-                log.warn("[skill] 技能 {} 三级加载正文为空，跳过该技能", s.id());
+        List<AssistantSkillSource.SkillView> views = AssistantSkillSource.all();
+        List<LoadedSkill> out = new ArrayList<>(views.size());
+        for (AssistantSkillSource.SkillView v : views) {
+            if (v.body() == null || v.body().isBlank()) {
+                log.warn("[skill] 技能 {} 正文为空，跳过该技能", v.id());
                 continue;
             }
-            log.debug("[skill] {} 生效来源={} bytes={}", s.id(), source, body.length());
-            out.add(new LoadedSkill(s.id(), s.name(), s.description(), s.minRole(), s.triggers(), body));
+            out.add(new LoadedSkill(v.id(), v.displayName(), v.description(), v.minRole(),
+                v.triggers(), v.body()));
         }
+        log.debug("[skill] 装载 {} 个技能（官方仓合并视图）", out.size());
         return List.copyOf(out);
-    }
-
-    private static String loadExternal(String id) {
-        Path dir = Path.of("config", "prompts", "skills");
-        Path p = dir.resolve(id + ".md");
-        if (!Files.isRegularFile(p)) {
-            return null;
-        }
-        try {
-            String ext = Files.readString(p, StandardCharsets.UTF_8);
-            return ext.isBlank() ? null : stripFrontmatter(ext);
-        } catch (IOException e) {
-            log.warn("[skill] 外部技能读取失败，回退 classpath: {}", p.toAbsolutePath(), e);
-            return null;
-        }
-    }
-
-    private static String loadClasspath(String id) {
-        try (InputStream in = SkillAssets.class.getResourceAsStream("/prompts/skills/" + id + ".md")) {
-            if (in == null) {
-                return null;
-            }
-            return stripFrontmatter(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            return null;
-        }
-    }
-
-    /** 外部技能文件允许带 frontmatter（id/name/description/minRole 会被忽略——元数据以内嵌表为准，
-     *  外部文件只覆写正文；这样管理员改文案不用碰权限语义） */
-    private static String stripFrontmatter(String raw) {
-        String s = raw.startsWith("﻿") ? raw.substring(1) : raw;
-        if (s.startsWith("---")) {
-            int end = s.indexOf("\n---", 3);
-            if (end > 0) {
-                int bodyStart = s.indexOf('\n', end + 4);
-                s = bodyStart > 0 ? s.substring(bodyStart + 1) : "";
-            }
-        }
-        return s;
-    }
-
-    private static String normalize(String raw) {
-        String content = raw.replace("\r\n", "\n").strip();
-        return content.isBlank() ? null : content;
     }
 }

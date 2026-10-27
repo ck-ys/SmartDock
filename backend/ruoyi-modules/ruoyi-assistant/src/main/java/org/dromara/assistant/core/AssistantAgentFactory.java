@@ -3,6 +3,8 @@ package org.dromara.assistant.core;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.state.AgentStateStore;
+import io.agentscope.core.permission.PermissionBehavior;
+import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.tool.Toolkit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -194,6 +196,18 @@ public class AssistantAgentFactory {
         // G4-#4：租户工具闸随行传入（mcp:<server> 键，off/admin 生效于挂载面）+ 用户角色档
         registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
             aguiThreadId, pb, tenantCfg.toolGate(), identity.getRoleLevel()));
+        // B 批装载替换（2026-10-27 题2=甲/题3=甲）：技能面迁官方 DynamicSkillMiddleware——
+        // sysPrompt 不再拼自研目录（SkillAssets.catalog 摘除），每次调用由官方中间件按可见
+        // 视图重组官方 <skills> 段；我们的子类 AssistantSkillGateMiddleware 管「谁能用哪个技能」
+        // （minRole + 工具开关矩阵 skill:<name> 行，语义与工具行同构）。矩阵改动走装配面指纹
+        // 失效缓存会话→下一请求重建即生效（题4 甲：新对话不可见，进行中对话不踢）。
+        AssistantSkillGateMiddleware skillGate =
+            new AssistantSkillGateMiddleware(toolkit, identity.getRoleLevel(), tenantCfg.toolGate());
+        // 官方 load_skill_through_path 工具随中间件注册；权限补 ALLOW 规则（只读取正文，
+        // 与 view_skill 同口径，不赌引擎 passthrough 默认）
+        pb.addAllowRule("load_skill_through_path",
+            new PermissionRule("load_skill_through_path", "",
+                PermissionBehavior.ALLOW, "dcs-assistant"));
         ReActAgent agent = ReActAgent.builder()
             .name(AGENT_ID)
             // 批F2：速查卡按注册面裁剪——无权工具名留在提示词里，模型照词幻觉调用也会
@@ -205,11 +219,15 @@ public class AssistantAgentFactory {
                 PromptAssets.filterCheatsheet(
                     PromptAssets.sysPrompt(memoryOn, false),
                     registered),
-                registered) + SkillAssets.catalog(identity.getRoleLevel()))
+                registered))
             .model(model)
             .stateStore(stateStore)
             .toolkit(toolkit)
             .permissionContext(pb.build())
+            // 官方预留通道：dynamicSkillsEnabled(false)=由我们子类接管技能动态段
+            // （builder.skillRepository 自动装的是基类，读不到矩阵）
+            .dynamicSkillsEnabled(false)
+            .middleware(skillGate)
             // 稳流① Q1（2026-10-20 拍板 A①）：流层真事件心跳——20s 一帧 dcs-heartbeat
             // CUSTOM 帧（合法静默期也出网：联网搜索/慢首 token/自动压缩摘要期），喂前端
             // 600s 看门狗+刷新 Recorder lastEventAt（工具/压缩段豁免的事件层实现）。
