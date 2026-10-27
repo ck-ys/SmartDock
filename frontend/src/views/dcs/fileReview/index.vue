@@ -385,13 +385,20 @@
           <el-tab-pane label="安全检测" name="guard">
             <!-- 近 7 天命中概览条（Q4=A：观察期运营抓手） -->
             <div class="file-review-guard-statbar">
-              <span class="file-review-guard-statbar__main"
-                >近 7 天命中 <b>{{ guardStats.total }}</b> 次</span
-              >
-              <span class="file-review-guard-statbar__sub"
-                >观察放行 {{ guardStats.observed }} · 强制进审 {{ guardStats.reviewed }} · 拦截 {{ guardStats.denied }}</span
-              >
-              <el-button link type="primary" class="file-review-guard-statbar__link" @click="gotoGuardLogs">查看检测记录</el-button>
+              <!-- 三态（2026-10-27 批3）：取不到检测统计时说取不到，不要写成「命中 0 次」 -->
+              <template v-if="guardStatsError">
+                <span class="file-review-guard-statbar__main">近 7 天检测统计暂时取不到</span>
+                <el-button link type="primary" class="file-review-guard-statbar__link" @click="refreshGuardStats">重试</el-button>
+              </template>
+              <template v-else>
+                <span class="file-review-guard-statbar__main"
+                  >近 7 天命中 <b>{{ guardStats.total }}</b> 次</span
+                >
+                <span class="file-review-guard-statbar__sub"
+                  >观察放行 {{ guardStats.observed }} · 强制进审 {{ guardStats.reviewed }} · 拦截 {{ guardStats.denied }}</span
+                >
+                <el-button link type="primary" class="file-review-guard-statbar__link" @click="gotoGuardLogs">查看检测记录</el-button>
+              </template>
             </div>
 
             <el-form label-width="90px">
@@ -535,6 +542,8 @@ const reviewedList = ref<FileReviewRow[]>([]);
 const pendingTotal = ref(0);
 const reviewedTotal = ref(0);
 const pendingCount = ref(0);
+const pendingError = ref(false);
+const guardStatsError = ref(false);
 const pendingPage = reactive({ pageNum: 1, pageSize: 20 });
 const reviewedPage = reactive({ pageNum: 1, pageSize: 20 });
 
@@ -665,10 +674,15 @@ const loadGuardStats = async () => {
       reviewed: Number(d.reviewed) || 0,
       observed: Number(d.observed) || 0
     };
+    guardStatsError.value = false;
   } catch {
     guardStats.value = { total: 0, denied: 0, reviewed: 0, observed: 0 };
+    guardStatsError.value = true;
   }
 };
+
+/** 概览条上的「重试」：只重拉检测统计，不动整页 */
+const refreshGuardStats = () => loadGuardStats();
 
 /** 概览条「查看检测记录」：关设置弹窗并切到检测记录页签 */
 const gotoGuardLogs = () => {
@@ -703,7 +717,13 @@ const categoryIcons: Record<string, Component> = {
 };
 
 const headerMetrics = computed<DcsOperationsMetric[]>(() => [
-  { label: '待审核', value: pendingCount.value, hint: '待审期间仅本人与审核员可见', tone: pendingCount.value > 0 ? 'warning' : 'primary' },
+  {
+    label: '待审核',
+    // 三态：取不到时写破折号，0 是「真的没有待审」
+    value: pendingError.value ? '—' : pendingCount.value,
+    hint: pendingError.value ? '待审数量暂时取不到' : '待审期间仅本人与审核员可见',
+    tone: !pendingError.value && pendingCount.value > 0 ? 'warning' : 'primary'
+  },
   {
     label: '本页结果',
     value: activeTab.value === 'pending' ? pendingTotal.value : activeTab.value === 'reviewed' ? reviewedTotal.value : guardLogTotal.value,
@@ -767,8 +787,10 @@ const refreshPendingCount = async () => {
   try {
     const res = await getFileReviewPendingCount();
     pendingCount.value = Number(res.data) || 0;
+    pendingError.value = false;
   } catch {
     pendingCount.value = 0;
+    pendingError.value = true;
   }
 };
 
