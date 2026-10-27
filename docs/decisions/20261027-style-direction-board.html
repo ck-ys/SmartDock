@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>界面风格方向拍板 · 2026-10-27</title>
+<style>
+  :root { --ink:#1f2329; --sub:#5a6472; --line:#e4e7ec; --bg:#f6f7f9; --card:#fff; --accent:#2b6cf0; --warn:#c4453c; --ok:#2f9e60; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font:15px/1.75 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; color:var(--ink); background:var(--bg); padding:28px 16px 64px; }
+  .wrap { max-width:1280px; margin:0 auto; }
+  header h1 { font-size:22px; margin-bottom:8px; }
+  header p { color:var(--sub); font-size:13.5px; }
+  .badge { display:inline-block; font-size:11.5px; font-weight:700; border:1px solid currentColor; border-radius:4px; padding:1px 7px; letter-spacing:.3px; }
+  .badge.fixed { color:var(--ok); }
+  .badge.rec { color:var(--accent); }
+  .badge.wait { color:#8a6d1f; }
+  nav.toc { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 20px; margin:18px 0; }
+  nav.toc b { font-size:13px; }
+  nav.toc ol { margin:6px 0 0 22px; font-size:13.5px; }
+  nav.toc a { color:var(--accent); text-decoration:none; }
+  nav.toc a:hover { text-decoration:underline; }
+  section.block { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px 22px; margin-top:16px; }
+  section.block h2 { font-size:16.5px; margin-bottom:10px; display:flex; align-items:center; gap:10px; }
+  section.block h3 { font-size:14.5px; margin:14px 0 6px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:10px; }
+  .grid3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:10px; }
+  figure { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
+  figure img { display:block; width:100%; height:auto; }
+  figcaption { font-size:12.5px; color:var(--sub); padding:7px 10px; border-top:1px solid var(--line); }
+  ol.diag { margin:8px 0 0 20px; font-size:14px; }
+  ol.diag li { margin:7px 0; }
+  ol.diag b { color:var(--warn); }
+  .opt { border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin-top:14px; background:#fbfcfe; }
+  .opt.rec { border-color:var(--accent); background:#f2f7ff; }
+  .opt h3 { display:flex; align-items:center; gap:10px; margin:0 0 8px; }
+  .opt .why { font-size:13.5px; }
+  .opt .meta { font-size:12.5px; color:var(--sub); margin-top:8px; }
+  .opt .risk { color:#8a4b1f; }
+  table.cmp { width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
+  table.cmp th, table.cmp td { border:1px solid var(--line); padding:7px 10px; text-align:left; vertical-align:top; }
+  table.cmp th { background:#f1f4f9; font-weight:600; }
+  .flow { margin:8px 0 0 20px; font-size:13.5px; }
+  .flow li { margin:5px 0; }
+  footer { margin-top:22px; font-size:12.5px; color:var(--sub); line-height:1.9; }
+  .kpi-pair { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media (max-width:900px){ .grid2,.grid3,.kpi-pair{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>界面风格方向拍板（2026-10-27）</h1>
+  <p>起因：您反馈「当前 UI 跟之前的 DCS 比总感觉不搭、看着累」。本页把「哪里不一样」逐条拍到图里，并给出三个方向供您拍板。白条问题<span class="badge fixed">已修复</span>（提交 0a2da1d，更新日志 v3.29.1）。</p>
+</header>
+
+<nav class="toc">
+  <b>问题清单（点击直达）</b>
+  <ol>
+    <li><a href="#diag">诊断：到底哪里「诡异」（五条，均附真机截图）</a></li>
+    <li><a href="#q1">Q1 壳层方向：甲 全面对齐 DCS 骨架（推荐） / 乙 保留浮卡补对比 / 丙 最小矫正</a></li>
+    <li><a href="#q2">Q2 关键数字要不要上色：A 学 DCS 上语义色（推荐） / B 保持灰阶</a></li>
+    <li><a href="#flow">执行流程与验收方式</a></li>
+  </ol>
+</nav>
+
+<section class="block" id="diag">
+  <h2>诊断：五条「诡异感」的来源（真机对比）</h2>
+  <ol class="diag">
+    <li><b>全白糊成一片</b>：您当前用的是浅色皮肤——侧栏、画布、卡片全是白的，分区只剩 1px 细线，眼睛要费力找边界；DCS 是「深色侧栏 + 浅灰画布 + 白卡片」三层明暗差，边界天然清楚。</li>
+    <li><b>导航没有锚点</b>：DCS 选中的菜单是实心蓝块、白字；我们的是浅蓝药丸、深蓝字，视觉重量弱一档，扫视时找不到「我在哪」。</li>
+    <li><b>整页像浮起来的一张纸</b>：我们的壳是 8px 悬空外卡 + 14px 大圆角 + 双层阴影，1920 宽屏下四周一圈缝很像「没放正的纸」；DCS 内容区贴边、直角、通高。</li>
+    <li><b>底部悬空空白带</b>：<span class="badge fixed">已修复</span> 起因是为可拖拽的悬浮球预留 80px；悬浮球本来就哪都能拖（您已把它拖到右侧中部），预留带没有意义，已恢复通高贴底。</li>
+    <li><b>重点信息没有颜色</b>：DCS 的待办 20 用蓝、待审核 91 用橙、待修改 1 用红，扫一眼就知道轻重；我们的关键数字统一深灰，得逐字读。</li>
+  </ol>
+  <div class="grid2">
+    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/local-t7-afterfix-1920.png" alt="现状"><figcaption>现状（您的浅色皮肤原样，含已修的底部白条）</figcaption></figure>
+    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/dcs-home-1920.png" alt="DCS 首页"><figcaption>DCS 真机（192.168.3.12 实拍）：深色栏 + 灰画布 + 走边通高</figcaption></figure>
+    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/sd-01-系统管理.png" alt="我们的用户管理"><figcaption>我们：用户管理（白侧栏 + 浅蓝药丸 + 浮卡）</figcaption></figure>
+    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/dcs-01-系统管理.png" alt="DCS 用户管理"><figcaption>DCS：用户管理（深侧栏 + 实心蓝选中块 + 灰画布）</figcaption></figure>
+    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/sd-07-画像与分析.png" alt="我们的用户画像"><figcaption>我们：用户画像（整页白色、数字全灰）</figcaption></figure>
+    <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-menucompare/dcs-09-评分与画像.png" alt="DCS 用户画像"><figcaption>DCS：用户画像（关注块带彩色竖条与彩数字）</figcaption></figure>
+  </div>
+</section>
+
+<section class="block" id="q1">
+  <h2>Q1 壳层方向：三案 <span class="badge wait">待您拍板</span></h2>
+  <table class="cmp">
+    <tr><th>方案</th><th>改什么</th><th>改完的观感</th><th>代价 / 风险</th></tr>
+    <tr><td><b>甲（推荐）</b></td><td>深色侧栏 + 实心蓝选中块 + 灰画布贴边通高（去掉浮卡、大圆角、阴影），卡片圆角统一 12</td><td>与 DCS 同一骨架，最接近您觉得顺眼的观感</td><td>壳层 4-5 个文件；等于推翻 10-26 的「外卡悬空」拍板，需要您明说</td></tr>
+    <tr><td>乙</td><td>保留浮卡，但换深侧栏 + 实心蓝选中 + 加深画布让白卡浮起来 + 圆角收到 10</td><td>层次清楚很多，但「浮纸」本身还在</td><td>改动约为甲的一半；不推翻原结构</td></tr>
+    <tr><td>丙</td><td>侧栏保持浅色，只把选中改实心蓝 + 画布微灰 + 圆角 12</td><td>比现在舒服，但「全白」只是缓解</td><td>改动最小，1 小时内</td></tr>
+  </table>
+
+  <div class="opt rec">
+    <h3>甲 · 全面对齐 DCS 骨架 <span class="badge rec">推荐</span></h3>
+    <p class="why">您的原话是「DCS 看着顺眼」。顺眼的根本原因是它的三层明暗（深栏/灰布/白卡）+ 走边通高 + 实心蓝选中块，这一案就是把它搬回来；同时保留我们自己的令牌体系，以后想换色只动令牌。</p>
+    <p class="meta">代价：改壳层样式与两套皮肤同步，半天内；风险：与上轮「外卡悬空」拍板相反，需您明确同意推翻。</p>
+    <div class="grid2">
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-jia-dcs-parity-1920.png" alt="甲模拟"><figcaption>甲 · 真实页面 CSS 模拟（落地即真机）</figcaption></figure>
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/dcs-home-1920.png" alt="DCS 参考"><figcaption>DCS 真机参考</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="opt">
+    <h3>乙 · 保留浮卡，补对比</h3>
+    <p class="why">不动外卡结构，只把导航换回深色 + 选中实心蓝 + 画布加深，让白卡能「浮起来」。</p>
+    <p class="meta risk">风险：浮卡的「纸感」与四周缝隙还在，1920 宽屏下仍可能与 DCS 观感有差距。</p>
+    <div class="grid2">
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-yi-flyingcard-plus-1920.png" alt="乙模拟"><figcaption>乙 · 模拟（保留浮卡 + 深导航 + 加深画布）</figcaption></figure>
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/local-t7-afterfix-1920.png" alt="现状"><figcaption>现状对照</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="opt">
+    <h3>丙 · 最小矫正</h3>
+    <p class="why">侧栏仍是浅色，只改三处：选中实心蓝、画布微灰、圆角 12。改动最小、当天可回滚。</p>
+    <p class="meta risk">风险：「侧栏无深色锚点」这一主因仍在，观感改善有限。</p>
+    <div class="grid2">
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-bing-1920.png" alt="丙模拟"><figcaption>丙 · 模拟（浅侧栏 + 实心蓝选中 + 微灰画布）</figcaption></figure>
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/local-t7-afterfix-1920.png" alt="现状"><figcaption>现状对照</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="q2">
+  <h2>Q2 关键数字要不要上色 <span class="badge wait">待您拍板</span></h2>
+  <div class="opt rec">
+    <h3>A · 关键数字用语义色（学 DCS）<span class="badge rec">推荐</span></h3>
+    <p class="why">只给「关键数字与风险状态」上色：蓝=常规重点、橙=待处理、红=风险。不是把全站撒成彩色，只让眼睛先看到该看的。</p>
+    <p class="meta">代价：KPI 与风险表两处样式；风险：颜色用多了会花，需限定在白名单组件内。</p>
+    <div class="kpi-pair">
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-kpi-color-crop.png" alt="上色样张"><figcaption>A · 上色后（蓝 / 橙 对照）</figcaption></figure>
+      <figure><img src="file:///D:/Git/git-gitee/smart-dock/.workshop/evidence/20261027-whitestrip/sim-kpi-gray-crop.png" alt="灰阶样张"><figcaption>现状 · 灰阶</figcaption></figure>
+    </div>
+  </div>
+  <div class="opt">
+    <h3>B · 保持灰阶</h3>
+    <p class="why">靠字号与字重分层，整体更「安静」。但与 DCS 的观感差距会保留一部分。</p>
+    <p class="meta risk">风险：重点信息扫描速度慢，与您「看着累」的反馈方向相反。</p>
+  </div>
+</section>
+
+<section class="block" id="flow">
+  <h2>执行流程与验收方式</h2>
+  <ol class="flow">
+    <li>您在对话里直接回复「甲A」这类组合（答案只认对话明说，不点按钮也算超过期）。</li>
+    <li>我按方向改壳层样式（两套皮肤同步）；动工前截真机「改前」，改完截「改后」。</li>
+    <li>逐页回归：首页 + 系统管理 + 任务中心 + 画像与分析 + AI 助手等 8 个菜单页，另加 375 手机档。</li>
+    <li>出前后对比页（双写归档）→ build:prod → 更新日志 → 提交推送。</li>
+  </ol>
+  <p class="meta" style="font-size:12.5px;color:var(--sub);margin-top:10px">附：逐菜单对比原图共 22 张，在 .workshop/evidence/20261027-menucompare/（dcs-* 为 DCS 实拍，sd-* 为我们）。</p>
+</section>
+
+<footer>
+  修订记录：<br>
+  2026-10-27 v1 初版：白条修复已随本板上线（0a2da1d）；诊断五条 + Q1/Q2 两题三案；DCS 真机图为 192.168.3.12 登录实拍；甲/乙/丙均为真实页面 CSS 覆盖模拟（非手绘），落地即真机效果。
+</footer>
+</div>
+</body>
+</html>
