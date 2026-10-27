@@ -203,7 +203,7 @@
   margin: 14px 0 0;
   padding: 0;
   list-style: none;
-  font-size: 11.5px;
+  font-size: 12px;
   color: #a9c3e2;
   li {
     display: flex;
@@ -822,7 +822,7 @@
   }
   .scene-brand__tagline {
     margin-top: 6px;
-    font-size: 11.5px;
+    font-size: 12px;
   }
   .scene-brand__caps,
   .product-stage,

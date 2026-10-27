@@ -486,7 +486,7 @@ onMounted(loadAll);
   .c {
     display: block;
     margin-top: 4px;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--app-faint);
   }
 }
@@ -522,7 +522,7 @@ onMounted(loadAll);
       color: var(--app-text);
       span {
         margin-left: 8px;
-        font-size: 11.5px;
+        font-size: 12px;
         font-weight: 400;
         color: var(--app-faint);
       }
@@ -545,7 +545,7 @@ onMounted(loadAll);
   border: 0;
   background: transparent;
   padding: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--app-muted);
   cursor: pointer;
   &:hover {
@@ -583,7 +583,7 @@ onMounted(loadAll);
   }
   .end {
     fill: var(--app-accent);
-    font-size: 11px;
+    font-size: 12px;
     font-family: var(--el-font-family);
     font-variant-numeric: tabular-nums;
   }
@@ -596,7 +596,7 @@ onMounted(loadAll);
   flex: 1;
   margin: 0;
   padding: 24px 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--app-faint);
   &.is-error {
     color: var(--el-color-warning);
@@ -665,7 +665,7 @@ onMounted(loadAll);
     border: 1px solid var(--app-control);
     border-radius: var(--app-control-radius);
     background: transparent;
-    font-size: 12.5px;
+    font-size: 13px;
     color: var(--app-muted);
     cursor: pointer;
     transition:
@@ -692,14 +692,14 @@ onMounted(loadAll);
     border-top: 1px solid var(--app-rule);
     b {
       display: block;
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 500;
       color: var(--app-text);
       line-height: 1.5;
     }
     p {
       margin: 3px 0 0;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--app-faint);
       line-height: 1.6;
     }
@@ -711,7 +711,7 @@ onMounted(loadAll);
     border-radius: var(--app-control-radius);
     background: var(--app-raised);
     color: var(--app-muted);
-    font-size: 11px;
+    font-size: 12px;
     line-height: 20px;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
   }

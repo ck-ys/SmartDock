@@ -322,7 +322,7 @@ onMounted(load);
   &__excerpt {
     margin: 0;
     flex: 1;
-    font-size: 13.5px;
+    font-size: 14px;
     line-height: 1.7;
     color: var(--app-muted);
     overflow-wrap: anywhere;
@@ -338,7 +338,7 @@ onMounted(load);
     justify-content: space-between;
     gap: 12px;
     margin-top: 16px;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--app-faint);
 
     time {
@@ -391,7 +391,7 @@ onMounted(load);
   border-radius: var(--app-control-radius);
   background: transparent;
   color: var(--app-muted);
-  font-size: 13.5px;
+  font-size: 14px;
   cursor: pointer;
 
   &:hover {
@@ -467,7 +467,7 @@ onMounted(load);
   gap: 10px;
   padding-top: 16px;
   border-top: 1px solid var(--app-rule);
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--app-faint);
 }
 
@@ -504,7 +504,7 @@ onMounted(load);
 
   dd {
     margin: 0;
-    font-size: 13.5px;
+    font-size: 14px;
     line-height: 1.5;
     color: var(--app-muted);
     font-variant-numeric: tabular-nums;
@@ -533,7 +533,7 @@ onMounted(load);
 
     .an-card__excerpt {
       max-width: none;
-      font-size: 13.5px;
+      font-size: 14px;
       -webkit-line-clamp: 2;
     }
   }

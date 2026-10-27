@@ -466,13 +466,13 @@ onMounted(load);
 }
 
 .cl-date {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--app-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .cl-targets {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--app-faint);
 }
 
@@ -541,7 +541,7 @@ onMounted(load);
 
 .cl-foot {
   margin: 14px 0 0;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.7;
   color: var(--app-faint);
 }
@@ -670,7 +670,7 @@ onMounted(load);
   }
 
   .cl-points li {
-    font-size: 13.5px;
+    font-size: 14px;
     line-height: 1.7;
   }
 

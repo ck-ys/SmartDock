@@ -605,7 +605,7 @@ onMounted(load);
 
   &__meta {
     margin: 0;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.7;
     color: var(--app-faint);
   }
@@ -615,7 +615,7 @@ onMounted(load);
     padding: 10px 12px;
     border-radius: var(--app-control-radius);
     background: var(--app-raised);
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--app-muted);
   }
 }
@@ -661,7 +661,7 @@ onMounted(load);
   grid-template-columns: 88px minmax(0, 1fr);
   gap: 6px 12px;
   margin: 0;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.65;
 
   dt {
@@ -689,7 +689,7 @@ onMounted(load);
 
   &__text {
     margin: 5px 0 0;
-    font-size: 13.5px;
+    font-size: 14px;
     line-height: 1.75;
     color: var(--app-text);
     white-space: pre-wrap;

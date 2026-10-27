@@ -3065,7 +3065,7 @@ onUnmounted(() => {
 }
 .keys-summary {
   color: var(--el-text-color-secondary);
-  font-size: 12.5px;
+  font-size: 12px;
   flex: 1;
   min-width: 200px;
 }
@@ -3094,7 +3094,7 @@ onUnmounted(() => {
 .keys-footnote {
   margin-top: 10px;
   color: var(--el-text-color-secondary);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 .ai-key-drawer :deep(.el-drawer__footer) {
   text-align: right;

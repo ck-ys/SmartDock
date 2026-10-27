@@ -318,7 +318,7 @@ const submit = async () => {
 
   &__sub {
     margin: 3px 0 0;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.6;
     color: var(--dcs-text-placeholder);
   }
@@ -409,7 +409,7 @@ const submit = async () => {
     span {
       display: block;
       margin-top: 1px;
-      font-size: 11.5px;
+      font-size: 12px;
       color: var(--dcs-text-placeholder);
     }
 
@@ -478,7 +478,7 @@ const submit = async () => {
     display: flex;
     gap: 4px;
     margin-top: 7px;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-placeholder);
     font-variant-numeric: tabular-nums;
   }
@@ -544,7 +544,7 @@ const submit = async () => {
 
   &__who {
     margin: 0;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--el-color-primary);
   }
 
