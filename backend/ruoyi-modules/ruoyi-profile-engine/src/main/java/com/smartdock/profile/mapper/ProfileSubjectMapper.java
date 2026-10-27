@@ -213,13 +213,29 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
 
     /**
      * 批2 列源: 有主体的源清单(画像系下拉用), 附主体数。
+     * 画像方向第二批: 联表显示配置——停用源从下拉滤掉, 显示名随配置覆盖。
+     */
+    @Select("""
+        SELECT s.source, count(*) AS subjects, c.display_name AS display_name
+        FROM profile_subject s
+        LEFT JOIN profile_source_config c
+          ON c.tenant_id = s.tenant_id AND c.source = s.source AND c.del_flag = '0'
+        WHERE s.tenant_id = #{tenantId} AND s.del_flag = '0'
+          AND (c.enabled IS NULL OR c.enabled = '1')
+        GROUP BY s.source, c.display_name
+        ORDER BY s.source
+        """)
+    List<java.util.Map<String, Object>> selectSubjectSources(@Param("tenantId") String tenantId);
+
+    /**
+     * 不做停用过滤的原始版(来源管理面计数用)。
      */
     @Select("""
         SELECT source, count(*) AS subjects FROM profile_subject
         WHERE tenant_id = #{tenantId} AND del_flag = '0'
         GROUP BY source ORDER BY source
         """)
-    List<java.util.Map<String, Object>> selectSubjectSources(@Param("tenantId") String tenantId);
+    List<java.util.Map<String, Object>> selectSubjectSourcesRaw(@Param("tenantId") String tenantId);
 
     /**
      * 每个主体最新维度快照(复核扫描用)。

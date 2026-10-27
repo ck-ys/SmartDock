@@ -59,10 +59,18 @@ public class ProfileQueryController {
             // 五审回修: 租户上下文缺失时返回空清单, 不拿字面量 "null" 当租户号查库
             out.put("subjectSources", java.util.List.of());
             out.put("eventSources", java.util.List.of());
+            out.put("subjectHidden", 0);
+            out.put("eventHidden", 0);
             return R.ok(out);
         }
-        out.put("subjectSources", subjectMapper.selectSubjectSources(tenantId));
-        out.put("eventSources", eventMapper.selectEventSources(tenantId));
+        // 过滤版(下拉用, 停用源剔除) + 停用计数(三审 dspro P2):
+        // 清单为空但 hidden>0 = "全被停用了"而不是"没数据", 前端空态分两套文案
+        java.util.List<java.util.Map<String, Object>> subjectFiltered = subjectMapper.selectSubjectSources(tenantId);
+        java.util.List<java.util.Map<String, Object>> eventFiltered = eventMapper.selectEventSources(tenantId);
+        out.put("subjectSources", subjectFiltered);
+        out.put("eventSources", eventFiltered);
+        out.put("subjectHidden", subjectMapper.selectSubjectSourcesRaw(tenantId).size() - subjectFiltered.size());
+        out.put("eventHidden", eventMapper.selectEventSourcesRaw(tenantId).size() - eventFiltered.size());
         return R.ok(out);
     }
 

@@ -260,6 +260,12 @@ INSERT INTO public.sys_role_menu (role_id, menu_id)
 SELECT DISTINCT rm.role_id, 9070 FROM public.sys_role_menu rm
 WHERE rm.menu_id = 11982
   AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 9070);
+-- 画像方向第二批: 来源管理按钮(12019)跟随列源页(11989)授权——
+-- 与 migration/2026-10-27_direction_b2_source_config.sql 同构(升级库/全新装口径一致)
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12019 FROM public.sys_role_menu rm
+WHERE rm.menu_id = 11989
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12019);
 DELETE FROM public.sys_role_menu rm
 WHERE rm.menu_id = 12018
   AND NOT EXISTS (SELECT 1 FROM public.sys_role r WHERE r.role_id = rm.role_id);

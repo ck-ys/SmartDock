@@ -51,6 +51,13 @@
                 </el-tag>
               </template>
             </el-table-column>
+            <!-- 题4: 口径列——数据来源写在脸上(完成率=审核通过÷任务发布, 一眼看懂);
+                 tooltip 截断防挤横向滚动(三审 dsflash P2) -->
+            <el-table-column label="口径（数据来源）" min-width="190" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span class="basis-text">{{ row.basisText }}</span>
+              </template>
+            </el-table-column>
             <el-table-column label="打分上限" width="100" prop="scoreMax" />
             <el-table-column label="覆盖率" min-width="190">
               <template #default="{ row }">
@@ -267,6 +274,20 @@
 
     <!-- 维度编辑 -->
     <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="min(780px, 94%)" top="4vh" destroy-on-close>
+      <!-- 题4 简版: 新建先挑模板, 点一下预填全部字段(事件名是 dcs 的真实示例, 换成你自己的) -->
+      <div v-if="!dimForm.dimensionId" class="tpl-zone">
+        <div class="tpl-caption muted">从模板开始，点一下预填全部字段——不想用模板就选「空白自建」</div>
+        <div class="tpl-cards">
+          <button v-for="t in DIM_TEMPLATES" :key="t.key" type="button" class="tpl-card" @click="applyDimTemplate(t.key)">
+            <span class="tpl-name">{{ t.name }}</span>
+            <span class="tpl-desc">{{ t.desc }}</span>
+          </button>
+          <button type="button" class="tpl-card tpl-card--plain" @click="applyDimTemplate('blank')">
+            <span class="tpl-name">空白自建</span>
+            <span class="tpl-desc">从零开始，不预填</span>
+          </button>
+        </div>
+      </div>
       <el-form label-width="108px" class="dim-form">
         <el-collapse v-model="formSections" class="dim-sections">
           <el-collapse-item name="src">
@@ -297,7 +318,7 @@
           </el-collapse-item>
 
           <el-collapse-item name="calc">
-            <template #title><span class="section-num">②</span> 计算 —— 指标口径与打分映射</template>
+            <template #title><span class="section-num">②</span> 计算 —— 统计什么事件、怎么算</template>
             <template v-if="dimForm.calcMode === 'EVENT_AGG'">
               <div class="form-grid">
                 <el-form-item label="算子">
@@ -340,53 +361,6 @@
                 <el-form-item v-if="dimForm.windowType === 'rolling'" label="最近天数">
                   <el-input-number v-model="dimForm.windowDays" :min="1" :max="3650" controls-position="right" style="width: 100%" />
                 </el-form-item>
-                <el-form-item label="映射方式">
-                  <el-select v-model="dimForm.scoreType" style="width: 100%">
-                    <el-option label="linear · 线性" value="linear" />
-                    <el-option label="bucket · 分档" value="bucket" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标下界">
-                  <el-input-number v-model="dimForm.lo" :controls="false" style="width: 100%" />
-                </el-form-item>
-                <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标上界">
-                  <el-input-number v-model="dimForm.hi" :controls="false" style="width: 100%" />
-                </el-form-item>
-                <el-form-item v-if="dimForm.scoreType === 'linear'" label="方向">
-                  <el-select v-model="dimForm.direction" style="width: 100%">
-                    <el-option label="越高越好" value="higher" />
-                    <el-option label="越低越好" value="lower" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="缺失策略">
-                  <el-select v-model="dimForm.missing" style="width: 100%">
-                    <el-option label="neutral · 中性分" value="neutral" />
-                    <el-option label="zero · 0 分" value="zero" />
-                    <el-option label="skip · 跳过本维度" value="skip" />
-                  </el-select>
-                </el-form-item>
-              </div>
-
-              <div v-if="dimForm.scoreType === 'bucket'" class="bucket-editor">
-                <div class="bucket-head">
-                  <span>分档（按顺序匹配，lte 留空 = 兜底档）</span>
-                  <el-button v-hasPermi="['profile:dimension:edit']" link type="primary" @click="addBucket">+ 添加档位</el-button>
-                </div>
-                <div v-for="(bucket, index) in dimForm.buckets" :key="index" class="bucket-row">
-                  <span class="bucket-index">#{{ index + 1 }}</span>
-                  <el-input v-model="bucket.lte" placeholder="lte，留空=兜底" style="width: 170px" />
-                  <span class="muted">→</span>
-                  <el-input-number v-model="bucket.score" :min="0" :max="1000" controls-position="right" style="width: 130px" />
-                  <el-button
-                    v-hasPermi="['profile:dimension:edit']"
-                    link
-                    type="danger"
-                    :disabled="dimForm.buckets.length <= 1"
-                    @click="removeBucket(index)"
-                  >
-                    删除
-                  </el-button>
-                </div>
               </div>
             </template>
 
@@ -415,8 +389,62 @@
             </template>
           </el-collapse-item>
 
+          <!-- 题4 简版: 打分映射是专业词, 默认收进「高级」——模板已带合理默认值, 多数人不用动 -->
+          <el-collapse-item name="score">
+            <template #title><span class="section-num">③</span> 打分设置（高级）—— 指标值怎么变成分数</template>
+            <div class="form-grid">
+              <el-form-item label="映射方式">
+                <el-select v-model="dimForm.scoreType" style="width: 100%">
+                  <el-option label="linear · 线性" value="linear" />
+                  <el-option label="bucket · 分档" value="bucket" />
+                </el-select>
+              </el-form-item>
+              <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标下界">
+                <el-input-number v-model="dimForm.lo" :controls="false" style="width: 100%" />
+              </el-form-item>
+              <el-form-item v-if="dimForm.scoreType === 'linear'" label="指标上界">
+                <el-input-number v-model="dimForm.hi" :controls="false" style="width: 100%" />
+              </el-form-item>
+              <el-form-item v-if="dimForm.scoreType === 'linear'" label="方向">
+                <el-select v-model="dimForm.direction" style="width: 100%">
+                  <el-option label="越高越好" value="higher" />
+                  <el-option label="越低越好" value="lower" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="缺失策略">
+                <el-select v-model="dimForm.missing" style="width: 100%">
+                  <el-option label="neutral · 中性分" value="neutral" />
+                  <el-option label="zero · 0 分" value="zero" />
+                  <el-option label="skip · 跳过本维度" value="skip" />
+                </el-select>
+              </el-form-item>
+            </div>
+
+            <div v-if="dimForm.scoreType === 'bucket'" class="bucket-editor">
+              <div class="bucket-head">
+                <span>分档（按顺序匹配，lte 留空 = 兜底档）</span>
+                <el-button v-hasPermi="['profile:dimension:edit']" link type="primary" @click="addBucket">+ 添加档位</el-button>
+              </div>
+              <div v-for="(bucket, index) in dimForm.buckets" :key="index" class="bucket-row">
+                <span class="bucket-index">#{{ index + 1 }}</span>
+                <el-input v-model="bucket.lte" placeholder="lte，留空=兜底" style="width: 170px" />
+                <span class="muted">→</span>
+                <el-input-number v-model="bucket.score" :min="0" :max="1000" controls-position="right" style="width: 130px" />
+                <el-button
+                  v-hasPermi="['profile:dimension:edit']"
+                  link
+                  type="danger"
+                  :disabled="dimForm.buckets.length <= 1"
+                  @click="removeBucket(index)"
+                >
+                  删除
+                </el-button>
+              </div>
+            </div>
+          </el-collapse-item>
+
           <el-collapse-item name="gov">
-            <template #title><span class="section-num">③</span> 治理 —— 备注与高级配置</template>
+            <template #title><span class="section-num">④</span> 治理 —— 备注与高级配置</template>
             <el-form-item label="备注">
               <el-input v-model="dimForm.remark" type="textarea" :rows="2" maxlength="500" show-word-limit />
             </el-form-item>
@@ -726,7 +754,46 @@ const draft = computed(() => ruleHistory.value.find((rule) => rule.status === 'D
 const copyableRules = computed(() => ruleHistory.value.filter((rule) => rule.status !== 'DRAFT'));
 
 const enabledDimensions = computed(() => dimensions.value.filter((dim) => dim.enabled === '1'));
-const dimensionRows = computed(() => dimensions.value.map((dim) => ({ ...dim, coverage: coverageOf(dim.dimCode) })));
+const dimensionRows = computed(() =>
+  dimensions.value.map((dim) => ({ ...dim, coverage: coverageOf(dim.dimCode), basisText: calcBasisText(dim) }))
+);
+
+/**
+ * 题4: 维度「口径」列——完成率到底哪来的, 直接把分子÷分母写在脸上。
+ * 解析 calc_config 的 metric 段(EVENT_AGG), STRATEGY 显示策略 Bean 语义。
+ */
+function calcBasisText(dim: ProfileDimension): string {
+  if (dim.calcMode === 'STRATEGY') return '业务策略计算（后端 Bean 产出）';
+  let metric: any;
+  try {
+    const cfg = typeof dim.calcConfig === 'string' ? JSON.parse(dim.calcConfig || '{}') : dim.calcConfig || {};
+    metric = cfg.metric || {};
+  } catch {
+    return '—';
+  }
+  const opLabel: Record<string, string> = {
+    COUNT: '次数',
+    COUNT_DISTINCT: '去重数',
+    SUM: '求和',
+    AVG: '平均',
+    RATE: '比率',
+    LAST_VALUE: '最近值'
+  };
+  const op = opLabel[metric.operator as string] || metric.operator || '';
+  if (metric.operator === 'RATE') {
+    const num = metric.numerator?.eventType || '?';
+    const den = metric.denominator?.eventType || '?';
+    return `${num} ÷ ${den}（${op}）`;
+  }
+  // 三审 dspro P2: 属性键与过滤条件也是口径(如"平均 · data.submitted 的 responseHours")
+  const evt = metric.target?.eventType || '';
+  const prop = metric.prop ? ` 的 ${metric.prop}` : '';
+  const filter = Object.entries(metric.target?.propFilter || {})
+    .map(([k, v]) => `${k}=${v}`)
+    .join(' & ');
+  const target = [evt + prop, filter ? `[${filter}]` : ''].filter(Boolean).join(' ');
+  return target ? `${op} · ${target}` : op || '—';
+}
 
 const coverageMap = computed(() => {
   const map: Record<string, ProfileDimensionCoverage> = {};
@@ -808,8 +875,8 @@ const dimForm = reactive({
 
 const dimDialogVisible = ref(false);
 
-/** 维度编辑三区段（批9）：数据源 / 计算 / 治理，默认全开 */
-const formSections = ref(['src', 'calc', 'gov']);
+/** 维度编辑四区段（题4 简版）: 基本信息 / 计算默认开, 打分(专业词)与治理默认收起 */
+const formSections = ref(['src', 'calc']);
 const previewVisible = ref(false);
 const previewForm = reactive({ subjectType: 'user', subjectId: '' });
 const previewResult = ref<ProfileDimensionPreview | null>(null);
@@ -904,7 +971,131 @@ const openCreateDimension = () => {
 };
 const openEditDimension = (dim: ProfileDimension) => {
   fillFormFromDimension(dim);
+  // 三审 dsflash P2: 分档类维度/非默认打分参数藏在折叠区里, 编辑时自动展开「打分设置」
+  if (dimForm.scoreType === 'bucket' || Number(dimForm.scoreMax ?? 100) !== 100) {
+    formSections.value = ['src', 'calc', 'score'];
+  }
   dimDialogVisible.value = true;
+};
+
+/**
+ * 题4 简版·模板卡: 4 个内置配方一键预填(事件名是 dcs 的真实事件, 接入方换成自己的)。
+ * RFM 模板=模型链的内置预设, 在权重/模型页, 不在这里重复。
+ */
+interface DimTemplate {
+  key: string;
+  name: string;
+  desc: string;
+  patch: Partial<typeof dimForm>;
+}
+const DIM_TEMPLATES: DimTemplate[] = [
+  {
+    key: 'activity',
+    name: '活跃度',
+    desc: '最近 30 天干活次数（dcs 内置同款思路）',
+    patch: {
+      dimCode: 'activity',
+      dimName: '活跃度',
+      operator: 'COUNT',
+      targetEvent: 'data.submitted',
+      windowType: 'rolling',
+      windowDays: 30,
+      scoreType: 'linear',
+      lo: 0,
+      hi: 10,
+      direction: 'higher',
+      missing: 'neutral'
+    }
+  },
+  {
+    key: 'completion',
+    name: '完成率',
+    desc: '审核通过 ÷ 任务发布（dcs 内置 completion 同款）',
+    patch: {
+      dimCode: 'completion_rate',
+      dimName: '完成率',
+      operator: 'RATE',
+      numeratorEvent: 'data.audit_passed',
+      denominatorEvent: 'task.published',
+      windowType: 'all',
+      scoreType: 'linear',
+      lo: 0,
+      hi: 1,
+      direction: 'higher',
+      missing: 'neutral'
+    }
+  },
+  {
+    key: 'consume',
+    name: '内容消费',
+    desc: '看了多少页内容（事件名换成你的）',
+    patch: {
+      dimCode: 'consume',
+      dimName: '内容消费',
+      operator: 'COUNT',
+      targetEvent: 'page_view',
+      windowType: 'all',
+      scoreType: 'linear',
+      lo: 0,
+      hi: 50,
+      direction: 'higher',
+      missing: 'neutral'
+    }
+  },
+  {
+    key: 'churn',
+    name: '流失风险',
+    desc: '近 90 天动作越多分越高，零动作=0 分=该跟进了',
+    patch: {
+      dimCode: 'churn_risk',
+      dimName: '流失风险',
+      operator: 'COUNT',
+      targetEvent: 'data.submitted',
+      windowType: 'rolling',
+      windowDays: 90,
+      scoreType: 'linear',
+      lo: 0,
+      hi: 20,
+      // 三审 dspro P1: linear 的 lower=1-ratio(零动作反而满分), 与"低分=该跟进"正好相反——
+      // 必须 higher+missing zero: 零动作 0 分, 越活跃越高分
+      direction: 'higher',
+      missing: 'zero'
+    }
+  }
+];
+// 三审 dspro P2: 新建态开「直接编辑 calc_config」时用当前表单回填文本框——
+// 否则模板预填后开高级只见空 placeholder, 保存被"不是合法对象"拦住走不通
+watch(
+  () => dimForm.advanced,
+  (v) => {
+    if (v && !dimForm.advancedJson.trim()) {
+      dimForm.advanced = false;
+      try {
+        dimForm.advancedJson = JSON.stringify(buildCalcConfig(), null, 2);
+      } catch {
+        // 表单不完整时留空, 保存校验会拦
+      } finally {
+        dimForm.advanced = true;
+      }
+    }
+  }
+);
+
+const applyDimTemplate = async (key: string) => {
+  // 三审 dspro P2: 高级模式下手写的 calc_config 会被 reset 静默清掉——先问一句
+  if (dimForm.advanced && dimForm.advancedJson.trim()) {
+    try {
+      await ElMessageBox.confirm('你正在直接编辑 calc_config，套模板会清掉手写内容。继续？', '套用模板', { type: 'warning' });
+    } catch {
+      return;
+    }
+  }
+  resetDimensionForm();
+  if (key !== 'blank') {
+    const tpl = DIM_TEMPLATES.find((t) => t.key === key);
+    if (tpl) Object.assign(dimForm, tpl.patch);
+    ElMessage.success('已按模板预填——事件名改成你自己的再保存');
+  }
 };
 
 const onOperatorChange = () => {
@@ -1796,5 +1987,58 @@ onMounted(async () => {
   .weight-row {
     grid-template-columns: 120px minmax(0, 1fr) 100px;
   }
+}
+/* ---- 题4 简版: 模板卡 + 口径列 ---- */
+.tpl-zone {
+  margin-bottom: 12px;
+}
+.tpl-caption {
+  font-size: 12.5px;
+  margin-bottom: 8px;
+}
+.tpl-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+/* 窄屏单列要写在基础规则之后才生效(三审 dsflash P2: 同特异性下后者覆盖前者, 原顺序是死规则) */
+@media (max-width: 992px) {
+  .tpl-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.tpl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-control-radius);
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.15s ease;
+}
+.tpl-card:hover {
+  border-color: var(--app-accent);
+}
+.tpl-card--plain {
+  border-style: dashed;
+}
+.tpl-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text, var(--el-text-color-primary));
+}
+.tpl-desc {
+  font-size: 11.5px;
+  color: var(--app-muted);
+  line-height: 1.5;
+}
+.basis-text {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  color: var(--app-muted);
 }
 </style>

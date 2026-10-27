@@ -312,11 +312,27 @@ public interface AnalyticsEventMapper {
 
     /**
      * 批2 列源: 有事件的源清单(分析系下拉用), 附事件数。
+     * 画像方向第二批: 联表显示配置——停用源从下拉滤掉, 显示名随配置覆盖。
+     */
+    @Select("""
+        SELECT e.source, count(*) AS events, c.display_name AS display_name
+        FROM profile_event e
+        LEFT JOIN profile_source_config c
+          ON c.tenant_id = e.tenant_id AND c.source = e.source AND c.del_flag = '0'
+        WHERE e.tenant_id = #{tenantId} AND e.del_flag = '0'
+          AND (c.enabled IS NULL OR c.enabled = '1')
+        GROUP BY e.source, c.display_name
+        ORDER BY e.source
+        """)
+    List<java.util.Map<String, Object>> selectEventSources(@Param("tenantId") String tenantId);
+
+    /**
+     * 不做停用过滤的原始版(来源管理面计数用)。
      */
     @Select("""
         SELECT source, count(*) AS events FROM profile_event
         WHERE tenant_id = #{tenantId} AND del_flag = '0'
         GROUP BY source ORDER BY source
         """)
-    List<java.util.Map<String, Object>> selectEventSources(@Param("tenantId") String tenantId);
+    List<java.util.Map<String, Object>> selectEventSourcesRaw(@Param("tenantId") String tenantId);
 }

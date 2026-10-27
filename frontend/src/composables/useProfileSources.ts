@@ -4,13 +4,12 @@ import { listProfileSources } from '@/api/dcs/core/profile';
 /**
  * 批2 列源单源化: 全部画像/分析页的「数据源」下拉共用一份后端清单
  * (画像系=有主体的源, 分析系=有事件的源), 拉取失败时退回内置兜底清单。
+ * 标签只认内置两个真实源(三审 dsflash P2): web/order/supply 是旧演示假源,
+ * 真实源恰好撞名时显示原始名, 不再冒出「xx 演示站点」。
  */
 export const SOURCE_LABELS: Record<string, string> = {
   dcs: 'dcs 数据采集',
-  risk: 'risk 风控',
-  web: 'web 演示站点',
-  order: 'order 订单',
-  supply: 'supply 供应链'
+  risk: 'risk 风控'
 };
 
 export interface SourceOption {
@@ -40,14 +39,18 @@ const eventOptions = ref<SourceOption[]>([]);
  */
 const subjectEmpty = ref(false);
 const eventEmpty = ref(false);
+/** 三审 dspro P2: 被停用的源数——清单空但 hidden>0 = "全被停用"而非"没数据", 空态分两套文案 */
+const subjectHidden = ref(0);
+const eventHidden = ref(0);
 let inflight: Promise<void> | null = null;
 
 const toOptions = (
-  rows: { source: string; subjects?: number | string; events?: number | string }[] | undefined,
+  rows: { source: string; subjects?: number | string; events?: number | string; display_name?: string | null }[] | undefined,
   countKey: 'subjects' | 'events'
 ): SourceOption[] =>
   (rows || []).map((row) => ({
-    label: SOURCE_LABELS[row.source] || row.source,
+    // 第二批改名: 管理面起的显示名优先, 未配置回退内置标签
+    label: row.display_name || SOURCE_LABELS[row.source] || row.source,
     value: row.source,
     count: row[countKey]
   }));
@@ -61,6 +64,8 @@ const ensureSources = (): Promise<void> => {
         eventOptions.value = toOptions(data.eventSources, 'events');
         subjectEmpty.value = subjectOptions.value.length === 0;
         eventEmpty.value = eventOptions.value.length === 0;
+        subjectHidden.value = Number(data.subjectHidden ?? 0) || 0;
+        eventHidden.value = Number(data.eventHidden ?? 0) || 0;
       })
       .catch((e) => {
         // 三审 P2: 失败必须放掉 inflight——否则吞错后这份"兜底 promise"被永久缓存,
@@ -88,6 +93,8 @@ export function invalidateSources() {
   eventOptions.value = [];
   subjectEmpty.value = false;
   eventEmpty.value = false;
+  subjectHidden.value = 0;
+  eventHidden.value = 0;
 }
 
 /**
@@ -121,4 +128,9 @@ export function autoPickSource(list: { value: SourceOption[] }, current: { value
 /** 真实清单为空(加载成功): 画像系/分析系各自查, 页面据此显示诚实空态+接入引导 */
 export function useSourceEmpty(kind: 'subject' | 'event') {
   return kind === 'subject' ? subjectEmpty : eventEmpty;
+}
+
+/** 被停用的源数: 空态文案分叉用(全被停用 ≠ 没数据) */
+export function useSourceHidden(kind: 'subject' | 'event') {
+  return kind === 'subject' ? subjectHidden : eventHidden;
 }

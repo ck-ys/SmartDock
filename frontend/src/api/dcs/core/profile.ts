@@ -889,11 +889,31 @@ export const getRiskBands = (): Promise<ProfileRiskBands> => r<ProfileRiskBands>
 
 /** 批2 列源: 画像系(有主体)/分析系(有事件)两份源清单(行键为 snake 原名) */
 export interface ProfileSourceSummary {
-  subjectSources: { source: string; subjects: number | string }[];
-  eventSources: { source: string; events: number | string }[];
+  /** 被停用的源数(清单空但 hidden>0 = 全被停了, 不是没数据) */
+  subjectHidden?: number;
+  eventHidden?: number;
+  subjectSources: { source: string; subjects: number | string; display_name?: string | null }[];
+  eventSources: { source: string; events: number | string; display_name?: string | null }[];
 }
 
 export const listProfileSources = (): Promise<ProfileSourceSummary> => r<ProfileSourceSummary>({ url: `${BASE}/source/list`, method: 'get' });
+
+// ---------------------------------------------------------------- 第二批: 来源改名/停用
+
+/** 来源管理行: 显示名/启停为配置覆盖层(未配置=默认启用/空显示名), 计数现算 */
+export interface ProfileSourceConfigRow {
+  source: string;
+  displayName?: string | null;
+  enabled: string;
+  subjects?: number | string;
+  events?: number | string;
+}
+
+export const listSourceConfigs = (): Promise<ProfileSourceConfigRow[]> =>
+  r<ProfileSourceConfigRow[]>({ url: `${BASE}/source-config/list`, method: 'get' });
+
+export const saveSourceConfig = (data: { source: string; displayName?: string; enabled?: string }): Promise<void> =>
+  r<void>({ url: `${BASE}/source-config/save`, method: 'post', data });
 
 export const getSubjectSummary = (subjectId: string, subjectType = 'user', source?: string): Promise<ProfileSubjectSummary> =>
   r<ProfileSubjectSummary>({ url: `${BASE}/subject/summary`, method: 'get', params: { subjectId, subjectType, source: source || undefined } });

@@ -289,11 +289,11 @@ docker compose ps        # 五个服务应为 running / healthy
 
 ## 更多界面
 
-四张图来自同一套演示数据，分别证明分析深度、画像运营与企业合规：
+四张图分别证明分析深度、画像运营与企业合规：
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/07-analytics-funnel.png" alt="转化漏斗"><br><sub>转化漏斗：40 位访客 → 16 次站内搜索 → 2 次注册（5%），下方是每一步的流失去向</sub></td>
+<td width="50%"><img src="docs/images/screenshots/07-analytics-funnel.png" alt="转化漏斗"><br><sub>转化漏斗：内置 demo 的真实任务链路——任务发布 → 数据提交 → 审核通过，每一步的流失去向都写在下方</sub></td>
 <td width="50%"><img src="docs/images/screenshots/08-profile-segments.png" alt="标签分群"><br><sub>标签分群：规则只写一次，成员按最新快照实时求值，运行记录可追溯</sub></td>
 </tr>
 <tr>

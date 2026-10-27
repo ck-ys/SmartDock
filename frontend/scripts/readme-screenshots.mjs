@@ -172,7 +172,8 @@ const main = async () => {
     }
 
     if (want('02')) {
-      await goto(page, '/insight/profile-analytics', '数据分析中心', 2000);
+      // 三审 dsflash P1: 演示数据灌在 web 源, 不带 source 默认 dcs → 全 0 空态
+      await goto(page, '/insight/profile-analytics?source=web', '数据分析中心', 2000);
       await shot(page, '02-analytics.png');
     }
 
@@ -232,14 +233,16 @@ const main = async () => {
     }
 
     if (want('09')) {
-      // 低分复核已并入画像页抽屉(2026-10-27 第一批): ?review=1 深链自动打开
+      // 低分复核已并入画像页抽屉(2026-10-27 第一批): ?review=1 深链自动打开;
+      // 多等 3 秒让限流 toast 自然消失(三审 dsflash P2: 上一版带红色报错进图)
       await goto(page, '/insight/profile?review=1', '低分复核', 1600);
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(3600);
       await shot(page, '09-profile-review.png');
     }
 
     if (want('10')) {
-      await goto(page, '/insight/compliance', '合规中心', 1600);
+      // 2026-10-27 菜单折叠后合规中心新址在 engine-ops 组下, waitText 用页面正文独有文案
+      await goto(page, '/insight/engine-ops/compliance', 'PII 字段清单', 1600);
       await shot(page, '10-compliance.png');
     }
 

@@ -31,14 +31,21 @@
       </template>
     </dcs-operations-page-header>
 
-    <el-alert
-      v-if="noRealSource"
-      type="info"
-      :closable="false"
-      show-icon
-      title="还没有任何数据"
-      description="分析中心读的是真实业务事件——在系统里发布/提交/审核任务，或照 dcs 的做法把你的业务数据接进来，各面板会自动出现真实数字。"
-    />
+    <!-- 第二批: 空态=完整接入示例卡(题7), 告诉用户数据从哪来、怎么接;
+         三审 dspro P2-1: 全部源被停用时数据其实都在, 指引改指「去启用」而非「去接入」 -->
+    <el-card v-if="noRealSource && sourceHiddenCount > 0" shadow="never" class="analytics-empty-guide">
+      <div class="analytics-empty-guide__title">数据都在，{{ sourceHiddenCount }} 个来源被停用了</div>
+      <p class="analytics-empty-guide__text">来源停用后从所有页面隐藏，事件与主体数据原样保留——启用后立刻回来。</p>
+      <div class="analytics-empty-guide__foot">
+        <el-button v-if="canEditSource" type="primary" @click="goEnableSource">去引擎管理 · 启用来源</el-button>
+        <span v-else class="analytics-empty-guide__hint">来源启停由管理员在「引擎与运维 → 引擎运维 → 引擎管理 → 来源管理」操作</span>
+      </div>
+    </el-card>
+    <AccessGuideCard v-else-if="noRealSource" class="analytics-empty-guide" />
+    <!-- 无测试发送权限者给「找管理员」脚注(三审 dsflash P2: 卡内步骤②指引走不通时要兜底) -->
+    <p v-if="noRealSource && sourceHiddenCount === 0 && !canTestSend" class="analytics-empty-guide__hint analytics-empty-guide__hint--block">
+      数据接入由管理员在「引擎与运维 → 引擎运维」里配置
+    </p>
     <div class="meta-line">
       <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
       <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
@@ -802,6 +809,7 @@ import { BarChart, LineChart, SankeyChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import VChart from 'vue-echarts';
 import { useChartTokens, alpha } from '@/utils/chart-theme';
+import AccessGuideCard from './AccessGuideCard.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   deleteAnalyticsFunnel,
@@ -845,12 +853,17 @@ import {
   type AnalyticsTrendPoint
 } from '@/api/dcs/core/analytics';
 import { download } from '@/utils/request';
-import { useSourceOptions, useSourceEmpty, autoPickSource } from '@/composables/useProfileSources';
+import { useSourceOptions, useSourceEmpty, useSourceHidden, autoPickSource } from '@/composables/useProfileSources';
+import { checkPermi } from '@/utils/permission';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('event');
 const eventEmpty = useSourceEmpty('event');
+const sourceHiddenCount = useSourceHidden('event');
 const noRealSource = computed(() => eventEmpty.value);
+const canEditSource = checkPermi(['profile:source:edit']);
+const canTestSend = checkPermi(['profile:engine:query']);
 const router = useRouter();
+const goEnableSource = () => router.push('/insight/engine-ops/profile-ops?tab=admin&sub=source');
 /** 批2 看画像: 会话行/抽屉直达画像详情页; 匿名行(无 subjectId)按钮禁用 */
 const goProfile = (subjectType?: string, subjectId?: string) => {
   if (!subjectId) return;
@@ -1004,7 +1017,7 @@ const onSessionRangeChange = (range: [string, string] | null) => {
   searchSessions();
 };
 const sessionQuery = reactive<AnalyticsSessionQuery>({
-  source: 'web',
+  source: '', // 每次请求前都会被当前源覆盖, 死值 'web' 只会误导(三审 dsflash P3)
   days: 30,
   pageNum: 1,
   pageSize: 20,
@@ -1842,6 +1855,15 @@ onMounted(async () => {
   // R2-4 我的视图: 无权限(403)时静默为空列表, 下拉只显示占位
   loadMyReports();
 });
+
+// 三审 glm53 P2: keep-alive 缓存页回页自愈——来源被改名/停用/新增后,
+// 不进画像页直接切回分析中心也能拿到新清单(与画像页 onActivated 同款轻量路径)
+onActivated(async () => {
+  const before = source.value;
+  await ensureSources();
+  if (source.value === before) autoPickSource(sourceOpts, source);
+  if (source.value !== before) onSourceChange();
+});
 </script>
 
 <style scoped>
@@ -2220,5 +2242,30 @@ onMounted(async () => {
   background: var(--app-accent);
   opacity: 0.7;
   transition: height 0.4s ease;
+}
+/* 全部源被停用的空态卡(三审 dspro P2-1): 与 index.vue 的 empty-guide 同款结构 */
+.analytics-empty-guide__title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.analytics-empty-guide__text {
+  margin: 0 0 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+.analytics-empty-guide__foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.analytics-empty-guide__hint {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+}
+.analytics-empty-guide__hint--block {
+  display: block;
+  margin: 8px 4px 0;
 }
 </style>

@@ -3,7 +3,7 @@
     <dcs-operations-page-header
       eyebrow="画像引擎"
       title="用户画像"
-      subtitle="事件驱动的通用画像引擎：主体、维度、权重、排行与证据一条链。"
+      subtitle="事件驱动的通用画像引擎：主体、维度、权重、排行与证据一条链。画像分析的是被服务的人（访客 / 接任务的人）——发布、提交、审核这些业务动作才进画像，配置与运维操作不进。"
       :metrics="overviewMetrics"
     >
       <template #actions>
@@ -16,18 +16,37 @@
     </dcs-operations-page-header>
 
     <el-card v-if="noRealSource" shadow="never" class="empty-guide">
-      <div class="empty-guide__title">还没有任何数据</div>
-      <p class="empty-guide__text">
-        画像分析的是真实业务操作——在系统里发布/提交/审核任务，或照 dcs 的做法把你的业务数据接进来，这里会自动出现真实的主体与分数。
-      </p>
-      <el-button v-if="canTestSend" type="primary" @click="goTestSend">去引擎运维·测试发送</el-button>
-      <el-button :loading="!sourcesReady" @click="refreshSources">重新检测</el-button>
-      <p v-if="!canTestSend" class="empty-guide__hint">数据接入由管理员在「引擎与运维 → 引擎运维」里配置</p>
+      <!-- 三审 dspro P2: 全部源被停用 ≠ 没数据——数据都在库里, 指引去启用而不是去接入 -->
+      <template v-if="sourceHiddenCount > 0">
+        <div class="empty-guide__title">数据都在，{{ sourceHiddenCount }} 个来源被停用了</div>
+        <p class="empty-guide__text">来源停用后从所有页面隐藏，事件与主体数据原样保留——启用后立刻回来。</p>
+        <div class="empty-guide__foot">
+          <el-button v-if="canEditSource" type="primary" @click="goEnableSource">去引擎管理 · 启用来源</el-button>
+          <el-button :loading="!sourcesReady" @click="refreshSources">重新检测</el-button>
+          <span v-if="!canEditSource" class="empty-guide__hint">来源启停由管理员在「引擎与运维 → 引擎运维 → 引擎管理 → 来源管理」操作</span>
+        </div>
+      </template>
+      <template v-else>
+        <div class="empty-guide__title">还没有任何数据</div>
+        <p class="empty-guide__text">
+          画像分析的是真实业务操作——在系统里发布/提交/审核任务，或照 dcs 的做法把你的业务数据接进来，这里会自动出现真实的主体与分数。
+        </p>
+        <AccessGuideCard class="empty-guide__card" />
+        <div class="empty-guide__foot">
+          <el-button :loading="!sourcesReady" @click="refreshSources">重新检测</el-button>
+          <span v-if="!canTestSend" class="empty-guide__hint">数据接入由管理员在「引擎与运维 → 引擎运维」里配置</span>
+        </div>
+      </template>
     </el-card>
 
     <el-card v-if="sourcesReady && !noRealSource" shadow="never" class="table-card">
       <el-tabs v-model="activeTab" @tab-change="onTabChange">
-        <el-tab-pane label="主体列表" name="list">
+        <el-tab-pane name="list">
+          <template #label>
+            <span>最近活跃的人</span>
+          </template>
+          <!-- 题3 口径标注: 排序=最近事件优先, 行里都是系统里真实干过活的人 -->
+          <div class="tab-caption muted">按最近事件排序 · 系统里真的发布 / 提交 / 审核过任务的人 · 配置与运维操作不进画像</div>
           <div class="filter-bar">
             <el-input v-model="query.keyword" placeholder="主体 ID / 名称" clearable style="width: 150px" @keyup.enter="search" />
             <el-select v-model="query.subjectType" clearable placeholder="主体类型" style="width: 110px">
@@ -119,6 +138,8 @@
         </el-tab-pane>
 
         <el-tab-pane label="维度排行" name="ranking">
+          <!-- 题3 口径标注: 分数哪来的说清楚, 空了不再让用户猜 -->
+          <div class="tab-caption muted">按当前来源的事件计算 · 分数来自最近一次重算快照 · 没有快照的维度不参与排行</div>
           <div class="filter-bar">
             <el-select v-model="ranking.dimension" clearable placeholder="按维度排行" style="width: 180px" @change="loadRanking">
               <el-option label="总分" value="" />
@@ -134,8 +155,8 @@
           <el-table v-loading="rankingLoading" class="ui-table" :data="rankingRows">
             <template #empty>
               <div class="ui-empty">
-                <p class="ui-empty__title">暂无排行数据</p>
-                <p class="ui-empty__hint">先产生事件并触发重算</p>
+                <p class="ui-empty__title">该来源还没有这类数据</p>
+                <p class="ui-empty__hint">排行要有评分快照——先在系统里产生真实操作，或到引擎运维触发一次重算</p>
               </div>
             </template>
             <el-table-column prop="rank" label="排名" width="70" align="right">
@@ -249,11 +270,15 @@ import {
 } from '@/api/dcs/core/profile';
 import { checkPermi } from '@/utils/permission';
 import { formatScore } from '@/utils/score';
-import { useSourceOptions, useSourceEmpty, autoPickSource, invalidateSources } from '@/composables/useProfileSources';
+import { useSourceOptions, useSourceEmpty, useSourceHidden, autoPickSource, invalidateSources } from '@/composables/useProfileSources';
 import ReviewPanel from './review/ReviewPanel.vue';
+import AccessGuideCard from './AccessGuideCard.vue';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
 const sourceEmpty = useSourceEmpty('subject');
+// 全部源被停用 ≠ 没数据(三审 dspro P2-1): 空态卡按 hidden 数分叉指引「去启用」而非「去接入」
+const sourceHiddenCount = useSourceHidden('subject');
+const canEditSource = checkPermi(['profile:source:edit']);
 const noRealSource = computed(() => sourceEmpty.value);
 // 三态(三审 dspro P2): 源清单没回来前既不渲染空态卡也不渲染主内容
 const sourcesReady = ref(false);
@@ -269,18 +294,22 @@ const refreshSources = async () => {
 };
 // 低分复核并入画像页(2026-10-27 第一批): 抽屉入口(支持 ?review=1 深链自动打开)
 const reviewVisible = ref(false);
-// 空态引导落点=引擎管理→测试发送(引擎运维页两层 tab, 用 query 深链); 无 12001/11989 权限者隐藏按钮改文字指引
+// 空态引导卡里的测试发送入口由 AccessGuideCard 自带(按 profile:engine:query 显隐),
+// 这里只判无权限者要不要显示「找管理员」脚注
 const canTestSend = checkPermi(['profile:engine:query']);
-const goTestSend = () => router.push('/insight/engine-ops/profile-ops?tab=admin&sub=seed');
 import DcsTableColumnSettings from '@/components/DcsTableColumnSettings/index.vue';
 import { readHiddenColumns, type TableColumnOption } from '@/components/DcsTableColumnSettings/table-columns';
 
 const router = useRouter();
 const route = useRoute();
+const goEnableSource = () => router.push('/insight/engine-ops/profile-ops?tab=admin&sub=source');
 // 批11 列级权限: 无 profile:pii:score 权限者不渲染分数/维度/风险三族列(后端同步置空)
 const canSeeScore = checkPermi(['profile:pii:score']);
 
 const source = ref('dcs');
+// 测试发送闭环回跳(三审 dsflash P2): 带 ?source= 直达刚灌数据的源;
+// 放在 initialSource 快照前, autoPick 只在"源不在真实清单"时才改选, 在清单内则保留
+if (typeof route.query.source === 'string' && route.query.source) source.value = route.query.source;
 // 真实数据优先: 清单加载后当前源不在真实清单里就自动切到唯一/首个真实源。
 // 首挂单轮加载(三审 dspro P1): setup 不再"先拉一轮默认源", onMounted 等清单→autoPick→一次 loadAll,
 // 消灭旧源/新源两轮并发、慢响应乱序覆盖的竞态。清单回来前用户已手选过源则不自动改选。
@@ -686,6 +715,23 @@ watch(
 .empty-guide {
   text-align: center;
   padding: 18px 0 6px;
+}
+/* 第二批: 空态卡里嵌接入示例卡(左对齐块), 脚注行恢复左对齐 */
+.empty-guide :deep(.access-guide) {
+  text-align: left;
+  border: 0;
+  box-shadow: none;
+}
+.empty-guide__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.tab-caption {
+  font-size: 12px;
+  margin-bottom: 8px;
 }
 .empty-guide__title {
   font-size: 16px;

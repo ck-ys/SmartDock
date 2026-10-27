@@ -1639,6 +1639,26 @@ CREATE INDEX idx_profile_event_archive_source ON public.profile_event_archive US
 CREATE INDEX idx_profile_event_archive_subject ON public.profile_event_archive USING btree (tenant_id, source, subject_type, subject_id);
 CREATE INDEX idx_profile_event_archive_anon ON public.profile_event_archive (tenant_id, source, anonymous_id) WHERE anonymous_id IS NOT NULL;
 
+-- 画像方向第二批: 数据源显示配置(改名/停用)——覆盖层, 未配置的源默认启用
+CREATE TABLE public.profile_source_config (
+    config_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    source character varying(64) NOT NULL,
+    display_name character varying(64),
+    enabled char(1) DEFAULT '1'::bpchar NOT NULL,
+    remark character varying(500),
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_source_config PRIMARY KEY (config_id),
+    CONSTRAINT ck_profile_source_config_enabled CHECK (enabled IN ('0', '1'))
+);
+CREATE UNIQUE INDEX uk_profile_source_config_tenant_source
+  ON public.profile_source_config (tenant_id, source) WHERE del_flag = '0';
+
 CREATE UNIQUE INDEX uk_profile_engine_config
     ON public.profile_engine_config USING btree (tenant_id, source)
     WHERE (del_flag = '0'::bpchar);

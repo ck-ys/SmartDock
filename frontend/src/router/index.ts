@@ -165,6 +165,8 @@ export const constantRoutes: RouteRecordRaw[] = [
   { path: '/insight/profile-ops', redirect: '/insight/engine-ops/profile-ops', hidden: true },
   { path: '/insight/profile-health', redirect: '/insight/engine-ops/profile-ops?tab=health', hidden: true },
   { path: '/insight/engine-admin', redirect: '/insight/engine-ops/profile-ops?tab=admin', hidden: true },
+  // 第二批补: 合规中心旧地址兜底(第一批挪折叠组时漏配)
+  { path: '/insight/compliance', redirect: '/insight/engine-ops/compliance', hidden: true },
   { path: '/dcs/profile-analytics', redirect: '/insight/profile-analytics', hidden: true },
   {
     path: '/dcs/profile-detail/:source/:subjectId',
