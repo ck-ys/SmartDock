@@ -223,6 +223,8 @@ const loading = ref(false);
 const walletList = ref<TenantWalletVO[]>([]);
 const total = ref(0);
 const summary = ref<{ walletCount: number; totalBalance: number; totalFrozen: number; belowThreshold: number; abnormal: number } | null>(null);
+/** 汇总取不到时要留一句白话，不能让整条 KPI 无声消失 */
+const summaryError = ref(false);
 const queryParams = reactive({
   pageNum: 1,
   pageSize: 10,
@@ -257,7 +259,17 @@ const isLowBalance = (row: TenantWalletVO) => {
 
 const emitMetrics = () => {
   if (metricsDisposed) return;
-  if (!summary.value) return;
+  if (!summary.value) {
+    // 汇总取不到时整条 KPI 会消失，看着像页面坏了；保留三格占位写「—」，数字位不撒谎也不让版面塌成一张空卡
+    if (summaryError.value) {
+      emit('metrics', [
+        { label: '钱包总数', value: '—', hint: '汇总取数失败，点表格上方「刷新」重试', tone: 'danger' },
+        { label: '总余额', value: '—', hint: '', tone: 'neutral' },
+        { label: '总冻结', value: '—', hint: '', tone: 'neutral' }
+      ]);
+    }
+    return;
+  }
   const s = summary.value;
   emit('metrics', [
     { label: '钱包总数', value: s.walletCount, hint: '全量口径·不受筛选分页影响', tone: 'primary' },
@@ -272,9 +284,12 @@ const getSummary = async () => {
   try {
     const res: any = await getWalletSummary();
     summary.value = res.data || null;
+    summaryError.value = false;
     emitMetrics();
   } catch {
     summary.value = null;
+    summaryError.value = true;
+    emitMetrics();
   }
 };
 
