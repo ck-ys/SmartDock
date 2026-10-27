@@ -223,7 +223,10 @@ html.density-compact {
   line-height: 1.3;
 }
 
-/* KPI 数字永远是主文字色：红/黄/绿只留给状态药丸 */
+/* KPI 数字默认主文字色（红/黄/绿只留给状态药丸）。
+   例外只有一个：需要人动手的数字，由**该页面自己的 scoped 样式**上语义色
+   （首页低分主体、画像页关注/高风险）。这里不提供全局语义色类——
+   全局类会被所有复用 KPI 的页面继承，等于把整站数字自动染色 */
 .ui-kpi__value,
 .dcs-ops-metric__value {
   display: block;

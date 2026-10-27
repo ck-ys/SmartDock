@@ -69,7 +69,9 @@
   border-radius: var(--app-card-radius, 10px);
 }
 
-/* 四个指标条统一用唯一数据色：状态色留给真正的状态标签，不做装饰 */
+/* 四个指标条统一用唯一数据色：状态色留给真正的状态标签，不做装饰。
+   tone 在这一层只管装饰条，不管数字：数字染色是页面自己的决定（哪些数算「要人动手」）。
+   若在此处按 --warning/--danger 统一染数字，所有复用页头的页面会被一起染上 */
 .dcs-ops-metric::before {
   position: absolute;
   inset: 0 auto 0 0;

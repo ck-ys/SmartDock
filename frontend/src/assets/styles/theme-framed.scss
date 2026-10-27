@@ -45,13 +45,14 @@
   --app-fab-fg: #ffffff;
   --app-fab-border: transparent;
 
-  /* 侧栏一族（shell/sideText/activeBg/activeText/activeBar；hover 档在 shell 与 activeBg 之间取） */
+  /* 侧栏一族（shell/sideText/activeBg/activeText；hover 档在 shell 与 activeBg 之间取）
+     2026-10-27 风格方向（拍板 Q1=甲）：选中项＝实心主色块＋白字，对齐用户认可的 DCS 导航锚点；
+     原来的左缘 3px 色条（activeBar）退场——实心块本身就是唯一选中信号，再叠条是双重强调 */
   --app-shell: #1e2a38;
   --app-side-text: #c7d2de;
   --app-side-hover: #263545;
-  --app-side-active-bg: #2a3a4c;
+  --app-side-active-bg: var(--app-accent);
   --app-side-active-text: #ffffff;
-  --app-side-active-bar: #4a8cf7;
 
   /* 品牌字母标（markBg/markFg，两主题同款、颜色随令牌） */
   --app-mark-bg: #eef2f7;
@@ -72,7 +73,11 @@
   --app-sidebar-w: 256px;
   --app-topbar-h: 64px;
   --app-sheet-radius: 8px;
-  --app-sheet-inset: 8px;
+  /* 2026-10-27 拍板 Q5=丙：外卡不再是一张「浮在灰底上的白纸」，改成整片灰画布。
+     四周 8px 缝归零（外卡贴边），外卡圆角与双层阴影一并归零（见下两条 shell-*） */
+  --app-sheet-inset: 0px;
+  /* 2026-10-27 拍板 Q4=甲：卡片圆角保持 8（不回 12）。
+     真机把 8/12 放大 4 倍并排比过，1440 宽下几乎看不出差别，不值得为这 4px 引一条新规则 */
   --app-card-radius: 8px;
   --app-control-radius: 8px;
   --app-nav-radius: 8px; // 导航药丸专用：不跟控件圆角走
@@ -84,9 +89,10 @@
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
   --app-shadow-sm: none;
-  /* 波一骨架 inset（2026-10-27，蓝本 ui/sidebar.tsx:309）：内容外卡＝四周 8px／圆角 14／双层 1px 软阴影 */
-  --app-shell-radius: 14px;
-  --app-shell-shadow: 0 0 0 1px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.08), 0 12px 28px -16px rgba(15, 23, 42, 0.14);
+  /* 2026-10-27 拍板 Q5=丙：内容外卡与顶栏都并进灰画布，不再单独成一张卡——
+     圆角与双层软阴影归零（令牌保留：sidebar.scss / layout/index.vue 仍在消费，只换值） */
+  --app-shell-radius: 0px;
+  --app-shell-shadow: none;
   --app-shadow-md: none;
   --app-shadow-lg: none;
   --app-surface-bg: var(--app-surface);
@@ -210,9 +216,10 @@ html[data-skin='t7'] :is(.login-page, .register-page, .agreement-page, .dcs-dw, 
   --app-primary-active: #004ac3;
   --app-mark-bg: #0052d9;
   --app-mark-fg: #ffffff;
-  --app-card-radius: 4px;
-  --app-sheet-radius: 4px;
-  --app-control-radius: 4px;
+  /* 2026-10-27 拍板 Q4=甲：常亮页跟着四套皮肤一起 8px，否则切皮肤后登录页仍是方的 */
+  --app-card-radius: 8px;
+  --app-sheet-radius: 8px;
+  --app-control-radius: 8px;
   --el-color-primary: #0052d9;
   --el-color-primary-light-3: #4c85e4;
   --el-color-primary-light-5: #7fa8ec;
@@ -340,9 +347,9 @@ html.dark {
   --app-shell: #16202c;
   --app-side-text: #aebdcb;
   --app-side-hover: #1c2836;
-  --app-side-active-bg: #22303f;
+  /* 深色下 accent(#4a8cf7) 偏亮，白字对比只有 3.3:1 不够 4.5；选中块改用同族深一档 #2f6feb（4.6:1） */
+  --app-side-active-bg: #2f6feb;
   --app-side-active-text: #ffffff;
-  --app-side-active-bar: #4a8cf7;
 
   --app-mark-bg: #eef2f7;
   --app-mark-fg: #16202c;
@@ -362,9 +369,10 @@ html.dark {
   --app-nav-radius: 8px;
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
-  /* 波一外卡暗色阴影：线=白 10% 口径，阴影加深不提亮 */
-  --app-shell-radius: 14px;
-  --app-shell-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 28px -16px rgba(0, 0, 0, 0.55);
+  /* 2026-10-27 拍板 Q5=丙：外卡不再是一只浮起的纸片——去缝、去外圆角、去外阴影，
+     内容直接铺在灰画布上，层次交给白卡 */
+  --app-shell-radius: 0px;
+  --app-shell-shadow: none;
   --app-surface-bg: var(--app-surface);
   --app-surface-border: var(--app-border);
 
@@ -439,9 +447,8 @@ html[data-skin='t7'] {
   --app-shell: #ffffff;
   --app-side-text: #333d4b;
   --app-side-hover: #f5f7fa;
-  --app-side-active-bg: #e8f3ff;
-  --app-side-active-text: #0052d9;
-  --app-side-active-bar: #0052d9;
+  --app-side-active-bg: var(--app-accent);
+  --app-side-active-text: #ffffff;
 
   --app-mark-bg: #0052d9;
   --app-mark-fg: #ffffff;
@@ -456,10 +463,12 @@ html[data-skin='t7'] {
   --app-warm-done-border: #c2e7b0;
   --app-warm-ink: #6b5900;
 
-  --app-card-radius: 4px;
+  /* 2026-10-27 拍板 Q4=甲：白侧栏这套原来卡片/控件/导航药丸都是 4px，
+     和默认皮肤的 8px 差一档，换肤时块面的「硬」会跟着变。三个一起提到 8，四皮肤一个口径 */
+  --app-card-radius: 8px;
   --app-sheet-radius: 4px;
-  --app-control-radius: 4px;
-  --app-nav-radius: 4px;
+  --app-control-radius: 8px;
+  --app-nav-radius: 8px;
   --app-card-shadow: none;
 
   --el-color-primary: #0052d9;
@@ -524,9 +533,9 @@ html[data-skin='t7'].dark {
   --app-shell: #1a1a1a;
   --app-side-text: #b9b9b9;
   --app-side-hover: #262626;
-  --app-side-active-bg: #1b2b45;
-  --app-side-active-text: #7aa8ff;
-  --app-side-active-bar: #4583ff;
+  /* 同 T1 深色口径：accent(#4583ff) 白字 3.5:1 不够，选中块取深一档蓝（5.2:1） */
+  --app-side-active-bg: #2b66d9;
+  --app-side-active-text: #ffffff;
 
   --app-mark-bg: #4583ff;
   --app-mark-fg: #ffffff;
@@ -540,10 +549,12 @@ html[data-skin='t7'].dark {
   --app-warm-done-border: #2c4a28;
   --app-warm-ink: #f0d08a;
 
-  --app-card-radius: 4px;
+  /* 2026-10-27 拍板 Q4=甲：白侧栏这套原来卡片/控件/导航药丸都是 4px，
+     和默认皮肤的 8px 差一档，换肤时块面的「硬」会跟着变。三个一起提到 8，四皮肤一个口径 */
+  --app-card-radius: 8px;
   --app-sheet-radius: 4px;
-  --app-control-radius: 4px;
-  --app-nav-radius: 4px;
+  --app-control-radius: 8px;
+  --app-nav-radius: 8px;
   --app-card-border: 1px solid var(--app-border);
   --app-card-shadow: none;
   --app-surface-bg: var(--app-surface);
@@ -601,9 +612,11 @@ body {
 
 /* ============================ 壳层 ============================ */
 #app .main-container {
-  /* 波一 inset（2026-10-27）：main-container 升级为内容外卡，底色从「框」改为「纸」；
-     尺寸/圆角/阴影/让位在 sidebar.scss，皮肤层只管颜色 */
-  background: var(--app-sheet-bg);
+  /* 2026-10-27 拍板 Q5=丙：外卡底色改「灰画布」，白卡直接浮在上面，不再是「白纸里放白卡」。
+     尺寸/圆角/阴影/让位在 sidebar.scss，皮肤层只管颜色。
+     注意：不直接改 --app-sheet-bg——那个令牌还被悬浮球图标色、图表底色、外观抽屉消费，
+     它们要的是「纸」的白色，不能跟着变灰 */
+  background: var(--app-ground);
   /* 纸面的 margin-top=壳层高度会穿过 height:100% 的容器塌到 body 上，
      把整页顶下去 82px 并多出一条整页滚动条；建立 BFC 把外边距收在容器里 */
   display: flow-root;
@@ -655,13 +668,19 @@ body {
   color: var(--app-side-text) !important;
 }
 
-/* 当前页药丸：spec activeBg/activeText + 左缘 3px activeBar（T1 深蓝药丸 / T7 蓝底蓝字同一条规则） */
-#app .sidebar-container .el-menu-item.is-active,
-#app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
+/* 当前页：实心主色块 + 白字（2026-10-27 甲方向；四皮肤同一个判断，色值全走 side-active 令牌） */
+#app .sidebar-container .el-menu-item.is-active {
   background-color: var(--app-side-active-bg) !important;
   color: var(--app-side-active-text) !important;
   font-weight: 500;
-  box-shadow: inset 3px 0 0 var(--app-side-active-bar);
+}
+
+/* 父级分组只是「装着一个当前页」，自己不是当前页：给一层轻底，不跟着刷实心块
+   （否则展开二级菜单时父行＋子行两块蓝叠在一起，看着像同时选了两个） */
+#app .sidebar-container .el-sub-menu.is-active > .el-sub-menu__title {
+  background-color: var(--app-side-hover) !important;
+  color: var(--app-side-text) !important;
+  font-weight: 500;
 }
 
 #app .sidebar-container .el-menu-item.is-active .svg-icon {

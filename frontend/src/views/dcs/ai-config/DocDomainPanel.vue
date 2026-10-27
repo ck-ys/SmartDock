@@ -239,6 +239,11 @@ onMounted(getList);
   width: 100%;
   min-width: 0;
   overflow-x: auto;
+  /* 2026-10-27 拍板 Q5=丙：内容区改灰画布后，透明表头 + 白行的表格会被看成被切掉一截；
+     给它一张自己的纸面，表头与表身同底色 */
+  background: var(--app-surface);
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-card-radius);
 }
 .dd-table-wrap :deep(.el-table) {
   /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加 */

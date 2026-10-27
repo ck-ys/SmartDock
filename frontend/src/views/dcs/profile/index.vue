@@ -86,7 +86,8 @@
               </el-table-column>
             </template>
             <el-table-column v-if="isSubjectColumnVisible('eventCount')" prop="eventCount" label="事件数" width="90" align="right" />
-            <el-table-column v-if="isSubjectColumnVisible('lastEvent')" label="最近事件" width="170">
+            <!-- 时间列右对齐：与相邻的事件数同列气质，且表格横向滚动时固定操作列左边不会露出时间的前半个字 -->
+            <el-table-column v-if="isSubjectColumnVisible('lastEvent')" label="最近事件" width="170" align="right">
               <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
             </el-table-column>
             <el-table-column v-if="canSeeScore && isSubjectColumnVisible('risk')" label="风险" width="100">
@@ -317,11 +318,15 @@ const riskPillClass = (value?: number | string | null) =>
 
 // 指标带只留 4 格：关注/高风险直接回答「谁要跟」，已算分是分母、低风险是结论的补集，
 // 两者下方分布图里都有，不再各占一格（KPI 一容器 3–4 格）
+// 2026-10-27 甲+A：关注/高风险带 tone，数字按「要人动手」的严重度上色（黄→红），其余保持主文字色。
+// 有值才上色：0 和加载中的「—」不上色，否则零数据租户一进页面就像全线告警
+const riskTone = (v: number | null | undefined, tone: 'warning' | 'danger') =>
+  (Number(v ?? 0) > 0 ? tone : undefined);
 const overviewMetrics = computed(() => [
   { label: '主体数', value: overview.value.subjectCount ?? '—' },
   { label: '平均分', value: formatScore(overview.value.avgScore) },
-  { label: '关注', value: overview.value.mediumRisk ?? '—' },
-  { label: '高风险', value: overview.value.highRisk ?? '—' }
+  { label: '关注', value: overview.value.mediumRisk ?? '—', tone: riskTone(overview.value.mediumRisk, 'warning') },
+  { label: '高风险', value: overview.value.highRisk ?? '—', tone: riskTone(overview.value.highRisk, 'danger') }
 ]);
 
 const parseDetail = (row: ProfileSubjectRow): Record<string, ProfileDimensionDetail> => {
@@ -460,6 +465,14 @@ onMounted(loadAll);
 }
 .profile-page :deep(.dcs-ops-header) {
   margin-bottom: 4px;
+}
+/* 语义色只在本页生效：关注/高风险是唯一「要人动手」的两个数。
+   写成全局规则会连带染上所有复用页头的页面（累计调用、待支付这类中性量） */
+.profile-page :deep(.dcs-ops-metric--warning .dcs-ops-metric__value) {
+  color: var(--el-color-warning);
+}
+.profile-page :deep(.dcs-ops-metric--danger .dcs-ops-metric__value) {
+  color: var(--el-color-danger);
 }
 .profile-page :deep(.dcs-ops-header__actions) {
   flex-wrap: wrap;

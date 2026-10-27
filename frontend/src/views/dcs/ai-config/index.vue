@@ -3566,6 +3566,11 @@ onUnmounted(() => {
   width: 100%;
   min-width: 0;
   overflow-x: auto;
+  /* 2026-10-27 拍板 Q5=丙：内容区底色改成灰画布后，这两张「透明表头 + 白行」的表格
+     直接铺在灰底上会被看成表格被切掉一截；给它们一张自己的纸面，表头与表身同底色 */
+  background: var(--app-surface);
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-card-radius);
 }
 /* 只覆盖 EP 表格 CSS 变量，不重写组件（契约 §2.5） */
 .price-table-wrap :deep(.el-table),

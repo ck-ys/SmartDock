@@ -1,26 +1,25 @@
 @use './variables.module.scss' as *;
 
 #app {
-  /* 波一骨架 inset（2026-10-27 拍板 Q1=甲，蓝本 ui/sidebar.tsx:309）：
-     main-container 从「留左边距的平面」升级为一张四周 8px、圆角 14、双层软阴影的外卡；
-     顶栏/页签/内容纸都在卡内（fixed-header 见 layout/index.vue），纸中纸结构由 AppMain 退位 */
+  /* 2026-10-27 拍板 Q5=丙：外卡由「浮起纸片」改为「铺满的灰画布 + 白卡内容」——
+     缝 0 / 外圆角 0 / 外阴影 none（三值在 theme-framed 皮肤层定义，此处只消费）。
+     底色不在这里声明：唯一事实源是 theme-framed 的 .main-container 规则 */
   .main-container {
     /* U-01 悬浮球让位：2026-10-27 用户两度否决「底部悬空灰带」——外卡恢复通高贴底（与 DCS 原生同骨架），
        悬浮球改为浮于内容之上（本就是可拖拽 fixed 组件，位置不固定，预留带前提不成立）；
        --app-fab-yield 仍保留定义：仅供 AppMain 的 --session-chrome 算式消费（助手会话页高度不变） */
     --app-fab-yield: 80px;
-    height: calc(100% - var(--app-sheet-inset, 8px) * 2);
+    height: calc(100% - var(--app-sheet-inset, 0px) * 2);
     transition: margin 0.28s;
-    margin: var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) var(--app-sheet-inset, 8px) calc(#{$base-sidebar-width} + var(--app-sheet-inset, 8px));
+    margin: var(--app-sheet-inset, 0px) var(--app-sheet-inset, 0px) var(--app-sheet-inset, 0px) calc(#{$base-sidebar-width} + var(--app-sheet-inset, 0px));
     position: relative;
-    background: var(--app-sheet-bg, var(--el-bg-color));
-    border-radius: var(--app-shell-radius, 14px);
+    border-radius: var(--app-shell-radius, 0px);
     box-shadow: var(--app-shell-shadow, none);
     overflow: hidden;
   }
 
   .sidebarHide {
-    margin-left: var(--app-sheet-inset, 8px) !important;
+    margin-left: var(--app-sheet-inset, 0px) !important;
   }
 
   .sidebar-container {
@@ -136,8 +135,8 @@
       margin: 0 var(--app-nav-inset);
 
       &.is-active {
-        background-color: var(--app-active) !important;
-        color: var(--app-text);
+        background-color: var(--app-side-active-bg) !important;
+        color: var(--app-side-active-text);
       }
       &:not(.is-active):hover {
         // you can use $sub-menuHover
@@ -152,8 +151,8 @@
       margin: 0 var(--app-nav-inset);
 
       &.is-active {
-        background-color: var(--app-active) !important;
-        color: var(--app-text);
+        background-color: var(--app-side-active-bg) !important;
+        color: var(--app-side-active-text);
       }
       &:not(.is-active):hover {
         // you can use $sub-menuHover
@@ -168,8 +167,8 @@
       margin: 0 var(--app-nav-inset);
 
       &.is-active {
-        background-color: var(--app-active) !important;
-        color: var(--app-text);
+        background-color: var(--app-side-active-bg) !important;
+        color: var(--app-side-active-text);
       }
       &:not(.is-active):hover {
         // you can use $sub-menuHover
@@ -194,8 +193,8 @@
       height: var(--app-nav-row-h);
       // 选中状态的菜单
       &.is-active {
-        background-color: var(--app-active) !important;
-        color: var(--app-text) !important;
+        background-color: var(--app-side-active-bg) !important;
+        color: var(--app-side-active-text) !important;
       }
 
       .el-tooltip {
@@ -211,9 +210,11 @@
         height: var(--app-nav-row-h);
       }
 
-      // 选中状态的菜单
+      // 选中状态的菜单。折叠态父级给实心块是**有意**与展开态不同：
+      // 收起后父级那一行是唯一可见的入口，它就是「代理选中」；展开时父级只给轻底，蓝色只留给真正的子项
       &.is-active .el-sub-menu__title.el-tooltip__trigger {
-        background-color: var(--app-active) !important;
+        background-color: var(--app-side-active-bg) !important;
+        color: var(--app-side-active-text) !important;
       }
 
       & > .el-sub-menu__title {
@@ -223,7 +224,7 @@
 
     .el-menu--collapse {
       .is-active .svg-icon {
-        fill: var(--app-text);
+        fill: var(--app-side-active-text);
       }
       .svg-icon {
         display: flex;

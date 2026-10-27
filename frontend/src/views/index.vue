@@ -17,7 +17,7 @@
     <section class="ov-kpis" :style="{ gridTemplateColumns: `repeat(${kpis.length}, minmax(0, 1fr))` }">
       <div v-for="item in kpis" :key="item.label" class="ov-kpi">
         <span class="k">{{ item.label }}</span>
-        <b class="v">{{ item.value }}</b>
+        <b class="v" :class="item.tone ? `is-${item.tone}` : ''">{{ item.value }}</b>
         <span class="c">{{ item.caption }}</span>
       </div>
     </section>
@@ -170,7 +170,7 @@ const prompts = ['近 30 天谁最不活跃？', '本周流量趋势怎么样？
 
 /** KPI 只列当前账号真能拿到的数，拿不到的不摆空格子 */
 const kpis = computed(() => {
-  const list: Array<{ label: string; value: string | number; caption: string }> = [];
+  const list: Array<{ label: string; value: string | number; caption: string; tone?: 'warn' }> = [];
   if (canProfile.value) {
     list.push({
       label: '画像主体',
@@ -189,7 +189,9 @@ const kpis = computed(() => {
     list.push({
       label: '低分主体',
       value: profile.value?.highRisk ?? '—',
-      caption: '低于复核阈值'
+      caption: '低于复核阈值',
+      // 需要人动手的数字才上语义色（整屏仅此一处），见 dcs-ui-kit 的 KPI 口径
+      tone: Number(profile.value?.highRisk ?? 0) > 0 ? 'warn' : undefined
     });
     list.push({
       label: '平均分',
@@ -424,6 +426,10 @@ onMounted(loadAll);
     font-weight: 400;
     color: var(--app-text);
     font-variant-numeric: tabular-nums;
+    /* 语义色只认显式声明（低分主体 > 0 才变橙），不按数值自动染色 */
+    &.is-warn {
+      color: var(--el-color-warning);
+    }
   }
   .c {
     display: block;

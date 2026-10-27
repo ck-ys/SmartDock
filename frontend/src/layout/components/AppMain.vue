@@ -53,8 +53,8 @@ function addIframe() {
 
 <style lang="scss" scoped>
 .app-main {
-  /* 波一骨架 inset（2026-10-27 拍板 Q1=甲）：外卡=.main-container（sidebar.scss，四周 8px/圆角 14/软阴影），
-     本组件退位为卡内透明滚动区——纸中纸取消；--sp-top=手机顶部安全区，桌面为 0
+  /* 2026-10-27 拍板 Q5=丙：外卡（.main-container，sidebar.scss）已无缝/外圆角/外阴影，
+     本组件是灰画布上的透明滚动区，白卡直接浮在画布上；--sp-top=手机顶部安全区，桌面为 0
      U-01 让位令牌 --app-fab-yield 唯一定义在 .main-container（桌面 80/手机 84+safe），此处只消费不重复定义 */
   --app-chrome: var(--app-topbar-h);
   --session-chrome: calc(var(--app-chrome) + 16px + var(--app-fab-yield));

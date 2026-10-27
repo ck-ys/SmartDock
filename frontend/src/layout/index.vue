@@ -169,9 +169,9 @@ const setLayout = () => {
   z-index: 999;
 }
 
-/* 波一骨架 inset：顶栏+页签从「贴窗口顶」改为「卡内顶端」——
-   fixed 定位保留（滚动不丢顶栏），用 left/right 收进外卡、带卡顶圆角与卡底色；
-   数值出处=蓝本 layout/header.tsx（64px 在卡内）+ ui/sidebar.tsx:309（卡 inset 8/圆角 14） */
+/* 壳层顶栏：fixed 定位（滚动不丢顶栏），left/right 跟着 --app-sheet-inset 收边。
+   2026-10-27 拍板 Q5=丙 之后 inset=0、外卡圆角=0，顶栏与内容区并进同一片灰画布，
+   底部那条 1px rule（theme-framed 里 #app .fixed-header）保留，用来托住页签行 */
 .fixed-header {
   position: fixed;
   top: var(--app-sheet-inset, 8px);
@@ -180,8 +180,10 @@ const setLayout = () => {
   z-index: 9;
   width: auto;
   transition: left 0.28s;
-  background: var(--app-sheet-bg, #fff);
-  border-radius: var(--app-shell-radius, 14px) var(--app-shell-radius, 14px) 0 0;
+  /* 2026-10-27 拍板 Q5=丙：顶栏并进灰画布，不再单独一条白带；
+     圆角随 --app-shell-radius 归零（令牌仍在，皮肤层只换值） */
+  background: var(--app-ground);
+  border-radius: var(--app-shell-radius, 0px) var(--app-shell-radius, 0px) 0 0;
   box-shadow: none;
 }
 
