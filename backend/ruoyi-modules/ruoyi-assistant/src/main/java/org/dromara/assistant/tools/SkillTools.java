@@ -42,12 +42,13 @@ public class SkillTools {
         }
         // 三审回修 P1-1：矩阵 off/提档的技能自取一并拦（与 load_skill_through_path 可见集一致）
         if (!org.dromara.assistant.core.AssistantSkillGateMiddleware.visibleTo(
-            skillId.trim(), identity.getRoleLevel(), toolGate)) {
+            skillId.trim(), identity.getRoleLevel(), toolGate, identity.getTenantId())) {
             out.put(ToolContracts.KEY_ERROR, "ERROR");
             out.put("message", "没有这个技能，或当前身份无权使用（技能目录里有的 id 才有效）");
             return ToolSupport.secureJson(out, identity);
         }
-        String body = org.dromara.assistant.core.SkillAssets.body(skillId.trim(), identity.getRoleLevel());
+        String body = org.dromara.assistant.core.SkillAssets.body(skillId.trim(), identity.getRoleLevel(),
+            identity.getTenantId());
         if (body == null) {
             out.put(ToolContracts.KEY_ERROR, "ERROR");
             out.put("message", "没有这个技能，或当前身份无权使用（技能目录里有的 id 才有效）");

@@ -19,7 +19,8 @@ import java.util.stream.Stream;
  * B 批装载替换（2026-10-27 拍板 题2=甲）：技能装载唯一来源缝——官方 AgentSkillRepository 分层栈。
  *
  * <p><b>层序</b>（官方语义：后加者=高优先级，同名后赢）：classpath {@code /skills}（jar 内置）
- * → {@code config/skills}（部署期热覆写/增删，目录含至少一个 SKILL.md 才挂）。取代旧
+ * → {@code config/skills}（部署期热覆写/增删，目录含至少一个 SKILL.md 才挂）→
+ * <b>{@code dcs_assistant_skill} 数据库在线层（5b 批起最高，按租户）</b>。取代旧
  * {@code SkillAssets} 三级兜底读盘；旧 {@code config/prompts/skills/*.md} 平铺覆写路径随
  * 旧装载一并退役（部署覆写请用新目录结构：config/skills/&lt;技能名&gt;/SKILL.md）。</p>
  *
@@ -42,6 +43,10 @@ public final class AssistantSkillSource {
 
     private static volatile List<AgentSkillRepository> stack;
     private static volatile List<SkillView> merged;
+    /** 5b 批：按租户的合并视图缓存（题3=乙——TTL 30 秒兜底＋保存/Redis 广播即时失效） */
+    private static final java.util.Map<String, TenantCache> MERGED_BY_TENANT = new java.util.concurrent.ConcurrentHashMap<>();
+    private record TenantCache(List<SkillView> views, long at) {
+    }
     /** 三审回修 P1-3：技能工作目录进程级单根（框架 box 物化用），静态块创建+退出清理 */
     private static volatile java.nio.file.Path skillWorkDir;
 
@@ -83,6 +88,25 @@ public final class AssistantSkillSource {
 
     /** 官方仓分层栈（进程级单例；FileSystem 仓自带 mtime+size 记忆化，共享实例才生效） */
     public static List<AgentSkillRepository> repositories() {
+        return repositories(DatabaseSkillRepository.GLOBAL_TENANT);
+    }
+
+    /**
+     * 租户版分层栈（5b 批，题2 甲·三层叠加）：classpath（jar 内置）→ 外部目录 →
+     * <b>数据库在线层（最高，按租户）</b>。前两层进程级共享（含记忆化），DB 层按租户新建
+     * （读取有自身的按租户 TTL 记忆化，见 {@link DatabaseSkillRepository}）。
+     * 官方中间件按本栈组装目录与按需装载——DB 层技能自动进目录，无需自拼。
+     */
+    public static List<AgentSkillRepository> repositories(String tenantId) {
+        List<AgentSkillRepository> base = baseStack();
+        List<AgentSkillRepository> out = new ArrayList<>(base.size() + 1);
+        out.addAll(base);
+        out.add(new DatabaseSkillRepository(tenantId));
+        return List.copyOf(out);
+    }
+
+    /** 前两层（classpath+外部目录）进程级单例；DB 故障/纯单测场景 Spring 未就绪时 DB 层自行缺席 */
+    private static List<AgentSkillRepository> baseStack() {
         List<AgentSkillRepository> snap = stack;
         if (snap != null) {
             return snap;
@@ -102,8 +126,24 @@ public final class AssistantSkillSource {
 
     /** 全量技能合并视图（后层同名覆盖前层）；进程级缓存，外部目录变更重启生效（与旧口径一致） */
     public static List<SkillView> all() {
-        repositories();
-        return merged;
+        return all(DatabaseSkillRepository.GLOBAL_TENANT);
+    }
+
+    /**
+     * 租户版合并视图（5b 批）：三层叠加后按租户的最终生效技能。
+     * 缓存 TTL 30 秒（题3=乙兜底）＋保存/广播即时失效（{@link #invalidateAll()}）。
+     */
+    public static List<SkillView> all(String tenantId) {
+        String key = tenantId == null || tenantId.isBlank()
+            ? DatabaseSkillRepository.GLOBAL_TENANT : tenantId;
+        TenantCache snap = MERGED_BY_TENANT.get(key);
+        long now = System.currentTimeMillis();
+        if (snap != null && now - snap.at() < DatabaseSkillRepository.TTL_MS) {
+            return snap.views();
+        }
+        List<SkillView> views = mergeAll(repositories(key));
+        MERGED_BY_TENANT.put(key, new TenantCache(views, now));
+        return views;
     }
 
     /** 技能元数据 minRole 档位（member=0/publisher=1/admin=2）；缺失或非法=0（全员，官方默认口径） */
@@ -222,5 +262,17 @@ public final class AssistantSkillSource {
             stack = null;
             merged = null;
         }
+    }
+
+    /** 5b 批：全量失效（保存路径＋Redis 广播收到时调用）——两层视图+DB 层租户缓存全清 */
+    public static void invalidateAll() {
+        invalidate();
+        MERGED_BY_TENANT.clear();
+        DatabaseSkillRepository.invalidateAll();
+    }
+
+    /** 仅清合并视图缓存（DB 层缓存保留——纯单测 primeForTest 后的视图重算通道） */
+    static void clearMergedOnly() {
+        MERGED_BY_TENANT.clear();
     }
 }

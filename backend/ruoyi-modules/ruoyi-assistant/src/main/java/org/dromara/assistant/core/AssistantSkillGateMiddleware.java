@@ -28,19 +28,23 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
 
     private final int roleLevel;
     private final Map<String, String> toolGate;
+    private final String tenantId;
 
     /**
-     * 仓分层栈取 {@link AssistantSkillSource}（进程级共享，FileSystem 记忆化才生效）。
+     * 仓分层栈取 {@link AssistantSkillSource}（前两层进程级共享，FileSystem 记忆化才生效；
+     * 5b 批起第三层=数据库在线层，按本租户绑定）。
      * 三审回修 P1-3：共享稳定 workDir——基类每实例 mkdtemp+挂 shutdown hook，会话级
      * 实例化下 /tmp 目录与 hook 无界增长；传共享目录后两者只发生一次（caller-supplied
      * root 不挂 hook），进程级清理由 AssistantSkillSource 静态块兜底。
      */
     public AssistantSkillGateMiddleware(Toolkit toolkit, int roleLevel,
-                                        Map<String, String> toolGate) {
-        super(AssistantSkillSource.repositories(), toolkit, null, false,
+                                        Map<String, String> toolGate, String tenantId) {
+        super(AssistantSkillSource.repositories(tenantId), toolkit, null, false,
             AssistantSkillSource.sharedSkillWorkDir());
         this.roleLevel = roleLevel;
         this.toolGate = toolGate;
+        this.tenantId = tenantId == null || tenantId.isBlank()
+            ? DatabaseSkillRepository.GLOBAL_TENANT : tenantId;
     }
 
     @Override
@@ -83,10 +87,21 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
      * 自动挂载、模型自取三条旁路一并封死（与模型侧目录段、/skills 端点同口径）。
      */
     public static boolean visibleTo(String skillId, int roleLevel, Map<String, String> toolGate) {
+        return visibleTo(skillId, roleLevel, toolGate, SkillAssets.currentTenant());
+    }
+
+    /**
+     * id 型可见性判定单一真相（三审回修 P1-1，dspro/dsflash 两席共识）：注入装饰器/
+     * view_skill 取正文前过同一道闸——矩阵 off/提档后，陈旧 localStorage 胶囊、
+     * 模型自取等旁路一并封死（与模型侧目录段、/skills 端点同口径）。
+     * 5b 批：按租户视图判定（agent 线程显式传租户——LoginHelper 在那里不可用）。
+     */
+    public static boolean visibleTo(String skillId, int roleLevel, Map<String, String> toolGate,
+                                    String tenantId) {
         if (skillId == null || skillId.isBlank()) {
             return false;
         }
-        for (SkillAssets.LoadedSkill s : SkillAssets.skills()) {
+        for (SkillAssets.LoadedSkill s : SkillAssets.skills(tenantId)) {
             if (s.id().equals(skillId.trim())) {
                 int effective = ToolRegistry.effectiveMinRoleSingle(
                     gateKey(s.id()), s.minRole(),

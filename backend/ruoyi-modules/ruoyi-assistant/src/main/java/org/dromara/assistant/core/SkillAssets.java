@@ -38,7 +38,7 @@ public final class SkillAssets {
     }
 
     /** R1 首批三技能（2026-10-13 拍板 Q3=A+C；create-template 随 R4a act_create_template 同批上） */
-    static final List<Skill> SKILLS = List.of(
+    public static final List<Skill> SKILLS = List.of(
         new Skill("create-mission", "创建任务", "把「帮我建任务」引导成完整草稿（类型/时间/说明问全再建）", 1,
         java.util.List.of("帮我建任务", "建个任务", "新建任务", "创建任务", "发起一个任务", "发个任务让大家"), """
             你正在使用「创建任务」技能。目标：把用户模糊的建任务意愿引导成一张可直接发布的任务草稿。
@@ -91,40 +91,64 @@ public final class SkillAssets {
     private SkillAssets() {
     }
 
-    /** 加载后的技能（body=最终生效正文，按三级兜底定；triggers 恒取内嵌表=权限语义同源） */
+    /** 加载后的技能（body=最终生效正文，按三层叠加定） */
     public record LoadedSkill(String id, String name, String description, int minRole,
                               java.util.List<String> triggers, String body) {
     }
 
-    private static volatile List<LoadedSkill> cache;
-
-    /** 全量技能（B 批起读 {@link AssistantSkillSource} 合并视图；进程缓存+invalidate 测试通道口径不变——外部目录变更重启生效） */
+    /**
+     * 全量技能（5b 批起按租户视图；缓存与失效统一在 {@link AssistantSkillSource}——
+     * TTL 30 秒兜底＋保存/广播即时失效，本门面不再自持进程级缓存）。
+     * 无参版给请求线程目录端点用（LoginHelper 解析当前租户，异常兜底全局租户）。
+     */
     public static List<LoadedSkill> skills() {
-        List<LoadedSkill> snap = cache;
-        if (snap != null) {
-            return snap;
-        }
-        synchronized (SkillAssets.class) {
-            if (cache == null) {
-                cache = loadAll();
+        return skills(currentTenant());
+    }
+
+    /** 租户版全量技能（工具线程/装饰器显式传租户用——LoginHelper 在 agent 线程不可用） */
+    public static List<LoadedSkill> skills(String tenantId) {
+        List<AssistantSkillSource.SkillView> views = AssistantSkillSource.all(tenantId);
+        List<LoadedSkill> out = new ArrayList<>(views.size());
+        for (AssistantSkillSource.SkillView v : views) {
+            if (v.body() == null || v.body().isBlank()) {
+                log.warn("[skill] 技能 {} 正文为空，跳过该技能", v.id());
+                continue;
             }
-            return cache;
+            out.add(new LoadedSkill(v.id(), v.displayName(), v.description(), v.minRole(),
+                v.triggers(), v.body()));
+        }
+        return List.copyOf(out);
+    }
+
+    /** 请求线程当前租户（LoginHelper 不可用=agent 线程/纯单测→全局租户兜底） */
+    static String currentTenant() {
+        try {
+            String tenantId = org.dromara.common.satoken.utils.LoginHelper.getTenantId();
+            return tenantId == null || tenantId.isBlank()
+                ? DatabaseSkillRepository.GLOBAL_TENANT : tenantId;
+        } catch (Exception e) {
+            return DatabaseSkillRepository.GLOBAL_TENANT;
         }
     }
 
-    /** 立即失效缓存（测试/热更用） */
+    /** 立即失效缓存（测试通道；5b 起全量失效走 AssistantSkillSource.invalidateAll） */
     static void invalidate() {
-        cache = null;
+        AssistantSkillSource.invalidateAll();
     }
 
-    /** 技能正文（注入/自取共用）；id 不存在返回 null（调用方自处理）。
+    /** 技能正文（注入/自取共用，按租户视图）；id 不存在返回 null（调用方自处理）。
      *  B 批起系统提示词的技能目录段由官方中间件组装（AssistantSkillGateMiddleware），
      *  本门面不再提供 catalog 拼装（旧自研目录段已随装载替换退役）。 */
     public static String body(String skillId, int roleLevel) {
+        return body(skillId, roleLevel, currentTenant());
+    }
+
+    /** 租户版正文（工具线程显式传租户） */
+    public static String body(String skillId, int roleLevel, String tenantId) {
         if (skillId == null || skillId.isBlank()) {
             return null;
         }
-        for (LoadedSkill s : skills()) {
+        for (LoadedSkill s : skills(tenantId)) {
             if (s.id().equals(skillId.trim())) {
                 if (s.minRole() > roleLevel) {
                     return null;
@@ -135,9 +159,14 @@ public final class SkillAssets {
         return null;
     }
 
-    /** 技能是否存在（角色无关） */
+    /** 技能是否存在（角色无关，请求线程版） */
     public static boolean exists(String skillId) {
-        return skills().stream().anyMatch(s -> s.id().equals(skillId));
+        return exists(skillId, currentTenant());
+    }
+
+    /** 租户版存在性判定 */
+    public static boolean exists(String skillId, String tenantId) {
+        return skills(tenantId).stream().anyMatch(s -> s.id().equals(skillId));
     }
 
     private static String capBody(LoadedSkill s) {
@@ -146,21 +175,5 @@ public final class SkillAssets {
         }
         log.warn("[skill] 技能 {} 正文超 {} 字符上限，截断（原长 {}）", s.id(), BODY_CAP, s.body().length());
         return s.body().substring(0, BODY_CAP);
-    }
-
-    /** B 批装载替换：官方仓合并视图 → 兼容 LoadedSkill（外部层同名覆写已由 AssistantSkillSource.mergeAll 完成） */
-    private static List<LoadedSkill> loadAll() {
-        List<AssistantSkillSource.SkillView> views = AssistantSkillSource.all();
-        List<LoadedSkill> out = new ArrayList<>(views.size());
-        for (AssistantSkillSource.SkillView v : views) {
-            if (v.body() == null || v.body().isBlank()) {
-                log.warn("[skill] 技能 {} 正文为空，跳过该技能", v.id());
-                continue;
-            }
-            out.add(new LoadedSkill(v.id(), v.displayName(), v.description(), v.minRole(),
-                v.triggers(), v.body()));
-        }
-        log.debug("[skill] 装载 {} 个技能（官方仓合并视图）", out.size());
-        return List.copyOf(out);
     }
 }
