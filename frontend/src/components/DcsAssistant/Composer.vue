@@ -119,14 +119,11 @@
 
         <!-- 业务批7 Q3：技能胶囊挪到联网开关旁（会话级开关联动族：➕ 选完=本会话增强，
              与联网同侧语义一致；小屏 <560px 沿用 bpill 图标化规则不挤爆）。
-             能力① Q7：自动挂载态加「自动」角标——点 × 撤销后本组件生命周期内不再自动挂 -->
+             5b 批题7 甲：触发词自动挂载已拆——什么时候用技能由后端一句话说明喂模型判断 -->
         <span
           v-if="skillCur"
           class="btool bpill spill"
-          :class="{ auto: autoSkillApplied === skillCur.id }"
-          :title="autoSkillApplied === skillCur.id
-            ? `从你的输入认出了「${skillCur.name}」需求，已自动挂载：${skillCur.desc}。点 × 移除`
-            : `技能「${skillCur.name}」本会话每轮生效：${skillCur.desc}。点 × 停用`"
+          :title="`技能「${skillCur.name}」本会话每轮生效：${skillCur.desc}。点 × 停用`"
           role="button"
           tabindex="0"
           @click="addOpen = true"
@@ -134,12 +131,11 @@
         >
           <IconSpan name="sparkles" :size="14" />
           <span class="tlabel">{{ skillCur.name }}</span>
-          <span v-if="autoSkillApplied === skillCur.id" class="tauto">自动</span>
           <button
             class="sx"
             aria-label="停用技能"
-            :title="autoSkillApplied === skillCur.id ? '移除自动挂载的技能（这次不再自动加回来）' : '停用技能（本会话不再按它执行）'"
-            @click.stop="revokeAutoSkill"
+            title="停用技能（本会话不再按它执行）"
+            @click.stop="clearSkillPill"
           >
             <IconSpan name="x" :size="12" />
           </button>
@@ -500,7 +496,7 @@ import { getAssistantStatus, getAssistantModelChoice, getAssistantSkillCatalog, 
 import { getMyCreditSummary, type CreditSummaryVO } from '@/api/dcs/ai-credit';
 import { checkPermi } from '@/utils/permission';
 import { readWebOn, writeWebOn, webOnKey } from './webOnState';
-import { skillCatalog, applyRemoteCatalog, matchSkillTrigger, readSkillId, writeSkillId, isSkillKey } from './skillState';
+import { skillCatalog, applyRemoteCatalog, readSkillId, writeSkillId, isSkillKey } from './skillState';
 import { matchAiCapability } from '@/api/dcs/ai';
 import { mentionTasks } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
@@ -1090,38 +1086,8 @@ function skillTileCls(id: string): string {
 function readSkillSync() {
   skillId.value = readSkillId(userStore.userId, props.state.threadId, localStorage);
 }
-/* ===== 能力① Q7：触发词自动挂载（可撤销）=====
- * 用户没手动动过技能（skillUserTouched）且未撤销过该技能（revokedAuto）时，
- * 输入命中触发词 → 自动写入同款会话键（后端注入通道零改动）+「自动挂载」角标；
- * 撤销=移除键+记忆（本组件生命周期内不再自动挂该技能）。 */
-const skillUserTouched = ref(false);
-const revokedAutoSkills = new Set<string>();
-const autoSkillApplied = ref<string | null>(null);
-watch(
-  () => draft.value,
-  (v) => {
-    if (skillUserTouched.value || skillId.value) {
-      return;
-    }
-    const hit = matchSkillTrigger(v ?? '');
-    if (!hit || revokedAutoSkills.has(hit.id)) {
-      return;
-    }
-    autoSkillApplied.value = hit.id;
-    skillId.value = hit.id;
-    writeSkillId(userStore.userId, props.state.threadId, hit.id, localStorage);
-    pushToast(`检测到你想${hit.name}，已自动挂载「${hit.name}」技能——点胶囊 × 可移除`, 'info');
-  }
-);
-/** 撤销自动挂载（兼手动选中态的 ×）：无条件置 touched——glm53 审查 P2-3，漏置会让
- *  手动挂载的技能被移除后又被触发词“自动”挂回，违背用户刚表达的意愿 */
-function revokeAutoSkill() {
-  skillUserTouched.value = true;
-  const id = autoSkillApplied.value;
-  if (id) {
-    revokedAutoSkills.add(id);
-    autoSkillApplied.value = null;
-  }
+/** 胶囊 × 停用本会话技能（5b 批题7 甲：自动挂载已拆，× 只剩手动停用语义） */
+function clearSkillPill() {
   if (skillId.value) {
     const label = skillCatalog.value.find((s) => s.id === skillId.value)?.name ?? skillId.value;
     skillId.value = null;
@@ -1130,8 +1096,6 @@ function revokeAutoSkill() {
   }
 }
 function toggleSkill(id: string) {
-  skillUserTouched.value = true;
-  autoSkillApplied.value = null;
   const next = skillId.value === id ? null : id;
   skillId.value = next;
   writeSkillId(userStore.userId, props.state.threadId, next, localStorage);
@@ -1328,9 +1292,6 @@ watch(
     serverTriggerTokens.value = null; // 批A-1 回修：旧会话的后端触发线不带入新会话（响应回来前的窗口也不闪旧线）
     readWebOnSync();
     readSkillSync();
-    // 能力① Q7（glm53 审查 P2-4）：「自动」角标状态随会话切换复位——新会话里从 storage
-    // 恢复的技能（含用户手动选的）不得错挂上一会话的自动角标（touched/撤销记忆跨会话保留=用户偏好）
-    autoSkillApplied.value = null;
     // 业务批7 Q10：切会话/新会话重拉模型选择——新开对话显示的默认模型不再停留旧快照
     void refreshChoice();
     if (amActive()) {
@@ -2560,16 +2521,6 @@ defineExpose({
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    /* 能力① Q7：自动挂载角标（弱化小字，与技能名区分——不是用户亲手选的） */
-    .tauto {
-      flex: none;
-      padding: 0 4px;
-      border-radius: 4px;
-      font-size: 10px;
-      line-height: 14px;
-      background: rgb(64 158 255 / 12%);
-      opacity: 0.85;
     }
     .sx {
       flex: none;

@@ -36,7 +36,7 @@ class AssistantSkillGateMiddlewareUnitTest {
                 Map.of("name", s.id(), "description", s.description(),
                     "minRole", s.minRole() == ToolIdentity.LEVEL_ADMIN ? "admin"
                         : s.minRole() == ToolIdentity.LEVEL_PUBLISHER ? "publisher" : "member",
-                    "displayName", s.name(), "triggers", s.triggers()),
+                    "displayName", s.name()),
                 s.embeddedBody(), Map.of(), "test"));
         }
         for (int level : new int[]{ToolIdentity.LEVEL_MEMBER, ToolIdentity.LEVEL_PUBLISHER,
@@ -133,7 +133,7 @@ class AssistantSkillGateMiddlewareUnitTest {
             out.add(new AgentSkill(
                 Map.of("name", v.id(), "description", v.description(),
                     "minRole", v.minRole() == 2 ? "admin" : v.minRole() == 1 ? "publisher" : "member",
-                    "displayName", v.displayName(), "triggers", v.triggers()),
+                    "displayName", v.displayName()),
                 v.body(), Map.of(), "test"));
         }
         return out;

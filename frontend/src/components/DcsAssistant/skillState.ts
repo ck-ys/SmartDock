@@ -8,6 +8,8 @@
  *
  * 前端目录为编译期兜底：远端 /dcs/assistant/skills（B 批起读官方技能仓，且同过租户
  * 开关矩阵）正常时以远端为准；此处静态四技能仅在网络空/异常时兜底。
+ * 5b 批题7 甲（2026-10-28 拍板）：触发词自动挂载拆除——助手什么时候用哪个技能由
+ * 后端「一句话说明」喂模型自主判断（view_skill 自取路），前端不再做关键词匹配。
  * minRole 口径与 roleOf 对齐：member=成员可见，publisher=发布人/管理员，admin=仅管理员。
  * create-template 已随 R4a act_create_template 同批上（后端同款纪律）。
  */
@@ -27,15 +29,13 @@ export interface SkillCatalogItem {
   /** 最低角色：'member'=全员，'publisher'=发布人/管理员，'admin'=仅管理员（三审回修：admin 档如实透出） */
   minRole: 'member' | 'publisher' | 'admin';
   tile: string;
-  /** 能力① Q7：触发词（输入命中任一 → 前端自动挂载，可撤销）；来自后端目录，兜底目录常配 */
-  triggers?: string[];
 }
 
 export const SKILL_CATALOG: SkillCatalogItem[] = [
-  { id: 'create-mission', name: '创建任务', desc: '把「帮我建任务」引导成完整草稿', minRole: 'publisher', tile: '建', triggers: ['帮我建任务', '建个任务', '新建任务', '创建任务', '发起一个任务', '发个任务让大家'] },
-  { id: 'create-template', name: '创建模板', desc: '把「做个采集模板」引导成字段清单再建', minRole: 'publisher', tile: '板', triggers: ['做个模板', '建个模板', '创建模板', '新建模板', '做个表单', '建个采集模板'] },
-  { id: 'data-reading', name: '数据解读', desc: '查到的数字讲成人话结论，口径说清', minRole: 'member', tile: '读', triggers: ['数据解读', '解读数据', '帮我解读', '分析这些数据', '这数据怎么看'] },
-  { id: 'urge-wording', name: '催办话术', desc: '写不伤人的催办提醒', minRole: 'publisher', tile: '催', triggers: ['催办话术', '写个催办', '帮我写催办', '怎么催比较好', '提醒话术'] }
+  { id: 'create-mission', name: '创建任务', desc: '把「帮我建任务/建个任务」引导成完整草稿', minRole: 'publisher', tile: '建' },
+  { id: 'create-template', name: '创建模板', desc: '把「做个模板/建个表单」引导成字段齐全再建', minRole: 'publisher', tile: '板' },
+  { id: 'data-reading', name: '数据解读', desc: '查到的数字讲成人话结论，口径说清', minRole: 'member', tile: '读' },
+  { id: 'urge-wording', name: '催办话术', desc: '写不伤人的催办提醒', minRole: 'publisher', tile: '催' }
 ];
 
 /* ===== 能力① Q4 轻量（2026-10-20）：目录动态化——编译期兜底之上按后端 /skills 刷新 =====
@@ -50,7 +50,6 @@ export interface RemoteSkillRow {
   name: string;
   desc: string;
   minRole: 'member' | 'publisher' | 'admin';
-  triggers?: string[];
 }
 
 /** 喂远端目录（后端加/改技能无需前端发版；空/异常静默保持兜底目录） */
@@ -66,22 +65,8 @@ export function applyRemoteCatalog(rows: RemoteSkillRow[] | null | undefined): v
       name: r.name || fallback.get(r.id)?.name || r.id,
       desc: r.desc || fallback.get(r.id)?.desc || '',
       minRole: r.minRole === 'member' ? 'member' : r.minRole === 'admin' ? 'admin' : 'publisher',
-      tile: fallback.get(r.id)?.tile || (r.name || r.id).slice(0, 1),
-      triggers: Array.isArray(r.triggers) ? r.triggers.filter((t) => typeof t === 'string' && t) : []
+      tile: fallback.get(r.id)?.tile || (r.name || r.id).slice(0, 1)
     }));
-}
-
-/** 输入文本 → 命中技能（首个命中即返回；无命中=null）——能力① Q7 自动挂载判定 */
-export function matchSkillTrigger(text: string): SkillCatalogItem | null {
-  if (!text) {
-    return null;
-  }
-  for (const s of skillCatalog.value) {
-    if (s.triggers?.some((t) => t && text.includes(t))) {
-      return s;
-    }
-  }
-  return null;
 }
 
 export function skillKey(userId: string | number, threadId: string): string {

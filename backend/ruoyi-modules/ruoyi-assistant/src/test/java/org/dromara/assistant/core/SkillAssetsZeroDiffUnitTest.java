@@ -29,7 +29,6 @@ class SkillAssetsZeroDiffUnitTest {
             assertThat(ls.name()).as("技能 %s 名称", ls.id()).isEqualTo(src.name());
             assertThat(ls.description()).as("技能 %s 描述", ls.id()).isEqualTo(src.description());
             assertThat(ls.minRole()).as("技能 %s 门槛", ls.id()).isEqualTo(src.minRole());
-            assertThat(ls.triggers()).as("技能 %s 触发词", ls.id()).isEqualTo(src.triggers());
             assertThat(ls.body()).as("技能 %s 正文", ls.id()).isEqualTo(src.embeddedBody().strip());
         }
     }

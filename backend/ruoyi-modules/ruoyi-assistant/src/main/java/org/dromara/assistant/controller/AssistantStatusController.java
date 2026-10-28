@@ -55,7 +55,8 @@ public class AssistantStatusController extends BaseController {
     /**
      * 能力① Q4 轻量（2026-10-20）：用户视角技能目录（perm=use——panorama 是管理端点，
      * 普通用户拉不到）。前端 SKILL_CATALOG 编译期兜底之上动态化：后端加/改技能无需发版。
-     * 触发词（Q7）一并透出——前端输入命中时自动挂载（可撤销）。
+     * 5b 批题7 甲（2026-10-28）：触发词透出已随自动挂载拆除——什么时候用技能由
+     * 技能 description（一句话说明）喂模型判断，前端不再做关键词匹配。
      * B 批题4（2026-10-27）：目录同过工具开关矩阵（skill:<name> 行）——off/提档技能
      * 用户目录不可见，与模型侧可见集（AssistantSkillGateMiddleware）同口径同刻快照。
      */
@@ -81,7 +82,6 @@ public class AssistantStatusController extends BaseController {
             row.put("desc", s.description());
             // 三审回修 P2（dsflash）：admin 档如实透出（旧二元映射会把 admin 压成 publisher）
             row.put("minRole", s.minRole() == 0 ? "member" : s.minRole() == 2 ? "admin" : "publisher");
-            row.put("triggers", s.triggers());
             out.add(row);
         }
         return R.ok(out);

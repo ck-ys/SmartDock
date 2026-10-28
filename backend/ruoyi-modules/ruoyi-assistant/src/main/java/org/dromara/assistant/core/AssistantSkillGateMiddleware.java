@@ -83,8 +83,8 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
 
     /**
      * id 型可见性判定单一真相（三审回修 P1-1，dspro/dsflash 两席共识）：注入装饰器/
-     * view_skill 取正文前过同一道闸——矩阵 off/提档后，陈旧 localStorage 胶囊、触发词
-     * 自动挂载、模型自取三条旁路一并封死（与模型侧目录段、/skills 端点同口径）。
+     * view_skill 取正文前过同一道闸——矩阵 off/提档后，陈旧 localStorage 胶囊、
+     * 模型自取两条旁路一并封死（与模型侧目录段、/skills 端点同口径）。
      */
     public static boolean visibleTo(String skillId, int roleLevel, Map<String, String> toolGate) {
         return visibleTo(skillId, roleLevel, toolGate, SkillAssets.currentTenant());

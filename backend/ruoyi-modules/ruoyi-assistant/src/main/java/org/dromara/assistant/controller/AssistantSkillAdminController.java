@@ -82,8 +82,7 @@ public class AssistantSkillAdminController extends BaseController {
             }
             Map<String, Object> row = baseRow(new SkillAssets.LoadedSkill(r.getSkillId(),
                 r.getDisplayName() == null || r.getDisplayName().isBlank() ? r.getSkillId() : r.getDisplayName(),
-                r.getDescription(), DatabaseSkillRepository.minRoleOf(r.getMinRole()),
-                List.of(), r.getBody()));
+                r.getDescription(), DatabaseSkillRepository.minRoleOf(r.getMinRole()), r.getBody()));
             row.put("source", builtinMinRoleName(r.getSkillId()).isEmpty()
                 ? "online-disabled" : "builtin-disabled");
             row.put("builtinMinRole", builtinMinRoleName(r.getSkillId()));

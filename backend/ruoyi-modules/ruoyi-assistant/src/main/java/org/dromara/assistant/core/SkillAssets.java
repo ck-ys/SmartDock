@@ -30,17 +30,16 @@ public final class SkillAssets {
     /** 单技能正文上限（防误放整个说明书进技能；超出截断并告警） */
     static final int BODY_CAP = 6000;
 
-    /** 技能元数据 + 三级兜底内嵌正文（与 classpath md 同源；新增/修改技能两处同步改）。
-     *  triggers=能力① Q7（2026-10-20）触发词：用户输入含任一词时前端自动挂载该技能
-     *  （可撤销徽章）；目录端点透出。保守配词——误挂比漏挂伤体验。 */
+    /** 技能元数据 + 兜底内嵌正文（与 classpath md 同源；新增/修改技能两处同步改）。
+     *  5b 批题7 甲（2026-10-28 拍板）拆除触发词：什么时候用技能由 description（一句话
+     *  说明）喂模型判断——原触发词已并进各技能 description。 */
     public record Skill(String id, String name, String description, int minRole,
-                        java.util.List<String> triggers, String embeddedBody) {
+                        String embeddedBody) {
     }
 
     /** R1 首批三技能（2026-10-13 拍板 Q3=A+C；create-template 随 R4a act_create_template 同批上） */
     public static final List<Skill> SKILLS = List.of(
-        new Skill("create-mission", "创建任务", "把「帮我建任务」引导成完整草稿（类型/时间/说明问全再建）", 1,
-        java.util.List.of("帮我建任务", "建个任务", "新建任务", "创建任务", "发起一个任务", "发个任务让大家"), """
+        new Skill("create-mission", "创建任务", "用户说「帮我建任务/建个任务/新建任务」时，把模糊意愿引导成完整草稿（类型/时间/说明问全再建）", 1, """
             你正在使用「创建任务」技能。目标：把用户模糊的建任务意愿引导成一张可直接发布的任务草稿。
 
             步骤：
@@ -51,8 +50,7 @@ public final class SkillAssets {
 
             禁止：不问就建；把任务类型说反；承诺草稿=已发布。
             """),
-        new Skill("create-template", "创建模板", "把「做个采集模板」引导成字段清单齐全的模板再建", 1,
-        java.util.List.of("做个模板", "建个模板", "创建模板", "新建模板", "做个表单", "建个采集模板"), """
+        new Skill("create-template", "创建模板", "用户说「做个模板/建个表单/建个采集模板」时，引导成字段清单齐全的模板再建（先推荐复用预设）", 1, """
             你正在使用「创建模板」技能。目标：把用户「做个模板/建个表单」的意愿引导成一份字段齐全的采集模板。
 
             步骤：
@@ -64,8 +62,7 @@ public final class SkillAssets {
 
             禁止：不问就建；SELECT 字段不给选项；把字段类型编成 STRING/NUMBER/DATE/BOOLEAN/SELECT/USER/ATTACHMENT/ORG_CASCADE 之外的值。
             """),
-        new Skill("data-reading", "数据解读", "把查到的数字讲成人话结论（先结论后细节，口径说清）", 0,
-        java.util.List.of("数据解读", "解读数据", "帮我解读", "分析这些数据", "这数据怎么看"), """
+        new Skill("data-reading", "数据解读", "用户说「解读数据/这数据怎么看/帮我解读」时，把查到的数字讲成人话结论（先结论后细节，口径说清）", 0, """
             你正在使用「数据解读」技能。目标：把查到的业务数字讲成领导能直接用的结论。
 
             规则：
@@ -75,8 +72,7 @@ public final class SkillAssets {
             4. 有 3 个以上可比项时给一张统计图（按统计图协议）；数字全部来自工具真数。
             5. 最后给一条可执行建议（如「优先催 XX 部门」），并说明依据。
             """),
-        new Skill("urge-wording", "催办话术", "写不伤人的催办提醒（有依据、给出路、不施压过度）", 1,
-        java.util.List.of("催办话术", "写个催办", "帮我写催办", "怎么催比较好", "提醒话术"), """
+        new Skill("urge-wording", "催办话术", "用户说「帮我写催办/怎么催比较好/写个催办」时，写不伤人的催办提醒（有依据、给出路、不施压过度）", 1, """
             你正在使用「催办话术」技能。目标：帮用户起草一条得体的催办留言。
 
             写法（催办留言默认 100 字内）：
@@ -91,9 +87,8 @@ public final class SkillAssets {
     private SkillAssets() {
     }
 
-    /** 加载后的技能（body=最终生效正文，按三层叠加定） */
-    public record LoadedSkill(String id, String name, String description, int minRole,
-                              java.util.List<String> triggers, String body) {
+    /** 加载后的技能（body=最终生效正文，按三层叠加定；5b 起 description=模型触发唯一依据） */
+    public record LoadedSkill(String id, String name, String description, int minRole, String body) {
     }
 
     /**
@@ -114,8 +109,7 @@ public final class SkillAssets {
                 log.warn("[skill] 技能 {} 正文为空，跳过该技能", v.id());
                 continue;
             }
-            out.add(new LoadedSkill(v.id(), v.displayName(), v.description(), v.minRole(),
-                v.triggers(), v.body()));
+            out.add(new LoadedSkill(v.id(), v.displayName(), v.description(), v.minRole(), v.body()));
         }
         return List.copyOf(out);
     }

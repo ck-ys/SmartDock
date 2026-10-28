@@ -87,8 +87,6 @@ class SkillOfficialFormatZeroDiffUnitTest {
                     .isEqualTo(src.name());
                 assertThat(ROLE_LEVELS.get(meta.get("minRole"))).as("技能 %s minRole 档位", src.id())
                     .isEqualTo(src.minRole());
-                assertThat(meta.get("triggers")).as("技能 %s triggers", src.id())
-                    .isEqualTo(src.triggers());
                 assertThat(s.getSkillContent().strip()).as("技能 %s 正文与内嵌表零漂移", src.id())
                     .isEqualTo(src.embeddedBody().strip());
             }
@@ -107,7 +105,7 @@ class SkillOfficialFormatZeroDiffUnitTest {
             assertThat(md).contains("version: ");
             assertThat(md).contains("displayName: " + s.name() + "\n");
             assertThat(md).contains("minRole: ");
-            for (String t : s.triggers()) {
+            for (String t : java.util.List.<String>of()) {
                 assertThat(md).contains("  - " + t + "\n");
             }
         }

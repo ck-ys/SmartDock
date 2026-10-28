@@ -36,9 +36,8 @@ public final class AssistantSkillSource {
     /** 部署期覆写目录（相对进程工作目录，与旧 config/prompts 同级约定） */
     static final Path EXTERNAL_DIR = Path.of("config", "skills");
 
-    /** 目录端点/装饰器/工具共用的技能视图（元数据已归一为强类型） */
-    public record SkillView(String id, String displayName, String description, int minRole,
-                            List<String> triggers, String body) {
+    /** 目录端点/装饰器/工具共用的技能视图（元数据已归一为强类型；5b 题7 甲起无触发词） */
+    public record SkillView(String id, String displayName, String description, int minRole, String body) {
     }
 
     private static volatile List<AgentSkillRepository> stack;
@@ -159,20 +158,6 @@ public final class AssistantSkillSource {
         };
     }
 
-    static List<String> triggersOf(AgentSkill skill) {
-        Object v = skill.getMetadata().get("triggers");
-        if (!(v instanceof List<?> list)) {
-            return List.of();
-        }
-        List<String> out = new ArrayList<>(list.size());
-        for (Object o : list) {
-            if (o != null && !String.valueOf(o).isBlank()) {
-                out.add(String.valueOf(o));
-            }
-        }
-        return List.copyOf(out);
-    }
-
     static String displayNameOf(AgentSkill skill) {
         Object v = skill.getMetadata().get("displayName");
         return v == null || String.valueOf(v).isBlank() ? skill.getName() : String.valueOf(v);
@@ -245,7 +230,7 @@ public final class AssistantSkillSource {
         List<SkillView> out = new ArrayList<>(byName.size());
         for (AgentSkill s : byName.values()) {
             out.add(new SkillView(s.getName(), displayNameOf(s), s.getDescription(),
-                effectiveMinRole(s, byName), triggersOf(s), s.getSkillContent().strip()));
+                effectiveMinRole(s, byName), s.getSkillContent().strip()));
         }
         return List.copyOf(out);
     }
