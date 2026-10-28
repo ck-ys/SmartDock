@@ -90,9 +90,8 @@ CREATE TABLE IF NOT EXISTS public.analytics_funnel (
     CONSTRAINT uk_analytics_funnel UNIQUE (tenant_id, source, funnel_code)
 );
 
-CREATE INDEX IF NOT EXISTS idx_profile_event_visitor
-    ON public.profile_event USING btree (tenant_id, source, anonymous_id, occurred_time)
-    WHERE anonymous_id IS NOT NULL;
+-- 用户键表达式索引 idx_profile_event_visitor 的权威定义在 01_schema.sql（E 片起改为
+-- COALESCE(NULLIF(anonymous_id,''), subject_id) 用户键版本），此处不再重复声明。
 
 -- 采集源默认只做分析，不触发画像重算/复核；需要画像时再单独打开
 INSERT INTO public.profile_engine_config
