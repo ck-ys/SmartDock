@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>能力页「还是有点乱」· 五题拍板 · 2026-10-28</title>
+<style>
+  :root{
+    --ink:#14202d; --ink2:#3c4a5a; --muted:#64748b; --faint:#9aa6b4;
+    --rule:#e5e7eb; --rule2:#eef0f3; --surface:#fff; --ground:#f6f7f9;
+    --brand:#2f6feb; --brand-bg:#eef4fe;
+    --warn-ink:#92400e; --warn-bg:#fdf6ec; --warn-border:#fae8d8;
+    --hold:#831c1e; --hold-bg:#ffedea; --hold-border:#f7cdc9;
+    --ok:#1e7b4f; --ok-bg:#f2faf5; --ok-border:#bfe6d2;
+    --card-r:8px; --ctl-r:6px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font:14px/1.72 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1120px;margin:0 auto;padding:36px 22px 90px}
+  h1{font-size:26px;line-height:1.35;margin:0 0 8px;letter-spacing:-.2px}
+  h2{font-size:19px;line-height:1.4;margin:0 0 10px;letter-spacing:-.1px}
+  h3{font-size:15px;margin:0 0 6px}
+  h4{font-size:14px;margin:16px 0 6px}
+  p{margin:0 0 10px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;
+    background:#eef1f5;border-radius:4px;padding:1px 5px;word-break:break-all}
+  .sub{color:var(--muted);font-size:13px}
+  .lede{font-size:15.5px;line-height:1.8;color:var(--ink2);margin:12px 0 0}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .chip{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;
+    border:1px solid var(--rule);background:#fff;font-size:12px;color:var(--ink2);white-space:nowrap}
+  .chip.hold{border-color:var(--hold-border);background:var(--hold-bg);color:var(--hold)}
+  .chip.ok{border-color:var(--ok-border);background:var(--ok-bg);color:var(--ok)}
+  .chip.warn{border-color:var(--warn-border);background:var(--warn-bg);color:var(--warn-ink)}
+  .card{background:var(--surface);border:1px solid var(--rule);border-radius:var(--card-r);padding:16px 18px}
+  section{margin-top:30px}
+  .sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .sec-head .n{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule2);vertical-align:top}
+  th{font-size:12px;font-weight:600;color:var(--muted);background:#fafbfc;border-bottom:1px solid var(--rule)}
+  tr:last-child td{border-bottom:none}
+  .toc{display:flex;flex-direction:column;gap:2px;padding:6px}
+  .toc a{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:10px;align-items:center;
+    padding:8px 10px;border-radius:var(--ctl-r);text-decoration:none;color:var(--ink);font-size:13px;border:1px solid transparent}
+  .toc a:hover{background:#f6f8fb;border-color:var(--rule2)}
+  .toc .no{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .toc .why{font-size:12px;color:var(--muted)}
+  .verdict{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;font-size:12px;white-space:nowrap}
+  .verdict.hold{background:var(--hold-bg);color:var(--hold);border:1px solid var(--hold-border)}
+  .verdict.warn{background:var(--warn-bg);color:var(--warn-ink);border:1px solid var(--warn-border)}
+  .verdict.ok{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok-border)}
+  .verdict.rec{background:var(--brand-bg);color:#1d4ed8;border:1px solid #c7d9fb}
+  .opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 12px}
+  .opt{border:1px solid var(--rule);border-radius:var(--card-r);padding:12px 14px;background:#fff}
+  .opt.rec{border-color:#9cc3f7;background:#f7faff}
+  .opt .tag{display:inline-flex;align-items:center;gap:6px;margin-bottom:6px}
+  .opt b{font-size:14px}
+  .opt p{font-size:12.5px;line-height:1.72;color:var(--ink2);margin:4px 0 0}
+  .opt .why{font-size:12px;color:var(--muted);margin-top:8px}
+  .opt .risk{font-size:12px;color:var(--hold);margin-top:4px}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .mock{border:1px solid var(--rule);border-radius:var(--card-r);overflow:hidden;background:#fff}
+  .mock-h{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--rule2);font-size:12px;color:var(--muted)}
+  .mock-b{padding:12px;background:#fbfcfd}
+  .note{background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:var(--card-r);padding:12px 14px;color:var(--warn-ink);font-size:13px}
+  .note b{color:var(--warn-ink)}
+  .okbox{background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:var(--card-r);padding:12px 14px;color:var(--ok);font-size:13px}
+  ol,ul{margin:6px 0 10px;padding-left:20px}
+  li{margin:4px 0}
+  footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--rule);font-size:12px;color:var(--faint)}
+
+  /* ---------- 模拟 UI 共用（真令牌，非示意色） ---------- */
+  .m-tabs{display:flex;gap:16px;font-size:13px;color:var(--muted);padding:0 0 8px;border-bottom:1px solid var(--rule)}
+  .m-tabs b{color:var(--ink);font-weight:600;box-shadow:inset 0 -2px 0 var(--brand)}
+  .m-sec{border:1px solid var(--rule);border-radius:8px;background:#fff;margin-bottom:10px}
+  .m-sec.flat{border:none;background:transparent}
+  .m-sec-h{display:flex;align-items:baseline;gap:8px;padding:10px 14px 8px;border-bottom:1px solid var(--rule2);font-size:13px}
+  .m-sec-h b{font-size:15px}
+  .m-cnt{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;background:#f1f4f8;font-size:12px;color:var(--muted)}
+  .m-body{padding:12px 14px}
+  .m-row{display:grid;grid-template-columns:minmax(0,1fr) 44px 132px 36px;gap:8px;align-items:center;
+    min-height:44px;border-bottom:1px solid var(--rule2);font-size:13px}
+  .m-row:last-child{border-bottom:none}
+  .m-name b{font-size:14px;font-weight:600;display:block;line-height:1.4}
+  .m-name span{font-size:12px;color:var(--muted)}
+  .m-badge{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:9px;font-size:11.5px}
+  .m-badge.high{background:var(--hold-bg);color:var(--hold)}
+  .m-badge.mid{background:var(--warn-bg);color:var(--warn-ink)}
+  .m-sel{display:inline-flex;align-items:center;justify-content:space-between;gap:6px;height:26px;padding:0 8px;
+    border:1px solid #d5dbe3;border-radius:6px;background:#fff;font-size:12px;color:var(--ink);white-space:nowrap}
+  .m-sel i{font-style:normal;color:var(--faint);font-size:10px}
+  .m-link{font-size:12px;color:var(--muted);text-align:right}
+  .m-colhead{display:grid;grid-template-columns:minmax(0,1fr) 44px 132px 36px;gap:8px;align-items:center;
+    padding:6px 2px;border-bottom:1px solid var(--rule);font-size:12px;color:var(--faint)}
+  .m-note{font-size:12px;color:var(--muted);line-height:1.7}
+  .m-warnband{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 11px;border:1px solid var(--warn-border);
+    border-radius:6px;background:var(--warn-bg);color:var(--warn-ink);font-size:12.5px}
+  .m-warnband .m-btn{white-space:nowrap}
+  .m-warnband .txt{min-width:0}
+  .m-warnband .dot{width:6px;height:6px;border-radius:50%;background:#b88030;flex:none}
+  .m-warnband .act{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .m-btn{display:inline-flex;align-items:center;justify-content:center;height:24px;padding:0 10px;border-radius:6px;
+    border:1px solid #d5dbe3;background:#fff;font-size:12px;color:var(--ink2)}
+  .m-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  .m-faint{color:var(--faint)}
+  .m-stack{display:flex;flex-direction:column;gap:6px}
+  .m-block{border:1px solid var(--rule);border-radius:6px;padding:8px 10px;background:#fff;font-size:12.5px}
+  .m-block.plain{border:none;border-bottom:1px solid var(--rule2);border-radius:0;background:transparent;padding:8px 2px}
+  .m-block .h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .m-block .tag2{font-size:11.5px;color:var(--faint)}
+  .m-inner{border:1px solid var(--rule);border-radius:6px;padding:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+  .m-grey{background:#f1f4f8;border-radius:4px;padding:6px 8px;margin-top:6px;font-size:12px;color:var(--muted)}
+  .m-code{background:#f1f4f8;border-radius:4px;padding:8px;margin-top:6px;font-size:11.5px;color:var(--ink2);
+    font-family:ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+  .m-toc{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  .m-toc .on{color:var(--brand);background:var(--brand-bg);border-radius:4px;padding:3px 6px}
+  .tall-917{min-height:118px} .tall-518{min-height:76px} .tall-266{min-height:48px}
+  .tall-609{min-height:84px} .tall-813{min-height:110px} .tall-512{min-height:70px}
+  /* Q3 的 800px 空档必须在整幅宽度里才看得见，故该题模拟改为上下通栏 */
+  .pair.stack{grid-template-columns:1fr}
+  .m-gap{display:flex;align-items:center;gap:8px;margin:2px 0 2px;color:var(--faint);font-size:11.5px}
+  .m-gap .ln{flex:1;border-top:1px dashed #d5dbe3}
+  .label{font-size:11.5px;color:var(--faint);margin-top:6px}
+  @media(max-width:900px){
+    .wrap{padding:22px 14px 60px}
+    h1{font-size:21px}
+    .opts,.pair{grid-template-columns:1fr}
+    .m-row,.m-colhead{grid-template-columns:minmax(0,1fr) 40px 112px 30px;gap:6px}
+    table{font-size:12px}
+    th,td{padding:6px 7px}
+    .toc a{grid-template-columns:28px minmax(0,1fr);}
+    .toc .why{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>能力页「还是有点乱」：四条病根 + 五道选择题</h1>
+  <div class="sub">AI 助手管理 → 能力 · 2026-10-28 · 这一板只出方案，<b>没回执不动代码</b></div>
+  <p class="lede">
+    上一批把能力清单本身理顺了（一行一件事、去掉重复状态），但整页看上去仍然乱——乱的地方不在那张清单，
+    而在<b>它周围</b>：一个页签里塞了三件不同性质的事，三段各用一套版面语言，行与行之间的横向关系也没说清。
+    下面先摆实测证据，再给五道题，每题 2-3 案、标★推荐，能改的都给前后模拟。
+  </p>
+  <div class="chips">
+    <span class="chip hold">实测：能力页 1745px，装了三段</span>
+    <span class="chip hold">8 种字号 / 10 种圆角 / 124 条分隔线</span>
+    <span class="chip hold">行内 800px 空档</span>
+    <span class="chip ok">上一批的 51 条断言仍全绿</span>
+  </div>
+
+  <section>
+    <div class="sec-head"><h2>四条病根（都是量的，不是感觉）</h2></div>
+    <div class="card">
+      <table>
+        <thead><tr><th style="width:26px">#</th><th style="width:170px">病根</th><th>实测证据</th><th style="width:210px">为什么看着乱</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><b>一个页签装了三件事</b></td>
+            <td>能力页 = 能力清单 917px + 外部服务 266px + 助手行为总纲 518px，共 <b>1745px</b>。这三件事分别是「权限配置 / 服务登记 / 提示词文档」。</td>
+            <td>三段的工作性质不同，读者被迫在同一个页签里切换三种心智。</td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><b>三段各用一套容器</b></td>
+            <td>能力清单：<b>无卡平铺</b>，只有分隔线；外部服务：<b>卡里再套一张带表头的表</b>；行为总纲：<b>卡片里再套灰描述条 + 灰代码块</b>（三层）。</td>
+            <td>三种「深度」并排，眼睛找不到统一的边界规则。</td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><b>行的左右两半没关系</b></td>
+            <td>行网格实测 <code>806px 56px 212px 44px</code>：名字列吃掉 806px，名字写完到徽章之间空着约 800px；每组的「当前生效 → 本租户覆盖」还重复了 <b>3 次</b>，却没有列头把两半连起来。</td>
+            <td>空档没有语义，读者不知道该横向对齐什么。</td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><b>顶部叠了四条横带</b></td>
+            <td>标题行（含「只看高危」）→ 说明段两行 → 黄条 42px → 分段控件行，<b>四条</b>之后才见到第一行内容；全页 8 种字号（10/11/11.5/12/12.5/13/14/15）、10 种圆角、9 种文字色、124 条分隔线。</td>
+            <td>进门先过四道不同高度的横带，节奏被打碎。</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="m-note" style="margin-top:10px">
+        顺带发现一条旁证：总览页「这一页管什么」的三条简介里，<b>能力</b>写的是「助手会什么、谁能用、哪项危险」，<b>规则</b>写的是「租户开关、模型与费用、额度」——
+        <b>没有一条提到「行为总纲」</b>。它现在挂在能力页，但连页面自己的导览都没给它位置。
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>这批活怎么干</h2><span class="n">先定架构 → 再统容器 → 再治行与顶 → 最后小修</span></div>
+    <div class="card">
+      <ol>
+        <li><b>第 1 步 先答 Q1（架构）。</b>因为它决定后面几步改哪个文件、改哪一段；答完只搬迁不改样式，搬完先截一张「结构图」确认三段位置对了。</li>
+        <li><b>第 2 步 答 Q2（容器）+ Q4（顶部）。</b>这两条都在同一页的样式层，一起做一次回归：1440 / 390 两档、亮暗两主题、零横向溢出。</li>
+        <li><b>第 3 步 答 Q3（行的横向关系）。</b>动的是行网格与列头，必须逐行量列宽，并用「十个下拉零截字」这条老断言复验（历史坑：加宽后仍差 2px）。</li>
+        <li><b>第 4 步 答 Q5（外部服务单元格小修）+ 收字号圆角。</b>这一层只做减法，不做新交互。</li>
+        <li><b>第 5 步 收口。</b>真机断言（沿用 <code>probe-prime-live.mjs</code>，新增列头 / 容器 / 横带三条）→ 前后对比页（双写）→ 更新日志一条 → 人话日志 → 提交。</li>
+      </ol>
+      <p class="m-note">每步验收口径固定：<b>DOM 实算（不是看截图猜）+ 截图目检 + 390 零溢出 + 下拉零截字 + 暗色</b>。任一步不过就停在那一步，不往下叠。</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>问题清单</h2><span class="n">点题号直达；答完可回来看徽标</span></div>
+    <div class="card toc">
+      <a href="#q1"><span class="no">Q1</span><span>行为总纲（518px 的提示词文档）该放哪个页签</span><span class="verdict warn">待定</span></a>
+      <a href="#q2"><span class="no">Q2</span><span>三段用什么容器：卡片 / 平铺 / 混合</span><span class="verdict warn">待定</span></a>
+      <a href="#q3"><span class="no">Q3</span><span>清单行中间那 800px 空档怎么收</span><span class="verdict warn">待定</span></a>
+      <a href="#q4"><span class="no">Q4</span><span>顶部四条横带怎么减</span><span class="verdict warn">待定</span></a>
+      <a href="#q5"><span class="no">Q5</span><span>外部服务表里那格三行的本机命令</span><span class="verdict warn">待定</span></a>
+    </div>
+  </section>
+
+  <!-- ==================== Q1 ==================== -->
+  <section id="q1">
+    <div class="sec-head"><h2>Q1 · 行为总纲放哪</h2><span class="n">这一题定架构，后面几步都跟着它走</span></div>
+    <p class="m-note">
+      现状：能力页装「能力清单 / 外部服务 / 助手行为总纲」；规则页装「租户设置 / 模型与费用 / 每人每天额度」。
+      行为总纲是<b>助手每次回答前都读的「岗位说明」文档</b>（7 段，可逐段改），本质是「它被要求怎么做事」。
+    </p>
+    <div class="opts">
+      <div class="opt rec">
+        <span class="tag"><span class="verdict rec">★ 推荐</span></span>
+        <b>甲 · 搬到「规则」页，放在规则页第一段</b>
+        <p>能力页只留「能力清单 + 外部服务」两段。规则页变成「行为总纲 → 租户设置 → 模型与费用 → 额度」，读起来是「它被要求做什么 → 怎么收费 → 能用多少」，一条线。</p>
+        <div class="why">好在：总分关系立住，能力页从 1745px 降到约 1200px；总览导览文案补一句就能自洽。</div>
+        <div class="risk">代价：规则页变长（1978 → 约 2500px），需要在规则页顶部加一排「跳到哪一段」的小目录。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">乙</span></span>
+        <b>乙 · 独立成第 5 个页签「提示词」</b>
+        <p>顶部导航变「总览 / 能力 / 规则 / 运营 / 提示词」，文档拿到整屏空间。</p>
+        <div class="why">好在：编辑体验最好，不受别的段落挤压。</div>
+        <div class="risk">代价：上一批刚从 8 个页签收到 4 个，现在又加回 5 个；手机档页签本来就要横滑，再挤一格。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">丙</span></span>
+        <b>丙 · 留在能力页，收进折叠组</b>
+        <p>能力页变成「能力清单 + 外部服务 + 一个默认收起的『助手行为总纲（7 段）』」。</p>
+        <div class="why">好在：零搬迁，路由和书签都不变，改动最小。</div>
+        <div class="risk">代价：根因没除——一个 518px 的编辑器藏在「能力」里；展开后照样是三种版面语言并排。</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th style="width:76px">方案</th><th>第一次来</th><th>日常用</th><th>防呆</th><th>适合谁</th><th style="width:150px">代价</th></tr></thead>
+      <tbody>
+        <tr><td><b>甲 ★</b></td><td>能力页只有两段，一眼看到底</td><td>改提示词去规则页第一段，顺手看额度</td><td>规则页顶部有段目录，不会找不到</td><td>想「一眼看懂这页管什么」的单位</td><td>搬迁 + 规则页加小目录</td></tr>
+        <tr><td>乙</td><td>多一个页签，需要逐个点开认识</td><td>提示词单独占屏，改起来最舒服</td><td>页签名直白</td><td>天天改提示词的深度用户</td><td>页签 4 → 5，与上一批收敛方向相反</td></tr>
+        <tr><td>丙</td><td>仍要看到三个不同版面</td><td>多点一次展开</td><td>折叠组标题写清段数，不会漏</td><td>只想尽快收口、不改结构</td><td>乱在根上，后面还会被提一次</td></tr>
+      </tbody>
+    </table>
+
+    <h4>前后模拟（左=现在，右=甲案改后）</h4>
+    <div class="pair">
+      <div class="mock">
+        <div class="mock-h"><span class="verdict hold">现在</span>能力页 = 3 段</div>
+        <div class="mock-b">
+          <div class="m-tabs"><b>总览</b><span style="color:var(--ink);box-shadow:inset 0 -2px 0 var(--brand)">能力</span><span>规则</span><span>运营</span></div>
+          <div class="m-stack" style="margin-top:10px">
+            <div class="m-block tall-917"><div class="h"><b>能力清单</b><span class="tag2">917px</span></div><div class="label">平铺 · 分隔线 · 无卡</div></div>
+            <div class="m-block tall-266"><div class="h"><b>外部服务</b><span class="tag2">266px</span></div><div class="m-inner">卡里再套一张表</div></div>
+            <div class="m-block tall-518"><div class="h"><b>助手行为总纲</b><span class="tag2">518px</span></div><div class="m-grey">灰描述条</div><div class="m-code">灰代码块</div></div>
+          </div>
+          <div class="label">三段三种版面语言，共 1745px</div>
+        </div>
+      </div>
+      <div class="mock">
+        <div class="mock-h"><span class="verdict ok">甲案</span>能力页 = 2 段 · 规则页收编</div>
+        <div class="mock-b">
+          <div class="m-tabs"><b>总览</b><span style="color:var(--ink);box-shadow:inset 0 -2px 0 var(--brand)">能力</span><span>规则</span><span>运营</span></div>
+          <div class="m-stack" style="margin-top:10px">
+            <div class="m-block tall-917"><div class="h"><b>能力清单</b><span class="tag2">917px</span></div></div>
+            <div class="m-block tall-266"><div class="h"><b>外部服务</b><span class="tag2">266px</span></div></div>
+          </div>
+          <div class="label">能力页约 1200px，只剩「能做什么 / 接了什么」</div>
+          <div class="m-tabs" style="margin-top:12px"><span>总览</span><span style="color:var(--ink);box-shadow:inset 0 -2px 0 var(--brand)">规则</span><span>运营</span></div>
+          <div class="m-stack" style="margin-top:8px">
+            <div class="m-block tall-518"><div class="h"><b>助手行为总纲</b><span class="tag2">518px · 第一段</span></div><div class="label">它被要求怎么做事</div></div>
+            <div class="m-block tall-609"><div class="h"><b>租户设置</b><span class="tag2">609px</span></div></div>
+            <div class="m-block tall-813"><div class="h"><b>模型与费用</b><span class="tag2">813px</span></div></div>
+            <div class="m-block tall-512"><div class="h"><b>每人每天额度</b><span class="tag2">512px</span></div></div>
+          </div>
+          <div class="label">规则页约 2500px，顶部加「跳到哪一段」小目录</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Q2 ==================== -->
+  <section id="q2">
+    <div class="sec-head"><h2>Q2 · 三段用同一套容器</h2><span class="n">现在三段三种「深度」</span></div>
+    <p class="m-note">医生的直觉：同一页里的边界规则只能有一套。要么都用卡、要么都不用；混着用，眼睛会一直找「为什么这段有框那段没框」。</p>
+    <div class="opts">
+      <div class="opt rec">
+        <span class="tag"><span class="verdict rec">★ 推荐</span></span>
+        <b>甲 · 每段一张卡，卡内只用分隔线</b>
+        <p>三段都是「同规格白卡（同内边距、同 8px 圆角、段间同 20px 间距）」；卡里的表格和清单<b>只留分隔线，不再套第二层边框</b>。</p>
+        <div class="why">好在：产品基线本来就是卡片语言（壳层、系统管理都一样），把「三套深度」压成「一套深度」，一眼就是三段。</div>
+        <div class="risk">代价：能力清单从「通栏平铺」变成「卡内清单」，左右各让出 14-16px，行宽短一点点（下拉不会受影响）。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">乙</span></span>
+        <b>乙 · 全部去卡，只留分隔线与段标题</b>
+        <p>三段都像现在的能力清单：无卡、通栏、靠分隔线与段标题分层。</p>
+        <div class="why">好在：最安静、最省像素，长列表天然适合这种。</div>
+        <div class="risk">代价：行为总纲的文档编辑器会「飘」——灰色描述条与代码块失去外框后没有边界，改提示词时容易点错区域。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">丙</span></span>
+        <b>丙 · 保持现状，只对齐内边距与表头</b>
+        <p>清单继续平铺、后两段继续卡片，只把内边距、表头字号、段间距调成一致。</p>
+        <div class="why">好在：改动最小，风险最低。</div>
+        <div class="risk">代价：「有没有卡」仍然在表达分区，一眼看去还是两种语言，大概率这次还是觉得乱。</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th style="width:76px">方案</th><th>第一次来</th><th>日常用</th><th>防呆</th><th>适合谁</th><th style="width:150px">代价</th></tr></thead>
+      <tbody>
+        <tr><td><b>甲 ★</b></td><td>三段三段卡，边界规则统一</td><td>行宽略窄，操作位置不变</td><td>卡内不再套框，视觉噪声少一层</td><td>希望「和企业级后台一致」的单位</td><td>清单左右各让 14-16px</td></tr>
+        <tr><td>乙</td><td>最干净，像素利用率最高</td><td>文档区没有边框，长文容易看串</td><td>代码块边界消失</td><td>只看列表、不改提示词的人</td><td>文档编辑器体验下降</td></tr>
+        <tr><td>丙</td><td>仍有两种分区语言</td><td>不变</td><td>不变</td><td>不打算再改的人</td><td>这次的意见大概率还会再提一遍</td></tr>
+      </tbody>
+    </table>
+
+    <h4>前后模拟</h4>
+    <div class="pair">
+      <div class="mock">
+        <div class="mock-h"><span class="verdict hold">现在</span>三套深度</div>
+        <div class="mock-b">
+          <div class="m-block plain"><div class="h"><b>能力清单</b><span class="tag2">平铺 · 直接落在页面上</span></div><div class="label">没有卡，只有行分隔线</div></div>
+          <div class="m-block" style="margin-top:8px"><div class="h"><b>外部服务</b><span class="tag2">卡</span></div><div class="m-inner">里面再套一张带表头的表</div></div>
+          <div class="m-block" style="margin-top:8px"><div class="h"><b>助手行为总纲</b><span class="tag2">卡</span></div><div class="m-grey">灰描述条</div><div class="m-code">灰代码块</div><div class="label">卡 → 灰条 → 灰块，三层</div></div>
+        </div>
+      </div>
+      <div class="mock">
+        <div class="mock-h"><span class="verdict ok">甲案</span>一张卡一段，卡内只用分隔线</div>
+        <div class="mock-b">
+          <div class="m-sec"><div class="m-sec-h"><b>能力清单</b><span class="m-cnt">10 项</span></div><div class="m-body" style="padding:6px 14px">
+            <div class="m-row" style="grid-template-columns:minmax(0,1fr) 44px 132px 36px"><div class="m-name"><b>联网搜索</b><span>会话开启联网后出现</span></div><span class="m-badge high">高危</span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-link">详情</span></div>
+            <div class="m-row" style="grid-template-columns:minmax(0,1fr) 44px 132px 36px"><div class="m-name"><b>读会话附件</b><span>自动执行 · 低危（只读）</span></div><span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-link">详情</span></div>
+          </div></div>
+          <div class="m-sec"><div class="m-sec-h"><b>外部服务</b><span class="m-cnt">1 个</span></div><div class="m-body" style="padding:6px 14px">
+            <div class="m-row" style="grid-template-columns:140px minmax(0,1fr) 80px 60px"><div class="m-name"><b>weather_demo</b></div><div><span class="m-name"><span>天气查询（试点）</span></span></div><span class="m-badge mid">本地脚本</span><span class="m-link">编辑</span></div>
+          </div></div>
+          <div class="m-sec"><div class="m-sec-h"><b>助手行为总纲</b><span class="m-cnt">7 段</span></div><div class="m-body"><div class="m-toc"><span class="on">1 角色定位</span><span>2 业务纪律</span><span>3 催办纪律</span></div></div></div>
+          <div class="label">三张卡同规格；卡内表格不再套框</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Q3 ==================== -->
+  <section id="q3">
+    <div class="sec-head"><h2>Q3 · 行中间那 800px 空档</h2><span class="n">不是要填满它，是要说清它是什么</span></div>
+    <p class="m-note">
+      现在：名字写在最左，控制在最右，中间约 800px 没有任何东西；每组头上还有一句「当前生效 → 本租户覆盖」重复 3 次。
+      读者要横向跳 800px 才能把「联网搜索」和它的「高危」连起来。
+    </p>
+    <div class="opts">
+      <div class="opt rec">
+        <span class="tag"><span class="verdict rec">★ 推荐</span></span>
+        <b>甲 · 加一行列头，删掉 3 处重复图例</b>
+        <p>组头上方放一行 12px 灰列头：<b>能力 / 风险 / 本租户覆盖 /</b>（最后一格留给「详情」）。空档从「不知道对齐什么」变成「列与列之间」；三处「当前生效 → 本租户覆盖」删掉，图例只出现一次。</p>
+        <div class="why">好在：零新增交互，行高不变，手机上隐藏列头即可；顺手把重复文案清了。</div>
+        <div class="risk">代价：多一行 28px；列头文案要短，否则手机档要处理折行。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">乙</span></span>
+        <b>乙 · 风险徽章紧跟名字</b>
+        <p>徽章从右边挪到名字右侧（名字 + 徽章成为一组），右侧只留「下拉 + 详情」。</p>
+        <div class="why">好在：不动网格列数，改动只在模板顺序。</div>
+        <div class="risk">代价：徽章长度不一（高危/中危），紧跟名字会让每行的第二列起点参差；空档仍在，只是挪了位置。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">丙</span></span>
+        <b>丙 · 条件升成独立列，做成真表格</b>
+        <p>把名字下面那行小字（出现条件）提成单独一列：能力 | 出现条件 | 风险 | 本租户覆盖 | 详情。空档被真内容填满。</p>
+        <div class="why">好在：最像表、最整齐，横向信息量最大。</div>
+        <div class="risk">代价：手机档要再折一次（三排）；条件文案长度差异大，列宽不好定；改动最大。</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th style="width:76px">方案</th><th>第一次来</th><th>日常用</th><th>防呆</th><th>适合谁</th><th style="width:150px">代价</th></tr></thead>
+      <tbody>
+        <tr><td><b>甲 ★</b></td><td>列头一句话说清每列是什么</td><td>不看列头也熟了，零操作变化</td><td>图例只出现一次，不会重复干扰</td><td>所有人</td><td>多 28px 高度</td></tr>
+        <tr><td>乙</td><td>名字和徽章连在一起，读得快</td><td>零操作变化</td><td>徽章宽度差异会造成列起点参差</td><td>只看高危的人</td><td>视觉不齐</td></tr>
+        <tr><td>丙</td><td>信息密度最高</td><td>横向扫一眼就能比条件</td><td>手机档三排，容易看串行</td><td>常批量比条件的人</td><td>改动最大、手机最挤</td></tr>
+      </tbody>
+    </table>
+
+    <h4>前后模拟</h4>
+    <div class="pair stack">
+      <div class="mock">
+        <div class="mock-h"><span class="verdict hold">现在</span>无列头 + 图例重复 3 次</div>
+        <div class="mock-b">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:6px 2px;border-bottom:1px solid var(--rule2);font-size:12px;color:var(--muted)"><b style="font-size:13px">平台工具（5）</b><span style="color:var(--faint);font-size:11.5px">当前生效 → 本租户覆盖</span></div>
+          <div class="m-row"><div class="m-name"><b>联网搜索</b><span>会话开启联网后出现</span></div><span class="m-badge high">高危</span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-link">详情</span></div>
+          <div class="m-row"><div class="m-name"><b>读会话附件</b><span>自动执行 · 低危（只读）</span></div><span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-link">详情</span></div>
+          <div class="m-gap"><span class="ln"></span><span>← 名字写完到这里，中间约 800px 什么都没有 →</span><span class="ln"></span></div>
+          <div class="label">图例写在组头右侧，离真正要对齐的下拉还有约 700px</div>
+        </div>
+      </div>
+      <div class="mock">
+        <div class="mock-h"><span class="verdict ok">甲案</span>一行列头 + 图例只留一次</div>
+        <div class="mock-b">
+          <div style="padding:4px 2px 6px;font-size:12px;color:var(--muted)"><b style="font-size:13px">平台工具（5）</b></div>
+          <div class="m-colhead"><span>能力</span><span style="text-align:left">风险</span><span>本租户覆盖</span><span></span></div>
+          <div class="m-row"><div class="m-name"><b>联网搜索</b><span>会话开启联网后出现</span></div><span class="m-badge high">高危</span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-link">详情</span></div>
+          <div class="m-row"><div class="m-name"><b>读会话附件</b><span>自动执行 · 低危（只读）</span></div><span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-link">详情</span></div>
+          <div class="label">列头把小字与右侧控件连成同一张表；空档变成「列间距」</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Q4 ==================== -->
+  <section id="q4">
+    <div class="sec-head"><h2>Q4 · 顶部四条横带</h2><span class="n">进门先过四道不同高度的横带</span></div>
+    <p class="m-note">现在从上到下是：① 标题行（含右侧「只看高危」）② 两行说明 ③ 42px 琥珀色体检条 ④ 分段控件 + 一句提示。四条之后才是第一行能力。</p>
+    <div class="opts">
+      <div class="opt rec">
+        <span class="tag"><span class="verdict rec">★ 推荐</span></span>
+        <b>甲 · 说明收进「?」，视图控件并成一行</b>
+        <p>两行说明收进标题旁的「?」悬浮提示（第一次来点一下就有）；「只看高危」从标题行挪下来，与「按行微调 / 一键推荐」并成同一行工具条；体检条紧跟标题。</p>
+        <div class="why">好在：首屏少两条横带（约 60px），且同一行的两个控件都是「看哪些、怎么看」，语义一致。</div>
+        <div class="risk">代价：说明变成「要点一下才看到」，得保证「?」够显眼；老用户可能一时找不到那段话。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">乙</span></span>
+        <b>乙 · 只压缩，不搬家</b>
+        <p>说明改一行、体检条改更紧凑、分段控件行的提示删掉。结构仍是四条，只是每条更矮。</p>
+        <div class="why">好在：零学习成本，改动最小。</div>
+        <div class="risk">代价：四条还是四条，节奏依旧碎；省下的只有约 30px。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">丙</span></span>
+        <b>丙 · 说明整段删掉</b>
+        <p>直接删掉那两行说明，其余不动。省 44px，最快。</p>
+        <div class="why">好在：一秒钟改完。</div>
+        <div class="risk">代价：第一次来的人不知道下拉改的是「本租户覆盖」、不知道「保存后对下一轮新会话生效」——这两句是防误操作的关键。</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th style="width:76px">方案</th><th>第一次来</th><th>日常用</th><th>防呆</th><th>适合谁</th><th style="width:150px">代价</th></tr></thead>
+      <tbody>
+        <tr><td><b>甲 ★</b></td><td>点「?」才知道两句关键提示</td><td>首屏直接是清单，少滚 60px</td><td>「?」需要足够显眼，否则等于丢了提示</td><td>多数人已熟悉本页</td><td>提示藏起来一点</td></tr>
+        <tr><td>乙</td><td>提示都在，节奏仍碎</td><td>略紧凑</td><td>不变</td><td>要保守收口</td><td>省得少</td></tr>
+        <tr><td>丙</td><td>少了关键提示</td><td>最快</td><td>容易误操作（不知道改的是覆盖档）</td><td>不推荐</td><td>防呆能力下降</td></tr>
+      </tbody>
+    </table>
+
+    <h4>前后模拟</h4>
+    <div class="pair">
+      <div class="mock">
+        <div class="mock-h"><span class="verdict hold">现在</span>四条横带</div>
+        <div class="mock-b">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding-bottom:6px"><span><b style="font-size:15px">能力清单</b> <span class="m-cnt">10 项</span> <span class="m-note">另有 1 项因配置未开暂不出现（见底部）</span></span><span class="m-note">☐ 只看高危</span></div>
+          <div class="m-note" style="padding:2px 0 8px">一行就是一项能力：名字下面是它什么时候出现，有颜色的徽章表示要多看一眼（中危 / 高危）。下拉改的是<b>本租户的覆盖档</b>，保存后对下一轮新会话生效…</div>
+          <div class="m-warnband" style="margin-bottom:8px"><span class="dot"></span><span class="txt">要处理 2 件事：联网搜索、天气查询</span><span class="act"><span class="m-btn primary">一键收紧</span><span class="m-note">先看看会变哪几行</span></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="m-btn primary">按行微调</span><span class="m-btn">一键推荐</span><span class="m-note">改完点保存；有未保存改动时底部会出现保存条</span></div>
+          <div class="label">四条横带，高度与左对齐方式各不相同</div>
+        </div>
+      </div>
+      <div class="mock">
+        <div class="mock-h"><span class="verdict ok">甲案</span>两条（体检 + 工具条）</div>
+        <div class="mock-b">
+          <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:8px"><b style="font-size:15px">能力清单</b><span class="m-cnt">10 项</span><span class="m-note">另有 1 项因配置未开暂不出现</span><span style="margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--rule);border-radius:50%;font-size:11px;color:var(--muted)">?</span></div>
+          <div class="m-warnband" style="margin-bottom:8px"><span class="dot"></span><span>要处理 2 件事：联网搜索、天气查询（试点）</span><span class="act"><span class="m-btn primary">一键收紧</span><span class="m-note">先看看会变哪几行</span></span></div>
+          <div style="display:flex;align-items:center;gap:10px"><span class="m-btn primary">按行微调</span><span class="m-btn">一键推荐</span><span class="m-note" style="margin-left:auto">☐ 只看高危</span></div>
+          <div class="label">首屏少约 60px；两个视图控件并排，「?」承载原来那两行</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Q5 ==================== -->
+  <section id="q5">
+    <div class="sec-head"><h2>Q5 · 外部服务那格三行命令</h2><span class="n">小修，但它把表格撑歪了</span></div>
+    <p class="m-note">
+      「启动方式」那格现在直接打印完整命令：<code>node "D:/…/backend/mcp-demo/weather-server.mjs"</code>，折成三行，把整行撑高到 80px 并带一条本机绝对路径。
+    </p>
+    <div class="opts">
+      <div class="opt rec">
+        <span class="tag"><span class="verdict rec">★ 推荐</span></span>
+        <b>甲 · 列表只写摘要，全文进「编辑」</b>
+        <p>单元格改成「本地脚本」四个字（与已有的「方式」列语义一致），完整命令放在「编辑」抽屉里。</p>
+        <div class="why">好在：行高回到 44px；列表不再出现本机路径；要看细节的人本来就要点「编辑」。</div>
+        <div class="risk">代价：看命令多点一次（但这一列不是日常要看的信息）。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">乙</span></span>
+        <b>乙 · 一行截断 + 悬浮看全文</b>
+        <p>单元格保持原样但单行省略号，鼠标悬停出气泡显示完整命令。</p>
+        <div class="why">好在：零点击，改一行 CSS 就够。</div>
+        <div class="risk">代价：列表里仍然显示半截路径，手机档没有「悬浮」，等于看不到。</div>
+      </div>
+      <div class="opt">
+        <span class="tag"><span class="verdict hold">丙</span></span>
+        <b>丙 · 不动</b>
+        <p>保持现状，登记为已知。</p>
+        <div class="why">好在：零改动。</div>
+        <div class="risk">代价：这一格永远撑歪表格，也永远是最先被看见的「乱」。</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th style="width:76px">方案</th><th>第一次来</th><th>日常用</th><th>防呆</th><th>适合谁</th><th style="width:150px">代价</th></tr></thead>
+      <tbody>
+        <tr><td><b>甲 ★</b></td><td>一眼看到「本地脚本」四个字，不懂技术也能读</td><td>要看命令去编辑，位置固定</td><td>路径不外露</td><td>所有单位（含非技术管理员）</td><td>看命令多一次点击</td></tr>
+        <tr><td>乙</td><td>看到半截机器路径</td><td>桌面悬浮可看</td><td>手机档看不到全文</td><td>只在桌面用的人</td><td>手机档残缺</td></tr>
+        <tr><td>丙</td><td>三行命令撑歪表格</td><td>不变</td><td>不变</td><td>—</td><td>乱源保留</td></tr>
+      </tbody>
+    </table>
+
+    <h4>前后模拟</h4>
+    <div class="pair">
+      <div class="mock">
+        <div class="mock-h"><span class="verdict hold">现在</span>80px 行高</div>
+        <div class="mock-b">
+          <div class="m-colhead" style="grid-template-columns:120px minmax(0,1fr) 76px"><span>服务名</span><span>说明</span><span>启动方式</span></div>
+          <div class="m-row" style="grid-template-columns:120px minmax(0,1fr) 76px;align-items:start;padding:8px 0">
+            <div class="m-name"><b>weather_demo</b></div>
+            <div class="m-name"><span>天气查询（试点）</span></div>
+            <div class="m-code" style="margin:0;font-size:11px">node "D:/…/backend/mcp-demo/weather-server.mjs"</div>
+          </div>
+          <div class="label">单元格折三行，整行被撑高</div>
+        </div>
+      </div>
+      <div class="mock">
+        <div class="mock-h"><span class="verdict ok">甲案</span>44px 行高</div>
+        <div class="mock-b">
+          <div class="m-colhead" style="grid-template-columns:120px minmax(0,1fr) 76px 40px"><span>服务名</span><span>说明</span><span>启动方式</span><span></span></div>
+          <div class="m-row" style="grid-template-columns:120px minmax(0,1fr) 76px 40px"><div class="m-name"><b>weather_demo</b></div><div class="m-name"><span>天气查询（试点）</span></div><span class="m-badge mid">本地脚本</span><span class="m-link">编辑</span></div>
+          <div class="label">摘要四字；完整命令在「编辑」里</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>工时与分批</h2><span class="n">按★全选估算</span></div>
+    <div class="card">
+      <table>
+        <thead><tr><th style="width:110px">分批</th><th>内容</th><th style="width:90px">估时</th><th style="width:190px">验收</th></tr></thead>
+        <tbody>
+          <tr><td><b>批 1 · 架构</b></td><td>Q1 甲：行为总纲搬到规则页第一段 + 规则页加段目录 + 总览导览文案补一句</td><td>2.5 小时</td><td>两页段落顺序断言 + 跳转可用 + 390 零溢出</td></tr>
+          <tr><td><b>批 2 · 容器</b></td><td>Q2 甲：三段统一卡片 + 卡内去二层框 + 段间距/内边距/圆角统一；顺带收字号到 4 档</td><td>3 小时</td><td>三段的 padding/radius/gap 实算一致 + 亮暗双主题</td></tr>
+          <tr><td><b>批 3 · 行与顶</b></td><td>Q3 甲：列头一行 + 删 3 处重复图例；Q4 甲：说明进「?」+ 视图控件并一行</td><td>2.5 小时</td><td>列头对齐实算 + 十条下拉零截字 + 首屏高度对比</td></tr>
+          <tr><td><b>批 4 · 小修</b></td><td>Q5 甲：外部服务单元格摘要化 + 命令进编辑抽屉</td><td>1 小时</td><td>行高回到 44px + 编辑抽屉能看到完整命令</td></tr>
+          <tr><td><b>收口</b></td><td>前后对比页（双写）+ 更新日志 + 人话日志 + 提交</td><td>1.5 小时</td><td>对比页 0 溢出 / 图片全载；日志首位徽标</td></tr>
+        </tbody>
+      </table>
+      <p class="m-note" style="margin-top:8px">合计约 <b>10.5 小时</b>（按★全选）。只做 Q3+Q4+Q5（不搬架构、不统容器）约 4 小时，能改善但救不回「三种版面语言」这一层。</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>这一板刻意没提的三件事</h2></div>
+    <div class="note">
+      <b>1. 字号与圆角的全站收编。</b>本页仍有 8 种字号、10 种圆角，但其中多数来自全站公用组件（按钮、输入框、标签）。单页强改会与其它页脱钩，应走全站令牌批次，不塞进这一批。<br />
+      <b>2. 按角色总览矩阵里的 27 个绿勾。</b>那是数据本身（谁能用），不是装饰；上一批已确认保留对勾语义。<br />
+      <b>3. 演示库没有「租户管理员」账号。</b>上一批登记过的已知缺口，与本板无关，仍在案。
+    </div>
+  </section>
+
+  <footer>
+    本页为拍板页：<b>答案只在对话里说</b>，本板不改任何代码。选完后会把结论回写到本页与施工日志。<br />
+    实测数据来源：<code>.workshop/tmp/20261027-admin/diag-mess.mjs</code>（块结构/字号/圆角/分隔线）与 <code>diag-tabs.mjs</code>（四页签高度）。<br />
+    模拟 UI 说明：全部使用产品真令牌（#2f6feb / #14202d / #64748b / #e5e7eb / 8px 圆角），尺寸按真机比例缩放，非最终截图。<br />
+    修订记录：2026-10-28 首版（四条病根 + 五题 + 工时）。
+  </footer>
+
+</div>
+</body>
+</html>

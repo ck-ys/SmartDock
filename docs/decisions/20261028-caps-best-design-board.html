@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>能力页最佳设计 · 头脑风暴板（2026-10-28）</title>
+<style>
+  :root{
+    --ink:#1f2d3d; --sub:#64748b; --faint:#94a3b8;
+    --rule:#e4e7ec; --rule2:#f1f5f9; --bg:#f8fafc; --card:#ffffff;
+    --brand:#409eff; --brand-ink:#337ecc;
+    --red:#f56c6c; --red-bg:#fef0f0; --red-line:#fde2e2;
+    --org:#e6a23c; --org-bg:#fdf6ec; --org-line:#faecd8;
+    --ok:#67c23a;
+    --dark-ink:#e5eaf3; --dark-sub:#8b9bb0; --dark-rule:#2a2a2a; --dark-card:#141414; --dark-bg:#0a0a0a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font:14px/1.75 "PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);padding:28px 16px 80px}
+  .wrap{max-width:1180px;margin:0 auto}
+  .banner{background:linear-gradient(135deg,#1f2d3d,#33445c);color:#fff;border-radius:12px;padding:26px 28px;margin-bottom:22px;overflow:hidden;word-break:break-word}
+  .banner h1{font-size:24px;font-weight:700;letter-spacing:.5px}
+  .banner p{margin-top:8px;color:#c8d3e2;font-size:13.5px}
+  .banner .tag{display:inline-block;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:1px 10px;font-size:12px;margin-right:6px;vertical-align:2px}
+  .banner code{background:rgba(255,255,255,.12);border-radius:4px;padding:0 5px;font-size:12.5px;word-break:break-all}
+  .sec{background:var(--card);border:1px solid var(--rule);border-radius:12px;padding:26px 28px;margin-bottom:22px}
+  .sec>h2{font-size:19px;font-weight:700;margin-bottom:6px}
+  .sec>h2 .no{color:var(--brand);font-family:Consolas,monospace;margin-right:6px}
+  .sec>.lead{color:var(--sub);font-size:13.5px;margin-bottom:16px}
+  h3{font-size:15px;font-weight:700;margin:22px 0 8px}
+  h3:first-of-type{margin-top:4px}
+  .note{background:var(--rule2);border-left:3px solid var(--brand);border-radius:0 8px 8px 0;padding:10px 14px;font-size:13px;color:var(--sub);margin:12px 0}
+  .note b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0 4px}
+  th{background:#f8fafc;color:var(--sub);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);font-size:12px;white-space:nowrap}
+  td{padding:8px 10px;border-bottom:1px solid var(--rule2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;border-radius:999px;padding:0 10px;font-size:12px;line-height:20px;white-space:nowrap;border:1px solid transparent}
+  .pill.g{background:#f0f9eb;color:#529b2e;border-color:#e1f3d8}
+  .pill.b{background:#ecf5ff;color:var(--brand-ink);border-color:#d9ecff}
+  .pill.r{background:var(--red-bg);color:#c45656;border-color:var(--red-line)}
+  .pill.o{background:var(--org-bg);color:#b88230;border-color:var(--org-line)}
+  .pill.gr{background:#f4f4f5;color:#909399;border-color:#e9e9eb}
+  .pill.dk{background:#1f2d3d;color:#fff}
+  /* 问题清单 */
+  .toc{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:6px}
+  .toc a{display:flex;gap:10px;align-items:flex-start;background:#f8fafc;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;text-decoration:none;color:var(--ink);font-size:13.5px;transition:border-color .15s}
+  .toc a:hover{border-color:var(--brand)}
+  .toc .qno{flex:none;width:26px;height:26px;border-radius:8px;background:var(--brand);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .toc small{display:block;color:var(--faint);font-size:12px;margin-top:2px}
+  /* 流程图 */
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0;font-size:13px}
+  .flow .st{background:#f8fafc;border:1px solid var(--rule);border-radius:8px;padding:6px 12px;color:var(--ink)}
+  .flow .st.hot{background:#ecf5ff;border-color:#b3d8ff;color:var(--brand-ink);font-weight:600}
+  .flow .st.done{background:#f0f9eb;border-color:#c2e7b0;color:#529b2e}
+  .flow .ar{color:var(--faint);font-size:15px}
+  /* 选项 */
+  .opt{border:1px solid var(--rule);border-radius:10px;padding:16px 18px;margin:12px 0;position:relative}
+  .opt .oh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .opt .oh b{font-size:14.5px}
+  .opt.rec{border-color:#b3d8ff;background:#fafcff}
+  .opt.rec::before{content:"★ 推荐";position:absolute;top:-11px;right:14px;background:var(--brand);color:#fff;font-size:12px;border-radius:999px;padding:1px 10px}
+  .opt .why{font-size:13px;color:var(--sub);margin-top:6px}
+  .opt .why b{color:var(--ink)}
+  .five{width:100%;font-size:12.5px}
+  .five th{padding:6px 8px}
+  .five td{padding:6px 8px}
+  /* 模拟 UI */
+  .mock{background:var(--bg);border:1px dashed #cbd5e1;border-radius:10px;padding:16px;margin:12px 0;font-size:13px}
+  .mock .cap{font-size:12px;color:var(--faint);margin-bottom:10px}
+  .mock .cap b{color:var(--sub)}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .pair.stack{grid-template-columns:1fr}
+  .m-card{background:#fff;border:1px solid var(--rule);border-radius:10px}
+  .m-hd{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--rule);font-weight:600;font-size:13.5px;flex-wrap:wrap}
+  .m-hd .cnt{color:var(--faint);font-weight:400;font-size:12px;font-variant-numeric:tabular-nums}
+  .m-hd .q{color:var(--faint);font-weight:400;cursor:help;border:1px solid var(--rule);border-radius:999px;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+  .m-bd{padding:4px 0}
+  .m-row{display:grid;grid-template-columns:minmax(0,1fr) 64px 200px 48px;gap:10px;align-items:center;padding:0 16px;min-height:44px;border-bottom:1px solid var(--rule2);font-variant-numeric:tabular-nums}
+  .m-row:last-child{border-bottom:none}
+  .m-cols{display:grid;grid-template-columns:minmax(0,1fr) 64px 200px 48px;gap:10px;padding:6px 16px;color:var(--faint);font-size:12px;border-bottom:1px solid var(--rule)}
+  .m-cols .c-more{text-align:center}
+  .m-name b{font-weight:600;font-size:13px}
+  .m-name small{display:block;color:var(--faint);font-size:11.5px;line-height:1.5}
+  .badge{display:inline-block;border-radius:999px;padding:0 8px;font-size:11.5px;line-height:18px;white-space:nowrap}
+  .badge.hi{background:var(--red-bg);color:#c45656;border:1px solid var(--red-line)}
+  .badge.mid{background:var(--org-bg);color:#b88230;border:1px solid var(--org-line)}
+  .badge.none{color:var(--faint)}
+  .m-sel{border:1px solid var(--rule);border-radius:6px;height:30px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;color:var(--ink);font-size:12.5px;background:#fff}
+  .m-sel i{color:var(--faint);font-style:normal;font-size:11px}
+  .m-more{color:#64748b;font-size:12.5px;text-align:center;border:none;background:none;cursor:pointer;padding:4px 0}
+  .m-more:hover{color:var(--brand)}
+  .m-strip{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+  .m-strip .verdict{font-size:13px}
+  .m-strip .verdict b{color:#c45656}
+  .m-btn{white-space:nowrap;border-radius:6px;padding:5px 14px;font-size:12.5px}
+  .m-btn.pri{background:var(--brand);color:#fff}
+  .m-btn.ghost{color:var(--brand-ink);border:1px solid #d9ecff;background:#ecf5ff}
+  .m-link{color:var(--brand-ink);font-size:12.5px;text-decoration:none;white-space:nowrap}
+  .m-fold{color:var(--sub);font-size:12.5px;padding:10px 16px;border-top:1px dashed var(--rule)}
+  .m-sec-gap{height:14px}
+  .toggle{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;font-size:12px}
+  .toggle span{padding:3px 12px;color:var(--sub);background:#fff}
+  .toggle span.on{background:var(--brand);color:#fff}
+  .m-chk{color:var(--sub);font-size:12.5px;display:inline-flex;gap:5px;align-items:center}
+  .m-chk .bx{width:14px;height:14px;border:1px solid var(--rule);border-radius:3px;display:inline-block}
+  .m-chk.on .bx{background:var(--brand);border-color:var(--brand)}
+  /* 引线标注 */
+  .tagno{position:absolute;background:var(--ink);color:#fff;font-size:11px;border-radius:999px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-family:Consolas,monospace;box-shadow:0 1px 4px rgba(15,23,42,.3);z-index:2}
+  .annos{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .annos span{font-size:12px;color:var(--sub);background:#f8fafc;border:1px solid var(--rule);border-radius:6px;padding:2px 9px}
+  .annos b{font-family:Consolas,monospace;color:var(--ink)}
+  /* 发散墙 */
+  .wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:10px}
+  .idea{border:1px solid var(--rule);border-radius:10px;padding:12px 14px;font-size:12.5px;background:#fff}
+  .idea .ih{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:5px}
+  .idea .ih b{font-size:13px}
+  .idea p{color:var(--sub);line-height:1.65}
+  .idea.k{opacity:.82;background:#fbfbfc}
+  .idea.k .ih b{text-decoration:line-through;text-decoration-thickness:1px;text-decoration-color:#f56c6c66}
+  /* 暗色 */
+  .dark-demo{background:var(--dark-bg);border-radius:10px;padding:16px;border:1px solid #000}
+  .dark-demo .m-card{background:var(--dark-card);border-color:var(--dark-rule)}
+  .dark-demo .m-hd{color:var(--dark-ink);border-color:var(--dark-rule)}
+  .dark-demo .m-row{border-color:#1e1e1e}
+  .dark-demo .m-name b{color:var(--dark-ink)}
+  .dark-demo .m-cols{color:#6b7a8f;border-color:var(--dark-rule)}
+  .dark-demo .m-sel{background:#1a1a1a;border-color:#333;color:var(--dark-ink)}
+  .dark-demo .badge.hi{background:#3a1d1d;color:#f1a0a0;border-color:#4d2626}
+  .dark-demo .badge.mid{background:#3a2f1a;color:#ecc87e;border-color:#4d3d22}
+  /* footer */
+  .foot{color:var(--faint);font-size:12px;line-height:1.9;margin-top:8px}
+  .foot code{background:var(--rule2);border-radius:4px;padding:0 5px;word-break:break-all}
+  .rev{border-top:1px dashed var(--rule);margin-top:18px;padding-top:12px;color:var(--faint);font-size:12px}
+  .qa{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin:10px 0}
+  .qa .anchor{font-family:Consolas,monospace;color:var(--brand);font-size:12px}
+  /* 真机截图 */
+  .rs-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:12px 0}
+  .rs-pair:has(figure:only-child){grid-template-columns:1fr}
+  figure.realshot{margin:0;border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:#fff}
+  figure.realshot img{display:block;width:100%;height:auto;min-height:60px}
+  figure.realshot figcaption{padding:8px 12px;font-size:12.5px;color:var(--sub);border-top:1px solid var(--rule2);background:#fafbfc;line-height:1.7}
+  @media (max-width:760px){
+    body{padding:16px 10px 60px}
+    .sec{padding:18px 14px}
+    .banner{padding:18px 16px}
+    .pair{grid-template-columns:1fr}
+    .rs-pair{grid-template-columns:1fr}
+    .m-row,.m-cols{grid-template-columns:minmax(0,1fr) 60px 44px}
+    .m-row .m-sel{display:none}
+    .m-cols .c-cov{display:none}
+    .wall{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="banner">
+    <h1>能力页「最佳设计」· 头脑风暴板 <span class="tag">只出板 · 未动代码</span></h1>
+    <p>上一块板（<code>20261028-caps-mess-board.html</code>）回答的是「现在的结构怎么修」；这块板回答更高一层的问题——<b>如果把这页想透再动手，它最好的样子是什么</b>。做法：先想清楚这页到底是干什么用的 → 十二个点子全部摊开 → 淘汰 → 三个真候选 → 一条推荐路线 + 一张最佳设计全景图。答案请回到对话里说，板上的勾不算数。</p>
+  </div>
+
+  <!-- ═══════════ 执行流程 ═══════════ -->
+  <div class="sec" id="flow-sec">
+    <h2><span class="no">◎</span>这块板怎么用（执行流程）</h2>
+    <div class="flow">
+      <span class="st">① 先读 §0 弄清「这页是干什么的」</span><span class="ar">→</span>
+      <span class="st">② 扫 §1 发散墙，看哪些点子被毙了、为什么</span><span class="ar">→</span>
+      <span class="st">③ §2 三个候选方案各看模拟图</span><span class="ar">→</span>
+      <span class="st hot">④ §4 看最佳设计全景图（推荐落点的完整样子）</span><span class="ar">→</span>
+      <span class="st">⑤ 回答 §7 三道题（点清单直达）</span><span class="ar">→</span>
+      <span class="st">⑥ 回执后按 §6 路径施工</span>
+    </div>
+    <div class="note">和上一块板的关系：<b>题1 选「方案A」= 上一块板五题照做</b>；选「方案B」= 上一块板的 Q1 照做、Q2–Q5 被吸收进一次重写。两块板不冲突，先答哪块都行，答完这块，上一块的选择自然就定了。</div>
+  </div>
+
+  <!-- ═══════════ 问题清单 ═══════════ -->
+  <div class="sec">
+    <h2><span class="no">▣</span>问题清单（点题号直达，答完可回看）</h2>
+    <div class="toc">
+      <a href="#q1"><span class="qno">1</span><span>走哪条路线<small>方案A 清单精进 / 方案B 按七条规矩重写 / 方案C 双栏（左名单右详情）—— ★B</small></span></a>
+      <a href="#q2"><span class="qno">2</span><span>要不要「按角色看」这个切换<small>查「某人能用什么」不用再翻折叠组 —— ★要</small></span></a>
+      <a href="#q3"><span class="qno">3</span><span>进页第一眼看到什么<small>体检一句话 / 纯清单 / 预设三档卡 —— ★体检一句话</small></span></a>
+    </div>
+  </div>
+
+  <!-- ═══════════ §0 这页是干什么的 ═══════════ -->
+  <div class="sec" id="s0">
+    <h2><span class="no">§0</span>先把根想清楚：这页到底是干什么的</h2>
+    <p class="lead">设计之前先问用途。把管理员真正来这页干的六件事列出来，每件事多久来一次——答案决定了这页该长什么样。</p>
+    <table>
+      <tr><th>来这页干什么</th><th>多久一次</th><th>现在的体验</th></tr>
+      <tr><td>第一次把各能力的档位调合理</td><td>租户开通时，一次</td><td>中——清单能改，但不知道「从哪下手、调到哪算好」</td></tr>
+      <tr><td>体检亮灯后来收紧高危</td><td>偶尔（体检提示时）</td><td>好——「一键收紧」就在体检条上</td></tr>
+      <tr><td>查「这个能力谁能用」</td><td>有人问起时</td><td>好——行里直接写着档位</td></tr>
+      <tr><td>查「这个人能用什么」</td><td>有人问起时</td><td>中——藏在页面底部的折叠组里</td></tr>
+      <tr><td>登记/修改外部服务（本机脚本）</td><td>很少</td><td>好——但单元格被三行命令撑到 80px 高</td></tr>
+      <tr><td>改「助手行为总纲」（提示词文档）</td><td>很少</td><td>差——性质是文档，却挤在能力页最底下</td></tr>
+    </table>
+    <div class="note"><b>关键洞察：六件事没有一件是天天来的。</b>这不是一个每天要盯的看板，是一个<b>低频的「设置页」</b>。设置页的第一美德是<b>安静、规矩一致</b>——每次来都能凭上次的记忆直接找到东西；而不是信息丰富、元素热闹。现在这页「乱」的根源，就是按「浏览页」的热闹逻辑在铺，而它其实是个设置页。</div>
+    <div class="flow">
+      <span class="st">低频设置页</span><span class="ar">→</span>
+      <span class="st hot">规矩一致 &gt; 信息丰富</span><span class="ar">→</span>
+      <span class="st">每次来都不用重新学版面</span><span class="ar">→</span>
+      <span class="st done">「乱」自然消失</span>
+    </div>
+  </div>
+
+  <!-- ═══════════ §1 发散墙 ═══════════ -->
+  <div class="sec" id="s1">
+    <h2><span class="no">§1</span>发散墙：十二个点子全部摊开</h2>
+    <p class="lead">头脑风暴先把所有点子不加评判写出来，再逐个裁决。<span class="pill g">留</span> = 进入候选方案；<span class="pill b">并</span> = 不单独做、并进别处；<span class="pill r">毙</span> = 淘汰，右边写着为什么。</p>
+    <div class="wall">
+      <div class="idea"><div class="ih"><b>① 清单 + 列头</b><span class="pill g">留</span></div><p>一行一个能力不变，补一行 12px 灰列头（能力/风险/覆盖/详情），名字到徽章之间 800px 空档立刻有了意义。</p></div>
+      <div class="idea"><div class="ih"><b>② 体检一句话置顶</b><span class="pill g">留</span></div><p>体检条瘦身成一行：一句结论 + 两个动作。它是这页唯一「需要人做决定」的地方，理应第一眼。</p></div>
+      <div class="idea"><div class="ih"><b>③ 按角色切换看</b><span class="pill g">留</span></div><p>清单上方一个「按能力｜按角色」小切换。查「某人能用什么」从翻折叠组变成点一下。</p></div>
+      <div class="idea"><div class="ih"><b>④ 外部服务摘要化</b><span class="pill g">留</span></div><p>列表只写「本地脚本」，全文命令进「编辑」。行高 80px→44px。（即上一块板 Q5）</p></div>
+      <div class="idea"><div class="ih"><b>⑤ 预设三档</b><span class="pill b">并</span></div><p>不单独置顶成卡。收紧/预设都挂在体检条的动作里——先看影响再动手，一回事。</p></div>
+      <div class="idea"><div class="ih"><b>⑥ 反查下拉</b><span class="pill b">并</span></div><p>上批已删。它要回答的「谁能用」由 ③ 按角色切换接手，职责更清楚。</p></div>
+      <div class="idea k"><div class="ih"><b>⑦ 开关板</b><span class="pill r">毙</span></div><p>每行一个开关，像手机权限那样。毙因：我们的档位是「关闭/成员/发布人/管理员」四选一，开关只有开/关——<b>控件会撒谎</b>。</p></div>
+      <div class="idea k"><div class="ih"><b>⑧ 场景包</b><span class="pill r">毙</span></div><p>把能力捆成「联网包」「任务包」一键设档。毙因：只有 11 项，包是多余的一层皮；等能力涨到 30 项以上再议。</p></div>
+      <div class="idea k"><div class="ih"><b>⑨ 搜索框</b><span class="pill r">毙</span></div><p>顶部加搜索。毙因：11 行一眼扫完，搜索是大炮打蚊子，还多一条横带。</p></div>
+      <div class="idea k"><div class="ih"><b>⑩ 向导式整页</b><span class="pill r">毙</span></div><p>整页做成「下一步下一步」的配置向导。毙因：向导藏常态——低频页每次来都该一眼看到全貌，而不是被牵着走三步。</p></div>
+      <div class="idea k"><div class="ih"><b>⑪ 并进规则页</b><span class="pill r">毙</span></div><p>能力清单整段搬去规则页（总纲已计划搬过去）。毙因：规则页已 1978px，再塞 917px 能力清单会更长；能力与规则是两件事。</p></div>
+      <div class="idea k"><div class="ih"><b>⑫ 换成真表格</b><span class="pill r">毙</span></div><p>用组件库现成表格重排。毙因：表格墨重、行高失控、内嵌下拉会被撑变形——前几轮刚治理过表格墨色，不回头。</p></div>
+    </div>
+    <div class="note">刻意不塞进这批的三件事（和上一块板一致）：全站字号/圆角收编（该走令牌批次）、按角色矩阵里的 27 个绿勾（是数据不是装饰）、演示库缺「租户管理员」账号（测试缺口，不是设计问题）。</div>
+  </div>
+
+  <!-- ═══════════ §2 三个候选 ═══════════ -->
+  <div class="sec" id="s2">
+    <h2><span class="no">§2</span>三个候选方案（发散后真正立得住的）</h2>
+    <p class="lead">十二个点子收敛后剩三条路。前两条共享同一个终点长相（§4 手绘 + §4R 真机），差在「怎么到达」；第三条是真正不同的布局，作为对照保留。</p>
+
+    <h3>方案A · 清单精进——上一块板的★路线照做</h3>
+    <div class="mock">
+      <div class="cap"><b>示意图</b>（A 做完的样子，即上一块板五题★的合成效果；落地后换真机截图）</div>
+      <div class="pair">
+        <div>
+          <div class="m-card">
+            <div class="m-strip"><span class="verdict">体检：<b>3 项高危能力人人可用</b></span><span class="m-btn pri">一键收紧</span><span class="m-link">先看会变哪几行</span></div>
+            <div class="m-hd">能力清单<span class="cnt">10 项 · 另 1 项未开</span><span class="q">?</span><span style="flex:1"></span><span class="toggle"><span class="on">按能力</span><span>按角色</span></span></div>
+            <div class="m-cols"><span class="c-name">能力</span><span class="c-risk">风险</span><span class="c-cov">本租户覆盖</span><span class="c-more">详情</span></div>
+            <div class="m-row"><span class="m-name"><b>联网搜索</b><small>让助手查公开网页</small></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+            <div class="m-row"><span class="m-name"><b>天气查询（试点）</b><small>查天气与预警</small></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+            <div class="m-row"><span class="m-name"><b>技能：催办话术</b><small>写催办消息</small></span><span><span class="badge mid">中危</span></span><span class="m-sel">跟随平台 · 发布人及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+            <div class="m-fold">当前不会出现（1）· 按角色总览 ▾</div>
+          </div>
+        </div>
+        <div>
+          <div class="m-card">
+            <div class="m-hd">外部服务<span class="cnt">3 项</span><span class="q">?</span><span style="flex:1"></span><span class="m-btn ghost">新增服务</span></div>
+            <div class="m-row"><span class="m-name"><b>数据解读脚本</b></span><span><span class="badge none">—</span></span><span style="color:var(--sub);font-size:12px">本地脚本</span><span class="m-more">编辑</span></div>
+          </div>
+          <div class="m-sec-gap"></div>
+          <div class="m-card" style="opacity:.55">
+            <div class="m-hd">助手行为总纲<span class="q">?</span></div>
+            <div style="padding:10px 16px;color:var(--faint);font-size:12px">此段已搬去「规则」页第一段（上一块板 Q1，两案共用）</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="opt">
+      <div class="oh"><b>方案A：在现有结构上原地修</b><span class="pill gr">低风险</span><span class="pill gr">≈10.5 小时</span></div>
+      <p class="why">五处手术：总纲搬走 → 三段统一成卡 → 加列头删重复图例 → 顶带并成一行 → 命令摘要化。<b>优点</b>：每一步都是小改动，随时可停，回归风险最低。<b>缺点</b>：修完是「补丁摞补丁」——旧的类名、旧的结构还在，规矩是靠约束维持的，下次加功能还可能长歪。</p>
+      <table class="five">
+        <tr><th>第一次来</th><td>顶部一句话体检 + 一张清单，能看懂要干什么</td></tr>
+        <tr><th>日常用</th><td>和现在一样的路径，只是更清爽</td></tr>
+        <tr><th>防呆</th><td>列头 + 体检条仍在，不会误操作</td></tr>
+        <tr><th>适合谁</th><td>想小步快走、不愿一次大动的选择</td></tr>
+        <tr><th>代价</th><td>≈10.5 小时（四批+收口）；「立住规矩」靠自觉，无结构性保证</td></tr>
+      </table>
+    </div>
+
+    <h3>方案B · 按七条规矩重写（推荐）</h3>
+    <div class="mock">
+      <div class="cap"><b>示意图</b>（B 与 A 的终点长相相同——差别不在长相，在「怎么到达」，见下方对比；完整长相见 §4 全景图）</div>
+      <div class="pair">
+        <div class="m-card" style="padding:14px 16px">
+          <b style="font-size:13.5px">A 的做法：原地补丁</b>
+          <p style="color:var(--sub);font-size:12.5px;margin-top:6px">在现有模板上改：这里删一条横带、那里补一行列头、再把一段搬走。改完旧结构还在，新规矩是「贴」上去的。</p>
+          <div class="flow" style="margin-top:10px"><span class="st">现有模板</span><span class="ar">＋</span><span class="st">5 处补丁</span><span class="ar">→</span><span class="st">清爽但混血</span></div>
+        </div>
+        <div class="m-card" style="padding:14px 16px;border-color:#b3d8ff">
+          <b style="font-size:13.5px">B 的做法：先立规矩，整段重写</b>
+          <p style="color:var(--sub);font-size:12.5px;margin-top:6px">先把「设置页该怎么排」写成七条可验收的规矩（§5），然后能力页签的模板和样式<b>按规矩一次重写</b>。不是更多工作量，是同样的工作量换一种花法。</p>
+          <div class="flow" style="margin-top:10px"><span class="st hot">七条规矩</span><span class="ar">→</span><span class="st hot">整段重写</span><span class="ar">→</span><span class="st done">一个能被一句话描述的页</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="opt rec">
+      <div class="oh"><b>方案B：能力页签按七条规矩整段重写</b><span class="pill b">规矩立得住</span><span class="pill b">≈11–12 小时</span></div>
+      <p class="why">终点长相与 A 相同（§4），但过程不同：重写后这页能用一句话描述——<b>「上面一句体检结论，中间一张能力清单，下面一张服务清单」</b>，每段一种容器、每行 44px、说明全收进「?」。<b>为什么比 A 好</b>：A 修完旧类名旧结构还在，下次加功能还会长歪；B 把规矩写进结构本身，且每条规矩都配了自动断言（§5 的「怎么验」），长歪会被机器抓住。<b>风险</b>：整段重写回归面大——但上一批已沉淀 51 条活体断言探针，重写后全量重跑即可兜底。</p>
+      <table class="five">
+        <tr><th>第一次来</th><td>与 A 相同（终点长相一样），且三段完全同构，学一次就会</td></tr>
+        <tr><th>日常用</th><td>与 A 相同</td></tr>
+        <tr><th>防呆</th><td>七条规矩每条带断言，改坏会被自动检查抓住（A 没有这个保证）</td></tr>
+        <tr><th>适合谁</th><td>愿意花同样时间换「结构上立得住」的选择</td></tr>
+        <tr><th>代价</th><td>≈11–12 小时，比 A 多约 1 小时（写规矩+断言）；重写期中间态不可用，需一次到位</td></tr>
+      </table>
+    </div>
+
+    <h3>方案C · 双栏——左边名单、右边详情（对照案）</h3>
+    <div class="mock">
+      <div class="cap"><b>示意图</b>（C 的布局：左栏窄名单，右栏常驻详情面板；落地后换真机截图）</div>
+      <div class="pair stack">
+        <div class="m-card">
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) 1.2fr;min-height:190px">
+            <div style="border-right:1px solid var(--rule)">
+              <div class="m-row" style="grid-template-columns:minmax(0,1fr) 56px"><span class="m-name"><b>联网搜索</b></span><span><span class="badge hi">高危</span></span></div>
+              <div class="m-row" style="grid-template-columns:minmax(0,1fr) 56px;background:#ecf5ff"><span class="m-name"><b>技能：催办话术</b></span><span><span class="badge mid">中危</span></span></div>
+              <div class="m-row" style="grid-template-columns:minmax(0,1fr) 56px"><span class="m-name"><b>天气查询（试点）</b></span><span><span class="badge hi">高危</span></span></div>
+            </div>
+            <div style="padding:14px 16px;font-size:12.5px;color:var(--sub)">
+              <b style="color:var(--ink);font-size:13.5px">技能：催办话术</b>
+              <p style="margin:8px 0">让助手用合适的口吻写催办消息。</p>
+              <p style="margin:8px 0 4px">本租户覆盖</p>
+              <span class="m-sel" style="max-width:200px">跟随平台 · 发布人及以上 <i>▾</i></span>
+              <p style="margin:10px 0 4px;color:var(--faint)">风险说明 · 使用记录 · 快调三档</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="opt">
+      <div class="oh"><b>方案C：双栏主从布局</b><span class="pill gr">≈14 小时+</span><span class="pill r">暂不推荐</span></div>
+      <p class="why"><b>优点</b>：名字到徽章的 800px 空档天生有了去处（给右栏详情），查单个能力最舒服；行内不再塞下拉，行可以更矮。<b>为什么不推荐（现在）</b>：① 只有 11 行，撑不起双栏的「身价」——右栏大部分时间在重复抽屉已有的内容；② 手机档要退化成「点行开抽屉」，等于维护两套布局；③ 「一眼看全页」的能力丢失，与 §0 的低频设置页定位相悖。<b>什么时候回来找它</b>：能力数量涨到 30 项以上、或详情要常驻对照多行时。</p>
+      <table class="five">
+        <tr><th>第一次来</th><td>左右两栏需要一次学习；选中即见详情，查单项最快</td></tr>
+        <tr><th>日常用</th><td>点行→右栏变，无弹层；但改档位要去右栏</td></tr>
+        <tr><th>防呆</th><td>详情常驻不易误触；但整页扫视变弱</td></tr>
+        <tr><th>适合谁</th><td>能力很多、详情很长的未来形态</td></tr>
+        <tr><th>代价</th><td>≈14 小时起 + 手机档第二套布局的长期维护成本</td></tr>
+      </table>
+    </div>
+
+    <h3>跨案对比</h3>
+    <table>
+      <tr><th></th><th>方案A 清单精进</th><th>方案B 按规矩重写 ★</th><th>方案C 双栏</th></tr>
+      <tr><td><b>终点长相</b></td><td>与 B 相同</td><td>与 A 相同（§4 全景图）</td><td>另一种布局</td></tr>
+      <tr><td><b>规矩能不能立住</b></td><td>靠自觉，无保证</td><td>写进结构 + 每条带断言</td><td>立得住，但多一套手机布局要守</td></tr>
+      <tr><td><b>工时</b></td><td>≈10.5h</td><td>≈11–12h</td><td>≈14h+</td></tr>
+      <tr><td><b>回归风险</b></td><td>低（小步可停）</td><td>中（一次到位，51 断言兜底）</td><td>高（两套布局）</td></tr>
+      <tr><td><b>手机档</b></td><td>一行变两行，成熟方案</td><td>同左</td><td>要退化为抽屉，等于第二套布局</td></tr>
+      <tr><td><b>适合的时机</b></td><td>想小步走</td><td><b>现在</b></td><td>能力 ≥30 项的未来</td></tr>
+    </table>
+  </div>
+
+  <!-- ═══════════ §4 全景图 ═══════════ -->
+  <div class="sec" id="s4">
+    <h2><span class="no">§4</span>最佳设计全景图（推荐落点的完整样子）</h2>
+    <p class="lead">方案B + 题2选「要」+ 题3选「体检一句话」的完整效果。<b>通栏 1:1 示意</b>（真令牌真数据，落地后换真机截图）；圆片编号对应 §5 的规矩条号。</p>
+    <div class="mock">
+      <div class="cap"><b>能力页签 · 全景</b>——上面一句体检结论，中间一张能力清单，下面一张服务清单。整页再无别的横带。</div>
+      <div class="m-card">
+        <!-- 段1 体检 -->
+        <div class="m-strip" style="position:relative">
+          <span class="tagno" style="top:-8px;left:-8px">6</span>
+          <span class="verdict">体检：<b>3 项高危能力目前人人可用</b>，建议收紧</span>
+          <span class="m-btn pri">一键收紧</span>
+          <span class="m-link">先看会变哪几行</span>
+          <span style="flex:1"></span><span class="q" style="color:var(--faint);border:1px solid var(--rule);border-radius:999px;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:11px">?</span>
+        </div>
+        <!-- 段2 能力清单 -->
+        <div class="m-hd" style="position:relative">
+          <span class="tagno" style="top:-7px;left:-8px">1</span>
+          能力清单<span class="cnt">10 项 · 另 1 项未开</span><span class="q">?</span>
+          <span style="flex:1"></span>
+          <span class="toggle"><span class="on">按能力</span><span>按角色</span></span>
+          <span class="m-chk"><span class="bx"></span>只看高危</span>
+        </div>
+        <div class="m-cols" style="position:relative">
+          <span class="tagno" style="top:-4px;left:-8px">2</span>
+          <span class="c-name">能力</span><span class="c-risk">风险</span><span class="c-cov">本租户覆盖</span><span class="c-more">详情</span>
+        </div>
+        <div class="m-bd">
+          <div class="m-row"><span class="m-name"><b>联网搜索</b><small>让助手查公开网页，回答带出处</small></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+          <div class="m-row"><span class="m-name"><b>天气查询（试点）</b><small>查实时天气与预警信息</small></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+          <div class="m-row"><span class="m-name"><b>保存长期记忆</b><small>跨会话记住用户的事</small></span><span><span class="badge mid">中危</span></span><span class="m-sel" style="opacity:.5">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+          <div class="m-row"><span class="m-name"><b>技能：催办话术</b><small>按对象身份写催办消息</small></span><span><span class="badge mid">中危</span></span><span class="m-sel">跟随平台 · 发布人及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+          <div class="m-row"><span class="m-name"><b>技能：创建模板</b><small>把常用格式存成模板</small></span><span><span class="badge none">—</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+          <div class="m-row"><span class="m-name"><b>技能：创建任务</b><small>从对话里直接建任务</small></span><span><span class="badge none">—</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+        </div>
+        <div class="m-fold">▾ 当前不会出现（1）——配置未开，开启后自动进入上面的清单</div>
+        <!-- 段3 外部服务 -->
+        <div class="m-hd" style="border-top:1px solid var(--rule);margin-top:4px;position:relative">
+          <span class="tagno" style="top:-7px;left:-8px">1</span>
+          外部服务<span class="cnt">3 项</span><span class="q">?</span>
+          <span style="flex:1"></span><span class="m-btn ghost">新增服务</span>
+        </div>
+        <div class="m-row" style="position:relative"><span class="tagno" style="top:12px;left:-8px">4</span><span class="m-name"><b>数据解读脚本</b><small>表格/指标读法</small></span><span><span class="badge none">—</span></span><span style="color:var(--sub);font-size:12px">本地脚本</span><span class="m-more">编辑</span></div>
+        <div class="m-row"><span class="m-name"><b>话术润色脚本</b><small>对外文案统一口吻</small></span><span><span class="badge none">—</span></span><span style="color:var(--sub);font-size:12px">本地脚本</span><span class="m-more">编辑</span></div>
+        <div class="m-row"><span class="m-name"><b>周报汇总脚本</b><small>汇总一周使用情况</small></span><span><span class="badge none">—</span></span><span style="color:var(--sub);font-size:12px">本地脚本</span><span class="m-more">编辑</span></div>
+      </div>
+      <div class="annos">
+        <span><b>1</b> 段=一张卡：卡名+计数+「?」，卡内只用分隔线</span>
+        <span><b>2</b> 列头 12px 灰，800px 空档从此有含义</span>
+        <span><b>4</b> 颜色只给风险徽章和主按钮，其余全灰</span>
+        <span><b>6</b> 顶部只有一条：体检一句话+两个动作</span>
+        <span>规矩 <b>3</b>：所有说明收进「?」，版面只剩结论</span>
+        <span>规矩 <b>7</b>：未启用（保存长期记忆）进折叠组，不混在清单里数数——全景图按规矩画，故主清单 10 项</span>
+      </div>
+    </div>
+
+    <h3>暗色下同样成立（同令牌换底）</h3>
+    <div class="dark-demo">
+      <div class="m-card">
+        <div class="m-strip" style="border-color:var(--dark-rule)"><span class="verdict" style="color:var(--dark-ink)">体检：<b style="color:#f1a0a0">3 项高危能力目前人人可用</b></span><span class="m-btn pri">一键收紧</span></div>
+        <div class="m-cols"><span class="c-name">能力</span><span class="c-risk">风险</span><span class="c-cov">本租户覆盖</span><span class="c-more">详情</span></div>
+        <div class="m-row"><span class="m-name"><b>联网搜索</b></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more" style="color:#8ab4f8">详情</span></div>
+        <div class="m-row"><span class="m-name"><b>技能：催办话术</b></span><span><span class="badge mid">中危</span></span><span class="m-sel">跟随平台 · 发布人及以上 <i>▾</i></span><span class="m-more" style="color:#8ab4f8">详情</span></div>
+      </div>
+    </div>
+    <p class="foot" style="margin-top:8px">暗色只换底色与墨色两组令牌，七条规矩一条不用改——这是「规矩立得住」的另一个好处。手绘示意到此为止——<b>下一节是同样的候选搬上真机（真后端 + 真前端 + 真数据）拍出来的对照</b>，选择请以那一节为准。</p>
+  </div>
+
+  <!-- ═══════════ §4R 真机模拟对照 ═══════════ -->
+  <div class="sec" id="s4r">
+    <h2><span class="no">§4R</span>真机模拟对照（真页 · 真数据 · 真令牌）<span class="pill b">选择以此为准</span></h2>
+    <p class="lead">在真实运行的前端（5188）+ 后端（8090）上：「改前」直接截现状；「改后」把候选设计的结构与样式注入真页再截——<b>注入态刷新即还原，产品代码一行未动</b>。图里的 10 项能力、1 项未开、体检条内容都是接口返回的真数据。</p>
+
+    <h3>① 核心对照：能力清单段 改前 → 方案B</h3>
+    <div class="rs-pair">
+      <figure class="realshot"><img src="20261028-bestdesign-assets/before-sec1.png" alt="改前·能力清单段真机截图"><figcaption><span class="pill gr">改前</span> 现状：两行说明 → 黄色体检条 → 单选行（按行微调/一键推荐）→ 组头带重复图例，无列头。整段 <b>917px</b></figcaption></figure>
+      <figure class="realshot"><img src="20261028-bestdesign-assets/after-B-sec1.png" alt="改后·能力清单段真机截图"><figcaption><span class="pill b">方案B</span> 题头 +「?」+「按能力｜按角色」+ 只看高危并成一行 → 体检条一行 → 灰列头 → 44px 行。整段 <b>778px</b>（-139px）</figcaption></figure>
+    </div>
+
+    <h3>② 外部服务段 改前 → 方案B（Q5：命令列撤掉，全文进编辑）</h3>
+    <div class="rs-pair">
+      <figure class="realshot"><img src="20261028-bestdesign-assets/before-sec2.png" alt="改前·外部服务段真机截图"><figcaption><span class="pill gr">改前</span> 现状：长说明占两处 +「启动方式」列展示整段本机命令</figcaption></figure>
+      <figure class="realshot"><img src="20261028-bestdesign-assets/after-B-sec2.png" alt="改后·外部服务段真机截图"><figcaption><span class="pill b">方案B</span> 说明收进「?」；启动方式列撤（方式列的「本地脚本」标签已在，全文在「编辑」里看）</figcaption></figure>
+    </div>
+
+    <h3>③ 行为总纲段：搬走后只剩一条注记（两板共认 Q1）</h3>
+    <div class="rs-pair">
+      <figure class="realshot"><img src="20261028-bestdesign-assets/before-sec4.png" alt="改前·行为总纲段真机截图"><figcaption><span class="pill gr">改前</span> 现状：整段 <b>518px</b> 挤在能力页签最底下</figcaption></figure>
+      <figure class="realshot"><img src="20261028-bestdesign-assets/after-B-sec4.png" alt="改后·总纲搬走注记真机截图"><figcaption><span class="pill b">方案B</span> 搬去「规则」页第一段后只剩虚线注记，整段 <b>92px</b>（-426px）；技能库段（两图之间）保持现状不动</figcaption></figure>
+    </div>
+    <div class="note">三段合计：<b>能力页签整高 2428px → 1863px（-565px，约 -23%）</b>，四条顶部横带只剩一条，版面语言从三种归成一种。</div>
+
+    <h3>④ 题2 真机：「按角色」切换点开后的样子（数据从各行档位实时算出）</h3>
+    <div class="rs-pair">
+      <figure class="realshot"><img src="20261028-bestdesign-assets/after-B-role.png" alt="按角色视图真机截图"><figcaption><span class="pill b">按角色视图</span> 「成员进来就能用 / 能发布任务的人补齐 / 只有管理员能用」三组名字片——查「某人能用什么」从翻底部折叠组变成点一下</figcaption></figure>
+    </div>
+
+    <h3>⑤ 题3 真机：首屏第一眼的乙、丙两案（甲=上方方案B图）</h3>
+    <div class="rs-pair">
+      <figure class="realshot"><img src="20261028-bestdesign-assets/top-Yi.png" alt="题3乙真机截图"><figcaption><span class="pill gr">乙</span> 纯清单：体检条撤掉、右上给「体检」按钮——最安静，但高危提醒靠人主动点</figcaption></figure>
+      <figure class="realshot"><img src="20261028-bestdesign-assets/top-Bing.png" alt="题3丙真预设UI截图"><figcaption><span class="pill gr">丙</span> 预设三档卡置顶——<b>这张是真功能真点击</b>（切到页面现成的「一键推荐」拍的，非注入）：三档卡+「共 2 行会变」预览都是真的</figcaption></figure>
+    </div>
+
+    <h3>⑥ 题1 对照：方案C 双栏的真机形态（左名单 · 右详情常驻）</h3>
+    <div class="rs-pair">
+      <figure class="realshot"><img src="20261028-bestdesign-assets/after-C.png" alt="方案C双栏真机截图"><figcaption><span class="pill gr">方案C</span> 行内下拉与详情撤走，选中行浅蓝底，右栏常驻详情面板（副题/风险/三档按钮/说明）——查单项最爽，代价见 §2：手机档要第二套布局</figcaption></figure>
+    </div>
+
+    <h3>⑦ 手机档（390px）与暗色</h3>
+    <div class="rs-pair">
+      <figure class="realshot"><img src="20261028-bestdesign-assets/after-B-390-sec1.png" alt="方案B手机档首屏真机截图"><figcaption><span class="pill b">390 · 方案B</span> 首屏：题头一行 + 体检一行 + 列头两行制（覆盖列按规矩收进详情），实测<b>零横向溢出</b>；改前对照（before-390-sec1.png）在资产目录</figcaption></figure>
+      <figure class="realshot"><img src="20261028-bestdesign-assets/after-B-dark-sec1.png" alt="方案B暗色真机截图"><figcaption><span class="pill b">暗色 · 方案B</span> 同一段在暗色下的样子——注入样式全部走页面自己的令牌，换肤自动跟</figcaption></figure>
+    </div>
+    <div class="note">拍摄口径：1440×900 与 390×844 两档，管理员账号真登录；注入脚本与全部 15 张原图留档 <code>20261028-bestdesign-assets/</code>（本板同目录）与 <code>.workshop/tmp/20261027-admin/sim-bestdesign.mjs</code>。注入图里的下拉/按钮只展示形态不可真点；题3丙那张是真交互。</div>
+  </div>
+
+  <!-- ═══════════ §5 七条规矩 ═══════════ -->
+  <div class="sec" id="s5">
+    <h2><span class="no">§5</span>七条规矩（方案B的核心，每条带「怎么验」）</h2>
+    <p class="lead">规矩不是口号，每条都配一条机器断言——写完自动检查跑一遍，改歪了立刻红。这也是 B 比 A 多的那一小时花在哪。</p>
+    <table>
+      <tr><th>#</th><th>规矩</th><th>怎么验（自动断言）</th></tr>
+      <tr><td><b>1</b></td><td>段=一张卡：卡名 + 计数 + 「?」+ 内容；卡内只用分隔线，不再套第二层框</td><td>三段卡内嵌套边框层数 ≤ 1</td></tr>
+      <tr><td><b>2</b></td><td>一行 = 44px：名字 + 至多一枚风险徽章 + 一个档位控件 + 详情</td><td>每行实测高 44±2px；行内徽章数 ≤ 1</td></tr>
+      <tr><td><b>3</b></td><td>说明不占版面：解释全收进「?」，版面只留结论</td><td>页签内常驻说明文字 ≤ 2 处（体检结论 + 折叠组引导）</td></tr>
+      <tr><td><b>4</b></td><td>颜色只给风险和主按钮：高危红、中危橙，其余一律灰墨</td><td>扫行内元素彩色（非灰系）数量 = 风险徽章数 + 主按钮数</td></tr>
+      <tr><td><b>5</b></td><td>数字用等宽数字，列头 12px 灰，不抢内容的戏</td><td>列头 computed 字号 ≤ 12px；数字元素 font-variant = tabular-nums</td></tr>
+      <tr><td><b>6</b></td><td>顶部只留一条：体检一句话 + 两个动作，其余横带全撤</td><td>清单卡之前的块级横带数 = 1</td></tr>
+      <tr><td><b>7</b></td><td>没开的不混进来：未启用进折叠组，主清单每行都是真可用</td><td>主清单行数 = 可用数（当前 10）</td></tr>
+    </table>
+    <div class="note">七条合起来，这页可以用一句话讲完：<b>「上面一句体检结论，中间一张能力清单，下面一张服务清单。」</b>讲不完就说明又长歪了。</div>
+  </div>
+
+  <!-- ═══════════ §6 施工路径 ═══════════ -->
+  <div class="sec" id="s6">
+    <h2><span class="no">§6</span>施工路径（回执后怎么干）</h2>
+    <div class="flow">
+      <span class="st done">批0 截真机「改前」照存证</span><span class="ar">→</span>
+      <span class="st hot">批1 总纲搬规则页第一段（两板共认）</span><span class="ar">→</span>
+      <span class="st hot">批2 能力+服务两段按七条规矩整段重写（吸收上一块板 Q2–Q5）</span><span class="ar">→</span>
+      <span class="st hot">批3 「按角色」切换 + 体检条瘦身成一行</span><span class="ar">→</span>
+      <span class="st done">收口 51 条断言扩到约 70 条全绿 + 前后对比页 + 更新日志</span>
+    </div>
+    <table>
+      <tr><th>批次</th><th>内容</th><th>验收方式</th><th>与上一块板的对应</th></tr>
+      <tr><td>批1</td><td>行为总纲搬到规则页第一段</td><td>能力页高度 1745→约 1230；规则页导览补「行为总纲」</td><td>= Q1（两板相同）</td></tr>
+      <tr><td>批2</td><td>能力+服务两段按七条规矩重写：列头、44px 行、「?」、命令摘要化、统一卡片</td><td>七条断言逐条绿；手机档 390 两行布局不溢出</td><td>吸收 Q2/Q3/Q4/Q5</td></tr>
+      <tr><td>批3</td><td>「按能力｜按角色」切换（吸收原折叠总览）；体检条瘦身一行</td><td>切到按角色能答「某人能用什么」；顶部横带数=1</td><td>新增（题2/题3 的落点）</td></tr>
+      <tr><td>收口</td><td>断言扩充、前后对比页、更新日志、总账回刷</td><td>探针全绿 + 对比页双写归档</td><td>—</td></tr>
+    </table>
+    <div class="note">若题1 选了 <b>方案A</b>：批2 换成「五处原地补丁」，其余批次不变；若选 <b>方案C</b>：路径重排（先双栏骨架后手机档退化），工期另计。</div>
+  </div>
+
+  <!-- ═══════════ §7 三道题 ═══════════ -->
+  <div class="sec" id="q1">
+    <h2><span class="no">题1</span>走哪条路线？<span class="pill dk">必答</span></h2>
+    <p class="lead">三个方案的终点长相，A 与 B 相同、C 不同；真正的选择是「补丁还是重写」，以及「要不要现在就上双栏」。</p>
+    <div class="flow"><span class="st">现在：三种容器语言混血</span><span class="ar">→</span><span class="st hot">选 A = 原地五处补丁</span><span class="ar">/</span><span class="st hot">选 B = 七条规矩整段重写</span><span class="ar">/</span><span class="st">选 C = 双栏（暂不推荐）</span><span class="ar">→</span><span class="st done">终点：一句话能讲完的页（C 除外）</span></div>
+    <div class="opt"><div class="oh"><b>甲 · 方案A 清单精进</b></div><p class="why">小步可停、风险最低；但规矩靠自觉维持，下次加功能可能再长歪。详见 §2 方案A。</p></div>
+    <div class="opt rec"><div class="oh"><b>乙 · 方案B 按七条规矩重写</b></div><p class="why">同样长相、同样约 11–12 小时，换来「规矩写进结构 + 每条带断言」；51 条探针兜底回归。详见 §2 方案B 与 §4/§5。</p></div>
+    <div class="opt"><div class="oh"><b>丙 · 方案C 双栏</b></div><p class="why">查单项最爽，但 11 项撑不起双栏、手机档要第二套布局、丢整页扫视。建议留到能力 ≥30 项再启用。详见 §2 方案C。</p></div>
+    <div class="note">注：题2、题3 的答案对 A/B 都适用；选 C 时题2 的「按角色」自然成为左栏上方筛选，题3 不适用。</div>
+    <div class="qa"><span class="anchor">#q1</span>答：题1 选 ＿＿（甲/乙/丙）</div>
+  </div>
+
+  <div class="sec" id="q2">
+    <h2><span class="no">题2</span>要不要「按角色看」这个切换？</h2>
+    <p class="lead">查「某人能用什么」现在要去页面底部展开「按角色总览」折叠组，点两下、滚半屏。</p>
+    <div class="flow"><span class="st">现在：按角色总览藏在折叠组</span><span class="ar">→</span><span class="st hot">甲：升级为清单卡右上小切换</span><span class="ar">→</span><span class="st done">「按能力｜按角色」点一下即答</span></div>
+    <div class="pair">
+      <div class="mock">
+        <div class="cap"><b>甲 · 有切换</b>（卡头右侧）</div>
+        <div class="m-card">
+          <div class="m-hd">能力清单<span class="cnt">10 项</span><span class="q">?</span><span style="flex:1"></span><span class="toggle"><span class="on">按能力</span><span>按角色</span></span></div>
+          <div class="m-row"><span class="m-name"><b>联网搜索</b></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+        </div>
+      </div>
+      <div class="mock">
+        <div class="cap"><b>乙 · 维持折叠组</b>（现状）</div>
+        <div class="m-card">
+          <div class="m-hd">能力清单<span class="cnt">10 项</span></div>
+          <div class="m-row"><span class="m-name"><b>联网搜索</b></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+          <div class="m-fold">▾ 按角色总览（在页面最底部）</div>
+        </div>
+      </div>
+    </div>
+    <div class="opt rec"><div class="oh"><b>甲 · 要这个切换</b></div><p class="why">「按角色看」是六件事里唯一还藏在折叠组里的高频疑问；升级后折叠组删除，能力卡一个入口答两种问法（这能力谁能用 / 这人能用什么）。<b>代价</b>：约多 1.5 小时，切换的两套渲染要各配断言。</p></div>
+    <div class="opt"><div class="oh"><b>乙 · 不要，维持折叠组</b></div><p class="why">少一个控件、省 1.5 小时；代价是「某人能用什么」永远要先滚到底再展开。</p></div>
+    <div class="qa"><span class="anchor">#q2</span>答：题2 选 ＿＿（甲/乙）</div>
+  </div>
+
+  <div class="sec" id="q3">
+    <h2><span class="no">题3</span>进页第一眼看到什么？</h2>
+    <p class="lead">顶部撤掉四条横带后只留一条——那这一条放什么，是这页的「门面」选择。</p>
+    <div class="flow"><span class="st">现在：标题→两行说明→黄条→控件行</span><span class="ar">→</span><span class="st hot">只剩一条</span><span class="ar">→</span><span class="st done">放什么？三选一</span></div>
+    <div class="mock">
+      <div class="pair">
+        <div>
+          <div class="cap"><b>甲 · 体检一句话</b>（★）</div>
+          <div class="m-card">
+            <div class="m-strip"><span class="verdict">体检：<b>3 项高危能力目前人人可用</b></span><span class="m-btn pri">一键收紧</span><span class="m-link">先看会变哪几行</span></div>
+            <div class="m-hd" style="border-top:none">能力清单 …</div>
+          </div>
+          <p style="font-size:12px;color:var(--sub);margin-top:6px">有灯亮着才有人该动手；没灯时它自动变成一句绿字「无高风险项」，不占地方。</p>
+        </div>
+        <div>
+          <div class="cap"><b>乙 · 纯清单，体检收进右上按钮</b></div>
+          <div class="m-card">
+            <div class="m-hd">能力清单<span class="cnt">10 项</span><span style="flex:1"></span><span class="m-btn ghost">体检</span></div>
+            <div class="m-row"><span class="m-name"><b>联网搜索</b></span><span><span class="badge hi">高危</span></span><span class="m-sel">跟随平台 · 成员及以上 <i>▾</i></span><span class="m-more">详情</span></div>
+          </div>
+          <p style="font-size:12px;color:var(--sub);margin-top:6px">页面最安静，但高危提醒被藏进按钮，风险是没人点它。</p>
+        </div>
+      </div>
+      <div class="pair stack" style="margin-top:12px">
+        <div>
+          <div class="cap"><b>丙 · 预设三档卡置顶</b>（选一档=整批设档）</div>
+          <div class="m-card">
+            <div class="m-strip">
+              <span class="verdict">整体档位预设</span>
+              <span class="m-btn ghost">收紧（仅高危升管理员）</span>
+              <span class="m-btn ghost">均衡（推荐）</span>
+              <span class="m-btn ghost">开放（全部成员可用）</span>
+              <span class="m-link">先看每档会变哪几行</span>
+            </div>
+            <div class="m-hd">能力清单 …</div>
+          </div>
+          <p style="font-size:12px;color:var(--sub);margin-top:6px">第一次来最省事，但对回访的人，三个大按钮每次都在喊话——预设其实很少用第二次。</p>
+        </div>
+      </div>
+    </div>
+    <div class="opt rec"><div class="oh"><b>甲 · 体检一句话 + 两个动作</b></div><p class="why">设置页第一眼该是「有没有需要我处理的事」，体检结论正是这个答案；有事儿见按钮、没事儿一句绿字退场。预设三档不消失——收进「先看会变哪几行」的预览里（发散墙 ⑤）。</p></div>
+    <div class="opt"><div class="oh"><b>乙 · 纯清单</b></div><p class="why">最安静；但高危提醒的触达靠人主动点「体检」，收紧动作可能被漏。</p></div>
+    <div class="opt"><div class="oh"><b>丙 · 预设三档卡置顶</b></div><p class="why">首次配置体验最好；代价是低频预设常驻门面，回访时全是噪音——与设置页「安静」的定位相悖。</p></div>
+    <div class="qa"><span class="anchor">#q3</span>答：题3 选 ＿＿（甲/乙/丙）</div>
+  </div>
+
+  <div class="sec">
+    <h2><span class="no">◎</span>读板自检与产物位置</h2>
+    <p class="foot">
+      本板自检：双写两份 × 1440/390 两档零溢出、问题清单锚点可点通、每题 2–3 案 + ★推荐 + 五要素、涉 UI 的题均配方案间模拟（§2/§4/题2/题3）<b>+ §4R 真机对照 12 图全部加载成功</b>——自检脚本与截图留档 <code>.workshop/tmp/20261027-admin/</code>。<br>
+      产物：<code>.workshop/plans/20261028-caps-best-design-board.html</code>（仓内权威副本）+ 会话可视化目录（渲染中转）。<br>
+      关联：上一块板 <code>20261028-caps-mess-board.html</code>（增量五题）仍在等回执；本板题1 选甲 = 上一块板五题全按★。<br>
+      <b>本板零代码改动</b>：产品文件一行未动、无提交、无推送。答案只认对话里明说。
+    </p>
+    <div class="rev">修订记录：v1（2026-10-28）初版——十二点子发散墙、三候选、七条规矩、全景图、三题。v2（2026-10-28）用户反馈手绘示意不足以做选择，补 <b>§4R 真机模拟对照</b>：真页注入方案B/C 与题2/题3 各案，12 张真机截图（改前/改后、暗色、390、真预设UI），并经视觉席三轮复核修正（列头残留、圆片裁切、C案文案）。</div>
+  </div>
+
+</div>
+</body>
+</html>
