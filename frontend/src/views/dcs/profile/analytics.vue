@@ -39,7 +39,7 @@
       数据接入由管理员在「引擎与运维 → 引擎运维」里配置
     </p>
     <div class="meta-line">
-      <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
+      <!-- 单源重构批末: 恒单源,「数据源 dcs」技术字眼标签不再展示 -->
       <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
       <span class="muted">口径：<span class="trend-seg">使用次数=全部操作事件 ·</span> <span class="trend-seg">活跃用户=去重人员 ·</span> <span class="trend-seg">会话=一次连续使用 ·</span> <span class="trend-seg">单页离开=只做一件事就走</span></span>
     </div>
@@ -99,7 +99,7 @@
              PV/页面类指标没接页面埋点时恒 0, 必须先说清否则像坏了 -->
         <el-alert type="info" show-icon :closable="true" class="caliber-note" title="口径说明">
           <template #default>
-            本页按「统一事件流」统计系统的全部使用行为（登录、提交、审核、任务、页面浏览等）。页面浏览类指标（PV、页面与搜索、路径分析）只对接入了页面埋点的数据源有数，未接入时显示 0 属正常。
+            本页按「统一事件流」统计系统的全部使用行为（登录、提交、审核、任务、页面浏览等）。页面浏览类板块（页面与搜索、路径分析）只对接入了页面埋点的数据有数，未接入时显示 0 属正常。
           </template>
         </el-alert>
   <div v-loading="overviewLoading" class="ui-kpi-strip analytics-kpi analytics-kpi--six">
@@ -208,10 +208,10 @@
               </template>
               <el-table class="ui-table" :data="pageRows">
                 <el-table-column prop="label" label="页面" min-width="180" show-overflow-tooltip />
-                <el-table-column prop="pv" label="PV" width="80" align="right" />
-                <el-table-column prop="uv" label="UV" width="80" align="right" />
-                <el-table-column prop="visits" label="访问" width="80" align="right" />
-                <el-table-column label="PV 占比" width="140">
+                <el-table-column prop="pv" label="浏览量" width="80" align="right" />
+                <el-table-column prop="uv" label="人数" width="80" align="right" />
+                <el-table-column prop="visits" label="会话数" width="80" align="right" />
+                <el-table-column label="浏览占比" width="140">
                   <template #default="{ row }">
                     <div class="share-cell">
                       <el-progress :percentage="clamp(Number(row.share))" :show-text="false" :stroke-width="6" />

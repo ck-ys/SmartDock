@@ -2,9 +2,7 @@
   <div class="app-container studio-page">
     <dcs-operations-page-header eyebrow="画像引擎" title="画像工作室" subtitle="套场景模板点齐四件套，或自建维度配权重：改完发布，重算后生效。">
       <template #actions>
-        <el-select v-model="source" class="source-select" @change="onSourceChange">
-          <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
-        </el-select>
+        <!-- 单源重构批末: 恒单源, 源下拉退役(source 钉死内置源) -->
         <el-button @click="goBack">返回画像</el-button>
         <el-button :loading="loading" @click="loadAll">刷新</el-button>
       </template>
@@ -814,15 +812,14 @@ import {
   type ScenarioCatalog,
   type ScenarioTemplateSummary
 } from '@/api/dcs/core/profile';
-import { useSourceOptions, autoPickSource } from '@/composables/useProfileSources';
+import { useSourceOptions } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
-const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
+const { ensureSources } = useSourceOptions('subject');
 
 const router = useRouter();
 
+// 单源重构: 全站事件写入收口到内置统一源, 这里钉死不再可选
 const source = ref('dcs');
-// 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次加载, 不再双载
-const initialSource = source.value;
 const activeTab = ref('scenario');
 const loading = ref(false);
 const dimensionLoading = ref(false);
@@ -1553,10 +1550,6 @@ const removeScenario = async (tpl: ScenarioTemplateSummary) => {
   ElMessage.success('已删除');
 };
 
-const onSourceChange = async () => {
-  await loadAll();
-};
-
 const createDraft = async () => {
   ruleActionLoading.value = true;
   try {
@@ -1810,7 +1803,6 @@ onMounted(async () => {
     // 能力清单失败不阻塞页面
   }
   await ensureSources();
-  if (source.value === initialSource) autoPickSource(sourceOpts, source);
   await loadAll();
 });
 </script>
@@ -1827,11 +1819,6 @@ onMounted(async () => {
 }
 .studio-page :deep(.dcs-ops-header__actions) {
   flex-wrap: wrap;
-}
-@media (min-width: 993px) {
-  .source-select {
-    width: 150px;
-  }
 }
 /* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
 .studio-page :deep(.el-table) {

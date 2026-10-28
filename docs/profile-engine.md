@@ -14,11 +14,11 @@
 | `profile_protocol` | 业务源接入协议清单（`profile.protocol/v1`） | `source`、事件清单、主体类型、保留期 |
 | `profile_schema_registry` | 事件 Schema 注册与轻校验 | `event_name`、`schema_version`、`required`、`properties` |
 | `profile_identity_link` / `profile_identity_merge` | 身份图谱：匿名 → 登录主体归并 | `identity_type`、`identity_value`、`subject_id`、合并记录 |
-| `profile_score_dimension` | 维度治理 | `dim_code`、`source`、`calc_mode`、`calc_config(jsonb)`、`score_max`、`enabled`、`builtin` |
-| `profile_score_rule` | 评分规则/权重 | `rule_version`、`weights(jsonb)`、`enabled` |
+| `profile_score_dimension` | 维度治理（按 `subject_type` 分套） | `dim_code`、`source`、`subject_type`、`calc_mode`、`calc_config(jsonb)`、`score_max`、`enabled`、`builtin` |
+| `profile_score_rule` | 评分规则/权重（按 `subject_type` 分套） | `rule_version`、`weights(jsonb)`、`subject_type`、`enabled` |
 | `profile_recalc_batch` | 批量重算批次 | `status`、`total_subjects`、`done_subjects`、`last_subject_id`、`error_msg` |
 | `profile_score_snapshot` | 版本化快照 | `total_score`、`dimension_detail(jsonb)`、`rule_version`、`prev_snapshot_id`、`calc_time` |
-| `profile_score_model` / `profile_model_run` / `profile_model_snapshot` | 通用评分模型（RFM 只是预设） | `model_config(jsonb)`、分箱/权重、模型快照链 |
+| `profile_score_model` / `profile_model_run` / `profile_model_snapshot` | 通用评分模型（RFM 只是预设；按 `subject_type` 分套） | `model_config(jsonb)`、分箱/权重、模型快照链 |
 | `profile_segment` / `profile_segment_member` / `profile_segment_run` | 标签分群 | 规则 DSL、静态名单、成员快照、运行记录 |
 | `profile_review_queue` | 低分复核队列 | 触发来源、分数、状态、确认/忽略人 |
 | `profile_engine_config` | 按业务源的引擎开关 | 自动重算、复核、去抖窗口 |
@@ -182,8 +182,9 @@ profile_event
   | 编码 | Excel/Windows 导出的首列 BOM 会自动剥掉；换行与引号按标准 CSV 转义 |
   | 演示数据 | 官方合成演示脚本写入的数据带 `demo-` 前缀 eventUid；跨天重播前先按前缀清旧数据，否则叠加 |
 
-分析页面在「画像与分析 → 数据分析」，包含数据导入、流量概览、页面与搜索、
-路径分析、转化漏斗、留存分析、活跃分析、访问明细、自定义分析和实时看板十个页签。
+分析页面在「画像与分析 → 数据分析」，包含数据导入、使用概览、页面与搜索、
+路径分析、转化漏斗、持续使用、活跃分析、使用明细、自定义分析和实时看板十个页签
+（2026-10-28 单源换算后按「系统使用」口径统计；页面浏览类指标只对接入页面埋点的数据有数）。
 
 ## 6. 魔改指南：把画像改成你的业务（三层路径）
 

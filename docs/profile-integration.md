@@ -1,6 +1,6 @@
 # 画像接入指南（10 分钟版）
 
-> 本文是「怎么把你的业务系统接进画像」的**唯一真源**。系统内置的「任务转发」演示模块（`ruoyi-modules/ruoyi-dcs`）就是官方参考实现，本文所有写法与它的真实代码一致。
+> 本文是「怎么把你的业务系统接进画像」的**唯一真源**。系统内置的「任务转发」演示模块（`ruoyi-modules/ruoyi-dcs`）是官方参考实现，套路与本文一致；它是早期代码，事件名 setter 用的还是旧名 `setEventType`、编号第一段也没带模块名——新接入请按本文写（`setEventName` + 模块名前缀），demo 只是结构参考。
 >
 > 适用：当前版本（**单源口径已生效**：`source` 字段兼容保留，传任意值或不传都会被引擎统一收口，你的调用代码怎么写都能落库）。
 
@@ -23,14 +23,15 @@
 ## 2. 挂模块五步（新建业务模块必读）
 
 1. `backend/ruoyi-modules/pom.xml` 的模块清单加一行你的模块名；
-2. 你模块的 pom 依赖照抄 `ruoyi-dcs/pom.xml`，另加一行 `org.dromara:ruoyi-profile-engine`（版本由父工程统一管理，不用写版本号）；
+2. 你模块的 pom 依赖照抄 `ruoyi-dcs/pom.xml` 即可——它**已经包含** `org.dromara:ruoyi-profile-engine` 这行（版本由父工程统一管理），自建 pom 时照抄不要再重复声明；
 3. `backend/ruoyi-admin/pom.xml` 加上你模块的依赖。**不加这行模块不会进安装包，且不会报错**；
 4. **包名红线**：代码必须放 `com.smartdock.你的模块名` 包下。启动扫描和数据库映射扫描都按这个前缀写死，包名放错=功能静默失效；
 5. Service 里注入 `ProfileEventPublisher`（普通 Spring 接口，构造注入），照第 3 节发事件。
 
-## 3. 发第一条事件（整类可粘贴编译）
+## 3. 发第一条事件（整类可粘贴编译；import 段省略——lombok 与 profile-engine 依赖同工程已有）
 
 ```java
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class BizEventReporter {
@@ -130,7 +131,7 @@ public class BizEventReporter {
 1. 去「画像工作室」新建维度，从模板卡（活跃度/完成率/内容消费/流失风险）挑一张一键预填，把模板里的示例事件名换成你自己的；
 2. 配好权重发布 → 触发重算 → 约 2 秒内分数更新。
 
-> **警告**：不配打分规则就大量发事件，50 分低于复核线 60，会把「低分复核」队列刷满（全是假警报）。要么先配规则，要么先在引擎运维把复核暂停。
+> **说明**：未配置打分口径时，画像页会如实标注「未配置打分规则」，50 分只是占位、**不会**进入低分复核队列（旧版本会刷满队列的问题已修复）——可以放心先接事件、后配规则。
 
 ## 10. 不写 Java 也能进数据
 
@@ -138,7 +139,7 @@ public class BizEventReporter {
 
 ## 附录 A：长度与命名红线
 
-eventName ≤64 · eventUid ≤128 · subjectType ≤32 · subjectId ≤64 · anonymousId/sessionId ≤128 · schemaVersion ≤32（source 已被单源收口，不校验）。属性键名英文驼峰（`^[A-Za-z][A-Za-z0-9_]{0,62}$`）。超长直接抛错拒收。
+eventName ≤64 · eventUid ≤128 · subjectType ≤32 · subjectId ≤64 · anonymousId/sessionId ≤128 · schemaVersion ≤32（source 已被单源收口，不校验）。属性键名建议英文驼峰（`^[A-Za-z][A-Za-z0-9_]{0,62}$`）——事件入库本身不校验键名格式，但维度/评分模型配置里要按这个正则引用属性键，键名不合规的事件属性届时引用不到。字段超长直接抛错拒收。
 
 ## 附录 B：术语一句话
 

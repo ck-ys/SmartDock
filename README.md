@@ -26,8 +26,8 @@ SmartDock 是一套**通用智能体引擎**与**用户画像引擎**的参考�
 
 <table>
 <tr>
-<td width="33%"><img src="docs/images/screenshots/01-overview.png" alt="首页总览"><br><sub>首页总览：两条引擎的运行态与近 7 天流量</sub></td>
-<td width="33%"><img src="docs/images/screenshots/02-analytics.png" alt="数据分析中心"><br><sub>数据分析中心：会话重建后的 PV / UV / 跳出 / 停留</sub></td>
+<td width="33%"><img src="docs/images/screenshots/01-overview.png" alt="首页总览"><br><sub>首页总览：两条引擎的运行态与近 7 天使用次数</sub></td>
+<td width="33%"><img src="docs/images/screenshots/02-analytics.png" alt="数据分析中心"><br><sub>数据分析中心：使用次数 / 人数 / 会话 / 单页离开率</sub></td>
 <td width="33%"><img src="docs/images/screenshots/06-assistant.png" alt="AI 助手"><br><sub>AI 助手：工具调用链，查不到就说查不到</sub></td>
 </tr>
 </table>
@@ -36,10 +36,11 @@ SmartDock 是一套**通用智能体引擎**与**用户画像引擎**的参考�
   <a href="#快速开始"><b>本地 10 分钟跑起来</b></a> ｜
   <a href="docs/architecture.md"><b>分层与判定序</b></a> ｜
   <a href="docs/agent-engine.md">智能体引擎</a> ｜
-  <a href="docs/profile-engine.md">画像引擎</a>
+  <a href="docs/profile-engine.md">画像引擎</a> ｜
+  <a href="docs/profile-integration.md"><b>业务接入指南</b></a>
 </p>
 
-<sub>截图更新于 v3.28.1（双主题默认 T1 深蓝稳重）；界面数据由 `backend/script/demo/seed-analytics-demo.js` 生成的合成演示数据，不含真实个人信息。</sub>
+<sub>截图更新于 v3.34.1（单源重构 M1 批末，内部协作演示故事）；界面数据由 `backend/script/demo/seed-internal-ops-demo.js` 生成的合成演示数据，不含真实个人信息。</sub>
 
 ## 目录
 
@@ -91,8 +92,9 @@ SmartDock 是一套**通用智能体引擎**与**用户画像引擎**的参考�
 
 > **只想最快看到第一张图？** 按下面「方式一」起好后端与前端（约 3 分钟），
 > 跑一次造数脚本、点一次「重建汇总」，然后直达
-> **「画像与分析 → 数据分析」**——流量概览、漏斗、留存、明细等主要报表全部有数
-> （531 事件 / 135 会话 / 40 UV 的演示口径；实时看板只统计最近 5 分钟，演示种子是历史数据、显示为空属正常）。协议字段表与 Java 接入示例见
+> **「画像与分析 → 数据分析」**——使用概览、漏斗、留存、明细等主要报表全部有数
+> （约 292 事件 / 81 会话 / 4 位同事的内部协作演示口径；实时看板只统计最近 5 分钟，演示种子是历史数据、显示为空属正常）。Java 接入 10 分钟指南见
+> [docs/profile-integration.md](docs/profile-integration.md)，协议字段表见
 > [docs/profile-engine.md](docs/profile-engine.md#2-通用接入协议)。
 
 ### 前置条件
@@ -157,10 +159,10 @@ npm run dev
 空库也能跑，但界面没数据。想快速看到截图里的效果：
 
 ```bash
-node backend/script/demo/seed-analytics-demo.js --base http://localhost:8090 --days 30 --visitors 40
+node backend/script/demo/seed-internal-ops-demo.js --base http://localhost:8090 --days 30
 ```
 
-脚本走管理员登录 + CSV 导入端点写入合成事件（40 个访客、531 条事件），再到「数据分析 → 重建汇总」跑一次重建，即可得到 135 会话 / 316 PV / 40 UV 的演示口径。同一天重复执行幂等；跨天重播请先清掉旧的 `demo-` 前缀数据，否则会叠加。
+脚本走管理员登录 + CSV 导入端点写入合成事件（4 位同事 30 天的登录/发布/提交/审核/关闭，约 292 条），再到「数据分析 → 重建汇总」跑一次重建，即可得到约 81 会话 / 4 位同事的内部协作演示口径。同一天重复执行幂等；跨天重播请先清掉旧的 `demo-io-` 前缀数据，否则会叠加。
 
 ### 方式二：Docker Compose（Linux 服务器推荐）
 
@@ -271,7 +273,7 @@ docker compose ps        # 五个服务应为 running / healthy
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/04-profile-studio.png" alt="画像工作室"><br><sub>画像工作室：维度口径、覆盖率与权重规则</sub></td>
+<td width="50%"><img src="docs/images/screenshots/04-profile-studio.png" alt="画像工作室"><br><sub>画像工作室：7 套场景模板一键预填，维度/权重/分群/漏斗可完全自建</sub></td>
 <td width="50%"><img src="docs/images/screenshots/05-model-config.png" alt="AI 模型与钥匙"><br><sub>AI 模型与钥匙：按厂商管模型、价格、钥匙与巡检</sub></td>
 </tr>
 </table>
@@ -388,6 +390,7 @@ README 里的界面截图由 `frontend/scripts/readme-screenshots.mjs` 生成（
 
 - [智能体引擎深度文档](docs/agent-engine.md)
 - [用户画像引擎深度文档](docs/profile-engine.md)
+- [业务接入指南（10 分钟）](docs/profile-integration.md)
 - [架构设计](docs/architecture.md)
 - [使用说明（按角色走读）](docs/usage.md)
 - [部署指南](docs/deploy.md)

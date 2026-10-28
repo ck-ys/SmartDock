@@ -32,14 +32,14 @@
     </section>
 
     <div class="ov-grid" :class="{ 'is-single': !canAnalytics }">
-      <!-- 主图：近 7 天浏览量（墨青是整屏唯一的数据色） -->
+      <!-- 主图：近 7 天使用次数（墨青是整屏唯一的数据色）——E 片单源换算后口径与分析中心一致 -->
       <section v-if="canAnalytics" class="ov-panel">
         <header class="ov-panel__head">
-          <h2>近 7 天浏览量<span v-if="chart.has">合计 {{ pulse?.pv ?? 0 }}</span></h2>
+          <h2>近 7 天使用次数<span v-if="chart.has">合计 {{ pulse?.events ?? 0 }}</span></h2>
           <button type="button" class="ov-link" @click="go('/insight/profile-analytics')">分析中心 →</button>
         </header>
         <div v-if="chart.has" class="ov-chart">
-          <svg :viewBox="`0 0 ${chart.w} ${chart.h}`" role="img" aria-label="近 7 天浏览量趋势">
+          <svg :viewBox="`0 0 ${chart.w} ${chart.h}`" role="img" aria-label="近 7 天使用次数趋势">
             <g class="grid">
               <line v-for="t in chart.ticks" :key="`g${t.v}`" :x1="chart.padL" :x2="chart.w - chart.padR" :y1="t.y" :y2="t.y" />
             </g>
@@ -55,13 +55,13 @@
         <!-- 取数失败不能伪装成「还没有数据」：三条路分开说 -->
         <p v-else-if="pulseError" class="ov-empty is-error">统计接口暂时取不到数，点右上角刷新重试。</p>
         <p v-else-if="!pulseSource" class="ov-empty">
-          {{ eventSourcesEmpty ? '还没有接入任何数据源，接入后这里会出现最近 7 天的流量趋势。' : '数据源清单暂时取不到，点右上角刷新重试。' }}
+          {{ eventSourcesEmpty ? '还没有接入任何数据源，接入后这里会出现最近 7 天的使用趋势。' : '数据源清单暂时取不到，点右上角刷新重试。' }}
         </p>
         <p v-else class="ov-empty">近 7 天还没有汇总数据，事件入库后这里会出现趋势。</p>
-        <!-- 底部三项跟着图走：没有趋势时「跳出率 0% / 每次访问 0 页」只是在报空 -->
+        <!-- 底部三项跟着图走：没有趋势时「单页离开率 0% / 会话 0」只是在报空 -->
         <footer v-if="chart.has" class="ov-panel__foot">
-          <span>跳出率 {{ fmtBounce }}</span>
-          <span>每次访问 {{ fmtPages }}</span>
+          <span>单页离开率 {{ fmtBounce }}</span>
+          <span>会话数 {{ pulse?.visits ?? '—' }}</span>
           <span>平均停留 {{ avgDuration }}</span>
         </footer>
       </section>
@@ -218,10 +218,9 @@ function statNum(key: 'todo' | 'pendingAudit' | 'unreadNotices'): string {
 }
 
 const fmtBounce = computed(() => (pulse.value?.bounceRate == null ? '—' : `${pulse.value.bounceRate}%`));
-const fmtPages = computed(() => (pulse.value?.pagesPerVisit == null ? '—' : `${pulse.value.pagesPerVisit} 页`));
 
 const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-const prompts = ['近 30 天谁最不活跃？', '本周流量趋势怎么样？', '我有哪些待办？'];
+const prompts = ['近 30 天谁最不活跃？', '本周系统使用情况怎么样？', '我有哪些待办？'];
 
 /** KPI 只列当前账号真能拿到的数，拿不到的不摆空格子 */
 const kpis = computed(() => {
@@ -237,7 +236,7 @@ const kpis = computed(() => {
     list.push({
       label: '近 7 天事件',
       value: pulse.value?.events ?? '—',
-      caption: pulseSourceLabel.value ? `${pulseSourceLabel.value} · 业务事件` : noSourceText(eventSourcesEmpty.value)
+      caption: pulseSourceLabel.value ? `${pulseSourceLabel.value} · 全部操作` : noSourceText(eventSourcesEmpty.value)
     });
   }
   if (canProfile.value) {
@@ -272,7 +271,7 @@ const avgDuration = computed(() => {
 /** 7 天折线：手算 SVG，颜色全部走 --app-accent / --app-rule，深浅主题自动跟随 */
 const chart = computed(() => {
   const rows = trend.value.slice(-7);
-  const vals = rows.map((r) => Number(r.pv) || 0);
+  const vals = rows.map((r) => Number(r.events) || 0);
   // 手机档换窄画布：viewBox 随宽度缩时字会一起缩到看不清，宁可少画几列像素
   const w = viewportWidth.value <= 768 ? 322 : 560;
   const h = 170;

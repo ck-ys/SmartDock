@@ -71,18 +71,6 @@ export interface ProfileOverview {
   lastCalcTime?: string;
 }
 
-export interface ProfileRankingRow {
-  rank: number;
-  subjectType: string;
-  subjectId: string;
-  displayName?: string;
-  totalScore?: number | string;
-  dimensionScore?: number | string;
-  eventCount: number;
-  lastEventTime?: string;
-  calcTime?: string;
-}
-
 export interface ProfileDimension {
   dimensionId: string;
   tenantId: string;
@@ -240,9 +228,6 @@ export interface ProfileDetail {
 
 // ---------------------------------------------------------------- 查询面
 
-export const pageSubjects = (params?: Partial<ProfileSubjectQuery> & Record<string, unknown>) =>
-  table<ProfileSubjectRow>({ url: `${BASE}/subject/page`, method: 'get', params });
-
 /** 画像主视图行(单源重构 M1·题0-甲): user 视图=sys_user 全员(没事件也列出), 其余身份类型=主体登记跨源聚合 */
 export interface ProfileMainViewRow {
   subjectType: string;
@@ -274,9 +259,6 @@ export const pageSubjectMainView = (
 
 export const getOverview = (source: string, subjectType?: string): Promise<ProfileOverview> =>
   r<ProfileOverview>({ url: `${BASE}/overview`, method: 'get', params: { source, subjectType } });
-
-export const getRanking = (params: { source: string; subjectType?: string; dimension?: string; limit?: number }): Promise<ProfileRankingRow[]> =>
-  r<ProfileRankingRow[]>({ url: `${BASE}/ranking`, method: 'get', params });
 
 export const getScore = (source: string, subjectId: string, subjectType = 'user', tail = 8): Promise<ProfileDetail> =>
   r<ProfileDetail>({ url: `${BASE}/score/${source}/${subjectId}`, method: 'get', params: { subjectType, tail } });
@@ -879,20 +861,6 @@ export const updateEngineConfig = (data: Record<string, any>): Promise<ProfileEn
 
 // ---------------------------------------------------------------- 内部类型
 
-export interface ProfileSubjectQuery {
-  source?: string;
-  subjectType?: string;
-  keyword?: string;
-  minScore?: number;
-  maxScore?: number;
-  /** 风险档筛选: HIGH / MEDIUM / LOW（阈值由 /profile/risk-bands 单源下发） */
-  risk?: string;
-  sortBy?: string;
-  sortOrder?: string;
-  pageNum?: number;
-  pageSize?: number;
-}
-
 /** 风险分档阈值（后端单一来源，前端不再硬编码 75/60） */
 export interface ProfileRiskBands {
   mediumMin: number;
@@ -936,20 +904,6 @@ export const listProfileSources = (): Promise<ProfileSourceSummary> => r<Profile
 // ---------------------------------------------------------------- 第二批: 来源改名/停用
 
 /** 来源管理行: 显示名/启停为配置覆盖层(未配置=默认启用/空显示名), 计数现算 */
-export interface ProfileSourceConfigRow {
-  source: string;
-  displayName?: string | null;
-  enabled: string;
-  subjects?: number | string;
-  events?: number | string;
-}
-
-export const listSourceConfigs = (): Promise<ProfileSourceConfigRow[]> =>
-  r<ProfileSourceConfigRow[]>({ url: `${BASE}/source-config/list`, method: 'get' });
-
-export const saveSourceConfig = (data: { source: string; displayName?: string; enabled?: string }): Promise<void> =>
-  r<void>({ url: `${BASE}/source-config/save`, method: 'post', data });
-
 export const getSubjectSummary = (subjectId: string, subjectType = 'user', source?: string): Promise<ProfileSubjectSummary> =>
   r<ProfileSubjectSummary>({ url: `${BASE}/subject/summary`, method: 'get', params: { subjectId, subjectType, source: source || undefined } });
 
@@ -1156,4 +1110,4 @@ export const exportScenarioTemplate = (params: { code?: string; templateId?: str
   r<Record<string, any>>({ url: `${BASE}/scenario/export`, method: 'get', params });
 
 export const deleteScenarioTemplate = (templateId: string): Promise<boolean> =>
-  r<boolean>({ url: `${BASE}/scenario/${templateId}`, method: 'delete' });
+  r<boolean>({ url: `${BASE}/scenario/${templateId}/delete`, method: 'post' });
