@@ -26,7 +26,7 @@ public interface AnalyticsEventMapper {
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND occurred_time >= #{from} AND occurred_time < #{to}
-          AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
+          AND del_flag = '0'
         ORDER BY occurred_time, event_id
         """)
     List<AnalyticsEventRow> selectEvents(@Param("tenantId") String tenantId,
@@ -71,7 +71,7 @@ public interface AnalyticsEventMapper {
         FROM profile_event pe
         WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source}
           AND pe.occurred_time >= #{from} AND pe.occurred_time < #{to}
-          AND pe.del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
+          AND pe.del_flag = '0'
           AND COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) IN (
               SELECT COALESCE(NULLIF(a.anonymous_id, ''), a.subject_id)
               FROM profile_event a
@@ -204,7 +204,7 @@ public interface AnalyticsEventMapper {
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND COALESCE(NULLIF(anonymous_id, ''), subject_id) = #{visitorKey}
           AND occurred_time >= #{from} AND occurred_time < #{to}
-          AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
+          AND del_flag = '0'
         ORDER BY occurred_time, event_id
         """)
     List<AnalyticsEventRow> selectVisitorEvents(@Param("tenantId") String tenantId,
@@ -214,7 +214,8 @@ public interface AnalyticsEventMapper {
                                                 @Param("to") Date to);
 
     /**
-     * 实时看板（批8）：按分钟的浏览/事件/访客桶。
+     * 实时看板（批8）：按分钟的浏览/事件/用户桶。
+     * E 片起统一事件流（含自监控操作）进实时口径——「当前活跃」就是有人在操作。
      */
     @Select("""
         SELECT to_char(date_trunc('minute', occurred_time), 'YYYY-MM-DD HH24:MI') AS "minute",
@@ -223,7 +224,7 @@ public interface AnalyticsEventMapper {
                count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id)) AS "visitors"
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
         GROUP BY 1
         ORDER BY 1
         """)
@@ -233,13 +234,13 @@ public interface AnalyticsEventMapper {
                                                     @Param("to") Date to);
 
     /**
-     * 批4B: 窗口去重访客数下推 COUNT(DISTINCT), 不再拉列表进 Java 数 size。
-     * 访客键口径不变: COALESCE(NULLIF(anonymous_id,''), subject_id)。
+     * 批4B: 窗口去重用户数下推 COUNT(DISTINCT), 不再拉列表进 Java 数 size。
+     * 用户键口径: COALESCE(NULLIF(anonymous_id,''), subject_id)。
      */
     @Select("""
         SELECT count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id)) FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
         """)
     long countWindowVisitors(@Param("tenantId") String tenantId,
                              @Param("source") String source,
@@ -258,14 +259,14 @@ public interface AnalyticsEventMapper {
     List<Map<String, Object>> selectActivePairsSince(@Param("from") Date from);
 
     /**
-     * 活跃口径（批8）：天 × 访客 去重对（DAU/WAU/MAU 滚动窗口的原料）。
+     * 活跃口径（批8）：天 × 用户 去重对（DAU/WAU/MAU 滚动窗口的原料）。
      */
     @Select("""
         SELECT DISTINCT to_char(date_trunc('day', occurred_time), 'YYYY-MM-DD') AS "day",
                COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey"
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
         ORDER BY 1
         """)
     List<Map<String, Object>> selectDailyActiveVisitors(@Param("tenantId") String tenantId,
@@ -335,4 +336,68 @@ public interface AnalyticsEventMapper {
         GROUP BY source ORDER BY source
         """)
     List<java.util.Map<String, Object>> selectEventSourcesRaw(@Param("tenantId") String tenantId);
+
+    /**
+     * E 片上手指标(题2·第一眼): 周活/本周新同事/首周激活/两步漏斗, 一次查询带回。
+     * 用户键口径与其余读侧一致: COALESCE(NULLIF(anonymous_id,''), subject_id)。
+     * 首次使用取首见物化表; 动作名单由调用方传 SelfMonitorEvents.ACTED_OPERATIONS(本人主动, 不含被动记账)。
+     * 三席回修: ①newUsers/activated 都要求该键在事件账本里真实存在(防合并残留/删事件留下的幽灵首见行);
+     * ②coreUsers 带 EXISTS 登录嵌套——漏斗第二步必须是第一步的子集, 否则长会话(登录在窗口外)会让上手率 &gt;100%;
+     * ③activated 子查询上下界钉到固定参数(weekFrom/activationEnd), 让规划器走范围扫描而不是逐行相关子查询。
+     */
+    @Select("""
+        <script>
+        SELECT
+          (SELECT count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id))
+             FROM profile_event
+             WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+               AND occurred_time &gt;= #{weekFrom} AND occurred_time &lt; #{to}) AS "weeklyActive",
+          (SELECT count(*) FROM analytics_visitor_first_seen fs
+             WHERE fs.tenant_id = #{tenantId} AND fs.source = #{source}
+               AND fs.first_seen &gt;= #{weekFrom} AND fs.first_seen &lt; #{to}
+               AND EXISTS (SELECT 1 FROM profile_event pe
+                   WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source} AND pe.del_flag = '0'
+                     AND COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) = fs.visitor_key
+                     AND pe.occurred_time &gt;= #{weekFrom} AND pe.occurred_time &lt; #{to})) AS "newUsers",
+          (SELECT count(*) FROM analytics_visitor_first_seen fs
+             WHERE fs.tenant_id = #{tenantId} AND fs.source = #{source}
+               AND fs.first_seen &gt;= #{weekFrom} AND fs.first_seen &lt; #{to}
+               AND EXISTS (SELECT 1 FROM profile_event pe
+                   WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source} AND pe.del_flag = '0'
+                     AND COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) = fs.visitor_key
+                     AND pe.event_name IN
+                     <foreach collection="coreNames" item="n" open="(" separator="," close=")">#{n}</foreach>
+                     AND pe.occurred_time &gt;= fs.first_seen
+                     AND pe.occurred_time &gt;= #{weekFrom}
+                     AND pe.occurred_time &lt; fs.first_seen + interval '7 days'
+                     AND pe.occurred_time &lt; #{activationEnd})) AS "activated",
+          (SELECT count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id))
+             FROM profile_event
+             WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+               AND event_name = #{loginName}
+               AND occurred_time &gt;= #{from} AND occurred_time &lt; #{to}) AS "loginUsers",
+          (SELECT count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id))
+             FROM profile_event pe
+             WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source} AND pe.del_flag = '0'
+               AND pe.event_name IN
+               <foreach collection="coreNames" item="n" open="(" separator="," close=")">#{n}</foreach>
+               AND pe.occurred_time &gt;= #{from} AND pe.occurred_time &lt; #{to}
+               AND EXISTS (SELECT 1 FROM profile_event lg
+                   WHERE lg.tenant_id = #{tenantId} AND lg.source = #{source} AND lg.del_flag = '0'
+                     AND lg.event_name = #{loginName}
+                     AND COALESCE(NULLIF(lg.anonymous_id, ''), lg.subject_id) = COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id)
+                     AND lg.occurred_time &gt;= #{from} AND lg.occurred_time &lt; #{to})) AS "coreUsers",
+          (SELECT count(*) FROM profile_event
+             WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+               AND occurred_time &gt;= #{from} AND occurred_time &lt; #{to}) AS "events"
+        </script>
+        """)
+    Map<String, Object> selectAdoption(@Param("tenantId") String tenantId,
+                                       @Param("source") String source,
+                                       @Param("from") Date from,
+                                       @Param("to") Date to,
+                                       @Param("weekFrom") Date weekFrom,
+                                       @Param("activationEnd") Date activationEnd,
+                                       @Param("loginName") String loginName,
+                                       @Param("coreNames") List<String> coreNames);
 }

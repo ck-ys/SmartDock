@@ -41,7 +41,7 @@
     <div class="meta-line">
       <el-tag effect="plain" type="info">数据源 {{ source }}</el-tag>
       <span class="muted">统计区间 {{ overview.from || '—' }} ~ {{ overview.to || '—' }}</span>
-      <span class="muted">口径：<span class="trend-seg">PV=页面浏览 ·</span> <span class="trend-seg">UV=去重访客 ·</span> <span class="trend-seg">访问次数=去重会话 ·</span> <span class="trend-seg">跳出=只看一页</span></span>
+      <span class="muted">口径：<span class="trend-seg">使用次数=全部操作事件 ·</span> <span class="trend-seg">活跃用户=去重人员 ·</span> <span class="trend-seg">会话=一次连续使用 ·</span> <span class="trend-seg">单页离开=只做一件事就走</span></span>
     </div>
 
     <el-tabs v-model="tab" class="analytics-tabs" @tab-change="onTabChange">
@@ -80,7 +80,7 @@
             <div class="ui-kpi" v-for="s in crossData.sources" :key="s.source">
               <span class="ui-kpi__label">{{ s.source }} 事件</span>
               <strong class="ui-kpi__value">{{ formatNumber(s.events) }}</strong>
-              <span class="ui-kpi__hint">访客 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
+              <span class="ui-kpi__hint">人数 {{ formatNumber(s.visitors) }} · 最近写入 {{ formatLastAt(s.lastAt) }}</span>
             </div>
           </div>
           <el-alert v-if="loadErrors.cross" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
@@ -90,46 +90,62 @@
           <p class="muted small">画像引擎按统一事件协议接收任意业务源（网站 / 订单 / 供应链…）；每个源独立统计互不混算。</p>
         </el-card>
       </el-tab-pane>
-      <!-- ---------------------------------------------------------- 流量概览 -->
-      <el-tab-pane label="流量概览" name="overview">
-        <el-alert v-if="loadErrors.overview" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+      <!-- ---------------------------------------------------------- 使用概览（E 片单源重构：访客流→系统使用流） -->
+      <el-tab-pane label="使用概览" name="overview">
+        <el-alert v-if="loadErrors.overview || loadErrors.adoption" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
           <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
         </el-alert>
-  <div v-loading="overviewLoading" class="ui-kpi-strip analytics-kpi">
+        <!-- E 片单源重构: 口径升级说明——统计对象从"网站访客流"换成"系统统一事件流",
+             PV/页面类指标没接页面埋点时恒 0, 必须先说清否则像坏了 -->
+        <el-alert type="info" show-icon :closable="true" class="caliber-note" title="口径说明">
+          <template #default>
+            本页按「统一事件流」统计系统的全部使用行为（登录、提交、审核、任务、页面浏览等）。页面浏览类指标（PV、页面与搜索、路径分析）只对接入了页面埋点的数据源有数，未接入时显示 0 属正常。
+          </template>
+        </el-alert>
+  <div v-loading="overviewLoading" class="ui-kpi-strip analytics-kpi analytics-kpi--six">
           <div class="ui-kpi">
-            <span class="ui-kpi__label">浏览量 PV</span>
-            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.pv) }}</strong>
-            <span class="ui-kpi__hint delta" :class="deltaTone('pv')">{{ deltaText('pv') }}</span>
+            <span class="ui-kpi__label">周活（近 7 天）</span>
+            <strong class="ui-kpi__value">{{ formatNumber(adoption?.weeklyActive) }}</strong>
+            <span class="ui-kpi__hint">近 7 天用过系统的人数</span>
           </div>
           <div class="ui-kpi">
-            <span class="ui-kpi__label">访客数 UV</span>
+            <span class="ui-kpi__label">新同事（近 7 天）</span>
+            <strong class="ui-kpi__value">{{ formatNumber(adoption?.newUsers) }}</strong>
+            <span class="ui-kpi__hint">首周激活 {{ formatNumber(adoption?.activated) }} 人 · {{ activationRateText }}</span>
+          </div>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">使用次数</span>
+            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.events) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('events')">{{ deltaText('events') }}</span>
+          </div>
+          <div class="ui-kpi">
+            <span class="ui-kpi__label">活跃用户</span>
             <strong class="ui-kpi__value">{{ formatNumber(overview.current?.uv) }}</strong>
             <span class="ui-kpi__hint delta" :class="deltaTone('uv')">{{ deltaText('uv') }}</span>
           </div>
           <div class="ui-kpi">
-            <span class="ui-kpi__label">访问次数</span>
-            <strong class="ui-kpi__value">{{ formatNumber(overview.current?.visits) }}</strong>
-            <span class="ui-kpi__hint delta" :class="deltaTone('visits')">{{ deltaText('visits') }}</span>
+            <span class="ui-kpi__label">单页离开率</span>
+            <strong class="ui-kpi__value">{{ formatPercent(overview.current?.bounceRate) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('bounceRate')">{{ deltaText('bounceRate') }}</span>
           </div>
           <div class="ui-kpi">
-            <span class="ui-kpi__label">新访客占比</span>
-            <strong class="ui-kpi__value">{{ formatPercent(overview.current?.newRate) }}</strong>
-            <span class="ui-kpi__hint">新 {{ overview.current?.newVisitors ?? 0 }} / 回访 {{ overview.current?.returningVisitors ?? 0 }}</span>
+            <span class="ui-kpi__label">平均停留</span>
+            <strong class="ui-kpi__value">{{ formatDuration(overview.current?.avgDuration) }}</strong>
+            <span class="ui-kpi__hint delta" :class="deltaTone('avgDuration')">{{ deltaText('avgDuration') }}</span>
           </div>
-          <!-- U-22：跳出/停留/页次/事件数四个次要指标降级，并入下方流量趋势卡头部小字（8 格收 4 格） -->
         </div>
 
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="panel-head">
-              <span>流量趋势</span>
+              <span>使用趋势</span>
               <span class="muted trend-sub" v-if="overview.current">
                 <!-- P8④(2026-10-27 拍板A)：按「·」分段 nowrap，窄屏整段换行、段内不断，不再拆出「531」孤行；
                      分隔符随上一段走（并进 span），避免折行后「·」孤悬行首（四席复审 P1-4） -->
-                <span class="trend-seg">跳出 {{ formatPercent(overview.current?.bounceRate) }} ·</span>
-                <span class="trend-seg">停留 {{ formatDuration(overview.current?.avgDuration) }} ·</span>
-                <span class="trend-seg">页次 {{ formatNumber(overview.current?.pagesPerVisit, 2) }} ·</span>
-                <span class="trend-seg">事件 {{ formatNumber(overview.current?.events) }}</span>
+                <span class="trend-seg">会话 {{ formatNumber(overview.current?.visits) }} ·</span>
+                <span class="trend-seg">次均操作 {{ avgActionsText }} ·</span>
+                <span class="trend-seg">新用户 {{ formatNumber(overview.current?.newVisitors) }} ·</span>
+                <span class="trend-seg">老用户 {{ formatNumber(overview.current?.returningVisitors) }}</span>
               </span>
             </div>
           </template>
@@ -149,14 +165,14 @@
               <template #header>
                 <div class="panel-head">
                   <span>{{ block.title }}</span>
-                  <span class="muted">{{ block.hint }} · 点击行下钻访问明细</span>
+                  <span class="muted">{{ block.hint }} · 点击行下钻使用明细</span>
                 </div>
               </template>
               <el-table class="ui-table drill-table" :data="breakdowns[block.type] || []" :show-header="true" @row-click="(row: AnalyticsBreakdownRow) => drillToSessions(block.type, row)">
                 <el-table-column prop="label" :label="block.label" min-width="140" show-overflow-tooltip />
-                <el-table-column prop="pv" label="PV" width="76" align="right" />
-                <el-table-column prop="uv" label="UV" width="76" align="right" />
-                <el-table-column prop="visits" label="访问" width="76" align="right" />
+                <el-table-column prop="events" label="次数" width="76" align="right" />
+                <el-table-column prop="uv" label="人数" width="76" align="right" />
+                <el-table-column prop="visits" label="会话" width="76" align="right" />
                 <el-table-column label="占比" width="130">
                   <template #default="{ row }">
                     <div class="share-cell">
@@ -277,16 +293,48 @@
             <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
           </el-empty>
           <p class="muted small">
-            口径与转化漏斗一致：每位访客只取首次顺序走过的路径，连续重复页折叠为一步；线越粗走的人越多，鼠标悬停节点可看它通向哪里。带 ·2/·3
-            的节点表示该页在第 2/3 步被再次到达（按步分层，回访不会成环）。
+            口径与转化漏斗一致：每位用户只取首次顺序走过的路径，连续重复页折叠为一步；线越粗走的人越多，鼠标悬停节点可看它通向哪里。带 ·2/·3
+            的节点表示该页在第 2/3 步被再次到达（按步分层，再次到达不会成环）。
           </p>
         </el-card>
       </el-tab-pane>
 
       <el-tab-pane label="转化漏斗" name="funnel" lazy>
-        <el-alert v-if="loadErrors.funnels || loadErrors.funnelResult" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
+        <el-alert v-if="loadErrors.funnels || loadErrors.funnelResult || loadErrors.adoption" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
           <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
         </el-alert>
+
+        <!-- E 片两步上手漏斗: 固定口径(登录→首次核心动作), 不需要用户配置, 进页签即有答案 -->
+        <el-card shadow="never" class="panel-card" v-loading="adoptionLoading">
+          <template #header>
+            <div class="panel-head">
+              <span>两步上手</span>
+              <span class="muted">近 {{ adoption?.days ?? days }} 天 · 登录 → 首次核心动作</span>
+            </div>
+          </template>
+          <div class="funnel-list">
+            <div class="funnel-step">
+              <div class="funnel-step-head">
+                <div class="funnel-name"><span class="funnel-index">1</span><span>登录过系统</span><code class="mono">user.login</code></div>
+                <div class="funnel-numbers"><strong>{{ formatNumber(adoption?.loginUsers) }}</strong><span class="muted">人</span></div>
+              </div>
+              <div class="funnel-bar"><div class="funnel-bar-inner" :style="{ width: adoption?.loginUsers ? '100%' : '0%' }" /></div>
+            </div>
+            <div class="funnel-step">
+              <div class="funnel-step-head">
+                <div class="funnel-name"><span class="funnel-index">2</span><span>完成任一核心动作</span><code class="mono">发布 / 提交 / 审核 / 关闭</code></div>                <div class="funnel-numbers">
+                  <strong>{{ formatNumber(adoption?.coreUsers) }}</strong>
+                  <span class="muted">人 · 上手率 {{ twoStepRateText }}</span>
+                </div>
+              </div>
+              <div class="funnel-bar"><div class="funnel-bar-inner" :style="{ width: twoStepWidth }" /></div>
+            </div>
+          </div>
+          <p class="muted small" style="margin-top: 8px">
+            核心动作名单：发布任务、提交数据、完成审核、关闭任务（审核结果不算提交人的动作）。上手率 = 完成核心动作的人数 ÷
+            登录过的人数。首周激活按入职后自然 7 天计，刚入职几天的同事仍在观察期，读数偏低属正常。
+          </p>
+        </el-card>
 
         <el-card shadow="never" class="panel-card">
           <template #header>
@@ -298,7 +346,6 @@
                 </el-select>
                 <el-select v-model="funnelBreakdown" style="width: 132px" @change="loadFunnelResult">
                   <el-option label="整体口径" value="" />
-                  <el-option label="按渠道拆解" value="channel" />
                   <el-option label="按设备拆解" value="device" />
                   <el-option label="按系统拆解" value="os" />
                   <el-option label="按浏览器拆解" value="browser" />
@@ -325,7 +372,7 @@
           <template v-else-if="funnelResult">
             <div class="funnel-meta">
               <el-tag effect="plain">窗口 {{ funnelResult.windowDays }} 天</el-tag>
-              <span class="muted">参与访客 {{ funnelResult.visitors }} 人 · 整体转化 {{ formatPercent(funnelResult.overallRate) }}</span>
+              <span class="muted">参与用户 {{ funnelResult.visitors }} 人 · 整体转化 {{ formatPercent(funnelResult.overallRate) }}</span>
             </div>
             <div class="funnel-list">
               <div v-for="(step, index) in funnelResult.steps" :key="`${step.eventName}-${index}`" class="funnel-step">
@@ -352,7 +399,7 @@
             <template v-if="funnelResult.breakdownGroups?.length">
               <el-table class="ui-table" :data="funnelResult.breakdownGroups" style="margin-top: 14px">
                 <el-table-column prop="label" label="拆解组" min-width="120" fixed />
-                <el-table-column prop="visitors" label="参与访客" width="96" align="right" />
+                <el-table-column prop="visitors" label="参与用户" width="96" align="right" />
                 <el-table-column v-for="(gs, gi) in funnelResult.steps" :key="`bg-${gi}`" min-width="104" align="center">
                   <template #header>
                     <span>第{{ gi + 1 }}步 {{ gs.name || gs.eventName }}</span>
@@ -367,7 +414,7 @@
                 </el-table-column>
               </el-table>
               <div class="muted small" style="margin-top: 6px">
-                拆解口径: 按访客首步事件的「{{ funnelBreakdownLabel }}」取值分组(Top10 之外并入「其他」), 各组参与访客之和 = 整体参与访客(每访客只归一组)。
+                拆解口径: 按用户首步事件的「{{ funnelBreakdownLabel }}」取值分组(Top10 之外并入「其他」), 各组参与用户之和 = 整体参与用户(每用户只归一组)。
               </div>
             </template>
           </template>
@@ -393,51 +440,25 @@
           </div>
         </el-card>
 
-        <el-alert v-if="loadErrors.attribution" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
-          <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
-        </el-alert>
-  <el-card shadow="never" class="panel-card" v-loading="attributionLoading">
-          <template #header>
-            <div class="panel-head">
-              <span>渠道归因</span>
-              <div class="head-actions attribution-head">
-                <el-select v-model="conversionEvent" style="width: 160px" @change="loadAttribution">
-                  <el-option v-for="ev in conversionEventOptions" :key="ev.value" :label="ev.label" :value="ev.value" />
-                </el-select>
-                <span class="muted">共 {{ attributionData?.conversions ?? 0 }} 次转化</span>
-              </div>
-            </div>
-          </template>
-          <el-table v-if="attributionData?.rows?.length" class="ui-table" :data="attributionData.rows">
-            <el-table-column prop="channel" label="渠道" min-width="110" />
-            <el-table-column prop="first" label="首次归因" width="90" align="right" />
-            <el-table-column prop="last" label="末次归因" width="90" align="right" />
-            <el-table-column prop="linear" label="线性" width="80" align="right" />
-            <el-table-column prop="visitors" label="触达访客" width="90" align="right" />
-          </el-table>
-          <el-empty v-else-if="!loadErrors.attribution" :image-size="50" description="窗口期内没有转化事件，无法归因">
-            <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
-          </el-empty>
-          <p class="muted small">首次=最早带来的渠道记功；末次=临门一脚记功；线性=沿途触点平分。只统计转化发生之前的访问。</p>
-        </el-card>
+        <!-- E 片单源重构: 渠道归因卡整卡退役——"渠道"是外部网站投放概念, 内部系统统一事件流没有渠道字段, 恒空 -->
 
         <el-card shadow="never" class="panel-card tip-card">
           <div class="tip-copy">
             <strong>怎么读？</strong>
-            <p>每一步按访客「首次满足顺序」计数；窗口天数限制相邻两步的最大间隔。跨会话回访超过窗口不累计，避免把隔天回访误算成一次转化。</p>
+            <p>每一步按用户「首次满足顺序」计数；窗口天数限制相邻两步的最大间隔。跨会话回来超过窗口不累计，避免把隔天回来误算成一次转化。</p>
           </div>
         </el-card>
       </el-tab-pane>
 
       <!-- ---------------------------------------------------------- 留存 -->
-      <el-tab-pane label="留存分析" name="retention" lazy>
+      <el-tab-pane label="持续使用" name="retention" lazy>
         <el-alert v-if="loadErrors.retention" type="error" show-icon :closable="false" title="加载失败——服务可能不可用" class="load-error">
           <el-button size="small" type="primary" @click="retryFailed">重试</el-button>
         </el-alert>
   <el-card shadow="never" class="panel-card" v-loading="retentionLoading">
           <template #header>
             <div class="panel-head">
-              <span>访客留存</span>
+              <span>持续使用</span>
               <div class="head-actions">
                 <span v-if="retentionEffectiveDays > days" class="muted small">近 {{ retentionEffectiveDays }} 天</span>
                 <el-select v-model="retentionGranularity" style="width: 92px" @change="onRetentionGranularityChange">
@@ -457,8 +478,8 @@
           </template>
           <template v-if="retention.cohorts?.length">
             <el-table class="ui-table retention-table" :data="retention.cohorts">
-              <el-table-column prop="cohort" label="首次访问" width="120" fixed />
-              <el-table-column prop="total" label="新增访客" width="96" align="right" />
+              <el-table-column prop="cohort" label="首次使用" width="120" fixed />
+              <el-table-column prop="total" label="新增用户" width="96" align="right" />
               <el-table-column v-for="i in retention.window" :key="i" :label="`第 ${i - 1} ${retentionUnit}`" min-width="78" align="center">
                 <template #default="{ row }">
                   <div class="retention-cell" :style="retentionStyle(row.cells[i - 1])">
@@ -469,14 +490,14 @@
               </el-table-column>
             </el-table>
             <div class="retention-legend muted small">
-              <span>回访率</span>
+              <span>回来继续用的比例</span>
               <span class="retention-legend__swatch" :style="{ background: alpha(ct.accent, 0.12) }" />
               <span class="retention-legend__swatch" :style="{ background: alpha(ct.accent, 0.35) }" />
               <span class="retention-legend__swatch" :style="{ background: alpha(ct.accent, 0.85) }" />
-              <span>越高色越深（无回访不着色）</span>
+              <span>越高色越深（没人回来不着色）</span>
             </div>
           </template>
-          <el-empty v-else-if="!loadErrors.retention" :image-size="60" description="暂无留存数据">
+          <el-empty v-else-if="!loadErrors.retention" :image-size="60" description="暂无持续使用数据">
             <el-button type="primary" link @click="tab = 'collect'">去导入数据</el-button>
           </el-empty>
         </el-card>
@@ -515,26 +536,23 @@
           </div>
           <v-chart v-if="activityData?.dayList?.length" class="trend-chart" :option="activityOption" autoresize />
           <div class="muted small" style="margin-top: 8px">
-            最新一天（{{ activityData?.newVsReturning?.statDate || '—' }}）构成：新访客
-            {{ formatNumber(activityData?.newVsReturning?.newVisitors) }} 人 · 回访客
+            最新一天（{{ activityData?.newVsReturning?.statDate || '—' }}）构成：新用户
+            {{ formatNumber(activityData?.newVsReturning?.newVisitors) }} 人 · 老用户
             {{ formatNumber(activityData?.newVsReturning?.returningVisitors) }} 人
           </div>
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="访问明细" name="sessions" lazy>
+      <el-tab-pane label="使用明细" name="sessions" lazy>
         <el-card shadow="never" class="panel-card">
           <div class="filter-bar">
-            <el-input v-model="sessionQuery.keyword" placeholder="访客/主体/落地页" clearable style="width: 200px" @keyup.enter="searchSessions" />
-            <el-select v-model="sessionQuery.channel" placeholder="渠道" clearable style="width: 130px">
-              <el-option v-for="item in channelOptions" :key="item" :label="item" :value="item" />
+            <el-input v-model="sessionQuery.keyword" placeholder="人员/主体/页面" clearable style="width: 200px" @keyup.enter="searchSessions" />
+            <el-select v-model="sessionQuery.deviceType" placeholder="终端" clearable style="width: 120px">
+              <el-option label="电脑" value="desktop" />
+              <el-option label="手机" value="mobile" />
+              <el-option label="平板" value="tablet" />
             </el-select>
-            <el-select v-model="sessionQuery.deviceType" placeholder="设备" clearable style="width: 120px">
-              <el-option label="desktop" value="desktop" />
-              <el-option label="mobile" value="mobile" />
-              <el-option label="tablet" value="tablet" />
-            </el-select>
-            <el-select v-model="sessionQuery.bounce" placeholder="跳出" clearable style="width: 110px">
+            <el-select v-model="sessionQuery.bounce" placeholder="单页离开" clearable style="width: 110px">
               <el-option label="是" value="1" />
               <el-option label="否" value="0" />
             </el-select>
@@ -560,30 +578,29 @@
   <el-table class="ui-table" :data="sessions" v-loading="sessionLoading">
             <template #empty>
               <div class="ui-empty">
-                <p class="ui-empty__title">当前筛选下没有访问记录</p>
+                <p class="ui-empty__title">当前筛选下没有使用记录</p>
                 <p class="ui-empty__hint">调整筛选条件，或确认该业务源已有事件写入</p>
               </div>
             </template>
-            <el-table-column prop="visitorId" label="访客" min-width="130" show-overflow-tooltip />
+            <el-table-column prop="visitorId" label="用户" min-width="130" show-overflow-tooltip />
             <el-table-column prop="startedAt" label="开始时间" width="170" />
-            <el-table-column prop="sourceChannel" label="渠道" width="100" />
-            <el-table-column prop="entryPage" label="落地页" min-width="140" show-overflow-tooltip />
-            <el-table-column prop="exitPage" label="离开页" min-width="140" show-overflow-tooltip />
-            <el-table-column prop="pageViews" label="PV" width="66" align="right" />
+            <el-table-column prop="entryPage" label="起始页" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="exitPage" label="结束页" min-width="140" show-overflow-tooltip />
+            <el-table-column prop="pageViews" label="浏览" width="66" align="right" />
             <el-table-column prop="durationSeconds" label="时长" width="88" align="right">
               <template #default="{ row }">{{ formatDuration(row.durationSeconds) }}</template>
             </el-table-column>
-            <el-table-column label="新访客" width="86">
+            <el-table-column label="新老" width="86">
               <template #default="{ row }">
                 <el-tag size="small" :type="row.isNewVisitor === '1' ? 'success' : 'info'" effect="plain">
-                  {{ row.isNewVisitor === '1' ? '新' : '回访' }}
+                  {{ row.isNewVisitor === '1' ? '新' : '老' }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="跳出" width="76">
+            <el-table-column label="单页离开" width="92">
               <template #default="{ row }">
                 <el-tag size="small" :type="row.isBounce === '1' ? 'warning' : 'success'" effect="plain">
-                  {{ row.isBounce === '1' ? '跳出' : '继续' }}
+                  {{ row.isBounce === '1' ? '单页' : '多步' }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -605,22 +622,19 @@
             <el-select v-model="customForm.dimension" style="width: 160px" @change="loadCustom">
               <el-option label="按天" value="day" />
               <el-option label="页面" value="page" />
-              <el-option label="渠道" value="channel" />
-              <el-option label="投放活动" value="campaign" />
-              <el-option label="设备" value="device" />
+              <el-option label="事件" value="event" />
+              <el-option label="终端" value="device" />
               <el-option label="浏览器" value="browser" />
               <el-option label="操作系统" value="os" />
-              <el-option label="地域" value="geo" />
-              <el-option label="落地页" value="entry" />
-              <el-option label="离开页" value="exit" />
+              <el-option label="起始页" value="entry" />
+              <el-option label="结束页" value="exit" />
               <el-option label="搜索词" value="search" />
-              <el-option label="事件" value="event" />
             </el-select>
             <el-select v-model="customForm.metric" style="width: 140px" @change="loadCustom">
-              <el-option label="PV" value="pv" />
-              <el-option label="UV" value="uv" />
-              <el-option label="访问次数" value="visits" />
-              <el-option label="事件数" value="events" />
+              <el-option label="次数" value="events" />
+              <el-option label="人数" value="uv" />
+              <el-option label="会话数" value="visits" />
+              <el-option label="页面浏览" value="pv" />
             </el-select>
             <el-radio-group v-model="customForm.limit" @change="loadCustom">
               <el-radio-button :value="10">Top 10</el-radio-button>
@@ -673,19 +687,19 @@
           </template>
           <div class="ui-kpi-strip analytics-kpi">
             <div class="ui-kpi">
-              <span class="ui-kpi__label">在线访客</span>
+              <span class="ui-kpi__label">当前活跃</span>
               <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.visitors) }}</strong>
-            </div>
-            <div class="ui-kpi">
-              <span class="ui-kpi__label">页面浏览</span>
-              <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.pv) }}</strong>
             </div>
             <div class="ui-kpi">
               <span class="ui-kpi__label">事件</span>
               <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.events) }}</strong>
             </div>
             <div class="ui-kpi">
-              <span class="ui-kpi__label">新访客</span>
+              <span class="ui-kpi__label">页面浏览</span>
+              <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.pv) }}</strong>
+            </div>
+            <div class="ui-kpi">
+              <span class="ui-kpi__label">新用户</span>
               <strong class="ui-kpi__value">{{ formatNumber(realtimeData?.summary?.newVisitors) }}</strong>
             </div>
           </div>
@@ -693,29 +707,25 @@
             <i
               v-for="m in realtimeData?.minutes || []"
               :key="m.minute"
-              :style="{ height: pulseHeight(m.pv) }"
-              :title="`${m.minute} · 浏览 ${m.pv} · 事件 ${m.events}`"
+              :style="{ height: pulseHeight(m.events) }"
+              :title="`${m.minute} · 事件 ${m.events} · 浏览 ${m.pv}`"
             />
           </div>
-          <p class="muted small">更新于 {{ realtimeData?.now || '—' }}（按分钟的浏览量脉冲条，条越高那一分钟越热闹）</p>
+          <p class="muted small">更新于 {{ realtimeData?.now || '—' }}（按分钟的事件量脉冲条，条越高那一分钟越热闹）</p>
         </el-card>
       </el-tab-pane>
     </el-tabs>
 
     <!-- 会话详情抽屉 -->
-    <el-drawer v-model="sessionDrawer" size="min(560px, 92vw)" :title="sessionDetail?.session?.visitorId || '访问详情'">
+    <el-drawer v-model="sessionDrawer" size="min(560px, 92vw)" :title="sessionDetail?.session?.visitorId || '使用详情'">
       <template v-if="sessionDetail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="开始时间">{{ sessionDetail.session.startedAt }}</el-descriptions-item>
-          <el-descriptions-item label="渠道">{{ sessionDetail.session.sourceChannel || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="设备">{{ sessionDetail.session.deviceType || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="终端">{{ sessionDetail.session.deviceType || '—' }}</el-descriptions-item>
           <el-descriptions-item label="浏览器">{{ sessionDetail.session.browser || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="地域">
-            {{ [sessionDetail.session.country, sessionDetail.session.province, sessionDetail.session.city].filter(Boolean).join(' / ') || '—' }}
-          </el-descriptions-item>
           <el-descriptions-item label="时长">{{ formatDuration(sessionDetail.session.durationSeconds) }}</el-descriptions-item>
-          <el-descriptions-item label="落地页">{{ sessionDetail.session.entryPage || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="离开页">{{ sessionDetail.session.exitPage || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="起始页">{{ sessionDetail.session.entryPage || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="结束页">{{ sessionDetail.session.exitPage || '—' }}</el-descriptions-item>
         </el-descriptions>
 
         <div style="margin: 10px 0 4px">
@@ -758,7 +768,7 @@
     <el-dialog v-model="funnelDialog" :title="funnelForm.funnelId ? '编辑漏斗' : '新建漏斗'" width="min(620px, 94%)">
       <el-form :model="funnelForm" label-width="96px">
         <el-form-item label="漏斗名称">
-          <el-input v-model="funnelForm.funnelName" placeholder="例如：官网访问转化" />
+          <el-input v-model="funnelForm.funnelName" placeholder="例如：上手转化（登录→发布→提交）" />
         </el-form-item>
         <el-form-item v-if="!funnelForm.funnelId" label="漏斗编码">
           <el-input v-model="funnelForm.funnelCode" placeholder="例如：web_conversion" />
@@ -807,7 +817,7 @@ import {
   deleteAnalyticsFunnel,
   getAnalyticsBreakdown,
   getAnalyticsOverview,
-  getAnalyticsAttribution,
+  getAnalyticsAdoption,
   getAnalyticsActivity,
   getAnalyticsCrossSource,
   getAnalyticsFunnelLoss,
@@ -831,7 +841,7 @@ import {
   type AnalyticsFunnelResult,
   type AnalyticsFunnelStepDef,
   type AnalyticsOverview,
-  type AnalyticsAttribution,
+  type AnalyticsAdoption,
   type AnalyticsActivity,
   type AnalyticsCrossSource,
   type AnalyticsCustomReport,
@@ -873,13 +883,12 @@ const syncQuery = () => {
   if (source.value) q.source = source.value;
   if (days.value !== 30) q.days = String(days.value);
   if (tab.value && tab.value !== 'overview') q.tab = tab.value;
-  // 五审回修: 板3A 承诺「配好视图复制链接恢复同视图」——自定义分析条件与明细渠道也是视图的一部分
+  // 五审回修: 板3A 承诺「配好视图复制链接恢复同视图」——自定义分析条件也是视图的一部分
   if (tab.value === 'custom') {
     q.dimension = customForm.dimension;
     q.metric = customForm.metric;
     q.limit = String(customForm.limit);
   }
-  if (tab.value === 'sessions' && sessionQuery.channel) q.channel = sessionQuery.channel;
   router.replace({ query: q }).catch(() => undefined);
 };
 const tab = ref(String(route.query.tab || 'overview'));
@@ -890,6 +899,30 @@ const ct = useChartTokens();
 
 const overview = ref<Partial<AnalyticsOverview>>({});
 const trend = ref<AnalyticsTrendPoint[]>([]);
+/** E 片采用度: 周活/新同事/首周激活 + 两步上手漏斗的数据源 */
+const adoption = ref<AnalyticsAdoption | null>(null);
+const adoptionLoading = ref(false);
+const activationRateText = computed(() =>
+  adoption.value?.activationRate == null ? '激活率 —' : `激活率 ${formatPercent(adoption.value.activationRate)}`
+);
+/** 两步上手率 = 完成核心动作人数 ÷ 登录人数(后端已保证分子⊆分母, 前端再夹一层 ≤100% 兜底);
+ * 没人登录时显示「—」, 不造 0% */
+const twoStepRateText = computed(() => {
+  const a = adoption.value;
+  if (!a || !a.loginUsers) return '—';
+  return formatPercent(Math.min((a.coreUsers / a.loginUsers) * 100, 100));
+});
+const twoStepWidth = computed(() => {
+  const a = adoption.value;
+  if (!a || !a.loginUsers) return '0%';
+  return `${Math.min(Math.max((a.coreUsers / a.loginUsers) * 100, a.coreUsers > 0 ? 6 : 0), 100)}%`;
+});
+/** 次均操作 = 事件数 ÷ 会话数(旧「页次」只数页面浏览, 对操作流恒 0) */
+const avgActionsText = computed(() => {
+  const c = overview.value?.current;
+  if (!c || !c.visits) return '—';
+  return formatNumber(Number(c.events || 0) / Number(c.visits), 2);
+});
 /** 空源判定：窗口期事件/会话/PV 全 0 时趋势图换空态引导，不再渲染全 0 假曲线 */
 const hasOverviewData = computed(() => {
   const c = overview.value?.current;
@@ -899,17 +932,14 @@ const hasOverviewData = computed(() => {
 const overviewLoading = ref(false);
 const breakdownLoading = ref(false);
 
+// E 片单源重构: 渠道/地域是外部网站概念, 统一事件流没有这两个字段(恒"(未知)"), 两卡退役
 const breakdowns = reactive<Record<string, AnalyticsBreakdownRow[]>>({
-  channel: [],
   device: [],
-  browser: [],
-  geo: []
+  browser: []
 });
 const breakdownBlocks = [
-  { type: 'channel', title: '来源渠道', label: '渠道', hint: '按会话落地来源' },
-  { type: 'device', title: '设备分布', label: '设备', hint: 'desktop / mobile' },
-  { type: 'browser', title: '浏览器', label: '浏览器', hint: 'User-Agent 解析' },
-  { type: 'geo', title: '地域分布', label: '地域', hint: '国家 / 省 / 市' }
+  { type: 'device', title: '终端类型', label: '终端', hint: '电脑 / 手机 / 平板' },
+  { type: 'browser', title: '浏览器', label: '浏览器', hint: '来自事件上下文' }
 ];
 
 const pageLoading = ref(false);
@@ -938,15 +968,15 @@ const funnelForm = reactive<{
   enabled: '1',
   remark: '',
   steps: [
-    { eventName: 'page_view', name: '访问页面' },
-    { eventName: 'search', name: '站内搜索' },
-    { eventName: 'signup', name: '完成注册' }
+    { eventName: 'user.login', name: '登录系统' },
+    { eventName: 'task.published', name: '发布任务' },
+    { eventName: 'data.submitted', name: '提交数据' }
   ]
 });
 const currentFunnel = computed(() => funnels.value.find((f) => f.funnelId === funnelId.value));
-// R2-3: 漏斗拆解维度(整体/渠道/设备/系统/浏览器)
+// R2-3: 漏斗拆解维度(整体/设备/系统/浏览器); E 片渠道下架
 const funnelBreakdown = ref('');
-const funnelBreakdownLabel = computed(() => ({ channel: '渠道', device: '设备', os: '系统', browser: '浏览器' }[funnelBreakdown.value] || '整体'));
+const funnelBreakdownLabel = computed(() => ({ device: '终端', os: '系统', browser: '浏览器' }[funnelBreakdown.value] || '整体'));
 
 const retention = ref<Partial<AnalyticsRetention>>({ cohorts: [], window: 7, days: 30 });
 const retentionWindow = ref(7);
@@ -981,21 +1011,19 @@ const onRetentionGranularityChange = () => {
 };
 const retentionLoading = ref(false);
 
-// R2-4 下钻: 渠道/设备/浏览器/地域 四表行点击 → 访问明细带筛选直达
+// R2-4 下钻: 终端/浏览器 两表行点击 → 使用明细带筛选直达
 const sessionRange = ref<[string, string] | null>(null);
 const drillToSessions = (type: string, row: AnalyticsBreakdownRow) => {
   // 三审 P2: 「(未知)」是库里空值的展示兜底, 按它当筛选条件必然查空——不下钻
   if (!row.label || row.label === '(未知)') return;
   tab.value = 'sessions';
   Object.assign(sessionQuery, {
-    keyword: '', channel: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1
+    keyword: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1
   });  sessionRange.value = null;
   sessionQuery.fromDate = undefined;
   sessionQuery.toDate = undefined;
-  if (type === 'channel') sessionQuery.channel = row.label;
   if (type === 'device') sessionQuery.deviceType = row.label;
   if (type === 'browser') sessionQuery.browser = row.label;
-  if (type === 'geo') sessionQuery.country = row.label.split(' / ')[0].trim();
   // 五审回修: 程序化切页签也要落 URL, 分享/刷新才能回到下钻后的视图
   syncQuery();
   loadSessions();
@@ -1011,7 +1039,6 @@ const sessionQuery = reactive<AnalyticsSessionQuery>({
   pageNum: 1,
   pageSize: 20,
   keyword: '',
-  channel: '',
   deviceType: '',
   bounce: ''
 });
@@ -1021,7 +1048,7 @@ const sessionLoading = ref(false);
 const sessionDrawer = ref(false);
 const sessionDetail = ref<AnalyticsSessionDetail | null>(null);
 
-const customForm = reactive({ dimension: 'channel', metric: 'visits', limit: 20 });
+const customForm = reactive({ dimension: 'event', metric: 'events', limit: 20 });
 // R2-4 我的视图: 保存/打开/删除
 const myReports = ref<AnalyticsCustomReport[]>([]);
 const myReportId = ref('');
@@ -1094,32 +1121,23 @@ const importing = ref(false);
 const dimensionLabels: Record<string, string> = {
   day: '日期',
   page: '页面',
-  channel: '渠道',
-  device: '设备',
+  device: '终端',
   browser: '浏览器',
   os: '操作系统',
-  geo: '地域',
-  entry: '落地页',
-  exit: '离开页',
+  entry: '起始页',
+  exit: '结束页',
   search: '搜索词',
-  event: '事件',
-  campaign: '投放活动'
+  event: '事件'
 };
-const metricLabels: Record<string, string> = { pv: 'PV', uv: 'UV', visits: '访问次数', events: '事件数' };
+const metricLabels: Record<string, string> = { pv: '页面浏览', uv: '人数', visits: '会话数', events: '次数' };
 const dimensionLabel = computed(() => dimensionLabels[customForm.dimension] || customForm.dimension);
 const metricLabel = computed(() => metricLabels[customForm.metric] || customForm.metric);
-
-const channelOptions = computed(() => {
-  const set = new Set<string>(['direct', 'baidu', 'google', 'weibo', 'wechat']);
-  (breakdowns.channel || []).forEach((row) => set.add(row.label));
-  return Array.from(set);
-});
 
 const trendOption = computed<any>(() => ({
   color: ct.value.series,
   tooltip: { trigger: 'axis' },
-  legend: { data: ['PV', 'UV', '访问次数'], left: 'center', top: 0, itemWidth: 14, itemHeight: 8 },
-  /* top 52：右轴名「UV / 访问」贴着轴顶（52-16≈36 带），与 0 带的居中图例在 375 档同横带叠字——
+  legend: { data: ['使用次数', '活跃用户', '会话数'], left: 'center', top: 0, itemWidth: 14, itemHeight: 8 },
+  /* top 52：右轴名「用户 / 会话」贴着轴顶（52-16≈36 带），与 0 带的居中图例在 375 档同横带叠字——
      下压网格顶界让轴名带（30-42）与图例带（0-14）垂直分开（四席复审 medium，二修） */
   grid: { left: 52, right: 74, top: 52, bottom: 32 },
   xAxis: {
@@ -1129,11 +1147,11 @@ const trendOption = computed<any>(() => ({
     axisLabel: { color: ct.value.faint },
     axisLine: { lineStyle: { color: ct.value.border } }
   },
-  // PV 与 UV/访问次数量级差一个数量级，分左右轴，避免 UV 贴在 0 轴上看不见
+  // 使用次数(全部事件)与人数/会话差一个量级，分左右轴，避免人数贴在 0 轴上看不见
   yAxis: [
     {
       type: 'value',
-      name: 'PV',
+      name: '使用次数',
       nameGap: 16,
       minInterval: 1,
       axisLabel: { color: ct.value.faint },
@@ -1142,7 +1160,7 @@ const trendOption = computed<any>(() => ({
     },
     {
       type: 'value',
-      name: 'UV / 访问',
+      name: '用户 / 会话',
       nameGap: 16,
       minInterval: 1,
       nameTextStyle: { fontSize: 11, color: ct.value.faint },
@@ -1152,7 +1170,7 @@ const trendOption = computed<any>(() => ({
   ],
   series: [
     {
-      name: 'PV',
+      name: '使用次数',
       type: 'line',
       yAxisIndex: 0,
       smooth: true,
@@ -1160,10 +1178,10 @@ const trendOption = computed<any>(() => ({
       itemStyle: { color: ct.value.accent },
       lineStyle: { width: 2.2, color: ct.value.accent },
       areaStyle: { opacity: 0.08, color: ct.value.accent },
-      data: trend.value.map((p) => Number(p.pv || 0))
+      data: trend.value.map((p) => Number(p.events || 0))
     },
     {
-      name: '访问次数',
+      name: '会话数',
       type: 'line',
       yAxisIndex: 1,
       smooth: true,
@@ -1173,8 +1191,8 @@ const trendOption = computed<any>(() => ({
       data: trend.value.map((p) => Number(p.visits || 0))
     },
     {
-      // UV 与访问次数同值时也要能分辨：同色系浅一档 + 虚线，不另起色相
-      name: 'UV',
+      // 活跃用户与会话数同值时也要能分辨：同色系浅一档 + 虚线，不另起色相
+      name: '活跃用户',
       type: 'line',
       yAxisIndex: 1,
       smooth: true,
@@ -1208,6 +1226,18 @@ let loadBreakdowns = async () => {
     });
   } finally {
     breakdownLoading.value = false;
+  }
+};
+
+/** E 片采用度/两步上手: 概览 KPI(周活/新同事)与漏斗页签两步卡共用一份数据 */
+let loadAdoption = async () => {
+  adoptionLoading.value = true;
+  // 三席回修: 先清旧值——切源/切天数后请求失败时, 不让上一源的数字顶着错误条继续显示
+  adoption.value = null;
+  try {
+    adoption.value = await getAnalyticsAdoption(source.value, days.value);
+  } finally {
+    adoptionLoading.value = false;
   }
 };
 
@@ -1276,10 +1306,11 @@ const openFunnelDialog = (funnel?: AnalyticsFunnel) => {
       windowDays: 7,
       enabled: '1',
       remark: '',
+      // E 片三席回修: 默认模板用系统内部事件——旧官网故事(page_view/search/signup)在单源世界里建出来全 0
       steps: [
-        { eventName: 'page_view', name: '访问页面' },
-        { eventName: 'search', name: '站内搜索' },
-        { eventName: 'signup', name: '完成注册' }
+        { eventName: 'user.login', name: '登录系统' },
+        { eventName: 'task.published', name: '发布任务' },
+        { eventName: 'data.submitted', name: '提交数据' }
       ]
     });
   }
@@ -1387,7 +1418,7 @@ const resetSessions = () => {
   sessionRange.value = null;
   sessionQuery.fromDate = undefined;
   sessionQuery.toDate = undefined;
-  Object.assign(sessionQuery, { keyword: '', channel: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1 });
+  Object.assign(sessionQuery, { keyword: '', deviceType: '', browser: '', country: '', bounce: '', pageNum: 1 });
   loadSessions();
 };
 
@@ -1406,7 +1437,7 @@ const exportSessionsCsv = async () => {
     await download(
       '/analytics/export/sessions',
       { ...sessionQuery, source: source.value, days: days.value, masked: 'true' },
-      `访问明细-${source.value}-${date}.csv`
+      `使用明细-${source.value}-${date}.csv`
     );
   } catch {
     // download 内部已提示
@@ -1510,24 +1541,7 @@ const pathsOption = computed<any>(() => ({
 }));
 
 const funnelLoss = ref<AnalyticsFunnelLoss | null>(null);
-const attributionData = ref<AnalyticsAttribution | null>(null);
-const attributionLoading = ref(false);
-/* R2-1: 归因转化事件可选(后端本就支持 event 参数, 默认 signup), 换事件即重算 */
-const conversionEvent = ref('signup');
-const conversionEventOptions = [
-  { label: '转化事件：signup', value: 'signup' },
-  { label: '转化事件：login', value: 'login' },
-  { label: '转化事件：order_submit', value: 'order_submit' },
-  { label: '转化事件：pay_success', value: 'pay_success' }
-];
-let loadAttribution = async () => {
-  attributionLoading.value = true;
-  try {
-    attributionData.value = await getAnalyticsAttribution(source.value, days.value, conversionEvent.value);
-  } finally {
-    attributionLoading.value = false;
-  }
-};
+/* E 片单源重构: 渠道归因整卡退役(内部统一事件流没有渠道字段), 归因相关状态一并撤下 */
 
 const activityData = ref<AnalyticsActivity | null>(null);
 const activityLoading = ref(false);
@@ -1614,9 +1628,10 @@ const toggleRealtime = (on: any) => {
     stopRealtime();
   }
 };
-const pulseHeight = (pv: number) => {
-  const max = Math.max(1, ...(realtimeData.value?.minutes || []).map((m) => Number(m.pv) || 0));
-  return `${Math.max(4, ((Number(pv) || 0) / max) * 100)}%`;
+const pulseHeight = (events: number) => {
+  // E 片三席回修: 分子分母同用事件量(原来分母还是 pv——纯操作流 pv=0, 两条事件就能把条顶满溢出盖住 KPI)
+  const max = Math.max(1, ...(realtimeData.value?.minutes || []).map((m) => Number(m.events) || 0));
+  return `${Math.max(4, ((Number(events) || 0) / max) * 100)}%`;
 };
 
 const crossData = ref<AnalyticsCrossSource | null>(null);
@@ -1647,11 +1662,12 @@ onUnmounted(() => {
 });
 
 const fillCsvSample = () => {
+  // E 片: 示例换成内部操作故事(与演示种子同构)——旧官网 page_view 故事在单源世界里导进去全 0
   csvText.value = [
-    'eventName,anonymousId,sessionId,occurredTime,pageUrl,keyword,channel,deviceType,browser',
-    'page_view,csv-demo,csv-s1,2026-10-19 10:00:00,/home,,baidu,desktop,Chrome',
-    'search,csv-demo,csv-s1,2026-10-19 10:01:00,/search,pricing,baidu,desktop,Chrome',
-    'signup,csv-demo,csv-s1,2026-10-19 10:02:00,/signup,,baidu,desktop,Chrome'
+    'eventName,eventUid,subjectType,subjectId,occurredTime,deviceType,os,browser,props',
+    'user.login,demo-csv-1,user,9100000001,2026-10-28 09:00:00,desktop,Windows,Chrome,',
+    'data.submitted,demo-csv-2,user,9100000001,2026-10-28 09:05:00,desktop,Windows,Chrome,"{""taskId"":9001,""submissionId"":7001,""version"":1}"',
+    'data.audited,demo-csv-3,user,1,2026-10-28 10:00:00,desktop,Windows,Chrome,"{""submissionId"":7001}"'
   ].join('\n');
 };
 
@@ -1698,6 +1714,7 @@ const wrapLoad =
     }
   };
 loadOverview = wrapLoad('overview', loadOverview);
+loadAdoption = wrapLoad('adoption', loadAdoption);
 loadBreakdowns = wrapLoad('breakdowns', loadBreakdowns);
 loadPageAnalysis = wrapLoad('page', loadPageAnalysis);
 loadFunnels = wrapLoad('funnels', loadFunnels);
@@ -1706,7 +1723,6 @@ loadRetention = wrapLoad('retention', loadRetention);
 loadSessions = wrapLoad('sessions', loadSessions);
 loadCustom = wrapLoad('custom', loadCustom);
 loadPaths = wrapLoad('paths', loadPaths);
-loadAttribution = wrapLoad('attribution', loadAttribution);
 loadActivity = wrapLoad('activity', loadActivity);
 loadRealtime = wrapLoad('realtime', loadRealtime);
 loadCross = wrapLoad('cross', loadCross);
@@ -1747,11 +1763,11 @@ const reloadCurrent = async () => {
   loading.value = true;
   try {
     if (tab.value === 'overview') {
-      await Promise.all([loadOverview(), loadBreakdowns()]);
+      await Promise.all([loadOverview(), loadBreakdowns(), loadAdoption()]);
     } else if (tab.value === 'page') {
       await loadPageAnalysis();
     } else if (tab.value === 'funnel') {
-      await Promise.all([loadFunnels(), loadAttribution()]);
+      await Promise.all([loadFunnels(), loadAdoption()]);
     } else if (tab.value === 'retention') {
       await loadRetention();
     } else if (tab.value === 'paths') {
@@ -1795,6 +1811,8 @@ const formatPercent = (value: number | string | undefined) => {
   return Number.isFinite(num) ? `${num.toFixed(1)}%` : '—';
 };
 const formatDuration = (value: number | string | undefined) => {
+  // 三席回修: 未加载/无数据显示「—」而不是「0 秒」(平均停留升为主数字后, 0 秒会被读成真值)
+  if (value === undefined || value === null) return '—';
   const seconds = Number(value);
   if (!Number.isFinite(seconds) || seconds <= 0) return '0 秒';
   if (seconds < 60) return `${Math.round(seconds)} 秒`;
@@ -1823,12 +1841,11 @@ const deltaTone = (key: string) => {
 };
 
 onMounted(async () => {
-  // 五审回修: URL 带回的自定义分析条件/明细渠道先恢复, 再按恢复后的页签首挂载
+  // 五审回修: URL 带回的自定义分析条件先恢复, 再按恢复后的页签首挂载
   const q = route.query;
   if (q.dimension) customForm.dimension = String(q.dimension);
   if (q.metric) customForm.metric = String(q.metric);
   if (q.limit) customForm.limit = Number(q.limit) || 20;
-  if (q.channel) sessionQuery.channel = String(q.channel);
   // 真实数据优先(三审 dspro P1/P2): 先等源清单→autoPick→按最终源一次加载;
   // 空库时跳过注定为空的请求(诚实空态横幅已就位)
   await ensureSources();
@@ -1944,12 +1961,27 @@ onActivated(async () => {
   .analytics-kpi .ui-kpi {
     border-top: 1px solid var(--app-rule);
   }
-  .analytics-kpi .ui-kpi:nth-child(4n + 1) {
+  /* 三席回修: 旧四列 nth-child 规则必须排除六格条——同特异度下 4n+1/-n+4 会把六格条
+     第 5 格左边线、第 4 格上边线一并抹掉, 两行三列的分隔线断两处 */
+  .analytics-kpi:not(.analytics-kpi--six) .ui-kpi:nth-child(4n + 1) {
     border-left: 0;
   }
-  .analytics-kpi .ui-kpi:nth-child(-n + 4) {
+  .analytics-kpi:not(.analytics-kpi--six) .ui-kpi:nth-child(-n + 4) {
     border-top: 0;
   }
+  /* E 片六格采用度条: 3 列两行, 比 4+2 的参差行整齐 */
+  .analytics-kpi--six {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .analytics-kpi--six .ui-kpi:nth-child(3n + 1) {
+    border-left: 0;
+  }
+  .analytics-kpi--six .ui-kpi:nth-child(-n + 3) {
+    border-top: 0;
+  }
+}
+.caliber-note {
+  margin-bottom: 12px;
 }
 .delta {
   font-size: var(--dcs-font-xs);
@@ -1989,7 +2021,7 @@ onActivated(async () => {
 .muted {
   color: var(--el-text-color-secondary);
 }
-/* U-22：次要指标（跳出/停留/页次/事件）并入趋势卡头部的小字行 */
+/* U-22：次要指标并入趋势卡头部的小字行（E 片换成 会话/次均操作/新老用户） */
 .trend-sub {
   font-weight: 400;
   font-size: var(--dcs-font-sm);

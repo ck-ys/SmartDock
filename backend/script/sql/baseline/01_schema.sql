@@ -3255,6 +3255,13 @@ CREATE INDEX idx_profile_event_session ON public.profile_event USING btree (tena
 
 
 --
+-- Name: idx_profile_event_visitor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_event_visitor ON public.profile_event (tenant_id, source, (COALESCE(NULLIF(anonymous_id, ''), subject_id)), event_name, occurred_time) WHERE (del_flag = '0');
+
+
+--
 -- Name: idx_profile_identity_link_subject; Type: INDEX; Schema: public; Owner: -
 --
 

@@ -131,6 +131,18 @@ public class DcsAuditService {
         publishEvent(eventType, ProfileUids.uid("audit", decision.toLowerCase(), a.getId()),
             s.getSubmitterUserId(), props);
 
+        // E 片审核岗归属修复: 审核是审核人做的动作——再记一条到审核人名下,
+        // 否则采用度/两步漏斗对审核岗系统性低估(审核全记在提交人头上)。
+        // 三席回修口径注: 审核人=提交人(自审)时同一动作会记两条事件(提交人侧结果+审核人侧动作),
+        // "使用次数"按事件数会计双份; 采用度取数已按 ACTED_OPERATIONS(只认本人动作)免疫人数层面的双计。
+        Map<String, Object> auditorProps = new LinkedHashMap<>();
+        auditorProps.put("taskId", s.getTaskId());
+        auditorProps.put("submissionId", submissionId);
+        auditorProps.put("decision", decision);
+        auditorProps.put("submitterUserId", s.getSubmitterUserId());
+        publishEvent(SelfMonitorEvents.DATA_AUDITED, ProfileUids.uid("audited", decision.toLowerCase(), a.getId()),
+            me, auditorProps);
+
         String verdict = DcsAudit.DECISION_PASS.equals(decision) ? "已通过" : "被退回";
         noticeService.notify(s.getSubmitterUserId(), DcsNotice.TYPE_AUDIT_RESULT,
             "提交" + verdict + ": " + task.getTitle(),

@@ -264,11 +264,13 @@ public class AnalyticsSessionizer {
             (endedAt.getTime() - startedAt.getTime()) / 1000L)));
         session.setPageViews(pageViews);
         session.setEventCount(events.size());
-        // 跳出=只浏览了一个页面且没有搜索/注册等交互；page_leave 是收尾事件，不算交互
-        boolean interacted = events.stream().anyMatch(e ->
-            !PAGE_EVENTS.contains(String.valueOf(e.getEventName()))
-                && !"page_leave".equals(String.valueOf(e.getEventName())));
-        session.setIsBounce(pageViews <= 1 && !interacted ? "1" : "0");
+        // E 片单页离开口径: 有意义的事件(剔除 page_leave 收尾回声)只有一条 = 看一眼就走——
+        // 原「单页+无交互」在无页面事件的内部操作流里全失真(所有会话都跳出);
+        // page_leave 是同一页浏览的回声不算第二条活动, web 集成场景「看一页+离开」仍算离开
+        long meaningful = events.stream()
+            .filter(e -> !"page_leave".equals(String.valueOf(e.getEventName())))
+            .count();
+        session.setIsBounce(meaningful <= 1 ? "1" : "0");
         session.setEntryPage(entryPage);
         session.setExitPage(exitPage);
         session.setReferrer(referrer);

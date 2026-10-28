@@ -377,6 +377,34 @@ public class AnalyticsService {
 
     // ---------------------------------------------------------------- 查询面
 
+    /**
+     * E 片上手指标(题2·第一眼): 周活/本周新同事/首周激活 + 两步上手漏斗(登录→首次核心动作)。
+     * 窗口口径: 周活固定看最近 7 天; 漏斗两步随所选窗口(days)。
+     * 三席回修: 动作名单换 ACTED_OPERATIONS(本人主动, 不含被动记账的审核结果);
+     * days 上限与 overview/rebuild 对齐 365(原来静默截到 90, 同屏两套窗口)。
+     */
+    public Map<String, Object> adoption(String source, int days) {
+        requireSource(source);
+        int clampedDays = Math.min(Math.max(days, 1), 365);
+        String tenantId = currentTenant();
+        Date from = startOfDaysAgo(clampedDays);
+        Date to = startOfTomorrow();
+        Date weekFrom = startOfDaysAgo(7);
+        // 首周激活的上探边界: 首见最晚接近 to, 其激活窗最长到 to+7d(钉死固定参数利于走索引范围扫)
+        Date activationEnd = new Date(to.getTime() + 7L * 24 * 3600_000L);
+        Map<String, Object> row = eventMapper.selectAdoption(tenantId, source, from, to, weekFrom, activationEnd,
+            com.smartdock.profile.monitor.SelfMonitorEvents.LOGIN,
+            List.copyOf(com.smartdock.profile.monitor.SelfMonitorEvents.ACTED_OPERATIONS));
+        Map<String, Object> out = new LinkedHashMap<>(row);
+        long newUsers = longValue(row.get("newUsers"));
+        long activated = longValue(row.get("activated"));
+        // 分母为零不显百分比(前端落「—」), 不造 0%
+        out.put("activationRate", newUsers > 0 ? rate(activated, newUsers) : null);
+        out.put("source", source);
+        out.put("days", clampedDays);
+        return out;
+    }
+
     public Map<String, Object> overview(String source, int days) {
         requireSource(source);
         String tenantId = currentTenant();

@@ -18,11 +18,13 @@ WITH manifest AS (
         {"name": "user", "displayName": "用户", "idField": "userId"}
       ],
       "events": [
+        {"name": "user.login", "displayName": "登录成功", "subjectTypes": ["user"]},
         {"name": "task.published", "displayName": "任务发布", "subjectTypes": ["user"]},
         {"name": "task.closed", "displayName": "任务关闭", "subjectTypes": ["user"]},
         {"name": "data.submitted", "displayName": "数据提交", "subjectTypes": ["user"]},
-        {"name": "data.audit_passed", "displayName": "审核通过", "subjectTypes": ["user"]},
-        {"name": "data.audit_rejected", "displayName": "审核退回", "subjectTypes": ["user"]}
+        {"name": "data.audit_passed", "displayName": "审核通过(记提交人)", "subjectTypes": ["user"]},
+        {"name": "data.audit_rejected", "displayName": "审核退回(记提交人)", "subjectTypes": ["user"]},
+        {"name": "data.audited", "displayName": "完成审核(记审核人)", "subjectTypes": ["user"]}
       ],
       "dimensions": [
         {"name": "completion", "displayName": "完成率", "operator": "RATE", "scoreMax": 100},

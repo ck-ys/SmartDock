@@ -115,11 +115,18 @@ class ProfileSelfMonitorListenerTest {
 
     @Test
     void whitelistIsPinnedForAdoptionMetrics() {
-        // E 片「采用度/两步上手漏斗(登录→首次核心动作)」按此名单取数——增删必须连带评估分析侧
+        // CORE_OPERATIONS=自监控总开关管辖的全部站内事件; 「采用度/两步上手漏斗(登录→首次核心动作)」
+        // 取数用 ACTED_OPERATIONS(本人主动)——增删任一名单都必须连带评估分析侧
         assertEquals("user.login", SelfMonitorEvents.LOGIN);
         assertEquals(java.util.Set.of(
-            "task.published", "data.submitted", "data.audit_passed", "data.audit_rejected", "task.closed"),
+            "task.published", "data.submitted", "data.audit_passed", "data.audit_rejected",
+            "data.audited", "task.closed"),
             SelfMonitorEvents.CORE_OPERATIONS);
+        // 三席回修钉住: 主动作名单不含审核结果事件(那是记在提交人头上的被动记账)——
+        // 混进去会把没上手的人算成已上手
+        assertEquals(java.util.Set.of(
+            "task.published", "data.submitted", "data.audited", "task.closed"),
+            SelfMonitorEvents.ACTED_OPERATIONS);
         // 白名单里没有页面浏览类事件——自监控不记页面浏览是拍板口径
         assertTrue(SelfMonitorEvents.CORE_OPERATIONS.stream().noneMatch(
             name -> name.contains("page") || name.contains("view")));

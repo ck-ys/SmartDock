@@ -85,9 +85,10 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     }
 
     /**
-     * 自监控口径(单源重构 C 片): 写账本与主体登记, 跳过重算/汇总两个触发器——
-     * 采用度(事件数/最近活跃)不依赖触发器, 分数与汇总由按需重算兜底。
-     * 三审回修: 自监控总开关收敛到本咽喉(登录与站内核心操作同一把闸, 停用后任何入口不再新增)。
+     * 自监控口径(单源重构 C 片): 写账本与主体登记, 跳过分数重算触发器。
+     * 三审回修(E 片): 自监控事件已进会话/汇总口径, 汇总触发器必须跟上——
+     * 否则首屏 KPI 一半实时(采用度直读事件表)、一半滞后到次日(会话表), 同屏两套时间基准。
+     * 登录仍然不触发分数重算(保持安静)。
      */
     @Override
     public boolean publishQuiet(ProfileEventBo bo) {
@@ -96,7 +97,17 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
             && !configService.selfMonitorEnabled(currentTenant(), ProfileSources.UNIFIED)) {
             return false;
         }
-        return publishIsolated(bo) != null;
+        ProfileEvent written = publishIsolated(bo);
+        if (written == null) {
+            return false;
+        }
+        try {
+            analyticsRollupTrigger.onEvent(written.getTenantId(), written.getSource(), written.getOccurredTime());
+        } catch (Exception e) {
+            // 汇总调度失败不影响事件账本(夜间兜底任务会补昨天+今天)
+            log.warn("[Profile] quiet rollup schedule failed source={} err={}", written.getSource(), e.getMessage());
+        }
+        return true;
     }
 
     @Override
@@ -181,11 +192,10 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
                 return null;
             }
             upsertSubject(e, bo);
-            // 三审 P0 回修: 自监控事件不进访客口径——登录/站内操作不是"访客到访",
-            // 不登记首见, 否则新访客数与实时看板被每次登录污染
-            if (!SelfMonitorEvents.isSelfMonitor(e.getEventName())) {
-                upsertFirstSeen(e);
-            }
+            // E 片统一事件流口径: 首见=该用户键的首次使用(登录也是使用)——
+            // 持续使用分析/首周激活都以它为分母。C 片曾按自监控跳过(防登录污染 web 访客指标),
+            // 访客指标退役后该守卫反转, 存量库由重建补齐
+            upsertFirstSeen(e);
             return e;
         });
     }

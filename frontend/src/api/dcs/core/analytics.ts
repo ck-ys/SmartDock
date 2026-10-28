@@ -113,7 +113,6 @@ export interface AnalyticsSessionQuery {
   toDate?: string;
   visitorId?: string;
   subjectId?: string;
-  channel?: string;
   deviceType?: string;
   browser?: string;
   country?: string;
@@ -249,6 +248,34 @@ export interface AnalyticsImportResult {
   skipped: number;
 }
 
+// ---------------------------------------------------------------- E 片上手指标
+
+/**
+ * 采用度/两步上手漏斗(单源重构 E 片): 周活/本周新同事/首周激活 + 登录→核心动作两步。
+ * 周活与新同事固定看最近 7 天; loginUsers/coreUsers/events 随所选窗口 days。
+ */
+export interface AnalyticsAdoption {
+  source: string;
+  days: number;
+  /** 最近 7 天有使用(去重用户键) */
+  weeklyActive: number;
+  /** 最近 7 天首次使用的新同事数(首见物化表口径) */
+  newUsers: number;
+  /** 本周新同事里, 首见后 7 天内完成过任一核心操作的人数 */
+  activated: number;
+  /** 首周激活率; 新同事为 0 时后端给 null 显示「—」(RuoYi 把 BigDecimal 序列化成字符串, 前端按串处理) */
+  activationRate: number | string | null;
+  /** 所选窗口内登录过的人数 */
+  loginUsers: number;
+  /** 所选窗口内完成过核心操作的人数 */
+  coreUsers: number;
+  /** 所选窗口内使用次数(全部事件) */
+  events: number;
+}
+
+export const getAnalyticsAdoption = (source: string, days = 30) =>
+  r<AnalyticsAdoption>({ url: `${BASE}/adoption`, method: 'get', params: { source, days } });
+
 export interface AnalyticsRebuildResult {
   source: string;
   days: number;
@@ -264,7 +291,7 @@ export const getAnalyticsOverview = (source: string, days = 30) =>
 export const getAnalyticsTrend = (source: string, days = 30) =>
   r<AnalyticsTrendPoint[]>({ url: `${BASE}/trend`, method: 'get', params: { source, days } });
 
-export const getAnalyticsBreakdown = (source: string, days = 30, type = 'channel', limit = 20) =>
+export const getAnalyticsBreakdown = (source: string, days = 30, type = 'device', limit = 20) =>
   r<AnalyticsBreakdown>({ url: `${BASE}/breakdown`, method: 'get', params: { source, days, type, limit } });
 
 export const pageAnalyticsSessions = (query: AnalyticsSessionQuery) =>
@@ -352,22 +379,8 @@ export interface AnalyticsFunnelLoss {
   steps: AnalyticsFunnelLossStep[];
 }
 
-export interface AnalyticsAttributionRow {
-  channel: string;
-  first: number;
-  last: number;
-  linear: number;
-  visitors: number;
-}
-
-export interface AnalyticsAttribution {
-  source: string;
-  days: number;
-  conversionEvent: string;
-  conversions: number;
-  channels: number;
-  rows: AnalyticsAttributionRow[];
-}
+/* E 片三席回修: 渠道归因卡/类型/请求函数随访客口径一并退役删除;
+   后端 /analytics/attribution 端点保留, 批末统一定夺去留 */
 
 export interface AnalyticsActivity {
   source: string;
@@ -413,9 +426,6 @@ export const getAnalyticsPaths = (source: string, days = 30, start?: string) =>
 
 export const getAnalyticsFunnelLoss = (data: { funnelId?: string; days?: number }) =>
   r<AnalyticsFunnelLoss>({ url: `${BASE}/funnel/loss`, method: 'post', data });
-
-export const getAnalyticsAttribution = (source: string, days = 30, event?: string) =>
-  r<AnalyticsAttribution>({ url: `${BASE}/attribution`, method: 'get', params: { source, days, event } });
 
 export const getAnalyticsActivity = (source: string, days = 30) =>
   r<AnalyticsActivity>({ url: `${BASE}/activity`, method: 'get', params: { source, days } });

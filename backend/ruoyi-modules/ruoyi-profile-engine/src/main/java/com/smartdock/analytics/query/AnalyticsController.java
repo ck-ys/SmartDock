@@ -40,6 +40,14 @@ public class AnalyticsController {
         return R.ok(analyticsService.overview(source, days));
     }
 
+    /** E 片题2·第一眼: 周活/新同事首周激活 + 两步上手漏斗(登录→首次核心动作)。 */
+    @SaCheckPermission("analytics:center:query")
+    @GetMapping("/adoption")
+    public R<Map<String, Object>> adoption(@RequestParam String source,
+                                           @RequestParam(defaultValue = "30") int days) {
+        return R.ok(analyticsService.adoption(source, days));
+    }
+
     @SaCheckPermission("analytics:center:query")
     @GetMapping("/trend")
     public R<List<Map<String, Object>>> trend(@RequestParam String source,

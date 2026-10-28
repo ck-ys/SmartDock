@@ -143,12 +143,13 @@ class ProfileEventSourceUnificationTest {
 
     @Test
     void quietPublishWritesLedgerWithoutFiringTriggers() {
-        // C 片自监控口径: 静默发布只写账本, 不触发重算与分析汇总
+        // E 片三席回修: 静默发布写账本 + 触发分析汇总(自监控事件已进会话口径,
+        // 不触发则首屏 KPI 一半实时一半滞后到次日); 分数重算仍然安静(登录不刷分)
         assertTrue(service.publishQuiet(bo("dcs")));
 
         Mockito.verify(eventMapper).insertIgnore(any(ProfileEvent.class));
         Mockito.verify(recalcTrigger, Mockito.never()).onEvent(any(), any(), any(), any());
-        Mockito.verify(rollupTrigger, Mockito.never()).onEvent(any(), any(), any());
+        Mockito.verify(rollupTrigger).onEvent(any(), any(), any());
     }
 
     @Test
@@ -167,13 +168,14 @@ class ProfileEventSourceUnificationTest {
 
     @Test
     void selfMonitorEventsDoNotEnterVisitorFirstSeen() {
-        // 三审 P0 回修: 登录/站内操作不是"访客到访"——不登记首见, 分析口径(新访客/实时看板)不被登录污染
+        // E 片口径反转(题2 统一事件流): 登录/站内操作就是「使用」——首见=首次使用,
+        // 持续使用分析/首周激活都以它为分母; C 片"防访客污染"的跳过逻辑随访客指标退役
         service.publishQuiet(named("user.login", "dcs"));
-        Mockito.verify(firstSeenMapper, Mockito.never()).upsert(any(), any(), any(), any());
-
-        // 普通事件照常登记首见
-        service.publish(bo("web"));
         Mockito.verify(firstSeenMapper, Mockito.atLeastOnce()).upsert(any(), any(), any(), any());
+
+        // 普通业务事件照常登记首见
+        service.publish(bo("web"));
+        Mockito.verify(firstSeenMapper, Mockito.atLeast(2)).upsert(any(), any(), any(), any());
     }
 
     @Test
