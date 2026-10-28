@@ -38,8 +38,14 @@ public class AssistantToolGateController extends BaseController {
      *  off=跳过挂载、admin=仅管理员角色；askConfirm=服务含写类工具（read_only='0'）） */
     public record ToolGateRow(List<String> toolNames, String displayName, String category,
                               String gateDesc, int builtinLevel, String override, int effective,
-                              boolean locked, boolean askConfirm) {
+                              boolean locked, boolean askConfirm, String riskLevel) {
     }
+
+    /**
+     * 技能风险档：技能=给模型的行动指引，可能引出写操作，默认按中危。
+     * 只有明确不改数据的读法类技能列低危；新增技能不登记即中危（保守优先）。
+     */
+    private static final Map<String, String> SKILL_RISK = Map.of("data-reading", "low");
 
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping
@@ -59,7 +65,8 @@ public class AssistantToolGateController extends BaseController {
                 gate.get(firstName),
                 effective,
                 spec.minRoleLevel() >= org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN,
-                spec.behavior() == io.agentscope.core.permission.PermissionBehavior.ASK));
+                spec.behavior() == io.agentscope.core.permission.PermissionBehavior.ASK,
+                meta != null ? meta.riskLevel() : "mid"));
         }
         // G4-#4：MCP 外部服务并入闸矩阵视图（每服务一行；effective：off=-1/其余取覆盖或 member）。
         // 平台级表（tenant 恒 000000）——ignore 跨租户读，非 000000 租户管理员同样看得到全名单
@@ -71,10 +78,12 @@ public class AssistantToolGateController extends BaseController {
                 : "admin".equals(override) ? org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN
                 : org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER;
             rows.add(new ToolGateRow(
-                List.of(key), s.getServerName(), "外部工具",
-                "MCP 外部服务（" + s.getTransportType() + "）；off=本租户不挂载，admin=仅管理员可用",
+                List.of(key),
+                s.getDisplayName() != null && !s.getDisplayName().isBlank() ? s.getDisplayName() : s.getServerName(),
+                "外部工具",
+                "外部服务（" + s.getTransportType() + "）；off=本租户不挂载，admin=仅管理员可用",
                 org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER,
-                override, effective, false, "0".equals(s.getReadOnly())));
+                override, effective, false, "0".equals(s.getReadOnly()), "high"));
         }
         // B 批题4（2026-10-27）：技能并入同一矩阵（每技能一行，键 skill:<name>）——
         // 行数据经 AssistantSkillSource 官方仓视图；effective 与工具行共用单键档位核心
@@ -91,7 +100,8 @@ public class AssistantToolGateController extends BaseController {
                 org.dromara.assistant.core.ToolRegistry.effectiveMinRoleSingle(
                     key, sk.minRole(), gate.get(key)),
                 sk.minRole() >= org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN,
-                false));
+                false,
+                SKILL_RISK.getOrDefault(sk.id(), "mid")));
         }
         return R.ok(rows);
     }

@@ -534,6 +534,8 @@ export interface AssistantToolGateRow {
   locked: boolean;
   /** 执行前需用户确认（ASK 档） */
   askConfirm: boolean;
+  /** 能力风险档（管理页一键推荐按此推档位）：low=只读无副作用 / mid=会落数据 / high=出网或接外部服务 */
+  riskLevel: 'low' | 'mid' | 'high';
 }
 
 export function getAssistantToolGate() {
@@ -591,8 +593,19 @@ export function deleteAssistantMcpServer(id: string) {
   return request({ url: '/dcs/assistant/mcp/delete', method: 'post', params: { id } });
 }
 
-export function pageAssistantMcpCallLog(params: { serverName?: string; pageNum: number; pageSize: number }) {
-  return request<{ rows: AssistantMcpCallLog[]; total: number }>({ url: '/dcs/assistant/mcp/calllog', method: 'get', params });
+export function pageAssistantMcpCallLog(params: {
+  serverName?: string;
+  /** true=只看真实调用与失败（排除建会话的挂载成功/失败记录） */
+  realOnly?: boolean;
+  pageNum: number;
+  pageSize: number;
+}) {
+  return request<{
+    rows: AssistantMcpCallLog[];
+    total: number;
+    /** 同筛选口径的三格计数：全部 / 挂载记录 / 真实调用 */
+    stats?: { all: number; mounts: number; real: number };
+  }>({ url: '/dcs/assistant/mcp/calllog', method: 'get', params });
 }
 
 /* ============ 批4 Q11：助手公告（管理台发布/撤回 + 用户侧横幅） ============ */

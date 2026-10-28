@@ -1,18 +1,25 @@
 <template>
   <div class="app-container dcs-as-admin">
-    <!-- 页头（批C 重构）：标题+开通状态一屏可见，统计条零操作出数（五红线①） -->
-    <div class="adm-head">
-      <div class="head-txt">
-        <div class="head-title">
-          <b>AI 助手管理</b>
-          <el-tag v-if="cfg.enabled" type="success" size="small" effect="light">已开通</el-tag>
-          <el-tag v-else type="info" size="small" effect="light">未开通</el-tag>
-          <el-tag type="warning" size="small" effect="plain">试点期</el-tag>
-        </div>
-        <span class="head-sub">本租户的助手开关、模型、工具与费用，这一页看清</span>
+    <!-- 页头与四段导航同一行：首屏内容不再被标题和页签各吃一行（本批：起点 501px → ~130px） -->
+    <div class="adm-bar">
+      <div class="adm-title">
+        <b>AI 助手管理</b>
+        <el-tag v-if="cfg.enabled" type="success" size="small" effect="light">已开通</el-tag>
+        <el-tag v-else type="info" size="small" effect="light">未开通</el-tag>
+        <el-tag type="warning" size="small" effect="plain">试点期</el-tag>
       </div>
+      <nav class="adm-seg">
+        <button type="button" :class="{ on: tab === 'overview' }" @click="jumpTo('overview')">总览</button>
+        <button v-if="canConfig" type="button" :class="{ on: tab === 'caps' }" @click="jumpTo('caps')">能力</button>
+        <button v-if="canConfig" type="button" :class="{ on: tab === 'rules' }" @click="jumpTo('rules')">规则</button>
+        <button v-if="canConfig || canFeedback" type="button" :class="{ on: tab === 'ops' }" @click="jumpTo('ops')">运营</button>
+      </nav>
+      <span class="adm-sub">总览看现状 · 能力看它会什么、谁能用 · 规则定租户的规矩 · 运营看出过什么事</span>
     </div>
 
+    <div class="adm-body">
+      <!-- ============ 总览：数字 + 健康 + 需要处理 ============ -->
+      <div v-show="tab === 'overview'" class="adm-pane">
     <!-- 统计条（方案A重构 2026-10-11）：白底描边统计卡 + 数字统一主蓝（费用不再用橙色——EP 只认四级语义色），hover 边框亮起 -->
     <div v-if="checkPermi(['dcs:assistant:config'])" class="stat-grid" v-loading="statsLoading">
       <div class="stat-card">
@@ -36,7 +43,6 @@
         <div class="lbl">本月费用</div>
       </div>
     </div>
-
     <!-- 稳流② Q8②：运行健康（run 终态分布 + 追问失败分类；进程内累计=重启归零，够看趋势） -->
     <el-card v-if="checkPermi(['dcs:assistant:config'])" shadow="never" class="adm-card health-card" v-loading="healthLoading">
       <template #header>
@@ -67,10 +73,321 @@
       </div>
       <div class="field-hint">回答太短不发追问、超预算不发追问都属正常节流；「生成超时/解析失败」占比持续偏高时再去查模型侧配置。</div>
     </el-card>
+        <div class="ov-grid">
+          <section class="adm-sec ov-panel">
+            <div class="sec-head">
+              <div class="sec-ttl">
+                <b>需要处理</b>
+                <span class="sec-cnt">{{ attentionItems.length }} 项</span>
+              </div>
+              <span class="sec-note">只列真的会影响用户的事</span>
+            </div>
+            <ul class="att-list">
+              <li v-for="(it, i) in attentionItems" :key="i">
+                <span class="att-dot" :class="it.level"></span>
+                <div class="att-tx">
+                  <b>{{ it.title }}</b>
+                  <p>{{ it.desc }}</p>
+                </div>
+                <el-button link type="primary" size="small" @click="jumpTo(it.tab)">{{ it.action }} →</el-button>
+              </li>
+              <li v-if="!attentionItems.length" class="att-ok">
+                <span class="att-dot ok"></span>
+                <div class="att-tx"><b>都正常</b><p>没有发现会影响用户的问题。</p></div>
+              </li>
+            </ul>
+          </section>
 
-    <el-tabs v-model="tab" class="adm-tabs" @tab-change="onTabChange">
-      <!-- 页签一：租户开关（方案A重构 2026-10-11：kvrow 手拼列 → el-descriptions 边框式描述列表，标签列 168px 统一对齐；状态长说明收进 ⓘ） -->
-      <el-tab-pane label="租户设置" name="config">
+          <section class="adm-sec ov-panel">
+            <div class="sec-head">
+              <div class="sec-ttl"><b>这一页管什么</b></div>
+            </div>
+            <ul class="guide-list">
+              <li>
+                <div class="gl-tx"><b>能力</b><span>助手会什么、谁能用、哪项危险</span></div>
+                <el-button link type="primary" size="small" @click="jumpTo('caps')">打开 →</el-button>
+              </li>
+              <li>
+                <div class="gl-tx"><b>规则</b><span>租户开关、模型与费用、每人每天额度</span></div>
+                <el-button link type="primary" size="small" @click="jumpTo('rules')">打开 →</el-button>
+              </li>
+              <li>
+                <div class="gl-tx"><b>运营</b><span>真实调用与失败、错答反馈、运行记录、公告</span></div>
+                <el-button link type="primary" size="small" @click="jumpTo('ops')">打开 →</el-button>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </div>
+
+      <!-- ============ 能力：能力清单（权限控制台） + 外部服务 + 行为总纲 ============ -->
+      <div v-show="tab === 'caps'" v-if="canConfig" class="adm-pane">
+        <section class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl">
+              <b>能力清单</b>
+              <span class="sec-cnt">{{ tgRows.length }} 项</span>
+              <span class="sec-note">高危 {{ capCounts.high }} · 全员开放 {{ capCounts.open }} · 受限 {{ capCounts.restricted }} · 已关闭 {{ capCounts.off }}</span>
+            </div>
+            <div class="sec-acts">
+              <el-checkbox v-model="capHighOnly" label="只看高危" size="small" />
+              <el-select v-model="capReverse" clearable placeholder="反查：谁能用这项能力" size="small" class="cap-reverse-sel">
+                <el-option v-for="r in tgRows" :key="r.key" :label="r.displayName" :value="r.key" />
+              </el-select>
+            </div>
+          </div>
+
+          <div class="cap-note">
+            一行就是一项能力：左边是风险，右边是三个角色能不能用。下拉改的是<b>本租户的覆盖档</b>，保存后对下一轮新会话生效，进行中的对话不受影响。
+          </div>
+
+          <div v-if="capIssues.length" class="cap-health">
+            <span class="ch-dot"></span>
+            <span>体检：{{ capIssues.join(' · ') }}</span>
+          </div>
+
+          <div v-if="capReverseRow" class="cap-reverse-bar">
+            <b>{{ capReverseRow.displayName }}</b>
+            <span>{{ capReverseText }}</span>
+            <el-button link type="primary" size="small" @click="capReverse = ''">取消反查</el-button>
+          </div>
+
+          <div class="cap-matrix-wrap" v-loading="tgLoading">
+            <el-empty v-if="!tgLoading && tgRows.length === 0" description="能力清单加载失败——切换页签重试" :image-size="56" />
+            <table v-else class="cap-matrix">
+              <thead>
+                <tr>
+                  <th class="cm-name-col">能力（行）× 谁能用（列）</th>
+                  <th class="cm-risk-col">风险</th>
+                  <th>成员</th>
+                  <th>发布人</th>
+                  <th>管理员</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in capMatrixRows"
+                  :key="row.key"
+                  :class="{ 'is-high': row.riskLevel === 'high', 'is-picked': capReverse === row.key }"
+                  @click="openCapDetail(row)"
+                >
+                  <td>
+                    <div class="cm-name">
+                      <b>{{ row.displayName }}</b>
+                      <span>{{ capCondition(row) || (row.askConfirm ? '执行前会弹确认卡' : '自动执行') }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="risk-badge" :class="row.riskLevel">{{ RISK_LABEL[row.riskLevel] || '—' }}</span>
+                  </td>
+                  <td v-for="lv in capRoleLevels" :key="lv" class="cm-cell" :class="capCellClass(row, lv)">
+                    {{ capCell(row, lv) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="cap-switch">
+            <el-radio-group v-model="capMode" size="small">
+              <el-radio-button value="rows">按行微调</el-radio-button>
+              <el-radio-button value="preset">一键推荐</el-radio-button>
+            </el-radio-group>
+            <span class="sec-note">改完点保存；有未保存改动时底部会出现保存条</span>
+          </div>
+
+          <!-- 一键推荐（3 档策略 × 低/中/高危规则表） -->
+          <div v-if="capMode === 'preset'" class="preset-wrap">
+            <div class="pol-grid">
+              <button
+                v-for="p in POLICIES"
+                :key="p.key"
+                type="button"
+                class="pol-card"
+                :class="{ on: capPolicy === p.key }"
+                @click="setPolicy(p.key)"
+              >
+                <b>{{ p.name }}<span v-if="p.reco" class="pol-reco">推荐</span></b>
+                <p>{{ p.desc }}</p>
+              </button>
+            </div>
+            <div class="preset-sum">
+              {{ policyName(capPolicy) }} —— 共 <b>{{ capPreview.length }}</b> 行会变
+              <span class="sec-note">（其余 {{ tgRows.length - capPreview.length }} 项已符合该档；业务工具由菜单权限控制，不参与推荐）</span>
+            </div>
+            <table v-if="capPreview.length" class="preset-table">
+              <thead>
+                <tr><th class="pt-name">能力</th><th>现在</th><th>改成</th><th class="pt-risk">风险</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="x in capPreview" :key="x.row.key">
+                  <td>{{ x.row.displayName }}</td>
+                  <td class="pt-from">{{ x.from }}</td>
+                  <td class="pt-to">{{ x.to }}</td>
+                  <td><span class="risk-badge" :class="x.row.riskLevel">{{ RISK_LABEL[x.row.riskLevel] }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="preset-none">当前设置已符合{{ policyName(capPolicy) }}，没有需要改的行。</div>
+            <details class="rule-box">
+              <summary>规则表（选档即按此推）</summary>
+              <table class="rule-table">
+                <thead><tr><th>风险</th><th>保守</th><th>标准</th><th>宽松</th></tr></thead>
+                <tbody>
+                  <tr><td>低危 · 只读</td><td>跟随平台</td><td>跟随平台</td><td>跟随平台</td></tr>
+                  <tr><td>中危 · 会落数据</td><td>仅管理员</td><td>跟随平台</td><td>跟随平台</td></tr>
+                  <tr><td>高危 · 出网 / 外部服务</td><td>关闭</td><td>仅管理员</td><td>跟随平台</td></tr>
+                </tbody>
+              </table>
+            </details>
+            <div class="preset-foot">
+              <span class="sec-note">应用前会重新拉一次权限：这期间如果有人改过，就中止并让你复核。改动对下一轮新会话生效。</span>
+              <el-button size="small" @click="capPolicy = 'standard'">重置</el-button>
+              <el-button size="small" type="primary" :disabled="!capPreview.length" :loading="presetApplying" @click="applyPreset">
+                应用到 {{ tgRows.length }} 项能力
+              </el-button>
+            </div>
+          </div>
+
+          <!-- 按行微调：一行一个控件 -->
+          <div v-else class="cap-rows">
+            <div v-for="g in capGroups" :key="g.name" class="cap-group">
+              <div class="cap-group-head">{{ g.name }}（{{ g.rows.length }}）</div>
+              <div v-for="row in g.rows" :key="row.key" class="cap-line" :class="{ 'is-locked': row.locked }">
+                <div class="cap-name">
+                  <b>{{ row.displayName }}</b>
+                  <span class="cap-sub">{{ capCondition(row) || (row.askConfirm ? '执行前会弹确认卡' : '自动执行') }}</span>
+                </div>
+                <span class="risk-badge" :class="row.riskLevel">{{ RISK_LABEL[row.riskLevel] || '—' }}</span>
+                <span class="cap-eff" :class="{ off: capLevelOf(row, tgDraft) < 0, admin: capLevelOf(row, tgDraft) >= 2 }">
+                  {{ capEffText(row) }}
+                </span>
+                <el-select
+                  v-if="!row.locked"
+                  :model-value="capRowValue(row)"
+                  size="small"
+                  class="cap-select"
+                  @change="setRowValue(row, $event)"
+                >
+                  <el-option :label="`跟随平台（${LEVEL_LABEL[row.builtinLevel] || '成员及以上'}）`" value="default" />
+                  <el-option label="仅管理员" value="admin" />
+                  <el-option label="关闭" value="off" />
+                </el-select>
+                <span v-else class="cap-locked">锁定：仅管理员</span>
+                <el-button link type="primary" size="small" @click="openCapDetail(row)">详情</el-button>
+              </div>
+            </div>
+            <div class="cap-biz-note">
+              业务工具（查任务、查待办、待审列表、建任务等）不在这张表里——它们由角色菜单权限控制，见「系统管理 → 角色管理」。
+            </div>
+          </div>
+
+          <div v-if="tgDirty" class="cap-save">
+            <span>有 <b>{{ tgDirtyCount }}</b> 项未保存改动，保存后对下一轮新会话生效</span>
+            <el-button size="small" :disabled="tgSaving" @click="resetToolGate">放弃改动</el-button>
+            <el-button size="small" type="primary" :loading="tgSaving" @click="onSaveToolGate">保存 {{ tgDirtyCount }} 项</el-button>
+          </div>
+        </section>
+
+        <section class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl">
+              <b>外部服务</b>
+              <span class="sec-cnt">{{ mcpRows.length }} 个</span>
+            </div>
+            <span class="sec-note">把只读的外部 MCP 服务挂进助手工具面；改动对下一轮新会话生效</span>
+          </div>
+        <el-card shadow="never" class="adm-card" v-loading="mcpLoading">
+          <template #header>
+            <div class="card-head">
+              <b>已注册的服务</b>
+              <span class="head-note">试点只收免密钥的只读服务；本地脚本只允许服务器允许目录内的 node 脚本，网络地址须在白名单</span>
+              <el-button size="small" type="primary" @click="openMcpForm()">注册服务</el-button>
+            </div>
+          </template>
+          <el-table :data="mcpRows" size="default" stripe>
+            <el-table-column label="服务名" prop="serverName" min-width="130" />
+            <el-table-column label="说明" prop="displayName" min-width="120" />
+            <el-table-column label="方式" width="110">
+              <template #default="{ row }">
+                <el-tag size="small" effect="plain">{{ row.transportType === 'STDIO' ? '本地脚本' : '网络服务' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="启动方式" min-width="240">
+              <template #default="{ row }">{{ row.transportType === 'STDIO' ? row.command + ' ' + (row.args || '') : row.url }}</template>
+            </el-table-column>
+            <el-table-column label="请求头键名" width="130">
+              <!-- G4 三审回修：后端早回了 headerKeys 但表里没有列——管理员看不到已有键，
+                   补一个头会静默丢掉其它鉴权头（值永不回显，只显示键名） -->
+              <template #default="{ row }">{{ row.headerKeys || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-switch :model-value="row.enabled === '1'" @change="(v: any) => onToggleMcp(row, v)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150">
+              <template #default="{ row }">
+                <el-button size="small" link type="primary" @click="openMcpForm(row)">编辑</el-button>
+                <el-button size="small" link type="primary" @click="openMcpAudit(row.serverName)">审计</el-button>
+                <el-button size="small" link type="danger" @click="onDeleteMcp(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+        </section>
+
+        <section class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl">
+              <b>助手行为总纲</b>
+              <span class="sec-cnt">{{ panoSegments.length }} 段</span>
+            </div>
+            <div class="sec-acts">
+              <el-button size="small" @click="copyFullPrompt">复制完整提示词</el-button>
+            </div>
+          </div>
+          <div class="cap-note">这段文字是助手每次回答前都会读的「岗位说明」——只读，随版本更新。点左边目录看某一段，复制按钮拿到的是按拼装顺序的全篇。</div>
+          <div class="pd-wrap" v-loading="panoLoading">
+            <nav class="pd-toc">
+              <button
+                v-for="(seg, i) in panoSegments"
+                :key="seg.key"
+                type="button"
+                :class="{ on: activeSegKey === seg.key }"
+                @click="activeSegKey = seg.key"
+              >
+                <i>{{ i + 1 }}</i>
+                <span class="pt">{{ seg.title }}</span>
+                <span class="pf">prompts/{{ seg.file }}</span>
+              </button>
+              <div v-if="!panoSegments.length" class="pf faint">提示词加载中…</div>
+            </nav>
+            <article v-if="activeSegment" class="pd-body">
+              <div class="pd-meta">
+                <b>{{ activeSegment.title }}</b>
+                <el-tag size="small" effect="plain" :type="activeSegment.source === 'external' ? 'warning' : 'info'">
+                  {{ SOURCE_TXT[activeSegment.source] || activeSegment.source }}
+                </el-tag>
+                <span class="pd-file">prompts/{{ activeSegment.file }}</span>
+                <span class="sp" />
+                <el-button link type="primary" size="small" @click="copyOneSegment">复制这一段</el-button>
+              </div>
+              <p class="pd-why">{{ segWhy(activeSegment.key) }}</p>
+              <pre class="sys-prompt">{{ activeSegment.content }}</pre>
+            </article>
+            <el-empty v-else description="提示词加载失败或为空——切换页签重试" :image-size="56" />
+          </div>
+        </section>
+      </div>
+
+      <!-- ============ 规则：租户开关 + 模型 + 额度 ============ -->
+      <div v-show="tab === 'rules'" v-if="canConfig" class="adm-pane">
+        <section class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl"><b>租户设置</b></div>
+            <span class="sec-note">本租户的总开关与默认值；改完立即生效，影响本租户全部用户</span>
+          </div>
         <el-card shadow="never" class="adm-card" v-loading="loading">
           <el-descriptions :column="1" border class="adm-desc">
             <el-descriptions-item label="AI 助手开关">
@@ -188,7 +505,13 @@
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
+        </section>
 
+        <section class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl"><b>模型与费用</b></div>
+            <span class="sec-note">助手回答用哪个模型、用户能不能自己换</span>
+          </div>
         <!-- 批6(Q5/Q13)+方案A重构 2026-10-11：模型选择卡描述列表化；★ 星号标默认 → 「默认」tag（业内惯例）; 覆盖弹窗在页尾 -->
         <el-card shadow="never" class="adm-card model-card" v-loading="modelLoading">
           <template #header>
@@ -369,433 +692,13 @@
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
-      </el-tab-pane>
+        </section>
 
-      <!-- 页签二：能力全景（Q4/3.1 批C）：全部工具+系统提示词只读——助手的"说明书"；
-           dspro P1-1 回修：端点已收紧到 config 权限，页签守卫与统计条同款对齐 -->
-      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="能力全景" name="panorama" lazy>
-        <el-card shadow="never" class="adm-card" v-loading="panoLoading">
-          <template #header>
-            <div class="card-head">
-              <b>助手会用的工具</b>
-              <span class="head-note">
-                共 {{ panoTools.length }} 个 · 自动执行 {{ autoCount }} 个 · 需用户确认 {{ askCount }} 个——确认类工具执行前会先弹卡片征求同意
-              </span>
-            </div>
-          </template>
-          <el-empty v-if="!panoLoading && panoTools.length === 0" description="工具清单加载失败或为空——切换页签重试" :image-size="60" />
-          <el-table v-else :data="panoTools" size="default" stripe>
-            <el-table-column label="工具" min-width="150">
-              <template #default="{ row }">
-                <div class="tool-cell">
-                  <span class="tool-name">{{ row.displayName }}</span>
-                  <span class="tool-code">{{ row.name }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="分类" width="90">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="row.category === '动作' ? 'warning' : row.category === '交互' ? 'primary' : 'info'">
-                  {{ row.category }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="批次" width="80">
-              <template #default="{ row }">{{ STATION_TXT[row.station] ?? '—' }}</template>
-            </el-table-column>
-            <el-table-column label="执行方式" width="100">
-              <template #default="{ row }">
-                <el-tag size="small" :type="row.behavior === '需确认' ? 'warning' : 'success'" effect="light">
-                  {{ row.behavior }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="使用门槛" prop="gateDesc" min-width="140">
-              <template #default="{ row }">{{ row.gateDesc || '所有用户' }}</template>
-            </el-table-column>
-            <!-- 批1 Q1=B：工具开关覆盖后的本租户实际生效档（-1=已关闭；关闭行通体标红提示） -->
-            <el-table-column label="本租户生效档" width="120">
-              <template #default="{ row }">
-                <el-tag v-if="row.effective == null" size="small" effect="plain" type="info">—</el-tag>
-                <el-tag
-                  v-else
-                  size="small"
-                  effect="light"
-                  :type="row.effective < 0 ? 'danger' : row.effective >= 2 ? 'warning' : row.effective === 1 ? 'info' : 'success'"
-                >
-                  {{ row.effective < 0 ? '已关闭' : row.effective >= 2 ? '仅管理员' : row.effective === 1 ? '发布人及以上' : '全员可用' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <!-- 业务批7 Q9：技能库（➕ 面板可选的技能第一次在管理端可见——名称/门槛/注入方式/正文折叠） -->
-        <!-- k3 P1-1：补 pano-prompt 类——.sys-prompt/.el-collapse 的 scoped 样式全嵌套在
-             .pano-prompt 下（与下方总纲卡同款），缺了它 pre 无 white-space/max-height 约束长文溢出 -->
-        <el-card shadow="never" class="adm-card pano-prompt" v-loading="panoLoading">
-          <template #header>
-            <div class="card-head">
-              <b>技能库（➕ 面板）</b>
-              <span class="head-note">共 {{ panoSkills.length }} 个 · 会话中选中才注入 · 未选中的会话不产生额外消耗</span>
-            </div>
-          </template>
-          <el-collapse v-if="panoSkills.length > 0">
-            <el-collapse-item v-for="s in panoSkills" :key="s.id" :name="s.id">
-              <template #title>
-                <div class="card-head skill-head">
-                  <b>{{ s.name }}</b>
-                  <el-tag size="small" effect="plain" :type="s.minRoleLevel >= 1 ? 'warning' : 'info'">
-                    {{ s.minRoleLevel >= 1 ? '发布人及以上' : '所有用户' }}
-                  </el-tag>
-                  <span class="head-note">{{ s.description }}</span>
-                </div>
-              </template>
-              <pre class="sys-prompt">{{ s.body }}</pre>
-            </el-collapse-item>
-          </el-collapse>
-          <el-empty v-else description="技能清单加载失败或为空——切换页签重试" :image-size="60" />
-        </el-card>
-
-        <!-- 系统提示词只读折叠（改提示词=后端发版或 config/prompts 覆写，页面只看不改）；
-             批2 Q8：总纲升级为分段视图——每段=来源 md 文件+标题+内容，按拼装顺序排列 -->
-        <el-card shadow="never" class="adm-card pano-prompt">
-          <el-collapse>
-            <el-collapse-item name="sys">
-              <template #title>
-                <div class="card-head">
-                  <b>助手行为总纲</b>
-                  <span class="head-note">系统提示词的分段展示（只读，随版本更新；共 {{ panoSegments.length }} 段按拼装顺序排列）</span>
-                </div>
-              </template>
-              <template v-if="panoSegments.length > 0">
-                <div v-for="seg in panoSegments" :key="seg.key" class="prompt-seg">
-                  <div class="seg-head">
-                    <b class="seg-title">{{ seg.title }}</b>
-                    <span class="seg-file">prompts/{{ seg.file }}</span>
-                    <el-tag size="small" effect="plain" :type="seg.source === 'external' ? 'warning' : 'info'">
-                      {{ SOURCE_TXT[seg.source] ?? seg.source }}
-                    </el-tag>
-                  </div>
-                  <pre class="sys-prompt">{{ seg.content }}</pre>
-                </div>
-              </template>
-              <pre v-else class="sys-prompt">{{ panoSysPrompt || '加载中…' }}</pre>
-            </el-collapse-item>
-          </el-collapse>
-        </el-card>
-      </el-tab-pane>
-
-      <!-- 页签二B：工具开关（批1 Q1=B 开关矩阵）：租户级逐工具三档覆盖 + 勾选批量；
-           生效口径=下一轮新会话（在跑会话不踢），仅管理员档只升不降 -->
-      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="工具开关" name="toolgate" lazy>
-        <el-card shadow="never" class="adm-card" v-loading="tgLoading">
-          <template #header>
-            <div class="card-head">
-              <b>工具开关矩阵（平台 + 外部工具）</b>
-              <span class="head-note">
-                平台内置工具、技能（skill: 开头行）与 MCP 外部服务（mcp: 开头行）的租户级开关；业务工具（任务/画像查询等）走角色权限另管。关闭=成员和管理员的助手都彻底不可见；仅管理员=普通成员不可见、管理员可用（门槛只升不降）。改动对下一轮新会话生效，进行中的对话不受影响，仅本租户。
-              </span>
-            </div>
-          </template>
-          <el-empty v-if="!tgLoading && tgRows.length === 0" description="工具清单加载失败——切换页签重试" :image-size="60" />
-          <template v-else>
-            <div v-for="g in tgGroups" :key="g.category" class="tg-group">
-              <div class="tg-group-head">
-                <el-checkbox
-                  :model-value="groupAllChecked(g)"
-                  :indeterminate="groupIndeterminate(g)"
-                  :disabled="g.rows.every((r) => r.locked)"
-                  @change="toggleGroup(g, $event)"
-                >{{ g.category }}（{{ g.rows.length }}）</el-checkbox>
-              </div>
-              <div v-for="row in g.rows" :key="row.key" class="tg-row" :class="{ 'tg-row-locked': row.locked }">
-                <el-checkbox :model-value="tgChecked.includes(row.key)" :disabled="row.locked" @change="toggleRowCheck(row.key)" />
-                <span class="tool-name">{{ row.displayName }}</span>
-                <el-tag size="small" effect="plain" :type="row.askConfirm ? 'warning' : 'success'">
-                  {{ row.askConfirm ? '需确认' : '自动执行' }}
-                </el-tag>
-                <el-tag v-if="row.locked" size="small" type="info" effect="plain">🔒 强制仅管理员</el-tag>
-                <span class="field-hint tg-desc">{{ row.gateDesc || '所有用户' }}</span>
-                <span class="tg-status" :class="{ 'tg-off': tgEffective(row) < 0, 'tg-admin': tgEffective(row) >= 2 }">
-                  {{ tgEffectiveText(row) }}
-                </span>
-                <el-select
-                  :model-value="tgRowValue(row)"
-                  :disabled="row.locked"
-                  size="small"
-                  class="tg-select"
-                  @change="setRowValue(row, $event)"
-                >
-                  <el-option label="默认（内置档）" value="" />
-                  <el-option label="全员可用" value="member" />
-                  <el-option label="仅管理员" value="admin" />
-                  <el-option label="关闭" value="off" />
-                </el-select>
-              </div>
-            </div>
-            <div v-if="tgChecked.length > 0" class="tg-batch">
-              <span>已选 {{ tgChecked.length }} 项，批量设为：</span>
-              <el-button size="small" @click="batchSet('member')">全员可用</el-button>
-              <el-button size="small" @click="batchSet('admin')">仅管理员</el-button>
-              <el-button size="small" type="danger" plain @click="batchSet('off')">关闭</el-button>
-              <el-button size="small" @click="batchSet('')">恢复默认</el-button>
-            </div>
-            <div class="tg-save">
-              <el-button type="primary" :loading="tgSaving" :disabled="!tgDirty" @click="onSaveToolGate">
-                保存（{{ tgDirtyCount }} 项改动）
-              </el-button>
-              <el-button :disabled="!tgDirty || tgSaving" @click="resetToolGate">放弃改动</el-button>
-              <span v-if="tgDirty" class="field-hint">有未保存改动——保存后新会话才生效</span>
-            </div>
-          </template>
-        </el-card>
-      </el-tab-pane>
-
-      <!-- 页签二C：外部工具（批2 Q2=A MCP 试点）：服务注册+启停+调用审计；
-           试点=平台级只读免密钥服务，白名单外一律拒存，挂载失败不连坐助手会话 -->
-      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="外部工具" name="mcp" lazy>
-        <el-card shadow="never" class="adm-card" v-loading="mcpLoading">
-          <template #header>
-            <div class="card-head">
-              <b>外部工具（MCP 试点）</b>
-              <span class="head-note">
-                把只读 MCP 服务挂进助手工具面。试点只收免密钥服务；STDIO 仅允许 node 且脚本须在服务器允许目录内，HTTP 地址 host 须在白名单；改动对下一轮新会话生效。
-              </span>
-              <el-button size="small" type="primary" @click="openMcpForm()">注册服务</el-button>
-            </div>
-          </template>
-          <el-table :data="mcpRows" size="default" stripe>
-            <el-table-column label="服务名" prop="serverName" min-width="130" />
-            <el-table-column label="说明" prop="displayName" min-width="120" />
-            <el-table-column label="传输" width="130">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain">{{ row.transportType === 'STDIO' ? 'STDIO(node)' : row.transportType }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="命令 / 地址" min-width="240">
-              <template #default="{ row }">{{ row.transportType === 'STDIO' ? row.command + ' ' + (row.args || '') : row.url }}</template>
-            </el-table-column>
-            <el-table-column label="请求头键名" width="130">
-              <!-- G4 三审回修：后端早回了 headerKeys 但表里没有列——管理员看不到已有键，
-                   补一个头会静默丢掉其它鉴权头（值永不回显，只显示键名） -->
-              <template #default="{ row }">{{ row.headerKeys || '—' }}</template>
-            </el-table-column>
-            <el-table-column label="状态" width="90">
-              <template #default="{ row }">
-                <el-switch :model-value="row.enabled === '1'" @change="(v: any) => onToggleMcp(row, v)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="150">
-              <template #default="{ row }">
-                <el-button size="small" link type="primary" @click="openMcpForm(row)">编辑</el-button>
-                <el-button size="small" link type="primary" @click="mcpLogFilter = row.serverName; mcpLogPage = 1; loadMcpCallLog()">审计</el-button>
-                <el-button size="small" link type="danger" @click="onDeleteMcp(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <!-- 调用/挂载审计（双态落账：MOUNT_OK/MOUNT_ERROR/CALL_OK/CALL_ERROR/RATE_LIMITED） -->
-        <el-card shadow="never" class="adm-card">
-          <template #header>
-            <div class="card-head">
-              <b>调用审计</b>
-              <span class="head-note">每次挂载与每次真实调用都落账——限频 30 次/分/租户，超限调用对助手报人话错误</span>
-              <el-button v-if="mcpLogFilter" size="small" @click="mcpLogFilter = ''; mcpLogPage = 1; loadMcpCallLog()">清除筛选：{{ mcpLogFilter }}</el-button>
-            </div>
-          </template>
-          <el-table :data="mcpLogRows" size="small" stripe>
-            <el-table-column label="时间" width="170">
-              <template #default="{ row }">{{ formatMcpTime(row.createTime) }}</template>
-            </el-table-column>
-            <el-table-column label="服务" prop="serverName" width="120" />
-            <el-table-column label="动作" width="120">
-              <template #default="{ row }">{{ MCP_ACTION_TXT[row.action] ?? row.action }}</template>
-            </el-table-column>
-            <el-table-column label="结果" width="80">
-              <template #default="{ row }">
-                <el-tag size="small" :type="row.status === '1' ? 'success' : 'danger'">{{ row.status === '1' ? '成功' : '失败' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="耗时" width="90">
-              <template #default="{ row }">{{ row.durationMs != null ? row.durationMs + 'ms' : '—' }}</template>
-            </el-table-column>
-            <el-table-column label="详情/错误" min-width="220">
-              <template #default="{ row }">{{ row.errorMsg || '—' }}</template>
-            </el-table-column>
-          </el-table>
-          <div class="mcp-log-pager">
-            <el-button size="small" :disabled="mcpLogPage <= 1" @click="mcpLogPage--; loadMcpCallLog()">上一页</el-button>
-            <span class="field-hint">第 {{ mcpLogPage }} 页 · 共 {{ mcpLogTotal }} 条</span>
-            <el-button size="small" :disabled="mcpLogPage * 20 >= mcpLogTotal" @click="mcpLogPage++; loadMcpCallLog()">下一页</el-button>
+        <section class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl"><b>每人每天额度</b></div>
+            <span class="sec-note">先看租户默认，再给个别用户设单人上限；0 = 关停对应能力</span>
           </div>
-        </el-card>
-
-        <!-- 注册/编辑抽屉 -->
-        <el-drawer v-model="mcpFormVisible" :title="mcpForm.id ? '编辑外部服务' : '注册外部服务'" size="480px">
-          <el-form label-width="92px">
-            <el-form-item label="服务名" required>
-              <el-input v-model="mcpForm.serverName" placeholder="小写字母/数字/下划线，3-30 位，如 weather_demo" :disabled="!!mcpForm.id" />
-            </el-form-item>
-            <el-form-item label="说明">
-              <el-input v-model="mcpForm.displayName" placeholder="如：天气查询（试点）" maxlength="100" />
-            </el-form-item>
-            <el-form-item label="传输类型" required>
-              <el-select v-model="mcpForm.transportType" style="width:100%" :disabled="!!mcpForm.id">
-                <el-option label="STDIO（node 脚本，试点推荐）" value="STDIO" />
-                <el-option label="STREAMABLE_HTTP" value="STREAMABLE_HTTP" />
-                <el-option label="SSE" value="SSE" />
-              </el-select>
-            </el-form-item>
-            <template v-if="mcpForm.transportType === 'STDIO'">
-              <el-form-item label="命令">
-                <el-input model-value="node" disabled />
-              </el-form-item>
-              <el-form-item label="脚本路径" required>
-                <el-input v-model="mcpForm.argsJson" placeholder='JSON 数组，如 ["D:/.../backend/mcp-demo/weather-server.mjs"]' />
-              </el-form-item>
-            </template>
-            <template v-else>
-              <el-form-item label="服务地址" required>
-                <el-input v-model="mcpForm.url" placeholder="http://127.0.0.1:3000/mcp（host 须在白名单）" />
-              </el-form-item>
-            </template>
-            <el-form-item v-if="mcpForm.transportType !== 'STDIO'" label="请求头">
-              <el-input v-model="mcpForm.headers" :placeholder="mcpHeadersPlaceholder" />
-            </el-form-item>
-            <el-form-item label="备注">
-              <el-input v-model="mcpForm.remark" type="textarea" :rows="2" maxlength="255" />
-            </el-form-item>
-            <el-form-item label="立即启用">
-              <el-switch v-model="mcpForm.enabledBool" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="mcpFormVisible = false">取消</el-button>
-            <el-button type="primary" :loading="mcpSaving" @click="onSaveMcp">保存</el-button>
-          </template>
-        </el-drawer>
-      </el-tab-pane>
-
-      <!-- 页签三：错答反馈（perm=dcs:assistant:feedback:query；N 条待处理跳这）——方案A: 括号手拼计数 → el-badge 红色角标 -->
-      <el-tab-pane v-if="checkPermi(['dcs:assistant:feedback:query'])" name="feedback">
-        <template #label>错答反馈<el-badge v-if="fbTotal > 0" :value="fbTotal" class="tab-badge" /></template>
-        <el-card v-if="fbStats" shadow="never" class="adm-card">
-          <!-- AI 缺口批 Q10：反馈聚合——好评率大数字 + 点踩原因 CSS 横条 + 周趋势小卡 -->
-          <div class="fb-stats">
-            <div class="fb-rate">
-              <div class="fb-rate-num" :class="fbRateTone">{{ fbStats.upRate == null ? '—' : `${fbStats.upRate}%` }}</div>
-              <div class="fb-rate-lbl">好评率（近 {{ fbStats.windowDays }} 天）</div>
-              <div class="fb-rate-sub">👍 {{ fbStats.up }} · 👎 {{ fbStats.down }}</div>
-            </div>
-            <div class="fb-reasons">
-              <div class="fb-sec-title">点踩原因分布</div>
-              <div v-for="r in fbStats.downReasons || []" :key="r.reason" class="fb-reason-row">
-                <span class="fb-reason-name" :title="r.reason">{{ r.reason }}</span>
-                <span class="fb-reason-bar"><i :style="{ width: reasonPct(r.cnt) + '%' }" /></span>
-                <span class="fb-reason-cnt">{{ r.cnt }}</span>
-              </div>
-              <div v-if="!fbStats.downReasons?.length" class="fb-empty">近窗口还没有点踩</div>
-            </div>
-            <div class="fb-trend">
-              <div class="fb-sec-title">近 {{ Math.ceil((fbStats.windowDays || 28) / 7) }} 周趋势</div>
-              <div v-for="w in fbStats.trend || []" :key="w.week" class="fb-trend-row">
-                <span class="fb-trend-week">{{ String(w.week).substring(5) }}</span>
-                <span class="fb-trend-nums">👍{{ w.up }} 👎{{ w.down }}</span>
-              </div>
-              <div v-if="!fbStats.total" class="fb-empty">还没有样本</div>
-            </div>
-          </div>
-        </el-card>
-        <el-card shadow="never" class="adm-card">
-          <el-table :data="fbRows" v-loading="fbLoading" size="small">
-            <el-table-column label="评价" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.rating === 'UP' ? 'success' : 'danger'" size="small"
-                  ><IconSpan :name="row.rating === 'UP' ? 'thumbs-up' : 'thumbs-down'" /> {{ row.rating === 'UP' ? '有用' : '错答' }}</el-tag
-                >
-              </template>
-            </el-table-column>
-            <el-table-column label="反馈说明" prop="note" show-overflow-tooltip />
-            <el-table-column label="时间" width="160">
-              <template #default="{ row }">{{ fmtIsoTime(row.createTime) }}</template>
-            </el-table-column>
-          </el-table>
-          <div v-if="fbTotal > fbRows.length" class="fb-more">
-            <el-button link type="primary" @click="loadFeedback">加载更多（{{ fbRows.length }} / {{ fbTotal }}）</el-button>
-          </div>
-          <el-empty v-if="!fbLoading && fbRows.length === 0" description="还没有反馈——用户在回答尾部点「点踩」时会落到这里" :image-size="60" />
-        </el-card>
-      </el-tab-pane>
-      <!-- 页签四：运行记录（二站① AU-52：动作账本只读，perm=config 与租户开关同源；2026-10-11 日常查询+标准分页） -->
-      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="运行记录" name="actions" lazy>
-        <el-card shadow="never" class="adm-card">
-          <!-- 查询栏（2026-10-11）：关键词模糊（动作/结果/操作人）+ 状态 + 时间范围 -->
-          <div class="log-filter">
-            <el-input
-              v-model="logQuery.keyword"
-              placeholder="动作 / 结果 / 操作人（模糊）"
-              clearable
-              style="width: 240px"
-              @keyup.enter="onLogSearch"
-              @clear="onLogSearch"
-            />
-            <el-select v-model="logQuery.status" clearable placeholder="状态" style="width: 130px" @change="onLogSearch">
-              <el-option v-for="(st, key) in LOG_ST" :key="key" :label="st.label" :value="key" />
-            </el-select>
-            <el-date-picker
-              v-model="logRange"
-              type="daterange"
-              value-format="YYYY-MM-DD"
-              range-separator="至"
-              start-placeholder="开始日期"
-              end-placeholder="结束日期"
-              style="width: 260px"
-              @change="onLogSearch"
-            />
-            <el-button type="primary" :loading="logLoading" @click="onLogSearch">查询</el-button>
-            <el-button @click="onLogReset">重置</el-button>
-          </div>
-          <el-table :data="logRows" v-loading="logLoading" size="small">
-            <el-table-column label="时间" width="160">
-              <template #default="{ row }">{{ fmtIsoTime(row.createTime) }}</template>
-            </el-table-column>
-            <el-table-column label="动作" width="110">
-              <template #default="{ row }">{{ ACT[row.toolName] ?? row.toolName }}</template>
-            </el-table-column>
-            <el-table-column label="状态" width="90">
-              <template #default="{ row }">
-                <el-tag :type="logSt(row.status).type" size="small">{{ logSt(row.status).label }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="结果" prop="resultSummary" show-overflow-tooltip>
-              <template #default="{ row }">{{ row.resultSummary || '—' }}</template>
-            </el-table-column>
-            <el-table-column label="操作人" prop="userName" width="120">
-              <template #default="{ row }">{{ row.userName || '—' }}</template>
-            </el-table-column>
-          </el-table>
-          <div class="log-pager">
-            <el-pagination
-              v-model:current-page="logQuery.pageNum"
-              :page-size="logQuery.pageSize"
-              :total="logTotal"
-              layout="total, prev, pager, next, jumper"
-              @current-change="loadActionLog"
-            />
-          </div>
-          <el-empty
-            v-if="!logLoading && logRows.length === 0"
-            description="没有符合条件的运行记录——换个关键词或放宽时间范围试试；AI 替用户执行确认过的写操作（如发催办）会记到这里"
-            :image-size="60"
-          />
-        </el-card>
-      </el-tab-pane>
-
-      <!-- 业务批3-③(#16)：用户额度——单人上限覆盖/重置今日额度/禁用；读走 config 权限，操作走 quota:edit -->
-      <!-- UI-UX 批（2026-10-13，frontend-design+element-plus-aesthetic）：概览条+用量进度条+费用千分位 -->
-      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="用户额度" name="quota" lazy>
         <el-card shadow="never" class="adm-card">
           <!-- 概览条：左=租户默认口径（来自本页配置卡数据源）；右=本页速览（口径=当前页，不跨页误导） -->
           <div class="quota-overview">
@@ -969,10 +872,193 @@
             />
           </div>
         </el-card>
-      </el-tab-pane>
+        </section>
+      </div>
 
-      <!-- 批4 Q11：公告横幅——发布即生效（用户助手顶部横幅），撤回即消失；每用户新公告会重新弹出 -->
-      <el-tab-pane v-if="checkPermi(['dcs:assistant:config'])" label="助手公告" name="announcement" lazy>
+      <!-- ============ 运营：审计 + 反馈 + 运行记录 + 公告 ============ -->
+      <div v-show="tab === 'ops'" v-if="canConfig || canFeedback" class="adm-pane">
+        <section v-if="canConfig" class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl">
+              <b>调用审计</b>
+              <span class="sec-cnt">{{ auditStats.real }} 条真实调用</span>
+            </div>
+            <div class="sec-acts">
+              <el-select v-model="mcpLogFilter" clearable placeholder="全部外部服务" size="small" style="width: 160px" @change="reloadMcpLog">
+                <el-option v-for="s in mcpRows" :key="s.id" :label="s.serverName" :value="s.serverName" />
+              </el-select>
+              <el-checkbox v-model="auditShowMounts" label="显示挂载记录" size="small" @change="reloadMcpLog" />
+            </div>
+          </div>
+          <div class="audit-sum">
+            <span>全部 <b>{{ auditStats.all }}</b></span>
+            <span>真实调用 <b>{{ auditStats.real }}</b></span>
+            <span>挂载记录 <b>{{ auditStats.mounts }}</b><em>建会话的例行记录，默认收起</em></span>
+          </div>
+          <el-card shadow="never" class="adm-card ops-card">
+            <el-table :data="mcpLogRows" size="small" stripe :row-class-name="auditRowClass">
+              <el-table-column label="时间" width="170">
+                <template #default="{ row }">{{ formatMcpTime(row.createTime) }}</template>
+              </el-table-column>
+              <el-table-column label="服务" prop="serverName" width="120" />
+              <el-table-column label="动作" width="110">
+                <template #default="{ row }">{{ MCP_ACTION_TXT[row.action] ?? row.action }}</template>
+              </el-table-column>
+              <el-table-column label="结果" width="80">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.status === '1' ? 'success' : 'danger'">{{ row.status === '1' ? '成功' : '失败' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="耗时" width="90">
+                <template #default="{ row }">{{ row.durationMs != null ? row.durationMs + 'ms' : '—' }}</template>
+              </el-table-column>
+              <el-table-column label="详情/错误" min-width="220">
+                <template #default="{ row }">{{ row.errorMsg || '—' }}</template>
+              </el-table-column>
+              <template #empty>
+                <el-empty
+                  :description="auditShowMounts ? '还没有调用或挂载记录' : '还没有真实调用——右上角可打开挂载记录'"
+                  :image-size="56"
+                />
+              </template>
+            </el-table>
+            <div class="mcp-log-pager">
+              <el-button size="small" :disabled="mcpLogPage <= 1" @click="mcpLogPage--; loadMcpCallLog()">上一页</el-button>
+              <span class="field-hint">第 {{ mcpLogPage }} 页 · 共 {{ mcpLogTotal }} 条</span>
+              <el-button size="small" :disabled="mcpLogPage * 20 >= mcpLogTotal" @click="mcpLogPage++; loadMcpCallLog()">下一页</el-button>
+            </div>
+          </el-card>
+        </section>
+
+        <section v-if="canFeedback" class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl">
+              <b>错答反馈</b>
+              <span v-if="fbTotal > 0" class="sec-cnt">{{ fbTotal }} 条</span>
+            </div>
+            <span class="sec-note">用户在回答尾部点「错答」会落到这里，先看原因分布再决定改哪里</span>
+          </div>
+        <el-card v-if="fbStats" shadow="never" class="adm-card">
+          <!-- AI 缺口批 Q10：反馈聚合——好评率大数字 + 点踩原因 CSS 横条 + 周趋势小卡 -->
+          <div class="fb-stats">
+            <div class="fb-rate">
+              <div class="fb-rate-num" :class="fbRateTone">{{ fbStats.upRate == null ? '—' : `${fbStats.upRate}%` }}</div>
+              <div class="fb-rate-lbl">好评率（近 {{ fbStats.windowDays }} 天）</div>
+              <div class="fb-rate-sub">👍 {{ fbStats.up }} · 👎 {{ fbStats.down }}</div>
+            </div>
+            <div class="fb-reasons">
+              <div class="fb-sec-title">点踩原因分布</div>
+              <div v-for="r in fbStats.downReasons || []" :key="r.reason" class="fb-reason-row">
+                <span class="fb-reason-name" :title="r.reason">{{ r.reason }}</span>
+                <span class="fb-reason-bar"><i :style="{ width: reasonPct(r.cnt) + '%' }" /></span>
+                <span class="fb-reason-cnt">{{ r.cnt }}</span>
+              </div>
+              <div v-if="!fbStats.downReasons?.length" class="fb-empty">近窗口还没有点踩</div>
+            </div>
+            <div class="fb-trend">
+              <div class="fb-sec-title">近 {{ Math.ceil((fbStats.windowDays || 28) / 7) }} 周趋势</div>
+              <div v-for="w in fbStats.trend || []" :key="w.week" class="fb-trend-row">
+                <span class="fb-trend-week">{{ String(w.week).substring(5) }}</span>
+                <span class="fb-trend-nums">👍{{ w.up }} 👎{{ w.down }}</span>
+              </div>
+              <div v-if="!fbStats.total" class="fb-empty">还没有样本</div>
+            </div>
+          </div>
+        </el-card>
+        <el-card shadow="never" class="adm-card">
+          <el-table :data="fbRows" v-loading="fbLoading" size="small">
+            <el-table-column label="评价" width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.rating === 'UP' ? 'success' : 'danger'" size="small"
+                  ><IconSpan :name="row.rating === 'UP' ? 'thumbs-up' : 'thumbs-down'" /> {{ row.rating === 'UP' ? '有用' : '错答' }}</el-tag
+                >
+              </template>
+            </el-table-column>
+            <el-table-column label="反馈说明" prop="note" show-overflow-tooltip />
+            <el-table-column label="时间" width="160">
+              <template #default="{ row }">{{ fmtIsoTime(row.createTime) }}</template>
+            </el-table-column>
+          </el-table>
+          <div v-if="fbTotal > fbRows.length" class="fb-more">
+            <el-button link type="primary" @click="loadFeedback">加载更多（{{ fbRows.length }} / {{ fbTotal }}）</el-button>
+          </div>
+          <el-empty v-if="!fbLoading && fbRows.length === 0" description="还没有反馈——用户在回答尾部点「点踩」时会落到这里" :image-size="60" />
+        </el-card>
+        </section>
+
+        <section v-if="canConfig" class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl"><b>运行记录</b></div>
+            <span class="sec-note">AI 替用户执行过的动作账本（只读）</span>
+          </div>
+        <el-card shadow="never" class="adm-card">
+          <!-- 查询栏（2026-10-11）：关键词模糊（动作/结果/操作人）+ 状态 + 时间范围 -->
+          <div class="log-filter">
+            <el-input
+              v-model="logQuery.keyword"
+              placeholder="动作 / 结果 / 操作人（模糊）"
+              clearable
+              style="width: 240px"
+              @keyup.enter="onLogSearch"
+              @clear="onLogSearch"
+            />
+            <el-select v-model="logQuery.status" clearable placeholder="状态" style="width: 130px" @change="onLogSearch">
+              <el-option v-for="(st, key) in LOG_ST" :key="key" :label="st.label" :value="key" />
+            </el-select>
+            <el-date-picker
+              v-model="logRange"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              style="width: 260px"
+              @change="onLogSearch"
+            />
+            <el-button type="primary" :loading="logLoading" @click="onLogSearch">查询</el-button>
+            <el-button @click="onLogReset">重置</el-button>
+          </div>
+          <el-table :data="logRows" v-loading="logLoading" size="small">
+            <el-table-column label="时间" width="160">
+              <template #default="{ row }">{{ fmtIsoTime(row.createTime) }}</template>
+            </el-table-column>
+            <el-table-column label="动作" width="110">
+              <template #default="{ row }">{{ ACT[row.toolName] ?? row.toolName }}</template>
+            </el-table-column>
+            <el-table-column label="状态" width="90">
+              <template #default="{ row }">
+                <el-tag :type="logSt(row.status).type" size="small">{{ logSt(row.status).label }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="结果" prop="resultSummary" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.resultSummary || '—' }}</template>
+            </el-table-column>
+            <el-table-column label="操作人" prop="userName" width="120">
+              <template #default="{ row }">{{ row.userName || '—' }}</template>
+            </el-table-column>
+          </el-table>
+          <div class="log-pager">
+            <el-pagination
+              v-model:current-page="logQuery.pageNum"
+              :page-size="logQuery.pageSize"
+              :total="logTotal"
+              layout="total, prev, pager, next, jumper"
+              @current-change="loadActionLog"
+            />
+          </div>
+          <el-empty
+            v-if="!logLoading && logRows.length === 0"
+            description="没有符合条件的运行记录——换个关键词或放宽时间范围试试；AI 替用户执行确认过的写操作（如发催办）会记到这里"
+            :image-size="60"
+          />
+        </el-card>
+        </section>
+
+        <section v-if="canConfig" class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl"><b>助手公告</b></div>
+            <span class="sec-note">发布后用户打开助手即见顶部横幅；同一时刻只显示最新一条</span>
+          </div>
         <el-card shadow="never" class="adm-card">
           <div class="ann-form">
             <el-input
@@ -1016,8 +1102,62 @@
           </el-table>
           <el-empty v-if="!annLoading && annRows.length === 0" description="还没有公告——发布后用户打开 AI 助手即见顶部横幅" :image-size="60" />
         </el-card>
-      </el-tab-pane>
-    </el-tabs>
+        </section>
+      </div>
+    </div>
+
+    <!-- ===== 能力详情抽屉（技术名只在这里出现） ===== -->
+    <el-drawer v-model="capDetailOpen" title="能力详情" size="460px" append-to-body class="cap-detail-drawer">
+      <div v-if="capDetailRow" class="cd">
+        <div class="cd-name">
+          <b>{{ capDetailRow.displayName }}</b>
+          <span class="risk-badge" :class="capDetailRow.riskLevel">{{ RISK_LABEL[capDetailRow.riskLevel] || '—' }}</span>
+        </div>
+        <div class="cd-sub">{{ capCondition(capDetailRow) || '无条件，随会话出现' }}</div>
+        <div class="cd-sec">
+          <h4>这条能力能做什么</h4>
+          <p>{{ capDesc(capDetailRow) }}</p>
+        </div>
+        <div class="cd-sec">
+          <h4>权限链路（从上到下逐层收窄）</h4>
+          <ol class="cd-chain">
+            <li>
+              <b>租户总闸</b>
+              <span>{{ cfg.enabled ? '助手已开通' : '助手已停用——所有能力都不可用' }}</span>
+            </li>
+            <li>
+              <b>出现条件</b>
+              <span>{{ capCondition(capDetailRow) || '无条件，每次会话都会注册' }}</span>
+            </li>
+            <li>
+              <b>平台内置门槛</b>
+              <span>{{ LEVEL_LABEL[capDetailRow.builtinLevel] || '成员及以上' }}</span>
+            </li>
+            <li>
+              <b>本租户覆盖</b>
+              <span>{{ capOverrideText(capDetailRow) }}</span>
+            </li>
+            <li>
+              <b>最终生效</b>
+              <span>{{ capEffText(capDetailRow) }}</span>
+            </li>
+            <li v-if="capDetailRow.askConfirm">
+              <b>执行确认</b>
+              <span>属于写入类动作，执行前会先弹确认卡征求用户同意</span>
+            </li>
+          </ol>
+        </div>
+        <div class="cd-sec">
+          <h4>技术信息</h4>
+          <div class="cd-kv"><span>内部标识</span><code>{{ capDetailRow.toolNames.join(' / ') }}</code></div>
+          <div class="cd-kv"><span>风险档</span>{{ RISK_LABEL[capDetailRow.riskLevel] || '—' }}</div>
+        </div>
+        <div v-if="capSkillBody(capDetailRow)" class="cd-sec">
+          <h4>技能正文（选中这个技能时才注入）</h4>
+          <pre class="sys-prompt">{{ capSkillBody(capDetailRow) }}</pre>
+        </div>
+      </div>
+    </el-drawer>
 
     <!-- 批6(Q13): 能力覆盖弹窗——三模板(三档可调/仅开·关/不支持), 只影响本租户, 官方 seed 升级不冲掉 -->
     <el-dialog v-model="ovDialog" title="覆盖该模型的能力映射" width="560px" append-to-body class="ov-dialog">
@@ -1163,8 +1303,53 @@
         >
       </template>
     </el-dialog>
+        <!-- 注册/编辑抽屉 -->
+        <el-drawer v-model="mcpFormVisible" :title="mcpForm.id ? '编辑外部服务' : '注册外部服务'" size="480px">
+          <el-form label-width="92px">
+            <el-form-item label="服务名" required>
+              <el-input v-model="mcpForm.serverName" placeholder="小写字母/数字/下划线，3-30 位，如 weather_demo" :disabled="!!mcpForm.id" />
+            </el-form-item>
+            <el-form-item label="说明">
+              <el-input v-model="mcpForm.displayName" placeholder="如：天气查询（试点）" maxlength="100" />
+            </el-form-item>
+            <el-form-item label="传输类型" required>
+              <el-select v-model="mcpForm.transportType" style="width:100%" :disabled="!!mcpForm.id">
+                <el-option label="STDIO（node 脚本，试点推荐）" value="STDIO" />
+                <el-option label="STREAMABLE_HTTP" value="STREAMABLE_HTTP" />
+                <el-option label="SSE" value="SSE" />
+              </el-select>
+            </el-form-item>
+            <template v-if="mcpForm.transportType === 'STDIO'">
+              <el-form-item label="命令">
+                <el-input model-value="node" disabled />
+              </el-form-item>
+              <el-form-item label="脚本路径" required>
+                <el-input v-model="mcpForm.argsJson" placeholder='JSON 数组，如 ["D:/.../backend/mcp-demo/weather-server.mjs"]' />
+              </el-form-item>
+            </template>
+            <template v-else>
+              <el-form-item label="服务地址" required>
+                <el-input v-model="mcpForm.url" placeholder="http://127.0.0.1:3000/mcp（host 须在白名单）" />
+              </el-form-item>
+            </template>
+            <el-form-item v-if="mcpForm.transportType !== 'STDIO'" label="请求头">
+              <el-input v-model="mcpForm.headers" :placeholder="mcpHeadersPlaceholder" />
+            </el-form-item>
+            <el-form-item label="备注">
+              <el-input v-model="mcpForm.remark" type="textarea" :rows="2" maxlength="255" />
+            </el-form-item>
+            <el-form-item label="立即启用">
+              <el-switch v-model="mcpForm.enabledBool" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="mcpFormVisible = false">取消</el-button>
+            <el-button type="primary" :loading="mcpSaving" @click="onSaveMcp">保存</el-button>
+          </template>
+        </el-drawer>
   </div>
 </template>
+
 
 <script setup lang="ts">
 /**
@@ -1239,7 +1424,11 @@ import { applyAssistantName } from '@/components/DcsAssistant/nameState';
 const userStore = useUserStore();
 const router = useRouter();
 
-const tab = ref('config');
+/** 四段导航：总览 / 能力 / 规则 / 运营（原 8 个平铺页签，同类项合一） */
+const tab = ref('overview');
+/** 权限闸（模板里多处复用，集中成 computed 避免逐处 checkPermi） */
+const canConfig = computed(() => checkPermi(['dcs:assistant:config']));
+const canFeedback = computed(() => checkPermi(['dcs:assistant:feedback:query']));
 const loading = ref(false);
 const saving = ref(false);
 const cfg = ref<AssistantEffectiveConfig>({
@@ -2192,13 +2381,13 @@ function fuTone(k: string): string {
   return k === 'succeeded' ? 'ok' : k === 'answer-too-short' || k === 'budget-gated' ? 'mid' : 'bad';
 }
 
-/* ===== 能力全景页签（批C）：工具清单+系统提示词（批A 端点消费） ===== */
+/* ===== 能力数据源（能力清单 + 行为总纲） ===== */
 const panoLoading = ref(false);
 const panoTools = ref<AssistantPanoramaTool[]>([]);
 const panoSysPrompt = ref('');
-/** 业务批7 Q9：技能库（折叠看正文；注入方式与 SkillAssets 口径一致） */
+/** 技能正文（清单里点详情看，不再单独占一张卡） */
 const panoSkills = ref<AssistantPanoramaSkill[]>([]);
-/** 批2 Q8：总纲分段视图（来源 md 文件+只读内容，随版本更新） */
+/** 行为总纲分段（来源 md 文件+只读内容，随版本更新） */
 interface AssistantPromptSegment {
   key: string;
   title: string;
@@ -2208,9 +2397,6 @@ interface AssistantPromptSegment {
 }
 const panoSegments = ref<AssistantPromptSegment[]>([]);
 const SOURCE_TXT: Record<string, string> = { external: '外部覆写', classpath: '随版文件', embedded: '内嵌兜底' };
-const STATION_TXT: Record<number, string> = { 1: '一期', 2: '二站', 3: '本期' };
-const autoCount = computed(() => panoTools.value.filter((t) => t.behavior !== '需确认').length);
-const askCount = computed(() => panoTools.value.filter((t) => t.behavior === '需确认').length);
 async function loadPanorama() {
   panoLoading.value = true;
   try {
@@ -2222,96 +2408,376 @@ async function loadPanorama() {
     panoSegments.value = res?.data?.promptSegments ?? [];
     panoSkills.value = (res?.data as unknown as { skills?: AssistantPanoramaSkill[] })?.skills ?? [];
   } catch {
-    ElMessage.error('能力全景加载失败，请稍后再试');
+    ElMessage.error('能力数据加载失败，请稍后再试');
   } finally {
     panoLoading.value = false;
   }
 }
 
-/* ===== 工具开关页签（批1 Q1=B）：租户级逐工具三档覆盖 + 勾选批量（用户要求多选） ===== */
-/** 行 UI 模型：key=多工具同档的合并键（勾选身份）；草稿/快照按工具名存（PUT 校验键∈allToolNames） */
+/* ===== 行为总纲：目录 + 正文（题 4），复制走系统剪贴板 ===== */
+const activeSegKey = ref('');
+const activeSegment = computed(
+  () => panoSegments.value.find((s) => s.key === activeSegKey.value) ?? panoSegments.value[0] ?? null
+);
+watch(
+  panoSegments,
+  (list) => {
+    if (!activeSegKey.value && list.length) activeSegKey.value = list[0].key;
+  },
+  { immediate: true }
+);
+/** 「这段管什么」——目录上一句话，避免管理员点开八段才知道哪段讲什么 */
+const SEG_WHY: Record<string, string> = {
+  role: '告诉助手它是谁、说话什么调子——所有回答的底色。',
+  discipline: '业务数据纪律：拿不到真数据就说不清，不许编。',
+  'discipline-urge': '催办时的分寸：说事不说人、给出路。',
+  layout: '回答怎么排版：日期写 MM-DD、用全角括号、别堆一堆小标题。',
+  cheatsheet: '工具速查：什么时候该用哪个工具、参数怎么填。',
+  routes: '站内链接怎么给：用户说「打开任务页」时给可点的直达链接。',
+  chart: '统计图协议：什么时候画图、画什么图、数据从哪来。',
+  memory: '长期记忆的存取规矩：记什么、不记什么、怎么用。'
+};
+function segWhy(key: string): string {
+  return SEG_WHY[key] || '这一段是助手的行为约定，随版本更新。';
+}
+async function copyText(text: string, okMsg: string) {
+  if (!text) {
+    ElMessage.warning('这段内容还没加载出来');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success(okMsg);
+  } catch {
+    ElMessage.warning('复制失败——请手动选中文本复制');
+  }
+}
+function copyFullPrompt() {
+  void copyText(panoSysPrompt.value || panoSegments.value.map((s) => s.content).join('\n\n'), '已复制完整提示词');
+}
+function copyOneSegment() {
+  if (activeSegment.value) void copyText(activeSegment.value.content, '已复制这一段');
+}
+
+/* ===== 总览：需要处理（只列会影响用户的事，点一下直达对应段） ===== */
+const attentionItems = computed(() => {
+  const out: Array<{ level: string; title: string; desc: string; action: string; tab: string }> = [];
+  if (!cfg.value.enabled) {
+    out.push({ level: 'bad', title: '助手是停用状态', desc: '所有用户看不到入口，发消息会被直接拒绝。', action: '去开通', tab: 'rules' });
+  }
+  if (cfg.value.memoryEnabled !== '1') {
+    out.push({ level: 'warn', title: '长期记忆是关闭的', desc: '保存长期记忆这项能力不会出现，用户偏好不会跨会话保留。', action: '去开启', tab: 'rules' });
+  }
+  const openHigh = tgRows.value.filter((r) => r.riskLevel === 'high' && capAvailable(r) && capLevelOf(r, tgDraft.value) === 0);
+  if (openHigh.length) {
+    out.push({
+      level: 'warn',
+      title: `${openHigh.length} 项高危能力对全员开放`,
+      desc: `${openHigh.map((r) => r.displayName).join('、')}——出网或接外部服务，建议收到仅管理员。`,
+      action: '去收紧',
+      tab: 'caps'
+    });
+  }
+  if (auditStats.value.mounts > 0) {
+    out.push({
+      level: 'info',
+      title: '调用记录里大部分是挂载记录',
+      desc: `${auditStats.value.all} 条里 ${auditStats.value.mounts} 条是每次建会话的例行挂载，真正的调用只有 ${auditStats.value.real} 条。`,
+      action: '看真实调用',
+      tab: 'ops'
+    });
+  }
+  const offMcp = mcpRows.value.filter((s) => s.enabled !== '1');
+  if (offMcp.length) {
+    out.push({ level: 'info', title: `${offMcp.length} 个外部服务已停用`, desc: '对应的能力当前不会出现在会话里。', action: '去看看', tab: 'caps' });
+  }
+  return out;
+});
+/** 总览的「去看看」/段内互跳：切段并补一次懒加载 */
+function jumpTo(name: string) {
+  tab.value = name;
+  onTabChange(name);
+}
+
+/* ===== 能力清单（原「能力全景」+「工具开关」合并）：一处说清会什么 / 谁能用 / 哪项危险 ===== */
+/** 行 UI 模型：key=多工具同档的合并键（详情/反查身份） */
 interface TgRowUi extends AssistantToolGateRow {
   key: string;
 }
-interface TgGroup {
-  category: string;
+interface CapGroup {
+  name: string;
   rows: TgRowUi[];
 }
+const RISK_LABEL: Record<string, string> = { high: '高危', mid: '中危', low: '低危' };
+/** 生效档人话：0=成员及以上（不再造「全员可用」第二个说法） */
+const LEVEL_LABEL: Record<number, string> = { 0: '成员及以上', 1: '发布人及以上', 2: '仅管理员' };
+const capRoleLevels = [0, 1, 2];
+
 const tgLoading = ref(false);
 const tgSaving = ref(false);
 const tgRows = ref<TgRowUi[]>([]);
-/** 已保存覆盖快照（工具名→off/member/admin；无键=默认内置档） */
+/** 已保存覆盖快照（工具名→off/admin；无键=跟随平台） */
 const tgSaved = ref<Record<string, string>>({});
 /** 草稿覆盖——保存时整份提交（后端全量覆盖语义，空表=全恢复默认） */
 const tgDraft = ref<Record<string, string>>({});
-const tgChecked = ref<string[]>([]);
-/** 行勾选（el-checkbox 单挂数组 model 不在组内属未文档用法——显式维护，行为等价） */
-function toggleRowCheck(key: string) {
-  const i = tgChecked.value.indexOf(key);
-  if (i >= 0) tgChecked.value.splice(i, 1);
-  else tgChecked.value.push(key);
-}
-const tgGroups = computed<TgGroup[]>(() => {
-  const map = new Map<string, TgRowUi[]>();
-  for (const r of tgRows.value) {
-    const list = map.get(r.category) ?? [];
-    list.push(r);
-    map.set(r.category, list);
-  }
-  return [...map.entries()].map(([category, rows]) => ({ category, rows }));
-});
+const capHighOnly = ref(false);
+const capReverse = ref('');
+const capMode = ref<'rows' | 'preset'>('rows');
+type CapPolicy = 'conservative' | 'standard' | 'open';
+const capPolicy = ref<CapPolicy>('standard');
+const presetApplying = ref(false);
+
 const tgDirtyCount = computed(() =>
   tgRows.value.filter((r) => (tgDraft.value[r.toolNames[0]] ?? '') !== (tgSaved.value[r.toolNames[0]] ?? '')).length
 );
 const tgDirty = computed(() => tgDirtyCount.value > 0);
-function tgRowValue(row: TgRowUi): string {
-  return tgDraft.value[row.toolNames[0]] ?? '';
-}
-/** 三审回修（dsflash/dspro P1）：生效档按草稿即时推导（后端 effectiveMinRole 同口径
- *  off=-1 / admin=max(builtin,2) / member=max(builtin,0) / 默认=builtin）——
- *  保存前后状态列与下拉值始终一致，不再吃 GET 时的旧快照 */
-function tgEffective(row: TgRowUi): number {
-  const v = tgDraft.value[row.toolNames[0]] ?? '';
+
+/** 生效档核心（与服务端 effectiveMinRoleSingle 同口径）：off=-1；admin=max(builtin,2)；
+ *  member 与未配置同效——等级 0 就是成员档，所以「全员可用」覆盖项数学上是空操作，UI 不再提供 */
+function capLevelOf(row: TgRowUi, map: Record<string, string>): number {
+  const v = map[row.toolNames[0]] ?? '';
   if (v === 'off') return -1;
   if (v === 'admin') return Math.max(row.builtinLevel, 2);
-  if (v === 'member') return Math.max(row.builtinLevel, 0);
   return row.builtinLevel;
 }
-function tgEffectiveText(row: TgRowUi): string {
-  const e = tgEffective(row);
+function capRowValue(row: TgRowUi): string {
+  // 'default' 是下拉的哨兵值（'' 会被 el-select 当成空值显示占位符）
+  return tgDraft.value[row.toolNames[0]] || 'default';
+}
+function capEffText(row: TgRowUi): string {
+  const e = capLevelOf(row, tgDraft.value);
   if (e < 0) return '本租户已关闭';
-  if (e >= 2) return '仅管理员可用';
-  if (e === 1) return '发布人及以上';
-  return '全员可用';
+  return LEVEL_LABEL[e] ?? '成员及以上';
 }
 /** 多工具 spec 同档共进退：设值写到全部工具名（effectiveMinRole 任一命中即生效，全写避免先命中的残留旧值） */
 function setRowValue(row: TgRowUi, v: string) {
+  // 'default'=跟随平台 → 删除覆盖键（后端整列覆盖语义：空表恢复默认）
+  const val = v === 'default' ? '' : v;
   const next = { ...tgDraft.value };
   for (const n of row.toolNames) {
-    if (v) next[n] = v;
+    if (val) next[n] = val;
     else delete next[n];
   }
   tgDraft.value = next;
 }
-function groupAllChecked(g: TgGroup): boolean {
-  return g.rows.every((r) => r.locked || tgChecked.value.includes(r.key));
-}
-function groupIndeterminate(g: TgGroup): boolean {
-  const sel = g.rows.filter((r) => !r.locked && tgChecked.value.includes(r.key)).length;
-  const selectable = g.rows.filter((r) => !r.locked).length;
-  return sel > 0 && sel < selectable;
-}
-function toggleGroup(g: TgGroup, on: unknown) {
-  const keys = g.rows.filter((r) => !r.locked).map((r) => r.key);
-  if (on) tgChecked.value = [...new Set([...tgChecked.value, ...keys])];
-  else tgChecked.value = tgChecked.value.filter((k) => !keys.includes(k));
-}
-/** 批量设档：锁定项自动跳过并提示（代码强制项不参与租户覆盖） */
-function batchSet(v: string) {
-  // 勾选集只含可勾选行（行 checkbox/组头对 locked 均已禁用/过滤），无需跳过计数
+
+/** 分组：平台工具（查询+交互）/ 技能 / 外部服务；业务工具在清单尾注里交代（不走本表） */
+const CAP_CAT_GROUP: Record<string, string> = { 查询: '平台工具', 交互: '平台工具', 技能: '技能', 外部工具: '外部服务' };
+const capGroups = computed<CapGroup[]>(() => {
+  const order = ['平台工具', '技能', '外部服务'];
+  const map = new Map<string, TgRowUi[]>();
   for (const r of tgRows.value) {
-    if (!r.locked && tgChecked.value.includes(r.key)) setRowValue(r, v);
+    const name = CAP_CAT_GROUP[r.category] ?? r.category;
+    const list = map.get(name) ?? [];
+    list.push(r);
+    map.set(name, list);
   }
+  const out = order.filter((n) => map.has(n)).map((name) => ({ name, rows: map.get(name) as TgRowUi[] }));
+  for (const [name, rows] of map) {
+    if (!order.includes(name)) out.push({ name, rows });
+  }
+  return out;
+});
+
+/** 出现条件（人话）：配置没开/服务没起时说清「当前不会出现」，别让管理员对着开关猜 */
+function capCondition(row: TgRowUi): string {
+  const first = row.toolNames[0];
+  if (first === 'web_search') return wsState.configured ? '会话开启联网后出现' : '本租户未配搜索密钥，当前不会出现';
+  if (first === 'save_memory') return cfg.value.memoryEnabled === '1' ? '租户已开启长期记忆' : '租户未开启长期记忆，当前不会出现';
+  if (first.startsWith('mcp:')) {
+    const s = mcpRows.value.find((x) => `mcp:${x.serverName}` === first);
+    if (!s) return '服务已删除，当前不会出现';
+    return s.enabled === '1' ? '服务在线时出现' : '服务已停用，当前不会出现';
+  }
+  return row.gateDesc || '';
+}
+function capAvailable(row: TgRowUi): boolean {
+  return !capCondition(row).includes('不会出现');
+}
+/** 矩阵格子：先看配置是否让这项能力出现，再按生效档比角色等级 */
+function capCell(row: TgRowUi, roleLevel: number): string {
+  if (!capAvailable(row)) return '随配置';
+  const e = capLevelOf(row, tgDraft.value);
+  if (e < 0) return '×';
+  return roleLevel >= e ? '✓' : '×';
+}
+function capCellClass(row: TgRowUi, roleLevel: number): string {
+  if (!capAvailable(row)) return 'na';
+  const e = capLevelOf(row, tgDraft.value);
+  if (e < 0) return 'no';
+  return roleLevel >= e ? 'yes' : 'no';
+}
+const capMatrixRows = computed(() => (capHighOnly.value ? tgRows.value.filter((r) => r.riskLevel === 'high') : tgRows.value));
+const capCounts = computed(() => {
+  const list = tgRows.value;
+  return {
+    high: list.filter((r) => r.riskLevel === 'high').length,
+    open: list.filter((r) => capAvailable(r) && capLevelOf(r, tgDraft.value) === 0).length,
+    restricted: list.filter((r) => capAvailable(r) && capLevelOf(r, tgDraft.value) > 0).length,
+    off: list.filter((r) => capLevelOf(r, tgDraft.value) < 0).length
+  };
+});
+const capReverseRow = computed(() => tgRows.value.find((r) => r.key === capReverse.value) ?? null);
+const capReverseText = computed(() => {
+  const row = capReverseRow.value;
+  if (!row) return '';
+  if (!capAvailable(row)) return capCondition(row);
+  const e = capLevelOf(row, tgDraft.value);
+  if (e < 0) return '当前关闭——成员、发布人、管理员都用不到';
+  const names = ['成员', '发布人', '管理员'];
+  const yes = names.filter((_, lv) => lv >= e);
+  return `可用：${yes.join('、')}。门槛由平台内置档 + 本租户覆盖共同决定，只能收紧不能放宽。`;
+});
+/** 体检条：只列会让管理员意外的事 */
+const capIssues = computed(() => {
+  const out: string[] = [];
+  const openHigh = tgRows.value.filter((r) => r.riskLevel === 'high' && capAvailable(r) && capLevelOf(r, tgDraft.value) === 0);
+  if (openHigh.length) out.push(`${openHigh.length} 项高危能力对全员开放（${openHigh.map((r) => r.displayName).join('、')}）`);
+  if (cfg.value.memoryEnabled !== '1') out.push('长期记忆关闭——保存长期记忆不会出现');
+  const offMcp = mcpRows.value.filter((s) => s.enabled !== '1');
+  if (offMcp.length) out.push(`${offMcp.length} 个外部服务已停用，对应能力当前不会出现`);
+  return out;
+});
+
+/* ===== 一键推荐（题 8 乙）：3 档策略 × 风险档规则表，预览差异后整列覆盖 ===== */
+const POLICIES = [
+  { key: 'conservative', name: '保守档', desc: '只读按平台；会落数据的能力收管理员；出网 / 外部服务关掉', reco: false },
+  { key: 'standard', name: '标准档', desc: '只读与写操作按平台；出网 / 外部服务收管理员', reco: true },
+  { key: 'open', name: '宽松档', desc: '全部按平台默认，不再额外收紧', reco: false }
+] as const;
+function setPolicy(k: string) {
+  capPolicy.value = k as CapPolicy;
+}
+function policyName(k: CapPolicy): string {
+  return POLICIES.find((p) => p.key === k)?.name ?? '';
+}
+/** 目标生效档：低危恒跟随平台；中危/高危按策略收紧 */
+function capTargetLevel(row: TgRowUi, policy: CapPolicy): number {
+  const base = row.builtinLevel;
+  if (row.riskLevel === 'high') {
+    return policy === 'conservative' ? -1 : policy === 'standard' ? Math.max(base, 2) : base;
+  }
+  if (row.riskLevel === 'mid') {
+    return policy === 'conservative' ? Math.max(base, 2) : base;
+  }
+  return base;
+}
+function capTargetOverride(row: TgRowUi, target: number): string {
+  if (target < 0) return 'off';
+  if (target > row.builtinLevel) return 'admin';
+  return '';
+}
+const capPreview = computed(() =>
+  tgRows.value
+    .map((row) => ({
+      row,
+      fromLevel: capLevelOf(row, tgSaved.value),
+      toLevel: capTargetLevel(row, capPolicy.value)
+    }))
+    .filter((x) => x.fromLevel !== x.toLevel)
+    .map((x) => ({
+      ...x,
+      from: x.fromLevel < 0 ? '已关闭' : LEVEL_LABEL[x.fromLevel] ?? '—',
+      to: x.toLevel < 0 ? '关闭' : LEVEL_LABEL[x.toLevel] ?? '—'
+    }))
+);
+/** 快照比对：后端当前覆盖表与页面快照是否一致（忽略 member——它与默认同效） */
+function sameSaved(rows: AssistantToolGateRow[]): boolean {
+  const fresh: Record<string, string> = {};
+  for (const r of rows) {
+    if (r.override && r.override !== 'member') for (const n of r.toolNames) fresh[n] = r.override;
+  }
+  const keys = new Set([...Object.keys(fresh), ...Object.keys(tgSaved.value)]);
+  for (const k of keys) {
+    if ((fresh[k] ?? '') !== (tgSaved.value[k] ?? '')) return false;
+  }
+  return true;
+}
+/** 应用到全部能力：三道闸（草稿覆盖确认 → 重拉比对防并发 → 生效口径确认）后整列覆盖 */
+async function applyPreset() {
+  const preview = capPreview.value;
+  if (!preview.length) return;
+  if (tgDirty.value) {
+    try {
+      await ElMessageBox.confirm(
+        `你还有 ${tgDirtyCount.value} 项手工改动没保存，应用推荐会覆盖它们。继续？`,
+        '覆盖手工改动',
+        { type: 'warning', confirmButtonText: '继续应用', cancelButtonText: '先取消' }
+      );
+    } catch {
+      return;
+    }
+  }
+  presetApplying.value = true;
+  try {
+    const res = (await getAssistantToolGate()) as unknown as { data?: AssistantToolGateRow[] };
+    if (!sameSaved(res.data ?? [])) {
+      await loadToolGate();
+      ElMessage.warning('刚有人改过权限——已刷新，请重看「会变几行」再应用');
+      return;
+    }
+    try {
+      await ElMessageBox.confirm(
+        `按${policyName(capPolicy.value)}改 ${preview.length} 项能力。改动对下一轮新会话生效，进行中的对话不受影响。`,
+        '应用推荐',
+        { type: 'info', confirmButtonText: `应用 ${preview.length} 项`, cancelButtonText: '再看看' }
+      );
+    } catch {
+      return;
+    }
+    const next: Record<string, string> = { ...tgSaved.value };
+    for (const x of preview) {
+      const v = capTargetOverride(x.row, x.toLevel);
+      for (const n of x.row.toolNames) {
+        if (v) next[n] = v;
+        else delete next[n];
+      }
+    }
+    await saveAssistantToolGate(next);
+    await loadToolGate();
+    capMode.value = 'rows';
+    ElMessage.success(`已应用——${preview.length} 项按${policyName(capPolicy.value)}生效，下一轮新会话起作用`);
+  } catch {
+    // 值域/工具名校验的人话报错已由 request 层弹出
+  } finally {
+    presetApplying.value = false;
+  }
+}
+
+/* ===== 能力详情抽屉：技术名只在这里出现 ===== */
+const capDetailOpen = ref(false);
+const capDetailRow = ref<TgRowUi | null>(null);
+function openCapDetail(row: TgRowUi) {
+  capDetailRow.value = row;
+  capDetailOpen.value = true;
+}
+/** 平台工具的「能做什么」人话说明（技能/外部服务/业务工具走各自数据） */
+const CAP_DESC: Record<string, string> = {
+  web_search: '在公开网页里搜最新信息；每搜一次算一次联网额度，出网内容先过安全过滤。',
+  read_attachment: '读当前会话里用户上传的附件内容（只读自己会话的文件）。',
+  submit_plan: '把要做的事列成一张计划卡给用户确认，没有副作用。',
+  todo_write: '维护本次会话的任务清单（整表替换式），用户在侧栏能看到进度。',
+  save_memory: '把用户偏好写成长期记忆，跨会话保留；用户可在「AI 助手记忆」页删除。',
+  view_skill: '模型按需自取某个技能的详细做法（技能正文只在需要时读取，不常驻）。'
+};
+function capDesc(row: TgRowUi): string {
+  const first = row.toolNames[0];
+  if (CAP_DESC[first]) return CAP_DESC[first];
+  const sk = panoSkills.value.find((s) => first === `skill:${s.id}`);
+  if (sk) return sk.description || '技能：把某类任务的做法写成固定步骤。';
+  if (first.startsWith('mcp:')) return '外部 MCP 服务提供的工具，按服务声明的只读工具面挂载。';
+  return row.gateDesc || '这项能力没有额外说明。';
+}
+function capSkillBody(row: TgRowUi): string {
+  const first = row.toolNames[0];
+  return panoSkills.value.find((s) => first === `skill:${s.id}`)?.body || '';
+}
+function capOverrideText(row: TgRowUi): string {
+  const v = tgDraft.value[row.toolNames[0]] ?? '';
+  if (!v) return '未覆盖，跟随平台内置档';
+  if (v === 'off') return '本租户设为关闭';
+  if (v === 'admin') return '本租户设为仅管理员';
+  return '旧值「全员可用」（与跟随平台同效）';
 }
 async function loadToolGate() {
   tgLoading.value = true;
@@ -2321,11 +2787,11 @@ async function loadToolGate() {
     tgRows.value = rows.map((r) => ({ ...r, key: r.toolNames.join('/') }));
     const saved: Record<string, string> = {};
     for (const r of rows) {
-      if (r.override) for (const n of r.toolNames) saved[n] = r.override;
+      // member 与默认同效（等级 0 就是成员档），归一掉——页面不再显示一个改了等于没改的选项
+      if (r.override && r.override !== 'member') for (const n of r.toolNames) saved[n] = r.override;
     }
     tgSaved.value = saved;
     tgDraft.value = { ...saved };
-    tgChecked.value = [];
   } catch {
     // 具体错误 request 层已弹；失败态由页面空态文案兜底（切换页签可重试）
   } finally {
@@ -2334,16 +2800,12 @@ async function loadToolGate() {
 }
 function resetToolGate() {
   tgDraft.value = { ...tgSaved.value };
-  tgChecked.value = [];
 }
 async function onSaveToolGate() {
   tgSaving.value = true;
   try {
     await saveAssistantToolGate(tgDraft.value);
     tgSaved.value = { ...tgDraft.value };
-    tgChecked.value = [];
-    // 全景缓存作废——「本租户生效档」列下次切入重拉（三审回修 P1）
-    panoTools.value = [];
     ElMessage.success('已保存——下一轮新会话起生效');
   } catch {
     // 值域/工具名校验的人话报错已由 request 层弹出，这里不再叠一层通用文案
@@ -2380,6 +2842,9 @@ const mcpLogRows = ref<AssistantMcpCallLog[]>([]);
 const mcpLogTotal = ref(0);
 const mcpLogPage = ref(1);
 const mcpLogFilter = ref('');
+/** 默认只看真实调用与失败——挂载成功/失败是每次建会话的例行记录，会把真正要看的一屏淹掉 */
+const auditShowMounts = ref(false);
+const auditStats = ref({ all: 0, mounts: 0, real: 0 });
 const MCP_ACTION_TXT: Record<string, string> = {
   MOUNT_OK: '挂载成功',
   MOUNT_ERROR: '挂载失败',
@@ -2406,14 +2871,36 @@ async function loadMcpServers() {
 }
 async function loadMcpCallLog() {
   try {
-    const res = (await pageAssistantMcpCallLog({ serverName: mcpLogFilter.value || undefined, pageNum: mcpLogPage.value, pageSize: 20 })) as unknown as {
-      data?: { rows?: AssistantMcpCallLog[]; total?: number };
+    const res = (await pageAssistantMcpCallLog({
+      serverName: mcpLogFilter.value || undefined,
+      realOnly: !auditShowMounts.value,
+      pageNum: mcpLogPage.value,
+      pageSize: 20
+    })) as unknown as {
+      data?: { rows?: AssistantMcpCallLog[]; total?: number; stats?: { all: number; mounts: number; real: number } };
     };
     mcpLogRows.value = res.data?.rows ?? [];
     mcpLogTotal.value = res.data?.total ?? 0;
+    if (res.data?.stats) auditStats.value = res.data.stats;
   } catch {
     // 同上：request 层已弹
   }
+}
+/** 切换「显示挂载记录」/换服务：回到第 1 页再拉 */
+function reloadMcpLog() {
+  mcpLogPage.value = 1;
+  void loadMcpCallLog();
+}
+/** 外部服务行里的「审计」：带着服务名跳到运营段 */
+function openMcpAudit(serverName: string) {
+  mcpLogFilter.value = serverName;
+  mcpLogPage.value = 1;
+  tab.value = 'ops';
+  void loadMcpCallLog();
+}
+/** 失败行标红：真实调用里最该看的就是失败 */
+function auditRowClass({ row }: { row: AssistantMcpCallLog }): string {
+  return row.status === '1' ? '' : 'audit-fail';
 }
 function openMcpForm(row?: AssistantMcpServerRow) {
   if (row) {
@@ -2494,31 +2981,22 @@ function formatMcpTime(t: string): string {
   return isNaN(d.getTime()) ? t : d.toLocaleString('zh-CN', { hour12: false });
 }
 
-/** lazy 页签首访加载（批C）：能力全景切到才拉（工作面不预载用不到的数据） */
-/** 公告页签首开即拉列表（lazy 页签，与 panorama/quota 同款 onTabChange 模式）。
- *  dspro P2-5 回修：反馈页签每次切入重刷统计——原「fbRows 非空只刷一次」会让管理员
- *  处理完反馈后看到的仍是进页那一刻的好评率/原因分布（核心工作流恰是看数据→处理→再看）。 */
+/** 四段导航的懒加载（总览首屏已带齐数字/健康/能力快照，其余段进到才拉） */
 function onTabChange(name: string | number) {
-  if (name === 'panorama' && panoTools.value.length === 0 && !panoLoading.value) {
-    void loadPanorama();
+  if (name === 'caps') {
+    if (tgRows.value.length === 0 && !tgLoading.value) void loadToolGate();
+    if (panoSegments.value.length === 0 && !panoLoading.value) void loadPanorama();
+    if (mcpRows.value.length === 0 && !mcpLoading.value) void loadMcpServers();
   }
-  if (name === 'toolgate' && tgRows.value.length === 0 && !tgLoading.value) {
-    void loadToolGate();
-  }
-  if (name === 'mcp' && mcpRows.value.length === 0 && !mcpLoading.value) {
-    void loadMcpServers();
-    void loadMcpCallLog();
-  } else if (name === 'mcp') {
-    void loadMcpCallLog();
-  }
-  if (name === 'quota' && quotaRows.value.length === 0 && !quotaLoading.value) {
+  if (name === 'rules' && quotaRows.value.length === 0 && !quotaLoading.value) {
     void loadQuotaPage();
   }
-  if (name === 'announcement' && annRows.value.length === 0 && !annLoading.value) {
-    void loadAnnouncements();
-  }
-  if (name === 'feedback') {
+  if (name === 'ops') {
+    void loadMcpCallLog();
     void loadFbStats();
+    if (fbRows.value.length === 0) void loadFeedback();
+    if (logRows.value.length === 0) void loadActionLog();
+    if (annRows.value.length === 0 && !annLoading.value) void loadAnnouncements();
   }
 }
 
@@ -2775,17 +3253,19 @@ async function onWsSaveKey() {
 
 onMounted(() => {
   loadConfig();
-  if (checkPermi(['dcs:assistant:config'])) {
+  if (canConfig.value) {
     void loadWsInfo();
-  }
-  if (checkPermi(['dcs:assistant:config'])) {
     loadStats();
     loadModelSection();
-    loadActionLog();
     loadHealth();
+    // 总览的「需要处理」要用能力快照（风险档/生效档）与审计计数，首屏就把这几份小数据带齐
+    void loadPanorama();
+    void loadToolGate();
+    void loadMcpServers();
+    void loadMcpCallLog();
   }
-  if (checkPermi(['dcs:assistant:feedback:query'])) {
-    loadFeedback();
+  if (canFeedback.value) {
+    void loadFbStats();
   }
 });
 </script>
@@ -3651,4 +4131,920 @@ onMounted(() => {
   gap: 10px;
   margin-top: 10px;
 }
+
+/* ===== 四段重构（2026-10-27）：总览 / 能力 / 规则 / 运营 ===== */
+.dcs-as-admin {
+  /* 页头与四段导航同一行——首屏内容起点从 501px 收到 ~130px 以内 */
+  padding-top: 10px;
+
+  .adm-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--el-border-color-light);
+  }
+  .adm-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    b {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--dcs-text-primary);
+    }
+  }
+  .adm-seg {
+    display: flex;
+    gap: 22px;
+
+    button {
+      position: relative;
+      padding: 6px 0 11px;
+      border: none;
+      background: transparent;
+      font-size: 14px;
+      color: var(--dcs-text-secondary);
+      cursor: pointer;
+
+      &::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        bottom: -1px;
+        left: 0;
+        height: 2px;
+        border-radius: 2px;
+        background: transparent;
+      }
+      &:hover {
+        color: var(--dcs-text-primary);
+      }
+      &.on {
+        color: var(--dcs-text-primary);
+        font-weight: 600;
+
+        &::after {
+          background: var(--el-color-primary);
+        }
+      }
+    }
+  }
+  .adm-sub {
+    margin-left: auto;
+    font-size: 12.5px;
+    color: var(--dcs-text-secondary);
+  }
+  /* 段内小节：不再套第二层页签，用标题把内容分开 */
+  .adm-sec {
+    margin-bottom: 22px;
+
+    &:last-child {
+      margin-bottom: 4px;
+    }
+  }
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 9px;
+  }
+  .sec-ttl {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    flex-wrap: wrap;
+
+    b {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--dcs-text-primary);
+    }
+  }
+  .sec-cnt {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--el-fill-color-light);
+    font-size: 12px;
+    color: var(--dcs-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .sec-note {
+    font-size: 12.5px;
+    color: var(--dcs-text-secondary);
+  }
+  .sec-acts {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .cap-reverse-sel {
+    width: 200px;
+  }
+
+  /* ---- 总览两栏 ---- */
+  .ov-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 18px;
+  }
+  .ov-panel {
+    padding: 16px 18px;
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-light);
+    border-radius: var(--app-card-radius);
+  }
+  .att-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px dashed var(--el-border-color-lighter);
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+    .att-dot {
+      flex: none;
+      width: 8px;
+      height: 8px;
+      margin-top: 6px;
+      border-radius: 50%;
+      background: var(--el-color-info);
+
+      &.bad {
+        background: var(--el-color-danger);
+      }
+      &.warn {
+        background: var(--el-color-warning);
+      }
+      &.info {
+        background: var(--el-color-primary);
+      }
+      &.ok {
+        background: var(--el-color-success);
+      }
+    }
+    .att-tx {
+      flex: 1;
+      min-width: 0;
+
+      b {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--dcs-text-primary);
+      }
+      p {
+        margin: 2px 0 0;
+        font-size: 12.5px;
+        line-height: 1.65;
+        color: var(--dcs-text-secondary);
+      }
+    }
+    .att-ok {
+      color: var(--dcs-text-secondary);
+    }
+  }
+  .guide-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px dashed var(--el-border-color-lighter);
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+    .gl-tx {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      b {
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      span {
+        font-size: 12.5px;
+        color: var(--dcs-text-secondary);
+      }
+    }
+  }
+
+  /* ---- 能力清单 ---- */
+  .cap-note {
+    margin-bottom: 10px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--dcs-text-secondary);
+  }
+  .cap-health {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+    padding: 7px 11px;
+    border-radius: var(--app-control-radius);
+    background: var(--el-color-warning-light-9);
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--el-color-warning-dark-2);
+
+    .ch-dot {
+      flex: none;
+      width: 6px;
+      height: 6px;
+      margin-top: 7px;
+      border-radius: 50%;
+      background: var(--el-color-warning);
+    }
+  }
+  .cap-reverse-bar {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    padding: 7px 11px;
+    border-radius: var(--app-control-radius);
+    background: var(--el-color-primary-light-9);
+    font-size: 12.5px;
+    color: var(--dcs-text-secondary);
+
+    b {
+      color: var(--dcs-text-primary);
+    }
+  }
+  .cap-matrix-wrap {
+    overflow-x: auto;
+  }
+  .cap-matrix {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    th {
+      padding: 7px 8px;
+      border-bottom: 1px solid var(--el-border-color);
+      font-size: 12px;
+      font-weight: 500;
+      text-align: center;
+      white-space: nowrap;
+      color: var(--dcs-text-secondary);
+    }
+    .cm-name-col {
+      text-align: left;
+      padding-left: 10px;
+    }
+    td {
+      padding: 0 8px;
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      height: 44px;
+      text-align: center;
+    }
+    tbody tr {
+      cursor: pointer;
+
+      &:hover td {
+        background: var(--el-fill-color-lighter);
+      }
+      &.is-picked td {
+        background: var(--el-color-primary-light-9);
+      }
+    }
+    .cm-name {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1px;
+      padding: 6px 0;
+
+      b {
+        font-weight: 600;
+        color: var(--dcs-text-primary);
+      }
+      span {
+        font-size: 11.5px;
+        color: var(--dcs-text-secondary);
+      }
+    }
+    .cm-cell {
+      font-size: 14px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+
+      &.yes {
+        color: var(--el-color-success);
+      }
+      &.no {
+        color: var(--el-text-color-placeholder);
+      }
+      &.na {
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--el-text-color-placeholder);
+      }
+    }
+  }
+  .risk-badge {
+    display: inline-block;
+    padding: 0 7px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-style: normal;
+    font-weight: 500;
+    line-height: 18px;
+    text-align: center;
+
+    &.high {
+      background: var(--el-color-danger-light-9);
+      color: var(--el-color-danger);
+    }
+    &.mid {
+      background: var(--el-color-warning-light-9);
+      color: var(--el-color-warning-dark-2);
+    }
+    &.low {
+      background: var(--el-fill-color-light);
+      color: var(--dcs-text-secondary);
+    }
+  }
+  .cap-switch {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 14px 0 10px;
+  }
+
+  /* ---- 一键推荐 ---- */
+  .preset-wrap {
+    padding: 14px 16px 12px;
+    border: 1px solid var(--el-border-color-light);
+    border-radius: var(--app-card-radius);
+    background: var(--el-fill-color-blank);
+  }
+  .pol-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .pol-card {
+    padding: 10px 12px 11px;
+    text-align: left;
+    border: 1px solid var(--el-border-color-light);
+    border-radius: var(--app-control-radius);
+    background: var(--el-bg-color);
+    cursor: pointer;
+    transition:
+      border-color 0.15s,
+      background 0.15s;
+
+    &:hover {
+      border-color: var(--el-color-primary-light-5);
+    }
+    &.on {
+      border-color: var(--el-color-primary);
+      background: var(--el-color-primary-light-9);
+    }
+    b {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13.5px;
+      color: var(--dcs-text-primary);
+    }
+    p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--dcs-text-secondary);
+    }
+    .pol-reco {
+      padding: 0 6px;
+      border-radius: 8px;
+      background: var(--el-color-primary);
+      font-size: 10.5px;
+      font-weight: 500;
+      line-height: 16px;
+      color: #fff;
+    }
+  }
+  .preset-sum {
+    margin: 12px 0 8px;
+    font-size: 13px;
+    color: var(--dcs-text-primary);
+
+    b {
+      font-size: 15px;
+      color: var(--el-color-primary);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  .preset-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+
+    th {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--el-border-color);
+      font-size: 12px;
+      font-weight: 500;
+      text-align: left;
+      color: var(--dcs-text-secondary);
+    }
+    .pt-name {
+      width: 36%;
+    }
+    .pt-risk {
+      width: 64px;
+      text-align: center;
+    }
+    td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--el-border-color-lighter);
+    }
+    .pt-from {
+      color: var(--dcs-text-secondary);
+    }
+    .pt-to {
+      font-weight: 600;
+      color: var(--el-color-success);
+    }
+    td:last-child {
+      text-align: center;
+    }
+  }
+  .preset-none {
+    padding: 14px 4px;
+    font-size: 12.5px;
+    color: var(--dcs-text-secondary);
+  }
+  .rule-box {
+    margin-top: 10px;
+    font-size: 12.5px;
+
+    summary {
+      cursor: pointer;
+      color: var(--dcs-text-secondary);
+      user-select: none;
+    }
+    .rule-table {
+      width: 100%;
+      margin-top: 8px;
+      border-collapse: collapse;
+
+      th,
+      td {
+        padding: 5px 8px;
+        border-bottom: 1px solid var(--el-border-color-lighter);
+        text-align: left;
+      }
+      th {
+        font-weight: 500;
+        color: var(--dcs-text-secondary);
+      }
+    }
+  }
+  .preset-foot {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+
+    .sec-note {
+      margin-right: auto;
+      max-width: 620px;
+      line-height: 1.6;
+    }
+  }
+
+  /* ---- 按行微调：一行一个控件 ---- */
+  .cap-group {
+    margin-bottom: 10px;
+  }
+  .cap-group-head {
+    margin-bottom: 2px;
+    padding: 6px 2px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--dcs-text-secondary);
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+  .cap-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 56px 118px 196px 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+
+    &:hover {
+      background: var(--el-fill-color-lighter);
+    }
+    .cap-name {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+
+      b {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--dcs-text-primary);
+      }
+    }
+    .cap-sub {
+      font-size: 11.5px;
+      color: var(--dcs-text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cap-eff {
+      font-size: 12.5px;
+      color: var(--el-color-success);
+
+      &.admin {
+        color: var(--el-color-warning-dark-2);
+      }
+      &.off {
+        color: var(--el-text-color-placeholder);
+      }
+    }
+    .cap-locked {
+      font-size: 12px;
+      color: var(--el-text-color-placeholder);
+    }
+    .cap-select {
+      width: 196px;
+    }
+    &.is-locked {
+      background: var(--el-fill-color-lighter);
+    }
+  }
+  .cap-biz-note {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--dcs-text-secondary);
+  }
+  .cap-save {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--el-color-primary-light-7);
+    border-radius: var(--app-control-radius);
+    background: var(--el-color-primary-light-9);
+    font-size: 12.5px;
+    color: var(--dcs-text-primary);
+
+    b {
+      color: var(--el-color-primary);
+    }
+    .el-button {
+      margin-left: auto;
+    }
+    .el-button + .el-button {
+      margin-left: 0;
+    }
+  }
+
+  /* ---- 行为总纲：目录 + 正文 ---- */
+  .pd-wrap {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+    margin-top: 8px;
+  }
+  .pd-toc {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid var(--el-border-color-light);
+    border-radius: var(--app-card-radius);
+    background: var(--el-fill-color-blank);
+
+    button {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr);
+      gap: 2px 8px;
+      padding: 7px 8px;
+      border: none;
+      border-radius: var(--app-control-radius);
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--el-fill-color-light);
+      }
+      &.on {
+        background: var(--el-color-primary-light-9);
+
+        .pt {
+          color: var(--el-color-primary);
+          font-weight: 600;
+        }
+      }
+      i {
+        grid-row: span 2;
+        font-style: normal;
+        font-size: 11.5px;
+        line-height: 18px;
+        text-align: center;
+        color: var(--el-text-color-placeholder);
+      }
+      .pt {
+        font-size: 13px;
+        color: var(--dcs-text-primary);
+      }
+      .pf {
+        font-size: 11px;
+        color: var(--el-text-color-placeholder);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+    .faint {
+      padding: 8px;
+      font-size: 12px;
+      color: var(--el-text-color-placeholder);
+    }
+  }
+  .pd-body {
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid var(--el-border-color-light);
+    border-radius: var(--app-card-radius);
+    background: var(--el-bg-color);
+  }
+  .pd-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    b {
+      font-size: 14px;
+      color: var(--dcs-text-primary);
+    }
+    .pd-file {
+      font-size: 11.5px;
+      color: var(--el-text-color-placeholder);
+    }
+    .sp {
+      flex: 1;
+    }
+  }
+  .pd-why {
+    margin: 8px 0 10px;
+    padding: 7px 10px;
+    border-radius: var(--app-control-radius);
+    background: var(--el-fill-color-lighter);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--dcs-text-secondary);
+  }
+  .pd-body .sys-prompt {
+    margin: 0;
+    padding: 12px 14px;
+    max-height: 520px;
+    overflow: auto;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--dcs-text-regular);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--el-fill-color-lighter);
+    border-radius: var(--app-control-radius);
+  }
+
+  /* ---- 运营：审计摘要 ---- */
+  .audit-sum {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    font-size: 12.5px;
+    color: var(--dcs-text-secondary);
+
+    b {
+      font-size: 15px;
+      color: var(--dcs-text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+    em {
+      margin-left: 5px;
+      font-style: normal;
+      font-size: 11.5px;
+      color: var(--el-text-color-placeholder);
+    }
+  }
+  .ops-card :deep(.audit-fail) td {
+    background: var(--el-color-danger-light-9);
+  }
+  .ops-card {
+    border-radius: var(--app-card-radius);
+  }
+
+
+}
+
+/* 能力详情抽屉（append-to-body：样式不能挂在 .dcs-as-admin 下） */
+.cap-detail-drawer {
+  .sys-prompt {
+    margin: 0;
+    padding: 12px 14px;
+    max-height: 420px;
+    overflow: auto;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--dcs-text-regular);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--el-fill-color-lighter);
+    border-radius: var(--app-control-radius);
+  }
+  .cd {
+    .cd-name {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+
+      b {
+        font-size: 16px;
+        color: var(--dcs-text-primary);
+      }
+    }
+    .cd-sub {
+      margin-top: 4px;
+      font-size: 12.5px;
+      color: var(--dcs-text-secondary);
+    }
+    .cd-sec {
+      margin-top: 18px;
+
+      h4 {
+        margin: 0 0 7px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--dcs-text-primary);
+      }
+      p {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.75;
+        color: var(--dcs-text-regular);
+      }
+    }
+    .cd-chain {
+      margin: 0;
+      padding-left: 18px;
+
+      li {
+        padding: 3px 0;
+        font-size: 13px;
+        line-height: 1.65;
+        color: var(--dcs-text-secondary);
+      }
+      b {
+        color: var(--dcs-text-primary);
+        font-weight: 600;
+        margin-right: 8px;
+      }
+    }
+    .cd-kv {
+      display: flex;
+      gap: 10px;
+      padding: 4px 0;
+      font-size: 12.5px;
+      color: var(--dcs-text-secondary);
+
+      span {
+        width: 72px;
+        flex: none;
+        color: var(--el-text-color-placeholder);
+      }
+      code {
+        font-size: 12px;
+        word-break: break-all;
+      }
+    }
+  }
+}
+
+@media (max-width: 1100px) {
+  .dcs-as-admin .ov-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 900px) {
+  .dcs-as-admin .pd-wrap {
+    grid-template-columns: 1fr;
+  }
+  .dcs-as-admin .pd-toc {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+
+    button {
+      flex: none;
+      min-width: 132px;
+    }
+  }
+}
+@media (max-width: 760px) {
+  .dcs-as-admin .adm-bar {
+    gap: 8px;
+  }
+  .dcs-as-admin .adm-sub {
+    display: none;
+  }
+  .dcs-as-admin .adm-seg {
+    width: 100%;
+    gap: 16px;
+    overflow-x: auto;
+  }
+  .dcs-as-admin .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .dcs-as-admin .stat-grid .stat-card {
+    padding: 12px 14px 11px;
+  }
+  .dcs-as-admin .health-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+  .dcs-as-admin .pol-grid {
+    grid-template-columns: 1fr;
+  }
+  .dcs-as-admin .cap-line {
+    grid-template-columns: minmax(0, 1fr) 56px 44px;
+    grid-template-areas:
+      'name risk more'
+      'eff eff eff'
+      'sel sel sel';
+
+    .cap-name {
+      grid-area: name;
+    }
+    .risk-badge {
+      grid-area: risk;
+      justify-self: end;
+    }
+    .cap-eff {
+      grid-area: eff;
+    }
+    .cap-select,
+    .cap-locked {
+      grid-area: sel;
+      width: 100%;
+    }
+    .el-button {
+      grid-area: more;
+      justify-self: end;
+    }
+  }
+  .dcs-as-admin .cap-save .el-button {
+    margin-left: 0;
+  }
+}
+
 </style>

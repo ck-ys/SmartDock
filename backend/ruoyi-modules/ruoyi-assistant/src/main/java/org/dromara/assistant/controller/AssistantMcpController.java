@@ -89,7 +89,9 @@ public class AssistantMcpController extends BaseController {
 
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/calllog")
-    public R<java.util.Map<String, Object>> callLog(@RequestParam(required = false) String serverName, PageQuery pageQuery) {
+    public R<java.util.Map<String, Object>> callLog(@RequestParam(required = false) String serverName,
+                                                    @RequestParam(required = false) Boolean realOnly,
+                                                    PageQuery pageQuery) {
         // 三审回修（dspro P1-4）：非超管只看本租户审计（超管全量）；pageSize 兜 cap 防
         // PageQuery 缺省 MAX_VALUE 全表扫（dsflash P2）
         boolean superAdmin = LoginHelper.isSuperAdmin();
@@ -97,9 +99,23 @@ public class AssistantMcpController extends BaseController {
         LambdaQueryWrapper<DcsMcpCallLog> q = new LambdaQueryWrapper<DcsMcpCallLog>()
             .eq(!superAdmin, DcsMcpCallLog::getTenantId, LoginHelper.getTenantId())
             .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName)
+            // 管理页默认只看真实调用与失败：挂载成功/失败是每次建会话的例行记录，
+            // 混在调用里会把真正要看的一屏淹掉。realOnly=true 时排除两条 MOUNT_*。
+            .notIn(Boolean.TRUE.equals(realOnly), DcsMcpCallLog::getAction, java.util.List.of("MOUNT_OK", "MOUNT_ERROR"))
             .orderByDesc(DcsMcpCallLog::getCreateTime);
         var page = callLogMapper.selectPage(pageQuery.build(), q);
+        // 摘要三格：全部 / 挂载记录 / 真实调用——同 where 口径计数，前端不必自己猜占比
+        long all = callLogMapper.selectCount(new LambdaQueryWrapper<DcsMcpCallLog>()
+            .eq(!superAdmin, DcsMcpCallLog::getTenantId, LoginHelper.getTenantId())
+            .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName));
+        long mounts = callLogMapper.selectCount(new LambdaQueryWrapper<DcsMcpCallLog>()
+            .eq(!superAdmin, DcsMcpCallLog::getTenantId, LoginHelper.getTenantId())
+            .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName)
+            .in(DcsMcpCallLog::getAction, java.util.List.of("MOUNT_OK", "MOUNT_ERROR")));
         // R.ok 统一包装（同 /list 口径）——TableDataInfo 顶层 rows 结构与前端 request 层解析不符（老坑）
-        return R.ok(java.util.Map.of("rows", page.getRecords(), "total", page.getTotal()));
+        return R.ok(java.util.Map.of(
+            "rows", page.getRecords(),
+            "total", page.getTotal(),
+            "stats", java.util.Map.of("all", all, "mounts", mounts, "real", all - mounts)));
     }
 }

@@ -223,20 +223,25 @@ public final class ToolRegistry {
         return List.copyOf(SPECS);
     }
 
-    /** 工具展示元数据（能力全景/管理页，批A Q4）：与 SPECS 同文件=单点注册不破。 */
-    public record ToolMeta(String displayName, String category, int station, String gateDesc) {
+    /**
+     * 工具展示元数据（能力全景/管理页，批A Q4）：与 SPECS 同文件=单点注册不破。
+     *
+     * @param riskLevel 能力风险档（low/mid/high）——管理页「一键推荐」按此 × 策略推档位；
+     *                  口径：low=只读无副作用，mid=会落数据或改变会话状态，high=出网/接外部服务
+     */
+    public record ToolMeta(String displayName, String category, int station, String gateDesc, String riskLevel) {
     }
 
     /**
-     * 工具名 → 中文展示元数据。station：1=一期基础 / 2=二站（管理页暂缓展示） / 3=本期。
-     * gateDesc 空=恒可用；save_memory 随租户记忆开关注册；web_search 随会话联网开关注册（业务批3-④）。
+     * 工具名 → 中文展示元数据。gateDesc 空=恒可用；save_memory 随租户记忆开关注册；
+     * web_search 随会话联网开关注册（业务批3-④）。
      */
     public static final java.util.Map<String, ToolMeta> TOOL_META = java.util.Map.ofEntries(
-        java.util.Map.entry("web_search", new ToolMeta("联网搜索", "查询", 1, "会话开启联网后")),
-        java.util.Map.entry("read_attachment", new ToolMeta("读会话附件", "查询", 1, "")),
-        java.util.Map.entry("submit_plan", new ToolMeta("计划卡", "交互", 2, "")),
-        java.util.Map.entry("save_memory", new ToolMeta("保存长期记忆", "交互", 2, "租户开启长期记忆后")),
-        java.util.Map.entry("todo_write", new ToolMeta("任务清单", "交互", 3, "")),
-        java.util.Map.entry("view_skill", new ToolMeta("查看技能指引", "交互", 3, ""))
+        java.util.Map.entry("web_search", new ToolMeta("联网搜索", "查询", 1, "会话开启联网后", "high")),
+        java.util.Map.entry("read_attachment", new ToolMeta("读会话附件", "查询", 1, "", "low")),
+        java.util.Map.entry("submit_plan", new ToolMeta("计划卡", "交互", 2, "", "low")),
+        java.util.Map.entry("save_memory", new ToolMeta("保存长期记忆", "交互", 2, "租户开启长期记忆后", "mid")),
+        java.util.Map.entry("todo_write", new ToolMeta("任务清单", "交互", 3, "", "low")),
+        java.util.Map.entry("view_skill", new ToolMeta("查看技能指引", "交互", 3, "", "low"))
     );
 }
