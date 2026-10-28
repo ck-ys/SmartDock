@@ -160,4 +160,39 @@ class ProfileScoreUnconfiguredGuardTest {
         assertEquals(0, snapshot.getTotalScore().compareTo(BigDecimal.valueOf(80)));
         Mockito.verify(review).evaluateAfterRecalc(Mockito.any());
     }
+
+    @Test
+    void dimsAndRuleQueriesAreScopedBySubjectType() {
+        // 题0-乙: 引擎载维度/权重必须带 subject_type 条件(员工/会员各一套)——
+        // wrapper 断言防"查询忘了带类型、member 事件套用 user 维度"的回归
+        DimensionEvaluator evaluator = Mockito.mock(DimensionEvaluator.class);
+        Mockito.when(evaluator.evaluate(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+            .thenReturn(DimensionResult.skipped());
+        ProfileReviewService review = Mockito.mock(ProfileReviewService.class);
+        ProfileScoreDimensionMapper dimensionMapper = Mockito.mock(ProfileScoreDimensionMapper.class);
+        ProfileScoreRuleMapper ruleMapper = Mockito.mock(ProfileScoreRuleMapper.class);
+        ProfileScoreSnapshotMapper snapshotMapper = Mockito.mock(ProfileScoreSnapshotMapper.class);
+        Mockito.when(dimensionMapper.selectList(Mockito.any())).thenReturn(List.of(dim("act_freq")));
+        Mockito.when(ruleMapper.selectList(Mockito.any())).thenReturn(Collections.emptyList());
+        Mockito.when(snapshotMapper.selectList(Mockito.any())).thenReturn(Collections.emptyList());
+        ProfileScoreEngine engine = new ProfileScoreEngine(dimensionMapper, ruleMapper, snapshotMapper, evaluator,
+            Mockito.mock(ProfileEventMapper.class), List.of(), List.of(), review);
+
+        engine.recalcSubject("dcs", "member", "member-1");
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        org.mockito.ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ProfileScoreDimension>> dimCaptor =
+            org.mockito.ArgumentCaptor.forClass((Class) com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        Mockito.verify(dimensionMapper).selectList(dimCaptor.capture());
+        String dimSql = dimCaptor.getValue().getSqlSegment();
+        assertTrue(dimSql.contains("subject_type"), "维度查询缺 subject_type 条件: " + dimSql);
+        assertTrue(dimCaptor.getValue().getParamNameValuePairs().containsValue("member"),
+            "维度查询参数里没有 member: " + dimCaptor.getValue().getParamNameValuePairs());
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        org.mockito.ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.smartdock.profile.domain.ProfileScoreRule>> ruleCaptor =
+            org.mockito.ArgumentCaptor.forClass((Class) com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper.class);
+        Mockito.verify(ruleMapper).selectList(ruleCaptor.capture());
+        assertTrue(ruleCaptor.getValue().getSqlSegment().contains("subject_type"), "权重规则查询缺 subject_type 条件");
+    }
 }

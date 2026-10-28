@@ -68,12 +68,15 @@ public class ProfileScoreEngine {
      */
     public ProfileScoreSnapshot recalcSubject(String source, String subjectType, String subjectId) {
         String tenantId = currentTenant();
+        // 题0-乙: 维度/权重按 (source, subjectType) 分套——员工与会员各自一套口径
+        String type = SubjectTypes.normalize(subjectType);
         List<ProfileScoreDimension> dims = dimensionMapper.selectList(
             new LambdaQueryWrapper<ProfileScoreDimension>()
                 .eq(ProfileScoreDimension::getSource, source)
+                .eq(ProfileScoreDimension::getSubjectType, type)
                 .eq(ProfileScoreDimension::getEnabled, "1")
                 .orderByAsc(ProfileScoreDimension::getSortOrder));
-        ProfileScoreRule rule = latestRule(source);
+        ProfileScoreRule rule = latestRule(source, type);
         Map<String, Double> weights = parseWeights(rule);
 
         // 维度执行
@@ -231,9 +234,10 @@ public class ProfileScoreEngine {
             .last("LIMIT " + Math.min(Math.max(1, n), 50))); // dspro P2-1: 链尾封顶 50, 防全量拉取
     }
 
-    private ProfileScoreRule latestRule(String source) {
+    private ProfileScoreRule latestRule(String source, String subjectType) {
         return ruleMapper.selectList(new LambdaQueryWrapper<ProfileScoreRule>()
                 .eq(ProfileScoreRule::getSource, source)
+                .eq(ProfileScoreRule::getSubjectType, subjectType)
                 .eq(ProfileScoreRule::getStatus, "PUBLISHED")
                 .orderByDesc(ProfileScoreRule::getPublishedAt)
                 .orderByDesc(ProfileScoreRule::getCreateTime)

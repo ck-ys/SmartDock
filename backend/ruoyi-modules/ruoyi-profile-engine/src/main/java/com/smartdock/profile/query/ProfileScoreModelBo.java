@@ -23,6 +23,9 @@ public class ProfileScoreModelBo implements Serializable {
 
     private String source;
 
+    /** 适用主体类型(缺省 user; 该模型只统计/打分该类主体) */
+    private String subjectType;
+
     private String modelCode;
 
     private String modelName;

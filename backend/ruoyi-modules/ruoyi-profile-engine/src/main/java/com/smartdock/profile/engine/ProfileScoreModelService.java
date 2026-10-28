@@ -78,10 +78,11 @@ public class ProfileScoreModelService {
 
     private final Map<String, CachedModelData> populationCache = new ConcurrentHashMap<>();
 
-    public List<ProfileScoreModel> list(String source) {
+    public List<ProfileScoreModel> list(String source, String subjectType) {
         requireSource(source);
         return modelMapper.selectList(new LambdaQueryWrapper<ProfileScoreModel>()
             .eq(ProfileScoreModel::getSource, source)
+            .eq(ProfileScoreModel::getSubjectType, SubjectTypes.normalize(subjectType))
             .orderByDesc(ProfileScoreModel::getBuiltin)
             .orderByAsc(ProfileScoreModel::getCreateTime));
     }
@@ -140,16 +141,19 @@ public class ProfileScoreModelService {
     public ProfileScoreModel create(ProfileScoreModelBo bo) {
         requireSource(bo.getSource());
         validateBo(bo, true);
+        String subjectType = SubjectTypes.normalize(bo.getSubjectType());
         Long duplicated = modelMapper.selectCount(new LambdaQueryWrapper<ProfileScoreModel>()
             .eq(ProfileScoreModel::getSource, bo.getSource())
+            .eq(ProfileScoreModel::getSubjectType, subjectType)
             .eq(ProfileScoreModel::getModelCode, bo.getModelCode().trim()));
         if (duplicated != null && duplicated > 0) {
-            throw new ServiceException("同一业务源下模型编码已存在: " + bo.getModelCode());
+            throw new ServiceException("同一业务源+主体类型下模型编码已存在: " + bo.getModelCode());
         }
         ProfileScoreModel model = new ProfileScoreModel();
         model.setModelId(IdWorker.getId());
         model.setTenantId(currentTenant());
         model.setSource(bo.getSource());
+        model.setSubjectType(subjectType);
         model.setModelCode(bo.getModelCode().trim());
         model.setModelName(bo.getModelName().trim());
         model.setModelType(resolveType(bo));
@@ -174,6 +178,7 @@ public class ProfileScoreModelService {
         }
         ProfileScoreModel existing = get(bo.getModelId());
         bo.setSource(existing.getSource());
+        bo.setSubjectType(existing.getSubjectType());
         bo.setModelCode(existing.getModelCode());
         validateBo(bo, false);
         if (bo.getRevision() == null || !bo.getRevision().equals(existing.getRevision())) {
@@ -261,9 +266,12 @@ public class ProfileScoreModelService {
         }
         // 批4A 护栏: 全量运行前主体轻量 COUNT, 超阈值在载入前报错(不写 SKIPPED——人工入口)
         scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
+        // 题0-乙: 模型只统计/打分自己那类主体(员工模型不算会员, 反之亦然)
+        String modelSubjectType = SubjectTypes.normalize(model.getSubjectType());
         List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
             .eq(ProfileSubject::getTenantId, model.getTenantId())
             .eq(ProfileSubject::getSource, model.getSource())
+            .eq(ProfileSubject::getSubjectType, modelSubjectType)
             .orderByAsc(ProfileSubject::getSubjectType)
             .orderByAsc(ProfileSubject::getSubjectId));
 
@@ -302,9 +310,11 @@ public class ProfileScoreModelService {
     public void evaluateSubjectIfActive(String tenantId, String source, String subjectType, String subjectId) {
         // 事件已落库: 人口统计与主体指标都可能变化, 增量不能读旧缓存
         invalidate();
+        String type = SubjectTypes.normalize(subjectType);
         List<ProfileScoreModel> models = modelMapper.selectList(new LambdaQueryWrapper<ProfileScoreModel>()
             .eq(ProfileScoreModel::getTenantId, tenantId)
             .eq(ProfileScoreModel::getSource, source)
+            .eq(ProfileScoreModel::getSubjectType, type)
             .eq(ProfileScoreModel::getEnabled, "1")
             .eq(ProfileScoreModel::getStatus, "PUBLISHED"));
         for (ProfileScoreModel model : models) {
@@ -484,6 +494,7 @@ public class ProfileScoreModelService {
         List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
             .eq(ProfileSubject::getTenantId, model.getTenantId())
             .eq(ProfileSubject::getSource, model.getSource())
+            .eq(ProfileSubject::getSubjectType, SubjectTypes.normalize(model.getSubjectType()))
             .orderByAsc(ProfileSubject::getSubjectType)
             .orderByAsc(ProfileSubject::getSubjectId));
         CachedModelData data = loadModelData(model, def, true);
@@ -860,18 +871,20 @@ public class ProfileScoreModelService {
 
     private Map<String, BigDecimal> fetchMetric(ProfileScoreModel model, ProfileModelDefinition.MetricCalc calc) {
         String type = calc.getType() == null ? "" : calc.getType().trim().toUpperCase();
+        // 模型指标只统计自己那类主体(题0-乙; mapper 第三参预留位启用)
+        String modelSubjectType = SubjectTypes.normalize(model.getSubjectType());
         List<String> events = normalizeEvents(calc.getEventTypes());
         List<Map<String, Object>> rows = switch (type) {
-            case "COUNT" -> metricMapper.selectCount(model.getTenantId(), model.getSource(), null, events);
+            case "COUNT" -> metricMapper.selectCount(model.getTenantId(), model.getSource(), modelSubjectType, events);
             case "COUNT_DISTINCT" -> metricMapper.selectCountDistinct(model.getTenantId(), model.getSource(),
-                null, events, calc.getProp());
-            case "SUM" -> metricMapper.selectSum(model.getTenantId(), model.getSource(), null, events, calc.getProp());
-            case "AVG" -> metricMapper.selectAvg(model.getTenantId(), model.getSource(), null, events, calc.getProp());
+                modelSubjectType, events, calc.getProp());
+            case "SUM" -> metricMapper.selectSum(model.getTenantId(), model.getSource(), modelSubjectType, events, calc.getProp());
+            case "AVG" -> metricMapper.selectAvg(model.getTenantId(), model.getSource(), modelSubjectType, events, calc.getProp());
             case "LAST_VALUE" -> metricMapper.selectLastValue(model.getTenantId(), model.getSource(),
-                null, events, calc.getProp());
-            case "RATE" -> metricMapper.selectRate(model.getTenantId(), model.getSource(), null,
+                modelSubjectType, events, calc.getProp());
+            case "RATE" -> metricMapper.selectRate(model.getTenantId(), model.getSource(), modelSubjectType,
                 calc.getNumerator(), calc.getDenominator());
-            default -> metricMapper.selectRecencyDays(model.getTenantId(), model.getSource(), null, events);
+            default -> metricMapper.selectRecencyDays(model.getTenantId(), model.getSource(), modelSubjectType, events);
         };
         Map<String, BigDecimal> out = new HashMap<>();
         for (Map<String, Object> row : rows) {

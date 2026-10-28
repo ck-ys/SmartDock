@@ -90,9 +90,10 @@ public class ProfileQueryService {
         return TableDataInfo.build(result);
     }
 
-    public ProfileOverview overview(String source) {
+    public ProfileOverview overview(String source, String subjectType) {
         requireSource(source);
-        ProfileOverview overview = subjectMapper.selectOverview(currentTenant(), source);
+        String type = SubjectTypes.normalize(subjectType);
+        ProfileOverview overview = subjectMapper.selectOverview(currentTenant(), source, type);
         if (overview == null) {
             overview = new ProfileOverview();
             overview.setSubjectCount(0L);
@@ -102,7 +103,7 @@ public class ProfileQueryService {
             overview.setMediumRisk(0L);
             overview.setHighRisk(0L);
         }
-        overview.setLastCalcTime(snapshotMapper.selectLastCalcTime(currentTenant(), source));
+        overview.setLastCalcTime(snapshotMapper.selectLastCalcTime(currentTenant(), source, type));
         return overview;
     }
 
@@ -111,7 +112,7 @@ public class ProfileQueryService {
         int capped = Math.min(Math.max(limit <= 0 ? 10 : limit, 1), 100);
         String dim = StringUtils.isBlank(dimension) ? null : dimension.trim();
         if (dim != null) {
-            boolean known = dimensionService.list(source).stream()
+            boolean known = dimensionService.list(source, SubjectTypes.normalize(subjectType)).stream()
                 .anyMatch(d -> dim.equals(d.getDimCode()));
             if (!known) {
                 throw new ServiceException("排行维度不存在: " + dim);
@@ -152,7 +153,7 @@ public class ProfileQueryService {
         List<ProfileScoreSnapshot> history = latest == null ? List.of()
             : scoreEngine.snapshotTail(source, type, subjectId, tail);
         Map<String, Object> detailMap = parseObject(latest == null ? null : latest.getDimensionDetail());
-        List<Map<String, Object>> dimensions = buildDimensionRows(source, detailMap);
+        List<Map<String, Object>> dimensions = buildDimensionRows(source, type, detailMap);
 
         // 批11 回修(终审 P1): 详情口与列表口同权——属性打码 + 无列级分数权限置空
         boolean canScore = piiService.canViewScore();
@@ -165,7 +166,7 @@ public class ProfileQueryService {
         out.put("latest", canScore ? latest : null);
         out.put("history", canScore ? history : List.of());
         out.put("dimensions", canScore ? dimensions : List.of());
-        out.put("rule", ruleService.current(source));
+        out.put("rule", ruleService.current(source, type));
         out.put("rank", canScore ? rankOf(source, type, latest) : null);
         out.put("risk", canScore ? riskOf(latest == null ? null : latest.getTotalScore()) : null);
         out.put("trend", canScore ? trend(history) : List.of());
@@ -174,9 +175,9 @@ public class ProfileQueryService {
         return out;
     }
 
-    private List<Map<String, Object>> buildDimensionRows(String source, Map<String, Object> detailMap) {
+    private List<Map<String, Object>> buildDimensionRows(String source, String subjectType, Map<String, Object> detailMap) {
         List<Map<String, Object>> rows = new ArrayList<>();
-        List<ProfileScoreDimension> configured = dimensionService.list(source);
+        List<ProfileScoreDimension> configured = dimensionService.list(source, subjectType);
         for (ProfileScoreDimension dim : configured) {
             rows.add(dimensionRow(dim.getDimCode(), dim.getDimName(), dim.getScoreMax(),
                 dim.getSortOrder(), dim.getEnabled(), detailMap.get(dim.getDimCode())));

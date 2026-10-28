@@ -95,8 +95,9 @@ public class ProfileQueryController {
      */
     @SaCheckPermission("profile:score:query")
     @GetMapping("/overview")
-    public R<ProfileOverview> overview(@RequestParam String source) {
-        return R.ok(queryService.overview(source));
+    public R<ProfileOverview> overview(@RequestParam String source,
+                                       @RequestParam(required = false) String subjectType) {
+        return R.ok(queryService.overview(source, subjectType));
     }
 
     /**

@@ -17,11 +17,11 @@ public interface ProfileScoreModelMapper extends BaseMapperPlus<ProfileScoreMode
 
     @Insert("""
         INSERT INTO profile_score_model
-            (model_id, tenant_id, source, model_code, model_name, model_type, model_version,
+            (model_id, tenant_id, source, subject_type, model_code, model_name, model_type, model_version,
              config, score_max, enabled, builtin, remark, status, revision, create_by, create_time)
         VALUES
-            (#{m.modelId}, #{m.tenantId}, #{m.source}, #{m.modelCode}, #{m.modelName}, #{m.modelType},
-             #{m.modelVersion}, #{m.config}::jsonb, #{m.scoreMax}, #{m.enabled}, #{m.builtin},
+            (#{m.modelId}, #{m.tenantId}, #{m.source}, #{m.subjectType}, #{m.modelCode}, #{m.modelName},
+             #{m.modelType}, #{m.modelVersion}, #{m.config}::jsonb, #{m.scoreMax}, #{m.enabled}, #{m.builtin},
              #{m.remark}, #{m.status}, #{m.revision}, #{m.createBy}, CURRENT_TIMESTAMP)
         """)
     int insertJsonb(@Param("m") ProfileScoreModel m);

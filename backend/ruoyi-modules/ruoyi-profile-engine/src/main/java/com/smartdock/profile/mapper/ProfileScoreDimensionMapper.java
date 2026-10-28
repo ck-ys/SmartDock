@@ -19,11 +19,11 @@ public interface ProfileScoreDimensionMapper extends BaseMapperPlus<ProfileScore
 
     @Insert("""
         INSERT INTO profile_score_dimension
-            (dimension_id, tenant_id, dim_code, dim_name, source, calc_mode, calc_config,
+            (dimension_id, tenant_id, dim_code, dim_name, source, subject_type, calc_mode, calc_config,
              score_max, enabled, builtin, sort_order, remark, create_by, create_time)
         VALUES
-            (#{d.dimensionId}, #{d.tenantId}, #{d.dimCode}, #{d.dimName}, #{d.source}, #{d.calcMode},
-             #{d.calcConfig}::jsonb, #{d.scoreMax}, #{d.enabled}, #{d.builtin}, #{d.sortOrder},
+            (#{d.dimensionId}, #{d.tenantId}, #{d.dimCode}, #{d.dimName}, #{d.source}, #{d.subjectType},
+             #{d.calcMode}, #{d.calcConfig}::jsonb, #{d.scoreMax}, #{d.enabled}, #{d.builtin}, #{d.sortOrder},
              #{d.remark}, #{d.createBy}, CURRENT_TIMESTAMP)
         """)
     int insertJsonb(@Param("d") ProfileScoreDimension d);

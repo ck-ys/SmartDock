@@ -1208,6 +1208,7 @@ CREATE TABLE public.profile_score_dimension (
     dim_code character varying(64) NOT NULL,
     dim_name character varying(100) NOT NULL,
     source character varying(32) NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
     calc_mode character varying(16) DEFAULT 'EVENT_AGG'::character varying NOT NULL,
     calc_config jsonb DEFAULT '{}'::jsonb NOT NULL,
     score_max numeric(6,2) DEFAULT 100 NOT NULL,
@@ -1232,6 +1233,7 @@ CREATE TABLE public.profile_score_rule (
     rule_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     source character varying(32) NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
     rule_version character varying(32) NOT NULL,
     rule_name character varying(100),
     status character varying(16) DEFAULT 'PUBLISHED'::character varying NOT NULL,
@@ -1413,6 +1415,7 @@ CREATE TABLE public.profile_score_model (
     model_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     source character varying(32) NOT NULL,
+    subject_type character varying(32) DEFAULT 'user'::character varying NOT NULL,
     model_code character varying(64) NOT NULL,
     model_name character varying(100) NOT NULL,
     model_type character varying(32) DEFAULT 'GENERIC'::character varying NOT NULL,
@@ -1435,7 +1438,7 @@ CREATE TABLE public.profile_score_model (
 );
 
 CREATE UNIQUE INDEX uk_profile_model_code
-    ON public.profile_score_model USING btree (tenant_id, source, model_code)
+    ON public.profile_score_model USING btree (tenant_id, source, subject_type, model_code)
     WHERE (del_flag = '0'::bpchar);
 
 
@@ -3306,14 +3309,14 @@ CREATE INDEX idx_profile_rule_source ON public.profile_score_rule USING btree (t
 -- Name: uk_profile_rule_published; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_profile_rule_published ON public.profile_score_rule USING btree (tenant_id, source) WHERE ((status = 'PUBLISHED'::text) AND (del_flag = '0'::bpchar));
+CREATE UNIQUE INDEX uk_profile_rule_published ON public.profile_score_rule USING btree (tenant_id, source, subject_type) WHERE ((status = 'PUBLISHED'::text) AND (del_flag = '0'::bpchar));
 
 
 --
 -- Name: uk_profile_rule_draft; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_profile_rule_draft ON public.profile_score_rule USING btree (tenant_id, source) WHERE ((status = 'DRAFT'::text) AND (del_flag = '0'::bpchar));
+CREATE UNIQUE INDEX uk_profile_rule_draft ON public.profile_score_rule USING btree (tenant_id, source, subject_type) WHERE ((status = 'DRAFT'::text) AND (del_flag = '0'::bpchar));
 
 
 --
@@ -3579,7 +3582,7 @@ CREATE UNIQUE INDEX uk_profile_recalc_running ON public.profile_recalc_batch USI
 -- Name: uk_profile_score_dimension; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_profile_score_dimension ON public.profile_score_dimension USING btree (tenant_id, source, dim_code) WHERE (del_flag = '0'::bpchar);
+CREATE UNIQUE INDEX uk_profile_score_dimension ON public.profile_score_dimension USING btree (tenant_id, source, subject_type, dim_code) WHERE (del_flag = '0'::bpchar);
 
 
 --

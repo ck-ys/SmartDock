@@ -51,42 +51,48 @@ public interface ProfileScoreSnapshotMapper extends BaseMapperPlus<ProfileScoreS
                               @Param("detail") String detail);
 
     /**
-     * 各维度在“每主体最新快照”中的覆盖次数。
+     * 各维度在“每主体最新快照”中的覆盖次数(按主体类型一套)。
      */
     @Select("""
         SELECT key AS dim_code, COUNT(*) AS covered
         FROM (
-            SELECT DISTINCT ON (subject_type, subject_id) dimension_detail
+            SELECT DISTINCT ON (subject_id) dimension_detail
             FROM profile_score_snapshot
-            WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
-            ORDER BY subject_type, subject_id, calc_time DESC, snapshot_id DESC
+            WHERE tenant_id = #{tenantId} AND source = #{source} AND subject_type = #{subjectType}
+              AND del_flag = '0'
+            ORDER BY subject_id, calc_time DESC, snapshot_id DESC
         ) t, LATERAL jsonb_each(t.dimension_detail)
         GROUP BY key
         """)
     List<Map<String, Object>> selectDimensionCoverage(@Param("tenantId") String tenantId,
-                                                      @Param("source") String source);
+                                                      @Param("source") String source,
+                                                      @Param("subjectType") String subjectType);
 
     /**
-     * 有最新快照的主体数。
+     * 有最新快照的主体数(按主体类型)。
      */
     @Select("""
         SELECT COUNT(*) FROM (
-            SELECT DISTINCT ON (subject_type, subject_id) 1
+            SELECT DISTINCT ON (subject_id) 1
             FROM profile_score_snapshot
-            WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
-            ORDER BY subject_type, subject_id, calc_time DESC, snapshot_id DESC
+            WHERE tenant_id = #{tenantId} AND source = #{source} AND subject_type = #{subjectType}
+              AND del_flag = '0'
+            ORDER BY subject_id, calc_time DESC, snapshot_id DESC
         ) t
         """)
     Long countLatestSnapshotSubjects(@Param("tenantId") String tenantId,
-                                     @Param("source") String source);
+                                     @Param("source") String source,
+                                     @Param("subjectType") String subjectType);
 
     /**
-     * 最近一次算分时间。
+     * 最近一次算分时间(按主体类型)。
      */
     @Select("""
         SELECT MAX(calc_time) FROM profile_score_snapshot
-        WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
+        WHERE tenant_id = #{tenantId} AND source = #{source} AND subject_type = #{subjectType}
+          AND del_flag = '0'
         """)
     Date selectLastCalcTime(@Param("tenantId") String tenantId,
-                            @Param("source") String source);
+                            @Param("source") String source,
+                            @Param("subjectType") String subjectType);
 }

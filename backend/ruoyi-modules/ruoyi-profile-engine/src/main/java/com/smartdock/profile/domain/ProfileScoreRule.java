@@ -30,6 +30,9 @@ public class ProfileScoreRule extends BaseEntity {
 
     private String source;
 
+    /** 适用主体类型(题0-乙): 员工/会员各自一套, 缺省 user */
+    private String subjectType;
+
     private String ruleVersion;
 
     /** 规则显示名(草稿/发布版本共用) */

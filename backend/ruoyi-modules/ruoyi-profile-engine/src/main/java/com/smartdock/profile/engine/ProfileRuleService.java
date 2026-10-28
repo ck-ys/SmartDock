@@ -52,10 +52,11 @@ public class ProfileRuleService {
     private final ProfileSubjectMapper subjectMapper;
     private final ProfileDimensionService dimensionService;
 
-    public ProfileScoreRule current(String source) {
+    public ProfileScoreRule current(String source, String subjectType) {
         requireSource(source);
         return ruleMapper.selectList(new LambdaQueryWrapper<ProfileScoreRule>()
                 .eq(ProfileScoreRule::getSource, source)
+                .eq(ProfileScoreRule::getSubjectType, SubjectTypes.normalize(subjectType))
                 .eq(ProfileScoreRule::getStatus, PUBLISHED)
                 .orderByDesc(ProfileScoreRule::getPublishedAt)
                 .orderByDesc(ProfileScoreRule::getCreateTime)
@@ -63,10 +64,11 @@ public class ProfileRuleService {
             .stream().findFirst().orElse(null);
     }
 
-    public List<ProfileScoreRule> history(String source) {
+    public List<ProfileScoreRule> history(String source, String subjectType) {
         requireSource(source);
         return ruleMapper.selectList(new LambdaQueryWrapper<ProfileScoreRule>()
             .eq(ProfileScoreRule::getSource, source)
+            .eq(ProfileScoreRule::getSubjectType, SubjectTypes.normalize(subjectType))
             .orderByDesc(ProfileScoreRule::getCreateTime)
             .orderByDesc(ProfileScoreRule::getRuleId));
     }
@@ -82,15 +84,16 @@ public class ProfileRuleService {
     @Transactional(rollbackFor = Exception.class)
     public ProfileScoreRule createDraft(ProfileRuleBo bo) {
         requireSource(bo.getSource());
-        ProfileScoreRule open = queryOpenDraft(bo.getSource());
+        String subjectType = SubjectTypes.normalize(bo.getSubjectType());
+        ProfileScoreRule open = queryOpenDraft(bo.getSource(), subjectType);
         if (open != null) {
             return open;
         }
-        List<String> codes = dimensionService.enabledCodes(bo.getSource());
+        List<String> codes = dimensionService.enabledCodes(bo.getSource(), subjectType);
         if (codes.isEmpty()) {
-            throw new ServiceException("该业务源没有启用的评分维度, 请先配置维度");
+            throw new ServiceException("该业务源+主体类型没有启用的评分维度, 请先配置维度");
         }
-        ProfileScoreRule sourceRule = bo.getSourceRuleId() == null ? current(bo.getSource())
+        ProfileScoreRule sourceRule = bo.getSourceRuleId() == null ? current(bo.getSource(), subjectType)
             : get(bo.getSourceRuleId());
         if (sourceRule != null && !bo.getSource().equals(sourceRule.getSource())) {
             throw new ServiceException("复制来源规则不属于当前业务源");
@@ -112,6 +115,7 @@ public class ProfileRuleService {
         draft.setRuleId(IdWorker.getId());
         draft.setTenantId(currentTenant());
         draft.setSource(bo.getSource());
+        draft.setSubjectType(subjectType);
         draft.setRuleVersion("draft-" + draft.getRuleId());
         draft.setRuleName(StringUtils.isBlank(bo.getRuleName())
             ? (sourceRule == null || StringUtils.isBlank(sourceRule.getRuleName())
@@ -127,7 +131,7 @@ public class ProfileRuleService {
         try {
             ruleMapper.insertJsonb(draft);
         } catch (DuplicateKeyException concurrent) {
-            ProfileScoreRule existing = queryOpenDraft(bo.getSource());
+            ProfileScoreRule existing = queryOpenDraft(bo.getSource(), subjectType);
             if (existing != null) {
                 return existing;
             }
@@ -147,7 +151,7 @@ public class ProfileRuleService {
             throw new ServiceException("草稿已被其他人修改, 请刷新后重试");
         }
         if (bo.getWeights() != null && !bo.getWeights().isEmpty()) {
-            validateDraftWeights(bo.getWeights(), draft.getSource());
+            validateDraftWeights(bo.getWeights(), draft.getSource(), draft.getSubjectType());
             draft.setWeights(toJson(bo.getWeights()));
         }
         if (bo.getRuleName() != null) {
@@ -167,7 +171,7 @@ public class ProfileRuleService {
 
     public Map<String, Object> validateDraft(Long ruleId) {
         ProfileScoreRule rule = get(ruleId);
-        List<String> codes = dimensionService.enabledCodes(rule.getSource());
+        List<String> codes = dimensionService.enabledCodes(rule.getSource(), rule.getSubjectType());
         Map<String, Double> weights = parseWeights(rule.getWeights());
         List<String> errors = ProfileRuleWeights.validate(weights, codes);
         List<String> warnings = new ArrayList<>();
@@ -210,7 +214,7 @@ public class ProfileRuleService {
         if (bo.getRevision() != null && !bo.getRevision().equals(draft.getRevision())) {
             throw new ServiceException("草稿已被其他人修改, 请刷新后重试");
         }
-        List<String> codes = dimensionService.enabledCodes(draft.getSource());
+        List<String> codes = dimensionService.enabledCodes(draft.getSource(), draft.getSubjectType());
         Map<String, Double> weights = parseWeights(draft.getWeights());
         List<String> errors = ProfileRuleWeights.validate(weights, codes);
         if (!errors.isEmpty()) {
@@ -218,13 +222,14 @@ public class ProfileRuleService {
         }
         Long duplicated = ruleMapper.selectCount(new LambdaQueryWrapper<ProfileScoreRule>()
             .eq(ProfileScoreRule::getSource, draft.getSource())
+            .eq(ProfileScoreRule::getSubjectType, draft.getSubjectType())
             .eq(ProfileScoreRule::getRuleVersion, version)
             .ne(ProfileScoreRule::getRuleId, draft.getRuleId()));
         if (duplicated != null && duplicated > 0) {
-            throw new ServiceException("该业务源已存在同名版本: " + version);
+            throw new ServiceException("该业务源+主体类型已存在同名版本: " + version);
         }
 
-        ruleMapper.archivePublished(draft.getTenantId(), draft.getSource());
+        ruleMapper.archivePublished(draft.getTenantId(), draft.getSource(), draft.getSubjectType());
         draft.setRuleVersion(version);
         draft.setStatus(PUBLISHED);
         draft.setEnabled("1");
@@ -259,8 +264,9 @@ public class ProfileRuleService {
 
     public Map<String, Object> diff(Long ruleId) {
         ProfileScoreRule draft = get(ruleId);
-        ProfileScoreRule base = StringUtils.isBlank(draft.getBaseRuleVersion()) ? current(draft.getSource())
-            : findByVersion(draft.getSource(), draft.getBaseRuleVersion());
+        ProfileScoreRule base = StringUtils.isBlank(draft.getBaseRuleVersion())
+            ? current(draft.getSource(), draft.getSubjectType())
+            : findByVersion(draft.getSource(), draft.getSubjectType(), draft.getBaseRuleVersion());
         Map<String, Double> before = base == null ? Map.of() : parseWeights(base.getWeights());
         Map<String, Double> after = parseWeights(draft.getWeights());
         Set<String> keys = new TreeSet<>();
@@ -298,7 +304,7 @@ public class ProfileRuleService {
 
     public Map<String, Object> impact(Long ruleId) {
         ProfileScoreRule draft = get(ruleId);
-        ProfileScoreRule published = current(draft.getSource());
+        ProfileScoreRule published = current(draft.getSource(), draft.getSubjectType());
         Map<String, Double> draftWeights = parseWeights(draft.getWeights());
         Map<String, Double> currentWeights = published == null ? Map.of() : parseWeights(published.getWeights());
         List<String> changed = new ArrayList<>();
@@ -312,8 +318,9 @@ public class ProfileRuleService {
             }
         }
         Long subjects = subjectMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.smartdock.profile.event.ProfileSubject>()
-            .eq(com.smartdock.profile.event.ProfileSubject::getSource, draft.getSource()));
-        Long snapshots = snapshotMapper.countLatestSnapshotSubjects(draft.getTenantId(), draft.getSource());
+            .eq(com.smartdock.profile.event.ProfileSubject::getSource, draft.getSource())
+            .eq(com.smartdock.profile.event.ProfileSubject::getSubjectType, draft.getSubjectType()));
+        Long snapshots = snapshotMapper.countLatestSnapshotSubjects(draft.getTenantId(), draft.getSource(), draft.getSubjectType());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("draftRuleId", draft.getRuleId());
         out.put("publishedVersion", published == null ? null : published.getRuleVersion());
@@ -326,16 +333,16 @@ public class ProfileRuleService {
         return out;
     }
 
-    public List<Map<String, Object>> templates(String source) {
+    public List<Map<String, Object>> templates(String source, String subjectType) {
         requireSource(source);
-        List<String> codes = dimensionService.enabledCodes(source);
+        List<String> codes = dimensionService.enabledCodes(source, subjectType);
         if (codes.isEmpty()) {
             return List.of();
         }
         List<Map<String, Object>> out = new ArrayList<>();
         out.add(template("balanced", "均衡模板", "所有启用维度等权", ProfileRuleWeights.balanced(codes)));
 
-        ProfileScoreRule current = current(source);
+        ProfileScoreRule current = current(source, subjectType);
         if (current != null) {
             Map<String, Double> weights = parseWeights(current.getWeights());
             if (ProfileRuleWeights.validate(weights, codes).isEmpty()) {
@@ -407,8 +414,8 @@ public class ProfileRuleService {
         return JsonUtils.toJsonString(weights == null ? Map.of() : weights);
     }
 
-    private void validateDraftWeights(Map<String, Double> weights, String source) {
-        Set<String> codes = new LinkedHashSet<>(dimensionService.enabledCodes(source));
+    private void validateDraftWeights(Map<String, Double> weights, String source, String subjectType) {
+        Set<String> codes = new LinkedHashSet<>(dimensionService.enabledCodes(source, subjectType));
         for (Map.Entry<String, Double> entry : weights.entrySet()) {
             if (!codes.contains(entry.getKey())) {
                 throw new ServiceException("权重引用了未启用维度: " + entry.getKey());
@@ -420,17 +427,19 @@ public class ProfileRuleService {
         }
     }
 
-    private ProfileScoreRule queryOpenDraft(String source) {
+    private ProfileScoreRule queryOpenDraft(String source, String subjectType) {
         return ruleMapper.selectList(new LambdaQueryWrapper<ProfileScoreRule>()
                 .eq(ProfileScoreRule::getSource, source)
+                .eq(ProfileScoreRule::getSubjectType, SubjectTypes.normalize(subjectType))
                 .eq(ProfileScoreRule::getStatus, DRAFT)
                 .last("LIMIT 1"))
             .stream().findFirst().orElse(null);
     }
 
-    private ProfileScoreRule findByVersion(String source, String version) {
+    private ProfileScoreRule findByVersion(String source, String subjectType, String version) {
         return ruleMapper.selectList(new LambdaQueryWrapper<ProfileScoreRule>()
                 .eq(ProfileScoreRule::getSource, source)
+                .eq(ProfileScoreRule::getSubjectType, SubjectTypes.normalize(subjectType))
                 .eq(ProfileScoreRule::getRuleVersion, version)
                 .last("LIMIT 1"))
             .stream().findFirst().orElse(null);

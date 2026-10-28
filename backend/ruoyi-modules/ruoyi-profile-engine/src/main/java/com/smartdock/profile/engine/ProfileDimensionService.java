@@ -53,10 +53,12 @@ public class ProfileDimensionService {
     private final DimensionEvaluator evaluator;
     private final List<DimensionStrategy> strategies;
 
-    public List<ProfileScoreDimension> list(String source) {
+    /** 维度列表(按 source+subjectType 一套; subjectType 空白归 user)。 */
+    public List<ProfileScoreDimension> list(String source, String subjectType) {
         requireSource(source);
         return dimensionMapper.selectList(new LambdaQueryWrapper<ProfileScoreDimension>()
             .eq(ProfileScoreDimension::getSource, source)
+            .eq(ProfileScoreDimension::getSubjectType, SubjectTypes.normalize(subjectType))
             .orderByAsc(ProfileScoreDimension::getSortOrder)
             .orderByAsc(ProfileScoreDimension::getDimCode));
     }
@@ -72,8 +74,8 @@ public class ProfileDimensionService {
     /**
      * 引擎/规则服务用的启用维度码(按排序)。
      */
-    public List<String> enabledCodes(String source) {
-        return list(source).stream()
+    public List<String> enabledCodes(String source, String subjectType) {
+        return list(source, subjectType).stream()
             .filter(d -> "1".equals(d.getEnabled()))
             .map(ProfileScoreDimension::getDimCode)
             .toList();
@@ -82,16 +84,19 @@ public class ProfileDimensionService {
     @Transactional(rollbackFor = Exception.class)
     public ProfileScoreDimension create(ProfileDimensionBo bo) {
         validateBo(bo, true);
+        String subjectType = SubjectTypes.normalize(bo.getSubjectType());
         Long duplicated = dimensionMapper.selectCount(new LambdaQueryWrapper<ProfileScoreDimension>()
             .eq(ProfileScoreDimension::getSource, bo.getSource())
+            .eq(ProfileScoreDimension::getSubjectType, subjectType)
             .eq(ProfileScoreDimension::getDimCode, bo.getDimCode()));
         if (duplicated != null && duplicated > 0) {
-            throw new ServiceException("同一业务源下维度码已存在: " + bo.getDimCode());
+            throw new ServiceException("同一业务源+主体类型下维度码已存在: " + bo.getDimCode());
         }
         ProfileScoreDimension dim = new ProfileScoreDimension();
         dim.setDimensionId(IdWorker.getId());
         dim.setTenantId(currentTenant());
         dim.setSource(bo.getSource());
+        dim.setSubjectType(subjectType);
         dim.setDimCode(bo.getDimCode().trim());
         dim.setDimName(bo.getDimName().trim());
         dim.setCalcMode(bo.getCalcMode().trim().toUpperCase());
@@ -111,8 +116,9 @@ public class ProfileDimensionService {
             throw new ServiceException("dimensionId 不能为空");
         }
         ProfileScoreDimension existing = get(bo.getDimensionId());
-        // source / dimCode / builtin 是身份字段, 修改会让历史快照对不上号
+        // source / subjectType / dimCode / builtin 是身份字段, 修改会让历史快照对不上号
         bo.setSource(existing.getSource());
+        bo.setSubjectType(existing.getSubjectType());
         bo.setDimCode(existing.getDimCode());
         validateBo(bo, false);
         existing.setDimName(bo.getDimName().trim());
@@ -157,16 +163,18 @@ public class ProfileDimensionService {
         return out;
     }
 
-    public List<Map<String, Object>> coverage(String source) {
+    public List<Map<String, Object>> coverage(String source, String subjectType) {
         requireSource(source);
-        List<ProfileScoreDimension> dims = list(source);
+        String type = SubjectTypes.normalize(subjectType);
+        List<ProfileScoreDimension> dims = list(source, type);
         Long subjectCount = subjectMapper.selectCount(new LambdaQueryWrapper<ProfileSubject>()
-            .eq(ProfileSubject::getSource, source));
-        Long scoredCount = snapshotMapper.countLatestSnapshotSubjects(currentTenant(), source);
-        Date lastCalcTime = snapshotMapper.selectLastCalcTime(currentTenant(), source);
+            .eq(ProfileSubject::getSource, source)
+            .eq(ProfileSubject::getSubjectType, type));
+        Long scoredCount = snapshotMapper.countLatestSnapshotSubjects(currentTenant(), source, type);
+        Date lastCalcTime = snapshotMapper.selectLastCalcTime(currentTenant(), source, type);
 
         Map<String, Long> covered = new LinkedHashMap<>();
-        for (Map<String, Object> row : snapshotMapper.selectDimensionCoverage(currentTenant(), source)) {
+        for (Map<String, Object> row : snapshotMapper.selectDimensionCoverage(currentTenant(), source, type)) {
             Object code = row.get("dim_code");
             Object count = row.get("covered");
             if (code != null) {

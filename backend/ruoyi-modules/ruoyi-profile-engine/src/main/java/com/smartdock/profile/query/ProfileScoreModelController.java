@@ -38,8 +38,9 @@ public class ProfileScoreModelController {
 
     @SaCheckPermission("profile:model:query")
     @GetMapping("/list")
-    public R<List<ProfileScoreModel>> list(@RequestParam String source) {
-        return R.ok(modelService.list(source));
+    public R<List<ProfileScoreModel>> list(@RequestParam String source,
+                                           @RequestParam(required = false) String subjectType) {
+        return R.ok(modelService.list(source, subjectType));
     }
 
     @SaCheckPermission("profile:model:query")

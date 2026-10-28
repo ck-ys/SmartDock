@@ -35,6 +35,9 @@ public class ProfileScoreDimension extends BaseEntity {
     /** 归属业务源(维度按 source 隔离) */
     private String source;
 
+    /** 适用主体类型(题0-乙): 员工/会员各自一套, 缺省 user */
+    private String subjectType;
+
     /** EVENT_AGG(JSON 配置) | STRATEGY(Java Bean) */
     private String calcMode;
 

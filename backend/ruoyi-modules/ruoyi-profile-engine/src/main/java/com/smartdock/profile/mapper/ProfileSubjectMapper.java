@@ -174,10 +174,12 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
             ORDER BY snap.calc_time DESC, snap.snapshot_id DESC
             LIMIT 1
         ) s ON TRUE
-        WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source} AND sub.del_flag = '0'
+        WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source} AND sub.subject_type = #{subjectType}
+          AND sub.del_flag = '0'
         """)
     ProfileOverview selectOverview(@Param("tenantId") String tenantId,
-                                   @Param("source") String source);
+                                   @Param("source") String source,
+                                   @Param("subjectType") String subjectType);
 
     /**
      * 分群候选: 主体 + 最新维度快照(全量, 由 Java 规则引擎筛选)。

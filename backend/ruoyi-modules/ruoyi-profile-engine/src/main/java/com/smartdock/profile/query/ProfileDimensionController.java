@@ -33,8 +33,9 @@ public class ProfileDimensionController {
 
     @SaCheckPermission("profile:score:query")
     @GetMapping("/list")
-    public R<List<ProfileScoreDimension>> list(@RequestParam String source) {
-        return R.ok(dimensionService.list(source));
+    public R<List<ProfileScoreDimension>> list(@RequestParam String source,
+                                               @RequestParam(required = false) String subjectType) {
+        return R.ok(dimensionService.list(source, subjectType));
     }
 
     @SaCheckPermission("profile:score:query")
@@ -45,8 +46,9 @@ public class ProfileDimensionController {
 
     @SaCheckPermission("profile:score:query")
     @GetMapping("/coverage")
-    public R<List<Map<String, Object>>> coverage(@RequestParam String source) {
-        return R.ok(dimensionService.coverage(source));
+    public R<List<Map<String, Object>>> coverage(@RequestParam String source,
+                                                 @RequestParam(required = false) String subjectType) {
+        return R.ok(dimensionService.coverage(source, subjectType));
     }
 
     @SaCheckPermission("profile:score:query")

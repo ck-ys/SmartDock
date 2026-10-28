@@ -23,6 +23,9 @@ public class ProfileDimensionBo implements Serializable {
 
     private String source;
 
+    /** 适用主体类型(缺省 user; 员工/会员各自一套) */
+    private String subjectType;
+
     private String dimCode;
 
     private String dimName;

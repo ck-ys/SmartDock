@@ -33,20 +33,23 @@ public class ProfileRuleController {
 
     @SaCheckPermission("profile:score:query")
     @GetMapping("/current")
-    public R<ProfileScoreRule> current(@RequestParam String source) {
-        return R.ok(ruleService.current(source));
+    public R<ProfileScoreRule> current(@RequestParam String source,
+                                       @RequestParam(required = false) String subjectType) {
+        return R.ok(ruleService.current(source, subjectType));
     }
 
     @SaCheckPermission("profile:score:query")
     @GetMapping("/history")
-    public R<List<ProfileScoreRule>> history(@RequestParam String source) {
-        return R.ok(ruleService.history(source));
+    public R<List<ProfileScoreRule>> history(@RequestParam String source,
+                                             @RequestParam(required = false) String subjectType) {
+        return R.ok(ruleService.history(source, subjectType));
     }
 
     @SaCheckPermission("profile:score:query")
     @GetMapping("/templates")
-    public R<List<Map<String, Object>>> templates(@RequestParam String source) {
-        return R.ok(ruleService.templates(source));
+    public R<List<Map<String, Object>>> templates(@RequestParam String source,
+                                                  @RequestParam(required = false) String subjectType) {
+        return R.ok(ruleService.templates(source, subjectType));
     }
 
     @SaCheckPermission("profile:score:query")
