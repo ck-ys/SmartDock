@@ -265,9 +265,10 @@ public class ProfileScoreModelService {
             throw new ServiceException("模型配置不合法: " + String.join("; ", errors));
         }
         // 批4A 护栏: 全量运行前主体轻量 COUNT, 超阈值在载入前报错(不写 SKIPPED——人工入口)
-        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
         // 题0-乙: 模型只统计/打分自己那类主体(员工模型不算会员, 反之亦然)
         String modelSubjectType = SubjectTypes.normalize(model.getSubjectType());
+        // 批末回修: 护栏同口径按类型计数(全类型合计会误拦单类型运行)
+        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource(), modelSubjectType);
         List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
             .eq(ProfileSubject::getTenantId, model.getTenantId())
             .eq(ProfileSubject::getSource, model.getSource())
@@ -364,7 +365,8 @@ public class ProfileScoreModelService {
         ProfileScoreModel model = get(modelId);
         // 批4A 护栏: overview 是第 4 个全量读面(selectLatestAll 全量载入后 Java 聚合,
         // rfm 页首屏即调), 主体超阈值先报错——subjectPage 走分页不拦
-        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
+        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource(),
+            SubjectTypes.normalize(model.getSubjectType()));
         List<ProfileModelSubjectRow> rows = snapshotMapper.selectLatestAll(
             model.getTenantId(), model.getSource(), SubjectTypes.normalize(model.getSubjectType()),
             model.getModelCode(), model.getModelVersion());
@@ -415,7 +417,8 @@ public class ProfileScoreModelService {
 
     public Map<String, Object> subjectDetail(Long modelId, String subjectType, String subjectId) {
         ProfileScoreModel model = get(modelId);
-        String type = StringUtils.isBlank(subjectType) ? "user" : subjectType;
+        // 缺省取模型自身类型而非写死 user——会员模型从 UI 点主体详情时也该查会员快照
+        String type = StringUtils.isBlank(subjectType) ? SubjectTypes.normalize(model.getSubjectType()) : subjectType;
         List<Map<String, Object>> history = snapshotMapper.selectHistory(model.getTenantId(),
             model.getSource(), model.getModelCode(), type, subjectId, 20);
         List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
@@ -438,7 +441,10 @@ public class ProfileScoreModelService {
 
     public List<Map<String, Object>> trend(Long modelId, int days) {
         ProfileScoreModel model = get(modelId);
-        return snapshotMapper.selectTrend(model.getTenantId(), model.getSource(), model.getModelCode(),
+        // 批末回修(dsflash P2): model_code 唯一键含 subject_type, 不带类型会把
+        // 员工/会员同名模型的快照混成一条趋势线
+        return snapshotMapper.selectTrend(model.getTenantId(), model.getSource(),
+            SubjectTypes.normalize(model.getSubjectType()), model.getModelCode(),
             Math.min(Math.max(1, days), 365));
     }
 
@@ -491,7 +497,8 @@ public class ProfileScoreModelService {
             throw new ServiceException("模型配置不合法: " + String.join("; ", errors));
         }
         // 批4A 护栏: 试算与全量运行同一全量载入模式, 同阈值前置
-        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
+        scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource(),
+            SubjectTypes.normalize(model.getSubjectType()));
         List<ProfileSubject> subjects = subjectMapper.selectList(new LambdaQueryWrapper<ProfileSubject>()
             .eq(ProfileSubject::getTenantId, model.getTenantId())
             .eq(ProfileSubject::getSource, model.getSource())

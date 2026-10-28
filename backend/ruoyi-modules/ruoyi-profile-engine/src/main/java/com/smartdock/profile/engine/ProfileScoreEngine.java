@@ -19,6 +19,7 @@ import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -57,6 +58,7 @@ public class ProfileScoreEngine {
     private final ProfileScoreSnapshotMapper snapshotMapper;
     private final DimensionEvaluator evaluator;
     private final ProfileEventMapper eventMapper;
+    private final TransactionTemplate snapshotTx;
     private final List<DimensionStrategy> strategies;
     private final List<ProfilePostProcessor> postProcessors;
     private final ProfileReviewService reviewService;
@@ -138,10 +140,19 @@ public class ProfileScoreEngine {
 
         // 前链 + 落库(dspro P1-3 回修: 先落库、再以已存在行跑后处理——processor 拿到的
         // snapshotId 真实可外键; _extra 经一次 UPDATE 合并回本条快照, 不再构造幽灵快照)
-        ProfileScoreSnapshot prev = latestSnapshot(source, subjectType, subjectId);
-        ProfileScoreSnapshot snapshot = buildSnapshot(tenantId, source, subjectType, subjectId,
-            total, detail, rule == null ? "none" : rule.getRuleVersion(), prev == null ? null : prev.getSnapshotId());
-        snapshotMapper.insertJsonb(snapshot);
+        // 批末回修(dspro P1-3): 前链「读尾-插新」原为无锁两步, 批次重算(不持锁)/身份回放与
+        // 事件触发重算(持 Redis 锁)交错时, 两方读到同一条前驱各插新快照=链变树。
+        // advisory 事务锁把同主体的读尾+插新串行化, 锁随本段事务提交释放;
+        // 后处理/复核评估仍在事务外, 行为不变。
+        ProfileScoreSnapshot snapshot = snapshotTx.execute(status -> {
+            snapshotMapper.advisoryXactLock("score:" + tenantId + ":" + source + ":" + subjectType + ":" + subjectId);
+            ProfileScoreSnapshot prev = latestSnapshot(source, subjectType, subjectId);
+            ProfileScoreSnapshot s = buildSnapshot(tenantId, source, subjectType, subjectId,
+                total, detail, rule == null ? "none" : rule.getRuleVersion(),
+                prev == null ? null : prev.getSnapshotId());
+            snapshotMapper.insertJsonb(s);
+            return s;
+        });
         if (!postProcessors.isEmpty()) {
             Map<String, Object> extra = new LinkedHashMap<>();
             ProfilePostProcessor.SnapshotContext ctx = new ProfilePostProcessor.SnapshotContext(snapshot, extra);

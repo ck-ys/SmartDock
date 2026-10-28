@@ -31,7 +31,7 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND subject_type = #{subjectType}
           AND identifier_type = #{identifierType} AND identifier_value = #{identifierValue}
-        ORDER BY last_seen DESC
+        ORDER BY last_seen DESC, link_id DESC
         LIMIT 1
         """)
     ProfileIdentityLink selectLinkStrong(@Param("tenantId") String tenantId,
@@ -50,7 +50,7 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
         FROM profile_identity_link
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND identifier_type = #{identifierType} AND identifier_value = #{identifierValue}
-        ORDER BY last_seen DESC
+        ORDER BY last_seen DESC, link_id DESC
         LIMIT 1
         """)
     ProfileIdentityLink selectLinkShared(@Param("tenantId") String tenantId,
@@ -65,7 +65,7 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
         FROM profile_identity_link
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND subject_type = #{subjectType} AND subject_id = #{subjectId}
-        ORDER BY last_seen DESC
+        ORDER BY last_seen DESC, link_id DESC
         """)
     List<ProfileIdentityLink> selectBySubject(@Param("tenantId") String tenantId,
                                               @Param("source") String source,
@@ -88,7 +88,7 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
             confidence = EXCLUDED.confidence,
             is_secure = EXCLUDED.is_secure,
             status = 'ACTIVE',
-            last_seen = EXCLUDED.last_seen,
+            last_seen = GREATEST(profile_identity_link.last_seen, EXCLUDED.last_seen),
             update_time = CURRENT_TIMESTAMP
         """)
     int upsertLink(@Param("l") ProfileIdentityLink link);

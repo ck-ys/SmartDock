@@ -186,18 +186,23 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         // 身份解析失败不阻断事件(链接表是索引, 事件是账本); 下一条事件会再补
         e.setSubjectId(resolveCanonicalSubject(e, bo));
 
-        return requiresNew.execute(status -> {
+        ProfileEvent inserted = requiresNew.execute(status -> {
             int rows = eventMapper.insertIgnore(e);
-            if (rows == 0) {
-                return null;
-            }
-            upsertSubject(e, bo);
-            // E 片统一事件流口径: 首见=该用户键的首次使用(登录也是使用)——
-            // 持续使用分析/首周激活都以它为分母。C 片曾按自监控跳过(防登录污染 web 访客指标),
-            // 访客指标退役后该守卫反转, 存量库由重建补齐
-            upsertFirstSeen(e);
-            return e;
+            return rows == 0 ? null : e;
         });
+        if (inserted == null) {
+            return null;
+        }
+        // 批末回修(dspro P1-1): 主体/首见两条旁路写必须在账本事务提交之后执行——
+        // 之前它们与账本同事务且各自 catch, 一条语句失败会把 PG 事务置为 aborted,
+        // COMMIT 静默变 ROLLBACK: 账本丢行而 publish 仍返回成功。移出后失败只丢
+        // 索引(下一条事件会再补), 与"登记是索引"的既有语义真正一致。
+        upsertSubject(e, bo);
+        // E 片统一事件流口径: 首见=该用户键的首次使用(登录也是使用)——
+        // 持续使用分析/首周激活都以它为分母。C 片曾按自监控跳过(防登录污染 web 访客指标),
+        // 访客指标退役后该守卫反转, 存量库由重建补齐
+        upsertFirstSeen(e);
+        return inserted;
     }
 
     /**

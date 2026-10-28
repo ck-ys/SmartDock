@@ -220,7 +220,13 @@ public class ProfileScenarioService {
             bo.setEnabled("1");
             bo.setSortOrder(dim.getSortOrder() == null ? 0 : dim.getSortOrder());
             bo.setRemark("场景模板「" + def.getName() + "」预填");
-            dimensionService.create(bo);
+            try {
+                dimensionService.create(bo);
+            } catch (DuplicateKeyException concurrent) {
+                // 批末回修(双席互证 dspro P2-3/glm53 P2-2): check-then-act 与并发套用之间的窗口
+                // 撞唯一键, PG 事务已中止——抛人话并整单回滚, 重试即得「全跳过」回执
+                throw new ServiceException("另一管理员正在套用同一模板或已建同编码维度, 请刷新后重试");
+            }
             dimsCreated.add(dim.getDimCode());
         }
 
@@ -232,7 +238,15 @@ public class ProfileScenarioService {
             .eq(ProfileScoreRule::getStatus, ProfileRuleService.DRAFT)
             .last("LIMIT 1"));
         if (open != null) {
-            draftNote = "已有未发布的权重草稿, 本次未改动——去「权重规则」页签处理完再套";
+            // 批末回修(dspro P1-2): 草稿不动, 但模板新建的启用维度没有权重会让草稿
+            // 「缺少维度权重」发布不了——回执必须把缺哪些维度说清楚, 否则是把用户锁死
+            List<String> missing = dimensionService.enabledCodes(source, st).stream()
+                .filter(dimCode -> !ruleService.parseWeights(open.getWeights()).containsKey(dimCode))
+                .toList();
+            draftNote = missing.isEmpty()
+                ? "已有未发布的权重草稿, 本次未改动——去「权重规则」页签处理完再套"
+                : "已有未发布的权重草稿, 本次未改动。注意: 启用维度 " + String.join(", ", missing)
+                    + " 在该草稿里没有权重, 直接发布会报「缺少维度权重」——请先在「权重规则」页签补上权重再发布";
             draftRuleId = open.getRuleId();
         } else {
             ProfileRuleBo createBo = new ProfileRuleBo();
@@ -279,7 +293,11 @@ public class ProfileScenarioService {
             bo.setRuleConfig(seg.getRuleConfig());
             bo.setDescription(StringUtils.defaultIfBlank(seg.getDescription(),
                 "场景模板「" + def.getName() + "」预填"));
-            segmentService.create(bo);
+            try {
+                segmentService.create(bo);
+            } catch (DuplicateKeyException concurrent) {
+                throw new ServiceException("另一管理员正在套用同一模板或已建同编码分群, 请刷新后重试");
+            }
             segsCreated.add(seg.getSegmentName());
         }
 
@@ -302,7 +320,11 @@ public class ProfileScenarioService {
             bo.setWindowDays(funnel.getWindowDays() == null ? 7 : funnel.getWindowDays());
             bo.setEnabled("1");
             bo.setRemark("场景模板「" + def.getName() + "」预填");
-            analyticsService.saveFunnel(bo);
+            try {
+                analyticsService.saveFunnel(bo);
+            } catch (DuplicateKeyException concurrent) {
+                throw new ServiceException("另一管理员正在套用同一模板或已建同编码漏斗, 请刷新后重试");
+            }
             funnelsCreated.add(funnel.getFunnelName());
         }
 
@@ -384,6 +406,10 @@ public class ProfileScenarioService {
             errors.add("维度最多 " + MAX_DIMENSIONS + " 个");
         }
         for (ScenarioTemplateDef.DimensionDef dim : def.getDimensions()) {
+            if (dim == null) {
+                errors.add("维度项不能为空");
+                continue;
+            }
             String prefix = "维度[" + dim.getDimCode() + "] ";
             if (dim.getDimCode() == null || !CODE_PATTERN.matcher(dim.getDimCode()).matches()) {
                 errors.add(prefix + "编码不合法");
@@ -424,7 +450,9 @@ public class ProfileScenarioService {
             if (!dimCodes.contains(e.getKey())) {
                 errors.add("权重引用了模板里没有的维度: " + e.getKey());
             }
-            if (e.getValue() == null || e.getValue() < 0 || e.getValue() > 1) {
+            if (e.getValue() == null || !Double.isFinite(e.getValue()) || e.getValue() < 0 || e.getValue() > 1) {
+                // isFinite 拦 NaN/Infinity: JSON 字符串 "NaN" 能被 Jackson 解成 Double.NaN,
+                // 而 NaN 的任何比较都是 false, 只比大小会放行到套用时才炸 NumberFormatException
                 errors.add("维度 " + e.getKey() + " 的权重须在 0~1 之间");
             }
         }
@@ -439,6 +467,10 @@ public class ProfileScenarioService {
             errors.add("分群最多 " + MAX_SEGMENTS + " 个");
         }
         for (ScenarioTemplateDef.SegmentDef seg : def.getSegments()) {
+            if (seg == null) {
+                errors.add("分群项不能为空");
+                continue;
+            }
             String prefix = "分群[" + seg.getSegmentCode() + "] ";
             if (seg.getSegmentCode() == null || !CODE_PATTERN.matcher(seg.getSegmentCode()).matches()) {
                 errors.add(prefix + "编码不合法");
@@ -456,6 +488,10 @@ public class ProfileScenarioService {
             errors.add("漏斗最多 " + MAX_FUNNELS + " 个");
         }
         for (ScenarioTemplateDef.FunnelDef funnel : def.getFunnels()) {
+            if (funnel == null) {
+                errors.add("漏斗项不能为空");
+                continue;
+            }
             String prefix = "漏斗[" + funnel.getFunnelCode() + "] ";
             if (funnel.getFunnelCode() == null || !CODE_PATTERN.matcher(funnel.getFunnelCode()).matches()) {
                 errors.add(prefix + "编码不合法");

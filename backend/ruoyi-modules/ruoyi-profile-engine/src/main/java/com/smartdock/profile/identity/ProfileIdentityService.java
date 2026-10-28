@@ -73,12 +73,15 @@ public class ProfileIdentityService {
         if (ids.isEmpty()) {
             return subjectId;
         }
-        // 批11 Q4-A: 归并焦点(匿名 ID 优先, 否则首个标识)上事务级 advisory 锁——
-        // 同一匿名 ID 两处并发登录归并时不再写出双链/双份 merge 审计(TOCTOU)
-        String anchor = ids.get("anonymous_id") != null ? ids.get("anonymous_id")
-            : ids.entrySet().iterator().next().getValue();
+        // 批11 Q4-A + 批末回修: 事务级 advisory 锁——同一匿名 ID 两处并发登录归并时
+        // 不再写出双链/双份 merge 审计(TOCTOU)。锁全部标识值而非「首个标识」:
+        // Map 迭代序不稳定(同载荷两请求可能锁不同键), 同主体并发携带不同标识集合
+        // (只带邮箱 vs 带邮箱+手机)也只有锁住每个值才能互斥; 排序后依次上锁防死锁。
+        List<String> anchors = ids.values().stream().distinct().sorted().toList();
         return txTemplate.execute(status -> {
-            linkMapper.advisoryXactLock("identity:" + tenantId + ":" + source + ":" + anchor);
+            for (String anchor : anchors) {
+                linkMapper.advisoryXactLock("identity:" + tenantId + ":" + source + ":" + anchor);
+            }
             return resolveAndLinkLocked(tenantId, source, subjectType, subjectId, ids);
         });
     }

@@ -39,6 +39,14 @@ public interface ProfileScoreSnapshotMapper extends BaseMapperPlus<ProfileScoreS
     int insertJsonb(@Param("s") ProfileScoreSnapshot s);
 
     /**
+     * 快照前链「读尾+插新」的事务级互斥(单源重构批末, dspro P1-3): 与身份归并同款 pg advisory 手法,
+     * 批次重算/身份回放与事件触发重算并发时防止两条新快照指向同一前驱(链变树)。
+     * 返回值必须非 void——MyBatis 对 @Select 无法把结果行映射到 void。
+     */
+    @org.apache.ibatis.annotations.Select("SELECT pg_advisory_xact_lock(hashtext(#{key}))")
+    String advisoryXactLock(@org.apache.ibatis.annotations.Param("key") String key);
+
+    /**
      * 后处理 _extra 回写(dspro P1-3: 先落库再跑后处理, extra 合并回本条快照)。
      * 显式带 tenant_id——TenantLine 见条件列已存在会跳过追加。
      */

@@ -1,6 +1,7 @@
 package com.smartdock.profile.engine;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.smartdock.profile.domain.ProfileEngineConfig;
 import com.smartdock.profile.mapper.ProfileEngineConfigMapper;
@@ -74,15 +75,30 @@ public class ProfileEngineConfigService {
             throw new ServiceException("source 不能为空");
         }
         ProfileEngineConfig config = getOrCreate(bo.getSource());
+        // 批末回修: 定向更新(只写本次动过的列)——两个管理员同时改不同开关时,
+        // 整行 updateById 会把对方刚保存的值用自己读到的旧值盖回去
+        LambdaUpdateWrapper<ProfileEngineConfig> uw = new LambdaUpdateWrapper<ProfileEngineConfig>()
+            .eq(ProfileEngineConfig::getConfigId, config.getConfigId())
+            .eq(ProfileEngineConfig::getTenantId, config.getTenantId());
+        boolean changed = false;
         if (bo.getAutoRecalc() != null) {
-            config.setAutoRecalc("0".equals(bo.getAutoRecalc()) ? "0" : "1");
+            String v = "0".equals(bo.getAutoRecalc()) ? "0" : "1";
+            config.setAutoRecalc(v);
+            uw.set(ProfileEngineConfig::getAutoRecalc, v);
+            changed = true;
         }
         if (bo.getReviewEnabled() != null) {
-            config.setReviewEnabled("0".equals(bo.getReviewEnabled()) ? "0" : "1");
+            String v = "0".equals(bo.getReviewEnabled()) ? "0" : "1";
+            config.setReviewEnabled(v);
+            uw.set(ProfileEngineConfig::getReviewEnabled, v);
+            changed = true;
         }
         if (bo.getSelfMonitor() != null) {
             // C 片自监控总开关: 画像页同屏可停(D 片出 UI), 停后登录/核心操作不再新增记录
-            config.setSelfMonitor("0".equals(bo.getSelfMonitor()) ? "0" : "1");
+            String v = "0".equals(bo.getSelfMonitor()) ? "0" : "1";
+            config.setSelfMonitor(v);
+            uw.set(ProfileEngineConfig::getSelfMonitor, v);
+            changed = true;
         }
         if (bo.getReviewThreshold() != null) {
             if (bo.getReviewThreshold().signum() < 0
@@ -90,38 +106,54 @@ public class ProfileEngineConfigService {
                 throw new ServiceException("复核阈值必须在 0~100 之间");
             }
             config.setReviewThreshold(bo.getReviewThreshold());
+            uw.set(ProfileEngineConfig::getReviewThreshold, bo.getReviewThreshold());
+            changed = true;
         }
         if (bo.getDebounceMs() != null) {
             if (bo.getDebounceMs() < 0 || bo.getDebounceMs() > 60_000) {
                 throw new ServiceException("合并窗口必须在 0~60000 毫秒之间");
             }
             config.setDebounceMs(bo.getDebounceMs());
+            uw.set(ProfileEngineConfig::getDebounceMs, bo.getDebounceMs());
+            changed = true;
         }
         if (bo.getReviewSlaDays() != null) {
             if (bo.getReviewSlaDays() < 1 || bo.getReviewSlaDays() > 365) {
                 throw new ServiceException("复核 SLA 天数必须在 1~365 之间");
             }
             config.setReviewSlaDays(bo.getReviewSlaDays());
+            uw.set(ProfileEngineConfig::getReviewSlaDays, bo.getReviewSlaDays());
+            changed = true;
         }
         if (bo.getEventRetentionDays() != null) {
             if (bo.getEventRetentionDays() == 0) {
                 // 0=清空自定义, 回到继承全局默认(前端空输入即传 0; 不传字段则不动现值)
                 config.setEventRetentionDays(null);
+                uw.set(ProfileEngineConfig::getEventRetentionDays, null);
             } else if (bo.getEventRetentionDays() < 1 || bo.getEventRetentionDays() > 36_500) {
                 throw new ServiceException("事件保留天数必须在 0~36500 之间(0=继承全局默认)");
             } else {
                 config.setEventRetentionDays(bo.getEventRetentionDays());
+                uw.set(ProfileEngineConfig::getEventRetentionDays, bo.getEventRetentionDays());
             }
+            changed = true;
         }
         if (bo.getEventArchive() != null) {
-            config.setEventArchive("0".equals(bo.getEventArchive()) ? "0" : "1");
+            String v = "0".equals(bo.getEventArchive()) ? "0" : "1";
+            config.setEventArchive(v);
+            uw.set(ProfileEngineConfig::getEventArchive, v);
+            changed = true;
         }
         if (bo.getRemark() != null) {
             config.setRemark(StringUtils.substring(bo.getRemark(), 0, 500));
+            uw.set(ProfileEngineConfig::getRemark, config.getRemark());
+            changed = true;
         }
-        config.setUpdateBy(currentUser());
-        configMapper.updateById(config);
-        cache.remove(key(config.getTenantId(), config.getSource()));
+        if (changed) {
+            uw.set(ProfileEngineConfig::getUpdateBy, currentUser());
+            configMapper.update(null, uw);
+            cache.remove(key(config.getTenantId(), config.getSource()));
+        }
         return config;
     }
 

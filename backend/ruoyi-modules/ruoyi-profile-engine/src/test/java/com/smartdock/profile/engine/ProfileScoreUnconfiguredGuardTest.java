@@ -111,6 +111,12 @@ class ProfileScoreUnconfiguredGuardTest {
         return dim;
     }
 
+    /** 快照链锁事务模板: mock 管理器不真开事务, execute 照常执行回调内容。 */
+    private static org.springframework.transaction.support.TransactionTemplate passthroughTx() {
+        return new org.springframework.transaction.support.TransactionTemplate(
+            Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class));
+    }
+
     /** 协作件全 mock 的引擎实例: 只验编排逻辑, 不连库。 */
     private static ProfileScoreEngine engine(DimensionEvaluator evaluator,
                                              ProfileReviewService review,
@@ -123,7 +129,7 @@ class ProfileScoreUnconfiguredGuardTest {
         Mockito.when(ruleMapper.selectList(Mockito.any())).thenReturn(Collections.emptyList());
         Mockito.when(snapshotMapper.selectList(Mockito.any())).thenReturn(Collections.emptyList());
         return new ProfileScoreEngine(dimensionMapper, ruleMapper, snapshotMapper, evaluator,
-            eventMapper, List.of(), List.of(), review);
+            eventMapper, passthroughTx(), List.of(), List.of(), review);
     }
 
     @Test
@@ -180,7 +186,7 @@ class ProfileScoreUnconfiguredGuardTest {
         Mockito.when(ruleMapper.selectList(Mockito.any())).thenReturn(Collections.emptyList());
         Mockito.when(snapshotMapper.selectList(Mockito.any())).thenReturn(Collections.emptyList());
         ProfileScoreEngine engine = new ProfileScoreEngine(dimensionMapper, ruleMapper, snapshotMapper, evaluator,
-            Mockito.mock(ProfileEventMapper.class), List.of(), List.of(), review);
+            Mockito.mock(ProfileEventMapper.class), passthroughTx(), List.of(), List.of(), review);
 
         engine.recalcSubject("dcs", "member", "member-1");
 

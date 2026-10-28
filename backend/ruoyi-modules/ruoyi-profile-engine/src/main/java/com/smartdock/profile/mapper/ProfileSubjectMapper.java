@@ -340,6 +340,18 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
     long countBySource(@Param("tenantId") String tenantId, @Param("source") String source);
 
     /**
+     * 批末回修: 评分三表拆 subject_type 后模型只算自己那类主体, 模型护栏按类型计数
+     * (全类型合计会把 user+member 合计误拦单类型运行; 分群不分类型仍走 countBySource)。
+     */
+    @Select("""
+        SELECT count(*) FROM profile_subject
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND subject_type = #{subjectType} AND del_flag = '0'
+        """)
+    long countBySourceType(@Param("tenantId") String tenantId, @Param("source") String source,
+                           @Param("subjectType") String subjectType);
+
+    /**
      * 批2 列源: 有主体的源清单(画像系下拉用), 附主体数。
      * 画像方向第二批: 联表显示配置——停用源从下拉滤掉, 显示名随配置覆盖。
      */

@@ -43,7 +43,7 @@ public class ProfileAdminController {
      * 事件灌数(数组): 逐条幂等, 返回写入/重复/校验失败三类结果。
      */
     @SaCheckPermission("profile:event:publish")
-    @Log(title = "画像测试发送", businessType = BusinessType.INSERT)
+    @Log(title = "画像测试发送", businessType = BusinessType.INSERT, isSaveRequestData = false)
     @PostMapping("/event/publish")
     public R<Map<String, Object>> publish(@RequestBody List<ProfileEventBo> events) {
         return R.ok(eventService.publishBatchDetailed(events));

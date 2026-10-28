@@ -67,9 +67,9 @@ public class ProfileScaleGuard {
         requireWithin(count, maxSegmentCandidates, segmentMessage(count, maxSegmentCandidates));
     }
 
-    /** 模型全量运行/试算/总览护栏(载入前主体轻量 COUNT)。 */
-    public void checkModelSubjects(String tenantId, String source) {
-        long count = subjectMapper.countBySource(tenantId, source);
+    /** 模型全量运行/试算/总览护栏(载入前主体轻量 COUNT)——按模型自己的主体类型计数。 */
+    public void checkModelSubjects(String tenantId, String source, String subjectType) {
+        long count = subjectMapper.countBySourceType(tenantId, source, subjectType);
         checkModelSubjectsCount(count);
     }
 

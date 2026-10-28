@@ -141,6 +141,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
                    to_char(calc_time, 'YYYY-MM-DD') AS day, normalized_score
             FROM profile_model_snapshot
             WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
+              AND subject_type = #{subjectType}
               AND calc_time >= now() - make_interval(days => #{days})
               AND del_flag = '0'
               AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
@@ -151,6 +152,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
         """)
     List<Map<String, Object>> selectTrend(@Param("tenantId") String tenantId,
                                           @Param("source") String source,
+                                          @Param("subjectType") String subjectType,
                                           @Param("modelCode") String modelCode,
                                           @Param("days") int days);
 
@@ -160,6 +162,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
             SELECT DISTINCT ON (subject_type, subject_id) level
             FROM profile_model_snapshot
             WHERE tenant_id = #{tenantId} AND source = #{source} AND model_code = #{modelCode}
+              AND subject_type = #{subjectType}
               AND del_flag = '0'
               AND (run_id IS NULL OR EXISTS (SELECT 1 FROM profile_model_run pr WHERE pr.run_id = profile_model_snapshot.run_id AND pr.status = 'DONE'))
             ORDER BY subject_type, subject_id, calc_time DESC, model_snapshot_id DESC
@@ -168,6 +171,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
         """)
     List<Map<String, Object>> selectLevelDistribution(@Param("tenantId") String tenantId,
                                                       @Param("source") String source,
+                                                      @Param("subjectType") String subjectType,
                                                       @Param("modelCode") String modelCode);
 
     /**

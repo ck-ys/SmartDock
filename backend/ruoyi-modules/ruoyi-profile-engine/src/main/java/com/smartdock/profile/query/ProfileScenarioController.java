@@ -8,7 +8,6 @@ import org.dromara.common.core.domain.R;
 import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -65,10 +64,10 @@ public class ProfileScenarioController {
         return R.ok(scenarioService.export(code, templateId));
     }
 
-    /** 删除「我的模板」。 */
+    /** 删除「我的模板」(POST-delete, 与 segment/funnel 同款——部分客户 WAF 只放行 GET/POST)。 */
     @SaCheckPermission("profile:scenario:edit")
     @Log(title = "场景模板", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{templateId}")
+    @PostMapping("/{templateId}/delete")
     public R<Boolean> delete(@PathVariable Long templateId) {
         return R.ok(scenarioService.delete(templateId));
     }
