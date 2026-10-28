@@ -264,6 +264,32 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 > 浏览器优先 playwright MCP 否则 .workshop/tmp 自建、调研 fetch 官方文档站；选型结论写人话日志。
 > **读图铁律**：当前模型支持图片输入时，截图核验直接用 `Read` 打开 PNG/JPG，禁止默认绕道视觉 MCP；仅当模型不支持图片或用户明确要求时才调用视觉 MCP。
 
+## 常用推荐 skill 清单（按场景，实战检验过的优先）
+
+> 用法：Skill 工具按名调用；本清单是「常用+推荐」不是全集。凡标 ★ 的是本项目用户硬性要求或高频必用。
+
+| 场景 | 推荐 skill | 一句话说明 |
+|------|-----------|-----------|
+| ★ 改前端 UI / 出拍板页 | `design-taste-frontend` | 用户硬规：每波动前端 UI 必先读（管理台走 app-screens 模式：安静边框/小标签，禁渐变辉光） |
+| 写/改 Element Plus 组件 | `el-dialog` `el-form` `el-table` `el-select` `el-date-picker` `el-drawer` `el-upload` `el-tabs` `el-message-box` | 每个部件一页坑谱（props 静默降级/teleport 样式/空串当空值等，都是本仓踩过的） |
+| EP 主题与设计语言 | `element-plus-design-color` / `-typography` / `-layout` / `-border` / `element-plus-theming` | 动主题令牌/字号档位前先过一遍，防半像素字号回潮 |
+| Vue 代码质量 | `vue-best-practices` `vue-pinia-best-practices` `vue-router-best-practices` | 改 store/路由/组件前扫一眼，少走弯路 |
+| 调 Vue 疑难 | `vue-debug-guides` | 响应性/生命周期类怪象先查这里再动手 |
+| ★ 出拍板页前头脑风暴 | `brainstorming` | 每题 2-3 案的素材来源；配合 §6 出板规范 |
+| ★ 自我 grill / 审查自己 | `grill-me` `grilling` `grill-with-docs` | 收口前拿这三把刀拷问自己的方案与 diff（用户点名要求） |
+| 代码审查协作 | `requesting-code-review` `receiving-code-review` `review-agent` | 派审查席/接审查报告时的姿势（报告是线索不是结论） |
+| E2E / 活体验证 | `webapp-testing` | Playwright 走查、断言、截图的套路 |
+| 调试系统性问题 | `systematic-debugging` `verification-before-completion` | 先复现再修；完成前逐条验证不靠感觉 |
+| 计划与执行 | `writing-plans` `executing-plans` `planning-with-files-zh` | 批次计划/跨会话续作时用 |
+| 截图还原成代码 | `image-to-code` | 拿设计稿/竞品截图还原页面 |
+| 会话内可视化 | `visualize` | 出 HTML 可视化卡片（对比页/示意图），配合双写归档 |
+| 文档协作 | `documents:docx` `doc-coauthoring` | 交付 Word 类材料 |
+| 工作流编排 | `dynamic-workflows`（先读 skill 再写脚本）`dispatching-parallel-agents` `subagent-driven-development` | 多席并行审查/跑批时用；工作流必须用户明说才开 |
+| 造轮子 | `skill-creator`（做新 skill）`mcp-builder`（做 MCP 工具） | 沉淀可复用能力时 |
+| 物料图 | `imagegen` `banner-design` `brand` | README banner/图标类 |
+
+**纪律**：skill 是参考输入不是挡箭牌——结论仍要落到「计算样式断言 + 截图 + 原生读图」三件套；调用了什么 skill、采纳/拒绝了哪条要写进人话日志。
+
 ---
 
 ## 🔥 当前入口（新会话先看）
