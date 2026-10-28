@@ -455,7 +455,7 @@
                     :disabled="!skillNewMode && isBuiltinRow && opt.level < builtinRoleLevel"
                   />
                 </el-select>
-                <span v-if="!skillNewMode && isBuiltinRow" class="sk-hint">内置档「{{ activeSkillRow?.builtinMinRole }}」起，只能升不能降</span>
+                <span v-if="!skillNewMode && isBuiltinRow" class="sk-hint">内置档「{{ SKILL_ROLE_TXT[activeSkillRow?.builtinMinRole ?? ''] || activeSkillRow?.builtinMinRole }}」起，只能升不能降</span>
               </div>
               <div class="sk-field">
                 <label>一句话说明</label>

@@ -153,17 +153,10 @@ public class AssistantSkillAdminController extends BaseController {
                     + DatabaseSkillRepository.minRoleName(builtin.minRole()) + " 起）");
             }
         }
-        // 同租户名称唯一（覆写同名内置=允许；新建撞别的在线技能=拒绝）
+        // 同租户唯一（覆写同名内置=允许——覆写正是本表主路径；同租户撞已有在线行已被 exists 判定接走）
         DcsAssistantSkill exists = skillMapper.selectOne(new LambdaQueryWrapper<DcsAssistantSkill>()
             .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
         boolean isNew = exists == null;
-        if (isNew) {
-            boolean onlineTaken = SkillAssets.skills(tenantId).stream()
-                .anyMatch(s -> s.id().equals(skillId));
-            if (onlineTaken) {
-                return R.fail("技能标识已存在（同名覆写走编辑，改名请新建别的标识）");
-            }
-        }
         DcsAssistantSkill row = isNew ? new DcsAssistantSkill() : exists;
         row.setTenantId(tenantId);
         row.setSkillId(skillId);
