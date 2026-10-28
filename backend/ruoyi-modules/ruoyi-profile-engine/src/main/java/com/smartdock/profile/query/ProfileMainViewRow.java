@@ -31,6 +31,9 @@ public class ProfileMainViewRow implements Serializable {
     /** 账号状态(user 视图来自 sys_user: '0'正常/'1'停用, 其余身份类型为 null) */
     private String userStatus;
 
+    /** 部门名(user 视图来自 sys_dept, 其余身份类型为 null) */
+    private String deptName;
+
     /** 显示名: user 视图取昵称兜底登录名, 其余类型取最近活跃的主体登记名 */
     private String displayName;
 

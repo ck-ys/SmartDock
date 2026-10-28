@@ -39,9 +39,6 @@ const eventOptions = ref<SourceOption[]>([]);
  */
 const subjectEmpty = ref(false);
 const eventEmpty = ref(false);
-/** 三审 dspro P2: 被停用的源数——清单空但 hidden>0 = "全被停用"而非"没数据", 空态分两套文案 */
-const subjectHidden = ref(0);
-const eventHidden = ref(0);
 let inflight: Promise<void> | null = null;
 
 const toOptions = (
@@ -55,7 +52,7 @@ const toOptions = (
     count: row[countKey]
   }));
 
-const ensureSources = (): Promise<void> => {
+export const ensureSources = (): Promise<void> => {
   if (!inflight) {
     let failed = false;
     inflight = listProfileSources()
@@ -64,8 +61,6 @@ const ensureSources = (): Promise<void> => {
         eventOptions.value = toOptions(data.eventSources, 'events');
         subjectEmpty.value = subjectOptions.value.length === 0;
         eventEmpty.value = eventOptions.value.length === 0;
-        subjectHidden.value = Number(data.subjectHidden ?? 0) || 0;
-        eventHidden.value = Number(data.eventHidden ?? 0) || 0;
       })
       .catch((e) => {
         // 三审 P2: 失败必须放掉 inflight——否则吞错后这份"兜底 promise"被永久缓存,
@@ -93,8 +88,6 @@ export function invalidateSources() {
   eventOptions.value = [];
   subjectEmpty.value = false;
   eventEmpty.value = false;
-  subjectHidden.value = 0;
-  eventHidden.value = 0;
 }
 
 /**
@@ -128,9 +121,4 @@ export function autoPickSource(list: { value: SourceOption[] }, current: { value
 /** 真实清单为空(加载成功): 画像系/分析系各自查, 页面据此显示诚实空态+接入引导 */
 export function useSourceEmpty(kind: 'subject' | 'event') {
   return kind === 'subject' ? subjectEmpty : eventEmpty;
-}
-
-/** 被停用的源数: 空态文案分叉用(全被停用 ≠ 没数据) */
-export function useSourceHidden(kind: 'subject' | 'event') {
-  return kind === 'subject' ? subjectHidden : eventHidden;
 }

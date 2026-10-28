@@ -3,10 +3,10 @@
     <dcs-operations-page-header
       eyebrow="画像与分析"
       title="数据分析中心"
-      subtitle="事件账本 → 会话重建 → 日汇总 → 漏斗/留存/下钻。同一套采集协议可接官网、订单、供应链、工程等任意业务源。"
+      subtitle="事件账本 → 会话重建 → 日汇总 → 漏斗/留存/下钻。任何业务系统的操作事件都能接进来分析。"
     >
       <template #actions>
-        <el-select v-if="!noRealSource" v-model="source" class="source-select" @change="onSourceChange">
+        <el-select v-if="!noRealSource && sourceOpts.length > 1" v-model="source" class="source-select" @change="onSourceChange">
           <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-select v-model="daysMode" class="days-select" @change="onDaysModeChange">
@@ -32,18 +32,10 @@
     </dcs-operations-page-header>
 
     <!-- 第二批: 空态=完整接入示例卡(题7), 告诉用户数据从哪来、怎么接;
-         三审 dspro P2-1: 全部源被停用时数据其实都在, 指引改指「去启用」而非「去接入」 -->
-    <el-card v-if="noRealSource && sourceHiddenCount > 0" shadow="never" class="analytics-empty-guide">
-      <div class="analytics-empty-guide__title">数据都在，{{ sourceHiddenCount }} 个来源被停用了</div>
-      <p class="analytics-empty-guide__text">来源停用后从所有页面隐藏，事件与主体数据原样保留——启用后立刻回来。</p>
-      <div class="analytics-empty-guide__foot">
-        <el-button v-if="canEditSource" type="primary" @click="goEnableSource">去引擎管理 · 启用来源</el-button>
-        <span v-else class="analytics-empty-guide__hint">来源启停由管理员在「引擎与运维 → 引擎运维 → 引擎管理 → 来源管理」操作</span>
-      </div>
-    </el-card>
-    <AccessGuideCard v-else-if="noRealSource" class="analytics-empty-guide" />
+         三审三席 P1: 旧「来源被停用」分支指向已随来源管理页签退役的启用入口(死路)——整块删除 -->
+    <AccessGuideCard v-if="noRealSource" class="analytics-empty-guide" />
     <!-- 无测试发送权限者给「找管理员」脚注(三审 dsflash P2: 卡内步骤②指引走不通时要兜底) -->
-    <p v-if="noRealSource && sourceHiddenCount === 0 && !canTestSend" class="analytics-empty-guide__hint analytics-empty-guide__hint--block">
+    <p v-if="noRealSource && !canTestSend" class="analytics-empty-guide__hint analytics-empty-guide__hint--block">
       数据接入由管理员在「引擎与运维 → 引擎运维」里配置
     </p>
     <div class="meta-line">
@@ -853,17 +845,14 @@ import {
   type AnalyticsTrendPoint
 } from '@/api/dcs/core/analytics';
 import { download } from '@/utils/request';
-import { useSourceOptions, useSourceEmpty, useSourceHidden, autoPickSource } from '@/composables/useProfileSources';
+import { useSourceOptions, useSourceEmpty, autoPickSource } from '@/composables/useProfileSources';
 import { checkPermi } from '@/utils/permission';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 const { list: sourceOpts, ensureSources } = useSourceOptions('event');
 const eventEmpty = useSourceEmpty('event');
-const sourceHiddenCount = useSourceHidden('event');
 const noRealSource = computed(() => eventEmpty.value);
-const canEditSource = checkPermi(['profile:source:edit']);
 const canTestSend = checkPermi(['profile:engine:query']);
 const router = useRouter();
-const goEnableSource = () => router.push('/insight/engine-ops/profile-ops?tab=admin&sub=source');
 /** 批2 看画像: 会话行/抽屉直达画像详情页; 匿名行(无 subjectId)按钮禁用 */
 const goProfile = (subjectType?: string, subjectId?: string) => {
   if (!subjectId) return;
@@ -2243,23 +2232,7 @@ onActivated(async () => {
   opacity: 0.7;
   transition: height 0.4s ease;
 }
-/* 全部源被停用的空态卡(三审 dspro P2-1): 与 index.vue 的 empty-guide 同款结构 */
-.analytics-empty-guide__title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-.analytics-empty-guide__text {
-  margin: 0 0 12px;
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
-}
-.analytics-empty-guide__foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+/* 空态接入卡下的管理员脚注 */
 .analytics-empty-guide__hint {
   font-size: 12px;
   color: var(--el-text-color-placeholder);

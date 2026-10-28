@@ -408,11 +408,20 @@ public class ProfileQueryService {
             out.put("scored", false);
         } else {
             com.smartdock.profile.engine.ProfileScoreSnapshot snap = latest.get(0);
-            out.put("scored", true);
-            out.put("totalScore", snap.getTotalScore());
-            out.put("ruleVersion", snap.getRuleVersion());
-            out.put("calcTime", snap.getCalcTime());
-            out.put("dimensionDetail", parseSnapshotDetail(snap.getDimensionDetail()));
+            // 三审 dspro P2-1: 占位判断走解析后的键匹配(与引擎/SQL 同口径)——
+            // 裸子串 contains 会被「维度名含 _noDimensions 同形子串」的真分数快照误伤
+            if (ProfileScoreEngine.isUnconfiguredDetail(parseSnapshotDetail(snap.getDimensionDetail()))) {
+                // 单源重构 M1 D 片: 未配置维度的占位快照不冒充真分数——
+                // 前端据此显示「未配置打分口径」而不是一个假的 50 分
+                out.put("scored", false);
+                out.put("unconfigured", true);
+            } else {
+                out.put("scored", true);
+                out.put("totalScore", snap.getTotalScore());
+                out.put("ruleVersion", snap.getRuleVersion());
+                out.put("calcTime", snap.getCalcTime());
+                out.put("dimensionDetail", parseSnapshotDetail(snap.getDimensionDetail()));
+            }
         }
         return out;
     }

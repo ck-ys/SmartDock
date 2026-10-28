@@ -96,14 +96,14 @@ public class ProfileToolProvider implements BizToolProvider {
             + "- 精确查: 传 subjectId(主体的 ID)可选配 subjectType, 返回这个人最新一次打分的总分与各维度明细;\n"
             + "- 模糊找: 传 keyword(人名或 ID 片段), 返回最匹配的前几人, 适合「找一下姓王的」;\n"
             + "- 都不传=按最近活跃列出前几人, 直接回答「最近谁最活跃/最近 30 天谁最活跃」;\n"
-            + "- source 不传=跨全部来源查。用户没开分数权限时结果里不会有分数, 属正常现象, 照实转告即可。");
+            + "- source 可不传, 默认查全部数据。用户没开分数权限时结果里不会有分数, 属正常现象, 照实转告即可。");
         query.setMinRoleLevel(0);
         query.setRequiredPermission(PERM_QUERY);
         query.setParams(List.of(
             BizParamSpec.string("keyword", "人名或主体 ID 的模糊搜索词(与 subjectId 二选一)", false),
             BizParamSpec.string("subjectId", "精确主体 ID(与 keyword 二选一, 优先)", false),
             BizParamSpec.string("subjectType", "主体类型, 缺省 user", false),
-            BizParamSpec.string("source", "数据来源(如 dcs), 不传=全部来源", false),
+            BizParamSpec.string("source", "兼容参数, 一般不用填(不传=查全部数据)", false),
             BizParamSpec.number("limit", "列表返回条数(模糊找与最近活跃榜通用), 缺省 5, 上限 20", false)
         ));
 
@@ -125,7 +125,7 @@ public class ProfileToolProvider implements BizToolProvider {
             + "要具体成员名单用「圈人」工具, 本工具只看人数不动名单。");
         overview.setRequiredPermission(PERM_SEGMENT);
         overview.setParams(List.of(
-            BizParamSpec.string("source", "数据来源(如 dcs), 不传=全部来源", false),
+            BizParamSpec.string("source", "兼容参数, 一般不用填(不传=查全部数据)", false),
             BizParamSpec.string("segmentId", "分群 ID(可空=列全部分群)", false)
         ));
 
@@ -133,7 +133,7 @@ public class ProfileToolProvider implements BizToolProvider {
             "查低分复核队列概况: 待处理数、超时(SLA)数、最老一条入队时间。只看概况, 处理复核请到画像页面。");
         review.setRequiredPermission(PERM_REVIEW);
         review.setParams(List.of(
-            BizParamSpec.string("source", "数据来源(可空=全部)", false)
+            BizParamSpec.string("source", "兼容参数, 可不填(不传=全部)", false)
         ));
 
         return List.of(query, segment, overview, review);
@@ -261,7 +261,7 @@ public class ProfileToolProvider implements BizToolProvider {
             hint.append("共 ").append(total).append(" 人, 只列前 ").append(rows.size()).append(" 人; ");
         }
         if (sources.size() > 1) {
-            hint.append("总人数是各来源合计, 同一人出现在多个来源会被分别计入; ");
+            hint.append("总人数是多路数据合计, 同一人多路记录会被分别计入; ");
         }
         hint.append("要维度明细就传 subjectId 精确查");
         data.put("hint", hint.toString());

@@ -73,7 +73,7 @@
               <span class="pw-avatar">陈</span>
               <div class="pw-person">
                 <b>陈××</b>
-                <small>最近活跃：今天 09:42 · 来源：官网</small>
+                <small>最近活跃：今天 09:42 · 8 次业务操作</small>
               </div>
               <div class="pw-score">
                 <b>82</b><span>综合评分 <i>+4</i></span>

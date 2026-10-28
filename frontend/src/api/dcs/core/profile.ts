@@ -243,8 +243,37 @@ export interface ProfileDetail {
 export const pageSubjects = (params?: Partial<ProfileSubjectQuery> & Record<string, unknown>) =>
   table<ProfileSubjectRow>({ url: `${BASE}/subject/page`, method: 'get', params });
 
-export const getOverview = (source: string): Promise<ProfileOverview> =>
-  r<ProfileOverview>({ url: `${BASE}/overview`, method: 'get', params: { source } });
+/** 画像主视图行(单源重构 M1·题0-甲): user 视图=sys_user 全员(没事件也列出), 其余身份类型=主体登记跨源聚合 */
+export interface ProfileMainViewRow {
+  subjectType: string;
+  subjectId: string;
+  /** 登录名(user 视图) */
+  userName?: string | null;
+  /** 账号状态(user 视图: '0'正常/'1'停用) */
+  userStatus?: string | null;
+  /** 部门名(user 视图) */
+  deptName?: string | null;
+  displayName?: string | null;
+  eventCount: number | string | null;
+  firstEventTime?: string | null;
+  lastEventTime?: string | null;
+  /** 无列级分数权限时服务端置空 */
+  totalScore?: number | string | null;
+  calcTime?: string | null;
+  /** 最新快照是「未配置打分口径」占位(50 分只是占位不是评价) */
+  noDimensions?: boolean | null;
+  /** 有待处理的低分复核(「待联系」动作锚点) */
+  pendingReview?: boolean | null;
+}
+
+/** 画像页主列表(与数据源无关): subjectType 缺省 user */
+export const pageSubjectMainView = (
+  params?: { subjectType?: string; keyword?: string; pageNum?: number; pageSize?: number } & Record<string, unknown>
+): Promise<TableDataInfo<ProfileMainViewRow>> =>
+  table<ProfileMainViewRow>({ url: `${BASE}/subject/main-view`, method: 'get', params });
+
+export const getOverview = (source: string, subjectType?: string): Promise<ProfileOverview> =>
+  r<ProfileOverview>({ url: `${BASE}/overview`, method: 'get', params: { source, subjectType } });
 
 export const getRanking = (params: { source: string; subjectType?: string; dimension?: string; limit?: number }): Promise<ProfileRankingRow[]> =>
   r<ProfileRankingRow[]>({ url: `${BASE}/ranking`, method: 'get', params });
@@ -813,6 +842,8 @@ export interface ProfileEngineConfig {
   debounceMs: number;
   /** 复核 SLA（天）：超时未处理每天提醒管理员，1-365 */
   reviewSlaDays?: number;
+  /** 单源重构 M1 C 片: 自动记录本租户用户行为(登录+核心操作)总开关, 1=开(默认)/0=停 */
+  selfMonitor?: string;
   /** 批10 Q4: 事件保留天数（1-36500；空=继承全局默认 730） */
   eventRetentionDays?: number | null;
   /** 批10 Q4: 过期去向 1=先归档再删（默认）/0=直接删 */
@@ -879,6 +910,10 @@ export interface ProfileSubjectSummary {
   eventCount?: number;
   lastEventTime?: string;
   scored?: boolean;
+  /** 权限不含 profile:pii:score 时后端只给此键不给分数(批11 列级权限) */
+  scoreHidden?: boolean;
+  /** 最新快照是「未配置打分口径」占位(M1 D 片: scored=false 时携带, 前端显示「未配置打分规则」) */
+  unconfigured?: boolean;
   totalScore?: number | string;
   ruleVersion?: string;
   calcTime?: string;

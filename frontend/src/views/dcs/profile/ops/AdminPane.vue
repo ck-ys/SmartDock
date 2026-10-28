@@ -169,75 +169,6 @@
           </div>
         </el-card>
       </el-tab-pane>
-
-      <!-- ---------------------------------------------------------- 来源管理（第二批：改名/停用） -->
-      <el-tab-pane label="来源管理" name="source" lazy>
-        <el-card shadow="never" class="panel-card">
-          <template #header>
-            <div class="panel-head">
-              <span>来源改名 / 停用</span>
-              <span class="muted">改名=改所有下拉里的显示名；停用=从全部下拉消失（已入数据与配置保留，重新启用即恢复）</span>
-              <el-button link type="primary" @click="loadSourceConfigs">刷新</el-button>
-            </div>
-          </template>
-          <el-table v-loading="sourceCfgLoading" class="ui-table" :data="sourceCfgRows">
-            <template #empty>
-              <div class="ui-empty">
-                <p class="ui-empty__title">{{ sourceCfgFailed ? '清单加载失败' : '还没有任何来源' }}</p>
-                <p class="ui-empty__hint">
-                  {{ sourceCfgFailed ? '接口暂时不可用，点「刷新」重试' : '清单=真实有过数据的来源（主体表/事件表现算），没有数据的来源不会出现在这里' }}
-                </p>
-              </div>
-            </template>
-            <el-table-column label="来源标识" width="140">
-              <template #default="{ row }"><span class="mono">{{ row.source }}</span></template>
-            </el-table-column>
-            <el-table-column label="显示名（下拉里叫什么）" min-width="220">
-              <template #default="{ row }">
-                <el-input
-                  v-if="canEditSource"
-                  v-model="row.displayName"
-                  maxlength="64"
-                  :placeholder="'默认 ' + row.source"
-                  style="width: 220px"
-                />
-                <span v-else>{{ row.displayName || '（默认 ' + row.source + '）' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="主体数" prop="subjects" width="90" align="right" />
-            <el-table-column label="事件数" prop="events" width="90" align="right" />
-            <el-table-column label="状态" width="150">
-              <template #default="{ row }">
-                <el-switch
-                  v-if="canEditSource"
-                  v-model="row.enabled"
-                  active-value="1"
-                  inactive-value="0"
-                  active-text="启用"
-                  inactive-text="停用"
-                />
-                <el-tag v-else size="small" :type="row.enabled === '1' ? 'success' : 'info'">
-                  {{ row.enabled === '1' ? '启用' : '停用' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="canEditSource" label="操作" width="110" fixed="right">
-              <template #default="{ row }">
-                <el-button v-hasPermi="['profile:source:edit']" link type="primary" :loading="row._saving" @click="saveSourceCfg(row)"
-                  >保存</el-button
-                >
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-alert
-            type="info"
-            :closable="false"
-            show-icon
-            style="margin-top: 10px"
-            title="停用只是从界面隐藏：事件账本与主体数据原样保留，重新启用后立即恢复显示"
-          />
-        </el-card>
-      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -248,31 +179,29 @@ import {
   getProtocolCurrent,
   getRecalcBatch,
   listEventSchemas,
-  listSourceConfigs,
   publishProfileEvents,
   publishProtocol,
   registerEventSchema,
   resumeRecalcBatch,
-  saveSourceConfig,
   triggerRecalc,
   validateEventSchema,
   validateProtocol,
   type ProfileProtocol,
   type ProfileRecalcBatch,
-  type ProfileSchemaRegistry,
-  type ProfileSourceConfigRow
+  type ProfileSchemaRegistry
 } from '@/api/dcs/core/profile';
 import { useSourceOptions, autoPickSource, invalidateSources } from '@/composables/useProfileSources';
-import { checkPermi } from '@/utils/permission';
 
 const { list: sourceOpts, ensureSources } = useSourceOptions('subject');
 const source = ref('dcs');
 // 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次 loadAll, 不再双载
 const initialSource = source.value;
 
-// 子 tab 深链: 空态引导的「测试发送」直达 ?sub=seed; 来源管理 ?sub=source
+// 子 tab 深链: 空态引导的「测试发送」直达 ?sub=seed。
+// 单源重构 M1 D 片: 「来源管理」页签隐藏(单源下无意义, 第二步批整块退役后端);
+// 旧深链 ?sub=source 落回默认 recalc
 const route = useRoute();
-const SUB_TABS = ['recalc', 'protocol', 'seed', 'source'];
+const SUB_TABS = ['recalc', 'protocol', 'seed'];
 const subTabOf = (v: unknown) => (typeof v === 'string' && SUB_TABS.includes(v) ? v : 'recalc');
 const tab = ref(subTabOf(route.query.sub));
 // 三审 dspro P2: keep-alive 下二次导航同路由只变 query, onMounted 不会再跑
@@ -519,70 +448,13 @@ const publishEvents = async () => {
   }
 };
 
-// ---------------- 来源管理（第二批：改名/停用） ----------------
-const canEditSource = checkPermi(['profile:source:edit']);
-type SourceCfgRow = ProfileSourceConfigRow & { _saving?: boolean };
-const sourceCfgRows = ref<SourceCfgRow[]>([]);
-const sourceCfgLoading = ref(false);
-const sourceCfgFailed = ref(false);
-let cfgSeq = 0;
-const loadSourceConfigs = async () => {
-  // 三审 dspro P2: 请求栅栏——连存两行时两个 list 并发, 先发后到会用旧快照覆盖新保存
-  const seq = ++cfgSeq;
-  sourceCfgLoading.value = true;
-  sourceCfgFailed.value = false;
-  try {
-    const rows = await listSourceConfigs();
-    if (seq !== cfgSeq) return;
-    sourceCfgRows.value = rows;
-  } catch {
-    if (seq !== cfgSeq) return;
-    // 三审 dspro P2: 接口失败不能渲染成"还没有任何来源"——区分故障与真空
-    sourceCfgFailed.value = true;
-  } finally {
-    if (seq === cfgSeq) sourceCfgLoading.value = false;
-  }
-};
-const saveSourceCfg = async (row: SourceCfgRow) => {
-  row._saving = true;
-  const before = { displayName: row.displayName, enabled: row.enabled };
-  try {
-    await saveSourceConfig({ source: row.source, displayName: row.displayName || '', enabled: row.enabled });
-    ElMessage.success('已保存（画像/分析页下拉即时跟随）');
-    // 三审 dspro P1: 只 invalidate 不重拉=共享清单瞬间回落内置兜底, 刚停用的源会"复活"在
-    // 所有已挂载页下拉里——invalidate 后立即 ensureSources, 模块级 ref 一更新全部页面同步
-    invalidateSources();
-    await ensureSources();
-  } catch {
-    // 三审 dspro P2: 保存失败回滚本行显示(拦截器已弹错), 不整表重拉以免冲掉其它行未保存的手改
-    row.displayName = before.displayName;
-    row.enabled = before.enabled;
-  } finally {
-    row._saving = false;
-  }
-};
-// lazy 页签: 首次切到「来源管理」拉清单; immediate 兜住深链首挂即 source(无 tab 变更事件)
-watch(
-  tab,
-  (t) => {
-    if (t === 'source') loadSourceConfigs();
-  },
-  { immediate: true }
-);
+// ---------------- 来源配置（UI 已随「来源管理」页签隐藏, 接口保留待第二步批退役） ----------------
 
-// 测试发送闭环: 发完引导去画像页看效果(缓存已失效, 回页自动重拉);
-// 带上 ?source= 定位到刚灌数据的源(三审 dsflash P2: 不带则停在默认源, 新源数据看不到)
+// 测试发送闭环: 发完引导去画像页看效果(缓存已失效, 回页自动重拉)。
+// 单源口径下画像页主列表与数据源无关, 不再带 ?source= 定位参数
 const router = useRouter();
 const goSeeResult = () => {
-  let target = '/insight/profile';
-  try {
-    const events = JSON.parse(seedText.value);
-    const s = Array.isArray(events) && events.length && typeof events[0]?.source === 'string' ? events[0].source : '';
-    if (s) target += `?source=${encodeURIComponent(s)}`;
-  } catch {
-    // JSON 已在发布时校验过, 走不到; 兜底不带参
-  }
-  router.push(target);
+  router.push('/insight/profile');
 };
 
 // ---------------- 公共 ----------------

@@ -112,7 +112,7 @@
       </div>
     </el-card>
 
-    <el-card shadow="never">
+    <el-card v-if="canSeeMerges" shadow="never">
       <template #header>
         <div class="panel-head">
           <span>身份合并记录</span>
@@ -203,6 +203,10 @@ import {
   type ProfileIdentityMerge
 } from '@/api/dcs/core/profile';
 import { useSourceOptions, autoPickSource } from '@/composables/useProfileSources';
+import { checkPermi } from '@/utils/permission';
+
+// 身份合并记录卡: 读取走 profile:identity:query(12004), 无权限整卡不渲染也不发请求
+const canSeeMerges = checkPermi(['profile:identity:query']);
 
 const { list: sourceOptions, ensureSources } = useSourceOptions('event');
 const route = useRoute();
@@ -298,6 +302,9 @@ const loadConfig = async () => {
 };
 
 const loadMerges = async () => {
+  // 身份合并是跨身份运维域(权限 12004 只授超管侧): 无权限者不发请求,
+  // 否则角色6 进「数据运维」默认页签即 403(夜审 dsflash P1)
+  if (!canSeeMerges) return;
   mergeLoading.value = true;
   try {
     merges.value = await listIdentityMerges(source.value);

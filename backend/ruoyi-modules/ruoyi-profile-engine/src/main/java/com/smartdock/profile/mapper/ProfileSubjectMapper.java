@@ -104,6 +104,7 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
                u.user_id::text AS subject_id,
                u.user_name AS user_name,
                u.status AS user_status,
+               d.dept_name AS dept_name,
                COALESCE(NULLIF(u.nick_name, ''), u.user_name) AS display_name,
                COALESCE(agg.event_count, 0) AS event_count,
                agg.first_event_time AS first_event_time,
@@ -116,6 +117,7 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
                          AND q.subject_id = u.user_id::text AND q.status = 'PENDING'
                          AND q.del_flag = '0') AS pending_review
         FROM sys_user u
+        LEFT JOIN sys_dept d ON d.dept_id = u.dept_id AND d.tenant_id = u.tenant_id AND d.del_flag = '0'
         LEFT JOIN (
             SELECT subject_id, SUM(event_count) AS event_count,
                    MIN(first_event_time) AS first_event_time, MAX(last_event_time) AS last_event_time
@@ -154,6 +156,7 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
         SELECT agg.subject_type AS subject_type,
                agg.subject_id AS subject_id,
                NULL AS user_name,
+               NULL AS dept_name,
                nm.display_name AS display_name,
                agg.event_count AS event_count,
                agg.first_event_time AS first_event_time,
@@ -268,17 +271,22 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
 
     /**
      * 画像总览: 主体数/已算分数/平均分/风险分层。
+     * 单源重构 M1 D 片: ①占位快照(_noDimensions, 未配置维度的 50 分)不算「已算分」、
+     * 不进平均分与风险分层——新装租户还没配维度时, KPI 不会显示全员高风险的假象;
+     * ②user 视图与主列表同口径(sys_user 为主表)——历史遗留的 user 型孤儿主体
+     * (无对应账号, 如测试期数据)不再被 KPI 计入而列表里看不到。
      */
     @Select("""
+        <script>
         SELECT COUNT(*) AS subject_count,
-               COUNT(s.total_score) AS scored_count,
-               COALESCE(AVG(s.total_score), 0) AS avg_score,
-               COUNT(*) FILTER (WHERE s.total_score >= 75) AS low_risk,
-               COUNT(*) FILTER (WHERE s.total_score >= 60 AND s.total_score < 75) AS medium_risk,
-               COUNT(*) FILTER (WHERE s.total_score < 60) AS high_risk
+               COUNT(s.total_score) FILTER (WHERE NOT s.unconfig) AS scored_count,
+               COALESCE(AVG(s.total_score) FILTER (WHERE NOT s.unconfig), 0) AS avg_score,
+               COUNT(s.total_score) FILTER (WHERE NOT s.unconfig AND s.total_score >= 75) AS low_risk,
+               COUNT(s.total_score) FILTER (WHERE NOT s.unconfig AND s.total_score >= 60 AND s.total_score &lt; 75) AS medium_risk,
+               COUNT(s.total_score) FILTER (WHERE NOT s.unconfig AND s.total_score &lt; 60) AS high_risk
         FROM profile_subject sub
         LEFT JOIN LATERAL (
-            SELECT total_score, dimension_detail, calc_time
+            SELECT total_score, COALESCE(dimension_detail::text LIKE '%"_noDimensions"%', false) AS unconfig, calc_time
             FROM profile_score_snapshot snap
             WHERE snap.tenant_id = sub.tenant_id AND snap.source = sub.source
               AND snap.subject_type = sub.subject_type AND snap.subject_id = sub.subject_id
@@ -288,6 +296,12 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
         ) s ON TRUE
         WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source} AND sub.subject_type = #{subjectType}
           AND sub.del_flag = '0'
+        <if test="subjectType == 'user'">
+          AND EXISTS (SELECT 1 FROM sys_user u
+                      WHERE u.tenant_id = sub.tenant_id AND u.user_id::text = sub.subject_id
+                        AND u.del_flag = '0')
+        </if>
+        </script>
         """)
     ProfileOverview selectOverview(@Param("tenantId") String tenantId,
                                    @Param("source") String source,
