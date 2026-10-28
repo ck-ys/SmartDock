@@ -1993,7 +1993,7 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 .tpl-caption {
-  font-size: 12.5px;
+  font-size: 12px;
   margin-bottom: 8px;
 }
 .tpl-cards {
@@ -2032,7 +2032,7 @@ onMounted(async () => {
   color: var(--app-text, var(--el-text-color-primary));
 }
 .tpl-desc {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--app-muted);
   line-height: 1.5;
 }

@@ -741,7 +741,7 @@ watch(
 .empty-guide__hint {
   margin: 4px 0 0;
   color: var(--el-text-color-secondary);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 .empty-guide__text {
   max-width: 560px;
