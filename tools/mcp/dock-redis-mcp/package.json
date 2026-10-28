@@ -1,0 +1,26 @@
+{
+  "name": "dock-redis-mcp",
+  "version": "1.0.0",
+  "description": "Redis MCP server for SmartDock (stdio, debug queues/keys/pubsub)",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "dock-redis-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0"
+  }
+}

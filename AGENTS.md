@@ -155,6 +155,28 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 ---
 
+## 数据面口径（PG / Redis）
+
+> 本仓自带两个数据面 MCP：`dock-pg` / `dock-redis`（服务端本体在 `tools/mcp/`，随仓开源）。
+> 连接信息永远只写进 gitignored 的 `.zcode/config.json`，绝不写进任何 git 追踪文件；
+> 真实环境的地址与口令另见 `.workshop/plans/acceptance-prompt-*.md`（gitignored）。
+
+**首次搭建（用户还没配过时，按此流程，不要跳步）：**
+
+1. 检查 `.zcode/config.json` 是否已存在且含 `dock-pg`/`dock-redis`；`tools/mcp/*/dist/` 是否已构建。都在则直接用，跳过本流程。
+2. **先向用户要连接信息再动手**，缺一不可：PG 的 host/port/库名/用户名/密码；Redis 的 host/port/db 索引/密码（可无）。禁止臆测地址、禁止拿其它项目的连接凑数。
+3. 拿到后依次：`dist/` 缺失则进对应目录 `npm install && npm run build`（Node ≥ 20.19）→ 按两包 README 的模板写 `.zcode/config.json`（路径用仓库绝对路径）→ 提醒用户重启会话生效。
+4. 装好后冒烟：`pg_query` 跑 `select current_database()`、`redis_command` 跑 `PING`，确认连的是用户给的库。
+
+**日常使用口径：**
+
+1. 本机没有 5432 的 PG、也没有 6379 的 Redis；yml 里 `127.0.0.1` 是模板默认，起后端必须带覆盖参数（见验收提示词铁律）。
+2. 查本仓数据面**一律用 `dock-pg` / `dock-redis`**；会话里若同时挂载了默认库不属于本项目的其它 PG/Redis 工具，一律不用。
+3. 库分工（本机开发环境）：画像/分析取数、演示数据与截图 → `smartdock_shots`（基线六数字见「领域概念速查」）；跑后端的实验库 → `smartdock_scratch`。同实例上除 `smartdock_` 前缀的库一律不许读写。
+4. MCP 纪律：先列清单、再看列定义、后写 SQL；`pg_query` 每次一条、参数 `$1/$2` 绑定；DDL/DML 前先同条件 SELECT 验证影响面并等用户确认；行数估算不作数，真数用 `count(*)`。
+
+---
+
 ## 分支与提交策略
 
 1. **默认只提交到 `master`**（开源主干）；新会话启动先 `git branch --show-current` 确认。

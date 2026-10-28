@@ -1,0 +1,28 @@
+{
+  "name": "dock-pg-mcp",
+  "version": "1.0.0",
+  "description": "PostgreSQL MCP server for SmartDock (stdio, full privileges incl. DDL)",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "dock-pg-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "pg": "^8.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.6.3"
+  }
+}

@@ -908,7 +908,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
     const fresh = reactive(emptyTurn(tail.question));
     fresh.compactedBefore = tail.compactedBefore ?? null;
-    fresh.compactedBlockedBefore = tail.compactedBlockedBefore ?? null;
+    fresh.compactionBlockedBefore = tail.compactionBlockedBefore ?? null;
     state.turns[state.turns.length - 1] = fresh;
     attachRunning(fresh);
     return fresh;
