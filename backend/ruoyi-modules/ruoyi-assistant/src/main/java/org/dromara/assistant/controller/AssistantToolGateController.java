@@ -135,7 +135,29 @@ public class AssistantToolGateController extends BaseController {
                     "工具「" + k + "」档位只支持 off/member/admin");
             }
         }
-        configService.updateToolGate(org.dromara.common.satoken.utils.LoginHelper.getTenantId(), gate);
+        String tenant = org.dromara.common.satoken.utils.LoginHelper.getTenantId();
+        configService.updateToolGate(tenant, preserveHiddenSkillOverrides(
+            gate, configService.effective(tenant).toolGate(),
+            org.dromara.assistant.core.DatabaseSkillRepository.disabledIds(tenant)));
         return R.ok();
+    }
+
+    /**
+     * 整存合并（5b 清尾·件1）：停用技能在矩阵视图不显示（遮罩语义），其覆盖档
+     * 「看不见≠不存在」——POST 里缺失的停用技能键保留原值，防止保存矩阵时被
+     * 整列覆盖静默清掉；正常行的缺键仍等于恢复跟随内置档，语义不变。
+     */
+    static Map<String, String> preserveHiddenSkillOverrides(
+            Map<String, String> incoming, Map<String, String> current, Set<String> disabledSkillIds) {
+        Map<String, String> merged = new java.util.HashMap<>(incoming);
+        for (Map.Entry<String, String> e : current.entrySet()) {
+            String k = e.getKey();
+            if (k != null && k.startsWith("skill:")
+                && disabledSkillIds.contains(k.substring(6))
+                && !merged.containsKey(k)) {
+                merged.put(k, e.getValue());
+            }
+        }
+        return merged;
     }
 }

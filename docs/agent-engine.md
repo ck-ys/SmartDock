@@ -100,13 +100,13 @@ ReActAgent agent = ReActAgent.builder()
 
 **技能库（渐进披露，B 批起官方框架装载）**：
 
-- 技能资产为官方 **SKILL.md 格式**：`resources/skills/<技能名>/SKILL.md`，YAML frontmatter（`name/description/version/displayName/minRole/triggers`）+ 正文；
-- 装载走官方 **AgentSkillRepository 分层仓**（`AssistantSkillSource`）：classpath `/skills`（内置）→ `config/skills/<技能名>/SKILL.md`（部署期覆写/增删，后层同名胜出）；旧 `config/prompts/skills/*.md` 平铺覆写路径已废弃；
+- 技能资产为官方 **SKILL.md 格式**：`resources/skills/<技能名>/SKILL.md`，YAML frontmatter（`name/description/version/displayName/minRole`）+ 正文；**frontmatter 的一句话说明（description）是模型判断什么时候用这个技能的唯一依据**（旧的 triggers 触发词机制已于 2026-10-28 移除，写了也不认）；
+- 装载走官方 **AgentSkillRepository 分层仓**（`AssistantSkillSource`）：classpath `/skills`（内置）→ `config/skills/<技能名>/SKILL.md`（部署期覆写/增删，后层同名胜出）→ **数据库在线层**（管理台「能力 → 技能库」直接编辑，最高优先级；2026-10-28 起）；旧 `config/prompts/skills/*.md` 平铺覆写路径已废弃；
 - 系统提示词的技能目录段由官方 **DynamicSkillMiddleware** 每次调用动态重组（我们子类 `AssistantSkillGateMiddleware` 管可见性）；
-- 正文进入上下文的三条路都过同一道闸（frontmatter `minRole` + 租户工具开关矩阵 `skill:<技能名>` 行，off=剔除、member/admin=只升不降）：模型调官方 `load_skill_through_path` 自取、用户当轮选中注入（`SkillInjectModelDecorator`）、`view_skill` 工具兜底自取；
+- 正文进入上下文的三条路都过同一道闸（frontmatter `minRole` + 租户工具开关矩阵 `skill:<技能名>` 行，off=剔除、member/admin=只升不降；**停用的技能对所有角色整技能遮罩，超管也不可见**）：模型调官方 `load_skill_through_path` 自取、用户当轮选中注入（`SkillInjectModelDecorator`）、`view_skill` 工具兜底自取；
 - 开关矩阵改动经装配面指纹使缓存会话失效，**下一轮新会话生效**，进行中的对话不腰斩；
-- 单技能正文上限 **6000 字符**（自研通道），超出截断并告警；
-- 外部目录相对启动进程工作目录；进程内缓存不过期，变更后需重启（模型侧目录随官方仓 mtime 记忆化即时变，两条通道重启对齐）；容器部署需自行挂载 `config/skills`；
+- 单技能正文上限 **20000 字符**，超出保存即被拒；
+- 生效时机分层：**数据库在线层保存后秒级生效**（Redis 广播即时失效，30 秒兜底）；`config/skills` 部署目录层变更仍需重启；容器部署需自行挂载 `config/skills`；
 - 旧内嵌技能常量表（`SkillAssets.SKILLS`）退役为零漂移护栏单测的对照源。
 
 内置示例技能：`create-mission`（创建任务）、`create-template`（创建模板）、

@@ -392,7 +392,7 @@
               <span class="sec-cnt">{{ skillRows.length }} 个</span>
             </div>
             <div class="sec-acts">
-              <el-button v-hasPermi="['dcs:assistant:skill:edit']" size="small" type="primary" @click="newSkill">新增技能</el-button>
+              <el-button v-hasPermi="['dcs:assistant:skill:edit']" size="small" type="primary" @click="confirmNewSkill">新增技能</el-button>
             </div>
           </div>
           <div class="cap-note">技能是助手按需取用的「操作手册」：目录里只放一句话说明，正文用到才读。改完保存立即生效（下一轮新会话起）；「一句话说明」是助手判断什么时候用这个技能的唯一依据。</div>
@@ -403,7 +403,7 @@
                 :key="row.skillId"
                 type="button"
                 :class="{ on: !skillNewMode && activeSkillId === row.skillId }"
-                @click="openSkill(row)"
+                @click="confirmOpenSkill(row)"
               >
                 <i>{{ (row.displayName || row.skillId).slice(0, 1) }}</i>
                 <span class="pt">{{ row.displayName || row.skillId }}</span>
@@ -2687,8 +2687,9 @@ const attentionItems = computed(() => {
   }
   return out;
 });
-/** 总览的「去看看」/段内互跳：切段并补一次懒加载 */
-function jumpTo(name: string) {
+/** 总览的「去看看」/段内互跳：切段并补一次懒加载；从能力段带着未保存技能时先确认 */
+async function jumpTo(name: string) {
+  if (tab.value === 'caps' && name !== 'caps' && !(await confirmLeaveIfDirty())) return;
   tab.value = name;
   onTabChange(name);
 }
@@ -3118,8 +3119,9 @@ function reloadMcpLog() {
   mcpLogPage.value = 1;
   void loadMcpCallLog();
 }
-/** 外部服务行里的「审计」：带着服务名跳到运营段 */
-function openMcpAudit(serverName: string) {
+/** 外部服务行里的「审计」：带着服务名跳到运营段（离开编辑先过脏检查） */
+async function openMcpAudit(serverName: string) {
+  if (tab.value === 'caps' && !(await confirmLeaveIfDirty())) return;
   mcpLogFilter.value = serverName;
   mcpLogPage.value = 1;
   tab.value = 'ops';
@@ -3244,6 +3246,38 @@ const hasOnlineRow = computed(() => !!activeSkillRow.value && activeSkillRow.val
 const isBuiltinRow = computed(() => !!activeSkillRow.value && !!activeSkillRow.value.builtinMinRole);
 const builtinRoleLevel = computed(() => SKILL_ROLE_LEVEL[activeSkillRow.value?.builtinMinRole ?? 'member'] ?? 0);
 
+/* ===== 脏检查（5b 清尾·件3）：技能改一半切走不再静默丢——切技能/新增/离能力段先确认 ===== */
+const skillBaseline = ref('');
+function snapshotSkill(): string {
+  return JSON.stringify([
+    skillForm.skillId.trim(), skillForm.displayName.trim(), skillForm.description.trim(),
+    skillForm.minRole, skillForm.body, skillForm.disabled
+  ]);
+}
+const skillDirty = computed(() => snapshotSkill() !== skillBaseline.value);
+function markSkillClean() {
+  skillBaseline.value = snapshotSkill();
+}
+/** 未保存时确认离开：真离开返回 true，用户留下返回 false */
+async function confirmLeaveIfDirty(): Promise<boolean> {
+  if (!skillDirty.value) return true;
+  try {
+    await ElMessageBox.confirm('编辑内容还没保存，离开会丢掉这些改动。', '有未保存的改动',
+      { type: 'warning', confirmButtonText: '离开并丢弃', cancelButtonText: '继续编辑' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function confirmOpenSkill(row: AssistantSkillAdminRow) {
+  if (!(await confirmLeaveIfDirty())) return;
+  openSkill(row);
+}
+async function confirmNewSkill() {
+  if (!(await confirmLeaveIfDirty())) return;
+  newSkill();
+}
+
 async function loadSkillAdmin() {
   skillLoading.value = true;
   try {
@@ -3271,6 +3305,7 @@ function openSkill(row: AssistantSkillAdminRow) {
   skillForm.minRole = row.minRole === 'admin' ? 'admin' : row.minRole === 'publisher' ? 'publisher' : 'member';
   skillForm.body = row.body || '';
   skillForm.disabled = row.source === 'builtin-disabled' || row.source === 'online-disabled';
+  markSkillClean();
 }
 
 function newSkill() {
@@ -3282,6 +3317,7 @@ function newSkill() {
   skillForm.minRole = 'member';
   skillForm.body = '';
   skillForm.disabled = false;
+  markSkillClean();
 }
 function cancelNewSkill() {
   skillNewMode.value = false;
@@ -3307,6 +3343,7 @@ async function persistSkill(disabled: boolean) {
     ElMessage.success(disabled ? '已保存（仍停用）' : '已保存并生效——下一轮新会话起助手就用新内容');
     activeSkillId.value = skillForm.skillId.trim();
     await loadSkillAdmin();
+    markSkillClean();
   } catch {
     /* 校验人话报错已由 request 层弹出 */
   } finally {
@@ -3348,6 +3385,11 @@ function onRestoreSkill() {
         await deleteAssistantSkillAdmin(row.skillId);
         ElMessage.success(restoreBuiltin ? '已恢复内置原文' : '已删除');
         await loadSkillAdmin();
+        // 恢复内置后该技能仍在列表（内置层露出）——重开表单刷掉残留的已删在线行内容
+        const fresh = skillRows.value.find((r) => r.skillId === row.skillId);
+        if (fresh) {
+          openSkill(fresh);
+        }
       } catch {
         /* 人话报错已由 request 层弹出 */
       } finally {
