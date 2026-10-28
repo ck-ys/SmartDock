@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
 import com.smartdock.profile.event.ProfileSubject;
+import com.smartdock.profile.query.ProfileMainViewRow;
 import com.smartdock.profile.query.ProfileOverview;
 import com.smartdock.profile.query.ProfileRankingRow;
 import com.smartdock.profile.query.ProfileSubjectQuery;
@@ -87,6 +88,116 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
     IPage<ProfileSubjectRow> selectSubjectPage(IPage<ProfileSubjectRow> page,
                                                @Param("tenantId") String tenantId,
                                                @Param("q") ProfileSubjectQuery query);
+
+    /**
+     * 画像主视图分页(单源重构 M1·题0-甲)——user 视图: sys_user 为主表(文本联表
+     * subject_id = user_id::text), 没事件的本单位用户也列出; 聚合跨源:
+     * 事件数求和 / 首末时间极值 / 快照取最新。
+     *
+     * <p>派生表 JOIN 在租户插件下有被误注入 tenant_id 的风险, 故本方法与下方
+     * {@link #selectSubjectMainPage} 一样 @InterceptorIgnore + SQL 内全手写租户条件。</p>
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        <script>
+        SELECT 'user' AS subject_type,
+               u.user_id::text AS subject_id,
+               u.user_name AS user_name,
+               COALESCE(NULLIF(u.nick_name, ''), u.user_name) AS display_name,
+               COALESCE(agg.event_count, 0) AS event_count,
+               agg.first_event_time AS first_event_time,
+               agg.last_event_time AS last_event_time,
+               snap.total_score AS total_score,
+               snap.calc_time AS calc_time,
+               COALESCE(snap.dimension_detail::text LIKE '%"_noDimensions"%', false) AS no_dimensions,
+               EXISTS (SELECT 1 FROM profile_review_queue q
+                       WHERE q.tenant_id = u.tenant_id AND q.subject_type = 'user'
+                         AND q.subject_id = u.user_id::text AND q.status = 'PENDING'
+                         AND q.del_flag = '0') AS pending_review
+        FROM sys_user u
+        LEFT JOIN (
+            SELECT subject_id, SUM(event_count) AS event_count,
+                   MIN(first_event_time) AS first_event_time, MAX(last_event_time) AS last_event_time
+            FROM profile_subject
+            WHERE tenant_id = #{tenantId} AND subject_type = 'user' AND del_flag = '0'
+            GROUP BY subject_id
+        ) agg ON agg.subject_id = u.user_id::text
+        LEFT JOIN LATERAL (
+            SELECT total_score, calc_time, dimension_detail
+            FROM profile_score_snapshot s
+            WHERE s.tenant_id = u.tenant_id AND s.subject_type = 'user'
+              AND s.subject_id = u.user_id::text AND s.del_flag = '0'
+            ORDER BY s.calc_time DESC, s.snapshot_id DESC
+            LIMIT 1
+        ) snap ON TRUE
+        WHERE u.tenant_id = #{tenantId} AND u.del_flag = '0'
+        <if test="keyword != null and keyword != ''">
+          AND (u.user_name ILIKE CONCAT('%', #{keyword}, '%')
+               OR u.nick_name ILIKE CONCAT('%', #{keyword}, '%')
+               OR u.user_id::text ILIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY agg.last_event_time DESC NULLS LAST, u.user_id
+        </script>
+        """)
+    IPage<ProfileMainViewRow> selectUserMainPage(IPage<ProfileMainViewRow> page,
+                                                 @Param("tenantId") String tenantId,
+                                                 @Param("keyword") String keyword);
+
+    /**
+     * 画像主视图分页——非 user 身份类型: profile_subject 为主表(跨源聚合到主体),
+     * 显示名取最近活跃源的登记名, 快照取最新。
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        <script>
+        SELECT agg.subject_type AS subject_type,
+               agg.subject_id AS subject_id,
+               NULL AS user_name,
+               nm.display_name AS display_name,
+               agg.event_count AS event_count,
+               agg.first_event_time AS first_event_time,
+               agg.last_event_time AS last_event_time,
+               snap.total_score AS total_score,
+               snap.calc_time AS calc_time,
+               COALESCE(snap.dimension_detail::text LIKE '%"_noDimensions"%', false) AS no_dimensions,
+               EXISTS (SELECT 1 FROM profile_review_queue q
+                       WHERE q.tenant_id = #{tenantId} AND q.subject_type = #{subjectType}
+                         AND q.subject_id = agg.subject_id AND q.status = 'PENDING'
+                         AND q.del_flag = '0') AS pending_review
+        FROM (
+            SELECT subject_type, subject_id, SUM(event_count) AS event_count,
+                   MIN(first_event_time) AS first_event_time, MAX(last_event_time) AS last_event_time
+            FROM profile_subject
+            WHERE tenant_id = #{tenantId} AND subject_type = #{subjectType} AND del_flag = '0'
+            GROUP BY subject_type, subject_id
+        ) agg
+        LEFT JOIN LATERAL (
+            SELECT display_name FROM profile_subject n
+            WHERE n.tenant_id = #{tenantId} AND n.subject_type = #{subjectType}
+              AND n.subject_id = agg.subject_id AND n.del_flag = '0'
+            ORDER BY n.last_event_time DESC NULLS LAST, n.id DESC
+            LIMIT 1
+        ) nm ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT total_score, calc_time, dimension_detail
+            FROM profile_score_snapshot s
+            WHERE s.tenant_id = #{tenantId} AND s.subject_type = #{subjectType}
+              AND s.subject_id = agg.subject_id AND s.del_flag = '0'
+            ORDER BY s.calc_time DESC, s.snapshot_id DESC
+            LIMIT 1
+        ) snap ON TRUE
+        WHERE 1=1
+        <if test="keyword != null and keyword != ''">
+          AND (agg.subject_id ILIKE CONCAT('%', #{keyword}, '%')
+               OR nm.display_name ILIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY agg.last_event_time DESC NULLS LAST, agg.subject_id
+        </script>
+        """)
+    IPage<ProfileMainViewRow> selectSubjectMainPage(IPage<ProfileMainViewRow> page,
+                                                    @Param("tenantId") String tenantId,
+                                                    @Param("subjectType") String subjectType,
+                                                    @Param("keyword") String keyword);
 
     /**
      * 最新快照排行: dimension 为空按总分, 否则按该维度分数。

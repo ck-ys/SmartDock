@@ -58,6 +58,38 @@ public class ProfileQueryService {
     }
 
     /**
+     * 画像主视图分页(单源重构 M1 B 片·题0-甲): 画像页主列表的数据底座, 与 source 无关。
+     *
+     * <p>user 视图以 sys_user 为主表——没事件的本单位用户也列出; 其余身份类型(会员/订单等)
+     * 以 profile_subject 为主表跨源聚合。事件数求和、首末时间取极值、快照取最新;
+     * 分数列与 {@link #subjectPage} 同闸(无列级分数权限置空, noDimensions/pendingReview 不敏感保留)。</p>
+     */
+    public TableDataInfo<com.smartdock.profile.query.ProfileMainViewRow> mainViewPage(
+        String subjectType, String keyword, PageQuery pageQuery) {
+        String type = SubjectTypes.normalize(subjectType);
+        if (keyword != null && keyword.length() > 100) {
+            throw new ServiceException("搜索关键词不能超过 100 字");
+        }
+        String kw = StringUtils.isBlank(keyword) ? null : keyword.trim();
+        if (pageQuery == null) {
+            // PageQuery 构造器参数序为 (pageSize, pageNum)
+            pageQuery = new PageQuery(20, 1);
+        }
+        if (pageQuery.getPageSize() == null || pageQuery.getPageSize() > 200) {
+            pageQuery.setPageSize(200);
+        }
+        Page<com.smartdock.profile.query.ProfileMainViewRow> page = pageQuery.build();
+        page.setOptimizeCountSql(false);
+        IPage<com.smartdock.profile.query.ProfileMainViewRow> result = SubjectTypes.DEFAULT.equals(type)
+            ? subjectMapper.selectUserMainPage(page, currentTenant(), kw)
+            : subjectMapper.selectSubjectMainPage(page, currentTenant(), type, kw);
+        if (!piiService.canViewScore()) {
+            result.getRecords().forEach(row -> row.setTotalScore(null));
+        }
+        return TableDataInfo.build(result);
+    }
+
+    /**
      * 主体列表(画像方向第三批): scoreVisibleOverride 供助手工具线程传行级分数可见性——
      * 工具线程无 Sa-Token 上下文, piiService.canViewScore() 恒 false(保守), UI 路径不传(null)行为不变。
      * ⚠️ 仅限调用方已按菜单权限(profile:pii:score)判定的场景使用; 误传 TRUE = 越权输出全部分数与维度明细。

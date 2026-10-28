@@ -80,6 +80,18 @@ public class ProfileQueryController {
     }
 
     /**
+     * 画像主视图分页(单源重构 M1): user 视图=本单位用户全员(没事件也列出), 其余身份类型按主体登记;
+     * 聚合跨源, 与 source 无关。与 /subject/page 同暴露面(页面访问由菜单权限控, 分数列行级权限在服务内)。
+     */
+    @GetMapping("/subject/main-view")
+    public TableDataInfo<ProfileMainViewRow> mainView(
+        @RequestParam(required = false, defaultValue = "user") String subjectType,
+        @RequestParam(required = false) String keyword,
+        PageQuery pageQuery) {
+        return queryService.mainViewPage(subjectType, keyword, pageQuery);
+    }
+
+    /**
      * 单主体画像依据摘要(批9 Q7-A): 主体基本信息 + 最新维度快照, "查看依据"抽屉用。
      */
     @SaCheckPermission("profile:score:query")
