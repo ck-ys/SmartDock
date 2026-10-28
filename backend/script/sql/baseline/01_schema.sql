@@ -3291,6 +3291,26 @@ CREATE INDEX idx_profile_identity_link_subject ON public.profile_identity_link U
 
 
 --
+-- Name: idx_profile_identity_link_identifier; Type: INDEX; Schema: public; Owner: -
+--
+-- 单源重构批末: 跨类型身份桥查询 selectLinkShared 按 (tenant,source,identifier_type,identifier_value) 取行,
+-- 唯一键含 subject_type 后旧四列前缀不再命中, 单独补齐。
+--
+
+CREATE INDEX idx_profile_identity_link_identifier ON public.profile_identity_link USING btree (tenant_id, source, identifier_type, identifier_value);
+
+
+--
+-- Name: idx_profile_identity_link_strong; Type: INDEX; Schema: public; Owner: -
+--
+-- 单源重构批末: countStrongLinks 按 (tenant,source,subject_id) 计强标识(不分类型),
+-- 唯一键/主体索引都以 subject_type 为第三列, 这里补不带类型的前缀并只留 ACTIVE 行。
+--
+
+CREATE INDEX idx_profile_identity_link_strong ON public.profile_identity_link USING btree (tenant_id, source, subject_id) WHERE (status = 'ACTIVE');
+
+
+--
 -- Name: idx_profile_identity_merge_from; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3659,6 +3679,16 @@ CREATE UNIQUE INDEX uk_sys_user_tenant_email_ci ON public.sys_user USING btree (
 --
 
 CREATE UNIQUE INDEX uk_sys_user_tenant_phone ON public.sys_user USING btree (tenant_id, phonenumber) WHERE ((del_flag = '0'::bpchar) AND (phonenumber IS NOT NULL) AND ((phonenumber)::text <> ''::text));
+
+
+--
+-- Name: uk_sys_user_tenant_name; Type: INDEX; Schema: public; Owner: -
+--
+-- 单源重构批末: 自监控登录名→user_id 回查要按 (tenant,user_name) 唯一定位;
+-- 服务层查重只挡单请求, 并发注册同名用户的竞态由库层兜底(软删用户不占名)。
+--
+
+CREATE UNIQUE INDEX uk_sys_user_tenant_name ON public.sys_user USING btree (tenant_id, user_name) WHERE (del_flag = '0'::bpchar);
 
 
 --

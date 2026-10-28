@@ -2,7 +2,8 @@
 -- 目的：给内置 DCS 业务源一个可查看、可导出、可版本化的接入契约示例。
 -- 修复/重跑安全：ON CONFLICT 不覆盖已发布版本。
 
--- 1. DCS 业务源接入协议 v1.0.0
+-- 1. DCS 业务源接入协议 v1.1.0(批末与 migration 2026-10-28_singlesource_m1_protocol_events 对齐:
+--    补 user.login/data.audited 采用度取数事件, 新装与升级库版本一致)
 WITH manifest AS (
     SELECT $manifest$
     {
@@ -10,9 +11,9 @@ WITH manifest AS (
       "kind": "ProfileManifest",
       "metadata": {
         "namespace": "dcs",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "title": "任务填报画像",
-        "description": "内置演示业务源：任务发布、提交、审核通过/退回四类行为事件。"
+        "description": "内置演示业务源：登录、任务发布、提交、审核（通过/退回记提交人，完成审核记审核人）、任务关闭。"
       },
       "subjectTypes": [
         {"name": "user", "displayName": "用户", "idField": "userId"}
@@ -55,7 +56,7 @@ WITH manifest AS (
 INSERT INTO public.profile_protocol
     (protocol_id, tenant_id, source, version, status, manifest, checksum,
      published_at, published_by, create_dept, create_by, create_time)
-SELECT 9600, '000000', 'dcs', '1.0.0', 'PUBLISHED', doc,
+SELECT 9600, '000000', 'dcs', '1.1.0', 'PUBLISHED', doc,
        encode(sha256(convert_to(doc::text, 'UTF8')), 'hex'),
        '2026-10-19 00:00:00', 1, 103, 1, '2026-10-19 00:00:00'
 FROM manifest

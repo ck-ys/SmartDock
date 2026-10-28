@@ -4,10 +4,14 @@
 -- 协议表每源只允许一个 PUBLISHED 版本(uk_profile_protocol_published 部分唯一):
 -- 先把 v1.0.0 转SUPERSEDED 再发布 v1.1.0(保留旧版本可追溯)。幂等可重跑:
 -- 二次执行时 UPDATE 命中 0 行、INSERT 撞 (tenant,source,version) 唯一键跳过。
+-- 批末回修(dspro P2-5): 原版只处理默认租户 000000, 多租户部署的非默认租户升级后
+-- 仍停在 v1.0.0(读侧按当前租户查、无 000000 回退)——改为对每个已配置过 dcs 协议的
+-- 租户逐个派生; 主键用 max(id)+row_number() 单调派发, 重跑时先撞 (tenant,source,version)
+-- 唯一键被 DO NOTHING 吸收。
 
 UPDATE public.profile_protocol
 SET status = 'SUPERSEDED', update_time = now()
-WHERE tenant_id = '000000' AND source = 'dcs' AND version = '1.0.0'
+WHERE source = 'dcs' AND version = '1.0.0'
   AND status = 'PUBLISHED' AND del_flag = '0';
 
 WITH manifest AS (
@@ -58,12 +62,22 @@ WITH manifest AS (
       }
     }
     $manifest$::jsonb AS doc
+),
+targets AS (
+    SELECT DISTINCT tenant_id FROM public.profile_protocol
+    WHERE source = 'dcs' AND del_flag = '0'
+),
+ids AS (
+    SELECT tenant_id,
+           (SELECT coalesce(max(protocol_id), 9600) FROM public.profile_protocol)
+             + row_number() OVER (ORDER BY tenant_id) AS protocol_id
+    FROM targets
 )
 INSERT INTO public.profile_protocol
     (protocol_id, tenant_id, source, version, status, manifest, checksum,
      published_at, published_by, create_dept, create_by, create_time)
-SELECT 9609, '000000', 'dcs', '1.1.0', 'PUBLISHED', doc,
+SELECT i.protocol_id, i.tenant_id, 'dcs', '1.1.0', 'PUBLISHED', doc,
        encode(sha256(convert_to(doc::text, 'UTF8')), 'hex'),
        '2026-10-28 00:00:00', 1, 103, 1, '2026-10-28 00:00:00'
-FROM manifest
+FROM ids i CROSS JOIN manifest
 ON CONFLICT (tenant_id, source, version) DO NOTHING;

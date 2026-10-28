@@ -2,6 +2,12 @@
 -- 形状是 '{}' 且总分恒 50——读侧(画像主列表/依据抽屉/总览 KPI)按 _noDimensions
 -- 标记识别占位, 不补标记这些行会继续冒充真分数、其引发的 PENDING 复核永远挂队。
 -- 与引擎侧 supersedeIfPending 同列约定(status/review_note/reviewed_at/update_time)。可重复执行。
+-- 批末终审(glm53 P2)登记: 另一残留形状「维度非空但全跳过」(STRATEGY 维度 bean 失效期的
+-- 老快照, detail 含 "skipped":true 条目而非 '{}')不在本迁移覆盖——两库实测 0 行,
+-- 且全跳过检测需逐维度 JSON 判定, 复杂度大于收益。升级前可自查:
+--   SELECT count(*) FROM profile_score_snapshot WHERE del_flag='0' AND total_score=50
+--     AND dimension_detail::text LIKE '%"skipped":true%' AND NOT dimension_detail::text LIKE '%_noDimensions%';
+-- 非 0 的库把这些行的 dimension_detail 手工置 '{"_noDimensions": true}'::jsonb 即可归一。
 
 UPDATE profile_score_snapshot
    SET dimension_detail = '{"_noDimensions": true}'::jsonb
