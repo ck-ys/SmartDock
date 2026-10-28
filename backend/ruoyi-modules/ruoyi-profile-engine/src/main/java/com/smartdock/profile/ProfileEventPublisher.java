@@ -11,6 +11,12 @@ import java.util.Map;
  * <p>语义: append-only + 幂等。同一 (tenant, source, event_uid) 重复投递返回 false, 不报错。
  * 派生属性(responseHours/qualityScore 等)由业务写入前算好放 props, 引擎不做跨事件 join。</p>
  *
+ * <p>接入三条红线(违反会静默丢数/错算, 详见 docs/profile-integration.md):
+ * ① eventUid 第一段带模块名(如 myapp.order:paid:No1); 同一对象同一动作会发生多次的必须四段式带序号,
+ *    否则第二条被幂等键静默吞掉;
+ * ② 异步/定时/MQ 线程发事件必须 TenantHelper.dynamic(租户号, ...) 包裹, 否则缺租户上下文整条被拒;
+ * ③ props 数值属性必须放 JSON 数字(不是字符串), 布尔放 1/0, 否则算分取数被静默跳过。</p>
+ *
  * @author smartdock
  */
 public interface ProfileEventPublisher {

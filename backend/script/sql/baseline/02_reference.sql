@@ -975,3 +975,7 @@ ON CONFLICT (role_id, menu_id) DO NOTHING;
 
 \unrestrict TUgrW9Wmm3rfc3eEAVNqM6PGKcDt2Rx4Q6EJe3rCGMv1mLsfnlenU3MmHqYesVI
 
+
+-- 单源重构第一批(题4): 测试发送发布按钮权限位(原先 profile:event:publish 无任何菜单挂载, 非超管永远看不到按钮)
+INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (12020, '测试发送(引擎管理页内)', 12001, 23, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:event:publish', '#', 103, 1, '2026-10-28 00:00:00', NULL, NULL, '单源重构第一批(题4): 补挂发布按钮权限位, 与页签入口(11989)一并对齐');
+INSERT INTO public.sys_role_menu (role_id, menu_id) VALUES (1, 12020);

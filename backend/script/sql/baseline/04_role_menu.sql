@@ -269,3 +269,17 @@ WHERE rm.menu_id = 11989
 DELETE FROM public.sys_role_menu rm
 WHERE rm.menu_id = 12018
   AND NOT EXISTS (SELECT 1 FROM public.sys_role r WHERE r.role_id = rm.role_id);
+
+-- 单源重构第一批(题4): 引擎管理页签对租户管理员开放
+-- 修复权限错位: 发布按钮 profile:event:publish(11971)授了角色1+6, 页签入口 profile:engine:query(11989)只授角色1,
+-- 租户管理员有发布权却进不去测试发送页(死按钮)。只开页面与页签, 重算/Schema/来源改写按钮不随此开放。
+-- 与 migration/2026-10-28_singlesource_m1_engine_tab.sql 同构(升级库/全新装口径一致)
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 12001 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 12001);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 11989 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 11989);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 12020 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 12020);
