@@ -7,6 +7,7 @@ import com.smartdock.profile.domain.ProfileReviewQueue;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 import org.dromara.common.mybatis.core.mapper.BaseMapperPlus;
 
 /**
@@ -47,4 +48,20 @@ public interface ProfileReviewQueueMapper extends BaseMapperPlus<ProfileReviewQu
                                                       @Param("status") String status,
                                                       @Param("riskLevel") String riskLevel,
                                                       @Param("keyword") String keyword);
+
+    /**
+     * B 片三审回修: 自动销案改为条件更新——只对仍处 PENDING 的行生效,
+     * 与人工确认(同毫秒窗口)并发时后写不再覆盖先写(CONFIRMED 不会被冲成 SUPERSEDED)。
+     */
+    @Update("""
+        UPDATE profile_review_queue
+           SET status = 'SUPERSEDED', review_note = #{note}, reviewed_at = #{now},
+               update_time = CURRENT_TIMESTAMP
+         WHERE review_id = #{reviewId} AND tenant_id = #{tenantId}
+           AND status = 'PENDING' AND del_flag = '0'
+        """)
+    int supersedeIfPending(@Param("reviewId") Long reviewId,
+                           @Param("tenantId") String tenantId,
+                           @Param("note") String note,
+                           @Param("now") java.util.Date now);
 }

@@ -103,6 +103,7 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
         SELECT 'user' AS subject_type,
                u.user_id::text AS subject_id,
                u.user_name AS user_name,
+               u.status AS user_status,
                COALESCE(NULLIF(u.nick_name, ''), u.user_name) AS display_name,
                COALESCE(agg.event_count, 0) AS event_count,
                agg.first_event_time AS first_event_time,
@@ -352,10 +353,14 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
 
     /**
      * 每个主体最新维度快照(复核扫描用)。
+     *
+     * <p>B 片三审回修: 必须带 dimension_detail——evaluateAfterRecalc 的占位守卫
+     * (isPlaceholderScore)依赖该列, 漏投影会让 scan() 路径守卫恒空转(50 分占位照旧入队)。</p>
      */
     @Select("""
         SELECT DISTINCT ON (subject_type, subject_id)
-               snapshot_id, tenant_id, source, subject_type, subject_id, total_score, calc_time
+               snapshot_id, tenant_id, source, subject_type, subject_id, total_score,
+               dimension_detail, calc_time
         FROM profile_score_snapshot
         WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'
         ORDER BY subject_type, subject_id, calc_time DESC, snapshot_id DESC

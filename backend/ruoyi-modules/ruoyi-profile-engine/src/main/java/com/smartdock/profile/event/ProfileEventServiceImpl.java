@@ -245,7 +245,9 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         if (StringUtils.isBlank(bo.getSubjectId())) {
             throw new IllegalArgumentException("profile event subjectId is required");
         }
-        String subjectType = StringUtils.isBlank(bo.getSubjectType()) ? "user" : bo.getSubjectType();
+        // B 片三审回修: 入库前统一 normalize(去空白/缺省 user)——配置侧已按 normalize 分套,
+        // 事件侧存原值会造出 " user"/"Member" 影子命名空间(配置命中但快照/复核挂在另一个键上)
+        String subjectType = com.smartdock.profile.engine.SubjectTypes.normalize(bo.getSubjectType());
         String schemaVersion = StringUtils.isBlank(bo.getSchemaVersion()) ? "1-0-0" : bo.getSchemaVersion().trim();
         // 与 DDL 长度对齐——超长值在 PG 22001 之前拦下, 报可读错误
         // (subjectName 除外: 可选字段走 upsert 侧截断; source 已被单源收口不再校验)

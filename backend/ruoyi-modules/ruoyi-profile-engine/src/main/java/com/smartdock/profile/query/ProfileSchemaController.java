@@ -27,6 +27,9 @@ import java.util.Map;
  * <p>schema 是可选的强约束: 注册后事件在写入前按 required/properties 校验;
  * 未注册的 source/event 仍按宽松模式放行, 保证旧接入零破坏。</p>
  *
+ * <p>单源口径(M1, B 片三审回修): 事件校验固定查内置源——注册/校验/列表若还按
+ * 路径 source 落库, 非 dcs 源注册成功却永不生效(假绿灯); 路径参数接收但忽略。</p>
+ *
  * @author smartdock
  */
 @RestController
@@ -39,21 +42,22 @@ public class ProfileSchemaController {
     @SaCheckPermission("profile:schema:query")
     @GetMapping("/{source}")
     public R<List<ProfileSchemaRegistry>> list(@PathVariable String source) {
-        return R.ok(schemaService.list(source));
+        return R.ok(schemaService.list(com.smartdock.profile.event.ProfileSources.UNIFIED));
     }
 
     @SaCheckPermission("profile:schema:edit")
     @PostMapping("/{source}")
     public R<ProfileSchemaRegistry> register(@PathVariable String source,
                                              @RequestBody ProfileSchemaBo bo) {
-        return R.ok(schemaService.register(source, bo, currentUserId()));
+        return R.ok(schemaService.register(com.smartdock.profile.event.ProfileSources.UNIFIED, bo, currentUserId()));
     }
 
     @SaCheckPermission("profile:schema:query")
     @PostMapping("/{source}/validate")
     public R<Map<String, Object>> validate(@PathVariable String source,
                                            @RequestBody ProfileSchemaValidateBo bo) {
-        List<String> errors = schemaService.validate(currentTenant(), source, bo.getEventName(),
+        List<String> errors = schemaService.validate(currentTenant(),
+            com.smartdock.profile.event.ProfileSources.UNIFIED, bo.getEventName(),
             bo.getSchemaVersion(), bo.getProps(), bo.getContext(), bo.getTraits());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("valid", errors.isEmpty());

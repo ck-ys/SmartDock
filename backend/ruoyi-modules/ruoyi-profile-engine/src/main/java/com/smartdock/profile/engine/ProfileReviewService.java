@@ -61,10 +61,9 @@ public class ProfileReviewService {
         if (snapshot.isPlaceholderScore()) {
             ProfileReviewQueue stalePending = pending(tenantId, source, snapshot.getSubjectType(), snapshot.getSubjectId());
             if (stalePending != null) {
-                stalePending.setStatus("SUPERSEDED");
-                stalePending.setReviewNote("该主体无有效打分维度(未配置或全部跳过), 占位 50 分不再复核");
-                stalePending.setReviewedAt(new Date());
-                reviewMapper.updateById(stalePending);
+                // B 片三审回修: 条件更新——并发人工确认时本行可能已非 PENDING, 0 行=放弃, 不覆盖人工结论
+                reviewMapper.supersedeIfPending(stalePending.getReviewId(), tenantId,
+                    "该主体无有效打分维度(未配置或全部跳过), 占位 50 分不再复核", new Date());
             }
             return false;
         }
@@ -78,21 +77,24 @@ public class ProfileReviewService {
         boolean low = snapshot.getTotalScore().compareTo(threshold) < 0;
         if (!low) {
             if (pending != null) {
-                pending.setStatus("SUPERSEDED");
-                pending.setReviewNote("分数回升至 " + snapshot.getTotalScore().toPlainString()
-                    + "，自动销案（阈值 " + threshold.toPlainString() + "）");
-                pending.setReviewedAt(new Date());
-                reviewMapper.updateById(pending);
+                reviewMapper.supersedeIfPending(pending.getReviewId(), tenantId,
+                    "分数回升至 " + snapshot.getTotalScore().toPlainString()
+                        + "，自动销案（阈值 " + threshold.toPlainString() + "）", new Date());
             }
             return false;
         }
         String reason = "总分 " + snapshot.getTotalScore().setScale(2, RoundingMode.HALF_UP).toPlainString()
             + " 低于复核阈值 " + threshold.setScale(2, RoundingMode.HALF_UP).toPlainString();
         if (pending != null) {
-            pending.setSnapshotId(snapshot.getSnapshotId());
-            pending.setTotalScore(snapshot.getTotalScore());
-            pending.setTriggerReason(reason);
-            reviewMapper.updateById(pending);
+            // B 片三审回修: 只刷新三个业务字段且钉死 PENDING——整对象 updateById 会把
+            // 并发刚确认的行(含 status/conclusion)整体打回旧值
+            reviewMapper.update(null,
+                new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProfileReviewQueue>()
+                    .eq(ProfileReviewQueue::getReviewId, pending.getReviewId())
+                    .eq(ProfileReviewQueue::getStatus, "PENDING")
+                    .set(ProfileReviewQueue::getSnapshotId, snapshot.getSnapshotId())
+                    .set(ProfileReviewQueue::getTotalScore, snapshot.getTotalScore())
+                    .set(ProfileReviewQueue::getTriggerReason, reason));
             return false;
         }
         // 已人工处理过且分数没有继续恶化: 不重复打扰
@@ -163,8 +165,10 @@ public class ProfileReviewService {
         out.put("pendingBySource", bySource);
         out.put("overdueTotal", overdue);
         out.put("oldestCreatedAt", oldest);
+        // B 片三审回修: 缺省源从写死的 web 改内置源——getOrCreate 会落新配置行, 写死旧源=给租户造脏行
         out.put("reviewEnabled", configService.getOrCreate(
-            StringUtils.isBlank(source) ? "web" : source).getReviewEnabled());
+            StringUtils.isBlank(source) ? com.smartdock.profile.event.ProfileSources.UNIFIED : source)
+            .getReviewEnabled());
         return out;
     }
 
@@ -275,7 +279,14 @@ public class ProfileReviewService {
         review.setReviewedBy(currentUser());
         review.setReviewedAt(new Date());
         review.setUpdateBy(currentUser());
-        reviewMapper.updateById(review);
+        // B 片三审回修: 条件更新钉死 PENDING 前置——双运营并发/与自动销案并发时后写不再覆盖先写
+        int updated = reviewMapper.update(review,
+            new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ProfileReviewQueue>()
+                .eq(ProfileReviewQueue::getReviewId, review.getReviewId())
+                .eq(ProfileReviewQueue::getStatus, "PENDING"));
+        if (updated == 0) {
+            throw new ServiceException("该复核项刚被他人处理, 请刷新后查看");
+        }
         return review;
     }
 

@@ -25,6 +25,9 @@ import java.util.Map;
  * <p>协议是跨业务接入的契约(订单/供应链/工程/商城/租赁/用户均可声明自己的
  * subjectTypes/events/dimensions/metrics/rules/scoreModels/segments), 发布后不可变。</p>
  *
+ * <p>单源口径(M1, B 片三审回修): 同 schema 控制器——路径 source 接收但忽略,
+ * 一律按内置源读写, 防止在旧源名下发布协议成为永不生效的假绿灯。</p>
+ *
  * @author smartdock
  */
 @RestController
@@ -37,13 +40,13 @@ public class ProfileProtocolController {
     @SaCheckPermission("profile:protocol:query")
     @GetMapping("/{source}")
     public R<ProfileProtocol> current(@PathVariable String source) {
-        return R.ok(protocolService.current(source));
+        return R.ok(protocolService.current(com.smartdock.profile.event.ProfileSources.UNIFIED));
     }
 
     @SaCheckPermission("profile:protocol:query")
     @GetMapping("/{source}/history")
     public R<List<ProfileProtocol>> history(@PathVariable String source) {
-        return R.ok(protocolService.history(source));
+        return R.ok(protocolService.history(com.smartdock.profile.event.ProfileSources.UNIFIED));
     }
 
     @SaCheckPermission("profile:protocol:edit")
@@ -61,7 +64,7 @@ public class ProfileProtocolController {
     public R<ProfileProtocol> publish(@PathVariable String source,
                                       @RequestParam(required = false) String version,
                                       @RequestBody Map<String, Object> manifest) {
-        return R.ok(protocolService.publish(source, version, manifest, currentUserId()));
+        return R.ok(protocolService.publish(com.smartdock.profile.event.ProfileSources.UNIFIED, version, manifest, currentUserId()));
     }
 
     /**
@@ -70,7 +73,7 @@ public class ProfileProtocolController {
     @SaCheckPermission("profile:protocol:query")
     @GetMapping("/{source}/export")
     public R<Map<String, Object>> export(@PathVariable String source) {
-        return R.ok(JsonUtils.parseMap(protocolService.export(source)));
+        return R.ok(JsonUtils.parseMap(protocolService.export(com.smartdock.profile.event.ProfileSources.UNIFIED)));
     }
 
     private Long currentUserId() {

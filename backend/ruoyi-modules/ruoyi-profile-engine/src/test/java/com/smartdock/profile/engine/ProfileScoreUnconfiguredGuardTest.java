@@ -129,18 +129,22 @@ class ProfileScoreUnconfiguredGuardTest {
     @Test
     void allSkippedDimensionsAreFlaggedUnconfiguredAndSkipReview() {
         // 夜审 P1: 维度配了但全部跳过(策略缺失/评估异常)——总分 50 占位必须与「未配置」同口径,
-        // 打 _noDimensions 标记且不触发复核入队
+        // 打 _noDimensions 标记且不触发复核入队。
+        // B 片三审回修: 引擎不再按 unconfigured 短路——照常调 evaluateAfterRecalc,
+        // 由守卫内部识别占位快照(不入队+顺带销案存量 PENDING); 引擎侧短路会让销案路径永不执行
         DimensionEvaluator evaluator = Mockito.mock(DimensionEvaluator.class);
         Mockito.when(evaluator.evaluate(Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
             .thenReturn(DimensionResult.skipped());
         ProfileReviewService review = Mockito.mock(ProfileReviewService.class);
+        Mockito.when(review.evaluateAfterRecalc(Mockito.any())).thenReturn(false);
         ProfileScoreEngine engine = engine(evaluator, review, List.of(dim("act_freq")));
 
         ProfileScoreSnapshot snapshot = engine.recalcSubject("dcs", "user", "u-1");
 
         assertTrue(snapshot.getDimensionDetail().contains("\"" + ProfileScoreEngine.UNCONFIGURED_FLAG + "\""));
         assertEquals(0, snapshot.getTotalScore().compareTo(BigDecimal.valueOf(50)));
-        Mockito.verify(review, Mockito.never()).evaluateAfterRecalc(Mockito.any());
+        Mockito.verify(review).evaluateAfterRecalc(Mockito.argThat(
+            snap -> snap != null && snap.isPlaceholderScore()));
     }
 
     @Test

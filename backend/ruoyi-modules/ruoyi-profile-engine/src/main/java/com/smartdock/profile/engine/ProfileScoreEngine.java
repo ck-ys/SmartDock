@@ -158,13 +158,13 @@ public class ProfileScoreEngine {
                 snapshotMapper.updateDimensionDetail(snapshot.getSnapshotId(), tenantId, snapshot.getDimensionDetail());
             }
         }
-        if (!unconfigured) {
-            try {
-                reviewService.evaluateAfterRecalc(snapshot);
-            } catch (Exception e) {
-                // 复核入队失败不影响快照
-                log.warn("[Profile] review enqueue failed subject={} err={}", subjectId, e.getMessage());
-            }
+        // B 片三审回修: 不再按 unconfigured 短路——占位快照也要走 evaluateAfterRecalc,
+        // 守卫内会自动销案占位时期的存量 PENDING(短路会让这条清理路径永远不执行)
+        try {
+            reviewService.evaluateAfterRecalc(snapshot);
+        } catch (Exception e) {
+            // 复核入队失败不影响快照
+            log.warn("[Profile] review enqueue failed subject={} err={}", subjectId, e.getMessage());
         }
         log.info("[Profile] snapshot written subject={} total={} dims={} prev={}",
             subjectId, total, detail.size(), snapshot.getPrevSnapshotId());

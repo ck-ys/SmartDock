@@ -1641,6 +1641,11 @@ CREATE UNIQUE INDEX uk_profile_review_pending
     ON public.profile_review_queue USING btree (tenant_id, source, subject_type, subject_id)
     WHERE (status = 'PENDING'::character varying AND del_flag = '0'::bpchar);
 CREATE INDEX idx_profile_review_queue
+
+-- B 片三审回修: 跨源形态(主视图/守卫按租户+类型+主体探测, 不带 source)
+CREATE INDEX idx_review_pending_xsrc
+    ON public.profile_review_queue USING btree (tenant_id, subject_type, subject_id)
+    WHERE (status = 'PENDING'::text AND del_flag = '0'::bpchar);
     ON public.profile_review_queue USING btree (tenant_id, source, status, create_time DESC);
 
 
@@ -2903,6 +2908,11 @@ ALTER TABLE ONLY public.profile_event
 ALTER TABLE ONLY public.profile_subject
     ADD CONSTRAINT uk_profile_subject UNIQUE (tenant_id, source, subject_type, subject_id);
 
+-- B 片三审回修: 跨源聚合形态(主视图 GROUP BY subject_id, 不带 source)
+CREATE INDEX idx_profile_subject_xsrc
+    ON public.profile_subject USING btree (tenant_id, subject_type, subject_id)
+    WHERE (del_flag = '0'::bpchar);
+
 
 --
 -- Name: dcs_file_review_config uq_dcs_file_review_config_tenant; Type: CONSTRAINT; Schema: public; Owner: -
@@ -3296,6 +3306,13 @@ CREATE INDEX idx_profile_snap_latest ON public.profile_score_snapshot USING btre
 --
 
 CREATE INDEX idx_profile_snap_rank ON public.profile_score_snapshot USING btree (tenant_id, source, total_score DESC);
+
+
+--
+-- Name: idx_profile_snap_xsrc; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_profile_snap_xsrc ON public.profile_score_snapshot USING btree (tenant_id, subject_type, subject_id, calc_time DESC, snapshot_id DESC) WHERE (del_flag = '0'::bpchar);
 
 
 --

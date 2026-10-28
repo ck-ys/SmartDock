@@ -63,7 +63,8 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
             ORDER BY calc_time DESC, model_snapshot_id DESC
             LIMIT 1
         ) ms ON TRUE
-        WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source} AND sub.del_flag = '0'
+        WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source}
+          AND sub.subject_type = #{subjectType} AND sub.del_flag = '0'
         <if test="level != null and level != ''">
             AND ms.level = #{level}
         </if>
@@ -78,6 +79,7 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
         com.baomidou.mybatisplus.core.metadata.IPage<ProfileModelSubjectRow> page,
         @Param("tenantId") String tenantId,
         @Param("source") String source,
+        @Param("subjectType") String subjectType,
         @Param("modelCode") String modelCode,
         @Param("modelVersion") String modelVersion,
         @Param("level") String level,
@@ -100,11 +102,13 @@ public interface ProfileModelSnapshotMapper extends BaseMapperPlus<ProfileModelS
             ORDER BY calc_time DESC, model_snapshot_id DESC
             LIMIT 1
         ) ms ON TRUE
-        WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source} AND sub.del_flag = '0'
+        WHERE sub.tenant_id = #{tenantId} AND sub.source = #{source}
+          AND sub.subject_type = #{subjectType} AND sub.del_flag = '0'
         ORDER BY ms.normalized_score DESC NULLS LAST, sub.subject_id
         """)
     List<ProfileModelSubjectRow> selectLatestAll(@Param("tenantId") String tenantId,
                                                  @Param("source") String source,
+                                                 @Param("subjectType") String subjectType,
                                                  @Param("modelCode") String modelCode,
                                                  @Param("modelVersion") String modelVersion);
 

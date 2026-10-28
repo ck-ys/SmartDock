@@ -120,6 +120,17 @@ class ProfileMainViewPageTest {
         assertTrue(Boolean.TRUE.equals(out.getRows().get(0).getPendingReview()));
     }
 
+    @Test
+    void rankingBlankSubjectTypeDefaultsToUser() {
+        // B 片三审回修: 排行空白类型归一 user——此前传 null 不过滤, user/member 分套后混排成不可比名次
+        Mockito.when(subjectMapper.selectRanking(Mockito.any(), Mockito.any(), Mockito.any(),
+                Mockito.isNull(), Mockito.anyInt()))
+            .thenReturn(java.util.Collections.emptyList());
+        service.ranking("dcs", " ", null, 10);
+        Mockito.verify(subjectMapper).selectRanking(Mockito.eq("000000"), Mockito.eq("dcs"),
+            Mockito.eq("user"), Mockito.isNull(), Mockito.eq(10));
+    }
+
     private void stubUserPage(ProfileMainViewRow row) {
         Mockito.when(subjectMapper.selectUserMainPage(any(), any(), any()))
             .thenAnswer(inv -> pageWith(inv.getArgument(0), row));

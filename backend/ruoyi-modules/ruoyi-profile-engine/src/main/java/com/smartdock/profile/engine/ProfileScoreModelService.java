@@ -366,7 +366,8 @@ public class ProfileScoreModelService {
         // rfm 页首屏即调), 主体超阈值先报错——subjectPage 走分页不拦
         scaleGuard.checkModelSubjects(model.getTenantId(), model.getSource());
         List<ProfileModelSubjectRow> rows = snapshotMapper.selectLatestAll(
-            model.getTenantId(), model.getSource(), model.getModelCode(), model.getModelVersion());
+            model.getTenantId(), model.getSource(), SubjectTypes.normalize(model.getSubjectType()),
+            model.getModelCode(), model.getModelVersion());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("modelId", model.getModelId());
         out.put("modelCode", model.getModelCode());
@@ -409,7 +410,7 @@ public class ProfileScoreModelService {
         Page<ProfileModelSubjectRow> page = new Page<>(Math.max(1, pageNum), Math.min(Math.max(1, pageSize), 200));
         page.setOptimizeCountSql(false);
         return snapshotMapper.selectLatestPage(page, model.getTenantId(), model.getSource(),
-            model.getModelCode(), model.getModelVersion(), level, keyword);
+            model.getSubjectType(), model.getModelCode(), model.getModelVersion(), level, keyword);
     }
 
     public Map<String, Object> subjectDetail(Long modelId, String subjectType, String subjectId) {
@@ -510,7 +511,8 @@ public class ProfileScoreModelService {
                 subject.getDisplayName(), snapshot.getLevel(), snapshot.getNormalizedScore()));
         }
         List<ProfileModelSubjectRow> current = snapshotMapper.selectLatestAll(
-            model.getTenantId(), model.getSource(), model.getModelCode(), model.getModelVersion());
+            model.getTenantId(), model.getSource(), SubjectTypes.normalize(model.getSubjectType()),
+            model.getModelCode(), model.getModelVersion());
         List<ProfileModelCompare.SubjectVersion> base = new ArrayList<>();
         for (ProfileModelSubjectRow row : current) {
             base.add(new ProfileModelCompare.SubjectVersion(row.getSubjectType(), row.getSubjectId(),

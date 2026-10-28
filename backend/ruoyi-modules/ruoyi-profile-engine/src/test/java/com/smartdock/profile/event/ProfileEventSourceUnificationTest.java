@@ -121,6 +121,19 @@ class ProfileEventSourceUnificationTest {
     }
 
     @Test
+    void subjectTypeIsNormalizedAtWriteBoundary() {
+        // B 片三审回修: 入库前归一(subjectType 缺省 user/去空白)——" user " 这类影子命名空间
+        // 会让配置按 user 命中而快照/复核挂在另一个键上
+        ProfileEventBo bo = bo("dcs");
+        bo.setSubjectType(" user ");
+        assertTrue(service.publish(bo));
+
+        ArgumentCaptor<ProfileEvent> captor = ArgumentCaptor.forClass(ProfileEvent.class);
+        Mockito.verify(eventMapper).insertIgnore(captor.capture());
+        assertEquals("user", captor.getValue().getSubjectType());
+    }
+
+    @Test
     void unifiedValueIsPinnedToExistingData() {
         // 取值锚定存量数据所在源——改动等于把新旧事件拆成两套, 必须连同数据迁移一起评审
         assertEquals("dcs", ProfileSources.UNIFIED);

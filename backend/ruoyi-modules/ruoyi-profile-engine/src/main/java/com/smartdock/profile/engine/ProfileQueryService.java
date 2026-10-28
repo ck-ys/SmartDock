@@ -141,17 +141,19 @@ public class ProfileQueryService {
 
     public List<ProfileRankingRow> ranking(String source, String subjectType, String dimension, int limit) {
         requireSource(source);
+        // B 片三审回修: 空白归一 user——与 overview 同口径; 此前 SQL 传 null 不过滤,
+        // user/member 分套后会把两套分数混排成不可比名次
+        String type = SubjectTypes.normalize(subjectType);
         int capped = Math.min(Math.max(limit <= 0 ? 10 : limit, 1), 100);
         String dim = StringUtils.isBlank(dimension) ? null : dimension.trim();
         if (dim != null) {
-            boolean known = dimensionService.list(source, SubjectTypes.normalize(subjectType)).stream()
+            boolean known = dimensionService.list(source, type).stream()
                 .anyMatch(d -> dim.equals(d.getDimCode()));
             if (!known) {
                 throw new ServiceException("排行维度不存在: " + dim);
             }
         }
-        List<ProfileRankingRow> rows = subjectMapper.selectRanking(currentTenant(), source,
-            StringUtils.isBlank(subjectType) ? null : subjectType.trim(), dim, capped);
+        List<ProfileRankingRow> rows = subjectMapper.selectRanking(currentTenant(), source, type, dim, capped);
         // 批11 回修(终审 P1): 排行分数列与列表同闸——无列级分数权限置空, 只留主体与名次
         boolean canScore = piiService.canViewScore();
         int rank = 1;
