@@ -16,7 +16,6 @@ SET idle_in_transaction_session_timeout = 0;
 SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
@@ -1641,12 +1640,12 @@ CREATE UNIQUE INDEX uk_profile_review_pending
     ON public.profile_review_queue USING btree (tenant_id, source, subject_type, subject_id)
     WHERE (status = 'PENDING'::character varying AND del_flag = '0'::bpchar);
 CREATE INDEX idx_profile_review_queue
+    ON public.profile_review_queue USING btree (tenant_id, source, status, create_time DESC);
 
 -- B 片三审回修: 跨源形态(主视图/守卫按租户+类型+主体探测, 不带 source)
 CREATE INDEX idx_review_pending_xsrc
     ON public.profile_review_queue USING btree (tenant_id, subject_type, subject_id)
     WHERE (status = 'PENDING'::text AND del_flag = '0'::bpchar);
-    ON public.profile_review_queue USING btree (tenant_id, source, status, create_time DESC);
 
 
 --
@@ -3679,7 +3678,6 @@ SET idle_in_transaction_session_timeout = 0;
 SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;

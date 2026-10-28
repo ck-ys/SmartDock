@@ -2,7 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict TUgrW9Wmm3rfc3eEAVNqM6PGKcDt2Rx4Q6EJe3rCGMv1mLsfnlenU3MmHqYesVI
 
 -- Dumped from database version 17.10 (Debian 17.10-1.pgdg13+1)
 -- Dumped by pg_dump version 17.10
@@ -13,7 +12,6 @@ SET idle_in_transaction_session_timeout = 0;
 SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
@@ -974,7 +972,6 @@ ON CONFLICT (role_id, menu_id) DO NOTHING;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TUgrW9Wmm3rfc3eEAVNqM6PGKcDt2Rx4Q6EJe3rCGMv1mLsfnlenU3MmHqYesVI
 
 
 -- 单源重构第一批(题4): 测试发送发布按钮权限位(原先 profile:event:publish 无任何菜单挂载, 非超管永远看不到按钮)
