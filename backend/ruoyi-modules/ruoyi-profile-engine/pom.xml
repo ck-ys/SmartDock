@@ -59,6 +59,12 @@
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-common-redis</artifactId>
         </dependency>
+        <!-- 画像方向第三批: AI 助手业务工具 SPI(纯 JDK 契约包零框架依赖),
+             ProfileToolProvider 实现它把查画像/圈人两个只读工具喂给助手 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-assistant-spi</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>

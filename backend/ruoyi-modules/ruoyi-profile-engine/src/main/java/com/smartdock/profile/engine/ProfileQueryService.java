@@ -54,6 +54,16 @@ public class ProfileQueryService {
     private final ProfilePiiService piiService;
 
     public TableDataInfo<ProfileSubjectRow> subjectPage(ProfileSubjectQuery query, PageQuery pageQuery) {
+        return subjectPage(query, pageQuery, null);
+    }
+
+    /**
+     * 主体列表(画像方向第三批): scoreVisibleOverride 供助手工具线程传行级分数可见性——
+     * 工具线程无 Sa-Token 上下文, piiService.canViewScore() 恒 false(保守), UI 路径不传(null)行为不变。
+     * ⚠️ 仅限调用方已按菜单权限(profile:pii:score)判定的场景使用; 误传 TRUE = 越权输出全部分数与维度明细。
+     */
+    public TableDataInfo<ProfileSubjectRow> subjectPage(ProfileSubjectQuery query, PageQuery pageQuery,
+                                                        Boolean scoreVisibleOverride) {
         if (query == null) {
             query = new ProfileSubjectQuery();
         }
@@ -68,7 +78,7 @@ public class ProfileQueryService {
         page.setOptimizeCountSql(false);
         IPage<ProfileSubjectRow> result = subjectMapper.selectSubjectPage(page, currentTenant(), query);
         // 批11 Q1: 联系方式类属性打码; 无看分权限的角色分数列不返回
-        boolean scoreVisible = piiService.canViewScore();
+        boolean scoreVisible = scoreVisibleOverride != null ? scoreVisibleOverride : piiService.canViewScore();
         result.getRecords().forEach(row -> {
             row.setProperties(piiService.maskJsonOut(row.getProperties()));
             if (!scoreVisible) {
@@ -302,11 +312,21 @@ public class ProfileQueryService {
         return subjectSummary(subjectType, subjectId, null);
     }
 
+    public Map<String, Object> subjectSummary(String subjectType, String subjectId, String source) {
+        return subjectSummary(subjectType, subjectId, source, null);
+    }
+
     /**
      * 单主体摘要(批9 Q5/Q7-A): 基本信息 + 最新维度快照(分数/维度贡献/规则版本/计算时间)。
      * "查看依据"抽屉与助手只读工具共用此口径; source 可选(同 ID 跨源时避免取错)。
+     *
+     * @param scoreVisibleOverride 分数可见性显式覆盖(画像方向第三批): 助手工具线程无
+     *        Sa-Token 上下文, StpUtil 恒 false(保守隐藏), 调用方按 BizToolCall.menuPermissions
+     *        自判后传入; null=走 UI 原口径(StpUtil), UI 路径零变化
      */
-    public Map<String, Object> subjectSummary(String subjectType, String subjectId, String source) {
+    public Map<String, Object> subjectSummary(String subjectType, String subjectId, String source,
+                                              Boolean scoreVisibleOverride) {
+        boolean scoreVisible = scoreVisibleOverride != null ? scoreVisibleOverride : piiService.canViewScore();
         if (StringUtils.isBlank(subjectId)) {
             throw new ServiceException("subjectId 不能为空");
         }
@@ -317,6 +337,9 @@ public class ProfileQueryService {
                 .eq(com.smartdock.profile.event.ProfileSubject::getSubjectType, type)
                 .eq(com.smartdock.profile.event.ProfileSubject::getSubjectId, subjectId.trim())
                 .eq(StringUtils.isNotBlank(source), com.smartdock.profile.event.ProfileSubject::getSource, source)
+                // 三审 dspro P2-4: 跨源同 subjectId 时无排序会随机取一条——固定取最近活跃的
+                .orderByDesc(com.smartdock.profile.event.ProfileSubject::getLastEventTime)
+                .orderByDesc(com.smartdock.profile.event.ProfileSubject::getId)
                 .last("LIMIT 1"))
             .stream().findFirst().orElse(null);
         Map<String, Object> out = new LinkedHashMap<>();
@@ -342,8 +365,9 @@ public class ProfileQueryService {
                 .orderByDesc(com.smartdock.profile.engine.ProfileScoreSnapshot::getCalcTime)
                 .orderByDesc(com.smartdock.profile.engine.ProfileScoreSnapshot::getSnapshotId)
                 .last("LIMIT 1"));
-        if (!piiService.canViewScore()) {
-            out.put("scored", false);
+        if (!scoreVisible) {
+            // 三审 dsflash P2: 不出 scored:false——与 scoreHidden 同盒会让模型把「权限隐藏」误读成「没打过分的记录」;
+            // 前端抽屉 v-if="basisData.scored" 对缺键与 false 渲染一致, UI 无感
             out.put("scoreHidden", true);
         } else if (latest.isEmpty()) {
             out.put("scored", false);
