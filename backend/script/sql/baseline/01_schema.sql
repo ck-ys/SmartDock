@@ -1707,6 +1707,28 @@ CREATE TABLE public.profile_source_config (
 CREATE UNIQUE INDEX uk_profile_source_config_tenant_source
   ON public.profile_source_config (tenant_id, source) WHERE del_flag = '0';
 
+-- 单源重构 M1 F 片: 场景模板(我的模板)——导入的模板落这里, 内置模板是代码常量不落库
+CREATE TABLE public.profile_scenario_template (
+    template_id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    template_code character varying(64) NOT NULL,
+    template_name character varying(100) NOT NULL,
+    scenario character varying(50),
+    description character varying(500),
+    definition jsonb NOT NULL,
+    builtin character(1) DEFAULT '0'::bpchar NOT NULL,
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar,
+    CONSTRAINT pk_profile_scenario_template PRIMARY KEY (template_id),
+    CONSTRAINT ck_profile_scenario_builtin CHECK (builtin IN ('0', '1'))
+);
+CREATE UNIQUE INDEX uk_profile_scenario_template_code
+  ON public.profile_scenario_template (tenant_id, template_code) WHERE del_flag = '0';
+
 CREATE UNIQUE INDEX uk_profile_engine_config
     ON public.profile_engine_config USING btree (tenant_id, source)
     WHERE (del_flag = '0'::bpchar);

@@ -102,8 +102,9 @@ public class OrderEventReporter {
 - **身份归并**：同一 `anonymousId` 先产生匿名事件，登录后带 `userId`（`subjectType=user`）的事件
   会把身份链写入 `profile_identity_link`；分析会话优先采用归并后的登录主体。
 - **Schema 轻校验**：只检查必填键和基础类型；未注册 Schema 的事件直接放行，保证旧接入零破坏。
-- **三种扩展点**：`DimensionStrategy`（自定义维度口径）、`ProfilePostProcessor`（快照后处理）、
-  `EventQueryPort`（事件查询端口），均为 Spring Bean，只读、不写表。
+- **三种扩展点**：`DimensionStrategy`（自定义维度口径）与 `ProfilePostProcessor`（快照落库后的
+  后处理回调）是注册即用的 Spring Bean；`EventQueryPort`（事件查询端口）是引擎内部的
+  查询收口接口，换存储或加缓存时改 `ProfileScoreEngine` 的适配器实现。三者均只读、不写表。
 
 ## 3. 评分模型与 RFM
 
@@ -143,20 +144,23 @@ profile_event
   └─ 会话重建（analytics_session）
        ├─ 显式 sessionId 优先
        └─ 否则按访问者 + 30 分钟无操作切分
-            └─ 日汇总（analytics_daily）→ 趋势 / 渠道 / 设备 / 浏览器 / 地域
-                 ├─ 漏斗（analytics_funnel）：按访客顺序匹配步骤，窗口限制相邻间隔
-                 ├─ 留存：按首次访问日分组，统计第 N 天回访
+            └─ 日汇总（analytics_daily）→ 趋势 / 终端类型 / 浏览器 / 使用采用度
+                 ├─ 漏斗（analytics_funnel）：按用户顺序匹配步骤，窗口限制相邻间隔
+                 ├─ 留存：按首次使用日分组，统计第 N 天回访
                  ├─ 页面与搜索：page_view / keyword 下钻
-                 ├─ 自定义分析：维度 × 指标（PV / UV / 访问次数 / 事件数）
-                 └─ 访问明细：会话 + 事件时间线
+                 ├─ 自定义分析：维度 × 指标（页面使用次数 / 活跃用户数 / 会话 / 事件数）
+                 └─ 使用明细：会话 + 事件时间线
 ```
 
-口径固定且可解释：
+口径固定且可解释（2026-10-28 单源重构起，分析中心只看系统自己的使用）：
 
-- **PV** = `page_view` 事件数；**UV** = 去重访客；**访问次数** = 去重会话。
-- **跳出** = 只浏览一个页面且没有搜索、注册等交互；`page_leave` 是收尾事件，不算交互。
-- **新访客** = 该业务源内首次出现；回访 = 之前已有会话。
-- 漏斗步骤按访客「首次满足顺序」计数，跨会话超过窗口不累计。
+- **页面使用次数** = `page_view` 事件数；**活跃用户数** = 去重用户；**会话** = 去重会话。
+  概览页已改用这些新名称；「页面与搜索」页签的列头和部分接口字段仍沿用历史名
+  PV / UV（口径相同，只是叫法没换），后续版本统一。
+- **单页离开** = 会话内有意义的事件不超过 1 个（`page_leave` 是收尾回执，不算有意义动作）。
+  旧称「跳出率」已更名。
+- **新同事** = 该系统内首次出现的用户；回访 = 之前已有会话。
+- 漏斗步骤按用户「首次满足顺序」计数，跨会话超过窗口不累计。
 
 数据进系统只有两条路（外部网站采集口与 SDK 已于 2026-10-23 移除）：
 
@@ -180,3 +184,153 @@ profile_event
 
 分析页面在「画像与分析 → 数据分析」，包含数据导入、流量概览、页面与搜索、
 路径分析、转化漏斗、留存分析、活跃分析、访问明细、自定义分析和实时看板十个页签。
+
+## 6. 魔改指南：把画像改成你的业务（三层路径）
+
+想改画像的口径，从轻到重有三层路。绝大多数需求停在第一层就够了。
+
+| 想改什么 | 用哪层 | 在哪动手 |
+|---|---|---|
+| 维度算什么、怎么打分 | 第一层 | 画像工作室 → 维度配置 |
+| 各维度占多少分 | 第一层 | 画像工作室 → 权重规则（草稿 → 校验 → 影响评估 → 发布） |
+| 圈人条件 | 第一层 | 画像 → 分群（规则分群 / 静态名单） |
+| 漏斗步骤、自定义分析 | 第一层 | 数据分析 → 漏斗维护 / 自定义分析 |
+| 一整套维度+权重+分群+漏斗 | 第二层 | 画像工作室 → 场景模板（套用 / 导入 / 导出） |
+| 事件聚合算子表达不了的口径 | 第三层 | 写 Java：`DimensionStrategy` 扩展点 |
+
+### 第一层：零代码改配置
+
+页面上点一点，不写一行代码：
+
+- **维度 = 指标口径**。工作室 → 维度配置里新建 EVENT_AGG 维度：选算子
+  （次数 / 去重数 / 求和 / 平均 / 比率 / 最近值）→ 绑定事件名和属性键 → 定打分方式
+  （线性区间或分档）。新建对话框里有单维度模板，点一下预填全部字段。
+- **权重 = 版本化的配方**。改权重走草稿：保存 → 校验（覆盖全部启用维度且合计为 1）→
+  影响评估（多少主体分数会变）→ 发布。发布本身不重算历史，触发重算后新权重才进快照。
+- **分群条件字段白名单**：`totalScore` / `eventCount` / `lastEventDays` /
+  `dimension.<维度码>` / `property.<属性键>` / `tag.<码>.<键>`，比较符等于/大于/包含等，
+  不支持任意 SQL——规则只在应用侧对候选集求值，天然防注入。
+  **注意**：`dimension.<维度码>` 取的是该维度的 **0~100 归一分数**，不是业务原值——
+  想按「客单价 ≥ 300 元」圈人，要把 300 元按该维度的打分区间换算成分数阈值再填。
+
+### 第二层：模板 JSON（导入导出分享）
+
+工作室 → 场景模板提供 7 套内置推荐场景（内部协作采用度为推荐默认，另有零售商城、
+外卖平台、文旅景点、社区内容、SaaS 工具、MES 操作工），每套点齐「维度 + 权重 + 分群 +
+漏斗」四件套：
+
+- **套用不覆盖**：同编码的维度 / 分群 / 漏斗一律跳过；权重只生成草稿，去「权重规则」
+  核对发布后才影响打分。
+- **事件名是示例**：行业模板里的事件名（如 `order.paid`）是通用示例，套用后要按
+  [接入指南](profile-integration.md)换成你业务的真实事件名。
+- **导出 → 改 → 导入**：任何模板可导出成 JSON 文件，改完（或发给同事改完）在
+  「我的模板」里导入，导入即租户内共享。
+
+模板 JSON 的形状（导出文件即此格式；下面是一份**完整可导入**的最小模板——权重必须
+覆盖全部维度且合计≈1、漏斗至少 2 步、分群阈值用分数口径）：
+
+```json
+{
+  "code": "my_retail",
+  "name": "我的零售模板",
+  "scenario": "零售商城",
+  "description": "买得多、买得贵、退款少的顾客分高。事件名请换成你商城的真实事件名。",
+  "dimensions": [
+    {
+      "dimCode": "purchase_frequency",
+      "dimName": "购买频次",
+      "calcMode": "EVENT_AGG",
+      "calcConfig": {
+        "score": { "type": "linear", "lo": 0, "hi": 20, "direction": "higher" },
+        "metric": { "operator": "COUNT", "target": { "eventType": "order.paid" } },
+        "window": { "type": "rolling", "days": 90 },
+        "missing": "zero"
+      },
+      "scoreMax": 100,
+      "sortOrder": 1
+    },
+    {
+      "dimCode": "my_avg_order",
+      "dimName": "客单价",
+      "calcMode": "EVENT_AGG",
+      "calcConfig": {
+        "score": { "type": "linear", "lo": 50, "hi": 500, "direction": "higher" },
+        "metric": { "operator": "AVG", "prop": "amount", "target": { "eventType": "order.paid" } },
+        "window": { "type": "all" },
+        "missing": "neutral"
+      },
+      "scoreMax": 100,
+      "sortOrder": 2
+    }
+  ],
+  "weights": { "purchase_frequency": 0.5, "my_avg_order": 0.5 },
+  "segments": [
+    {
+      "segmentCode": "high_value",
+      "segmentName": "高价值顾客",
+      "description": "客单价维度分≥56, 约对应客单价 300 元(dimension.字段取 0~100 分数)",
+      "ruleConfig": {
+        "match": "ALL",
+        "conditions": [{ "field": "dimension.my_avg_order", "op": "GTE", "value": 56 }]
+      }
+    }
+  ],
+  "funnels": [
+    {
+      "funnelCode": "mall_conversion",
+      "funnelName": "逛购下单",
+      "steps": [
+        { "eventName": "page_view", "name": "看商品" },
+        { "eventName": "cart.add", "name": "加入购物车" },
+        { "eventName": "order.paid", "name": "支付下单" }
+      ],
+      "windowDays": 7
+    }
+  ]
+}
+```
+
+导入校验会拦住这些坏模板：编码不是字母开头 / 权重合计不为 1、缺维度权重或引用了
+不存在的维度 / 维度只允许 `EVENT_AGG`（STRATEGY 引用宿主环境的 Bean，搬不走）/
+维度名超 100 字、scoreMax 超出 1~1000 / 分群字段不在白名单 / 漏斗步骤数不在 2~10、
+窗口天数超出 1~90 / 模板定义超过 256KB。
+
+权限说明：套用/导入/删除按钮用 `profile:scenario:edit` 权限——它一次性预填维度、权重、
+分群、漏斗四类配置，因此授这个权限等于同时给了这四类配置的编辑入口，请只授给负责
+画像配置的管理员。
+
+### 第三层：代码扩展点
+
+事件聚合表达不了的口径，写 Java。前两个是注册即用的 Spring Bean；第三个是引擎内部
+的查询收口接口（改它要动引擎代码）。三者都只读、不写表：
+
+1. **`DimensionStrategy`**：自定义维度算子——实现 `source()` / `dimCode()` 与求值方法，
+   工作室的 STRATEGY 维度会自动发现它。
+2. **`ProfilePostProcessor`**：快照落库**之后**的回调——对新快照的标签字段做补充加工
+   （比如按外部系统回填等级）；分数与总分此时已定，接口约定不改它们。
+3. **`EventQueryPort`**：引擎内部的事件查询端口——把策略类对事件账本的查询收口到
+   一个接口；换存储或加缓存时改 `ProfileScoreEngine` 里的适配器实现。
+
+```java
+@Component
+public class LoyaltyDimension implements DimensionStrategy {
+
+    @Override
+    public String source() { return "dcs"; }
+
+    @Override
+    public String dimCode() { return "loyalty"; }
+
+    @Override
+    public DimensionResult calc(DimensionContext ctx) {
+        // 只读: ctx 提供该主体的事件查询; 禁止写表
+        // 抛异常由引擎捕获并按维度的 missing 策略处理, 不中断其他维度
+        DimensionResult result = new DimensionResult();
+        result.setScore(java.math.BigDecimal.valueOf(80));
+        result.getTags().put("basis", "近 90 天持续活跃");
+        return result;
+    }
+}
+```
+
+写完在工作室建一个 STRATEGY 维度指向它即可，其余（权重、发布、重算）与普通维度完全一样。

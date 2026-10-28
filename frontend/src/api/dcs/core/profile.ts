@@ -1100,3 +1100,60 @@ export const executeDeletion = (data: {
 export const listDeletionLogs = (): Promise<ProfileDeletionLogRow[]> => r<ProfileDeletionLogRow[]>({ url: `${BASE}/deletion/logs`, method: 'get' });
 
 export const listExportLogs = (): Promise<ProfileExportLogRow[]> => r<ProfileExportLogRow[]>({ url: `${BASE}/export/logs`, method: 'get' });
+
+// ---- F 片: 场景模板库(推荐场景=内置 7 套 / 我的模板=本租户导入) ----
+
+export interface ScenarioWeightPreview {
+  dimCode: string;
+  dimName: string;
+  weight: number | null;
+}
+
+export interface ScenarioTemplateSummary {
+  kind: 'builtin' | 'saved';
+  templateId: string | null; // 雪花ID超JS安全整数, Jackson序列化为字符串
+  code: string;
+  name: string;
+  scenario: string | null;
+  description: string | null;
+  recommended: boolean;
+  dimensionCount: number;
+  segmentCount: number;
+  funnelCount: number;
+  weightPreview: ScenarioWeightPreview[];
+}
+
+export interface ScenarioCatalog {
+  builtin: ScenarioTemplateSummary[];
+  saved: ScenarioTemplateSummary[];
+}
+
+export interface ScenarioApplyReceipt {
+  templateName: string;
+  dimensionsCreated: string[];
+  dimensionsSkipped: string[];
+  draftRuleId: string; // 同上, Long序列化为字符串
+  draftNote: string;
+  segmentsCreated: string[];
+  segmentsSkipped: string[];
+  funnelsCreated: string[];
+  funnelsSkipped: string[];
+}
+
+export const getScenarioTemplates = (): Promise<ScenarioCatalog> =>
+  r<ScenarioCatalog>({ url: `${BASE}/scenario/templates`, method: 'get' });
+
+export const applyScenarioTemplate = (data: {
+  code?: string;
+  templateId?: string;
+  subjectType?: string;
+}): Promise<ScenarioApplyReceipt> => r<ScenarioApplyReceipt>({ url: `${BASE}/scenario/apply`, method: 'post', data });
+
+export const importScenarioTemplate = (data: unknown): Promise<Record<string, any>> =>
+  r<Record<string, any>>({ url: `${BASE}/scenario/import`, method: 'post', data });
+
+export const exportScenarioTemplate = (params: { code?: string; templateId?: string }): Promise<Record<string, any>> =>
+  r<Record<string, any>>({ url: `${BASE}/scenario/export`, method: 'get', params });
+
+export const deleteScenarioTemplate = (templateId: string): Promise<boolean> =>
+  r<boolean>({ url: `${BASE}/scenario/${templateId}`, method: 'delete' });

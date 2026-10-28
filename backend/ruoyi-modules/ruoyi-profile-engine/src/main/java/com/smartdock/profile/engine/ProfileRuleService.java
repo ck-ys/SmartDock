@@ -140,6 +140,50 @@ public class ProfileRuleService {
         return draft;
     }
 
+    /**
+     * F 片三审回修(dspro P1): 场景模板套用专用——已有开放草稿时直接抛错而不是静默复用。
+     * createDraft 的复用语义对规则页无害(页面随后只读加载), 但并发套模板会把 A 的草稿
+     * 返回给 B, B 拿 A 的 revision 整份覆盖权重还回执「已生成」。因此这里不复用 createDraft,
+     * 创建体内联; 插入撞 uk_profile_rule_draft 时 DuplicateKeyException 原样冒泡——PG 事务
+     * 此刻已 aborted, 调用方须直接抛错让整单回滚, 不许再发后续 SQL。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ProfileScoreRule createDraftStrict(ProfileRuleBo bo) {
+        requireSource(bo.getSource());
+        String subjectType = SubjectTypes.normalize(bo.getSubjectType());
+        if (queryOpenDraft(bo.getSource(), subjectType) != null) {
+            throw new ServiceException("已有未发布的权重草稿, 请先处理后再套用模板");
+        }
+        List<String> codes = dimensionService.enabledCodes(bo.getSource(), subjectType);
+        if (codes.isEmpty()) {
+            throw new ServiceException("该业务源+主体类型没有启用的评分维度, 请先配置维度");
+        }
+        ProfileScoreRule sourceRule = current(bo.getSource(), subjectType);
+        Map<String, Double> weights = sourceRule == null
+            ? ProfileRuleWeights.balanced(codes)
+            : parseWeights(sourceRule.getWeights());
+        if (sourceRule != null && !ProfileRuleWeights.validate(weights, codes).isEmpty()) {
+            weights = ProfileRuleWeights.balanced(codes);
+        }
+        ProfileScoreRule draft = new ProfileScoreRule();
+        draft.setRuleId(IdWorker.getId());
+        draft.setTenantId(currentTenant());
+        draft.setSource(bo.getSource());
+        draft.setSubjectType(subjectType);
+        draft.setRuleVersion("draft-" + draft.getRuleId());
+        draft.setRuleName(StringUtils.isBlank(bo.getRuleName())
+            ? "画像权重草稿" : bo.getRuleName().trim());
+        draft.setStatus(DRAFT);
+        draft.setWeights(toJson(weights));
+        draft.setRemark(bo.getRemark());
+        draft.setBaseRuleVersion(sourceRule == null ? null : sourceRule.getRuleVersion());
+        draft.setRevision(0);
+        draft.setEnabled("0");
+        draft.setCreateBy(currentUser());
+        ruleMapper.insertJsonb(draft);
+        return draft;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public ProfileScoreRule updateDraft(ProfileRuleBo bo) {
         if (bo.getRuleId() == null) {

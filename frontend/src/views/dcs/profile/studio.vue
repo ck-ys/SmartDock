@@ -1,6 +1,6 @@
 <template>
   <div class="app-container studio-page">
-    <dcs-operations-page-header eyebrow="画像引擎" title="画像工作室" subtitle="配置指标口径与权重版本：维度改口径，规则改权重，发布后再重算生效。">
+    <dcs-operations-page-header eyebrow="画像引擎" title="画像工作室" subtitle="套场景模板点齐四件套，或自建维度配权重：改完发布，重算后生效。">
       <template #actions>
         <el-select v-model="source" class="source-select" @change="onSourceChange">
           <el-option v-for="s in sourceOpts" :key="s.value" :label="s.label" :value="s.value" />
@@ -17,6 +17,77 @@
 
     <el-card shadow="never" class="main-card">
       <el-tabs v-model="activeTab">
+        <el-tab-pane label="场景模板" name="scenario">
+          <div v-loading="scenarioLoading" class="scenario-intro">
+            <p class="scenario-intro__title">从场景模板开始，一套点齐「维度 + 权重 + 分群 + 漏斗」</p>
+            <p class="muted small">
+              套用不会覆盖已有配置（同编码一律跳过），权重只生成草稿——去「权重规则」核对发布后才影响打分。
+              行业模板里的事件名是通用示例，套用后按接入指南换成你业务的真实事件名。
+            </p>
+          </div>
+
+          <div class="scenario-group">
+            <div class="scenario-group__head">
+              <span class="scenario-group__title">推荐场景</span>
+              <span class="muted small">内置 {{ scenarioBuiltin.length }} 套，随系统升级</span>
+            </div>
+            <div class="scenario-cards">
+              <div v-for="tpl in scenarioBuiltin" :key="tpl.code" class="scenario-card" :class="{ 'scenario-card--star': tpl.recommended }">
+                <div class="scenario-card__head">
+                  <span class="scenario-card__name">{{ tpl.name }}</span>
+                  <el-tag v-if="tpl.recommended" type="success" effect="dark" size="small">推荐 · 默认</el-tag>
+                </div>
+                <p class="scenario-card__desc">{{ tpl.description }}</p>
+                <div class="scenario-card__chips muted small">
+                  <span>{{ tpl.dimensionCount }} 维度</span>
+                  <span>{{ tpl.segmentCount }} 分群</span>
+                  <span>{{ tpl.funnelCount }} 漏斗</span>
+                </div>
+                <div class="scenario-card__weights">
+                  <div v-for="w in tpl.weightPreview" :key="w.dimCode" class="scenario-weight">
+                    <span class="scenario-weight__name" :title="w.dimCode">{{ w.dimName }}</span>
+                    <span class="scenario-weight__bar">
+                      <i :style="{ width: weightBarWidth(w.weight) }" />
+                    </span>
+                    <span class="scenario-weight__num mono">{{ formatWeight(w.weight) }}</span>
+                  </div>
+                </div>
+                <div class="scenario-card__actions">
+                  <el-button v-hasPermi="['profile:scenario:edit']" type="primary" size="small" :loading="scenarioApplying === tpl.code" @click="applyScenario(tpl)">套用预填</el-button>
+                  <el-button size="small" @click="downloadScenario(tpl)">导出 JSON</el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="scenario-group">
+            <div class="scenario-group__head">
+              <span class="scenario-group__title">我的模板</span>
+              <div class="scenario-group__tools">
+                <el-button v-hasPermi="['profile:scenario:edit']" size="small" @click="openImportDialog">导入 JSON</el-button>
+                <span class="muted small">{{ scenarioSaved.length ? `共 ${scenarioSaved.length} 套` : '还没有自己的模板——导出内置模板改一改再导回来，或自己配好后导入' }}</span>
+              </div>
+            </div>
+            <div v-if="scenarioSaved.length" class="scenario-cards">
+              <div v-for="tpl in scenarioSaved" :key="tpl.templateId" class="scenario-card">
+                <div class="scenario-card__head">
+                  <span class="scenario-card__name">{{ tpl.name }}</span>
+                </div>
+                <p class="scenario-card__desc">{{ tpl.description }}</p>
+                <div class="scenario-card__chips muted small">
+                  <span>{{ tpl.dimensionCount }} 维度</span>
+                  <span>{{ tpl.segmentCount }} 分群</span>
+                  <span>{{ tpl.funnelCount }} 漏斗</span>
+                </div>
+                <div class="scenario-card__actions">
+                  <el-button v-hasPermi="['profile:scenario:edit']" type="primary" size="small" :loading="scenarioApplying === String(tpl.templateId)" @click="applyScenario(tpl)">套用预填</el-button>
+                  <el-button size="small" @click="downloadScenario(tpl)">导出 JSON</el-button>
+                  <el-button v-hasPermi="['profile:scenario:edit']" size="small" type="danger" plain @click="removeScenario(tpl)">删除</el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
         <el-tab-pane label="维度配置" name="dimension">
           <div class="toolbar">
             <div class="toolbar-left">
@@ -271,6 +342,26 @@
         </el-tab-pane>
       </el-tabs>
     </el-card>
+
+    <!-- 场景模板导入(F 片) -->
+    <el-dialog v-model="importDialogVisible" title="导入模板 JSON" width="min(640px, 94%)" destroy-on-close>
+      <p class="muted small" style="margin-top: 0">
+        粘贴导出的模板 JSON（或选文件），校验通过后存进「我的模板」。编码不能与内置模板或已有模板重复。
+      </p>
+      <input type="file" accept=".json,application/json" class="scenario-import-file" @change="onImportFile" />
+      <el-input
+        v-model="importJsonText"
+        type="textarea"
+        :rows="12"
+        placeholder='{"code":"my_retail","name":"我的零售模板",...}'
+        class="mono"
+        spellcheck="false"
+      />
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button v-hasPermi="['profile:scenario:edit']" type="primary" :loading="importSaving" :disabled="!importJsonText.trim()" @click="submitImport">校验并导入</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 维度编辑 -->
     <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="min(780px, 94%)" top="4vh" destroy-on-close>
@@ -684,17 +775,22 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { checkPermi } from '@/utils/permission';
 import {
+  applyScenarioTemplate,
   archiveRule as archiveRuleApi,
   createDimension,
   createRuleDraft,
   deleteRuleDraft,
+  deleteScenarioTemplate,
   diffRule,
   disableDimension,
+  exportScenarioTemplate,
   getCurrentRule,
   getDimensionCapabilities,
   getDimensionCoverage,
   getRuleHistory,
   getRuleTemplates,
+  getScenarioTemplates,
+  importScenarioTemplate,
   impactRule,
   listDimensions,
   previewDimension,
@@ -713,7 +809,10 @@ import {
   type ProfileRuleDiff,
   type ProfileRuleImpact,
   type ProfileRuleTemplate,
-  type ProfileRuleValidation
+  type ProfileRuleValidation,
+  type ScenarioApplyReceipt,
+  type ScenarioCatalog,
+  type ScenarioTemplateSummary
 } from '@/api/dcs/core/profile';
 import { useSourceOptions, autoPickSource } from '@/composables/useProfileSources';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
@@ -724,7 +823,7 @@ const router = useRouter();
 const source = ref('dcs');
 // 真实数据优先: 首挂单轮加载(三审 dspro P1)——onMounted 等清单→autoPick→一次加载, 不再双载
 const initialSource = source.value;
-const activeTab = ref('dimension');
+const activeTab = ref('scenario');
 const loading = ref(false);
 const dimensionLoading = ref(false);
 const coverageLoading = ref(false);
@@ -1329,9 +1428,129 @@ const loadAll = async () => {
   try {
     await loadDimensions();
     await loadRules();
+    await loadScenario();
   } finally {
     loading.value = false;
   }
+};
+
+// ---- F 片: 场景模板库 ----
+
+const scenarioCatalog = ref<ScenarioCatalog>({ builtin: [], saved: [] });
+const scenarioLoading = ref(false);
+const scenarioApplying = ref('');
+const importDialogVisible = ref(false);
+const importJsonText = ref('');
+const importSaving = ref(false);
+
+const scenarioBuiltin = computed(() => scenarioCatalog.value.builtin);
+const scenarioSaved = computed(() => scenarioCatalog.value.saved);
+
+const loadScenario = async () => {
+  scenarioLoading.value = true;
+  try {
+    scenarioCatalog.value = await getScenarioTemplates();
+  } finally {
+    scenarioLoading.value = false;
+  }
+};
+
+const weightBarWidth = (weight: number | null) => (weight == null ? '0%' : `${Math.max(2, Math.round(weight * 100))}%`);
+const formatWeight = (weight: number | null) => (weight == null ? '—' : `${Math.round(weight * 100)}%`);
+
+const receiptText = (r: ScenarioApplyReceipt) => {
+  const lines: string[] = [];
+  lines.push(`维度：新增 ${r.dimensionsCreated.length} 个${r.dimensionsSkipped.length ? `，跳过已存在 ${r.dimensionsSkipped.length} 个` : ''}`);
+  lines.push(`分群：新增 ${r.segmentsCreated.length} 个${r.segmentsSkipped.length ? `，跳过已存在 ${r.segmentsSkipped.length} 个` : ''}`);
+  lines.push(`漏斗：新增 ${r.funnelsCreated.length} 个${r.funnelsSkipped.length ? `，跳过已存在 ${r.funnelsSkipped.length} 个` : ''}`);
+  lines.push(`权重：${r.draftNote}`);
+  return lines.join('\n');
+};
+
+const applyScenario = async (tpl: ScenarioTemplateSummary) => {
+  const ok = await ElMessageBox.confirm(
+    `套用「${tpl.name}」：同编码的维度/分群/漏斗一律跳过，权重只生成草稿，不自动发布。继续？`,
+    '套用模板',
+    { type: 'info', confirmButtonText: '套用', cancelButtonText: '再想想' }
+  ).catch(() => false);
+  if (!ok) return;
+  scenarioApplying.value = tpl.kind === 'builtin' ? tpl.code : String(tpl.templateId);
+  try {
+    const receipt = await applyScenarioTemplate(
+      tpl.kind === 'builtin'
+        ? { code: tpl.code, subjectType: 'user' }
+        : { templateId: tpl.templateId ?? undefined, subjectType: 'user' }
+    );
+    // 回执先弹——刷新失败不能吞掉「服务端已写入」的事实(三审回修 dspro P2)
+    ElMessageBox.alert(receiptText(receipt), `已套用「${receipt.templateName}」`, {
+      confirmButtonText: '知道了',
+      customStyle: { whiteSpace: 'pre-line' } as any
+    }).catch(() => undefined);
+    await loadAll().catch(() => undefined);
+  } finally {
+    scenarioApplying.value = '';
+  }
+};
+
+const downloadScenario = async (tpl: ScenarioTemplateSummary) => {
+  const def = await exportScenarioTemplate(
+    tpl.kind === 'builtin' ? { code: tpl.code } : { templateId: tpl.templateId ?? undefined }
+  );
+  const blob = new Blob([JSON.stringify(def, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `smartdock-template-${tpl.code}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const openImportDialog = () => {
+  importJsonText.value = '';
+  importDialogVisible.value = true;
+};
+
+const onImportFile = (ev: Event) => {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    importJsonText.value = String(reader.result ?? '');
+  };
+  reader.readAsText(file);
+  input.value = '';
+};
+
+const submitImport = async () => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(importJsonText.value);
+  } catch (e) {
+    ElMessage.error(`不是合法 JSON：${(e as Error).message}`);
+    return;
+  }
+  importSaving.value = true;
+  try {
+    const saved = await importScenarioTemplate(parsed);
+    importDialogVisible.value = false;
+    await loadScenario();
+    ElMessage.success(`已导入「${saved.name}」，在「我的模板」里可见`);
+  } finally {
+    importSaving.value = false;
+  }
+};
+
+const removeScenario = async (tpl: ScenarioTemplateSummary) => {
+  const ok = await ElMessageBox.confirm(
+    `删除「${tpl.name}」只移除模板本身，已经套用生成的维度/分群/漏斗不受影响。继续？`,
+    '删除模板',
+    { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+  ).catch(() => false);
+  if (!ok) return;
+  await deleteScenarioTemplate(tpl.templateId!);
+  await loadScenario();
+  ElMessage.success('已删除');
 };
 
 const onSourceChange = async () => {
@@ -2040,5 +2259,128 @@ onMounted(async () => {
   font-family: Consolas, monospace;
   font-size: 12px;
   color: var(--app-muted);
+}
+
+/* ---- F 片: 场景模板库 ---- */
+.scenario-intro {
+  margin: 4px 0 16px;
+}
+.scenario-intro__title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.scenario-intro p {
+  margin: 0;
+  max-width: 72ch;
+}
+.scenario-group {
+  margin-bottom: 20px;
+}
+.scenario-group__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.scenario-group__title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.scenario-group__tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.scenario-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 992px) {
+  .scenario-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.scenario-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-control-radius);
+}
+.scenario-card--star {
+  border-color: var(--el-color-success-light-5);
+}
+.scenario-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.scenario-card__name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.scenario-card__desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--app-muted);
+  line-height: 1.5;
+}
+.scenario-card__chips {
+  display: flex;
+  gap: 10px;
+}
+.scenario-card__weights {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--app-ground);
+  border-radius: 6px;
+}
+.scenario-weight {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.scenario-weight__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scenario-weight__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--app-border);
+  overflow: hidden;
+}
+.scenario-weight__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--app-accent);
+}
+.scenario-weight__num {
+  text-align: right;
+  color: var(--app-muted);
+}
+.scenario-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+.scenario-import-file {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 12px;
 }
 </style>
