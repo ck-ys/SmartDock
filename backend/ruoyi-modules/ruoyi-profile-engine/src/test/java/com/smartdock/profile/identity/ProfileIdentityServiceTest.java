@@ -50,19 +50,24 @@ class ProfileIdentityServiceTest {
     }
 
     private ProfileIdentityLink link(String subjectId) {
+        return link("user", subjectId);
+    }
+
+    /** subjectType 显式版: 匿名桥行的类型冻结在首次创建时(如 visitor), 与持有者强标识命名空间(如 user)可以不同 */
+    private ProfileIdentityLink link(String subjectType, String subjectId) {
         ProfileIdentityLink link = new ProfileIdentityLink();
         link.setSubjectId(subjectId);
-        link.setSubjectType("user");
+        link.setSubjectType(subjectType);
         return link;
     }
 
     @Test
     void anonymousRevisitAfterLoginKeepsUserAttribution() {
-        // 匿名链接 A→U(U 持有 user_id 强标识); 登录后的下一次匿名事件必须归因到 U,
-        // 且绝不能把 U 并入匿名主体(旧实现反向 merge 会把用户链接搬走)
+        // 匿名桥行 (visitor, user-1)——桥类型冻结在访客期, 而 user-1 的强标识在 user 命名空间;
+        // 强标识计数必须跨类型, 否则会把真实用户误判成纯匿名主体而反向搬链接(两席审查实锤的回归)
         when(linkMapper.selectLinkShared("000000", "web", "anonymous_id", "anon-A"))
-            .thenReturn(link("user-1"));
-        when(linkMapper.countStrongLinks("000000", "web", "user", "user-1")).thenReturn(1);
+            .thenReturn(link("visitor", "user-1"));
+        when(linkMapper.countStrongLinks("000000", "web", "user-1")).thenReturn(1);
 
         String canonical = service.resolveAndLink("000000", "web", "visitor", "anon-A",
             Map.of("anonymous_id", "anon-A"));
@@ -74,11 +79,11 @@ class ProfileIdentityServiceTest {
 
     @Test
     void sharedBrowserSecondLoginDoesNotStealFirstUserLinks() {
-        // 浏览器匿名 A 已挂到 user-1; user-2 在同一浏览器登录: 只改挂匿名链接, 不搬 user-1 的身份
+        // 浏览器匿名桥 (visitor, user-1); user-2 在同一浏览器登录: 只改挂匿名链接, 不搬 user-1 的身份
         when(linkMapper.selectLinkStrong("000000", "web", "user", "user_id", "user-2")).thenReturn(null);
         when(linkMapper.selectLinkShared("000000", "web", "anonymous_id", "anon-A"))
-            .thenReturn(link("user-1"));
-        when(linkMapper.countStrongLinks("000000", "web", "user", "user-1")).thenReturn(1);
+            .thenReturn(link("visitor", "user-1"));
+        when(linkMapper.countStrongLinks("000000", "web", "user-1")).thenReturn(1);
 
         String canonical = service.resolveAndLink("000000", "web", "user", "user-2",
             Map.of("user_id", "user-2", "anonymous_id", "anon-A"));
@@ -96,8 +101,8 @@ class ProfileIdentityServiceTest {
         // 匿名链接 A→A(纯匿名主体, 无强标识): 首次登录正常升级, A 并入规范主体
         when(linkMapper.selectLinkStrong("000000", "web", "user", "user_id", "user-1")).thenReturn(null);
         when(linkMapper.selectLinkShared("000000", "web", "anonymous_id", "anon-A"))
-            .thenReturn(link("anon-A"));
-        when(linkMapper.countStrongLinks("000000", "web", "user", "anon-A")).thenReturn(0);
+            .thenReturn(link("visitor", "anon-A"));
+        when(linkMapper.countStrongLinks("000000", "web", "anon-A")).thenReturn(0);
 
         String canonical = service.resolveAndLink("000000", "web", "user", "user-1",
             Map.of("user_id", "user-1", "anonymous_id", "anon-A"));
@@ -106,6 +111,10 @@ class ProfileIdentityServiceTest {
         verify(linkMapper).moveSubject(eq("000000"), eq("web"), eq("user"),
             eq("anon-A"), eq("user-1"));
         verify(mergeMapper).insert(any(ProfileIdentityMerge.class));
+        // 桥行改挂到 user-1 后沿用既有行的 visitor 类型, 保持跨类型单行
+        verify(linkMapper).upsertLink(Mockito.argThat(l ->
+            "visitor".equals(l.getSubjectType()) && "user-1".equals(l.getSubjectId())
+                && "anonymous_id".equals(l.getIdentifierType())));
     }
 
     @Test

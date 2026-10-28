@@ -144,7 +144,8 @@ public class ProfileIdentityService {
                 String holder = existing.getSubjectId();
                 if (strongConflict) {
                     conflictingTypes.add("anonymous_id");
-                } else if (linkMapper.countStrongLinks(tenantId, source, existingAnonType, holder) > 0) {
+                } else if (linkMapper.countStrongLinks(tenantId, source, holder) > 0) {
+                    // 持有者在任一主体类型命名空间下有强标识即真实用户(桥行类型可能与强标识命名空间不同)
                     // 匿名 ID 已挂在真实用户名下:
                     // 匿名回访 → 沿用该用户, 事件归因不断链;
                     // 共享浏览器换账号(userId 已定新 canonical) → 只把匿名链接改挂到新主体, 不搬对方身份

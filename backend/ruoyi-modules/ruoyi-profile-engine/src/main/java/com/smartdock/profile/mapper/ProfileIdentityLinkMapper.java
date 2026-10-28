@@ -107,18 +107,18 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
 
     /**
      * 主体名下的强标识(user_id/email/...)链接数: 大于 0 即真实用户, 合并前必查, 防止搬走真实用户身份。
+     * 不按 subject_type 过滤——匿名桥行的类型冻结在首次创建时(如 visitor), 而持有者的强标识
+     * 登记在登录事件类型命名空间(如 user), 按桥行类型查会把真实用户误判成纯匿名主体而反向搬链接。
      */
     @Select("""
         SELECT count(*)
         FROM profile_identity_link
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND subject_type = #{subjectType}
           AND subject_id = #{subjectId} AND status = 'ACTIVE'
           AND identifier_type IN ('user_id','email_sha256','phone_sha256','crm_id','member_id','account_id')
         """)
     int countStrongLinks(@Param("tenantId") String tenantId,
                          @Param("source") String source,
-                         @Param("subjectType") String subjectType,
                          @Param("subjectId") String subjectId);
 
     /**
