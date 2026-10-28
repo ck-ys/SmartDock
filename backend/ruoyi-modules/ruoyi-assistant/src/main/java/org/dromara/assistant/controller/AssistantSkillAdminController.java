@@ -99,6 +99,21 @@ public class AssistantSkillAdminController extends BaseController {
         String tenantId = LoginHelper.getTenantId();
         SkillAssets.LoadedSkill eff = findEffective(skillId, tenantId);
         if (eff == null) {
+            // 停用行不在生效视图（遮罩语义），管理台编辑停用技能时仍要给回填
+            for (DcsAssistantSkill r : skillMapper.selectAllForTenant(tenantId)) {
+                if (r.getSkillId() != null && r.getSkillId().equals(skillId)
+                    && r.getDisabled() != null && r.getDisabled() == 1) {
+                    eff = new SkillAssets.LoadedSkill(r.getSkillId(),
+                        r.getDisplayName() == null || r.getDisplayName().isBlank()
+                            ? r.getSkillId() : r.getDisplayName(),
+                        r.getDescription() == null ? "" : r.getDescription(),
+                        DatabaseSkillRepository.minRoleOf(r.getMinRole()),
+                        r.getBody() == null ? "" : r.getBody());
+                    break;
+                }
+            }
+        }
+        if (eff == null) {
             return R.fail("没有这个技能，或当前租户不可见");
         }
         Map<String, Object> out = baseRow(eff);

@@ -29,6 +29,8 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
     private final int roleLevel;
     private final Map<String, String> toolGate;
     private final String tenantId;
+    /** 5b 批：本租户停用遮罩集（构造时取——停用行把内置/目录层同名技能一并藏起） */
+    private final java.util.Set<String> disabledIds;
 
     /**
      * 仓分层栈取 {@link AssistantSkillSource}（前两层进程级共享，FileSystem 记忆化才生效；
@@ -45,11 +47,12 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
         this.toolGate = toolGate;
         this.tenantId = tenantId == null || tenantId.isBlank()
             ? DatabaseSkillRepository.GLOBAL_TENANT : tenantId;
+        this.disabledIds = DatabaseSkillRepository.disabledIds(this.tenantId);
     }
 
     @Override
     protected List<AgentSkill> filterVisible(List<AgentSkill> raw, RuntimeContext ctx) {
-        return filterVisibleImpl(raw, roleLevel, toolGate);
+        return filterVisibleImpl(raw, roleLevel, toolGate, disabledIds);
     }
 
     /**
@@ -57,14 +60,27 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
      * 静态可测——不经框架运行时，正反例直接构造 AgentSkill 断言。
      *
      * <p><b>护栏约束（三审 glm53 P2-3）</b>：本方法<b>禁抛异常、禁引入可失败 IO/查库</b>——
-     * 官方基类对 filterVisible 的异常按 pass-through 全量放行处理，本方法是「谁能用哪个
-     * 技能」的唯一判定层，未来扩展只允许纯内存计算；矩阵快照在构造时取得，一切可失败
-     * 读取必须发生在构造路径（失败即建会话失败=关闭面）而非判定路径。</p>
+     * 官方基类对 filterVisible 的异常按 pass-through 全量放行处理，本方法是「谁能用哪个技能」
+     * 的唯一判定层，未来扩展只允许纯内存计算；矩阵快照与停用遮罩集在构造时取得，
+     * 一切可失败读取必须发生在构造路径（失败即建会话失败=关闭面）而非判定路径。</p>
      */
     static List<AgentSkill> filterVisibleImpl(List<AgentSkill> raw, int roleLevel,
                                               Map<String, String> toolGate) {
+        return filterVisibleImpl(raw, roleLevel, toolGate, null);
+    }
+
+    /** 5b 批：带停用遮罩集的判定（null/空=无停用行）；停用=整技能剔除，优先于档位判定 */
+    static List<AgentSkill> filterVisibleImpl(List<AgentSkill> raw, int roleLevel,
+                                              Map<String, String> toolGate,
+                                              java.util.Set<String> disabledIds) {
         List<AgentSkill> out = new ArrayList<>(raw.size());
         for (AgentSkill s : raw) {
+            if (s == null || s.getName() == null) {
+                continue;
+            }
+            if (disabledIds != null && disabledIds.contains(s.getName())) {
+                continue;
+            }
             int builtin = AssistantSkillSource.minRoleOf(s);
             int effective = ToolRegistry.effectiveMinRoleSingle(
                 gateKey(s.getName()), builtin,

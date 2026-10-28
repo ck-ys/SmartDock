@@ -103,4 +103,24 @@ class DatabaseSkillLayerUnitTest {
         assertThat(view).extracting(AssistantSkillSource.SkillView::id)
             .containsExactlyElementsOf(SkillAssets.SKILLS.stream().map(SkillAssets.Skill::id).toList());
     }
+
+    @Test
+    @Tag("dev")
+    void disabledRowMasksBuiltinEntirely() {
+        // 5b 停用遮罩（活体首测 P0 回修）：disabled=1 行必须把内置层同名技能一并藏起，
+        // 而不是被下层顶回——用户目录/管理列表/注入判定三条消费路径都吃 all() 视图
+        AssistantSkillSource.invalidateAll();
+        DatabaseSkillRepository.primeForTest(T_A, List.of(),
+            java.util.Set.of("urge-wording"));
+        AssistantSkillSource.clearMergedOnly();
+
+        List<AssistantSkillSource.SkillView> viewA = AssistantSkillSource.all(T_A);
+        assertThat(viewA).extracting(AssistantSkillSource.SkillView::id)
+            .doesNotContain("urge-wording")
+            .contains("data-reading");
+        // 遮罩集对无停用行的租户无溢出
+        AssistantSkillSource.clearMergedOnly();
+        assertThat(AssistantSkillSource.all(T_B)).extracting(AssistantSkillSource.SkillView::id)
+            .contains("urge-wording");
+    }
 }

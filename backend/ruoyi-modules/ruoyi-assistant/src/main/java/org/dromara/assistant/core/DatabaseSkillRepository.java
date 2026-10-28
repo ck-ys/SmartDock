@@ -37,7 +37,7 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
 
     private static final Map<String, Cached> CACHE = new ConcurrentHashMap<>();
 
-    private record Cached(List<AgentSkill> skills, long at) {
+    private record Cached(List<AgentSkill> skills, java.util.Set<String> disabled, long at) {
     }
 
     private final String tenantId;
@@ -53,9 +53,26 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
         if (snap != null && now - snap.at() < TTL_MS) {
             return snap.skills();
         }
-        List<AgentSkill> loaded = load();
-        CACHE.put(tenantId, new Cached(loaded, now));
-        return loaded;
+        Load loaded = load();
+        CACHE.put(tenantId, new Cached(loaded.skills(), loaded.disabled(), now));
+        return loaded.skills();
+    }
+
+    /**
+     * 本租户被停用（disabled=1）的技能标识集——停用是「整技能遮罩」语义：在线层停用行
+     * 必须把下层（内置/目录）同名技能一并藏起，而不是被下层顶回。合并视图
+     * （AssistantSkillSource.all）与门闸中间件构造路径都读本集；空集=无停用。
+     */
+    public static java.util.Set<String> disabledIds(String tenantId) {
+        String key = tenantId == null || tenantId.isBlank() ? GLOBAL_TENANT : tenantId;
+        Cached snap = CACHE.get(key);
+        long now = System.currentTimeMillis();
+        if (snap == null || now - snap.at() >= TTL_MS) {
+            // 触发一次正规装载（装载含禁用行解析），再读缓存
+            new DatabaseSkillRepository(key).getAllSkills();
+            snap = CACHE.get(key);
+        }
+        return snap == null ? java.util.Set.of() : snap.disabled();
     }
 
     @Override
@@ -124,26 +141,37 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
         CACHE.clear();
     }
 
-    /** 纯函数单测通道：直灌缓存绕开 Spring */
+    /** 纯函数单测通道：直灌缓存绕开 Spring（无停用行） */
     static void primeForTest(String tenantId, List<AgentSkill> skills) {
-        CACHE.put(tenantId, new Cached(List.copyOf(skills), System.currentTimeMillis()));
+        primeForTest(tenantId, skills, java.util.Set.of());
     }
 
-    /** 读表→官方 AgentSkill（同 skill_id 租户行胜全局行；minRole 只升不降对内置由合并层兜底） */
-    private List<AgentSkill> load() {
+    /** 纯函数单测通道：直灌缓存（生效技能＋停用遮罩集） */
+    static void primeForTest(String tenantId, List<AgentSkill> skills, java.util.Set<String> disabled) {
+        CACHE.put(tenantId, new Cached(List.copyOf(skills), java.util.Set.copyOf(disabled),
+            System.currentTimeMillis()));
+    }
+
+    /** 装载结果：生效技能＋停用遮罩集 */
+    private record Load(List<AgentSkill> skills, java.util.Set<String> disabled) {
+    }
+
+    /** 读表→官方 AgentSkill（同 skill_id 租户行胜全局行；disabled=1 行进遮罩集） */
+    private Load load() {
         AssistantSkillMapper mapper;
         try {
             mapper = SpringUtils.getBean(AssistantSkillMapper.class);
         } catch (Exception noSpring) {
             log.debug("[skill-db] Spring 未就绪（纯单测场景），数据库层缺席");
-            return List.of();
+            return new Load(List.of(), java.util.Set.of());
         }
         try {
-            List<DcsAssistantSkill> rows = mapper.selectEffective(tenantId);
+            // 全量行（含 disabled）在 Java 侧分拣：生效行建技能，停用行进遮罩集
+            List<DcsAssistantSkill> rows = mapper.selectAllForTenant(tenantId);
             Map<String, DcsAssistantSkill> byId = new LinkedHashMap<>();
+            java.util.Set<String> disabled = new java.util.LinkedHashSet<>();
             for (DcsAssistantSkill row : rows) {
-                if (row == null || row.getSkillId() == null || row.getBody() == null
-                    || row.getBody().isBlank()) {
+                if (row == null || row.getSkillId() == null) {
                     continue;
                 }
                 // 排序 tenant_id 在后=租户行，同 skill_id 覆盖 000000 行
@@ -151,6 +179,13 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
             }
             List<AgentSkill> out = new ArrayList<>(byId.size());
             for (DcsAssistantSkill row : byId.values()) {
+                if (row.getDisabled() != null && row.getDisabled() == 1) {
+                    disabled.add(row.getSkillId());
+                    continue;
+                }
+                if (row.getBody() == null || row.getBody().isBlank()) {
+                    continue;
+                }
                 Map<String, Object> meta = new LinkedHashMap<>();
                 meta.put("displayName",
                     row.getDisplayName() == null || row.getDisplayName().isBlank()
@@ -169,12 +204,13 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
                     .source("database")
                     .build());
             }
-            log.debug("[skill-db] 租户 {} 生效 {} 条在线技能行", tenantId, out.size());
-            return List.copyOf(out);
+            log.debug("[skill-db] 租户 {} 生效 {} 条在线技能行，停用遮罩 {} 条",
+                tenantId, out.size(), disabled.size());
+            return new Load(List.copyOf(out), java.util.Set.copyOf(disabled));
         } catch (Exception e) {
             // DB 故障=本层缺席（内置/目录层照常），不连坐建会话链
             log.warn("[skill-db] 租户 {} 在线层读取失败，本层缺席（内置层照常）: {}", tenantId, e.getMessage());
-            return List.of();
+            return new Load(List.of(), java.util.Set.of());
         }
     }
 

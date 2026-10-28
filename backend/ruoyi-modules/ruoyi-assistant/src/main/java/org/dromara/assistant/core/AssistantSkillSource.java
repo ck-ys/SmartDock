@@ -130,6 +130,8 @@ public final class AssistantSkillSource {
 
     /**
      * 租户版合并视图（5b 批）：三层叠加后按租户的最终生效技能。
+     * 停用行=整技能遮罩（把下层内置/目录同名技能一并藏起，见
+     * {@link DatabaseSkillRepository#disabledIds}）。
      * 缓存 TTL 30 秒（题3=乙兜底）＋保存/广播即时失效（{@link #invalidateAll()}）。
      */
     public static List<SkillView> all(String tenantId) {
@@ -140,7 +142,10 @@ public final class AssistantSkillSource {
         if (snap != null && now - snap.at() < DatabaseSkillRepository.TTL_MS) {
             return snap.views();
         }
-        List<SkillView> views = mergeAll(repositories(key));
+        List<SkillView> merged = mergeAll(repositories(key));
+        java.util.Set<String> masked = DatabaseSkillRepository.disabledIds(key);
+        List<SkillView> views = masked.isEmpty() ? merged : merged.stream()
+            .filter(v -> !masked.contains(v.id())).toList();
         MERGED_BY_TENANT.put(key, new TenantCache(views, now));
         return views;
     }

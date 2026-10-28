@@ -22,8 +22,23 @@ class AssistantSkillGateMiddlewareUnitTest {
     private static AgentSkill skill(String name, String minRole) {
         return new AgentSkill(
             Map.of("name", name, "description", "desc-" + name, "minRole", minRole,
-                "displayName", "显示-" + name, "triggers", List.of("词-" + name)),
+                "displayName", "显示-" + name),
             "body-" + name, Map.of(), "test");
+    }
+
+    @Test
+    @Tag("dev")
+    void disabledMaskDropsSkillBeforeRoleCheck() {
+        // 5b 停用遮罩（活体首测 P0 回修）：停用集优先于档位判定——即便超管也不可见
+        List<AgentSkill> raw = List.of(skill("data-reading", "member"));
+        assertThat(AssistantSkillGateMiddleware.filterVisibleImpl(raw,
+            ToolIdentity.LEVEL_ADMIN, Map.of(), java.util.Set.of("data-reading"))).isEmpty();
+        // 同集不影响未停用技能
+        assertThat(AssistantSkillGateMiddleware.filterVisibleImpl(raw,
+            ToolIdentity.LEVEL_MEMBER, Map.of(), java.util.Set.of("other-skill"))).hasSize(1);
+        // null 集=旧口径不变
+        assertThat(AssistantSkillGateMiddleware.filterVisibleImpl(raw,
+            ToolIdentity.LEVEL_MEMBER, null, null)).hasSize(1);
     }
 
     @Test
