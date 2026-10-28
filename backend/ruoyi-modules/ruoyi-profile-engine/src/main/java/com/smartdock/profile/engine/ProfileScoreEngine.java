@@ -41,6 +41,14 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ProfileScoreEngine {
 
+    /** 无启用维度时快照 detail 的标记键: 前端据此显示「未配置打分规则」, 而非把占位 50 分当真实评价。 */
+    public static final String UNCONFIGURED_FLAG = "_noDimensions";
+
+    /** 快照 detail 是否为「未配置」(无启用维度): 此类快照不入低分复核队列(防 50 分刷屏)。 */
+    public static boolean isUnconfiguredDetail(Map<String, Object> detail) {
+        return detail != null && detail.containsKey(UNCONFIGURED_FLAG);
+    }
+
     private final ProfileScoreDimensionMapper dimensionMapper;
     private final ProfileScoreRuleMapper ruleMapper;
     private final ProfileScoreSnapshotMapper snapshotMapper;
@@ -67,6 +75,12 @@ public class ProfileScoreEngine {
 
         // 维度执行
         Map<String, Object> detail = new LinkedHashMap<>();
+        // 无启用维度=该源未配置打分口径: 快照照落, 但总分 50 只是占位不是评价——
+        // 打标记(前端显示「未配置」)且不入低分复核队列, 防止 50<60 把复核页刷满
+        boolean unconfigured = dims.isEmpty();
+        if (unconfigured) {
+            detail.put(UNCONFIGURED_FLAG, true);
+        }
         BigDecimal weightedSum = BigDecimal.ZERO;
         BigDecimal weightSum = BigDecimal.ZERO;
         double defaultWeight = dims.isEmpty() ? 0 : 1.0 / dims.size();
@@ -131,11 +145,13 @@ public class ProfileScoreEngine {
                 snapshotMapper.updateDimensionDetail(snapshot.getSnapshotId(), tenantId, snapshot.getDimensionDetail());
             }
         }
-        try {
-            reviewService.evaluateAfterRecalc(snapshot);
-        } catch (Exception e) {
-            // 复核入队失败不影响快照
-            log.warn("[Profile] review enqueue failed subject={} err={}", subjectId, e.getMessage());
+        if (!unconfigured) {
+            try {
+                reviewService.evaluateAfterRecalc(snapshot);
+            } catch (Exception e) {
+                // 复核入队失败不影响快照
+                log.warn("[Profile] review enqueue failed subject={} err={}", subjectId, e.getMessage());
+            }
         }
         log.info("[Profile] snapshot written subject={} total={} dims={} prev={}",
             subjectId, total, detail.size(), snapshot.getPrevSnapshotId());
