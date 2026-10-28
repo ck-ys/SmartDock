@@ -41,10 +41,13 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class ProfileScoreEngine {
 
-    /** 无启用维度时快照 detail 的标记键: 前端据此显示「未配置打分规则」, 而非把占位 50 分当真实评价。 */
+    /** 无有效维度时快照 detail 的标记键: 前端据此显示「未配置打分规则」, 而非把占位 50 分当真实评价。 */
     public static final String UNCONFIGURED_FLAG = "_noDimensions";
 
-    /** 快照 detail 是否为「未配置」(无启用维度): 此类快照不入低分复核队列(防 50 分刷屏)。 */
+    /**
+     * 快照 detail 是否为「无有效维度」(未配置, 或维度配了但全部跳过——策略 bean 改名/评估异常/无证据 SKIP):
+     * 此类快照总分只是 50 占位不是评价, 不入低分复核队列(防 50 分刷屏)。
+     */
     public static boolean isUnconfiguredDetail(Map<String, Object> detail) {
         return detail != null && detail.containsKey(UNCONFIGURED_FLAG);
     }
@@ -116,6 +119,13 @@ public class ProfileScoreEngine {
             detail.put(key, entry);
             weightedSum = weightedSum.add(normalized.multiply(BigDecimal.valueOf(w)));
             weightSum = weightSum.add(BigDecimal.valueOf(w));
+        }
+
+        // 全部维度被跳过(策略缺失/评估异常/无证据)时与「未配置」同口径:
+        // 总分同样只是 50 占位不是评价, 补打标记且不入复核——夜审 P1: 只堵「无维度」漏了「全跳过」
+        if (!unconfigured && weightSum.signum() == 0) {
+            unconfigured = true;
+            detail.put(UNCONFIGURED_FLAG, true);
         }
 
         // 总分 = 参与维度加权和 / 参与权重和(跳过维度触发归一化)

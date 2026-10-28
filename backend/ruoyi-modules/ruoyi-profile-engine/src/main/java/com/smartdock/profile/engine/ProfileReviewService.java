@@ -56,6 +56,18 @@ public class ProfileReviewService {
         if (StringUtils.isBlank(tenantId) || StringUtils.isBlank(source)) {
             return false;
         }
+        // 夜审 P1: 占位 50 分不进复核。守卫放这里而不是只在引擎, 让 scan() 手动扫描(第二入口)
+        // 与其它调用方同一口径; 顺手把占位分时期误入队的存量 PENDING 自动销案
+        if (snapshot.isPlaceholderScore()) {
+            ProfileReviewQueue stalePending = pending(tenantId, source, snapshot.getSubjectType(), snapshot.getSubjectId());
+            if (stalePending != null) {
+                stalePending.setStatus("SUPERSEDED");
+                stalePending.setReviewNote("该主体无有效打分维度(未配置或全部跳过), 占位 50 分不再复核");
+                stalePending.setReviewedAt(new Date());
+                reviewMapper.updateById(stalePending);
+            }
+            return false;
+        }
         ProfileEngineConfig config = configService.getOrCreate(tenantId, source);
         if (!"1".equals(config.getReviewEnabled())) {
             return false;

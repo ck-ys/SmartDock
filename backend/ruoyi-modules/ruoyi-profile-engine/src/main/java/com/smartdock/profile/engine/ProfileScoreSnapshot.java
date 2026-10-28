@@ -46,4 +46,14 @@ public class ProfileScoreSnapshot extends BaseEntity {
     private Long prevSnapshotId;
 
     private Date calcTime;
+
+    /**
+     * 是否「无有效维度」的占位分快照: 引擎之外的第二入口(复核 scan 手动扫描等)不依赖引擎
+     * 内部分支也能识别, 占位 50 分不入复核。字符串包含法判键——免 JsonUtils 解析
+     * (其类初始化依赖 Spring, 纯单测不可用), 键名即前端契约(_noDimensions)。
+     */
+    public boolean isPlaceholderScore() {
+        return dimensionDetail != null
+            && dimensionDetail.contains("\"" + ProfileScoreEngine.UNCONFIGURED_FLAG + "\"");
+    }
 }
