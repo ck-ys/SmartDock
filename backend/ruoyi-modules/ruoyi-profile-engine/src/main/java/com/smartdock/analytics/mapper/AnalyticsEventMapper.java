@@ -26,7 +26,7 @@ public interface AnalyticsEventMapper {
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND occurred_time >= #{from} AND occurred_time < #{to}
-          AND del_flag = '0'
+          AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
         ORDER BY occurred_time, event_id
         """)
     List<AnalyticsEventRow> selectEvents(@Param("tenantId") String tenantId,
@@ -71,7 +71,7 @@ public interface AnalyticsEventMapper {
         FROM profile_event pe
         WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source}
           AND pe.occurred_time >= #{from} AND pe.occurred_time < #{to}
-          AND pe.del_flag = '0'
+          AND pe.del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
           AND COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) IN (
               SELECT COALESCE(NULLIF(a.anonymous_id, ''), a.subject_id)
               FROM profile_event a
@@ -204,7 +204,7 @@ public interface AnalyticsEventMapper {
         WHERE tenant_id = #{tenantId} AND source = #{source}
           AND COALESCE(NULLIF(anonymous_id, ''), subject_id) = #{visitorKey}
           AND occurred_time >= #{from} AND occurred_time < #{to}
-          AND del_flag = '0'
+          AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
         ORDER BY occurred_time, event_id
         """)
     List<AnalyticsEventRow> selectVisitorEvents(@Param("tenantId") String tenantId,
@@ -223,7 +223,7 @@ public interface AnalyticsEventMapper {
                count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id)) AS "visitors"
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
         GROUP BY 1
         ORDER BY 1
         """)
@@ -239,7 +239,7 @@ public interface AnalyticsEventMapper {
     @Select("""
         SELECT count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id)) FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
         """)
     long countWindowVisitors(@Param("tenantId") String tenantId,
                              @Param("source") String source,
@@ -265,7 +265,7 @@ public interface AnalyticsEventMapper {
                COALESCE(NULLIF(anonymous_id, ''), subject_id) AS "visitorKey"
         FROM profile_event
         WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0'
+          AND occurred_time >= #{from} AND occurred_time < #{to} AND del_flag = '0' AND event_name NOT IN ('user.login','task.published','data.submitted','data.audit_passed','data.audit_rejected','task.closed')
         ORDER BY 1
         """)
     List<Map<String, Object>> selectDailyActiveVisitors(@Param("tenantId") String tenantId,

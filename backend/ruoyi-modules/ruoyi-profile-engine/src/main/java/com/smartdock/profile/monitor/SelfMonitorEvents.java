@@ -15,16 +15,28 @@ import java.util.Set;
  */
 public final class SelfMonitorEvents {
 
-    /** 登录成功事件(固定事件名; 幂等编号 selfmon.login:userId:时间戳)。 */
+    /** 登录成功事件(固定事件名; 幂等编号 selfmon.login:userId:雪花ID)。 */
     public static final String LOGIN = "user.login";
 
-    /** 站内核心操作白名单(内置任务转发 demo 的五个动作, 事件名与落库 event_name 一致)。 */
+    // 站内核心操作(内置任务转发 demo 的五个动作)——生产侧一律引用常量, 禁止裸写字符串:
+    // 名单是 E 片采用度/两步漏斗的取数口径, 字面量漂移=指标静默归零(三审 P2)
+    public static final String TASK_PUBLISHED = "task.published";
+    public static final String DATA_SUBMITTED = "data.submitted";
+    public static final String DATA_AUDIT_PASSED = "data.audit_passed";
+    public static final String DATA_AUDIT_REJECTED = "data.audit_rejected";
+    public static final String TASK_CLOSED = "task.closed";
+
+    /** 站内核心操作白名单(事件名与落库 event_name 一致)。 */
     public static final Set<String> CORE_OPERATIONS = Set.of(
-        "task.published",
-        "data.submitted",
-        "data.audit_passed",
-        "data.audit_rejected",
-        "task.closed");
+        TASK_PUBLISHED, DATA_SUBMITTED, DATA_AUDIT_PASSED, DATA_AUDIT_REJECTED, TASK_CLOSED);
+
+    /**
+     * 是否自监控事件(按事件名判定, 与写入入口无关——CSV 补录进来的同名事件同口径)。
+     * 三审 P0: 分析读侧与会话/首见口径据此把自监控事件隔离在访客指标之外。
+     */
+    public static boolean isSelfMonitor(String eventName) {
+        return eventName != null && (LOGIN.equals(eventName) || CORE_OPERATIONS.contains(eventName));
+    }
 
     private SelfMonitorEvents() {
     }

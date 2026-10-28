@@ -376,6 +376,7 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
         SELECT user_id AS "userId", nick_name AS "nickName"
         FROM sys_user
         WHERE tenant_id = #{tenantId} AND user_name = #{userName} AND del_flag = '0'
+        ORDER BY user_id
         LIMIT 1
         """)
     java.util.Map<String, Object> selectUserIdByName(@Param("tenantId") String tenantId,

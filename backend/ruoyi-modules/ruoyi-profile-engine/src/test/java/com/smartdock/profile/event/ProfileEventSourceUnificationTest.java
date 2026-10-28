@@ -3,6 +3,7 @@ package com.smartdock.profile.event;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartdock.analytics.engine.AnalyticsRollupTrigger;
 import com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper;
+import com.smartdock.profile.engine.ProfileEngineConfigService;
 import com.smartdock.profile.engine.ProfileRecalcTrigger;
 import com.smartdock.profile.identity.ProfileIdentityService;
 import com.smartdock.profile.mapper.ProfileEventMapper;
@@ -44,9 +45,11 @@ import static org.mockito.ArgumentMatchers.eq;
 class ProfileEventSourceUnificationTest {
 
     private ProfileEventMapper eventMapper;
+    private ProfileEngineConfigService configService;
     private ProfileIdentityService identityService;
     private ProfileRecalcTrigger recalcTrigger;
     private com.smartdock.analytics.engine.AnalyticsRollupTrigger rollupTrigger;
+    private com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper;
     private ProfileEventServiceImpl service;
 
     @BeforeAll
@@ -65,17 +68,19 @@ class ProfileEventSourceUnificationTest {
     @BeforeEach
     void buildServiceWithMockedCollaborators() {
         eventMapper = Mockito.mock(ProfileEventMapper.class);
+        configService = Mockito.mock(ProfileEngineConfigService.class);
         identityService = Mockito.mock(ProfileIdentityService.class);
         recalcTrigger = Mockito.mock(ProfileRecalcTrigger.class);
         ProfileSchemaService schemaService = Mockito.mock(ProfileSchemaService.class);
         rollupTrigger = Mockito.mock(AnalyticsRollupTrigger.class);
-        AnalyticsVisitorFirstSeenMapper firstSeenMapper = Mockito.mock(AnalyticsVisitorFirstSeenMapper.class);
+        firstSeenMapper = Mockito.mock(AnalyticsVisitorFirstSeenMapper.class);
         Mockito.when(schemaService.validate(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of());
         Mockito.when(identityService.resolveAndLink(any(), any(), any(), any(), any())).thenReturn("u-1");
         Mockito.when(eventMapper.insertIgnore(any(ProfileEvent.class))).thenReturn(1);
 
-        service = new ProfileEventServiceImpl(eventMapper, schemaService, identityService,
+        Mockito.when(configService.selfMonitorEnabled(any(), any())).thenReturn(true);
+        service = new ProfileEventServiceImpl(eventMapper, configService, schemaService, identityService,
             recalcTrigger, rollupTrigger, firstSeenMapper, noOpTransactionManager());
         TenantHelper.setDynamic("000000");
     }
@@ -98,6 +103,8 @@ class ProfileEventSourceUnificationTest {
         Mockito.verify(identityService).resolveAndLink(eq("000000"), eq(ProfileSources.UNIFIED),
             eq("user"), eq("u-1"), anyMap());
         Mockito.verify(recalcTrigger).onEvent("000000", ProfileSources.UNIFIED, "user", "u-1");
+        // 三审补钉: publish 的正向触发断言(此前只有 quiet 的反向半边)
+        Mockito.verify(rollupTrigger).onEvent(eq("000000"), eq(ProfileSources.UNIFIED), any());
     }
 
     @Test
@@ -145,9 +152,41 @@ class ProfileEventSourceUnificationTest {
     }
 
     @Test
+    void quietSelfMonitorEventsBlockedWhenSwitchOff() {
+        // 三审回修: 自监控总开关收敛到发布咽喉——停用后登录/站内核心操作任何入口都不再新增
+        Mockito.when(configService.selfMonitorEnabled(any(), any())).thenReturn(false);
+
+        org.junit.jupiter.api.Assertions.assertFalse(service.publishQuiet(named("user.login", "dcs")));
+        org.junit.jupiter.api.Assertions.assertFalse(service.publishQuiet(named("task.published", "dcs")));
+        Mockito.verify(eventMapper, Mockito.never()).insertIgnore(any(ProfileEvent.class));
+
+        // 开关只闸自监控名单: 普通业务事件静默发布不受影响
+        org.junit.jupiter.api.Assertions.assertTrue(service.publishQuiet(named("order.paid", "crm")));
+        Mockito.verify(eventMapper, Mockito.times(1)).insertIgnore(any(ProfileEvent.class));
+    }
+
+    @Test
+    void selfMonitorEventsDoNotEnterVisitorFirstSeen() {
+        // 三审 P0 回修: 登录/站内操作不是"访客到访"——不登记首见, 分析口径(新访客/实时看板)不被登录污染
+        service.publishQuiet(named("user.login", "dcs"));
+        Mockito.verify(firstSeenMapper, Mockito.never()).upsert(any(), any(), any(), any());
+
+        // 普通事件照常登记首见
+        service.publish(bo("web"));
+        Mockito.verify(firstSeenMapper, Mockito.atLeastOnce()).upsert(any(), any(), any(), any());
+    }
+
+    @Test
     void unifiedValueIsPinnedToExistingData() {
         // 取值锚定存量数据所在源——改动等于把新旧事件拆成两套, 必须连同数据迁移一起评审
         assertEquals("dcs", ProfileSources.UNIFIED);
+    }
+
+    private ProfileEventBo named(String eventName, String source) {
+        ProfileEventBo bo = bo(source);
+        bo.setEventName(eventName);
+        bo.setEventUid("m1named:" + eventName + ":" + source);
+        return bo;
     }
 
     private ProfileEventBo bo(String source) {

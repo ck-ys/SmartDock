@@ -143,6 +143,14 @@ public class ProfileEngineConfigService {
         return value == null ? 0 : value;
     }
 
+    /**
+     * 自监控总开关(C 片, 三审回修收口): 缓存读——高频的自监控发布咽喉每次都要查,
+     * 停用最迟一个缓存周期生效。
+     */
+    public boolean selfMonitorEnabled(String tenantId, String source) {
+        return "1".equals(config(tenantId, source).getSelfMonitor());
+    }
+
     private ProfileEngineConfig config(String tenantId, String source) {
         String key = key(tenantId, source);
         Cached hit = cache.get(key);

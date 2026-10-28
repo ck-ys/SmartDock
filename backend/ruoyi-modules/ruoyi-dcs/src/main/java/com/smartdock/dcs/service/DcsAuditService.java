@@ -13,6 +13,7 @@ import com.smartdock.dcs.mapper.DcsTaskMapper;
 import com.smartdock.dcs.statemachine.DcsSubmissionStateMachine;
 import com.smartdock.dcs.support.DcsJsons;
 import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.monitor.SelfMonitorEvents;
 import com.smartdock.profile.event.ProfileEventBo;
 import com.smartdock.profile.ProfileUids;
 import lombok.RequiredArgsConstructor;
@@ -122,7 +123,7 @@ public class DcsAuditService {
         auditMapper.insert(a);
 
         // 事件翻译点③④: 主体=提交人
-        String eventType = DcsAudit.DECISION_PASS.equals(decision) ? "data.audit_passed" : "data.audit_rejected";
+        String eventType = DcsAudit.DECISION_PASS.equals(decision) ? SelfMonitorEvents.DATA_AUDIT_PASSED : SelfMonitorEvents.DATA_AUDIT_REJECTED;
         Map<String, Object> props = new LinkedHashMap<>();
         props.put("taskId", s.getTaskId());
         props.put("submissionId", submissionId);

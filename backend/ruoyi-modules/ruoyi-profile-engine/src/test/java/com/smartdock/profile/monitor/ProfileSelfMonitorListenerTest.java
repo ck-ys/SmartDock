@@ -73,9 +73,7 @@ class ProfileSelfMonitorListenerTest {
     }
 
     private void selfMonitorEnabled(String flag) {
-        ProfileEngineConfig config = new ProfileEngineConfig();
-        config.setSelfMonitor(flag);
-        when(configService.getOrCreate(anyString())).thenReturn(config);
+        when(configService.selfMonitorEnabled(anyString(), anyString())).thenReturn("1".equals(flag));
     }
 
     @Test

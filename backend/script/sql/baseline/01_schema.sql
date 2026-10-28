@@ -1667,6 +1667,7 @@ CREATE TABLE public.profile_engine_config (
     event_archive char(1) DEFAULT '1' NOT NULL,
     -- 单源重构 C 片: 自监控总开关('1'=记录登录/站内核心操作, '0'=停)
     self_monitor char(1) DEFAULT '1' NOT NULL,
+    CONSTRAINT ck_profile_engine_self_monitor CHECK (self_monitor IN ('0', '1')),
     remark character varying(500),
     create_dept bigint,
     create_by bigint,

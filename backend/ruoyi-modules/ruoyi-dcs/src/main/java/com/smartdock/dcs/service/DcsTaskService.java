@@ -15,6 +15,7 @@ import com.smartdock.dcs.mapper.DcsTaskMapper;
 import com.smartdock.dcs.statemachine.DcsTaskStateMachine;
 import com.smartdock.dcs.support.DcsJsons;
 import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.monitor.SelfMonitorEvents;
 import com.smartdock.profile.event.ProfileEventBo;
 import com.smartdock.profile.ProfileUids;
 import lombok.RequiredArgsConstructor;
@@ -144,7 +145,7 @@ public class DcsTaskService {
         props.put("title", safe(t.getTitle()));
         props.put("deadline", t.getDeadline() == null ? "" : String.valueOf(t.getDeadline().getTime()));
         props.put("assigneeCount", t.assigneeList().size());
-        publishEvent("task.published", ProfileUids.uid("task", "published", taskId), taskId, props, userId);
+        publishEvent(SelfMonitorEvents.TASK_PUBLISHED, ProfileUids.uid("task", "published", taskId), taskId, props, userId);
         for (Long uid : t.assigneeList()) {
             noticeService.notify(uid, DcsNotice.TYPE_TASK_PUBLISHED,
                 "新任务: " + t.getTitle(), "你有一个新的填报任务, 截止 " + safe(t.getDeadline()), taskId);
@@ -166,7 +167,7 @@ public class DcsTaskService {
         if (taskMapper.transitionStatus(taskId, t.getStatus(), DcsTask.STATUS_CLOSED) == 0) {
             throw new ServiceException("任务状态已变化, 请刷新重试");
         }
-        publishEvent("task.closed", ProfileUids.uid("task", "closed", taskId), taskId,
+        publishEvent(SelfMonitorEvents.TASK_CLOSED, ProfileUids.uid("task", "closed", taskId), taskId,
             Map.of("taskId", taskId), userId);
     }
 

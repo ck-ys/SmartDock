@@ -2,8 +2,10 @@ package com.smartdock.profile.event;
 
 import com.smartdock.analytics.engine.AnalyticsRollupTrigger;
 import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.engine.ProfileEngineConfigService;
 import com.smartdock.profile.engine.ProfileRecalcTrigger;
 import com.smartdock.profile.identity.ProfileIdentityService;
+import com.smartdock.profile.monitor.SelfMonitorEvents;
 import com.smartdock.profile.mapper.ProfileEventMapper;
 import com.smartdock.profile.protocol.ProfileSchemaService;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
@@ -45,6 +47,7 @@ import java.util.Map;
 public class ProfileEventServiceImpl implements ProfileEventPublisher {
 
     private final ProfileEventMapper eventMapper;
+    private final ProfileEngineConfigService configService;
     private final ProfileSchemaService schemaService;
     private final ProfileIdentityService identityService;
     private final ProfileRecalcTrigger recalcTrigger;
@@ -53,6 +56,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     private final TransactionTemplate requiresNew;
 
     public ProfileEventServiceImpl(ProfileEventMapper eventMapper,
+                                   ProfileEngineConfigService configService,
                                    ProfileSchemaService schemaService,
                                    ProfileIdentityService identityService,
                                    ProfileRecalcTrigger recalcTrigger,
@@ -60,6 +64,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
                                    com.smartdock.analytics.mapper.AnalyticsVisitorFirstSeenMapper firstSeenMapper,
                                    PlatformTransactionManager transactionManager) {
         this.eventMapper = eventMapper;
+        this.configService = configService;
         this.schemaService = schemaService;
         this.identityService = identityService;
         this.recalcTrigger = recalcTrigger;
@@ -82,9 +87,15 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     /**
      * 自监控口径(单源重构 C 片): 写账本与主体登记, 跳过重算/汇总两个触发器——
      * 采用度(事件数/最近活跃)不依赖触发器, 分数与汇总由按需重算兜底。
+     * 三审回修: 自监控总开关收敛到本咽喉(登录与站内核心操作同一把闸, 停用后任何入口不再新增)。
      */
     @Override
     public boolean publishQuiet(ProfileEventBo bo) {
+        String eventName = firstNonBlank(bo.getEventName(), bo.getEventType());
+        if (SelfMonitorEvents.isSelfMonitor(eventName)
+            && !configService.selfMonitorEnabled(currentTenant(), ProfileSources.UNIFIED)) {
+            return false;
+        }
         return publishIsolated(bo) != null;
     }
 
@@ -170,7 +181,11 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
                 return null;
             }
             upsertSubject(e, bo);
-            upsertFirstSeen(e);
+            // 三审 P0 回修: 自监控事件不进访客口径——登录/站内操作不是"访客到访",
+            // 不登记首见, 否则新访客数与实时看板被每次登录污染
+            if (!SelfMonitorEvents.isSelfMonitor(e.getEventName())) {
+                upsertFirstSeen(e);
+            }
             return e;
         });
     }

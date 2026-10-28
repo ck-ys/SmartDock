@@ -9,6 +9,7 @@ import com.smartdock.dcs.domain.DcsTask;
 import com.smartdock.dcs.mapper.DcsSubmissionMapper;
 import com.smartdock.dcs.support.DcsJsons;
 import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.monitor.SelfMonitorEvents;
 import com.smartdock.profile.event.ProfileEventBo;
 import com.smartdock.profile.ProfileUids;
 import lombok.RequiredArgsConstructor;
@@ -91,7 +92,7 @@ public class DcsSubmissionService {
         if (hours != null) {
             props.put("responseHours", hours);
         }
-        publishEvent("data.submitted",
+        publishEvent(SelfMonitorEvents.DATA_SUBMITTED,
             ProfileUids.uid("submission", "submit", s.getId(), "v" + s.getVersion()), taskId, me, props);
 
         // 通知审核人(按模式)
