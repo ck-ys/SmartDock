@@ -46,6 +46,7 @@ class ProfileEventSourceUnificationTest {
     private ProfileEventMapper eventMapper;
     private ProfileIdentityService identityService;
     private ProfileRecalcTrigger recalcTrigger;
+    private com.smartdock.analytics.engine.AnalyticsRollupTrigger rollupTrigger;
     private ProfileEventServiceImpl service;
 
     @BeforeAll
@@ -67,7 +68,7 @@ class ProfileEventSourceUnificationTest {
         identityService = Mockito.mock(ProfileIdentityService.class);
         recalcTrigger = Mockito.mock(ProfileRecalcTrigger.class);
         ProfileSchemaService schemaService = Mockito.mock(ProfileSchemaService.class);
-        AnalyticsRollupTrigger rollupTrigger = Mockito.mock(AnalyticsRollupTrigger.class);
+        rollupTrigger = Mockito.mock(AnalyticsRollupTrigger.class);
         AnalyticsVisitorFirstSeenMapper firstSeenMapper = Mockito.mock(AnalyticsVisitorFirstSeenMapper.class);
         Mockito.when(schemaService.validate(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(List.of());
@@ -131,6 +132,16 @@ class ProfileEventSourceUnificationTest {
         ArgumentCaptor<ProfileEvent> captor = ArgumentCaptor.forClass(ProfileEvent.class);
         Mockito.verify(eventMapper).insertIgnore(captor.capture());
         assertEquals("user", captor.getValue().getSubjectType());
+    }
+
+    @Test
+    void quietPublishWritesLedgerWithoutFiringTriggers() {
+        // C 片自监控口径: 静默发布只写账本, 不触发重算与分析汇总
+        assertTrue(service.publishQuiet(bo("dcs")));
+
+        Mockito.verify(eventMapper).insertIgnore(any(ProfileEvent.class));
+        Mockito.verify(recalcTrigger, Mockito.never()).onEvent(any(), any(), any(), any());
+        Mockito.verify(rollupTrigger, Mockito.never()).onEvent(any(), any(), any());
     }
 
     @Test

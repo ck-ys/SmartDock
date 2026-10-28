@@ -59,6 +59,15 @@ import AgreementPageLayout from './AgreementPageLayout.vue';
       <p>
         您在任务中填报或上传的数据可能包含敏感个人信息（如身份证件号码、健康生理信息、不满十四周岁未成年人信息等），其采集范围由任务发布人确定。此类信息仅用于任务流转与审核所必需，经加密与严格权限控制存储。任务发布人及其所在租户应在向您收集前单独向您告知并取得您的<strong>单独同意</strong>；如您在填报时未被单独征询，您可拒绝填报并通过本政策第九条联系方式向我们反映。
       </p>
+      <h3>9. 页面/功能使用类信息（产品自监控）</h3>
+      <p>
+        为帮助所在租户了解系统的实际使用情况（谁已上手、谁长期未使用），系统会记录您<strong>登录成功</strong>与<strong>站内核心操作</strong>（如发布任务、提交数据、审核、关闭任务）的事件（含时间与操作类型）。
+        <strong>系统不记录您浏览了哪些页面的明细</strong>，也不对按键、输入内容做屏幕录制。此类信息仅用于租户内的使用统计、活跃度画像与接入引导，可由租户管理员在「用户画像」页一键停用（停用后不再新增记录，此前已记录的数据仍按本政策保留）。
+      </p>
+      <p class="policy-notice-template">
+        <strong>告知文案模板（供租户管理员启用前向成员公示，可直接复制）：</strong>
+        「本单位使用 SmartDock 的使用情况统计功能。系统将记录您的登录与站内核心操作（如发布任务、提交数据、审核），用于了解系统使用情况、改进培训与支持；系统不记录页面浏览明细。您可在「用户协议与隐私政策」页面查看完整说明，或联系管理员停用对本账号的统计。」
+      </p>
     </section>
 
     <section>
@@ -154,3 +163,14 @@ import AgreementPageLayout from './AgreementPageLayout.vue';
     </section>
   </AgreementPageLayout>
 </template>
+
+<style lang="scss" scoped>
+/* 告知文案模板块: 与正文区隔, 管理员整段复制即可 */
+.policy-notice-template {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--el-color-primary-light-5);
+  background: var(--el-fill-color-light);
+  border-radius: 4px;
+}
+</style>

@@ -39,4 +39,7 @@ public class ProfileEngineConfigBo implements Serializable {
 
     /** 过期去向 1/0: 1=归档后删(默认), 0=直接删 */
     private String eventArchive;
+
+    /** 自监控开关(单源重构 C 片): '1'/'0', 不传不动现值 */
+    private String selfMonitor;
 }

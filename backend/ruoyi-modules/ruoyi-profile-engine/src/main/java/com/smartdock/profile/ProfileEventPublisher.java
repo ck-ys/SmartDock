@@ -32,6 +32,15 @@ public interface ProfileEventPublisher {
     boolean publish(ProfileEventBo event);
 
     /**
+     * 静默发布(自监控口径, 单源重构 C 片): 只写事件账本与主体登记, 不触发自动重算与分析汇总——
+     * 本产品自监控事件(登录/站内核心操作)由按需重算兜底, 避免高频操作逐条清评分缓存全窗重建。
+     * 默认退化为 {@link #publish}(触发链照走), 由 ProfileEventServiceImpl 提供精确实现。
+     */
+    default boolean publishQuiet(ProfileEventBo event) {
+        return publish(event);
+    }
+
+    /**
      * 批量发布(逐条幂等, 不整体事务——事件允许部分成功, 自然键保证可重放补齐)。
      *
      * @return 新写入条数

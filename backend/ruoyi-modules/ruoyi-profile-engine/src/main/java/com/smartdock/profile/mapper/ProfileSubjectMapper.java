@@ -367,4 +367,17 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
         """)
     List<com.smartdock.profile.engine.ProfileScoreSnapshot> selectLatestSnapshots(
         @Param("tenantId") String tenantId, @Param("source") String source);
+
+    /**
+     * C 片自监控: 登录事件只带登录名, 查 user_id/昵称把主体钉到主视图联表键(user_id::text)。
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        SELECT user_id AS "userId", nick_name AS "nickName"
+        FROM sys_user
+        WHERE tenant_id = #{tenantId} AND user_name = #{userName} AND del_flag = '0'
+        LIMIT 1
+        """)
+    java.util.Map<String, Object> selectUserIdByName(@Param("tenantId") String tenantId,
+                                                     @Param("userName") String userName);
 }

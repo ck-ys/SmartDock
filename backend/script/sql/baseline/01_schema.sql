@@ -1665,6 +1665,8 @@ CREATE TABLE public.profile_engine_config (
     -- 批10 Q4: 按源事件保留期(null=继承全局) + 过期去向(1=归档后删/0=直接删)
     event_retention_days integer,
     event_archive char(1) DEFAULT '1' NOT NULL,
+    -- 单源重构 C 片: 自监控总开关('1'=记录登录/站内核心操作, '0'=停)
+    self_monitor char(1) DEFAULT '1' NOT NULL,
     remark character varying(500),
     create_dept bigint,
     create_by bigint,

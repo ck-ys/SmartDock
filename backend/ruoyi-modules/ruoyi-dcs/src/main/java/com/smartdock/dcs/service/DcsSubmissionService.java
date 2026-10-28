@@ -139,7 +139,8 @@ public class DcsSubmissionService {
         e.setOccurredTime(new Date());
         e.setProps(new LinkedHashMap<>(props));
         try {
-            eventPublisher.publish(e);
+            // 单源重构 C 片: 本产品站内操作属自监控白名单——静默发布, 不逐条触发打分/汇总
+            eventPublisher.publishQuiet(e);
         } catch (Exception ex) {
             log.warn("[Dcs] profile event failed type={} uid={}: {}", eventType, eventUid, ex.getMessage());
         }

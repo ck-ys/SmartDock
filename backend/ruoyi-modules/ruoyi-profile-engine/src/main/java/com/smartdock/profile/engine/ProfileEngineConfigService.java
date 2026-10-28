@@ -57,6 +57,7 @@ public class ProfileEngineConfigService {
         created.setReviewThreshold(DEFAULT_THRESHOLD);
         created.setDebounceMs(2000);
         created.setReviewSlaDays(7);
+        created.setSelfMonitor("1");
         created.setRemark("默认配置");
         created.setCreateBy(currentUser());
         try {
@@ -78,6 +79,10 @@ public class ProfileEngineConfigService {
         }
         if (bo.getReviewEnabled() != null) {
             config.setReviewEnabled("0".equals(bo.getReviewEnabled()) ? "0" : "1");
+        }
+        if (bo.getSelfMonitor() != null) {
+            // C 片自监控总开关: 画像页同屏可停(D 片出 UI), 停后登录/核心操作不再新增记录
+            config.setSelfMonitor("0".equals(bo.getSelfMonitor()) ? "0" : "1");
         }
         if (bo.getReviewThreshold() != null) {
             if (bo.getReviewThreshold().signum() < 0

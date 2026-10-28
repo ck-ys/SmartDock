@@ -79,6 +79,15 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         return true;
     }
 
+    /**
+     * 自监控口径(单源重构 C 片): 写账本与主体登记, 跳过重算/汇总两个触发器——
+     * 采用度(事件数/最近活跃)不依赖触发器, 分数与汇总由按需重算兜底。
+     */
+    @Override
+    public boolean publishQuiet(ProfileEventBo bo) {
+        return publishIsolated(bo) != null;
+    }
+
     @Override
     public int publishBatch(List<ProfileEventBo> events) {
         if (events == null || events.isEmpty()) {

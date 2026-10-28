@@ -51,5 +51,8 @@ public class ProfileEngineConfig extends BaseEntity {
     /** 过期去向: 1=先迁归档表再删(默认), 0=直接删(测试源) */
     private String eventArchive;
 
+    /** 自监控开关(单源重构 C 片): '1'=记录本产品用户登录与站内核心操作画像事件; '0'=停(只停新增, 已有数据保留) */
+    private String selfMonitor;
+
     private String remark;
 }
