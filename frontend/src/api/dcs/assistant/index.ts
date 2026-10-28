@@ -87,11 +87,66 @@ export function getAssistantHealth() {
   return request<AssistantHealthReport>({ url: '/dcs/assistant/admin/health', method: 'get' });
 }
 
-/* ===== 能力① Q4/Q7：用户视角技能目录（触发词一并下发；perm=use） ===== */
+/* ===== 能力① Q4：用户视角技能目录（5b 批题7甲：触发词已拆除，description=唯一触发面） ===== */
 export function getAssistantSkillCatalog() {
-  return request<
-    Array<{ id: string; name: string; desc: string; minRole: 'member' | 'publisher'; triggers?: string[] }>
-  >({ url: '/dcs/assistant/skills', method: 'get' });
+  return request<Array<{ id: string; name: string; desc: string; minRole: 'member' | 'publisher' | 'admin' }>>({
+    url: '/dcs/assistant/skills',
+    method: 'get'
+  });
+}
+
+/* ============ 5b 批：技能在线层管理（能力段「技能库」数据源；读=config 权限，写=skill:edit） ============ */
+
+/** 管理列表行：生效内容（三层叠加后）∪ 停用行；source 标明这行从哪层来 */
+export interface AssistantSkillAdminRow {
+  skillId: string;
+  displayName: string;
+  /** 一句话说明——助手判断什么时候用这个技能的唯一依据（题7甲） */
+  description: string;
+  minRole: 'member' | 'publisher' | 'admin';
+  body: string;
+  /** builtin=随版内置 / online-overwrite=在线覆写 / online-new=在线新增 / builtin-disabled=内置已停用 / online-disabled=新增已停用 */
+  source: 'builtin' | 'online-overwrite' | 'online-new' | 'builtin-disabled' | 'online-disabled';
+  /** 内置档名（空串=纯在线技能，没有内置基线）；覆写只升不降的比对基准 */
+  builtinMinRole: string;
+}
+
+/** 详情出参：列表行 + 本租户在线行（编辑回填/恢复预览用；无在线行=undefined） */
+export interface AssistantSkillDetail extends AssistantSkillAdminRow {
+  online?: {
+    skillId: string;
+    displayName: string | null;
+    description: string | null;
+    minRole: string;
+    body: string | null;
+    disabled: number | null;
+    updateTime: string | null;
+  };
+}
+
+export function listAssistantSkillsAdmin() {
+  return request<AssistantSkillAdminRow[]>({ url: '/dcs/assistant/skill/list', method: 'get' });
+}
+
+export function getAssistantSkillDetail(skillId: string) {
+  return request<AssistantSkillDetail>({ url: `/dcs/assistant/skill/${skillId}`, method: 'get' });
+}
+
+/** 保存（新增/覆写/停用一体）：写后即时失效＋Redis 广播（题3=乙），下一轮新会话起生效 */
+export function saveAssistantSkillAdmin(data: {
+  skillId: string;
+  displayName?: string | null;
+  description: string;
+  minRole: 'member' | 'publisher' | 'admin';
+  body: string;
+  disabled?: number;
+}) {
+  return request({ url: '/dcs/assistant/skill/save', method: 'post', data });
+}
+
+/** 删除在线行：内置技能=恢复出厂原文；在线新增技能=彻底删除（铁律#21：DELETE→POST） */
+export function deleteAssistantSkillAdmin(skillId: string) {
+  return request({ url: `/dcs/assistant/skill/${skillId}`, method: 'post' });
 }
 
 /** 业务反馈批1015b Q14：搜索连通测试（key 可选=先验新钥匙再替换；不带=测当前生效 key） */

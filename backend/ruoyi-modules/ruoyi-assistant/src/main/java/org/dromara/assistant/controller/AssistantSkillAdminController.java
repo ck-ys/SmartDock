@@ -13,7 +13,6 @@ import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.web.core.BaseController;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,6 +48,7 @@ public class AssistantSkillAdminController extends BaseController {
     private final AssistantSkillMapper skillMapper;
 
     /** 管理列表：生效技能（三层叠加后）∪ 停用行（管理台要看得见停用的），带来源徽章与内置档 */
+    @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/list")
     public R<List<Map<String, Object>>> list() {
         String tenantId = LoginHelper.getTenantId();
@@ -93,6 +93,7 @@ public class AssistantSkillAdminController extends BaseController {
     }
 
     /** 详情：生效内容（merged）+ 本租户在线行（编辑回填用）+ 内置基线（恢复预览用） */
+    @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/{skillId}")
     public R<Map<String, Object>> detail(@PathVariable String skillId) {
         String tenantId = LoginHelper.getTenantId();
@@ -185,9 +186,9 @@ public class AssistantSkillAdminController extends BaseController {
         return R.ok(isNew ? "已新增并生效（下一轮新会话起）" : "已保存并生效（下一轮新会话起）");
     }
 
-    /** 删除在线行：内置技能=恢复出厂原文；在线新增技能=彻底删除 */
+    /** 删除在线行：内置技能=恢复出厂原文；在线新增技能=彻底删除（铁律#21：DELETE→POST） */
     @Log(title = "助手技能", businessType = BusinessType.DELETE)
-    @DeleteMapping("/{skillId}")
+    @PostMapping("/{skillId}")
     @SaCheckPermission("dcs:assistant:skill:edit")
     public R<Void> delete(@PathVariable String skillId) {
         String tenantId = LoginHelper.getTenantId();

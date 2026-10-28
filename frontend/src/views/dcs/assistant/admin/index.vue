@@ -384,6 +384,122 @@
         </el-card>
         </section>
 
+        <!-- ============ 5b 批：技能库（在线编辑层，与总纲同构的目录+正文） ============ -->
+        <section class="adm-sec">
+          <div class="sec-head">
+            <div class="sec-ttl">
+              <b>技能库</b>
+              <span class="sec-cnt">{{ skillRows.length }} 个</span>
+            </div>
+            <div class="sec-acts">
+              <el-button v-hasPermi="['dcs:assistant:skill:edit']" size="small" type="primary" @click="newSkill">新增技能</el-button>
+            </div>
+          </div>
+          <div class="cap-note">技能是助手按需取用的「操作手册」：目录里只放一句话说明，正文用到才读。改完保存立即生效（下一轮新会话起）；「一句话说明」是助手判断什么时候用这个技能的唯一依据。</div>
+          <div class="pd-wrap" v-loading="skillLoading">
+            <nav class="pd-toc">
+              <button
+                v-for="row in skillRows"
+                :key="row.skillId"
+                type="button"
+                :class="{ on: !skillNewMode && activeSkillId === row.skillId }"
+                @click="openSkill(row)"
+              >
+                <i>{{ (row.displayName || row.skillId).slice(0, 1) }}</i>
+                <span class="pt">{{ row.displayName || row.skillId }}</span>
+                <span class="pf">{{ SKILL_SOURCE_TXT[row.source] || row.source }} · {{ SKILL_ROLE_TXT[row.minRole] }}</span>
+              </button>
+              <button v-if="skillNewMode" type="button" class="on">
+                <i>＋</i>
+                <span class="pt">新技能（未保存）</span>
+                <span class="pf">在线新增</span>
+              </button>
+              <div v-if="!skillRows.length && !skillLoading" class="pf faint">技能加载失败或为空——切换页签重试</div>
+            </nav>
+            <article v-if="skillNewMode || activeSkillRow" class="pd-body sk-edit">
+              <div class="pd-meta">
+                <b>{{ skillNewMode ? '新增技能' : activeSkillRow?.displayName || activeSkillRow?.skillId }}</b>
+                <el-tag v-if="!skillNewMode" size="small" effect="plain" :type="activeSourceKey.startsWith('online') ? 'success' : 'info'">
+                  {{ SKILL_SOURCE_TXT[activeSourceKey] || activeSourceKey }}
+                </el-tag>
+                <span v-if="!skillNewMode" class="pd-file">{{ activeSkillRow?.skillId }}</span>
+                <span class="sp" />
+                <el-button
+                  v-if="!skillNewMode && hasOnlineRow"
+                  v-hasPermi="['dcs:assistant:skill:edit']"
+                  link
+                  type="danger"
+                  size="small"
+                  @click="onRestoreSkill"
+                >
+                  {{ isBuiltinRow ? '恢复内置原文' : '删除这个技能' }}
+                </el-button>
+                <el-button v-if="skillNewMode" link type="info" size="small" @click="cancelNewSkill">取消新增</el-button>
+              </div>
+              <div class="sk-field">
+                <label>技能名</label>
+                <el-input v-model="skillForm.displayName" maxlength="32" placeholder="给管理员看的名字，如「催办话术」" />
+              </div>
+              <div class="sk-field sk-id" v-if="skillNewMode">
+                <label>技能标识</label>
+                <el-input v-model="skillForm.skillId" placeholder="英文小写/数字/中划线，如 weekly-report；保存后不可改" />
+              </div>
+              <div class="sk-field">
+                <label>谁能用</label>
+                <el-select v-model="skillForm.minRole" style="width: 220px">
+                  <el-option
+                    v-for="opt in SKILL_ROLE_OPTS"
+                    :key="opt.v"
+                    :value="opt.v"
+                    :label="opt.label"
+                    :disabled="!skillNewMode && isBuiltinRow && opt.level < builtinRoleLevel"
+                  />
+                </el-select>
+                <span v-if="!skillNewMode && isBuiltinRow" class="sk-hint">内置档「{{ activeSkillRow?.builtinMinRole }}」起，只能升不能降</span>
+              </div>
+              <div class="sk-field">
+                <label>一句话说明</label>
+                <el-input
+                  v-model="skillForm.description"
+                  type="textarea"
+                  :rows="2"
+                  maxlength="1024"
+                  show-word-limit
+                  placeholder="什么时候用这个技能、用完产出什么——助手只看这句决定要不要用它"
+                />
+                <span class="sk-hint">⬆ 助手判断什么时候用这个技能的唯一依据，写给助手看，不写给管理员看</span>
+              </div>
+              <div class="sk-field">
+                <label>正文（详细做法）</label>
+                <el-input v-model="skillForm.body" type="textarea" :rows="12" maxlength="20000" show-word-limit class="sk-body" />
+                <span class="sk-hint">只在助手决定用这个技能时才整篇读入，平时不占上下文</span>
+              </div>
+              <div class="sk-acts">
+                <el-button
+                  v-hasPermi="['dcs:assistant:skill:edit']"
+                  type="primary"
+                  size="small"
+                  :loading="skillSaving"
+                  @click="onSaveSkill()"
+                >
+                  {{ skillForm.disabled ? '保存（仍停用）' : '保存并生效' }}
+                </el-button>
+                <el-button
+                  v-if="!skillNewMode"
+                  v-hasPermi="['dcs:assistant:skill:edit']"
+                  size="small"
+                  :loading="skillSaving"
+                  @click="skillForm.disabled ? enableSkill() : disableSkill()"
+                >
+                  {{ skillForm.disabled ? '重新启用' : '停用（藏起来）' }}
+                </el-button>
+                <span class="sk-saved">保存后立即生效：下一轮新会话起，助手目录就换成新内容</span>
+              </div>
+            </article>
+            <el-empty v-else description="技能加载失败或为空" :image-size="56" />
+          </div>
+        </section>
+
         <section class="adm-sec">
           <div class="sec-head">
             <div class="sec-ttl">
@@ -1451,6 +1567,10 @@ import {
   pageAssistantMcpCallLog,
   type AssistantMcpServerRow,
   type AssistantMcpCallLog,
+  listAssistantSkillsAdmin,
+  saveAssistantSkillAdmin,
+  deleteAssistantSkillAdmin,
+  type AssistantSkillAdminRow,
   listActionLog,
   listFeedback,
   getFeedbackStats,
@@ -3088,12 +3208,162 @@ function formatMcpTime(t: string): string {
   return isNaN(d.getTime()) ? t : d.toLocaleString('zh-CN', { hour12: false });
 }
 
+/* ===== 5b 批：技能库在线编辑（能力段；与总纲同构的目录+正文，但可编辑） ===== */
+const SKILL_SOURCE_TXT: Record<string, string> = {
+  builtin: '随版内置',
+  'online-overwrite': '在线覆写',
+  'online-new': '在线新增',
+  'builtin-disabled': '内置·已停用',
+  'online-disabled': '新增·已停用'
+};
+const SKILL_ROLE_TXT: Record<string, string> = { member: '成员及以上', publisher: '发布人及以上', admin: '仅管理员' };
+const SKILL_ROLE_LEVEL: Record<string, number> = { member: 0, publisher: 1, admin: 2 };
+const SKILL_ROLE_OPTS = [
+  { v: 'member', label: '成员及以上', level: 0 },
+  { v: 'publisher', label: '发布人及以上', level: 1 },
+  { v: 'admin', label: '仅管理员', level: 2 }
+] as const;
+
+const skillLoading = ref(false);
+const skillSaving = ref(false);
+const skillRows = ref<AssistantSkillAdminRow[]>([]);
+const activeSkillId = ref('');
+const skillNewMode = ref(false);
+const skillForm = reactive({
+  skillId: '',
+  displayName: '',
+  description: '',
+  minRole: 'member' as 'member' | 'publisher' | 'admin',
+  body: '',
+  disabled: false
+});
+const activeSkillRow = computed(() => skillRows.value.find((r) => r.skillId === activeSkillId.value) ?? null);
+const activeSourceKey = computed(() => activeSkillRow.value?.source ?? 'online-new');
+/** 在线行存在=可恢复内置/删除；内置基线存在=「谁能用」只升不降约束生效 */
+const hasOnlineRow = computed(() => !!activeSkillRow.value && activeSkillRow.value.source !== 'builtin');
+const isBuiltinRow = computed(() => !!activeSkillRow.value && !!activeSkillRow.value.builtinMinRole);
+const builtinRoleLevel = computed(() => SKILL_ROLE_LEVEL[activeSkillRow.value?.builtinMinRole ?? 'member'] ?? 0);
+
+async function loadSkillAdmin() {
+  skillLoading.value = true;
+  try {
+    const res = (await listAssistantSkillsAdmin()) as unknown as { data?: AssistantSkillAdminRow[] };
+    skillRows.value = res?.data ?? [];
+    if (!skillNewMode.value) {
+      if (skillRows.value.length && !skillRows.value.some((r) => r.skillId === activeSkillId.value)) {
+        openSkill(skillRows.value[0]);
+      }
+    }
+  } catch {
+    skillRows.value = [];
+  } finally {
+    skillLoading.value = false;
+  }
+}
+
+/** 选中某技能：表单回填当前生效内容（在此之上改动保存=生成在线覆写行） */
+function openSkill(row: AssistantSkillAdminRow) {
+  skillNewMode.value = false;
+  activeSkillId.value = row.skillId;
+  skillForm.skillId = row.skillId;
+  skillForm.displayName = row.displayName || row.skillId;
+  skillForm.description = row.description || '';
+  skillForm.minRole = row.minRole === 'admin' ? 'admin' : row.minRole === 'publisher' ? 'publisher' : 'member';
+  skillForm.body = row.body || '';
+  skillForm.disabled = row.source === 'builtin-disabled' || row.source === 'online-disabled';
+}
+
+function newSkill() {
+  skillNewMode.value = true;
+  activeSkillId.value = '';
+  skillForm.skillId = '';
+  skillForm.displayName = '';
+  skillForm.description = '';
+  skillForm.minRole = 'member';
+  skillForm.body = '';
+  skillForm.disabled = false;
+}
+function cancelNewSkill() {
+  skillNewMode.value = false;
+  if (skillRows.value.length) {
+    openSkill(skillRows.value[0]);
+  }
+}
+
+/** 保存（新增/覆写/停用一体，题3=乙写后即时广播生效）；错误人话已由 request 层弹出 */
+async function persistSkill(disabled: boolean) {
+  skillSaving.value = true;
+  try {
+    await saveAssistantSkillAdmin({
+      skillId: skillForm.skillId.trim(),
+      displayName: skillForm.displayName.trim(),
+      description: skillForm.description.trim(),
+      minRole: skillForm.minRole,
+      body: skillForm.body,
+      disabled: disabled ? 1 : 0
+    });
+    skillForm.disabled = disabled;
+    skillNewMode.value = false;
+    ElMessage.success(disabled ? '已保存（仍停用）' : '已保存并生效——下一轮新会话起助手就用新内容');
+    activeSkillId.value = skillForm.skillId.trim();
+    await loadSkillAdmin();
+  } catch {
+    /* 校验人话报错已由 request 层弹出 */
+  } finally {
+    skillSaving.value = false;
+  }
+}
+function onSaveSkill() {
+  void persistSkill(skillForm.disabled);
+}
+function disableSkill() {
+  ElMessageBox.confirm(
+    `停用后「${skillForm.displayName || skillForm.skillId}」对本租户全员藏起（下一轮新会话起），随时可重新启用。继续？`,
+    '停用技能',
+    { type: 'warning', confirmButtonText: '停用', cancelButtonText: '再想想' }
+  )
+    .then(() => void persistSkill(true))
+    .catch(() => undefined);
+}
+function enableSkill() {
+  void persistSkill(false);
+}
+/** 恢复内置原文（有内置基线）/ 彻底删除（纯在线新增）——都走删本租户在线行 */
+function onRestoreSkill() {
+  const row = activeSkillRow.value;
+  if (!row) {
+    return;
+  }
+  const restoreBuiltin = !!row.builtinMinRole;
+  ElMessageBox.confirm(
+    restoreBuiltin
+      ? `删掉本租户对「${row.displayName || row.skillId}」的在线改动，恢复出厂内置原文（下一轮新会话起）。继续？`
+      : `「${row.displayName || row.skillId}」是纯在线新增，删除后彻底消失（没有内置原文可恢复）。继续？`,
+    restoreBuiltin ? '恢复内置原文' : '删除在线技能',
+    { type: 'warning', confirmButtonText: restoreBuiltin ? '恢复内置' : '彻底删除', cancelButtonText: '再想想' }
+  )
+    .then(async () => {
+      skillSaving.value = true;
+      try {
+        await deleteAssistantSkillAdmin(row.skillId);
+        ElMessage.success(restoreBuiltin ? '已恢复内置原文' : '已删除');
+        await loadSkillAdmin();
+      } catch {
+        /* 人话报错已由 request 层弹出 */
+      } finally {
+        skillSaving.value = false;
+      }
+    })
+    .catch(() => undefined);
+}
+
 /** 四段导航的懒加载（总览首屏已带齐数字/健康/能力快照，其余段进到才拉） */
 function onTabChange(name: string | number) {
   if (name === 'caps') {
     if (tgRows.value.length === 0 && !tgLoading.value) void loadToolGate();
     if (panoSegments.value.length === 0 && !panoLoading.value) void loadPanorama();
     if (mcpRows.value.length === 0 && !mcpLoading.value) void loadMcpServers();
+    if (skillRows.value.length === 0 && !skillLoading.value) void loadSkillAdmin();
   }
   if (name === 'rules' && quotaRows.value.length === 0 && !quotaLoading.value) {
     void loadQuotaPage();
@@ -5086,6 +5356,46 @@ onMounted(() => {
     font-size: 12.5px;
     line-height: 1.7;
     color: var(--dcs-text-secondary);
+  }
+  /* 5b 批：技能库编辑区（总纲同构骨架上的表单款） */
+  .sk-edit .sk-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+
+    > label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--el-text-color-secondary);
+    }
+    .sk-hint {
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--el-text-color-placeholder);
+    }
+  }
+  .sk-edit .sk-field .el-select {
+    align-self: flex-start;
+  }
+  .sk-edit .sk-body :deep(textarea) {
+    font-family: Consolas, 'JetBrains Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .sk-edit .sk-acts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--el-border-color-lighter);
+
+    .sk-saved {
+      font-size: 12px;
+      color: var(--el-text-color-placeholder);
+    }
   }
   .pd-body .sys-prompt {
     margin: 0;
