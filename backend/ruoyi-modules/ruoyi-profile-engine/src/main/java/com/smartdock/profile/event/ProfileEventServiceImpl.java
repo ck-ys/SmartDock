@@ -26,6 +26,10 @@ import java.util.Map;
 /**
  * 事件发布实现: schema 校验 + 身份解析 + 幂等写入 + 主体登记 upsert。
  *
+ * <p>单源口径(M1): 本类是 profile_event 的唯一写入咽喉——业务喂数/CSV 补录/管理端灌数
+ * 全部经 {@link ProfileEventPublisher} 汇入此处, source 在 {@link #toEntity} 统一覆盖为
+ * {@link ProfileSources#UNIFIED}, 下游(schema/身份/主体/触发器)天然同源。</p>
+ *
  * <p>每条事件独立事务(REQUIRES_NEW)。不用方法级 {@code @Transactional} 的原因:
  * {@link #publishBatch} 若直接调用同类 {@link #publish}, Spring 代理不生效,
  * 外层事务会把整批事件绑在一起——单条坏数据会拖垮整批。这里用 TransactionTemplate
@@ -228,9 +232,8 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     }
 
     private ProfileEvent toEntity(ProfileEventBo bo) {
-        if (StringUtils.isBlank(bo.getSource())) {
-            throw new IllegalArgumentException("profile event source is required");
-        }
+        // M1 单源口径: source 兼容保留但统一收口——无论调用方传什么都归入唯一内置源,
+        // 配置(维度/规则/Schema)与数据永远只有一套; 传空/超长不再拒收(见 docs/profile-integration.md)
         String eventName = firstNonBlank(bo.getEventName(), bo.getEventType());
         String eventType = firstNonBlank(bo.getEventType(), bo.getEventName());
         if (StringUtils.isBlank(eventName)) {
@@ -245,8 +248,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         String subjectType = StringUtils.isBlank(bo.getSubjectType()) ? "user" : bo.getSubjectType();
         String schemaVersion = StringUtils.isBlank(bo.getSchemaVersion()) ? "1-0-0" : bo.getSchemaVersion().trim();
         // 与 DDL 长度对齐——超长值在 PG 22001 之前拦下, 报可读错误
-        // (subjectName 除外: 可选字段走 upsert 侧截断)
-        checkLen("source", bo.getSource(), 32);
+        // (subjectName 除外: 可选字段走 upsert 侧截断; source 已被单源收口不再校验)
         checkLen("eventName", eventName, 64);
         checkLen("eventType", eventType, 64);
         checkLen("eventUid", bo.getEventUid(), 128);
@@ -264,7 +266,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         ProfileEvent e = new ProfileEvent();
         e.setEventId(IdWorker.getId());
         e.setTenantId(currentTenant());
-        e.setSource(bo.getSource());
+        e.setSource(ProfileSources.UNIFIED);
         e.setEventType(eventType);
         e.setEventName(eventName);
         e.setEventUid(bo.getEventUid());

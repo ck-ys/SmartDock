@@ -19,7 +19,7 @@ public class ProfileEventBo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /** 业务源: dcs / crm / mall ... */
+    /** 业务源(兼容保留): 单源口径下写入时统一收口到内置源, 传入值不参与分表分套, 可不传 */
     private String source;
 
     /** 事件类型(旧接入字段, 与 eventName 二选一): task.published / data.submitted ... */

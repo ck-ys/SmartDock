@@ -11,6 +11,9 @@ import java.util.Map;
  * <p>语义: append-only + 幂等。同一 (tenant, source, event_uid) 重复投递返回 false, 不报错。
  * 派生属性(responseHours/qualityScore 等)由业务写入前算好放 props, 引擎不做跨事件 join。</p>
  *
+ * <p>单源口径(M1): source 由引擎在写入咽喉统一收口——调用方传任意值(或不传)都会归入
+ * 唯一内置源, 存量调用代码无需改动; 详见 {@link com.smartdock.profile.event.ProfileSources}。</p>
+ *
  * <p>接入三条红线(违反会静默丢数/错算, 详见 docs/profile-integration.md):
  * ① eventUid 第一段带模块名(如 myapp.order:paid:No1); 同一对象同一动作会发生多次的必须四段式带序号,
  *    否则第二条被幂等键静默吞掉;

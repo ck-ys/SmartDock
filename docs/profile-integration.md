@@ -2,7 +2,7 @@
 
 > 本文是「怎么把你的业务系统接进画像」的**唯一真源**。系统内置的「任务转发」演示模块（`ruoyi-modules/ruoyi-dcs`）就是官方参考实现，本文所有写法与它的真实代码一致。
 >
-> 适用：当前版本（单源改造过渡期：`source` 参数仍然必填，改造完成后引擎自动统一，你传什么都会被收下，无需改动调用代码）。
+> 适用：当前版本（**单源口径已生效**：`source` 字段兼容保留，传任意值或不传都会被引擎统一收口，你的调用代码怎么写都能落库）。
 
 ## 0. 你将在 10 分钟里做什么
 
@@ -40,7 +40,7 @@ public class BizEventReporter {
     /** 核心动作发生时，业务代码里调一行：reporter.onOrderPaid(orderNo, userId, amountFen, "wxpay") */
     public void onOrderPaid(String orderNo, Long userId, int amountFen, String channel) {
         ProfileEventBo e = new ProfileEventBo();
-        e.setSource("myapp");            // 过渡期必填：一个短名；单源改造后自动统一，传什么都被收下
+        e.setSource("myapp");            // 可不传：单源口径下引擎统一收口，传什么都归入内置源
         e.setEventName("order.paid");    // 点分小写：实体.动作
         e.setEventUid(ProfileUids.uid("myapp.order", "paid", orderNo)); // 编号第一段带模块名（第 5 节）
         e.setSubjectType("member");      // 主体类型（见第 6 节）；内部员工场景用 user（不填默认 user）
@@ -61,7 +61,7 @@ public class BizEventReporter {
 
 | 字段 | 必填 | 上限 | 说明 |
 |---|---|---|---|
-| `source` | 过渡期必填 | 32 字 | 短名即可；单源改造后自动统一 |
+| `source` | 否 | — | 兼容保留：引擎统一收口，传任意值都归入内置源 |
 | `eventName` | 是（与 eventType 二选一） | 64 字 | 点分小写 `实体.动作`；**只填这一个**，`eventType` 是旧名字别用 |
 | `eventUid` | 是 | 128 字 | 幂等编号，第 5 节 |
 | `subjectId` | 是 | 64 字 | 主体编号（字符串） |
@@ -136,7 +136,7 @@ public class BizEventReporter {
 
 ## 附录 A：长度与命名红线
 
-source ≤32 · eventName ≤64 · eventUid ≤128 · subjectType ≤32 · subjectId ≤64 · anonymousId/sessionId ≤128 · schemaVersion ≤32。属性键名英文驼峰（`^[A-Za-z][A-Za-z0-9_]{0,62}$`）。超长直接抛错拒收。
+eventName ≤64 · eventUid ≤128 · subjectType ≤32 · subjectId ≤64 · anonymousId/sessionId ≤128 · schemaVersion ≤32（source 已被单源收口，不校验）。属性键名英文驼峰（`^[A-Za-z][A-Za-z0-9_]{0,62}$`）。超长直接抛错拒收。
 
 ## 附录 B：术语一句话
 
