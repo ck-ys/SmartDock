@@ -610,6 +610,9 @@ public class AnalyticsService {
         if (StringUtils.isBlank(bo.getSource())) {
             throw new ServiceException("source 不能为空");
         }
+        // 批末回修(dsflash): 单源口径下漏斗只挂在统一源——API 直调传旧源会造出
+        // UI 永远查不到的孤儿配置, 建档一律归一(编辑路径不改源)
+        bo.setSource(com.smartdock.profile.event.ProfileSources.UNIFIED);
         if (StringUtils.isBlank(bo.getFunnelCode())) {
             throw new ServiceException("漏斗编码不能为空");
         }
@@ -962,6 +965,8 @@ public class AnalyticsService {
         if (bo == null || StringUtils.isBlank(bo.getSource())) {
             throw new ServiceException("source 不能为空");
         }
+        // 批末回修(dsflash): 自定义视图同漏斗口径, 建档归一统一源
+        bo.setSource(com.smartdock.profile.event.ProfileSources.UNIFIED);
         requireSource(bo.getSource());
         String name = AnalyticsReportValidator.normalizeName(bo.getReportName());
         String dimension = AnalyticsReportValidator.normalizeDimension(bo.getDimension());
@@ -1303,41 +1308,6 @@ public class AnalyticsService {
         out.put("days", days);
         out.put("windowDays", windowDays);
         out.put("steps", outSteps);
-        return out;
-    }
-
-    /**
-     * 渠道归因（拍板 Q3-A）：触点=会话渠道来源，转化=目标事件首次发生（默认 signup）。
-     */
-    public Map<String, Object> attribution(String source, int days, String conversionEvent) {
-        requireSource(source);
-        int clampedDays = Math.min(Math.max(days, 1), 90);
-        String conversion = StringUtils.isBlank(conversionEvent) ? "signup" : conversionEvent.trim();
-        Date from = startOfDaysAgo(clampedDays);
-        Date to = startOfTomorrow();
-        String tenantId = currentTenant();
-        List<AttributionCalculator.Touch> touches = new ArrayList<>();
-        for (Map<String, Object> row : sessionMapper.selectChannelTouchpoints(tenantId, source, from, to)) {
-            touches.add(new AttributionCalculator.Touch(
-                String.valueOf(row.get("visitorId")),
-                ((Date) row.get("startedAt")).getTime(),
-                String.valueOf(row.get("channel"))));
-        }
-        Map<String, Long> firstConversion = new LinkedHashMap<>();
-        // 批10 Q7: 归因只消费转化事件, 事件名下推后不再全量载入
-        for (AnalyticsEventRow event : eventMapper.selectEventsByNames(
-            tenantId, source, from, to, List.of(conversion))) {
-            if (conversion.equals(event.getEventName()) && event.getVisitorKey() != null
-                && !firstConversion.containsKey(event.getVisitorKey())) {
-                firstConversion.put(event.getVisitorKey(), event.getOccurredTime().getTime());
-            }
-        }
-        List<AttributionCalculator.Conversion> conversions = new ArrayList<>();
-        firstConversion.forEach((visitor, time) -> conversions.add(new AttributionCalculator.Conversion(visitor, time)));
-        Map<String, Object> out = AttributionCalculator.attribute(touches, conversions);
-        out.put("source", source);
-        out.put("days", clampedDays);
-        out.put("conversionEvent", conversion);
         return out;
     }
 

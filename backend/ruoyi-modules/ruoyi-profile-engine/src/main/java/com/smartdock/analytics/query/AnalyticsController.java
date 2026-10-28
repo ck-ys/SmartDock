@@ -197,17 +197,6 @@ public class AnalyticsController {
     }
 
     /**
-     * 批8 渠道归因：首次/末次/线性三模型（event 为空 = signup）。
-     */
-    @SaCheckPermission("analytics:center:query")
-    @GetMapping("/attribution")
-    public R<Map<String, Object>> attribution(@RequestParam String source,
-                                              @RequestParam(defaultValue = "30") int days,
-                                              @RequestParam(required = false) String event) {
-        return R.ok(analyticsService.attribution(source, days, event));
-    }
-
-    /**
      * 批8 活跃口径：DAU/WAU/MAU + 粘性 + 新老构成。
      */
     @SaCheckPermission("analytics:center:query")

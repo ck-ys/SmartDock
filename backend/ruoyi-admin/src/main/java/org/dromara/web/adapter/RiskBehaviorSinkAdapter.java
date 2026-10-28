@@ -46,7 +46,7 @@ public class RiskBehaviorSinkAdapter implements RiskBehaviorSink {
             return;
         }
         ProfileEventBo e = new ProfileEventBo();
-        e.setSource("risk");
+        e.setSource(com.smartdock.profile.event.ProfileSources.UNIFIED);
         // 三审 dspro P2-1: 键里用去歧义后的类型(空值落 RISK), 与 eventType 存储值一致;
         // 纳入 missionId 区分同毫秒同用户同类型的不同业务对象
         String typeKey = eventType == null || eventType.isBlank() ? "RISK" : eventType;

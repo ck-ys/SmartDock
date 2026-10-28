@@ -131,7 +131,7 @@ public class DcsSubmissionService {
     private void publishEvent(String eventType, String eventUid, Long taskId, Long subjectUserId,
                               Map<String, Object> props) {
         ProfileEventBo e = new ProfileEventBo();
-        e.setSource("dcs");
+        e.setSource(com.smartdock.profile.event.ProfileSources.UNIFIED);
         e.setEventType(eventType);
         e.setEventUid(eventUid);
         e.setSubjectType("user");

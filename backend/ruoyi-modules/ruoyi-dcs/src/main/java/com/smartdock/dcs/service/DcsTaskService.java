@@ -364,7 +364,7 @@ public class DcsTaskService {
     private void publishEvent(String eventType, String eventUid, Long taskId, Map<String, Object> props,
                               Long subjectUserId) {
         ProfileEventBo e = new ProfileEventBo();
-        e.setSource("dcs");
+        e.setSource(com.smartdock.profile.event.ProfileSources.UNIFIED);
         e.setEventType(eventType);
         e.setEventUid(eventUid);
         e.setSubjectType("user");

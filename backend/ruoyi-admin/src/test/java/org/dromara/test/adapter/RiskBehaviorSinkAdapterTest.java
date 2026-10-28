@@ -57,7 +57,7 @@ class RiskBehaviorSinkAdapterTest {
         ArgumentCaptor<ProfileEventBo> cap = ArgumentCaptor.forClass(ProfileEventBo.class);
         verify(publisher).publish(cap.capture());
         ProfileEventBo e = cap.getValue();
-        assertEquals("risk", e.getSource());
+        assertEquals(com.smartdock.profile.event.ProfileSources.UNIFIED, e.getSource());
         assertEquals("RISK", e.getEventType());
         assertEquals("9", e.getSubjectId());
         assertTrue(e.getEventUid().startsWith("risk:RISK:9:"));

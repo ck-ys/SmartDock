@@ -184,23 +184,4 @@ public interface AnalyticsSessionMapper extends BaseMapperPlus<AnalyticsSession,
                                               @Param("from") Date from,
                                               @Param("to") Date to,
                                               @Param("granularity") String granularity);
-
-    /**
-     * 归因触点（批8）：访客的每次带渠道来源的访问，按时间升序。
-     * 渠道为空时返回 "(无来源)" 之外的空串，由计算层归一。
-     */
-    @InterceptorIgnore(tenantLine = "true")
-    @Select("""
-        SELECT visitor_id AS "visitorId",
-               coalesce(nullif(source_channel, ''), '') AS "channel",
-               started_at AS "startedAt"
-        FROM analytics_session
-        WHERE tenant_id = #{tenantId} AND source = #{source}
-          AND started_at >= #{from} AND started_at < #{to} AND del_flag = '0'
-        ORDER BY started_at
-        """)
-    List<Map<String, Object>> selectChannelTouchpoints(@Param("tenantId") String tenantId,
-                                                       @Param("source") String source,
-                                                       @Param("from") Date from,
-                                                       @Param("to") Date to);
 }
