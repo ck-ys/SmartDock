@@ -27,8 +27,10 @@ import java.util.List;
 @Deprecated
 public final class SkillAssets {
 
-    /** 单技能正文上限（防误放整个说明书进技能；超出截断并告警） */
-    static final int BODY_CAP = 6000;
+    /** 单技能正文上限（防误放整个说明书进技能；超出截断并告警）。
+     *  5b 三审回修（dsflash P1-2）：与管理端保存上限 BODY_MAX=2 万对齐——官方 load 路径
+     *  读全文不截断，自研注入/view_skill 截 6000 会造成同一技能两条路径内容不一致 */
+    static final int BODY_CAP = 20_000;
 
     /** 技能元数据 + 兜底内嵌正文（与 classpath md 同源；新增/修改技能两处同步改）。
      *  5b 批题7 甲（2026-10-28 拍板）拆除触发词：什么时候用技能由 description（一句话

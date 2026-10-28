@@ -95,7 +95,8 @@ class SkillOfficialFormatZeroDiffUnitTest {
         }
     }
 
-    /** frontmatter 逐行防错位（name 首行/版本号存在/触发词逐条），生成侧护栏 */
+    /** frontmatter 逐行防错位（name 首行/版本号存在），生成侧护栏；
+     *  题7 甲反向护栏：触发词块不得回流（d799dd5 声称加了实际没加——三审 dsflash P1-3 抓的假绿灯） */
     @Test
     @Tag("dev")
     void frontmatterShapePinned() throws IOException {
@@ -105,9 +106,7 @@ class SkillOfficialFormatZeroDiffUnitTest {
             assertThat(md).contains("version: ");
             assertThat(md).contains("displayName: " + s.name() + "\n");
             assertThat(md).contains("minRole: ");
-            for (String t : java.util.List.<String>of()) {
-                assertThat(md).contains("  - " + t + "\n");
-            }
+            assertThat(md).doesNotContain("triggers:");
         }
     }
 

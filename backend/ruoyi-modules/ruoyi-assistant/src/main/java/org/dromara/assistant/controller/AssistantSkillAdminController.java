@@ -41,17 +41,35 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AssistantSkillAdminController extends BaseController {
 
-    /** 题5 防呆③上限：正文（字）与一句话说明（字，对齐 DDL varchar(1024)） */
+    /** 题5 防呆③上限：正文（字）与一句话说明（字，对齐 DDL varchar(1024)）与技能名（DDL varchar(64)） */
     static final int BODY_MAX = 20_000;
     static final int DESC_MAX = 1024;
+    static final int NAME_MAX = 64;
 
     private final AssistantSkillMapper skillMapper;
+
+    /**
+     * 当前租户口径（三审 dspro P1-5）：动态租户优先（超管切单位看/改谁家就是谁家），
+     * 兜底登录租户/全局——避免超管切到 A 单位时把改动写进 000000 全局基线波及全平台。
+     */
+    private static String currentTenant() {
+        String t;
+        try {
+            t = org.dromara.common.tenant.helper.TenantHelper.getTenantId();
+        } catch (Exception noTenantModule) {
+            t = null;
+        }
+        if (t == null || t.isBlank()) {
+            t = LoginHelper.getTenantId();
+        }
+        return (t == null || t.isBlank()) ? DatabaseSkillRepository.GLOBAL_TENANT : t;
+    }
 
     /** 管理列表：生效技能（三层叠加后）∪ 停用行（管理台要看得见停用的），带来源徽章与内置档 */
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/list")
     public R<List<Map<String, Object>>> list() {
-        String tenantId = LoginHelper.getTenantId();
+        String tenantId = currentTenant();
         Map<String, DcsAssistantSkill> dbRows = indexBySkillId(skillMapper.selectAllForTenant(tenantId));
         List<Map<String, Object>> out = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
@@ -96,7 +114,7 @@ public class AssistantSkillAdminController extends BaseController {
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/{skillId}")
     public R<Map<String, Object>> detail(@PathVariable String skillId) {
-        String tenantId = LoginHelper.getTenantId();
+        String tenantId = currentTenant();
         SkillAssets.LoadedSkill eff = findEffective(skillId, tenantId);
         if (eff == null) {
             // 停用行不在生效视图（遮罩语义），管理台编辑停用技能时仍要给回填
@@ -141,7 +159,7 @@ public class AssistantSkillAdminController extends BaseController {
     @PostMapping("/save")
     @SaCheckPermission("dcs:assistant:skill:edit")
     public R<Void> save(@RequestBody DcsAssistantSkill body) {
-        String tenantId = LoginHelper.getTenantId();
+        String tenantId = currentTenant();
         Long userId = LoginHelper.getUserId();
         String skillId = body.getSkillId() == null ? null : body.getSkillId().trim();
         if (skillId == null || skillId.isBlank() || !skillId.matches("[a-z0-9][a-z0-9-]{0,63}")) {
@@ -160,7 +178,17 @@ public class AssistantSkillAdminController extends BaseController {
         if (body.getBody().length() > BODY_MAX) {
             return R.fail("正文超长（" + body.getBody().length() + " > " + BODY_MAX + " 字上限）");
         }
-        int minRole = DatabaseSkillRepository.minRoleOf(body.getMinRole());
+        // 三审回修（dsflash P2-7）：技能名长度——DDL varchar(64)，前端只挡 32，直调 API 须人话报错
+        if (body.getDisplayName() != null && body.getDisplayName().length() > NAME_MAX) {
+            return R.fail("技能名超长（" + body.getDisplayName().length() + " > " + NAME_MAX + " 字上限）");
+        }
+        // 三审回修（dsflash P2-7）：minRole 非法值不得静默降档为 member（fail-open）
+        String rawRole = body.getMinRole();
+        if (rawRole != null && !rawRole.isBlank()
+            && !rawRole.matches("member|publisher|admin|0|1|2")) {
+            return R.fail("谁能用只能是 member/publisher/admin（收到：" + rawRole + "）");
+        }
+        int minRole = DatabaseSkillRepository.minRoleOf(rawRole);
         // 题5 防呆①：对内置技能覆写只升不降（SkillAssets.SKILLS=内置零漂移对照源）
         for (SkillAssets.Skill builtin : SkillAssets.SKILLS) {
             if (builtin.id().equals(skillId) && minRole < builtin.minRole()) {
@@ -179,7 +207,12 @@ public class AssistantSkillAdminController extends BaseController {
         row.setDescription(body.getDescription());
         row.setMinRole(DatabaseSkillRepository.minRoleName(minRole));
         row.setBody(body.getBody());
-        row.setDisabled(body.getDisabled() != null && body.getDisabled() == 1 ? 1 : 0);
+        // 三审回修（dsflash P2-7）：disabled 缺省沿用原值（未传≠启用），新行默认启用
+        if (body.getDisabled() != null) {
+            row.setDisabled(body.getDisabled() == 1 ? 1 : 0);
+        } else if (isNew) {
+            row.setDisabled(0);
+        }
         row.setUpdateBy(userId);
         if (isNew) {
             row.setCreateBy(userId);
@@ -187,7 +220,10 @@ public class AssistantSkillAdminController extends BaseController {
             skillMapper.insert(row);
         } else {
             row.setUpdateTime(new java.util.Date());
-            skillMapper.updateById(row);
+            // 三审回修（dspro P2-1）：并发删除（恢复内置）后 update 0 行=保存静默丢失，人话拒绝
+            if (skillMapper.updateById(row) == 0) {
+                return R.fail("这条在线版本刚被别人删除（恢复内置），请刷新列表后重试");
+            }
         }
         // 题3=乙：本机即时失效＋全机广播（广播丢失 30 秒兜底）
         SkillCacheBroadcaster.publishReload(tenantId);
@@ -199,14 +235,14 @@ public class AssistantSkillAdminController extends BaseController {
     @PostMapping("/{skillId}")
     @SaCheckPermission("dcs:assistant:skill:edit")
     public R<Void> delete(@PathVariable String skillId) {
-        String tenantId = LoginHelper.getTenantId();
+        String tenantId = currentTenant();
         int deleted = skillMapper.delete(new LambdaQueryWrapper<DcsAssistantSkill>()
             .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
         if (deleted > 0) {
             SkillCacheBroadcaster.publishReload(tenantId);
-        }
-        if (deleted > 0) {
-            return R.ok("已删除在线版本（内置原文自动恢复）");
+            // 三审回修（dsflash P2-12）：文案按有没有内置基线分流（纯在线技能删除后无内置可恢复）
+            boolean hasBuiltin = !builtinMinRoleName(skillId).isEmpty();
+            return R.ok(hasBuiltin ? "已删除在线版本（内置原文自动恢复）" : "已彻底删除该在线技能");
         }
         return R.fail("没有本租户的在线版本可删");
     }

@@ -37,6 +37,11 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
 
     private static final Map<String, Cached> CACHE = new ConcurrentHashMap<>();
 
+    /** 失效代数：invalidateAll() 递增——装载期间的旧快照不得回写覆盖已失效缓存（三审 dspro P1-1）；
+     *  包内可见：合并视图 AssistantSkillSource.all 与本层共用同一代数 */
+    static final java.util.concurrent.atomic.AtomicLong GEN =
+        new java.util.concurrent.atomic.AtomicLong();
+
     private record Cached(List<AgentSkill> skills, java.util.Set<String> disabled, long at) {
     }
 
@@ -49,12 +54,16 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
     @Override
     public List<AgentSkill> getAllSkills() {
         Cached snap = CACHE.get(tenantId);
-        long now = System.currentTimeMillis();
-        if (snap != null && now - snap.at() < TTL_MS) {
+        if (snap != null && System.currentTimeMillis() - snap.at() < TTL_MS) {
             return snap.skills();
         }
+        long gen = GEN.get();
         Load loaded = load();
-        CACHE.put(tenantId, new Cached(loaded.skills(), loaded.disabled(), now));
+        // 装载成功且装载期间未发生失效（保存/广播）才落缓存；失败沿用旧快照不入缓存
+        if (loaded.ok() && GEN.get() == gen) {
+            CACHE.put(tenantId, new Cached(loaded.skills(), loaded.disabled(),
+                System.currentTimeMillis()));
+        }
         return loaded.skills();
     }
 
@@ -66,8 +75,7 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
     public static java.util.Set<String> disabledIds(String tenantId) {
         String key = tenantId == null || tenantId.isBlank() ? GLOBAL_TENANT : tenantId;
         Cached snap = CACHE.get(key);
-        long now = System.currentTimeMillis();
-        if (snap == null || now - snap.at() >= TTL_MS) {
+        if (snap == null || System.currentTimeMillis() - snap.at() >= TTL_MS) {
             // 触发一次正规装载（装载含禁用行解析），再读缓存
             new DatabaseSkillRepository(key).getAllSkills();
             snap = CACHE.get(key);
@@ -136,8 +144,9 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
         // 无资源持有
     }
 
-    /** 全部租户缓存清空（保存路径＋Redis 广播收到时） */
+    /** 全部租户缓存清空（保存路径＋Redis 广播收到时）；递增代数使在途装载的旧快照作废 */
     static void invalidateAll() {
+        GEN.incrementAndGet();
         CACHE.clear();
     }
 
@@ -152,8 +161,11 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
             System.currentTimeMillis()));
     }
 
-    /** 装载结果：生效技能＋停用遮罩集 */
-    private record Load(List<AgentSkill> skills, java.util.Set<String> disabled) {
+    /** 装载结果：生效技能＋停用遮罩集；ok=装载成功（失败沿用旧快照，不落缓存） */
+    private record Load(List<AgentSkill> skills, java.util.Set<String> disabled, boolean ok) {
+        static Load empty() {
+            return new Load(List.of(), java.util.Set.of(), false);
+        }
     }
 
     /** 读表→官方 AgentSkill（同 skill_id 租户行胜全局行；disabled=1 行进遮罩集） */
@@ -163,7 +175,7 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
             mapper = SpringUtils.getBean(AssistantSkillMapper.class);
         } catch (Exception noSpring) {
             log.debug("[skill-db] Spring 未就绪（纯单测场景），数据库层缺席");
-            return new Load(List.of(), java.util.Set.of());
+            return Load.empty();
         }
         try {
             // 全量行（含 disabled）在 Java 侧分拣：生效行建技能，停用行进遮罩集
@@ -206,11 +218,16 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
             }
             log.debug("[skill-db] 租户 {} 生效 {} 条在线技能行，停用遮罩 {} 条",
                 tenantId, out.size(), disabled.size());
-            return new Load(List.copyOf(out), java.util.Set.copyOf(disabled));
+            return new Load(List.copyOf(out), java.util.Set.copyOf(disabled), true);
         } catch (Exception e) {
-            // DB 故障=本层缺席（内置/目录层照常），不连坐建会话链
-            log.warn("[skill-db] 租户 {} 在线层读取失败，本层缺席（内置层照常）: {}", tenantId, e.getMessage());
-            return new Load(List.of(), java.util.Set.of());
+            // DB 故障三审回修（dspro P1-2/dsflash P1-4）：不得把「空技能+空遮罩」当正常结果缓存——
+            // 那等于停用 fail-open 30 秒（被藏技能全员复活）。沿用上一次成功快照（含旧遮罩）；
+            // 冷缓存无旧值时才本层缺席（内置层照常，遮罩语义退化为无 DB 行=内置默认，可接受）
+            log.warn("[skill-db] 租户 {} 在线层读取失败，沿用上次快照（无则本层缺席）: {}",
+                tenantId, e.getMessage());
+            Cached prev = CACHE.get(tenantId);
+            return prev == null ? Load.empty()
+                : new Load(prev.skills(), prev.disabled(), false);
         }
     }
 

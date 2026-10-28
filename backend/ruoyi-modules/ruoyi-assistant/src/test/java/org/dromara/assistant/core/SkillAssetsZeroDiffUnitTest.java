@@ -49,13 +49,14 @@ class SkillAssetsZeroDiffUnitTest {
     @Test
     @Tag("dev")
     void holderClearsOnUnknownOrNullId() {
-        AssistantSkillHolder.set("t-zero-diff", "bogus-skill");
+        // 5b 起 set 带租户判存（三审 dspro P1-3）；测试用全局租户口径（内置四技能在场）
+        AssistantSkillHolder.set("t-zero-diff", "bogus-skill", "000000");
         assertThat(AssistantSkillHolder.get("t-zero-diff")).isNull();
-        AssistantSkillHolder.set("t-zero-diff", "data-reading");
+        AssistantSkillHolder.set("t-zero-diff", "data-reading", "000000");
         assertThat(AssistantSkillHolder.get("t-zero-diff")).isEqualTo("data-reading");
-        AssistantSkillHolder.set("t-zero-diff", null);
+        AssistantSkillHolder.set("t-zero-diff", null, "000000");
         assertThat(AssistantSkillHolder.get("t-zero-diff")).isNull();
-        AssistantSkillHolder.set("t-zero-diff", "  ");
+        AssistantSkillHolder.set("t-zero-diff", "  ", "000000");
         assertThat(AssistantSkillHolder.get("t-zero-diff")).isNull();
     }
 }

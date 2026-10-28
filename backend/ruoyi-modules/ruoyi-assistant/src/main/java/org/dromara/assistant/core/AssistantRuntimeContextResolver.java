@@ -147,8 +147,12 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         // 业务批3-④ #17：联网开关逐请求上行（默认关=不传/非真值），工具注册闸读它裁 web_search
         AssistantWebSearchHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("webSearchEnabled"));
         // 五需求批 R1：技能选择逐请求上行（未选=不传）。与 thinkTier/model 不同，装饰器每次
-        // 模型调用现读 holder——换选/摘掉下一轮即生效，无需失效缓存 agent
-        AssistantSkillHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("skillId"));
+        // 模型调用现读 holder——换选/摘掉下一轮即生效，无需失效缓存 agent。
+        // 5b 三审回修（dspro P1-3）：判存必须带租户——本方法跑在框架流线程，Sa-Token 上下文
+        // 已解绑，SkillAssets.exists 无参版会兜底 000000 视图，租户私有新增技能被当未知 id
+        // 静默清除（胶囊还挂着但正文永远不注入）
+        AssistantSkillHolder.set(aguiThreadId,
+            input == null ? null : input.getForwardedProp("skillId"), tenantId);
         // 批8-3 回修（dspro P1-1，javap 字节码实证）：agent 会话键=(复合用户"t:租户:用户", threadId)，
         // removeSession 单参版本按 ("__anon__",threadId) 查键恒 miss（原实现=死代码）——必须双参直指；
         // 「跟随默认」(声明 null)也参与差异判定（Holder.needsRebuild 已同步修），未命中返回 false 记 debug。

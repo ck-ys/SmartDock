@@ -41,7 +41,6 @@ public final class AssistantSkillSource {
     }
 
     private static volatile List<AgentSkillRepository> stack;
-    private static volatile List<SkillView> merged;
     /** 5b 批：按租户的合并视图缓存（题3=乙——TTL 30 秒兜底＋保存/Redis 广播即时失效） */
     private static final java.util.Map<String, TenantCache> MERGED_BY_TENANT = new java.util.concurrent.ConcurrentHashMap<>();
     private record TenantCache(List<SkillView> views, long at) {
@@ -112,12 +111,9 @@ public final class AssistantSkillSource {
         }
         synchronized (AssistantSkillSource.class) {
             if (stack == null) {
-                // 三审回修 P1-2（dspro）：先算两份、先发布 merged 后发布 stack——
-                // 快路径以 stack 非空为准入，发布序保证见到 stack 时 merged 必已就绪
-                List<AgentSkillRepository> built = buildStack();
-                List<SkillView> views = mergeAll(built);
-                merged = views;
-                stack = built;
+                // 注意：这里只建栈不再预算合并视图——5b 起合并视图按租户走 MERGED_BY_TENANT，
+                // 旧「先发布 merged 后发布 stack」的序已无读者（三审 dsflash P2-5 死代码清理）
+                stack = buildStack();
             }
             return stack;
         }
@@ -142,11 +138,16 @@ public final class AssistantSkillSource {
         if (snap != null && now - snap.at() < DatabaseSkillRepository.TTL_MS) {
             return snap.views();
         }
+        // 三审回修（dspro P1-1 同族）：与 DB 层共用失效代数——计算期间发生过保存/广播，
+        // 本次视图已旧，不回写缓存（旧值复活最多 30s 的竞态窗口闭合）
+        long gen = DatabaseSkillRepository.GEN.get();
         List<SkillView> merged = mergeAll(repositories(key));
         java.util.Set<String> masked = DatabaseSkillRepository.disabledIds(key);
         List<SkillView> views = masked.isEmpty() ? merged : merged.stream()
             .filter(v -> !masked.contains(v.id())).toList();
-        MERGED_BY_TENANT.put(key, new TenantCache(views, now));
+        if (DatabaseSkillRepository.GEN.get() == gen) {
+            MERGED_BY_TENANT.put(key, new TenantCache(views, System.currentTimeMillis()));
+        }
         return views;
     }
 
@@ -250,7 +251,6 @@ public final class AssistantSkillSource {
     static void invalidate() {
         synchronized (AssistantSkillSource.class) {
             stack = null;
-            merged = null;
         }
     }
 

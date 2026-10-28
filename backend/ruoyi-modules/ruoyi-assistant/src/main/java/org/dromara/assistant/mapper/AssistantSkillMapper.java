@@ -18,14 +18,11 @@ import java.util.List;
 public interface AssistantSkillMapper extends BaseMapper<DcsAssistantSkill> {
 
     /**
-     * 生效行（disabled=0）：全局基线＋本租户两层；同 skill_id 租户行胜由调用方归并。
-     * 管理列表用 {@link #selectAllForTenant}（含停用行）。
+     * 管理列表/装载共用：全局基线＋本租户全部行（含停用行）。生效/停用分拣与
+     * 「同 skill_id 租户行胜全局行」归并在 DatabaseSkillRepository.load 完成——
+     * 旧的 disabled=0 过滤版 selectEffective 已删（三审 dsflash P2-4 死 SQL；
+     * 它正是「停用被下层顶回」P0 的根因载体，留着易被误用）。
      */
-    @Select("SELECT * FROM dcs_assistant_skill WHERE disabled = 0"
-        + " AND tenant_id IN ('000000', #{tenantId}) ORDER BY skill_id, tenant_id")
-    List<DcsAssistantSkill> selectEffective(@Param("tenantId") String tenantId);
-
-    /** 管理列表：全局基线＋本租户全部行（含停用，管理台要看全量） */
     @Select("SELECT * FROM dcs_assistant_skill WHERE tenant_id IN ('000000', #{tenantId})"
         + " ORDER BY skill_id, tenant_id")
     List<DcsAssistantSkill> selectAllForTenant(@Param("tenantId") String tenantId);

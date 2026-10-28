@@ -36,6 +36,6 @@ SELECT 12040, '助手技能编辑', 11927, 10, '', NULL, 1, 0, 'F', '0', '0',
     '5b 批：管理台在线编辑技能内容（题5 甲·独立权限串）'
 WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 12040 OR perms = 'dcs:assistant:skill:edit');
 
-INSERT INTO sys_role_menu (role_id, menu_id)
-SELECT 6, 12040
-WHERE NOT EXISTS (SELECT 1 FROM sys_role_menu WHERE role_id = 6 AND menu_id = 12040);
+-- 权限串授权不做自动绑定（三审 dsflash P1-5 回修）：角色 6（租户管理员）在基线里连宿主菜单
+-- 11927 都没有，自动授 12040 只会造出「能盲写、不能读、看不到页面」的半授权；
+-- 拍板口径=「超管默认有，其他管理员按需勾」（板 v7 题5），由部署方在角色管理里自行勾选。

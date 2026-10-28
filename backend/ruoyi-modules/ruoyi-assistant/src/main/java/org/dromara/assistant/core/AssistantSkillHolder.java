@@ -19,8 +19,10 @@ public final class AssistantSkillHolder {
     private AssistantSkillHolder() {
     }
 
-    /** rawSkillId=null/空白/未知 id 一律清除（防脏值滞留后续轮次） */
-    public static void set(String threadId, Object rawSkillId) {
+    /** rawSkillId=null/空白/未知 id 一律清除（防脏值滞留后续轮次）。
+     *  5b 三审回修（dspro P1-3）：显式带租户判存——本调用方在框架流线程，
+     *  无参版会兜底 000000 视图，租户私有新增技能被误判未知而静默清除 */
+    public static void set(String threadId, Object rawSkillId, String tenantId) {
         if (threadId == null || threadId.isBlank()) {
             return;
         }
@@ -28,7 +30,7 @@ public final class AssistantSkillHolder {
             BY_THREAD.clear();
         }
         String id = rawSkillId == null ? null : String.valueOf(rawSkillId).trim();
-        if (id == null || id.isEmpty() || !SkillAssets.exists(id)) {
+        if (id == null || id.isEmpty() || !SkillAssets.exists(id, tenantId)) {
             BY_THREAD.remove(threadId);
             return;
         }
