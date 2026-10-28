@@ -95,7 +95,7 @@ public class ProfileIdentityService {
 
         String userId = ids.get("user_id");
         if (userId != null) {
-            ProfileIdentityLink existing = linkMapper.selectLink(tenantId, source, "user_id", userId);
+            ProfileIdentityLink existing = linkMapper.selectLinkStrong(tenantId, source, subjectType, "user_id", userId);
             if (existing != null && StringUtils.isNotBlank(existing.getSubjectId())) {
                 canonical = existing.getSubjectId();
                 canonicalFixed = true;
@@ -118,7 +118,7 @@ public class ProfileIdentityService {
             if (value == null) {
                 continue;
             }
-            ProfileIdentityLink existing = linkMapper.selectLink(tenantId, source, type, value);
+            ProfileIdentityLink existing = linkMapper.selectLinkStrong(tenantId, source, subjectType, type, value);
             if (existing != null && StringUtils.isNotBlank(existing.getSubjectId())
                 && !existing.getSubjectId().equals(canonical)) {
                 log.warn("[Profile] strong identity conflict source={} type={} existing={} incoming={}",
@@ -133,15 +133,18 @@ public class ProfileIdentityService {
         }
 
         // anonymous_id: 登录后把匿名主体并入规范主体; 挂载方是真实用户时绝不搬链接
+        // (existingAnonType 提升到匿名块外: 收尾登记时匿名桥沿用既有行类型保单行)
+        String existingAnonType = null;
         String anonymousId = ids.get("anonymous_id");
         if (anonymousId != null) {
-            ProfileIdentityLink existing = linkMapper.selectLink(tenantId, source, "anonymous_id", anonymousId);
+            ProfileIdentityLink existing = linkMapper.selectLinkShared(tenantId, source, "anonymous_id", anonymousId);
+            existingAnonType = existing == null ? null : existing.getSubjectType();
             if (existing != null && StringUtils.isNotBlank(existing.getSubjectId())
                 && !existing.getSubjectId().equals(canonical)) {
                 String holder = existing.getSubjectId();
                 if (strongConflict) {
                     conflictingTypes.add("anonymous_id");
-                } else if (linkMapper.countStrongLinks(tenantId, source, holder) > 0) {
+                } else if (linkMapper.countStrongLinks(tenantId, source, existingAnonType, holder) > 0) {
                     // 匿名 ID 已挂在真实用户名下:
                     // 匿名回访 → 沿用该用户, 事件归因不断链;
                     // 共享浏览器换账号(userId 已定新 canonical) → 只把匿名链接改挂到新主体, 不搬对方身份
@@ -172,7 +175,10 @@ public class ProfileIdentityService {
             if (conflictingTypes.contains(entry.getKey())) {
                 continue;
             }
-            upsertLink(tenantId, source, subjectType, canonical, entry.getKey(), entry.getValue(), now);
+            // 匿名桥改挂沿用既有行的 subject_type 保持单行语义; 强标识用事件主体类型(各命名空间各自登记)
+            String upsertType = "anonymous_id".equals(entry.getKey()) && existingAnonType != null
+                ? existingAnonType : subjectType;
+            upsertLink(tenantId, source, upsertType, canonical, entry.getKey(), entry.getValue(), now);
         }
         return canonical;
     }

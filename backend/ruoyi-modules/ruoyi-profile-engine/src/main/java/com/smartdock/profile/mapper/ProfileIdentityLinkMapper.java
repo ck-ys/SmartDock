@@ -13,8 +13,10 @@ import java.util.List;
 /**
  * 身份标识链接 Mapper。
  *
- * <p>唯一键 (tenant_id, source, identifier_type, identifier_value) 保证同一标识
- * 只有一个规范主体; 合并时用 {@link #moveSubject} 迁移链接, 不改历史事件。</p>
+ * <p>唯一键 (tenant_id, source, subject_type, identifier_type, identifier_value):
+ * 强标识(user_id/member_id/...)按主体类型隔离——员工(user)与顾客(member)同号互不串门;
+ * anonymous_id 是跨类型的「身份桥」, 用 {@link #selectLinkShared} 不分类型查,
+ * 改挂时沿用既有行的 subject_type 保持单行。合并用 {@link #moveSubject}, 不改历史事件。</p>
  *
  * @author smartdock
  */
@@ -27,13 +29,34 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
                first_seen, last_seen
         FROM profile_identity_link
         WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND subject_type = #{subjectType}
           AND identifier_type = #{identifierType} AND identifier_value = #{identifierValue}
+        ORDER BY last_seen DESC
         LIMIT 1
         """)
-    ProfileIdentityLink selectLink(@Param("tenantId") String tenantId,
-                                   @Param("source") String source,
-                                   @Param("identifierType") String identifierType,
-                                   @Param("identifierValue") String identifierValue);
+    ProfileIdentityLink selectLinkStrong(@Param("tenantId") String tenantId,
+                                         @Param("source") String source,
+                                         @Param("subjectType") String subjectType,
+                                         @Param("identifierType") String identifierType,
+                                         @Param("identifierValue") String identifierValue);
+
+    /**
+     * 跨类型标识查询(anonymous_id 专用): 身份桥不分主体类型, 按 last_seen 定序保证确定性。
+     */
+    @Select("""
+        SELECT link_id, tenant_id, source, subject_type, subject_id, identifier_type,
+               identifier_value, identifier_hash, confidence, is_secure, status,
+               first_seen, last_seen
+        FROM profile_identity_link
+        WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND identifier_type = #{identifierType} AND identifier_value = #{identifierValue}
+        ORDER BY last_seen DESC
+        LIMIT 1
+        """)
+    ProfileIdentityLink selectLinkShared(@Param("tenantId") String tenantId,
+                                         @Param("source") String source,
+                                         @Param("identifierType") String identifierType,
+                                         @Param("identifierValue") String identifierValue);
 
     @Select("""
         SELECT link_id, tenant_id, source, subject_type, subject_id, identifier_type,
@@ -58,7 +81,7 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
             (#{l.linkId}, #{l.tenantId}, #{l.source}, #{l.subjectType}, #{l.subjectId},
              #{l.identifierType}, #{l.identifierValue}, #{l.identifierHash}, #{l.confidence},
              #{l.isSecure}, #{l.status}, #{l.firstSeen}, #{l.lastSeen}, CURRENT_TIMESTAMP)
-        ON CONFLICT (tenant_id, source, identifier_type, identifier_value) DO UPDATE SET
+        ON CONFLICT (tenant_id, source, subject_type, identifier_type, identifier_value) DO UPDATE SET
             subject_type = EXCLUDED.subject_type,
             subject_id = EXCLUDED.subject_id,
             identifier_hash = COALESCE(EXCLUDED.identifier_hash, profile_identity_link.identifier_hash),
@@ -89,11 +112,13 @@ public interface ProfileIdentityLinkMapper extends BaseMapperPlus<ProfileIdentit
         SELECT count(*)
         FROM profile_identity_link
         WHERE tenant_id = #{tenantId} AND source = #{source}
+          AND subject_type = #{subjectType}
           AND subject_id = #{subjectId} AND status = 'ACTIVE'
           AND identifier_type IN ('user_id','email_sha256','phone_sha256','crm_id','member_id','account_id')
         """)
     int countStrongLinks(@Param("tenantId") String tenantId,
                          @Param("source") String source,
+                         @Param("subjectType") String subjectType,
                          @Param("subjectId") String subjectId);
 
     /**

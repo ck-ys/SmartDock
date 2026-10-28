@@ -536,6 +536,44 @@ CREATE INDEX idx_dcs_asst_comp_time ON public.dcs_assistant_compaction (create_t
 
 
 --
+-- Name: dcs_assistant_skill; Type: TABLE; Schema: public; Owner: -
+-- 5b 批（2026-10-28 拍板）：技能内容在线层——000000=全局基线行，租户行覆盖同 skill_id；
+-- 与 jar 内置/config/skills 的关系见 AssistantSkillSource 三层叠加（题2 甲）。
+-- 无触发词列（题7 甲：一句话说明 description 是模型触发唯一依据）。
+--
+
+CREATE TABLE public.dcs_assistant_skill (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    skill_id character varying(64) NOT NULL,
+    display_name character varying(64),
+    description character varying(1024) NOT NULL,
+    min_role character varying(16) DEFAULT 'member'::character varying NOT NULL,
+    body text NOT NULL,
+    disabled smallint DEFAULT 0 NOT NULL,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone
+);
+
+
+--
+-- Name: dcs_assistant_skill_pk; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dcs_assistant_skill
+    ADD CONSTRAINT dcs_assistant_skill_pk PRIMARY KEY (id);
+
+
+--
+-- Name: uk_dcs_assistant_skill_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_dcs_assistant_skill_tenant ON public.dcs_assistant_skill (tenant_id, skill_id);
+
+
+--
 -- Name: dcs_assistant_model_setting; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1333,7 +1371,7 @@ CREATE TABLE public.profile_identity_link (
     update_by bigint,
     update_time timestamp without time zone,
     CONSTRAINT pk_profile_identity_link PRIMARY KEY (link_id),
-    CONSTRAINT uk_profile_identity_link UNIQUE (tenant_id, source, identifier_type, identifier_value),
+    CONSTRAINT uk_profile_identity_link UNIQUE (tenant_id, source, subject_type, identifier_type, identifier_value),
     CONSTRAINT ck_profile_identity_confidence CHECK (confidence >= 0 AND confidence <= 1)
 );
 

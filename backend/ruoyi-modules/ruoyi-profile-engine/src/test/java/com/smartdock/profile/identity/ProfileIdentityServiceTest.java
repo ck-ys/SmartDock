@@ -52,6 +52,7 @@ class ProfileIdentityServiceTest {
     private ProfileIdentityLink link(String subjectId) {
         ProfileIdentityLink link = new ProfileIdentityLink();
         link.setSubjectId(subjectId);
+        link.setSubjectType("user");
         return link;
     }
 
@@ -59,9 +60,9 @@ class ProfileIdentityServiceTest {
     void anonymousRevisitAfterLoginKeepsUserAttribution() {
         // 匿名链接 A→U(U 持有 user_id 强标识); 登录后的下一次匿名事件必须归因到 U,
         // 且绝不能把 U 并入匿名主体(旧实现反向 merge 会把用户链接搬走)
-        when(linkMapper.selectLink("000000", "web", "anonymous_id", "anon-A"))
+        when(linkMapper.selectLinkShared("000000", "web", "anonymous_id", "anon-A"))
             .thenReturn(link("user-1"));
-        when(linkMapper.countStrongLinks("000000", "web", "user-1")).thenReturn(1);
+        when(linkMapper.countStrongLinks("000000", "web", "user", "user-1")).thenReturn(1);
 
         String canonical = service.resolveAndLink("000000", "web", "visitor", "anon-A",
             Map.of("anonymous_id", "anon-A"));
@@ -74,10 +75,10 @@ class ProfileIdentityServiceTest {
     @Test
     void sharedBrowserSecondLoginDoesNotStealFirstUserLinks() {
         // 浏览器匿名 A 已挂到 user-1; user-2 在同一浏览器登录: 只改挂匿名链接, 不搬 user-1 的身份
-        when(linkMapper.selectLink("000000", "web", "user_id", "user-2")).thenReturn(null);
-        when(linkMapper.selectLink("000000", "web", "anonymous_id", "anon-A"))
+        when(linkMapper.selectLinkStrong("000000", "web", "user", "user_id", "user-2")).thenReturn(null);
+        when(linkMapper.selectLinkShared("000000", "web", "anonymous_id", "anon-A"))
             .thenReturn(link("user-1"));
-        when(linkMapper.countStrongLinks("000000", "web", "user-1")).thenReturn(1);
+        when(linkMapper.countStrongLinks("000000", "web", "user", "user-1")).thenReturn(1);
 
         String canonical = service.resolveAndLink("000000", "web", "user", "user-2",
             Map.of("user_id", "user-2", "anonymous_id", "anon-A"));
@@ -93,10 +94,10 @@ class ProfileIdentityServiceTest {
     @Test
     void firstLoginUpgradesPureAnonymousSubject() {
         // 匿名链接 A→A(纯匿名主体, 无强标识): 首次登录正常升级, A 并入规范主体
-        when(linkMapper.selectLink("000000", "web", "user_id", "user-1")).thenReturn(null);
-        when(linkMapper.selectLink("000000", "web", "anonymous_id", "anon-A"))
+        when(linkMapper.selectLinkStrong("000000", "web", "user", "user_id", "user-1")).thenReturn(null);
+        when(linkMapper.selectLinkShared("000000", "web", "anonymous_id", "anon-A"))
             .thenReturn(link("anon-A"));
-        when(linkMapper.countStrongLinks("000000", "web", "anon-A")).thenReturn(0);
+        when(linkMapper.countStrongLinks("000000", "web", "user", "anon-A")).thenReturn(0);
 
         String canonical = service.resolveAndLink("000000", "web", "user", "user-1",
             Map.of("user_id", "user-1", "anonymous_id", "anon-A"));
@@ -108,9 +109,27 @@ class ProfileIdentityServiceTest {
     }
 
     @Test
+    void memberSameNumberDoesNotStealUserLink() {
+        // 员工(user)命名空间已用 user_id=123; 商城顾客(member)事件带同号标识: 各命名空间互不串门
+        when(linkMapper.selectLinkStrong("000000", "mall", "member", "user_id", "123"))
+            .thenReturn(null);
+
+        String canonical = service.resolveAndLink("000000", "mall", "member", "member-1",
+            Map.of("user_id", "123"));
+
+        assertThat(canonical).isEqualTo("member-1");
+        verify(mergeMapper, never()).insert(any(ProfileIdentityMerge.class));
+        verify(linkMapper, never()).moveSubject(anyString(), anyString(), anyString(), anyString(), anyString());
+        // 强标识登记在 member 命名空间, 不会改挂到 user 名下
+        verify(linkMapper).upsertLink(Mockito.argThat(l ->
+            "member".equals(l.getSubjectType()) && "member-1".equals(l.getSubjectId())
+                && "user_id".equals(l.getIdentifierType())));
+    }
+
+    @Test
     void strongUserIdConflictKeepsExistingSubject() {
         // user_id 已挂 user-1, 来了一个 subjectId=user-2 的事件: 沿用 user-1, 不改挂强标识
-        when(linkMapper.selectLink("000000", "web", "user_id", "u-100"))
+        when(linkMapper.selectLinkStrong("000000", "web", "user", "user_id", "u-100"))
             .thenReturn(link("user-1"));
 
         String canonical = service.resolveAndLink("000000", "web", "user", "user-2",
