@@ -20,16 +20,17 @@
       <span v-if="live && turn.toolCalls > 0" class="ts-ics" :class="{ live: turn.phase === 'acting' }">
         <IconSpan v-for="icn in toolIcons" :key="icn" :name="icn" />
       </span>
-      <Transition name="tkl" mode="out-in">
-        <span v-if="turn.phase === 'waiting'" :key="statText" class="ts-w8" v-html="emoToSvgHtml(statText)"></span>
-        <span
-          v-else
-          :key="statText"
-          class="ts-t"
-          :class="{ run: live, 'fin-warn': !live && turn.phase === 'stopped' && failCount > 0 }"
-          v-html="emoToSvgHtml(statText)"
-        ></span>
-      </Transition>
+      <!-- Q16 状态词不再走 <Transition mode="out-in">：out-in 要先等旧词 180ms 退场再让新词进场，
+           阶段切换（思考→执行→撰写）时胶囊里会出现约 180ms 的「只剩 · N 秒」空档。
+           直接换文本，字永远在。 -->
+      <span v-if="turn.phase === 'waiting'" :key="statText" class="ts-w8" v-html="emoToSvgHtml(statText)"></span>
+      <span
+        v-else
+        :key="statText"
+        class="ts-t"
+        :class="{ run: live, 'fin-warn': !live && turn.phase === 'stopped' && failCount > 0 }"
+        v-html="emoToSvgHtml(statText)"
+      ></span>
       <span v-if="failCount > 0" class="ts-f"><IconSpan name="ban" :size="12" /> ×{{ failCount }}</span>
       <span v-if="turn.toolCalls > 0 && live" class="ts-x">×{{ turn.toolCalls }}</span>
       <span v-if="durText" class="ts-d">· {{ durText }}</span>
@@ -38,7 +39,7 @@
 
     <!-- 折叠态偷看行（原型 tpeek/fpeekrow L338-346）：思考摘要渐隐小窗 + 失败行点击展开定位；
          UI 专项批1：仅运行中保留（思考进行中瞄一眼），终态收起——英文 CoT 原文不再怼脸，想看完整思考点胶囊展开 -->
-    <div v-if="folded && turn.thinkText && live" class="tpeek" title="展开过程明细" @click="toggleFold">{{ turn.thinkText }}</div>
+    <div v-if="folded && turn.thinkText && live" class="tpeek" title="展开过程明细" @click="toggleFold">{{ tpeekText }}</div>
     <div v-if="folded && failCount > 0" class="fpeekrow" @click="expandFail">
       <IconSpan name="ban" :size="12" /> {{ firstFailVerb }} · 失败 <IconSpan name="chevron-right" :size="12" />
     </div>
@@ -71,25 +72,40 @@
           >
             <span class="tk-i"><IconSpan name="brain" :size="14" /></span>
             <span class="tk-t" :class="{ run: !it.seg.done, cut: segCut(it.seg) }">{{ segLabel(it.seg, it.idx) }}</span>
-            <!-- 流式摘要小窗（Q9：只看本段最新 400 字；用户点开后让位正文区） -->
-            <span v-if="!it.seg.done && !segIsOpen(it.seg) && it.seg.text" :ref="(el) => setTkLive(el, it.seg)" class="tk-live">{{
-              it.seg.text.slice(-400)
-            }}</span>
-            <!-- 停止思考（Q12-②）：思考进行中可中断，复用宿主停止通道（停整轮，可「继续说完」） -->
-            <button
-              v-if="!it.seg.done && live"
-              type="button"
-              class="tk-stop"
-              title="停止思考（中断本轮，可点「继续说完」重问）"
-              @click.stop="emit('stop')"
-            >
-              停止思考
-            </button>
-            <span class="tk-c"><IconSpan :name="segIsOpen(it.seg) ? 'chevron-up' : 'chevron-down'" :size="12" /></span>
+            <!-- Q16：右侧一组（剩余量提示 + 开合箭头）整体靠右，箭头不再被提示挤走 -->
+            <span class="tk-r">
+              <!-- Q16：展开态且没滚到底时给个明确余量，光靠底部渐隐看不清还剩多少 -->
+              <span v-if="segIsOpen(it.seg) && tkbRemain" class="tk-more">还有约 {{ tkbRemain }} 字</span>
+              <!-- Q15：展开态常显上箭头（原来只绑 hover，点开后看不出「可收起」） -->
+              <span class="tk-c" :class="{ on: segIsOpen(it.seg) }"><IconSpan :name="segIsOpen(it.seg) ? 'chevron-up' : 'chevron-down'" :size="12" /></span>
+            </span>
+          </div>
+          <!-- 流式摘要小窗（Q9：只看本段最新 400 字；用户点开后让位正文区）。
+               Q13：独占整行——原先挤在标题行内只剩 404px（图标14+标题60+停止钮66+箭头12 挤掉 184px），
+               11.5px 下每行仅 35 字、可见 2 行≈70 字，故下移一级拿到整列宽度（566px≈49 字/行×5 行） -->
+          <div
+            v-if="!it.seg.done && !segIsOpen(it.seg) && it.seg.text"
+            :ref="(el) => setTkLive(el, it.seg)"
+            class="tk-live"
+            :class="{ 'fade-t': !tkAtTop, 'fade-b': !tkAtBottom }"
+            title="展开完整思考"
+            @scroll.passive="onTkScroll"
+            @click="onSegToggle(it.seg)"
+          >
+            {{ it.seg.text.slice(-400) }}
           </div>
           <!-- eslint-disable-next-line vue/no-v-html —— md.ts 先转义后白名单替换（与正文气泡同链路；
                批3回修：思考块同样挂点击/回车委托，块内链/复制钮不再是死按钮） -->
-          <div v-if="segIsOpen(it.seg)" class="tk-b" v-html="segHtml(it.seg)" @click="onMdClick" @keydown.enter="onMdClick"></div>
+          <div
+            v-if="segIsOpen(it.seg)"
+            :ref="setTkB"
+            class="tk-b"
+            :class="{ 'fade-t': !tkbAtTop, 'fade-b': !tkbAtBottom }"
+            v-html="segHtml(it.seg)"
+            @scroll.passive="onTkBScroll"
+            @click="onMdClick"
+            @keydown.enter="onMdClick"
+          ></div>
         </div>
 
         <!-- 工具行（Q10：单步耗时；Q12-③ 中段折叠>5 步首尾保留；终态可点开看真实返回 JSON） -->
@@ -155,8 +171,11 @@
     <div v-if="turn.bufText || turn.answerHtml" class="bub" :class="{ 'g-ok': turn.phase === 'done' && turn.toolCalls > 0 }">
       <!-- eslint-disable-next-line vue/no-v-html —— md.ts 先转义后白名单替换，无注入面；点击委托处理链导航/代码卡/表格复制 -->
       <div v-if="turn.answerHtml" class="md" v-html="turn.answerHtml" @click="onMdClick" @keydown.enter="onMdClick" />
-      <div v-else class="stream">
-        <template v-if="turn.bufText">{{ turn.bufText.slice(0, turn.shownLen) }}</template
+      <div v-else class="stream" @click="onMdClick" @keydown.enter="onMdClick">
+        <!-- Q16 流式期也过行内渲染（粗体 / 行内码 / 站内链）——原先整段当纯文本，
+             答案里 8 处 ** 原样露面，完成瞬间整块重排。块级结构仍留到完成态 -->
+        <!-- eslint-disable-next-line vue/no-v-html —— renderStream 先转义后白名单替换，与 .md 同链路 -->
+        <span v-if="turn.bufText" class="sh" v-html="streamHtml"></span
         ><span v-else class="dots"><i /><i /><i /></span><span class="cursor" />
       </div>
       <!-- 批6-#2：中断回答徽标（历史回放 end_reason=partial/truncated）——刷新/断网保全的
@@ -387,7 +406,7 @@ import ElicitCard from './ElicitationCard.vue';
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
 import { turnStateWord } from './assistantCtx';
-import { renderMd } from './md';
+import { renderMd, renderStream } from './md';
 import { parseToolJson, summarizeArgs } from './toolJson';
 import { submitFeedback, listConversations, listMessages, exportAssistantReport } from '@/api/dcs/assistant';
 import { pushToast } from './toastStore';
@@ -483,6 +502,14 @@ function onSegToggle(seg: ThinkSeg) {
   const next = !segIsOpen(seg);
   segOpen.value.set(seg.id, next);
   thinkBaseOpen.value = next;
+  /* Q16：手动开合=用户已经在这块内容上交互过——答完 1s 的自动收起必须让位，
+     否则刚点开想看，1 秒后整块又被收走（ZCode/assistant-ui 同口径：用户优先）。
+     同时撤掉已经排上的收起定时器，避免点开后 200ms 又被收。 */
+  userFolded = true;
+  if (foldTimer) {
+    clearTimeout(foldTimer);
+    foldTimer = null;
+  }
   if (thinkOpenByThread.size > 100) {
     thinkOpenByThread.clear(); // 同页面生命周期内的会话数有限，兜底防无界
   }
@@ -498,19 +525,82 @@ watch(
 );
 // 流式摘要小窗跟随滚底（R3：多段只有一个在流，函数 ref 只挂进行中段；内容尾部增量，
 // 不抢用户滚动——只在已贴底时跟随）
-let tkLiveEl: HTMLElement | null = null;
+/* Q13 跟随状态机：初值 true（首帧就贴底），只有用户真实上滚才置 false，回到距底 4px 内自动恢复。
+   原判据 `sh-st-h < 24` 在首帧 gap=142 时永不成立 → scrollTop 恒 17，加高后只是显示更多旧内容 */
+const tkLiveEl = ref<HTMLElement | null>(null);
+const tkFollowing = ref(true);
+/* Q16 动态遮罩：贴底时不该再把最新一行压暗（原来 55% 起的静态渐隐正好吃掉正在看的行）。
+   上下两端各一把开关，只在「那一侧还有内容」时才渐隐。 */
+const tkAtTop = ref(true);
+const tkAtBottom = ref(true);
+function syncTkEdges(el: HTMLElement) {
+  tkAtTop.value = el.scrollTop <= 2;
+  tkAtBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight <= 4;
+}
 function setTkLive(el: unknown, seg: ThinkSeg) {
-  tkLiveEl = seg.done ? null : ((el as HTMLElement | null) ?? null);
+  const node = seg.done ? null : ((el as HTMLElement | null) ?? null);
+  if (node === tkLiveEl.value) return;
+  tkLiveEl.value = node;
+  if (!node) return;
+  tkFollowing.value = true;
+  nextTick(() => {
+    node.scrollTop = node.scrollHeight;
+    syncTkEdges(node);
+  });
+}
+function onTkScroll(e: Event) {
+  const el = e.target as HTMLElement | null;
+  if (!el) return;
+  tkFollowing.value = el.scrollHeight - el.scrollTop - el.clientHeight <= 4;
+  syncTkEdges(el);
 }
 watch(
   () => (props.turn.thinkSegs.length ? props.turn.thinkSegs.map((s) => s.text.length).join(',') : props.turn.thinkText.length),
   () => {
-    const el = tkLiveEl;
-    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 24) {
+    if (!tkFollowing.value) return;
+    const el = tkLiveEl.value;
+    if (!el) return;
+    // flush:'pre' 下回调早于 DOM 更新，必须等一帧再量 scrollHeight
+    nextTick(() => {
       el.scrollTop = el.scrollHeight;
-    }
+      syncTkEdges(el);
+    });
   }
 );
+
+/* Q16 点开态（.tk-b）同样用动态遮罩，并在标题行右侧给出剩余字数——306px 的窗口只装得下
+   15 行，光有遮罩看不出还剩多少；滚到底提示自动消失。 */
+const tkbEl = ref<HTMLElement | null>(null);
+const tkbAtTop = ref(true);
+const tkbAtBottom = ref(true);
+const tkbSeen = ref(1);
+function syncTkb() {
+  const el = tkbEl.value;
+  if (!el) return;
+  const max = el.scrollHeight - el.clientHeight;
+  tkbAtTop.value = el.scrollTop <= 2;
+  tkbAtBottom.value = max - el.scrollTop <= 4;
+  tkbSeen.value = max <= 0 ? 1 : Math.min(1, Math.max(0, el.scrollTop / max));
+}
+function setTkB(el: unknown) {
+  const node = (el as HTMLElement | null) ?? null;
+  tkbEl.value = node;
+  if (!node) return;
+  tkbSeen.value = 0;
+  nextTick(syncTkb);
+}
+function onTkBScroll() {
+  syncTkb();
+}
+const tkbRemain = computed(() => {
+  if (tkbAtBottom.value) return '';
+  const seg = thinkSegsView.value.find((s) => segIsOpen(s));
+  const total = seg?.text.length ?? 0;
+  if (!total) return '';
+  const left = Math.max(0, Math.round(total * (1 - tkbSeen.value)));
+  if (left < 60) return '';
+  return left >= 1000 ? (left / 1000).toFixed(1) + 'k' : String(left);
+});
 const openSteps = ref(new Set<string>());
 const srcOpen = ref(false);
 const copied = ref(false);
@@ -553,6 +643,19 @@ const { has, add, remove } = useFavs();
 const faved = computed(() => has(props.turn.question));
 
 const live = computed(() => ['thinking', 'acting', 'writing'].includes(props.turn.phase));
+
+/** Q16 偷看行改取尾部：原来是「整段开头 + 单行省略」，运行中永远只能看见第一句，
+ *  正好是最没用的那部分（用户想知道「现在想到哪了」）。取最后 120 字并压成单行，
+ *  省略号朝前，读起来就是「…刚刚想到的地方」。 */
+const tpeekText = computed(() => {
+  const t = props.turn.thinkText || '';
+  if (t.length <= 120) return t.replace(/\s+/g, ' ');
+  return '…' + t.slice(-120).replace(/\s+/g, ' ');
+});
+
+/** Q16 流式正文：打字机长度不变（shownLen 逐帧增长），但每帧渲染的是「行内已闭合」的 HTML，
+ *  不再是裸文本——否则 **按月复盘** 会原样显示到完成那一刻才突然变粗。 */
+const streamHtml = computed(() => renderStream(props.turn.bufText.slice(0, props.turn.shownLen)));
 
 /** BN-2 原型口径：答完 1s 自动收起过程明细（用户手动展开/收起过则尊重用户） */
 watch(
@@ -1675,49 +1778,24 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     .tk-t.cut {
       color: var(--dcs-text-placeholder);
     }
-    /* Q9 流式摘要小窗（替代原 tk-s 60 字单行）：3 行高滚动跟随，底部渐隐 */
-    .tk-live {
-      flex: 1;
-      min-width: 0;
-      max-height: 54px;
-      overflow-y: auto;
-      font-size: 11.5px;
-      line-height: 1.55;
-      color: var(--dcs-text-placeholder);
-      white-space: pre-wrap;
-      word-break: break-word;
-      -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
-      mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
-      scrollbar-width: none;
-      &::-webkit-scrollbar {
-        display: none;
-      }
-    }
-    /* Q12-② 停止思考：小描边按钮，hover 红（与停止键同语义族） */
-    .tk-stop {
-      flex: none;
-      font-size: 11px;
-      line-height: 1;
-      font-family: inherit;
-      color: var(--dcs-text-secondary);
-      border: 1px solid var(--dcs-border-color-light);
-      border-radius: 999px;
-      padding: 6px 10px; /* 批8-3（k3 P2-3）：热区抬到 ≥24px（原 3px 9px≈19px 低于 WCAG 2.5.8） */
-      cursor: pointer;
-      background: var(--el-bg-color);
-      transition:
-        color 0.15s,
-        border-color 0.15s;
-
-      &:hover {
-        color: var(--dcs-color-danger);
-        border-color: var(--dcs-color-danger-light-5, #f89898);
-      }
-    }
+    /* Q14 块内「停止思考」已删：停止入口收敛到聊天框那一个按钮（ZCode 同款） */
     /* 展开钮默认隐、hover/展开时显（原型 tk-c L529-530） */
+    /* Q16：右侧「剩余量 + 箭头」成组靠右，箭头不再被提示文字挤到中间 */
+    .tk-r {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex: none;
+    }
+    .tk-more {
+      font-size: 11px;
+      color: var(--dcs-text-placeholder);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
     .tk-c {
       font-size: 12px;
-      margin-left: auto;
       opacity: 0;
       transition: opacity 0.15s;
     }
@@ -1729,13 +1807,65 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       color: var(--dcs-text-primary);
     }
   }
+  /* Q13 流式摘要小窗：独占整行（max-height 5 行，12px×18px 行高 → 90px），
+     宽度=内容列-22 缩进；Q16 起遮罩改为动态，见 .fade-t / .fade-b */
+  .tk-live {
+    margin: 2px 0 3px 22px;
+    max-height: 90px;
+    overflow-y: auto;
+    /* Q16：11.5px + placeholder 灰在真机上只有 3.03:1，几乎看不清；12px/18px 整数行高
+       与点开态（.tk-b 12px）统一，灰阶抬到 secondary（实测 4.93:1） */
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--dcs-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    scrollbar-width: none;
+    cursor: pointer;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+  /* Q16 动态遮罩：只在那一侧还有内容时渐隐。贴底=底部不再压暗（原来 55% 起的静态渐隐
+     正好把「最新想到的一行」压成半透明，边跟边看不清）。 */
+  .tk-live.fade-b,
+  .tk-b.fade-b {
+    -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(180deg, #000 calc(100% - 16px), transparent 100%);
+  }
+  .tk-live.fade-t,
+  .tk-b.fade-t {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16px);
+    mask-image: linear-gradient(180deg, transparent 0, #000 16px);
+  }
+  .tk-live.fade-t.fade-b,
+  .tk-b.fade-t.fade-b {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  }
   .tk-b {
     margin: 2px 0 2px 22px;
     padding-left: 12px;
     border-left: 1px solid var(--dcs-border-color-light);
-    /* Q9 拍板：限高 300px 滚动区 + markdown 渲染 */
-    max-height: 300px;
+    /* Q15：300 → 306——12px×1.7=20.4，306 正好 15 行整，收尾不再切出半行 */
+    max-height: 306px;
     overflow-y: auto;
+    /* Q15：滚动条常显。原先是系统 overlay 规则，静止时柄会淡出，看不出还能往下滚 */
+    scrollbar-width: thin;
+    scrollbar-color: var(--dcs-border-color) transparent;
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: var(--dcs-border-color);
+      border-radius: 3px;
+      &:hover {
+        background: var(--dcs-text-placeholder);
+      }
+    }
     font-size: 12px;
     line-height: 1.7;
     color: var(--dcs-text-placeholder);
@@ -1902,6 +2032,25 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   .stream {
     white-space: pre-wrap;
     word-break: break-word;
+
+    /* Q16 流式期行内渲染（v-html 内容无 data-v，必须 :deep）——完整 .md 那套只服务完成态 */
+    :deep(strong) {
+      font-weight: 600;
+      color: var(--dcs-text-primary);
+    }
+    :deep(code) {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      padding: 1px 4px;
+      border-radius: 4px;
+      background: var(--dcs-fill-light, #f2f4f7);
+    }
+    :deep(.dcs-link) {
+      color: var(--el-color-primary);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
 
     /* 原型 .dots（L183-186）：首 token 前三点波浪等待 */
     .dots {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMd } from './md';
+import { renderMd, renderStream } from './md';
 
 /** 批E 视觉审查 FAIL 回归锁：md 表格必须渲染为 <table>（管道符原样输出=乱码不可读） */
 describe('renderMd 表格白名单', () => {
@@ -228,5 +228,32 @@ describe('renderMd chart 围栏（批4）', () => {
     const html = renderMd('```sql\nSELECT 1;\n```');
     expect(html).toContain('<span>sql</span>');
     expect(html).toContain('cc-copy');
+  });
+});
+
+/** Q16 流式期行内渲染：已闭合的标记要生效，未闭合的必须原样留着（否则字会忽然消失） */
+describe('renderStream 流式行内渲染', () => {
+  it('闭合粗体 / 行内码渲染成标签', () => {
+    const html = renderStream('按**周复盘**适合 `7 天` 迭代');
+    expect(html).toContain('<strong>周复盘</strong>');
+    expect(html).toContain('<code>7 天</code>');
+  });
+
+  it('未闭合的 ** 原样保留，不吃掉后面正文', () => {
+    const html = renderStream('按**周复');
+    expect(html).toContain('**周复');
+    expect(html).not.toContain('<strong>');
+  });
+
+  it('换行转 <br>；HTML 先转义（无注入面）', () => {
+    const html = renderStream('a\n<img src=x onerror=alert(1)>');
+    expect(html).toContain('a<br>');
+    expect(html).toContain('&lt;img');
+    expect(html).not.toContain('<img');
+  });
+
+  it('PII 掩码不被残星管线吃成假明文', () => {
+    const html = renderStream('电话 138****0000');
+    expect(html).toContain('138****0000');
   });
 });

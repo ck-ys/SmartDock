@@ -365,31 +365,34 @@
             </button>
           </div>
         </button>
-        <button v-if="sending" class="round-btn stop show" aria-label="停止生成" title="停止（点错可点「继续说完」，Esc 同效）" @click="emit('stop')">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-        </button>
-        <!-- 发送键状态机（批J-2 对齐原型 L255：32×32 方圆角 8px 深灰 #1f2937；空=灰 dim；sending=深灰+琥珀角标）。永不 disabled（BN-9：空点=续发暂停的队列） -->
+        <!-- 单按钮状态机（Q14，对齐 ZCode）：生成中且输入框为空 = 停止；一开始打字就变回「排队 / 发送」。
+             原先是「停止 + 发送」并排两个按钮：多一个热区、抢输入框宽度，且停止在块内还有第二个入口 -->
         <button
-          class="round-btn send"
-          :class="{ dim: !canSend && !sending, busy: sending }"
-          :aria-label="sending ? '排队' : '发送'"
-          :title="sendTitle"
-          @click="onSend"
+          class="round-btn"
+          :class="stopMode ? 'stop show' : ['send', { dim: !canSend && !sending, busy: sending }]"
+          :aria-label="stopMode ? '停止生成' : sending ? '排队' : '发送'"
+          :title="stopMode ? '停止生成（点错可点「继续说完」，Esc 同效）' : sendTitle"
+          @click="stopMode ? emit('stop') : onSend()"
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M12 19V5" />
-            <path d="m5 12 7-7 7 7" />
+          <svg v-if="stopMode" viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
           </svg>
-          <span v-if="sending" class="qb" aria-hidden="true">＋</span>
+          <template v-else>
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 19V5" />
+              <path d="m5 12 7-7 7 7" />
+            </svg>
+            <span v-if="sending" class="qb" aria-hidden="true">＋</span>
+          </template>
         </button>
       </div>
 
@@ -1414,6 +1417,8 @@ onBeforeUnmount(() => {
 const chipsVisible = computed(() => props.state.turns.length > 0 || props.state.queue.length > 0);
 const showChips = computed(() => chipsVisible.value);
 const canSend = computed(() => !props.blocked && draft.value.trim().length > 0);
+/** Q14 单按钮：生成中且没在打字才显示「停止」；一打字立刻变回排队——不然想排队却把回答停了 */
+const stopMode = computed(() => props.sending && draft.value.trim() === '');
 const phPool = computed(() => PHINT[roleKey.value] ?? PHINT.teacher);
 const placeholder = computed(() => {
   if (props.sending) {

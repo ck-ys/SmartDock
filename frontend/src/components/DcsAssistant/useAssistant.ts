@@ -584,7 +584,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       onReasoningStart: () => {
         const last = turn.thinkSegs[turn.thinkSegs.length - 1];
         if (!last || last.done) {
-          turn.thinkSegs.push({ id: 'th' + ++seq, text: '', done: false, startedAt: Date.now(), durMs: 0, seq: evSeq++ });
+          /* Q16 首段起点取回合起点：START 事件常比 phase=thinking 晚 2–6 秒到达（模型先想再吐字），
+             段起点记成事件到达时间 → 同一轮里状态条说「13 秒」、思考块说「7 秒」，两个秒数打架。
+             首段代表「这一轮的思考」，从回合起算；工具之后开的后续段仍按自己的到达时间算。 */
+          const startAt = turn.thinkSegs.length === 0 ? turn.startedAt || Date.now() : Date.now();
+          turn.thinkSegs.push({ id: 'th' + ++seq, text: '', done: false, startedAt: startAt, durMs: 0, seq: evSeq++ });
         }
         turn.thinkActive = true;
       },
@@ -592,7 +596,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         let last = turn.thinkSegs[turn.thinkSegs.length - 1];
         if (!last) {
           // 协议容错：delta 先于 START 到达（或重试重置后）——补建段，不丢内容
-          last = { id: 'th' + ++seq, text: '', done: false, startedAt: Date.now(), durMs: 0, seq: evSeq++ };
+          const startAt = turn.thinkSegs.length === 0 ? turn.startedAt || Date.now() : Date.now();
+          last = { id: 'th' + ++seq, text: '', done: false, startedAt: startAt, durMs: 0, seq: evSeq++ };
           turn.thinkSegs.push(last);
         }
         last.text += delta;

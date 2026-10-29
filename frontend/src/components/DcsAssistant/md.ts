@@ -25,40 +25,54 @@ const TASK_CARD_RE = new RegExp('^\\[([^\\]\\n]{1,120})\\]\\((\\/dcs\\/mission\\
 
 /** 行内白名单：行内代码 / 粗体 / 站内链（先转义后替换，替换产物不受再转义影响；
  *  行内代码先换成 \x00N\x00 占位符，链/粗体替换不吞 code 内容，最后还原成 <code>） */
-function inline(s: string): string {
+function inline(s: string, keepOpenMarks = false): string {
   const codes: string[] = [];
   const masks: string[] = [];
   const stashMask = (m: string) => {
     masks.push(m);
     return `\x01${masks.length - 1}\x01`;
   };
-  return (
-    s
-      .replace(/`([^`\n]+)`/g, (_m, c: string) => {
-        codes.push(c);
-        return `\x00${codes.length - 1}\x00`;
-      })
-      // 092：后端 PII 掩码先抽 \x01N\x01 占位符再跑加粗/残星管线——否则 138****0000 被
-      // 残星清理吃成 1380000「假明文」、同行两掩码被 BOLD_RE 跨配成 <strong>。两形态=
-      // 数字夹星（手机/证件）与字母数字夹星尾随 @（邮箱前缀）；CJK 姓名掩码（张**）与
-      // 合法加粗闭合符结构不可辨，不在此列（掩码契约留档：PiiFilter 勿新增含 ** 掩码形态）
-      .replace(/\d\*{2,}\d/g, stashMask)
-      .replace(/[A-Za-z0-9]\*{2,}@/g, stashMask)
-      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
-      // 业务批4 Q12 基线修：模型偶发输出孤立 **（开头强调忘收尾），配对替换后残星
-      // 原样漏给用户看——清掉（合法强调已全被上一步配对消费，此处只剩星号噪音）。
-      // m3 P2-1 核验后维持全清：教学示例的 ** 都裹在行内代码里（上方 codes 占位已
-      // 先行抽走，不进本链）；无反引号的成对 ** 会被配对消费——"词中裸星"无真实场景。
-      // PII 掩码同样已在上方抽走（092），本链只清真正的星号噪音
-      .replace(/\*\*/g, '')
-      .replace(DCS_LINK_RE, (_m, text: string, url: string, meta?: string) =>
-        meta
-          ? `<a class="dcs-link" role="link" tabindex="0" data-dcs-link="${url}" title="${meta}">${text}</a>`
-          : `<a class="dcs-link" role="link" tabindex="0" data-dcs-link="${url}">${text}</a>`
-      )
-      .replace(/\x00(\d+)\x00/g, (_m, i: string) => `<code>${codes[Number(i)]}</code>`)
-      .replace(/\x01(\d+)\x01/g, (_m, i: string) => masks[Number(i)])
-  );
+  let out = s
+    .replace(/`([^`\n]+)`/g, (_m, c: string) => {
+      codes.push(c);
+      return `\x00${codes.length - 1}\x00`;
+    })
+    // 092：后端 PII 掩码先抽 \x01N\x01 占位符再跑加粗/残星管线——否则 138****0000 被
+    // 残星清理吃成 1380000「假明文」、同行两掩码被 BOLD_RE 跨配成 <strong>。两形态=
+    // 数字夹星（手机/证件）与字母数字夹星尾随 @（邮箱前缀）；CJK 姓名掩码（张**）与
+    // 合法加粗闭合符结构不可辨，不在此列（掩码契约留档：PiiFilter 勿新增含 ** 掩码形态）
+    .replace(/\d\*{2,}\d/g, stashMask)
+    .replace(/[A-Za-z0-9]\*{2,}@/g, stashMask)
+    .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  // 业务批4 Q12 基线修：模型偶发输出孤立 **（开头强调忘收尾），配对替换后残星
+  // 原样漏给用户看——清掉（合法强调已全被上一步配对消费，此处只剩星号噪音）。
+  // m3 P2-1 核验后维持全清：教学示例的 ** 都裹在行内代码里（上方 codes 占位已
+  // 先行抽走，不进本链）；无反引号的成对 ** 会被配对消费——"词中裸星"无真实场景。
+  // PII 掩码同样已在上方抽走（092），本链只清真正的星号噪音。
+  // Q16：流式期（keepOpenMarks）不清——此时「孤立 **」多半是还没吐完的闭合符，
+  // 清掉会让已经显示的字忽然消失（半个标记不该吃掉正文）。
+  if (!keepOpenMarks) out = out.replace(/\*\*/g, '');
+  return out
+    .replace(DCS_LINK_RE, (_m, text: string, url: string, meta?: string) =>
+      meta
+        ? `<a class="dcs-link" role="link" tabindex="0" data-dcs-link="${url}" title="${meta}">${text}</a>`
+        : `<a class="dcs-link" role="link" tabindex="0" data-dcs-link="${url}">${text}</a>`
+    )
+    .replace(/\x00(\d+)\x00/g, (_m, i: string) => `<code>${codes[Number(i)]}</code>`)
+    .replace(/\x01(\d+)\x01/g, (_m, i: string) => masks[Number(i)]);
+}
+
+/**
+ * 流式期行内渲染（Q16）：只做「已闭合」的行内替换（粗体 / 行内代码 / 站内链），
+ * 未闭合的 `**` 或反引号原样留着——不然半个标记会被吃掉，用户看到字在闪。
+ * 块级结构（标题 / 列表 / 表格 / 代码围栏）流式期一律不做：半行结构会让版面反复重排，
+ * 完成态再走 renderMd 全量解析（S-23 口径不变，只是把「整段裸文本」升级成「行内已渲染」）。
+ */
+export function renderStream(text: string): string {
+  return esc(text ?? '')
+    .split('\n')
+    .map((line) => inline(line, true))
+    .join('<br>');
 }
 
 /** 表格状态词 → 小标签（业务批4 Q12 基线修：状态列一串灰字挤在一起分不清，
