@@ -31,4 +31,7 @@ public class ProfileOverview implements Serializable {
     private Long highRisk;
 
     private Date lastCalcTime;
+
+    /** 待复核排队条数（2026-10-30 题1：与复核抽屉同口径，供首页「查看待复核」按钮） */
+    private Long pendingReviewCount;
 }

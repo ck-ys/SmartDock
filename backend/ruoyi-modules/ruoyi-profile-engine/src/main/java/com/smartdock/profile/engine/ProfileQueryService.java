@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.smartdock.profile.domain.ProfileScoreDimension;
 import com.smartdock.profile.domain.ProfileScoreRule;
 import com.smartdock.profile.event.ProfileSubject;
+import com.smartdock.profile.mapper.ProfileReviewQueueMapper;
 import com.smartdock.profile.mapper.ProfileScoreSnapshotMapper;
 import com.smartdock.profile.mapper.ProfileSubjectMapper;
 import com.smartdock.profile.query.ProfileOverview;
@@ -48,6 +49,7 @@ public class ProfileQueryService {
 
     private final ProfileSubjectMapper subjectMapper;
     private final ProfileScoreSnapshotMapper snapshotMapper;
+    private final ProfileReviewQueueMapper reviewQueueMapper;
     private final ProfileScoreEngine scoreEngine;
     private final ProfileDimensionService dimensionService;
     private final ProfileRuleService ruleService;
@@ -136,6 +138,8 @@ public class ProfileQueryService {
             overview.setHighRisk(0L);
         }
         overview.setLastCalcTime(snapshotMapper.selectLastCalcTime(currentTenant(), source, type));
+        // 2026-10-30 题1：按钮数字跟队列走（抽屉里排着几条就显示几），不再用低分人数冒充
+        overview.setPendingReviewCount(reviewQueueMapper.countPending(currentTenant(), source));
         return overview;
     }
 

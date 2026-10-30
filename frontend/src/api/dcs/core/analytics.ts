@@ -104,6 +104,10 @@ export interface AnalyticsSession {
   province?: string;
   city?: string;
   searchTerm?: string;
+  /** 显示名：登录主体取昵称，匿名访客为「访客 #尾4位」（后端回填，2026-10-30 题10） */
+  displayName?: string;
+  /** user = 登录主体 / visitor = 匿名访客 */
+  identityType?: 'user' | 'visitor';
 }
 
 export interface AnalyticsSessionQuery {

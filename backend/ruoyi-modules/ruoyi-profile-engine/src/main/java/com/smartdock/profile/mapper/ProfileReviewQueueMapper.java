@@ -50,6 +50,20 @@ public interface ProfileReviewQueueMapper extends BaseMapperPlus<ProfileReviewQu
                                                       @Param("keyword") String keyword);
 
     /**
+     * 2026-10-30 题1: 首页「待复核」按钮的数字——跟复核抽屉同一张表同一个口径(PENDING 条数)，
+     * 不再拿「低分主体人数」冒充队列长度。
+     */
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        <script>
+        SELECT COUNT(*) FROM profile_review_queue r
+        WHERE r.tenant_id = #{tenantId} AND r.del_flag = '0' AND r.status = 'PENDING'
+          <if test="source != null and source != ''">AND r.source = #{source}</if>
+        </script>
+        """)
+    long countPending(@Param("tenantId") String tenantId, @Param("source") String source);
+
+    /**
      * B 片三审回修: 自动销案改为条件更新——只对仍处 PENDING 的行生效,
      * 与人工确认(同毫秒窗口)并发时后写不再覆盖先写(CONFIRMED 不会被冲成 SUPERSEDED)。
      */

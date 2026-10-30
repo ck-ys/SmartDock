@@ -56,6 +56,7 @@ class ProfileSubjectSummaryUnconfiguredTest {
         ProfilePiiService piiService = Mockito.mock(ProfilePiiService.class);
         Mockito.when(piiService.canViewScore()).thenReturn(true);
         service = new ProfileQueryService(subjectMapper, snapshotMapper,
+            Mockito.mock(com.smartdock.profile.mapper.ProfileReviewQueueMapper.class),
             Mockito.mock(ProfileScoreEngine.class),
             Mockito.mock(ProfileDimensionService.class),
             Mockito.mock(ProfileRuleService.class),

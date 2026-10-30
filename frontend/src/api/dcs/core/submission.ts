@@ -9,6 +9,8 @@ export interface DcsSubmissionRow {
   id: string;
   taskId: string;
   taskTitle?: string;
+  /** 提交人昵称（后端回填，2026-10-30 题8） */
+  submitterName?: string;
   submitterUserId: number;
   version: number;
   status: 'PENDING_AUDIT' | 'APPROVED' | 'REJECTED';

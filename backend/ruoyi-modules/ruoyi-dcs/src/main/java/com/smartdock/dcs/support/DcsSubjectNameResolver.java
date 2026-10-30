@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -44,6 +46,33 @@ public class DcsSubjectNameResolver {
             log.debug("[Dcs] subject name resolve failed user={}: {}", userId, e.getMessage());
             return null;
         }
+    }
+
+    /** 批量版：列表/详情一次查名，避免逐行 N+1（2026-10-30 题8/12） */
+    public Map<Long, String> resolveBatch(Collection<Long> userIds) {
+        Map<Long, String> out = new HashMap<>();
+        if (userIds == null || userIds.isEmpty()) {
+            return out;
+        }
+        try {
+            List<Map<String, Object>> rows = userLookupMapper.selectBriefsByIds(userIds.stream().distinct().toList());
+            for (Map<String, Object> row : rows == null ? List.<Map<String, Object>>of() : rows) {
+                Object id = row.get("user_id");
+                if (id == null) {
+                    continue;
+                }
+                String name = firstText(row, "nick_name", "nickName");
+                if (StringUtils.isBlank(name)) {
+                    name = firstText(row, "user_name", "userName");
+                }
+                if (StringUtils.isNotBlank(name)) {
+                    out.put(((Number) id).longValue(), name);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[Dcs] subject name batch resolve failed: {}", e.getMessage());
+        }
+        return out;
     }
 
     private String firstText(Map<String, Object> row, String first, String second) {

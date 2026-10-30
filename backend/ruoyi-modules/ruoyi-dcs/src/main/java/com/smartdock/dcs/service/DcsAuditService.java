@@ -30,6 +30,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -77,6 +78,20 @@ public class DcsAuditService {
             .in(DcsSubmission::getTaskId, taskIds)
             .eq(DcsSubmission::getStatus, DcsSubmission.STATUS_PENDING_AUDIT)
             .orderByAsc(DcsSubmission::getSubmittedAt));
+        // 2026-10-30 题8：审核员要看「谁交的什么」，不是两串 19 位数字——
+        // 任务标题与提交人昵称在这里一次性回填（按页批量，不逐行查）
+        List<DcsSubmission> records = page.getRecords();
+        if (!records.isEmpty()) {
+            Map<Long, String> titles = taskMapper.selectBatchIds(
+                    records.stream().map(DcsSubmission::getTaskId).distinct().toList())
+                .stream().collect(Collectors.toMap(DcsTask::getId, DcsTask::getTitle, (a1, b1) -> a1));
+            Map<Long, String> names = subjectNameResolver.resolveBatch(
+                records.stream().map(DcsSubmission::getSubmitterUserId).filter(Objects::nonNull).distinct().toList());
+            for (DcsSubmission row : records) {
+                row.setTaskTitle(titles.get(row.getTaskId()));
+                row.setSubmitterName(names.get(row.getSubmitterUserId()));
+            }
+        }
         return TableDataInfo.build(page);
     }
 

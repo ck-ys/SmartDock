@@ -1,5 +1,6 @@
 package com.smartdock.dcs.domain;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -49,4 +50,12 @@ public class DcsSubmission implements Serializable {
     private Date auditedAt;
 
     private Date createTime;
+
+    /** 2026-10-30 题8：审核队列展示用——任务标题（不落库，查询后回填） */
+    @TableField(exist = false)
+    private String taskTitle;
+
+    /** 2026-10-30 题8：提交人昵称（不落库，查询后回填） */
+    @TableField(exist = false)
+    private String submitterName;
 }

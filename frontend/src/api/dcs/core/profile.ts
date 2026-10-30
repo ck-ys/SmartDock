@@ -69,6 +69,8 @@ export interface ProfileOverview {
   mediumRisk: number;
   highRisk: number;
   lastCalcTime?: string;
+  /** 待复核排队条数（与复核抽屉同口径，2026-10-30 题1） */
+  pendingReviewCount?: number;
 }
 
 export interface ProfileDimension {

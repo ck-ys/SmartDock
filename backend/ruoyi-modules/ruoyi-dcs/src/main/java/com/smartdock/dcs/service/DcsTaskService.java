@@ -190,6 +190,23 @@ public class DcsTaskService {
         requireAssigneesExist(t.getAuditorUserIds());
     }
 
+    /** 2026-10-30 题12：详情页把目标成员回填成姓名（成员被删时兜底「已注销用户」），
+     *  列表人数与详情名单同源——不再出现「列表 3 人 / 详情 —」。 */
+    public DcsTask withAssigneeNames(DcsTask task) {
+        java.util.List<Long> ids = task.assigneeList();
+        if (ids.isEmpty()) {
+            task.setAssigneeNames(java.util.List.of());
+            return task;
+        }
+        java.util.Map<Long, String> names = subjectNameResolver.resolveBatch(ids);
+        java.util.List<String> out = new java.util.ArrayList<>(ids.size());
+        for (Long id : ids) {
+            out.add(names.getOrDefault(id, "已注销用户"));
+        }
+        task.setAssigneeNames(out);
+        return task;
+    }
+
     /** 目标成员存在性校验(三审 glm53 P2-11): 跨租户/幽灵 userId 在建档时即拒,
      *  不等发布后通知静默落空; 租户过滤由拦截器保证"存在"即"同租户"。 */
     void requireAssigneesExist(String assigneeUserIdsJson) {

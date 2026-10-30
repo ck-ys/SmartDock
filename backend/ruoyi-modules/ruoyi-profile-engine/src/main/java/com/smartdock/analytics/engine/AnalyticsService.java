@@ -18,6 +18,7 @@ import com.smartdock.analytics.query.AnalyticsFunnelBo;
 import com.smartdock.analytics.query.AnalyticsImportBo;
 import com.smartdock.analytics.query.AnalyticsReportSaveBo;
 import com.smartdock.analytics.query.AnalyticsSessionQuery;
+import com.smartdock.analytics.support.SessionLabels;
 import com.smartdock.profile.ProfileEventPublisher;
 import com.smartdock.profile.domain.ProfileEngineConfig;
 import com.smartdock.profile.domain.ProfileExportLog;
@@ -82,6 +83,7 @@ public class AnalyticsService {
     private final com.smartdock.profile.engine.ProfilePiiService piiService;
     private final org.redisson.api.RedissonClient redisson;
     private final AnalyticsSessionizer sessionizer;
+    private final com.smartdock.analytics.mapper.AnalyticsUserLookupMapper userLookupMapper;
     /** ObjectProvider 打破 AnalyticsService → 事件发布器 → 自动汇总触发器 的构造环 */
     private final ObjectProvider<ProfileEventPublisher> eventPublisherProvider;
     /** 批4A 规模护栏: 大窗口(漏斗/路径/流失)载入前的前置信号 */
@@ -524,7 +526,61 @@ public class AnalyticsService {
             range[0], range[1], query);
         // 批11 Q1: 会话行的搜索词按清单打码
         rows.getRecords().forEach(r -> r.setSearchTerm(piiService.maskValueForKey("search_term", r.getSearchTerm())));
+        // 2026-10-30 题10：用户列要能读懂——登录取昵称，匿名给「访客 #尾4位」
+        fillSessionDisplayNames(rows.getRecords());
         return rows;
+    }
+
+    /** 会话行的显示名/身份类型（只对本页数据回填，批量查一次 sys_user）。 */
+    private void fillSessionDisplayNames(List<AnalyticsSession> records) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+        Set<Long> userIds = new LinkedHashSet<>();
+        for (AnalyticsSession r : records) {
+            Long uid = loggedInUserId(r);
+            if (uid != null) {
+                userIds.add(uid);
+            }
+        }
+        Map<Long, String> names = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            try {
+                for (Map<String, Object> row : userLookupMapper.selectBriefsByIds(userIds)) {
+                    Object id = row.get("user_id");
+                    Object nick = row.get("nick_name");
+                    Object account = row.get("user_name");
+                    String name = nick == null ? null : String.valueOf(nick);
+                    if (StringUtils.isBlank(name) && account != null) {
+                        name = String.valueOf(account);
+                    }
+                    if (id != null && StringUtils.isNotBlank(name)) {
+                        names.put(((Number) id).longValue(), name);
+                    }
+                }
+            } catch (Exception e) {
+                // 名称只是展示元数据，取不到不影响列表；但要留痕，否则整列静默降级成「访客」没人知道
+                log.warn("[Analytics] session display name lookup failed", e);
+            }
+        }
+        for (AnalyticsSession r : records) {
+            Long uid = loggedInUserId(r);
+            // 身份看「主体是不是登录用户」，不看名字查没查到：成员被注销/查询失败时不能反过来标成访客（批3 三审 P2）
+            boolean member = uid != null;
+            String name = member ? names.get(uid) : null;
+            if (StringUtils.isBlank(name)) {
+                // 认得出是成员但查无名字 → 「已注销用户」；真匿名才给访客短标签
+                r.setDisplayName(member ? "已注销用户" : SessionLabels.visitorLabel(r.getAnonymousId(), r.getVisitorId()));
+            } else {
+                r.setDisplayName(name);
+            }
+            r.setIdentityType(member ? "user" : "visitor");
+        }
+    }
+
+    /** 登录主体判定（纯函数见 SessionLabels，2026-10-30 题10）。 */
+    private Long loggedInUserId(AnalyticsSession r) {
+        return r == null ? null : SessionLabels.loggedInUserId(r.getSubjectType(), r.getSubjectId());
     }
 
     public Map<String, Object> sessionDetail(Long sessionId) {
@@ -532,6 +588,8 @@ public class AnalyticsService {
         if (session == null) {
             throw new ServiceException("访问记录不存在");
         }
+        // 2026-10-30 题10：抽屉标题也不该是裸 ID
+        fillSessionDisplayNames(List.of(session));
         Date from = new Date(session.getStartedAt().getTime() - 60_000L);
         Date to = new Date(session.getLastEventAt().getTime() + 60_000L);
         boolean explicit = session.getSessionKey() != null && session.getSessionKey().startsWith("s:");

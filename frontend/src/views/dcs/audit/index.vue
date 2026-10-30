@@ -14,8 +14,13 @@
     <el-card shadow="never" class="audit-card">
       <div class="dcs-ops-table-wrap">
         <el-table class="dcs-table-only ui-table audit-table" v-loading="loading" :data="rows">
-          <el-table-column prop="taskId" label="任务ID" min-width="170" />
-          <el-table-column prop="submitterUserId" label="提交人" width="110" />
+          <!-- 2026-10-30 题8：任务名与提交人由后端回填；删任务等极端情况退回编号，不当空 -->
+          <el-table-column label="任务" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.taskTitle || `任务 #${row.taskId}` }}</template>
+          </el-table-column>
+          <el-table-column label="提交人" width="130" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.submitterName || `用户 #${row.submitterUserId}` }}</template>
+          </el-table-column>
           <el-table-column prop="version" label="版本" width="70" align="right" />
           <el-table-column prop="submittedAt" label="提交时间" width="170" />
           <el-table-column label="数据" min-width="200">
@@ -41,13 +46,13 @@
         <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
         <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
           <div class="dcs-card-head">
-            <span class="dcs-card-title">任务 #{{ String(row.taskId).slice(-6) }}</span>
+            <span class="dcs-card-title">{{ row.taskTitle || `任务 #${String(row.taskId).slice(-6)}` }}</span>
             <span class="dcs-card-badge"
               ><span class="ui-pill ui-pill--muted">第 v{{ row.version }} 版</span></span
             >
           </div>
           <div class="dcs-card-meta">
-            <span>提交人 {{ row.submitterUserId }}</span>
+            <span>提交人 {{ row.submitterName || `用户 #${row.submitterUserId}` }}</span>
             <span>{{ row.submittedAt }}</span>
           </div>
           <div class="dcs-card-field">

@@ -546,7 +546,8 @@
       <el-tab-pane label="使用明细" name="sessions" lazy>
         <el-card shadow="never" class="panel-card">
           <div class="filter-bar">
-            <el-input v-model="sessionQuery.keyword" placeholder="人员/主体/页面" clearable style="width: 200px" @keyup.enter="searchSessions" />
+            <!-- 搜索只匹配主体 ID / 访客 ID / 页面地址，不匹配昵称——占位符说实话，别让人搜「张三」得到 0 条（批3 三审 P2） -->
+            <el-input v-model="sessionQuery.keyword" placeholder="主体ID / 访客ID / 页面" clearable style="width: 200px" @keyup.enter="searchSessions" />
             <el-select v-model="sessionQuery.deviceType" placeholder="终端" clearable style="width: 120px">
               <el-option label="电脑" value="desktop" />
               <el-option label="手机" value="mobile" />
@@ -582,7 +583,13 @@
                 <p class="ui-empty__hint">调整筛选条件，或确认该业务源已有事件写入</p>
               </div>
             </template>
-            <el-table-column prop="visitorId" label="用户" min-width="130" show-overflow-tooltip />
+            <!-- 2026-10-30 题10：用户列读名字，登录/匿名用一个小标签区分（匿名给「访客 #尾4位」） -->
+            <el-table-column label="用户" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span>{{ row.displayName || row.visitorId }}</span>
+                <span class="sess-role">{{ row.identityType === 'user' ? '成员' : '访客' }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="startedAt" label="开始时间" width="170" />
             <el-table-column prop="entryPage" label="起始页" min-width="140" show-overflow-tooltip />
             <el-table-column prop="exitPage" label="结束页" min-width="140" show-overflow-tooltip />
@@ -717,7 +724,7 @@
     </el-tabs>
 
     <!-- 会话详情抽屉 -->
-    <el-drawer v-model="sessionDrawer" size="min(560px, 92vw)" :title="sessionDetail?.session?.visitorId || '使用详情'">
+    <el-drawer v-model="sessionDrawer" size="min(560px, 92vw)" :title="sessionDetail?.session?.displayName || sessionDetail?.session?.visitorId || '使用详情'">
       <template v-if="sessionDetail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="开始时间">{{ sessionDetail.session.startedAt }}</el-descriptions-item>
@@ -726,6 +733,8 @@
           <el-descriptions-item label="时长">{{ formatDuration(sessionDetail.session.durationSeconds) }}</el-descriptions-item>
           <el-descriptions-item label="起始页">{{ sessionDetail.session.entryPage || '—' }}</el-descriptions-item>
           <el-descriptions-item label="结束页">{{ sessionDetail.session.exitPage || '—' }}</el-descriptions-item>
+          <!-- 列表只给「访客 #尾4位」短标签；原始访客键放这里，排障时能对回事件流水（批3 三审 P2） -->
+          <el-descriptions-item label="访客标识" :span="2">{{ sessionDetail.session.visitorId || '—' }}</el-descriptions-item>
         </el-descriptions>
 
         <div style="margin: 10px 0 4px">
@@ -2272,5 +2281,12 @@ onActivated(async () => {
 .analytics-empty-guide__hint--block {
   display: block;
   margin: 8px 4px 0;
+}
+
+/* 2026-10-30 题10：身份标签，安静的小字（不是新的彩色徽章体系） */
+.sess-role {
+  margin-left: 6px;
+  color: var(--app-faint);
+  font-size: 12px;
 }
 </style>

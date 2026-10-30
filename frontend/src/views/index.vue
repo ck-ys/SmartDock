@@ -7,7 +7,7 @@
         <p>{{ today }}<template v-if="updatedAt"> · 更新于 {{ updatedAt }}</template></p>
       </div>
       <div class="ov-head__actions">
-        <!-- 复核入口的数字来自低分主体：队列为空时降成普通按钮，避免整屏最亮的蓝指着一个空队列 -->
+        <!-- 数字来自复核队列的 PENDING 条数（与复核抽屉同口径，2026-10-30 题1）；队列为空时降成普通按钮，避免整屏最亮的蓝指着一个空队列 -->
         <el-button v-if="canReview && reviewCount > 0" type="primary" @click="go('/insight/profile?review=1')">
           查看待复核（{{ reviewCount }}）
         </el-button>
@@ -207,7 +207,8 @@ const canAnalytics = computed(() => checkPermi(['analytics:center:query']));
 const canReview = computed(() => checkPermi(['profile:review:query']));
 /** 首页直问是发 window 事件给壳层助手抽屉；没这个权限抽屉不会接，卡片摆出来就是死按钮 */
 const canAsk = computed(() => checkPermi(['dcs:assistant:use']));
-const reviewCount = computed(() => Number(profile.value?.highRisk ?? 0));
+// 2026-10-30 题1：按钮数字跟复核队列走（抽屉里排几条就显示几），不再拿低分人数冒充
+const reviewCount = computed(() => Number(profile.value?.pendingReviewCount ?? 0));
 
 /** 取数失败时给破折号，不能悄悄显示成 0（0 是真实业务值，和「没取到」是两回事） */
 function statNum(key: 'todo' | 'pendingAudit' | 'unreadNotices'): string {

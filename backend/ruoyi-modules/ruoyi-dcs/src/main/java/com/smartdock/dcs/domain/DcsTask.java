@@ -57,6 +57,10 @@ public class DcsTask implements Serializable {
     /** 目标成员 userId 数组的 JSON 文本(单级, 无组织树/转发) */
     private String assigneeUserIds;
 
+    /** 2026-10-30 题12：目标成员显示名（不落库，详情接口按需回填，契约里的死字段兑现） */
+    @TableField(exist = false)
+    private List<String> assigneeNames;
+
     /** ASSIGNED=指定审核人 / PUBLISHER=发布人直审 */
     private String auditMode;
 

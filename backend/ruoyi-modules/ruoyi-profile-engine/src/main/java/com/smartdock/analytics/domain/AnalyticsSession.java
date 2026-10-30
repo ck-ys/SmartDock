@@ -1,6 +1,7 @@
 package com.smartdock.analytics.domain;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -83,4 +84,12 @@ public class AnalyticsSession extends BaseEntity {
     private String city;
 
     private String searchTerm;
+
+    /** 2026-10-30 题10：展示名——登录主体取昵称，匿名访客给「访客 #尾4位」（不落库，查询后回填） */
+    @TableField(exist = false)
+    private String displayName;
+
+    /** user = 登录主体 / visitor = 匿名访客（前端据此挂徽章） */
+    @TableField(exist = false)
+    private String identityType;
 }

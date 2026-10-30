@@ -1,6 +1,7 @@
 package com.smartdock.profile.engine;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.smartdock.profile.mapper.ProfileReviewQueueMapper;
 import com.smartdock.profile.mapper.ProfileScoreSnapshotMapper;
 import com.smartdock.profile.mapper.ProfileSubjectMapper;
 import com.smartdock.profile.query.ProfileMainViewRow;
@@ -63,6 +64,7 @@ class ProfileMainViewPageTest {
         Mockito.when(piiService.canViewScore()).thenReturn(true);
         service = new ProfileQueryService(subjectMapper,
             Mockito.mock(ProfileScoreSnapshotMapper.class),
+            Mockito.mock(ProfileReviewQueueMapper.class),
             Mockito.mock(ProfileScoreEngine.class),
             Mockito.mock(ProfileDimensionService.class),
             Mockito.mock(ProfileRuleService.class),

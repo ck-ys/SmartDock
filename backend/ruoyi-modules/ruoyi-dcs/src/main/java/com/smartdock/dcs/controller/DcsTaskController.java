@@ -90,7 +90,7 @@ public class DcsTaskController extends BaseController {
     @SaCheckPermission("dcs:submission:submit")
     @GetMapping("/{id}")
     public R<Map<String, Object>> detail(@PathVariable Long id) {
-        DcsTask t = taskService.requireVisible(id, LoginHelper.getUserId());
+        DcsTask t = taskService.withAssigneeNames(taskService.requireVisible(id, LoginHelper.getUserId()));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("task", t);
         out.put("fields", taskService.fieldsOf(id));
