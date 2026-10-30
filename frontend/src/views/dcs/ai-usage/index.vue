@@ -17,7 +17,7 @@
         <div class="mb-4">
           <!-- 各调用方分布 -->
           <el-card v-if="summary && summary.costByCaller" shadow="never" class="caller-overview-card">
-            <template #header><span>调用方成本分布</span></template>
+            <template #header><span>调用方成本分布（全部调用，不随下方筛选）</span></template>
             <div class="ui-kpi-strip caller-strip">
               <div v-for="(cost, caller) in summary.costByCaller" :key="caller" class="ui-kpi">
                 <span class="ui-kpi__label">{{ callerLabel(String(caller)) }}</span>
@@ -28,7 +28,7 @@
           </el-card>
           <!-- 汇总失败时整张卡会消失，像这个模块不存在；留一张说明卡，别让版面无声塌掉 -->
           <el-card v-else-if="summaryError" shadow="never" class="caller-overview-card">
-            <template #header><span>调用方成本分布</span></template>
+            <template #header><span>调用方成本分布（全部调用，不随下方筛选）</span></template>
             <p class="ui-error">调用方成本暂时取不到，点右上角「刷新数据」重试。</p>
           </el-card>
         </div>
@@ -39,6 +39,22 @@
               <el-select v-model="queryParams.caller" clearable placeholder="调用方" style="width: 160px" @change="handleQuery">
                 <el-option v-for="[value, label] in callerOptions" :key="value" :label="label" :value="value" />
               </el-select>
+              <!-- 2026-10-30 题15（方案A）：副标题承诺「定位失败请求」，就得有状态与时间两个筛选 -->
+              <el-select v-model="queryParams.success" class="usage-status" clearable placeholder="状态" aria-label="按状态筛选" @change="handleQuery">
+                <el-option label="成功" value="1" />
+                <el-option label="失败" value="0" />
+              </el-select>
+              <el-date-picker
+                v-model="timeRange"
+                class="usage-range"
+                type="daterange"
+                value-format="YYYY-MM-DD"
+                range-separator="~"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                aria-label="按调用时间范围筛选"
+                @change="handleQuery"
+              />
               <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
               <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
               <!-- AI 缺口批 Q7：按当前筛选导出明细 Excel -->
@@ -46,7 +62,7 @@
             </div>
           </template>
           <div class="usage-table-wrap">
-            <el-table v-loading="loading" :data="usageList" class="ui-table dcs-table-only">
+            <el-table v-loading="loading" :data="usageList" class="ui-table dcs-table-only" :row-class-name="rowClassName">
               <el-table-column label="时间" prop="createTime" width="170" />
               <el-table-column label="调用方" width="120">
                 <template #default="{ row }">
@@ -128,7 +144,7 @@
               <p class="ui-empty__title">当前筛选下没有调用明细</p>
               <p class="ui-empty__hint">换个调用方或清空筛选后再看；有调用发生后这里会逐条列出 Token 与成本</p>
             </div>
-            <div v-for="row in usageList" :key="row.usageId" class="dcs-mobile-card">
+            <div v-for="row in usageList" :key="row.usageId" class="dcs-mobile-card" :class="{ 'usage-card--fail': row.success !== '1' }">
               <div class="dcs-card-head">
                 <span class="dcs-card-title">{{ sceneLabel(row.scene) }}</span>
                 <span class="dcs-card-badge"
@@ -261,8 +277,22 @@ const queryParams = reactive({
   pageSize: 20,
   caller: '',
   scene: '',
-  configId: undefined as number | string | undefined
+  configId: undefined as number | string | undefined,
+  // 2026-10-30 题15：'' 表示不过滤（空串走不了「成功/失败」）
+  success: ''
 });
+/** 日期控件值；提交时补成全天的起止时刻，避免只查到 00:00:00 那一秒 */
+const timeRange = ref<[string, string] | []>([]);
+const buildQuery = () => {
+  const [begin, end] = timeRange.value || [];
+  return {
+    ...queryParams,
+    beginTime: begin ? `${begin} 00:00:00` : undefined,
+    endTime: end ? `${end} 23:59:59` : undefined
+  };
+};
+/** 失败行整行浅红底：淡底不是大红，扫读时先看见再决定点开 */
+const rowClassName = ({ row }: { row: DcsAiUsageVO }) => (row.success === '1' ? '' : 'usage-row--fail');
 
 /** 业务批3-②(#14)：调用方中文名全集（库内 7 值 + 预留 3 值）——表格、分布卡、筛选下拉共用一源 */
 const CALLER_LABELS: Record<string, string> = {
@@ -339,7 +369,7 @@ const sceneLabel = (scene?: string): string => {
 const loadList = async () => {
   loading.value = true;
   try {
-    const res: any = await listDcsAiUsage(queryParams);
+    const res: any = await listDcsAiUsage(buildQuery() as any);
     usageList.value = res.rows || res.data || [];
     total.value = res.total || 0;
   } finally {
@@ -367,6 +397,8 @@ const resetQuery = () => {
   queryParams.caller = '';
   queryParams.scene = '';
   queryParams.configId = undefined;
+  queryParams.success = '';
+  timeRange.value = [];
   queryParams.pageNum = 1;
   loadList();
 };
@@ -534,9 +566,11 @@ watch(
 
 /** Q7：明细导出（按当前筛选） */
 const exportUsage = () => {
+  // 与列表共用 buildQuery，避免两处日界口径日后漂移（批2 三审 P2）
+  const { pageNum: _pn, pageSize: _ps, ...rest } = buildQuery();
   proxy?.download(
     '/dcs/ai-usage/export',
-    { caller: queryParams.caller || undefined, scene: queryParams.scene || undefined, configId: queryParams.configId },
+    { ...rest, caller: rest.caller || undefined, success: rest.success || undefined, beginTime: rest.beginTime, endTime: rest.endTime },
     `AI用量明细_${new Date().getTime()}.xlsx`
   );
 };
@@ -618,6 +652,25 @@ onMounted(loadData);
   min-width: 0;
   overflow-x: auto;
 }
+/* 手机卡片同步失败浅红底，同一份数据两种呈现别两套口径 */
+.usage-card--fail {
+  background-color: var(--dcs-pill-neg-bg);
+}
+
+.usage-status {
+  width: 120px;
+}
+
+.usage-range {
+  width: 250px;
+}
+
+/* 2026-10-30 题15：失败行浅红底（用负向淡底令牌，深色下同样成立）；悬停也保持色调 */
+.usage-table-wrap :deep(.el-table__body tr.usage-row--fail > td.el-table__cell),
+.usage-table-wrap :deep(.el-table__body tr.usage-row--fail:hover > td.el-table__cell) {
+  background-color: var(--dcs-pill-neg-bg);
+}
+
 .usage-table-wrap :deep(.el-table) {
   /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加 */
   min-width: 1610px;

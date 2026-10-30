@@ -101,7 +101,7 @@
       <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="load" />
     </el-card>
 
-    <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑任务' : '新建任务'" width="680px">
+    <el-dialog v-model="dialog.visible" :title="dialog.id ? '编辑任务' : '新建任务'" width="min(680px, 94%)">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
         <el-form-item label="标题" prop="title">
           <el-input v-model="form.title" maxlength="128" />
@@ -112,11 +112,25 @@
         <el-form-item label="截止日期">
           <el-date-picker v-model="form.deadline" type="date" value-format="YYYY-MM-DD" class="form-full" />
         </el-form-item>
-        <el-form-item label="目标成员" prop="assigneeUserIds">
-          <el-input v-model="assigneeInput" placeholder="成员 userId, 逗号分隔" />
+        <el-form-item label="目标成员" prop="assigneeUserIds" required>
+          <!-- 2026-10-30 题7（方案A）：搜姓名勾人，不再让人背数字 ID；底层仍提交 userId 数组 -->
+          <el-select
+            v-model="assigneeIds"
+            class="mission-assignee"
+            multiple
+            filterable
+            remote
+            clearable
+            reserve-keyword
+            :remote-method="searchUsers"
+            :loading="userLoading"
+            placeholder="搜姓名或账号，可多选"
+          >
+            <el-option v-for="u in userOptions" :key="u.value" :label="u.label" :value="u.value" />
+          </el-select>
         </el-form-item>
         <el-form-item label=" ">
-          <span class="tip">审核模式为发布人直审；填错的 userId 会被拒收</span>
+          <span class="tip">审核模式为发布人直审；只列你在本单位能看到的启用成员</span>
         </el-form-item>
         <el-divider content-position="left">填报字段</el-divider>
         <div v-for="(f, i) in form.fields" :key="i" class="field-row">
@@ -150,6 +164,9 @@
 <script setup name="DcsMission" lang="ts">
 import { pageTasks, createTask, updateTask, publishTask, closeTask, getTask } from '@/api/dcs/core/task';
 import type { DcsTaskRow, DcsTaskFieldDef } from '@/api/dcs/core/task';
+// 依赖 system:user:list / system:user:query（当前持 dcs:task:* 的角色 admin/tenant_admin 都带这两个权限；
+// 若日后新增「只授 dcs:task:*」的角色，选人下拉会取不到数据）
+import { listUser, optionSelect } from '@/api/system/user';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';
 
 const { proxy } = getCurrentInstance() as any;
@@ -177,7 +194,69 @@ const form = reactive<{
   deadline: '',
   fields: []
 });
-const assigneeInput = ref('');
+/**
+ * 2026-10-30 题7（方案A）：成员改成「搜名字勾选」。
+ * 下拉远程搜单位内启用成员，选中项保留在 userOptions 里当标签；提交仍只传 userId 数组。
+ */
+type AssigneeOption = { value: string | number; label: string };
+const assigneeIds = ref<Array<string | number>>([]);
+const userOptions = ref<AssigneeOption[]>([]);
+const userLoading = ref(false);
+const toOption = (u: { userId: string | number; nickName?: string; userName?: string }): AssigneeOption => ({
+  value: u.userId,
+  label: `${u.nickName || u.userName || u.userId}${u.userName ? `（${u.userName}）` : ''}`
+});
+const mergeOptions = (list: AssigneeOption[]) => {
+  const known = new Set(userOptions.value.map((o) => String(o.value)));
+  userOptions.value = [...userOptions.value, ...list.filter((o) => !known.has(String(o.value)))];
+};
+/**
+ * 后端 userName / nickName 是两个 AND 条件，单传一个只按该字段搜；
+ * 这里并发查两次取并集，才等于占位符承诺的「姓名或账号」。
+ * remote 模式下 Element Plus 不做本地过滤，所以每轮要按本次结果重建列表（只保留已选项）。
+ */
+let searchSeq = 0;
+const searchUsers = async (keyword: string) => {
+  const seq = ++searchSeq;
+  userLoading.value = true;
+  try {
+    const kw = keyword || undefined;
+    const [byAccount, byName] = await Promise.all([
+      listUser({ pageNum: 1, pageSize: 20, userName: kw, status: '0' }),
+      listUser({ pageNum: 1, pageSize: 20, nickName: kw, status: '0' })
+    ]);
+    const hits = new Map<string, AssigneeOption>();
+    [...(byAccount.rows || []), ...(byName.rows || [])].forEach((u) => {
+      const opt = toOption(u);
+      hits.set(String(opt.value), opt);
+    });
+    // 连打时旧请求可能后到：只有最后一次搜索能改列表，否则回退成上一轮的命中
+    if (seq !== searchSeq) return;
+    const picked = new Set(assigneeIds.value.map(String));
+    const selected = userOptions.value.filter((o) => picked.has(String(o.value)));
+    const rest = [...hits.values()].filter((o) => !picked.has(String(o.value)));
+    userOptions.value = [...selected, ...rest];
+  } catch {
+    if (seq === searchSeq) proxy.$modal.msgError('成员列表加载失败，请重试');
+  } finally {
+    if (seq === searchSeq) userLoading.value = false;
+  }
+};
+const loadAssigneeOptions = async (ids: Array<string | number>) => {
+  if (!ids.length) return;
+  try {
+    const res = await optionSelect(ids);
+    mergeOptions((res.data || []).map(toOption));
+  } catch {
+    // 只影响标签显示，提交仍用 ID 数组，不阻断编辑
+  }
+  // 停用/越权成员查不到名字时，至少给个可读占位（否则标签显示一串 19 位数字）
+  const known = new Set(userOptions.value.map((o) => String(o.value)));
+  const missing = ids.filter((id) => !known.has(String(id)));
+  if (missing.length) {
+    userOptions.value = [...userOptions.value, ...missing.map((id) => ({ value: id, label: `用户 ${id}（已停用或不可见）` }))];
+  }
+};
 const rules = { title: [{ required: true, message: '请输入标题', trigger: 'blur' }] };
 
 const load = async () => {
@@ -209,7 +288,9 @@ const openCreate = () => {
   form.description = '';
   form.deadline = '';
   form.fields = [{ fieldCode: '', fieldName: '填报内容', fieldType: 'text', required: '1', options: '' }];
-  assigneeInput.value = '';
+  assigneeIds.value = [];
+  // 打开即给一屏可选成员，不强迫先打字
+  void searchUsers('');
   dialog.visible = true;
 };
 const openEdit = async (row: DcsTaskRow) => {
@@ -234,10 +315,12 @@ const openEdit = async (row: DcsTaskRow) => {
       }
       return { ...f, options: Array.isArray(opts) ? (opts as string[]).join(',') : opts };
     });
-    // assigneeUserIds 后端出参是 JSON 字符串("[1,2]")而非数组——归一后再用
-    const ids: unknown = (t as any).assigneeUserIds;
-    const idList: number[] = Array.isArray(ids) ? ids : typeof ids === 'string' ? JSON.parse(ids || '[]') : [];
-    assigneeInput.value = idList.join(',');
+    // assigneeUserIds 后端出参是 JSON 文本("[1,2]")：19 位雪花 ID 走 JSON.parse 会被 JS 截断，
+    // 这里直接抽数字串保住原值（批2 三审 P0）
+    const raw: unknown = (t as any).assigneeUserIds;
+    const idList: string[] = Array.isArray(raw) ? raw.map(String) : (String(raw ?? '').match(/\d+/g) ?? []);
+    assigneeIds.value = idList;
+    await loadAssigneeOptions(idList);
     dialog.visible = true;
   } catch {
     proxy.$modal.msgError('任务详情加载失败, 请重试');
@@ -245,18 +328,14 @@ const openEdit = async (row: DcsTaskRow) => {
 };
 const assigneeCount = (row: DcsTaskRow) => {
   const v: unknown = (row as any).assigneeUserIds;
-  const list = Array.isArray(v) ? v : typeof v === 'string' ? JSON.parse(v || '[]') : [];
-  return list.length;
+  return Array.isArray(v) ? v.length : (String(v ?? '').match(/\d+/g) || []).length;
 };
 const save = async () => {
   await formRef.value?.validate();
-  const assigneeUserIds = assigneeInput.value
-    .split(/[,，\s]+/)
-    .filter(Boolean)
-    .map(Number)
-    .filter((n) => Number.isFinite(n));
+  // 选择器给的是字符串 ID（雪花 19 位转 Number 会丢精度，三审 P0）；只做合法性校验，不做类型转换
+  const assigneeUserIds = assigneeIds.value.map(String).filter((v) => /^\d+$/.test(v));
   if (!assigneeUserIds.length) {
-    proxy.$modal.msgError('请填写目标成员');
+    proxy.$modal.msgError('请选择目标成员');
     return;
   }
   const fields = form.fields.map((f, i) => {
@@ -373,6 +452,11 @@ html.dark .mission-title-link:hover {
 }
 
 .form-full {
+  width: 100%;
+}
+
+/* 2026-10-30 题7：多选标签需要整行宽度，长名字不挤 */
+.mission-assignee {
   width: 100%;
 }
 

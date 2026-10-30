@@ -24,4 +24,13 @@ public class DcsAiUsageQueryBo implements Serializable {
 
     /** 配置 ID 筛选 */
     private Long configId;
+
+    /** 调用结果筛选：1 成功 / 0 失败（2026-10-30 题15） */
+    private String success;
+
+    /** 调用时间起（含），格式 yyyy-MM-dd HH:mm:ss（2026-10-30 题15） */
+    private String beginTime;
+
+    /** 调用时间止（含），格式 yyyy-MM-dd HH:mm:ss（2026-10-30 题15） */
+    private String endTime;
 }

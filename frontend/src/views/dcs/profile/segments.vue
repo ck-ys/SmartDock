@@ -217,13 +217,23 @@
         <el-button type="primary" @click="loadMembers">查询</el-button>
         <span class="muted small">当前分群 {{ activeSegment?.memberCount ?? 0 }} 人</span>
       </div>
-      <el-table v-loading="memberLoading" class="ui-table" :data="members">
+      <el-table v-loading="memberLoading" class="ui-table" :data="members" :row-class-name="memberRowClass">
         <template #empty>
           <div class="ui-empty">
             <p class="ui-empty__title">该分群暂无成员</p>
             <p class="ui-empty__hint">先评估动态分群，或为静态分群导入名单</p>
           </div>
         </template>
+        <!-- 2026-10-30 题13（方案A）：六列最小 810px 塞 720px 抽屉，「最近事件」被固定操作列盖住——
+             命中原因收进行内展开（想知道再点开），操作列不再固定，时间一眼看全 -->
+        <el-table-column type="expand" width="40">
+          <template #default="{ row }">
+            <div class="member-detail">
+              <span class="member-detail__label">命中原因</span>
+              <span class="member-detail__text">{{ row.reason || '—' }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="主体" min-width="180">
           <template #default="{ row }">
             <div class="subject-cell">
@@ -236,18 +246,13 @@
           <template #default="{ row }">{{ formatScore(row.totalScore) }}</template>
         </el-table-column>
         <el-table-column prop="eventCount" label="事件数" width="80" align="right" />
-        <el-table-column label="命中原因" min-width="200">
-          <template #default="{ row }"
-            ><span class="muted">{{ row.reason || '—' }}</span></template
-          >
+        <el-table-column label="最近事件" width="170">
+          <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right">
+        <el-table-column label="操作" width="90">
           <template #default="{ row }">
             <el-button link type="primary" @click="goProfile(row.subjectType, row.subjectId)">看画像</el-button>
           </template>
-        </el-table-column>
-        <el-table-column label="最近事件" width="170">
-          <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
         </el-table-column>
       </el-table>
       <pagination
@@ -776,6 +781,8 @@ const doImport = async () => {
 // ---------------------------------------------------------------- 成员 / 运行记录
 const activeSegment = ref<ProfileSegment | null>(null);
 const memberVisible = ref(false);
+/** 展开列只在有命中原因时可用（无内容的行隐藏箭头，避免点开只有「—」） */
+const memberRowClass = ({ row }: { row: any }) => (row.reason ? '' : 'seg-row--no-reason');
 const memberLoading = ref(false);
 const members = ref<ProfileSegmentMemberRow[]>([]);
 const memberTotal = ref(0);
@@ -1007,6 +1014,26 @@ onMounted(async () => {
   }
 }
 /* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
+/* 2026-10-30 题13：展开行里的命中原因，标签+正文一段读完 */
+.member-detail {
+  display: flex;
+  gap: 12px;
+  padding: 4px 8px 4px 48px;
+  font-size: var(--dcs-font-sm);
+  line-height: 1.6;
+}
+.member-detail__label {
+  flex: none;
+  color: var(--app-faint);
+}
+.member-detail__text {
+  color: var(--app-muted);
+  word-break: break-word;
+}
+/* 命中原因为空（静态名单常见）就没有可展开的内容，箭头占位但不给点 */
+.segment-page :deep(.seg-row--no-reason .el-table__expand-icon) {
+  visibility: hidden;
+}
 .segment-page :deep(.el-table) {
   --el-table-border-color: var(--app-rule);
   --el-table-header-bg-color: transparent;

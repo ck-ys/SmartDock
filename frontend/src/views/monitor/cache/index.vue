@@ -8,7 +8,7 @@
             <span style="vertical-align: middle">基本信息</span>
           </template>
 
-          <div class="el-table el-table--enable-row-hover el-table--medium ui-table">
+          <div class="el-table el-table--enable-row-hover el-table--medium ui-table cache-info">
             <table style="width: 100%">
               <tbody>
                 <tr>
@@ -97,7 +97,7 @@
         </el-card>
       </el-col>
 
-      <el-col :span="12" class="card-box">
+      <el-col :xs="24" :sm="12" class="card-box">
         <el-card shadow="hover">
           <template #header>
             <PieChart style="width: 1em; height: 1em; vertical-align: middle" />
@@ -109,13 +109,23 @@
         </el-card>
       </el-col>
 
-      <el-col :span="12" class="card-box">
+      <el-col :xs="24" :sm="12" class="card-box">
         <el-card shadow="hover">
           <template #header>
             <Odometer style="width: 1em; height: 1em; vertical-align: middle" /> <span style="vertical-align: middle">内存信息</span>
           </template>
           <div class="el-table el-table--enable-row-hover el-table--medium">
-            <div ref="usedmemory" style="height: 420px" />
+            <!-- 2026-10-30 题2（方案A）：没设内存上限（maxmemory=0）就不画指针表盘——永远贴 0 的图比没有图更误导 -->
+            <div v-if="hasMemoryLimit" ref="usedmemory" style="height: 420px" />
+            <div v-else-if="cache.info" class="mem-nolimit">
+              <p class="mem-nolimit__label">内存用量</p>
+              <p class="mem-nolimit__value">{{ cache.info.used_memory_human || '—' }}</p>
+              <p class="mem-nolimit__hint">Redis 没设内存上限（maxmemory 为 0B），没有可比的「满格」基准，所以这里只给读数。配了上限后刷新本页会换成占比表盘。</p>
+            </div>
+            <div v-else class="mem-nolimit">
+              <p class="mem-nolimit__label">内存信息</p>
+              <p class="mem-nolimit__hint">暂时取不到 Redis 内存信息，请稍后刷新页面重试。</p>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -137,13 +147,35 @@ const ct = useChartTokens();
 let commandstatsIns: echarts.ECharts | null = null;
 let usedmemoryIns: echarts.ECharts | null = null;
 
+/**
+ * 2026-10-30 题2（方案A）：Redis INFO 的 *_human 带单位（"3.20G"/"512.00M"/"0B"），
+ * 直接 parseFloat 会把 3.20G 读成 3.2。这里统一换算成 MB，读数与量程共用一把尺子。
+ */
+const memToMb = (human?: string): number => {
+  const text = (human || '').trim();
+  const value = parseFloat(text);
+  if (!Number.isFinite(value)) return 0;
+  const unit = text.replace(/[0-9.]/g, '').toUpperCase();
+  if (unit.startsWith('T')) return value * 1024 * 1024;
+  if (unit.startsWith('P')) return value * 1024 * 1024 * 1024;
+  if (unit.startsWith('G')) return value * 1024;
+  if (unit.startsWith('K')) return value / 1024;
+  if (unit.startsWith('B')) return value / 1024 / 1024;
+  return value;
+};
+const usedMemoryText = computed(() => cache.value.info?.used_memory_human || '—');
+const maxMemoryText = computed(() => cache.value.info?.maxmemory_human || '—');
+const usedMemoryMb = computed(() => memToMb(cache.value.info?.used_memory_human));
+const maxMemoryMb = computed(() => memToMb(cache.value.info?.maxmemory_human));
+/** 0 = 不限（Redis 语义），此时表盘没有意义 */
+const hasMemoryLimit = computed(() => maxMemoryMb.value > 0);
+
 /* 画布读不到 CSS 变量：文字/配色从主题 token 取，切深色时重画 */
 const renderCharts = () => {
-  if (!commandstats.value || !usedmemory.value || !cache.value.commandStats) {
+  if (!commandstats.value || !cache.value.commandStats) {
     return;
   }
   commandstatsIns = commandstatsIns || echarts.init(commandstats.value);
-  usedmemoryIns = usedmemoryIns || echarts.init(usedmemory.value);
   commandstatsIns.setOption(
     {
       color: ct.value.series,
@@ -167,24 +199,33 @@ const renderCharts = () => {
     },
     true
   );
+  // 2026-10-30 题2（方案A）：没设上限就没有表盘，图实例也别初始化（v-if 已把容器摘掉）
+  if (!usedmemory.value) {
+    usedmemoryIns?.dispose();
+    usedmemoryIns = null;
+    return;
+  }
+  usedmemoryIns = usedmemoryIns || echarts.init(usedmemory.value);
   usedmemoryIns.setOption(
     {
       color: ct.value.series,
       textStyle: { color: ct.value.faint },
       tooltip: {
-        formatter: '{b} <br/>{a} : ' + cache.value.info?.used_memory_human
+        formatter: '{b} <br/>' + usedMemoryText.value + ' / 上限 ' + maxMemoryText.value
       },
       series: [
         {
-          name: '峰值',
+          name: '内存',
           type: 'gauge',
           min: 0,
-          max: 1000,
+          // 量程跟 maxmemory 走，读数与量程统一换算成 MB——比例才是真实占比
+          max: maxMemoryMb.value,
           // 仪表盘的读数与标题不跟 textStyle 走，深色下默认深灰字会看不见
-          detail: { formatter: cache.value.info?.used_memory_human, color: ct.value.ink },
+          detail: { formatter: usedMemoryText.value, color: ct.value.ink },
           title: { color: ct.value.muted },
-          axisLabel: { color: ct.value.faint },
-          data: [{ value: parseFloat(cache.value.info?.used_memory_human || '0'), name: '内存消耗' }]
+          // 刻度按 GB 读数，避免 819.2/1638.4 这类 MB 数字排满一圈
+          axisLabel: { color: ct.value.faint, formatter: (v: number) => (v >= 1024 ? `${Math.round(v / 1024)}G` : `${Math.round(v)}M`) },
+          data: [{ value: usedMemoryMb.value, name: '已用' }]
         }
       ]
     },
@@ -199,9 +240,16 @@ const resizeCharts = () => {
 
 const getList = async () => {
   proxy?.$modal.loading('正在加载缓存监控数据，请稍候！');
-  const res = await getCache();
-  proxy?.$modal.closeLoading();
-  cache.value = res.data;
+  let res: any = null;
+  try {
+    res = await getCache();
+  } finally {
+    // 失败也必须关遮罩：load 是全屏 lock，漏关会把整页锁死（批2 三审 P1）
+    proxy?.$modal.closeLoading();
+  }
+  cache.value = res?.data || {};
+  // v-if 要等这一帧 DOM 更新后才决定表盘容器在不在，先等渲染再画图（否则配了上限也不出图）
+  await nextTick();
   renderCharts();
 };
 
@@ -220,3 +268,51 @@ onBeforeUnmount(() => {
   usedmemoryIns = null;
 });
 </script>
+
+<style scoped>
+/* 2026-10-30 题2：未设上限时的数字卡，替代指针表盘（同卡片同高度，版面不塌） */
+/* 手机档：8 列信息表塞 384px 会把标签折成竖排、数值截半；改成表内横滚（与全站表格口径一致） */
+@media (max-width: 992px) {
+  .cache-info {
+    overflow-x: auto;
+  }
+
+  .cache-info table {
+    min-width: 720px;
+  }
+}
+
+.mem-nolimit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 420px;
+  padding: 0 32px;
+  text-align: center;
+}
+
+.mem-nolimit__label {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+}
+
+.mem-nolimit__value {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 34px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.mem-nolimit__hint {
+  margin: 0;
+  max-width: 340px;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.6;
+}
+</style>

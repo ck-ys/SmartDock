@@ -304,6 +304,19 @@ public class AiBillingService {
         return usageMapper.selectList(usageWrapper(bo, LoginHelper.getTenantId()).last("LIMIT 10000"));
     }
 
+    /** 2026-10-30 题15：GET 查询串里的时间按 DateUtils 的宽松格式解析；
+     *  解析失败不炸列表，但要留日志——静默丢条件会变成「筛了却像没筛」。 */
+    private java.util.Date parseTime(String field, String text) {
+        if (StrUtil.isBlank(text)) {
+            return null;
+        }
+        java.util.Date parsed = org.dromara.common.core.utils.DateUtils.parseDate(text);
+        if (parsed == null) {
+            log.warn("AI 用量查询时间参数无法解析，已忽略该条件: {}={}", field, text);
+        }
+        return parsed;
+    }
+
     private LambdaQueryWrapper<DcsAiUsage> usageWrapper(DcsAiUsageQueryBo bo, String tenantId) {
         LambdaQueryWrapper<DcsAiUsage> lqw = new LambdaQueryWrapper<DcsAiUsage>()
             .eq(DcsAiUsage::getTenantId, tenantId)
@@ -312,6 +325,13 @@ public class AiBillingService {
             if (StrUtil.isNotBlank(bo.getCaller())) lqw.eq(DcsAiUsage::getCaller, bo.getCaller());
             if (StrUtil.isNotBlank(bo.getScene())) lqw.eq(DcsAiUsage::getScene, bo.getScene());
             if (bo.getConfigId() != null) lqw.eq(DcsAiUsage::getConfigId, bo.getConfigId());
+            // 2026-10-30 题15：状态与时间范围（页面承诺「定位失败请求」，靠这两个条件才筛得出来）
+            if (StrUtil.isNotBlank(bo.getSuccess())) lqw.eq(DcsAiUsage::getSuccess, bo.getSuccess());
+            java.util.Date begin = parseTime("beginTime", bo.getBeginTime());
+            java.util.Date end = parseTime("endTime", bo.getEndTime());
+            if (begin != null) lqw.ge(DcsAiUsage::getCreateTime, begin);
+            // create_time 是带毫秒的 timestamp：按「秒」边界的 23:59:59 要补到 .999，否则漏掉最后一秒
+            if (end != null) lqw.le(DcsAiUsage::getCreateTime, new java.util.Date(end.getTime() + 999));
         }
         return lqw;
     }
