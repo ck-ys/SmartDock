@@ -36,12 +36,6 @@
     </div>
 
     <div class="drawer-item">
-      <span>纯黑夜主题</span>
-      <span class="comp-style">
-        <el-switch :model-value="settingsStore.dark" class="drawer-switch" @change="onDarkChange" />
-      </span>
-    </div>
-    <div class="drawer-item">
       <span>控件圆角</span>
       <span class="comp-style">
         <el-slider v-model="radiusBase" :min="0" :max="32" :step="2" style="width: 120px" @change="radiusBaseChange" />
@@ -99,10 +93,8 @@ const showSettings = ref(false);
 const storeSettings = computed(() => settingsStore);
 const navType = ref(settingsStore.navType);
 const radiusBase = ref(settingsStore.radiusBase);
-// 外观状态唯一入口在 store：切换时同步 html.dark、localStorage；皮肤与强调色由皮肤令牌固定（U-24）
-const onDarkChange = (value: boolean | string | number) => {
-  settingsStore.setDark(Boolean(value));
-};
+// 2026-10-30 题5（方案A）：明暗唯一入口在顶栏「外观」抽屉（DcsAppearanceDrawer → settings.setDark），
+// 这里原「纯黑夜主题」开关已撤；本抽屉只管布局，不再持有明暗状态。
 
 /** 菜单导航设置 */
 watch(

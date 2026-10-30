@@ -54,6 +54,8 @@
           <el-table-column prop="createTime" label="创建时间" width="170" />
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
+              <!-- 2026-10-30 题14（方案A）：详情入口全状态固定第一位，对齐手机端卡片 -->
+              <el-button link type="primary" @click="goDetail(row.id)">详情</el-button>
               <el-button v-if="row.status === 'DRAFT'" v-hasPermi="['dcs:task:publish']" link type="primary" @click="publish(row)">发布</el-button>
               <el-button v-if="row.status === 'COLLECTING'" v-hasPermi="['dcs:task:publish']" link @click="close(row)">关闭</el-button>
               <el-button v-if="row.status === 'DRAFT'" v-hasPermi="['dcs:task:edit']" link @click="openEdit(row)">编辑</el-button>
@@ -326,13 +328,25 @@ onMounted(load);
   --el-table-tr-bg-color: transparent;
 }
 
+/* 2026-10-30 题14（方案A）：标题是详情入口，必须看得出能点——恢复主色链接观感，hover 加下划线 */
 .mission-title-link {
-  color: var(--app-text);
+  color: var(--app-accent);
   font-weight: 500;
 }
 
 .mission-title-link:hover {
-  color: var(--app-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 深色皮肤下 --app-accent(#4583ff) 对 #242424 只有 4.39:1（批1 快筛席实测），
+   链接单独提亮一档到 5.8:1；只影响本页标题，不动全局主题令牌 */
+html.dark .mission-title-link {
+  color: #6f9dff;
+}
+
+html.dark .mission-title-link:hover {
+  color: #86aeff;
 }
 
 .mission-mobile {

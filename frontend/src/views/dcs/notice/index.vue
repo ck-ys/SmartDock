@@ -12,15 +12,17 @@
 
     <el-card shadow="never" class="notice-list-card">
       <div class="ui-toolbar notice-toolbar">
-        <el-radio-group v-model="query.readFlag" @change="load">
+        <el-radio-group v-model="query.readFlag" :disabled="markingAll" @change="load">
           <el-radio-button value="">全部</el-radio-button>
           <el-radio-button value="0">未读</el-radio-button>
           <el-radio-button value="1">已读</el-radio-button>
         </el-radio-group>
+        <!-- 2026-10-30 题11（方案A）：批量出口显式化；只作用本页未读（按钮文案已写明「本页」），量大再换批量接口 -->
+        <el-button plain icon="Check" title="仅标记当前页的未读消息" :disabled="unreadCount === 0 || markingAll" :loading="markingAll" @click="markAllRead">本页全部已读</el-button>
       </div>
 
       <div class="dcs-ops-table-wrap">
-        <el-table v-loading="loading" class="dcs-table-only ui-table notice-table" :data="rows" @row-click="read">
+        <el-table v-loading="loading" class="dcs-table-only ui-table notice-table" :data="rows">
           <el-table-column label="标题" min-width="260">
             <template #default="{ row }">
               <span class="notice-cell notice-cell--title" :class="{ 'is-unread': row.readFlag === '0' }">
@@ -39,6 +41,13 @@
             </template>
           </el-table-column>
           <el-table-column prop="createTime" label="时间" width="170" />
+          <!-- 2026-10-30 题11（方案A）：标已是显式动作，不再绑在整行点击上（避免误触把没看的标掉） -->
+          <el-table-column label="操作" width="90" align="right">
+            <template #default="{ row }">
+              <el-button v-if="row.readFlag === '0'" link type="primary" :disabled="markingAll" @click.stop="read(row)">标已读</el-button>
+              <span v-else class="notice-read-done">已读</span>
+            </template>
+          </el-table-column>
           <template #empty>
             <div class="ui-empty">
               <p class="ui-empty__title">暂无消息</p>
@@ -47,22 +56,13 @@
           </template>
         </el-table>
       </div>
-      <!-- ≤992：表格改卡片；点卡片=标为已读（与行点击同口径） -->
+      <!-- ≤992：表格改卡片；标读同样改成显式按钮 -->
       <div class="dcs-mobile-list notice-mobile">
         <div v-if="rows.length === 0" class="ui-empty">
           <p class="ui-empty__title">暂无消息</p>
           <p class="ui-empty__hint">任务分派、审核结果与系统提醒都会显示在这里。</p>
         </div>
-        <div
-          v-for="row in rows"
-          :key="row.id"
-          class="dcs-mobile-card notice-card"
-          role="button"
-          tabindex="0"
-          @click="read(row)"
-          @keydown.enter.prevent="read(row)"
-          @keydown.space.prevent="read(row)"
-        >
+        <div v-for="row in rows" :key="row.id" class="dcs-mobile-card notice-card">
           <div class="dcs-card-head">
             <span class="dcs-card-title" :class="{ 'is-unread': row.readFlag === '0' }">{{ typeBadge(row.noticeType) }} {{ row.title }}</span>
             <span class="dcs-card-badge">
@@ -73,6 +73,9 @@
             <span class="dcs-card-field__value">{{ row.content }}</span>
           </div>
           <div class="dcs-card-time">{{ row.createTime }}</div>
+          <div v-if="row.readFlag === '0'" class="dcs-card-foot">
+            <el-button link type="primary" :disabled="markingAll" @click.stop="read(row)">标已读</el-button>
+          </div>
         </div>
       </div>
 
@@ -121,11 +124,41 @@ const load = async () => {
 };
 
 const read = async (row: DcsNoticeRow) => {
-  if (row.readFlag === '0') {
+  if (row.readFlag !== '0') return;
+  try {
     await markNoticeRead(row.id);
     row.readFlag = '1';
     // 本页标读与铃铛是两套状态, 顺手校准避免数字悬停(全审 P2)
     noticeStore.refreshUnreadCount().catch(() => undefined);
+  } catch {
+    // 请求层已弹错误提示；这里吞掉避免重复点击产生未捕获 rejection（批1 深挖席 P2-1）
+  }
+};
+
+/** 2026-10-30 题11（方案A）：本页未读一键清零。逐条走既有单条接口，失败计数后提示，不假装成功。 */
+const markingAll = ref(false);
+const markAllRead = async () => {
+  const unread = rows.value.filter((r) => r.readFlag === '0');
+  if (!unread.length) return;
+  markingAll.value = true;
+  let failed = 0;
+  try {
+    for (const row of unread) {
+      try {
+        await markNoticeRead(row.id);
+        row.readFlag = '1';
+      } catch {
+        failed += 1;
+      }
+    }
+    // 列表按「未读优先」排序，重载后本页会补上后面的未读——不报一句数，用户会以为没生效（批1 复验）
+    if (failed === 0) ElMessage.success(`已标记 ${unread.length} 条为已读`);
+  } finally {
+    markingAll.value = false;
+    noticeStore.refreshUnreadCount().catch(() => undefined);
+    if (failed > 0) ElMessage.warning(`${failed} 条未能标为已读，请稍后重试`);
+    // 收尾重载：未读筛选下已读项应即时消失，total 与本页未读同步（glm53 P1-1 / dspro P2-2）
+    await load();
   }
 };
 
@@ -167,15 +200,24 @@ onMounted(load);
   font-weight: 600;
 }
 
-.notice-card {
-  cursor: pointer;
-}
-
 .notice-card .is-unread {
   font-weight: 700;
 }
 
 .notice-mobile {
   padding: 12px 16px 0;
+}
+
+/* 2026-10-30 题11：筛选与「全部已读」同一行，批量出口靠右 */
+.notice-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notice-read-done {
+  color: var(--app-faint);
+  font-size: 12px;
 }
 </style>
