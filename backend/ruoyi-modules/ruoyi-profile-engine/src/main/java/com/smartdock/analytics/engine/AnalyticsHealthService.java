@@ -2,6 +2,7 @@ package com.smartdock.analytics.engine;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.smartdock.analytics.mapper.AnalyticsRebuildLogMapper;
+import com.smartdock.common.text.HumanText;
 import com.smartdock.profile.domain.ProfileModelRun;
 import com.smartdock.profile.engine.ProfileRecalcBatch;
 import com.smartdock.profile.mapper.ProfileEventMapper;
@@ -132,17 +133,20 @@ public class AnalyticsHealthService {
         }
         if (backlog > BACKLOG_ALERT_LIMIT) {
             out.add(alert("backlog", String.valueOf(backlog),
-                "去抖队列积压 " + backlog + " 超过阈值 " + BACKLOG_ALERT_LIMIT));
+                "去抖队列积压 " + backlog + " 条 超过阈值 " + BACKLOG_ALERT_LIMIT + " 条"));
         }
         double latencyP95 = toDouble(latency == null ? null : latency.get("p95"));
         if (latencyP95 > LATENCY_P95_ALERT_MS) {
+            // 2026-10-30 题4：告警正文说人话（「约 53.3 秒」），value 仍是毫秒原值供页面画红标
             out.add(alert("latency", String.valueOf(latencyP95),
-                "事件延迟 P95 " + (long) latencyP95 + "ms 超过阈值 " + LATENCY_P95_ALERT_MS + "ms"));
+                "事件延迟 P95 " + HumanText.duration((long) latencyP95)
+                    + "，超过阈值 " + HumanText.duration(LATENCY_P95_ALERT_MS)));
         }
         double rebuildP95 = toDouble(rebuild == null ? null : rebuild.get("p95"));
         if (rebuildP95 > REBUILD_P95_ALERT_MS) {
             out.add(alert("rebuild", String.valueOf(rebuildP95),
-                "重建耗时 P95 " + (long) rebuildP95 + "ms 超过阈值 " + REBUILD_P95_ALERT_MS + "ms"));
+                "重建耗时 P95 " + HumanText.duration((long) rebuildP95)
+                    + "，超过阈值 " + HumanText.duration(REBUILD_P95_ALERT_MS)));
         }
         return out;
     }

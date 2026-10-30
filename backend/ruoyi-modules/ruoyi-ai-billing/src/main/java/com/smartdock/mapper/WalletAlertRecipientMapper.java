@@ -38,4 +38,15 @@ public interface WalletAlertRecipientMapper {
            AND u.status = '0'
         """)
     List<Long> selectTenantAdminUserIds(@Param("tenantId") String tenantId);
+
+    /**
+     * 租户显示名（2026-10-30 题4：降级告警前缀给名称，不再把租户编号怼给用户）。
+     */
+    @Select("""
+        SELECT company_name
+          FROM sys_tenant
+         WHERE tenant_id = #{tenantId}
+           AND del_flag = '0'
+        """)
+    String selectTenantName(@Param("tenantId") String tenantId);
 }

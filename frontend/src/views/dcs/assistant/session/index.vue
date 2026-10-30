@@ -56,7 +56,7 @@
                     @blur="saveRename(c)"
                   />
                 </template>
-                <template v-else>{{ c.title || '（未命名会话）' }}</template>
+                <template v-else>{{ displayTitle(c) }}</template>
               </div>
               <div class="c-meta">{{ rowStatus(c) === 'answering' ? '正在回答…' : dayTime(c.lastMessageTime) }}</div>
             </div>
@@ -87,7 +87,7 @@
             <span v-if="rowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
             <span v-else-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
             <div class="c-main">
-              <div class="c-title">{{ c.title || '（未命名会话）' }}</div>
+              <div class="c-title">{{ displayTitle(c) }}</div>
               <div class="c-meta">{{ rowStatus(c) === 'answering' ? '正在回答…' : dayTime(c.lastMessageTime) }}</div>
             </div>
             <span class="c-ops">
@@ -108,7 +108,7 @@
         <template v-if="archOpen">
           <div v-for="c in archivedExpanded" :key="c.id" class="conv-item archived" @click="openConversation(c)">
             <div class="c-main">
-              <div class="c-title">{{ c.title || '（未命名会话）' }}</div>
+              <div class="c-title">{{ displayTitle(c) }}</div>
               <div class="c-meta">{{ dayTime(c.lastMessageTime) }}</div>
             </div>
             <span class="c-ops"><button title="恢复会话" @click.stop="restoreConv(c)">↩</button></span>
@@ -128,7 +128,7 @@
     <section class="main">
       <div class="main-hd">
         <button class="side-toggle" type="button" @click="sideOpen = true"><IconSpan name="history" /> 历史会话</button>
-        <span>{{ selected ? selected.title || '（未命名会话）' : '新会话' }}</span>
+        <span>{{ selected ? displayTitle(selected) : '新会话' }}</span>
         <el-tag v-if="selected" size="small" type="info">thread {{ selected.threadId?.slice(0, 8) }}</el-tag>
         <el-tag v-if="selected?.status === 'ARCHIVED'" size="small" type="warning">已归档（只读回放，发消息前先恢复）</el-tag>
       </div>
@@ -267,6 +267,7 @@ import { getAssistant, ACT, logSt, tryAcquireRemoteWatch, releaseRemoteWatch } f
 import type { AssistantBindings } from '@/components/DcsAssistant/useAssistant';
 import { useHelpModal } from '@/components/DcsAssistant/helpModal';
 import { relTime, cnEpoch, cnDayDiff } from '@/components/DcsAssistant/time';
+import { displayTitle } from '@/utils/assistantTitle';
 import { pushToast } from '@/components/DcsAssistant/toastStore';
 import { assistantName } from '@/components/DcsAssistant/nameState';
 import MsgFlow from '@/components/DcsAssistant/MsgFlow.vue';
@@ -354,7 +355,7 @@ async function archiveConv(c: AssistantConversation) {
     return;
   }
   try {
-    await ElMessageBox.confirm(`归档会话「${(c.title ?? '未命名').slice(0, 20)}」？归档后收进折叠条，可随时恢复。`, '归档确认', { type: 'warning' });
+    await ElMessageBox.confirm(`归档会话「${displayTitle(c).slice(0, 20)}」？归档后收进折叠条，可随时恢复。`, '归档确认', { type: 'warning' });
   } catch {
     return;
   }

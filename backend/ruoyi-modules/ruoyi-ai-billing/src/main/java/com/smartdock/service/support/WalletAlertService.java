@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.smartdock.domain.DcsTenantWallet;
 import com.smartdock.domain.DcsWalletAlertState;
 import com.smartdock.mapper.DcsWalletAlertStateMapper;
+import com.smartdock.common.text.HumanText;
 import com.smartdock.mapper.WalletAlertRecipientMapper;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -107,9 +108,11 @@ public class WalletAlertService {
             .setScale(4, RoundingMode.HALF_UP);
         String title = "EXHAUSTED".equals(alertType) ? "钱包额度已耗尽" : "钱包余额不足提醒";
         String body = "EXHAUSTED".equals(alertType)
-            ? "您的钱包额度已耗尽(可用余额: " + available + " 元), AI 付费服务将按兜底策略降级或阻塞, 请及时充值。"
-            : "您的钱包余额已低于阈值(" + threshold + " 元), 当前可用: " + available + " 元, 请及时充值。";
-        String content = recipients.degraded() ? "【租户 " + wallet.getTenantId() + "】" + body : body;
+            // 2026-10-30 题4：金额两位小数（原先 4 位小数原样进正文）、降级前缀给租户名不给编号
+            ? "您的钱包额度已耗尽（可用余额 " + HumanText.money(available) + " 元），AI 付费服务会按兜底策略降级或阻塞，请及时充值。"
+            : "您的钱包余额已低于提醒线（" + HumanText.money(threshold) + " 元），当前可用 "
+                + HumanText.money(available) + " 元，请及时充值。";
+        String content = recipients.degraded() ? tenantLabel(wallet.getTenantId()) + body : body;
         // 低余额链保持 legacy 去重键(null)不动: DB 日历天判重已兜, 拍板 Q6:A
         WalletAlertEvent event = new WalletAlertEvent(
             recipients.noticeTenantId(), recipients.userIds(),
@@ -137,7 +140,7 @@ public class WalletAlertService {
     public void publishReconcileAlert(String tenantId, String title, String content, Map<String, Object> extra) {
         try {
             AlertRecipients recipients = resolveRecipients(tenantId);
-            String noticeContent = recipients.degraded() ? "【租户 " + tenantId + "】" + content : content;
+            String noticeContent = recipients.degraded() ? tenantLabel(tenantId) + content : content;
             // 每租户每日一告(拍板 Q6:A): 同键重发由 outbox 幂等重放, 不双发; 键用真实业务租户(降级收件不影响)
             String dedupKey = "walletReconcile:" + tenantId + ":"
                 + LocalDate.now(BEIJING).format(DateTimeFormatter.BASIC_ISO_DATE);
@@ -167,7 +170,7 @@ public class WalletAlertService {
                                    String refUrl, Map<String, Object> extra, String dedupKey) {
         try {
             AlertRecipients recipients = resolveRecipients(tenantId);
-            String noticeContent = recipients.degraded() ? "【租户 " + tenantId + "】" + content : content;
+            String noticeContent = recipients.degraded() ? tenantLabel(tenantId) + content : content;
             eventPublisher.publishEvent(new WalletAlertEvent(recipients.noticeTenantId(), recipients.userIds(),
                 noticeType, title, noticeContent, refUrl, extra, dedupKey));
             log.info("[CreditAlert] 租户 {} 发送 {} 给 {} 个管理员", tenantId, noticeType, recipients.userIds().size());
@@ -175,6 +178,22 @@ public class WalletAlertService {
             // 与对账告警同口径: 带堆栈, 单条失败不拦扫描(次日/下次扫描键不变不重发, 由键频次兜底)
             log.warn("[CreditAlert] 告警发送失败 tenant={} type={}", tenantId, noticeType, e);
         }
+    }
+
+    /**
+     * 降级告警的租户前缀：给名称（"【演示单位】"），查不到才退回编号（2026-10-30 题4）。
+     * 降级只发生在「该租户没有管理员」时，告警由平台超管收，前缀是让他知道是谁出事。
+     */
+    private String tenantLabel(String tenantId) {
+        try {
+            String name = recipientMapper.selectTenantName(tenantId);
+            if (StrUtil.isNotBlank(name)) {
+                return "【" + name + "】";
+            }
+        } catch (Exception e) {
+            log.warn("[WalletAlert] 租户名查询失败 tenant={}，退回编号: {}", tenantId, e.getMessage());
+        }
+        return "【租户 " + tenantId + "】";
     }
 
     /**

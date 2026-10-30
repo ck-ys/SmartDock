@@ -1,6 +1,7 @@
 package com.smartdock.profile.config;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.smartdock.common.text.HumanText;
 import com.smartdock.profile.domain.ProfileEngineConfig;
 import com.smartdock.profile.domain.ProfileReviewQueue;
 import com.smartdock.profile.domain.ProfileSegment;
@@ -109,29 +110,30 @@ public class ProfileOpsJob {
                 try {
                     int slaDays = config.getReviewSlaDays() == null ? 7 : config.getReviewSlaDays();
                     Date cutoff = new Date(now.getTime() - slaDays * 86_400_000L);
-                    List<ProfileReviewQueue> overdue = TenantHelper.ignore(() ->
-                        reviewMapper.selectList(new LambdaQueryWrapper<ProfileReviewQueue>()
-                            .eq(ProfileReviewQueue::getTenantId, config.getTenantId())
-                            .eq(ProfileReviewQueue::getSource, config.getSource())
-                            .eq(ProfileReviewQueue::getStatus, "PENDING")
-                            .lt(ProfileReviewQueue::getCreateTime, cutoff)
-                            .orderByAsc(ProfileReviewQueue::getCreateTime)
-                            .last("LIMIT 100")));
-                    if (overdue.isEmpty()) {
+                    LambdaQueryWrapper<ProfileReviewQueue> overdueWhere = new LambdaQueryWrapper<ProfileReviewQueue>()
+                        .eq(ProfileReviewQueue::getTenantId, config.getTenantId())
+                        .eq(ProfileReviewQueue::getSource, config.getSource())
+                        .eq(ProfileReviewQueue::getStatus, "PENDING")
+                        .lt(ProfileReviewQueue::getCreateTime, cutoff);
+                    // 数字要真：以前用「取 100 条再数长度」，积压 300 条时正文报「有 100 条」= 少报
+                    long overdueCount = nz(TenantHelper.ignore(() -> reviewMapper.selectCount(overdueWhere)));
+                    if (overdueCount == 0) {
                         continue;
                     }
+                    // 正文只需要最早一条的入队时间，取 1 条比取 100 条省
+                    List<ProfileReviewQueue> earliest = TenantHelper.ignore(() ->
+                        reviewMapper.selectList(overdueWhere.orderByAsc(ProfileReviewQueue::getCreateTime)
+                            .last("LIMIT 1")));
+                    Date firstIn = earliest.isEmpty() ? null : earliest.get(0).getCreateTime();
                     // 提醒复核负责人: 当前实现发给租户管理员(userId=1); 多级升级链留批 10/12
                     Long adminUserId = 1L;
                     String title = "低分复核超时提醒";
-                    String content = "业务源 " + config.getSource() + " 有 " + overdue.size()
-                        + " 条复核已超过 " + slaDays + " 天未处理（SLA "
-                        + slaDays + " 天），请尽快处理。最早一条入队于 "
-                        + overdue.get(0).getCreateTime() + "。";
+                    String content = slaReminderContent(config.getSource(), overdueCount, slaDays, firstIn);
                     TenantHelper.dynamic(config.getTenantId(), () ->
                         reachService.sendToUser(adminUserId, title, content,
                             "review_sla:" + config.getSource() + ":" + day));
                     log.info("[Profile] review SLA remind source={} overdue={} slaDays={}",
-                        config.getSource(), overdue.size(), slaDays);
+                        config.getSource(), overdueCount, slaDays);
                 } catch (Exception e) {
                     // 单个租户失败不阻断后续租户当天的提醒
                     log.warn("[Profile] review SLA remind failed tenant={} source={} err={}",
@@ -143,6 +145,21 @@ public class ProfileOpsJob {
         } finally {
             slaScanning.set(false);
         }
+    }
+
+    /**
+     * 复核超时提醒的正文（2026-10-30 题4）：抽成纯函数便于单测逐字钉死——
+     * 告警是给人看的，日期不能写成 {@code Mon Oct 19 23:08:19 GMT+08:00 2026}。
+     *
+     * <p>原句「已超过 7 天未处理（SLA 7 天）」把同一个数说了两遍，三审 P2 回修时合并成一句。</p>
+     */
+    static String slaReminderContent(String source, long overdueCount, int slaDays, Date earliest) {
+        String head = "业务源 " + source + " 有 " + overdueCount + " 条复核已超过 SLA " + slaDays + " 天未处理，请尽快处理。";
+        return earliest == null ? head : head + "最早一条入队于 " + HumanText.dateTime(earliest) + "。";
+    }
+
+    private static long nz(Long value) {
+        return value == null ? 0L : value;
     }
 
     /**

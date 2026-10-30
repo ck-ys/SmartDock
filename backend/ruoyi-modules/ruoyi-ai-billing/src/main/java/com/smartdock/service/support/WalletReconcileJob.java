@@ -8,6 +8,7 @@ import com.smartdock.domain.vo.WalletReconcileAssistantVo;
 import com.smartdock.domain.vo.WalletReconcileChainBreakVo;
 import com.smartdock.domain.vo.WalletReconcileDeductNullVo;
 import com.smartdock.domain.vo.WalletReconcileNetVo;
+import com.smartdock.common.text.HumanText;
 import com.smartdock.mapper.WalletReconcileMapper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -86,27 +87,28 @@ public class WalletReconcileJob {
             Map<String, Integer> tenantAssistantDiffs = new LinkedHashMap<>();
             for (WalletReconcileNetVo row : newBalanceDiffs) {
                 BigDecimal diff = row.getBalanceAmount().subtract(row.getLedgerNet());
+                // 2026-10-30 题4：金额走人话格式化（10.0000 → 10.00；分以下差额保留位数，别报「差 0.00」）
                 addFinding(tenantFindings, tenantBalanceDiffs, row.getTenantId(), String.format(
-                    "钱包 %d 余额(%s)与流水净额差 %s(已知基线 %s)", row.getWalletId(),
-                    row.getBalanceAmount().toPlainString(), diff.toPlainString(),
-                    knownBalanceDiffs.getOrDefault(row.getWalletId(), BigDecimal.ZERO).toPlainString()));
+                    "钱包 %d 余额 %s 元，与流水净额差 %s 元（已知基线 %s 元）", row.getWalletId(),
+                    HumanText.money(row.getBalanceAmount()), HumanText.money(diff),
+                    HumanText.money(knownBalanceDiffs.getOrDefault(row.getWalletId(), BigDecimal.ZERO))));
             }
             for (WalletReconcileChainBreakVo row : newBreaks) {
                 addFinding(tenantFindings, tenantChainBreaks, row.getTenantId(), String.format(
-                    "流水链断裂: ledger %d 期初 %s ≠ 前笔期末 %s", row.getLedgerId(),
-                    row.getBalanceBefore().toPlainString(), row.getPrevAfter().toPlainString()));
+                    "流水链断裂：ledger %d 期初 %s 元 ≠ 前笔期末 %s 元", row.getLedgerId(),
+                    HumanText.money(row.getBalanceBefore()), HumanText.money(row.getPrevAfter())));
             }
             for (WalletReconcileDeductNullVo row : newDeductNulls) {
                 addFinding(tenantFindings, tenantDeductNulls, row.getTenantId(), String.format(
-                    "DEDUCT 空 biz_id 流水 %d 条(基线 %d)", row.getNullBizCount(),
+                    "DEDUCT 空 biz_id 流水 %d 条（基线 %d 条）", row.getNullBizCount(),
                     deductBaseline.getOrDefault(row.getTenantId(), 0L)));
             }
             for (WalletReconcileAssistantVo row : assistantDiffs) {
                 addFinding(tenantFindings, tenantAssistantDiffs, row.getTenantId(), String.format(
-                    "助手计费不平: 单据 %d 笔/漏扣 %d 笔/非本币免扣 %d 笔/单据合计 %s vs 流水合计 %s",
+                    "助手计费不平：单据 %d 笔 / 漏扣 %d 笔 / 非本币免扣 %d 笔 / 单据合计 %s 元 vs 流水合计 %s 元",
                     row.getUsageCount(), row.getDeductMissing(),
                     row.getNonCnyExempt() == null ? 0 : row.getNonCnyExempt(),
-                    row.getUsageSum().toPlainString(), row.getLedgerSum().toPlainString()));
+                    HumanText.money(row.getUsageSum()), HumanText.money(row.getLedgerSum())));
             }
             tenantFindings.keySet().forEach(tenantId -> walletAlertService.publishReconcileAlert(
                 tenantId, "钱包对账发现新差异",

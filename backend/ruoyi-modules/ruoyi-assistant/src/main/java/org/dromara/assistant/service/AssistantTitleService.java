@@ -232,6 +232,11 @@ public class AssistantTitleService {
         Matcher json = TITLE_JSON.matcher(s);
         if (json.find()) {
             s = json.group(1);
+        } else if (looksLikeJsonFragment(s)) {
+            // 2026-10-30 题3：模型流式输出被截断时会出现半截 JSON（{"title":"周复盘适…），
+            // 旧逻辑把它当首行标题收下，再经 updateTitleIfMatch(CAS) 锁死——脏标题永不自愈。
+            // 认得出是 JSON 却没解析出 title，就整条放弃，保留会话创建时的原标题。
+            return null;
         } else {
             int nl = s.indexOf('\n');
             s = (nl > 0 ? s.substring(0, nl) : s).trim();
@@ -253,5 +258,40 @@ public class AssistantTitleService {
             return null;
         }
         return s;
+    }
+
+    /**
+     * 是否为半截 JSON / 未闭合引号（2026-10-30 题3）。
+     *
+     * <p>判据放宽到「以 { 或 [ 开头」就够——标题里合法以花括号开头的自然语言几乎不存在，
+     * 而截断残片的形态千变万化（结尾可能停在任意字符上），与其猜不如整体丢弃。</p>
+     *
+     * <p>注意：本判据只作用于模型输出（{@link #cleanTitle}），用户手动重命名不走这里。</p>
+     *
+     * <p>三审 P2 回修：模型被截断时可能只吐了开围栏（{@code ```json} + 半截 JSON），
+     * 闭合围栏匹配不上会落到「取首行」分支，把 {@code ```json} 当标题写库并 CAS 锁死。
+     * 所以先把没闭合的开围栏剥掉再判。</p>
+     */
+    static boolean looksLikeJsonFragment(String text) {
+        if (text == null) {
+            return false;
+        }
+        String s = text.trim();
+        if (s.startsWith("```")) {
+            s = s.replaceFirst("^```[A-Za-z]*\\s*", "").trim();
+            // 只剩围栏标记本身也是残片
+            if (s.isEmpty()) {
+                return true;
+            }
+        }
+        if (s.isEmpty()) {
+            return false;
+        }
+        char first = s.charAt(0);
+        if (first == '{' || first == '[') {
+            return true;
+        }
+        // 未闭合的引号：以引号开头却不以引号结尾（成对的情况在上面已被剥壳）
+        return (first == '"' || first == '\u201c') && !s.endsWith("\"") && !s.endsWith("\u201d");
     }
 }

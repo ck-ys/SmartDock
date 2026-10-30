@@ -23,7 +23,8 @@ export interface AssistantStatus {
 export interface AssistantConversation {
   id: number | string;
   threadId: string;
-  title: string;
+  /** 迁移 2026-10-30_assistant_title_fragment_cleanup.sql 会把历史残片标题置 NULL，读取方须兜底 */
+  title: string | null;
   lastMessageTime: string;
   status: string;
   /** Q4（业务批4）：后端瞬态回填——该会话有 RUNNING 中的 run（刷新后列表仍可标"正在回答…"） */

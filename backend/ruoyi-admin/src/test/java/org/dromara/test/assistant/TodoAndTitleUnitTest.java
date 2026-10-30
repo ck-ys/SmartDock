@@ -162,6 +162,21 @@ class TodoAndTitleUnitTest {
         assertEquals(60, AssistantTitleService.cleanTitle("{\"title\":\"" + b + "\"}").length());
     }
 
+    /**
+     * 2026-10-30 题3：模型输出被截断时留下的半截 JSON / 未闭合引号一律丢弃，不许当标题写进库
+     * （脏标题一旦经 updateTitleIfMatch 的 CAS 写进去就再也不会被清洗逻辑碰到）。
+     *
+     * <p>三审 P1-2 回修：本类全是 {@code @Tag("dev")}，默认门禁 {@code -Dsurefire.groups=local}
+     * 会静默跳过它，所以残片判据的权威用例在 {@code AssistantTitleFragmentLocalTest}（local 组），
+     * 这里只留一条冒烟对齐，避免两处副本各自漂移。</p>
+     */
+    @Test
+    void titleCleanRejectsTruncatedJsonFragments() {
+        assertNull(AssistantTitleService.cleanTitle("{\"title\":\"周复盘适"), "截断的 title 值");
+        assertNull(AssistantTitleService.cleanTitle("\"未闭合引号开头"), "裸引号未闭合");
+        assertEquals("周复盘适配改造", AssistantTitleService.cleanTitle("周复盘适配改造"));
+    }
+
     /** 可控假模型：回放固定文本块 */
     private static Model modelOf(String... texts) {
         Model m = mock(Model.class);

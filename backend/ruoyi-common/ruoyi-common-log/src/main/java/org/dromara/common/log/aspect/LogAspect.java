@@ -89,7 +89,10 @@ public class LogAspect {
             operLog.setOperUrl(StringUtils.substring(ServletUtils.getRequest().getRequestURI(), 0, 255));
             LoginUser loginUser = LoginHelper.getLoginUser();
             operLog.setOperName(loginUser.getUsername());
+            // 2026-10-30 题9：登录会话里的 deptName 是登录那一刻的快照，部门改名后长会话会一直写旧名；
+            // 这里带上 deptId，落库时按 ID 现查（见 SysOperLogServiceImpl），快照名只作查不到时的兜底
             operLog.setDeptName(loginUser.getDeptName());
+            operLog.setDeptId(loginUser.getDeptId());
 
             if (e != null) {
                 operLog.setStatus(BusinessStatus.FAIL.ordinal());

@@ -69,6 +69,11 @@ public class OperLogEvent implements Serializable {
     private String deptName;
 
     /**
+     * 部门ID（2026-10-30 题9：落库前按 ID 现查名称，登录快照里的旧部门名不再直接入库）
+     */
+    private Long deptId;
+
+    /**
      * 请求url
      */
     private String operUrl;

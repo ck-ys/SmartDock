@@ -25,6 +25,7 @@ import com.smartdock.mapper.DcsTenantWalletLedgerMapper;
 import com.smartdock.mapper.DcsTenantWalletMapper;
 import com.smartdock.mapper.DcsWalletAlertStateMapper;
 import org.springframework.stereotype.Service;
+import com.smartdock.common.text.HumanText;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -389,8 +390,8 @@ public class TenantWalletService {
         if (available.compareTo(need) > 0 && available.compareTo(BigDecimal.ZERO) > 0) {
             return FallbackDecision.pass();
         }
-        // 余额不足
-        String msg = "AI额度不足, 当前可用余额 " + available.setScale(4, RoundingMode.HALF_UP) + " 元";
+        // 余额不足（金额走人话格式化：4 位小数原样外露读起来像机器码）
+        String msg = "AI额度不足，当前可用余额 " + HumanText.money(available) + " 元";
         return decideByRule(rule, msg);
     }
 
@@ -560,7 +561,7 @@ public class TenantWalletService {
         int affected = walletMapper.conditionalDeduct(wallet.getWalletId(), amount);
         if (affected == 0) {
             BigDecimal available = availableBalanceOf(wallet.getTenantId());
-            throw new ServiceException("AI 助手额度不足，当前可用余额 " + available.toPlainString()
+            throw new ServiceException("AI 助手额度不足，当前可用余额 " + HumanText.money(available)
                 + " 元，请联系管理员充值后再试");
         }
         DcsTenantWallet fresh = walletMapper.selectById(wallet.getWalletId());

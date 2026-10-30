@@ -10,6 +10,7 @@ import io.agentscope.core.model.ToolSchema;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
+import com.smartdock.common.text.HumanText;
 import com.smartdock.domain.DcsAiConfig;
 import com.smartdock.domain.DcsAiModelPrice;
 import com.smartdock.service.IDcsAiCreditService;
@@ -180,7 +181,7 @@ public class BillingModelDecorator implements Model {
                     log.warn("[AssistantBilling] 前置拦截: 租户 {} 可用余额 {} 低于回合门槛 {}(floor={} est={})",
                         config.getTenantId(), available.toPlainString(), threshold.toPlainString(),
                         turnFloor.toPlainString(), estimate.toPlainString());
-                    return Flux.error(new ServiceException("AI 助手额度不足（当前可用 " + available.toPlainString()
+                    return Flux.error(new ServiceException("AI 助手额度不足（当前可用 " + HumanText.money(available)
                         + " 元），请联系管理员充值后再试"));
                 }
             }
