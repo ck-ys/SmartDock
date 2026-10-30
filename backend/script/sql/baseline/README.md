@@ -32,9 +32,15 @@ done
 ```
 
 升级脚本全部幂等，可重复执行；绝大多数只新增列/表/索引/权限。例外：
-`2026-10-23_drop_external_collect.sql` 会删除外部网站接入的两张表
-（`analytics_site` / `analytics_collect_log`，对应功能已于 2026-10-23 下线，
-执行前请确认不再需要外部接入数据）。
+
+- `2026-10-23_drop_external_collect.sql` 会删除外部网站接入的两张表
+  （`analytics_site` / `analytics_collect_log`，对应功能已于 2026-10-23 下线，
+  执行前请确认不再需要外部接入数据）。
+- `2026-10-30_drop_legacy_sys_notice_seed.sql` 会删除框架自带的 2018 年两条演示公告
+  （判定条件：id 为 1/2 + 默认租户 + 标题含 `2018-07-01`，不会命中自己建的公告），
+  并清掉对应公告已不存在的孤儿已读记录。
+- `2026-10-30_assistant_title_fragment_cleanup.sql` 会把 AI 会话标题里的 JSON 残片置 NULL
+  （执行前会先把命中行整表备份到 `dcs_assistant_conversation_title_bak_20261030`）。
 
 ## 内置账号（口令均为 `admin123`）
 

@@ -612,14 +612,6 @@ INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, com
 
 
 --
--- Data for Name: sys_notice; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.sys_notice (notice_id, tenant_id, notice_title, notice_type, notice_content, status, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (1, '000000', '温馨提醒：2018-07-01 新版本发布啦', '2', '新版本内容', '0', 103, 1, '2026-05-07 11:04:08.411218', NULL, NULL, '管理员');
-INSERT INTO public.sys_notice (notice_id, tenant_id, notice_title, notice_type, notice_content, status, create_dept, create_by, create_time, update_by, update_time, remark) VALUES (2, '000000', '维护通知：2018-07-01 系统凌晨维护', '1', '维护内容', '0', 103, 1, '2026-05-07 11:04:08.411218', NULL, NULL, '管理员');
-
-
---
 -- Data for Name: sys_post; Type: TABLE DATA; Schema: public; Owner: -
 --
 
