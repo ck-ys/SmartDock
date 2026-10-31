@@ -30,9 +30,14 @@
               <span>{{ (queryParams.pageNum - 1) * queryParams.pageSize + scope.$index + 1 }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="会话编号" align="center" prop="tokenId" :show-overflow-tooltip="true" />
+          <el-table-column label="会话编号" align="center" prop="tokenId">
+            <template #default="scope">
+              <el-tooltip :content="scope.row.tokenId" placement="top">
+                <span>…{{ scope.row.tokenId.slice(-10) }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
           <el-table-column label="登录名称" align="center" prop="userName" :show-overflow-tooltip="true" />
-          <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
           <el-table-column label="设备类型" align="center">
             <template #default="scope">
               <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
@@ -51,7 +56,7 @@
           <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
             <template #default="scope">
               <el-tooltip content="强退" placement="top">
-                <el-button v-hasPermi="['monitor:online:forceLogout']" link type="primary" icon="Delete" @click="handleForceLogout(scope.row)">
+                <el-button v-hasPermi="['monitor:online:forceLogout']" link type="primary" icon="CircleClose" @click="handleForceLogout(scope.row)">
                 </el-button>
               </el-tooltip>
             </template>
@@ -109,11 +114,11 @@ const resetQuery = () => {
 };
 /** 强退按钮操作 */
 const handleForceLogout = async (row: OnlineVO) => {
-  const [err] = await to(proxy?.$modal.confirm('是否确认强退名称为"' + row.userName + '"的用户?') as any);
+  const [err] = await to(proxy?.$modal.confirm('是否确认强退名称为“' + row.userName + '”的用户？') as any);
   if (!err) {
     await forceLogout(row.tokenId);
     await getList();
-    proxy?.$modal.msgSuccess('删除成功');
+    proxy?.$modal.msgSuccess('已强制下线');
   }
 };
 

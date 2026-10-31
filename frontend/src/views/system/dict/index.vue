@@ -60,21 +60,21 @@
               @row-click="handleTypeRowClick"
               @selection-change="handleTypeSelectionChange"
             >
-              <el-table-column type="selection" width="55" align="center" />
+              <el-table-column type="selection" width="40" align="center" />
               <el-table-column v-if="false" label="字典编号" align="center" prop="dictId" />
-              <el-table-column label="字典名称" align="center" prop="dictName" width="120" />
-              <el-table-column label="字典类型" align="center" prop="dictType" width="160">
+              <el-table-column label="字典名称" align="center" prop="dictName" width="90" :show-overflow-tooltip="true" />
+              <el-table-column label="字典类型" align="center" prop="dictType" min-width="135" :show-overflow-tooltip="true">
                 <template #default="scope">
                   <span class="link-type" @click.stop="handleTypeRowClick(scope.row)">{{ scope.row.dictType }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="备注" align="center" prop="remark" width="160" />
-              <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+              <el-table-column label="备注" align="center" prop="remark" min-width="70" :show-overflow-tooltip="true" />
+              <el-table-column label="创建时间" align="center" prop="createTime" width="115">
                 <template #default="scope">
-                  <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
+                  <span>{{ proxy.parseTime(scope.row.createTime, '{m}-{d} {h}:{i}') }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" fixed="right" align="center" width="120" class-name="small-padding fixed-width">
+              <el-table-column label="操作" fixed="right" align="center" width="85" class-name="small-padding fixed-width">
                 <template #default="scope">
                   <el-tooltip content="修改" placement="top">
                     <el-button v-hasPermi="['system:dict:edit']" link type="primary" icon="Edit" @click="handleTypeUpdate(scope.row)"></el-button>
@@ -160,7 +160,7 @@
 
           <div class="dict-table-wrap">
             <el-table v-loading="dataLoading" border class="ui-table" :data="dataList" @selection-change="handleDataSelectionChange">
-              <el-table-column type="selection" width="55" align="center" />
+              <el-table-column type="selection" width="40" align="center" />
               <el-table-column v-if="false" label="字典编码" align="center" prop="dictCode" />
               <el-table-column label="字典标签" align="center" prop="dictLabel" width="80">
                 <template #default="scope">
@@ -180,13 +180,13 @@
               </el-table-column>
               <el-table-column label="字典键值" align="center" prop="dictValue" width="80" />
               <el-table-column label="字典排序" align="right" class-name="ui-num" prop="dictSort" width="80" />
-              <el-table-column label="备注" align="center" prop="remark" width="100" />
-              <el-table-column label="创建时间" align="center" prop="createTime" width="180">
+              <el-table-column label="备注" align="center" prop="remark" min-width="70" :show-overflow-tooltip="true" />
+              <el-table-column label="创建时间" align="center" prop="createTime" width="115">
                 <template #default="scope">
-                  <span>{{ proxy.parseTime(scope.row.createTime) }}</span>
+                  <span>{{ proxy.parseTime(scope.row.createTime, '{m}-{d} {h}:{i}') }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" fixed="right" align="center" width="120" class-name="small-padding fixed-width">
+              <el-table-column label="操作" fixed="right" align="center" width="85" class-name="small-padding fixed-width">
                 <template #default="scope">
                   <el-tooltip content="修改" placement="top">
                     <el-button v-hasPermi="['system:dict:edit']" link type="primary" icon="Edit" @click="handleDataUpdate(scope.row)"></el-button>
@@ -679,10 +679,6 @@ onMounted(() => {
 
 .dict-table-wrap {
   overflow-x: auto;
-}
-
-.dict-table-wrap :deep(.el-table) {
-  min-width: 800px;
 }
 
 /* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */

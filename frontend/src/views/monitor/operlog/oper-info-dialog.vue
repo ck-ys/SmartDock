@@ -3,7 +3,7 @@
     <el-descriptions v-if="info" :column="1" border>
       <el-descriptions-item label="操作状态">
         <template #default>
-          <span v-if="info.status === 0" class="ui-pill ui-pill--pos">正常</span>
+          <span v-if="info.status === 0" class="ui-pill ui-pill--pos">成功</span>
           <span v-else-if="info.status === 1" class="ui-pill ui-pill--neg">失败</span>
         </template>
       </el-descriptions-item>

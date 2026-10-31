@@ -201,7 +201,9 @@ const onVisible = (visible: boolean) => {
 
 const onCommand = (command: string | number | object) => {
   if (command === '__manage') {
-    router.push('/system/tenant');
+    // 单位管理真实路由：sys_menu 目录 6「平台运营」path=tenant × 子菜单 121「租户管理」path=tenant，
+    // 动态路由拼出来是 /tenant/tenant（同目录钱包/配置深链同族）；/system/tenant 只是接口前缀，跳它必落 403
+    router.push('/tenant/tenant');
     return;
   }
   if (command === '__retry') {

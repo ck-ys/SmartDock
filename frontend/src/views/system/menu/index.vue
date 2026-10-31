@@ -32,6 +32,9 @@
               >级联删除</el-button
             >
           </el-col>
+          <el-col :span="1.5">
+            <el-button type="info" plain icon="Sort" @click="handleToggleExpandAll">展开/折叠</el-button>
+          </el-col>
           <right-toolbar v-model:show-search="showSearch" @query-table="getList"></right-toolbar>
         </el-row>
       </template>
@@ -382,6 +385,41 @@ const expandMenuHandle = async (row: any, expanded: boolean) => {
   if (!expanded) {
     menuExpandMap.value[row.menuId] = undefined;
   }
+};
+
+/** 展开/折叠操作（懒加载树，不能照搬 dept 的全量递归：未展开的后代还没进表格） */
+const isExpandAll = ref(false);
+const handleToggleExpandAll = async () => {
+  isExpandAll.value = !isExpandAll.value;
+  if (isExpandAll.value) {
+    await expandAllMenu(menuList.value);
+  } else {
+    collapseAllMenu(menuList.value);
+  }
+};
+
+/** 逐层展开：先展开当前层（触发懒加载），等渲染下一帧再展开子层 */
+const expandAllMenu = async (rows: any[]) => {
+  const expandable = rows.filter((row) => row.hasChildren);
+  expandable.forEach((row) => {
+    menuTableRef.value?.toggleRowExpansion(row, true);
+  });
+  await nextTick();
+  const children = expandable.flatMap((row) => menuChildrenListMap.value[row.menuId] || []);
+  if (children.length) {
+    await expandAllMenu(children);
+  }
+};
+
+/** 折叠全部：未渲染过的行 toggle 不生效也无副作用 */
+const collapseAllMenu = (rows: any[]) => {
+  rows.forEach((row) => {
+    menuTableRef.value?.toggleRowExpansion(row, false);
+    const children = menuChildrenListMap.value[row.menuId];
+    if (children?.length) {
+      collapseAllMenu(children);
+    }
+  });
 };
 
 /** 刷新展开的菜单数据 */

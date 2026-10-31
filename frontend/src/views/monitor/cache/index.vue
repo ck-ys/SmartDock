@@ -51,10 +51,10 @@
                     <div v-if="cache.info" class="cell">{{ cache.info.used_memory_human }}</div>
                   </td>
                   <td class="el-table__cell is-leaf">
-                    <div class="cell">使用CPU</div>
+                    <div class="cell">累计CPU(秒)</div>
                   </td>
                   <td class="el-table__cell is-leaf">
-                    <div v-if="cache.info" class="cell">{{ parseFloat(cache.info.used_cpu_user_children).toFixed(2) }}</div>
+                    <div v-if="cache.info" class="cell">{{ (parseFloat(cache.info.used_cpu_sys) + parseFloat(cache.info.used_cpu_user)).toFixed(2) }}</div>
                   </td>
                   <td class="el-table__cell is-leaf">
                     <div class="cell">内存配置</div>
@@ -74,7 +74,7 @@
                     <div class="cell">RDB是否成功</div>
                   </td>
                   <td class="el-table__cell is-leaf">
-                    <div v-if="cache.info" class="cell">{{ cache.info.rdb_last_bgsave_status }}</div>
+                    <div v-if="cache.info" class="cell">{{ cache.info.rdb_last_bgsave_status === 'ok' ? '成功' : '失败' }}</div>
                   </td>
                   <td class="el-table__cell is-leaf">
                     <div class="cell">Key数量</div>
@@ -87,7 +87,7 @@
                   </td>
                   <td class="el-table__cell is-leaf">
                     <div v-if="cache.info" class="cell">
-                      {{ cache.info.instantaneous_input_kbps }}kps/{{ cache.info.instantaneous_output_kbps }}kps
+                      {{ cache.info.instantaneous_input_kbps }}KB/s/{{ cache.info.instantaneous_output_kbps }}KB/s
                     </div>
                   </td>
                 </tr>
