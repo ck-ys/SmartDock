@@ -39,35 +39,35 @@
 
       <div class="ui-table-wrap">
         <el-table v-loading="loading" :data="ledgerList" class="ui-table dcs-table-only">
-          <el-table-column label="流水ID" prop="ledgerId" min-width="172" align="center">
+          <el-table-column label="流水ID" prop="ledgerId" min-width="165" align="center">
             <template #default="{ row }"
               ><span class="dcs-ops-id">{{ row.ledgerId }}</span></template
             >
           </el-table-column>
-          <el-table-column label="租户ID" prop="tenantId" min-width="150" show-overflow-tooltip />
-          <el-table-column label="钱包ID" prop="walletId" min-width="172" align="center">
+          <el-table-column label="租户ID" prop="tenantId" min-width="75" show-overflow-tooltip />
+          <el-table-column label="钱包ID" prop="walletId" min-width="165" align="center">
             <template #default="{ row }"
               ><span class="dcs-ops-id">{{ row.walletId }}</span></template
             >
           </el-table-column>
-          <el-table-column label="业务类型" width="120" align="center">
+          <el-table-column label="业务类型" width="80" align="center">
             <template #default="{ row }">
               <span class="ui-pill">{{ bizTypeLabel(row.bizType) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="方向" width="90" align="center">
+          <el-table-column label="方向" width="70" align="center">
             <template #default="{ row }">
               <span class="ui-pill" :class="row.direction === 'IN' ? 'ui-pill--pos' : 'ui-pill--neg'">{{ directionLabel(row.direction) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="金额" width="140" align="right">
+          <el-table-column label="金额" width="115" align="right">
             <template #default="{ row }">
               <span :class="row.direction === 'IN' ? 'amount-in' : 'amount-out'">
                 {{ row.direction === 'IN' ? '+' : '-' }}{{ money(row.amount) }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="余额变化" min-width="190" align="right">
+          <el-table-column label="余额变化" min-width="175" align="right">
             <template #default="{ row }">
               <span class="balance-change">
                 {{ money(row.balanceBefore) }}
@@ -78,13 +78,13 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="服务" width="170" show-overflow-tooltip>
+          <el-table-column label="服务" width="125" show-overflow-tooltip>
             <template #default="{ row }">
               <!-- 服务码中文化（raw code 进 title 供排障）；充值/赠送等非 AI 行不显服务 -->
               <span :title="row.serviceCode || undefined">{{ row.serviceCodeLabel || serviceCodeLabel(row.serviceCode) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="时间" prop="createTime" width="170" />
+          <el-table-column label="时间" prop="createTime" width="160" />
           <template #empty>
             <div class="ui-empty">
               <p class="ui-empty__title">暂无钱包流水</p>
@@ -94,7 +94,7 @@
         </el-table>
       </div>
 
-      <!-- U-09：≤992 钱包流水表格改卡片（9 列约 1360px） -->
+      <!-- U-09：≤992 钱包流水表格改卡片（9 列约 1130px） -->
       <div class="dcs-mobile-list">
         <div v-if="ledgerList.length === 0" class="ui-empty">
           <p class="ui-empty__title">暂无钱包流水</p>

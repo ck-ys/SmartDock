@@ -83,7 +83,7 @@
               {{ fmt(totalRemaining) }} <span class="ledger-unit">/ {{ fmt(summary.totalQuota) }} 积分</span>
             </div>
             <el-progress :percentage="totalPct" :stroke-width="8" :show-text="false" :color="barColor(totalPct)" />
-            <div class="ledger-hint">本订阅期已用 {{ fmt(summary.termUsed) }} 积分（{{ totalPct }}%）· 用满会不会断：暂不限制，按周池节奏走</div>
+            <div class="ledger-hint">本订阅期已用 {{ fmt(summary.termUsed) }} 积分（{{ totalUsedPct }}%）· 用满会不会断：暂不限制，按周池节奏走</div>
           </div>
         </el-col>
       </el-row>
@@ -539,6 +539,10 @@ const planTotal = (p: CreditPlanVO) =>
 /** Q12：整周期剩余与已用%（先软后硬：展示口径，不参与扣费闸） */
 const totalRemaining = computed(() => Math.max(0, (summary.value.totalQuota || 0) - (summary.value.termUsed || 0)));
 const totalPct = computed(() =>
+  summary.value.totalQuota > 0 ? Math.min(100, Math.round((totalRemaining.value / summary.value.totalQuota) * 100)) : 0
+);
+/** 业务批(1029)回修：hint 的「已用%」独立成口径——totalPct 已统一为剩余口径（1015 批统一时漏改），不能再拿它当已用% */
+const totalUsedPct = computed(() =>
   summary.value.totalQuota > 0 ? Math.min(100, Math.round((summary.value.termUsed / summary.value.totalQuota) * 100)) : 0
 );
 const windowLeft = computed(() => Math.max(0, summary.value.windowCap - summary.value.windowUsed));

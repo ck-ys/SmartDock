@@ -25,14 +25,7 @@
     </el-upload>
     <!-- 上传提示 -->
     <div v-if="showTip" class="el-upload__tip">
-      请上传
-      <template v-if="fileSize">
-        大小不超过 <b style="color: #f56c6c">{{ fileSize }}MB</b>
-      </template>
-      <template v-if="fileType">
-        格式为 <b style="color: #f56c6c">{{ fileType.join('/') }}</b>
-      </template>
-      的文件
+      <template v-if="fileSize">图片大小不超过 {{ fileSize }}MB</template><template v-if="fileSize && fileType">，</template><template v-if="fileType">支持 {{ fileType.join('/') }} 格式</template>
     </div>
 
     <el-dialog v-model="dialogVisible" title="预览" width="800px" append-to-body>
@@ -241,5 +234,9 @@ const listToString = (list: any[], separator?: string) => {
 // .el-upload--picture-card 控制加号部分
 :deep(.hide .el-upload--picture-card) {
   display: none;
+}
+// 上传提示为常规说明文字，用中性占位色，不用报错红
+.el-upload__tip {
+  color: var(--dcs-text-placeholder);
 }
 </style>

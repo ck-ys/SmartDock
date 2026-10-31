@@ -51,7 +51,7 @@
 
       <div class="dcs-ops-table-wrap">
         <el-table v-loading="loading" :data="eventList" class="ui-table risk-table">
-          <el-table-column label="时间" prop="createdTime" width="160">
+          <el-table-column label="时间" prop="createdTime" width="150">
             <template #default="{ row }">{{ formatTime(row.createdTime) }}</template>
           </el-table-column>
           <el-table-column label="事件类型" width="120">
@@ -64,14 +64,14 @@
               <span class="ui-pill ui-pill--muted">{{ EVENT_SOURCE_LABELS[row.source] || row.source }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="用户" width="160" show-overflow-tooltip>
+          <el-table-column label="用户" width="140" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.nickName || row.userName || row.userId || '-' }}
             </template>
           </el-table-column>
           <el-table-column label="IP" prop="ip" width="140" show-overflow-tooltip />
           <!-- 列表态打码(2026-08-23 拍板: 防肩窥/截图外泄), 详情弹窗内明文 -->
-          <el-table-column label="详情" min-width="240" show-overflow-tooltip>
+          <el-table-column label="详情" min-width="170" show-overflow-tooltip>
             <template #default="{ row }">{{ maskSensitiveDetail(row.detail || '-') }}</template>
           </el-table-column>
           <el-table-column label="风险分" prop="riskScore" width="90" align="right">

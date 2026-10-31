@@ -139,7 +139,7 @@
           <el-checkbox-group v-model="formScenes">
             <el-checkbox v-for="item in sceneOptions" :key="item.value" :value="item.value">{{ item.label }}</el-checkbox>
           </el-checkbox-group>
-          <div class="scene-hint">勾选后词条只在对应场景检测命中；两个都勾即全场景生效</div>
+          <div class="scene-hint">全部勾选即所有场景生效，只勾部分则未勾场景不检测</div>
         </el-form-item>
         <el-form-item label="启用状态">
           <el-switch v-model="form.enabled" active-value="1" inactive-value="0" />

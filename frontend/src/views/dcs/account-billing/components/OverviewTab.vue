@@ -23,25 +23,25 @@
             <span :title="`钱包ID ${row.walletId}`" class="dcs-ops-id">{{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="类型" width="100" align="center">
+        <el-table-column label="类型" width="90" align="center">
           <template #default="{ row }">
             <span class="ui-pill" :class="row.walletType === 'MAIN' ? 'ui-pill--pos' : 'ui-pill--muted'">{{ walletTypeLabel(row.walletType) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="余额" width="130" align="right">
+        <el-table-column label="余额" width="120" align="right">
           <template #default="{ row }">{{ money(row.balanceAmount) }}</template>
         </el-table-column>
-        <el-table-column label="冻结" width="120" align="right">
+        <el-table-column label="冻结" width="110" align="right">
           <template #default="{ row }">
             <span :class="{ 'amount-warn': Number(row.frozenAmount || 0) > 0 }">{{ money(row.frozenAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="可用" width="130" align="right">
+        <el-table-column label="可用" width="120" align="right">
           <template #default="{ row }">
             <span :class="{ 'amount-danger': Number(row.availableAmount || 0) < 0 }">{{ money(row.availableAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="150" align="center">
+        <el-table-column label="状态" width="110" align="center">
           <template #default="{ row }">
             <span class="ab-status-cell">
               <span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
@@ -49,11 +49,11 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="低余额阈值" width="120" align="right">
+        <el-table-column label="低余额阈值" width="110" align="right">
           <template #default="{ row }">{{ money(row.lowBalanceThreshold) }}</template>
         </el-table-column>
-        <el-table-column label="创建时间" prop="createTime" width="170" />
-        <el-table-column label="操作" width="210" align="center" fixed="right">
+        <el-table-column label="创建时间" prop="createTime" width="160" />
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <el-button link class="ui-row-action" @click="openRecharge(row)">充值</el-button>
             <el-button link class="ui-row-action" @click="openThreshold(row)">调阈值</el-button>
@@ -81,7 +81,7 @@
       </el-table>
     </div>
 
-    <!-- U-09：≤992 钱包表格改卡片（9 列约 1230px） -->
+    <!-- U-09：≤992 钱包表格改卡片（9 列约 1135px） -->
     <div class="dcs-mobile-list">
       <div v-if="walletList.length === 0" class="ui-empty">
         <p class="ui-empty__title">暂无钱包</p>
@@ -467,7 +467,7 @@ onMounted(reloadAll);
   min-width: 0;
   overflow-x: auto;
 }
-/* 表格规格走 Element Plus 变量：表头无底带 / 行线令牌 / 行 hover 中性底 / 冻结列无阴影 */
+/* 表格规格走 Element Plus 变量：表头无底带 / 行线令牌 / 行 hover 中性底 / 冻结列阴影按 EP 默认 */
 .ui-table {
   --el-table-border-color: var(--app-rule);
   --el-table-border: 1px solid var(--app-rule);
@@ -478,9 +478,10 @@ onMounted(reloadAll);
   --el-table-tr-bg-color: transparent;
   --el-table-row-hover-bg-color: var(--app-raised);
   --el-table-current-row-bg-color: var(--app-raised);
-  --el-table-fixed-box-shadow: none;
-  --el-table-fixed-left-column: none;
-  --el-table-fixed-right-column: none;
+  --el-table-fixed-box-shadow: var(--el-box-shadow-light);
+  /* 冻结列恢复 EP 默认边缘阴影（EP 仅在表格横向滚动时才画，兼作「右侧还有列」的提示；值取 EP 2.13.5 默认） */
+  --el-table-fixed-left-column: inset 10px 0 10px -10px #00000026;
+  --el-table-fixed-right-column: inset -10px 0 10px -10px #00000026;
 }
 .ui-table :deep(.el-table__empty-text) {
   width: 100%;
