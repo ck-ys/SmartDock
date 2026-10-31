@@ -19,7 +19,7 @@ public class DcsAiUsageQueryBo implements Serializable {
     /** 调用方筛选 */
     private String caller;
 
-    /** 场景筛选 */
+    /** 场景筛选（包含匹配，2026-10-31 题6） */
     private String scene;
 
     /** 配置 ID 筛选 */

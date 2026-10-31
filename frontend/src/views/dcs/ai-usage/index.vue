@@ -44,6 +44,25 @@
                 <el-option label="成功" value="1" />
                 <el-option label="失败" value="0" />
               </el-select>
+              <!-- 2026-10-31 题6：板上题15 方案 A 承诺过的两个预留筛选，之前只有查询参数、界面上没有入口 -->
+              <el-input
+                v-model="queryParams.scene"
+                class="usage-scene"
+                clearable
+                placeholder="场景含…"
+                aria-label="按场景包含筛选"
+                @keyup.enter="handleQuery"
+                @clear="handleQuery"
+              />
+              <el-input
+                v-model="queryParams.configId"
+                class="usage-config"
+                clearable
+                placeholder="配置 ID"
+                aria-label="按配置 ID 精确筛选"
+                @keyup.enter="handleQuery"
+                @clear="handleQuery"
+              />
               <el-date-picker
                 v-model="timeRange"
                 class="usage-range"
@@ -285,8 +304,12 @@ const queryParams = reactive({
 const timeRange = ref<[string, string] | []>([]);
 const buildQuery = () => {
   const [begin, end] = timeRange.value || [];
+  // 2026-10-31 题6：配置 ID 是输入框，清空后是空串；后端 BO 的 configId 是 Long，空串会绑定失败
+  const rawConfig = queryParams.configId;
+  const configId = rawConfig === '' || rawConfig === null ? undefined : rawConfig;
   return {
     ...queryParams,
+    configId,
     beginTime: begin ? `${begin} 00:00:00` : undefined,
     endTime: end ? `${end} 23:59:59` : undefined
   };
@@ -658,6 +681,14 @@ onMounted(loadData);
 }
 
 .usage-status {
+  width: 120px;
+}
+
+.usage-scene {
+  width: 150px;
+}
+
+.usage-config {
   width: 120px;
 }
 

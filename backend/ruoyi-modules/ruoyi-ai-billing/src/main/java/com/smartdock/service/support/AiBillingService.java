@@ -323,7 +323,9 @@ public class AiBillingService {
             .orderByDesc(DcsAiUsage::getCreateTime);
         if (bo != null) {
             if (StrUtil.isNotBlank(bo.getCaller())) lqw.eq(DcsAiUsage::getCaller, bo.getCaller());
-            if (StrUtil.isNotBlank(bo.getScene())) lqw.eq(DcsAiUsage::getScene, bo.getScene());
+            // 2026-10-31 题6：scene 是拼接串（如 assist:chat:seq1|sidecar:title），等值几乎筛不到；
+            // 改成包含匹配，输入 sidecar 即可同时命中标题生成与追问建议。
+            if (StrUtil.isNotBlank(bo.getScene())) lqw.like(DcsAiUsage::getScene, bo.getScene());
             if (bo.getConfigId() != null) lqw.eq(DcsAiUsage::getConfigId, bo.getConfigId());
             // 2026-10-30 题15：状态与时间范围（页面承诺「定位失败请求」，靠这两个条件才筛得出来）
             if (StrUtil.isNotBlank(bo.getSuccess())) lqw.eq(DcsAiUsage::getSuccess, bo.getSuccess());

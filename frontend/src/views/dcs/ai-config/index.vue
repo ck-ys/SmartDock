@@ -1228,6 +1228,7 @@ import {
 } from '@/api/dcs/ai/types';
 import { listTenant } from '@/api/system/tenant';
 import { TenantVO } from '@/api/system/tenant/types';
+import { tenantLabel } from '@/utils/tenantLabel';
 import { useUserStore } from '@/store/modules/user';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
@@ -1878,7 +1879,6 @@ const keyPathPreview = computed(() => {
   if (format === 'ANTHROPIC_MESSAGES' && base.endsWith('/v1')) return `${base}/messages`;
   return `${base}${apiFormatPath(format)}`;
 });
-const tenantLabel = (item: TenantVO) => `${item.tenantId} / ${item.companyName || item.contactUserName || '-'}`;
 const modelLabel = (item: DcsAiModelVO) => (item.ownedBy ? `${item.modelId} (${item.ownedBy})` : item.modelId);
 const formatContext = (value?: number) => (value ? `${Math.round(value / 1000)}K` : '-');
 const billingModeLabel = (mode?: string) => {
