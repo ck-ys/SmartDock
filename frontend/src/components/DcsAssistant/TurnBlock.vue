@@ -596,6 +596,11 @@ function syncTkb() {
 }
 function setTkB(el: unknown) {
   const node = (el as HTMLElement | null) ?? null;
+  /* 2026-10-31 卡死修复：函数 ref 在 Vue 里每次 patch 都会被调用（runtime-core setRef 对
+     函数 ref 没有同值短路），原实现无条件 `tkbSeen = 0`；而 syncTkb 会把滚动比例写回
+     tkbSeen，两者互相触发 → 无限更新循环，主线程被微任务吃满（实测展开思考块后一滚动
+     即卡死）。同一个节点必须直接返回，只有重新挂载才重置。 */
+  if (node === tkbEl.value) return;
   tkbEl.value = node;
   if (!node) return;
   tkbSeen.value = 0;
