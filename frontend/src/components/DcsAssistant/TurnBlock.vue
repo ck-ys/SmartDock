@@ -39,7 +39,13 @@
 
     <!-- 折叠态偷看行（原型 tpeek/fpeekrow L338-346）：思考摘要渐隐小窗 + 失败行点击展开定位；
          UI 专项批1：仅运行中保留（思考进行中瞄一眼），终态收起——英文 CoT 原文不再怼脸，想看完整思考点胶囊展开 -->
-    <div v-if="folded && turn.thinkText && live" class="tpeek" title="展开过程明细" @click="toggleFold">{{ tpeekText }}</div>
+    <div v-if="folded && turn.thinkText && live" ref="peekEl" class="tpeek" :class="{ 'fade-t': peekOver }" title="展开过程明细" @click="toggleFold">{{ tpeekText }}</div>
+    <!-- Q17 空窗占位：首个思考事件到达前（实测 2–6s）先给一行「正在准备…」。
+         只做静态提示，不建思考段（伪造段会换 key 重挂，整块闪一次），也不改协议 -->
+    <div v-if="folded && waitHint" class="tpeek twait" title="展开过程明细" @click="toggleFold">
+      <IconSpan name="loader-circle" cls="spin mini" :size="14" />
+      <span>正在准备…</span>
+    </div>
     <div v-if="folded && failCount > 0" class="fpeekrow" @click="expandFail">
       <IconSpan name="ban" :size="12" /> {{ firstFailVerb }} · 失败 <IconSpan name="chevron-right" :size="12" />
     </div>
@@ -48,7 +54,13 @@
          R3(2026-10-10 拍板A)：思考分段与工具行按事件到达序交错成统一时间线（ZCode 同构）——
          思考段就位在它发生的时刻（think①→工具①→think②），不再全文拼成一坨置顶；
          旧数据（thinkSegs 空/thinkText 有值、回放 steps 无 seq）兜底=合成单段置顶=旧行为 -->
-    <div v-show="!folded" class="proc">
+    <div v-show="!folded" class="proc" :class="{ 'proc-empty': !timeline.length }">
+      <!-- Q17 空窗占位：过程区还没有任何可显示的行时，先给一行「正在准备…」，
+           让「已发送 → 首个事件」这段不再是一片空白（胶囊秒数仍在标题行，这里只补过程区） -->
+      <div v-if="waitHint" class="twait">
+        <IconSpan name="loader-circle" cls="spin mini" :size="14" />
+        <span>正在准备…</span>
+      </div>
       <template v-for="it in timeline" :key="it.kind === 'think' ? 'th-' + it.seg.id : it.step.id">
         <button
           v-if="it.kind === 'tool' && !stepsAll && it.sIdx === 1 && hiddenMid > 0"
@@ -645,13 +657,27 @@ const faved = computed(() => has(props.turn.question));
 const live = computed(() => ['thinking', 'acting', 'writing'].includes(props.turn.phase));
 
 /** Q16 偷看行改取尾部：原来是「整段开头 + 单行省略」，运行中永远只能看见第一句，
- *  正好是最没用的那部分（用户想知道「现在想到哪了」）。取最后 120 字并压成单行，
- *  省略号朝前，读起来就是「…刚刚想到的地方」。 */
-const tpeekText = computed(() => {
-  const t = props.turn.thinkText || '';
-  if (t.length <= 120) return t.replace(/\s+/g, ' ');
-  return '…' + t.slice(-120).replace(/\s+/g, ' ');
-});
+ *  正好是最没用的那部分（用户想知道「现在想到哪了」）。
+ *  Q18 起改成两行贴底（见 .tpeek）：取尾部 300 字交给容器裁，能露多少由宽度决定，
+ *  不再用「120 字」猜一行——写字数只能适配一种视口，宽屏浪费、窄屏还是被切。 */
+const tpeekText = computed(() => (props.turn.thinkText || '').replace(/\s+/g, ' ').slice(-300));
+
+/** Q18 偷看行是否被两行窗口裁掉：只有真裁了才加顶部渐隐，短文本保持原样不压暗。
+ *  不能用 scrollHeight——容器是「贴底」布局，溢出的旧文本在块首方向，规范里不算进
+ *  scrollable overflow（scrollHeight 恒等于 clientHeight）；这里直接量文本 Range 的真实高度。 */
+const peekEl = ref<HTMLElement | null>(null);
+const peekOver = ref(false);
+function syncPeekOver() {
+  const el = peekEl.value;
+  if (!el) {
+    peekOver.value = false;
+    return;
+  }
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  peekOver.value = range.getBoundingClientRect().height > el.clientHeight + 1;
+}
+watch([tpeekText, folded, () => props.turn.phase], () => nextTick(syncPeekOver));
 
 /** Q16 流式正文：打字机长度不变（shownLen 逐帧增长），但每帧渲染的是「行内已闭合」的 HTML，
  *  不再是裸文本——否则 **按月复盘** 会原样显示到完成那一刻才突然变粗。 */
@@ -959,6 +985,11 @@ const timeline = computed<TlItem[]>(() => {
   const key = (it: TlItem) => (it.kind === 'think' ? it.seg.seq : (it.step.seq ?? Number.MAX_SAFE_INTEGER));
   return items.sort((a, b) => key(a) - key(b));
 });
+
+/** Q17 空窗占位：回合已开跑但过程区还没有任何一行（首个 REASONING_START 实测晚到 2–6s）。
+ *  只在 thinking / acting 阶段成立——writing 时答案已经在长，再提示「准备」自相矛盾。
+ *  刻意不建思考段：伪造段到达真段时会换 key 重挂，整块闪一次。 */
+const waitHint = computed(() => ['thinking', 'acting'].includes(props.turn.phase) && !timeline.value.length);
 
 /** 多段序号（思考①②…）：仅分段>1 时标号，单段保持「已思考 · N 秒」原口径 */
 const SEG_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
@@ -1653,8 +1684,14 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     transform: rotate(360deg);
   }
 }
-/* 折叠态偷看行（原型 tpeek/fpeekrow L338-346） */
+/* 折叠态偷看行（原型 tpeek/fpeekrow L338-346）
+   Q18：单行 → 两行。max-height 正好 2×20px；贴底对齐让「最新想到的那句」始终在窗口里，
+   超出的旧文本从上方裁掉（有没有裁由 .fade-t 决定：真裁了才做顶部渐隐，
+   否则第一行会被拦腰切断，看起来像渲染坏了）。短文本仍只占一行，不会白留 20px。 */
 .tpeek {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   max-height: 40px;
   overflow: hidden;
   font-size: 11.5px;
@@ -1663,14 +1700,36 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   cursor: pointer;
   border-radius: 6px;
   padding: 0 4px;
-  -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 30%, transparent 100%);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+
+  &.fade-t {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14px);
+    mask-image: linear-gradient(180deg, transparent 0, #000 14px);
+  }
 
   &:hover {
     box-shadow: inset 0 0 0 1px var(--dcs-border-color-light);
   }
+}
+/* Q17 空窗占位：过程区还没有任何一行时显示。放在 .proc 里时左起点=14px（容器 padding），
+   图标 14 + gap 8 → 文字与思考正文同起点（36px），不会看起来像另一套缩进 */
+.twait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dcs-text-secondary);
+}
+/* 折叠态复用 .tpeek：Q18 起父级是「两行贴底」的纵向 flex，这一行要改回横排一行 */
+.tpeek.twait {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 6px;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 .fpeekrow {
   display: flex;
@@ -1701,6 +1760,10 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     content: '';
     border-top: 1px solid var(--dcs-border-color-lighter);
     margin: 12px 0 0 -14px;
+  }
+  /* Q17：一条过程行都没有时不画收尾线——空窗期凭空一条横线更像「内容丢了」 */
+  &.proc-empty::after {
+    content: none;
   }
   /* Q12-③ 中段折叠行（首尾保留之间的「⋯ 另外 N 步」） */
   .midfold {
@@ -1802,6 +1865,13 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     &:hover .tk-c,
     .tk-c.on {
       opacity: 1;
+    }
+    /* Q17 触屏没有 hover：收起态箭头常显 35%，否则「可展开」这条唯一线索永远看不到；
+       桌面仍保持 hover 才显（ZCode 同款，避免每行右侧多一个符号显吵） */
+    @media (hover: none) {
+      .tk-c {
+        opacity: 0.35;
+      }
     }
     &:hover .tk-t {
       color: var(--dcs-text-primary);

@@ -932,9 +932,14 @@ onUnmounted(() => {
 .dcs-as-session {
   display: flex;
   gap: 12px;
-  /* 壳层高度由 AppMain 写 --session-chrome（无页签 58 / 有页签 92，含 8px 呼吸位） */
-  height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
-  height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
+  /* Q21（2026-10-29 拍板前实测）：底部恒空 96px——原公式扣 --session-chrome
+     （= app-chrome + 16 + --app-fab-yield 80），而壳层 .main-container/.app-main 早已改通高贴底，
+     那 80px 是「给悬浮球让位」的历史值；本页悬浮球 v-show=false（index.vue：/ai/assistant 路由下整体隐藏），
+     于是 1440×900 实测 root 底 804 / 视口 900，白空 96（80+16）。
+     Q23（2026-10-29）：只扣页头，呼吸位交给 padding——全局 box-sizing=border-box，
+     再减 24 等于「padding 之外又多留 24」，实测四边 12/12/12/36 不齐；现在四边同为 12。 */
+  height: calc(100vh - var(--app-chrome) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
+  height: calc(100dvh - var(--app-chrome) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
   padding: 12px;
 
   .side {
@@ -942,6 +947,16 @@ onUnmounted(() => {
     flex: none;
     display: flex;
     flex-direction: column;
+    /* Q24（2026-10-29 用户截图红圈）：全局 element 选择器 `aside{...}`（assets/styles/index.scss:150，
+       若依模板的文档页样式）打穿了本组件的根 aside——①margin-bottom:20px 让卡片底比右栏主区
+       高 20px（红圈处那条 20px 白带）；②padding:8px 24px 把 298 的内容宽吃到 250，会话滚动条
+       因此悬在离卡右缘 24px 的空白里；③line-height:32px 把每行会话从 ~56 撑到 82（标题行 32、
+       时间行 32）；④font-size:16px 抬高所有没显式设字号的文字。抽屉根 aside 早前已按同因复位
+       line-height/font-size（AssistantDrawer.vue `.dcs-dw`），本页整树一起复位。 */
+    margin: 0;
+    padding: 0;
+    line-height: 1.5;
+    font-size: 13px;
     border: 1px solid var(--dcs-border-color-lighter);
     border-radius: var(--app-card-radius);
     background: var(--el-bg-color);
@@ -951,9 +966,11 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
       padding: 10px 12px 6px;
 
       .side-t {
+        font-size: 14px;
         font-weight: 600;
         color: var(--dcs-text-primary);
       }
@@ -1154,21 +1171,74 @@ onUnmounted(() => {
     overflow: hidden;
     /* Q8/Q9/三反馈② 廊位：StatPanel 按容器宽解算（fills P+4 / capped 2P+956-W / 0 贴列）写
        --sp-strip，本层消费——胶囊与面板始终贴内容列右缘，宽屏不再漂在空档；
-       StatPanel 为 absolute 浮层不吃本层 padding，正文列与聊天框一起让、一起回 */
+       StatPanel 为 absolute 浮层不吃本层 padding，正文列与聊天框一起让、一起回
+       Q32（2026-10-30）：mini 退状态点时另写 --sp-strip-l，**左右等量**——
+       旧版只让右侧，列按剩余区居中 ⇒ 左 25 / 右 48（1280）差 23px，肉眼就是歪的 */
     padding-right: var(--sp-strip, 0px);
-    transition: padding-right 0.3s ease;
+    padding-left: var(--sp-strip-l, 0px);
+    transition:
+      padding-right 0.3s ease,
+      padding-left 0.3s ease;
+
+    /* Q28（2026-10-30 用户实拍两个红框）：让位带不留白。面板是浮在会话画布上的一层，
+       它身后这条竖带以前是 .main 的白底，和右侧白卡糊成一片白；现在按答案区同一档
+       画布色（--el-fill-color-light）铺底，整块读作「画布继续向右延」，面板落在画布上。
+       伪元素只吃 padding 区（内容都在 padding-box 内），不遮任何子元素。 */
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0 0 0 auto;
+      width: var(--sp-strip, 0px);
+      background: var(--el-fill-color-light, #f5f7fa);
+      pointer-events: none;
+      transition: width 0.3s ease;
+      /* Q36：滚动区（.dcs-flow）现在压进让位带里，得让它画在这条带之上——
+         否则 6px 滚动条正好被带子盖掉（带子是定位元素，默认压在普通流内容上）。 */
+      z-index: 0;
+    }
 
     .main-hd {
       display: flex;
       align-items: center;
       gap: 8px;
+      /* Q29：标题跟正文列同一左缘——正文列居中后，标题还钉 14px 会在宽屏错开一大截
+         （1920 实测列左 214、标题左 14）。列被帽限制时列左 =（内容区 − 列帽）/ 2；
+         列撑满时上式会掉到负数，用 25 兜底（= 列内距，与 .box 实宽同位） */
       padding: 10px 14px;
+      padding-left: calc(var(--sp-strip-l, 0px) + max(25px, calc((100% - var(--dcs-col-max, 900px)) / 2)));
+      /* Q32：左侧让位后标题条会被推离卡片左缘、下边框缺一小段——负外边距吃掉让位宽、
+         内距再补回来（padding 百分比对内层是「父内容宽」，不吃这层负 margin，故补一个 strip-l） */
+      margin-left: calc(-1 * var(--sp-strip-l, 0px));
+      /* Q28：让位带铺色后，标题条横贯整条（否则白底在带口断一刀）——
+         负外边距吃掉让位宽、右内距补回来，文字位置不变，下边框一直画到右缘 */
+      margin-right: calc(-1 * var(--sp-strip, 0px));
+      padding-right: calc(14px + var(--sp-strip, 0px));
+      position: relative;
+      z-index: 1;
+      background: var(--el-bg-color);
       border-bottom: 1px solid var(--dcs-border-color-lighter);
       font-weight: 600;
       color: var(--dcs-text-primary);
     }
     :deep(.dcs-flow) {
       flex: 1;
+    }
+    /* Q36（2026-10-30 用户红圈「这个滚动条能不能放在最右侧」）：消息区滚动条原来贴的是
+       「内容列右缘 + 24」，离卡内右缘整整一个让位宽（1920 实测滚动条 1715–1720、卡内右缘 1907）——
+       因为滚动容器是 .dcs-flow，而让位是 .main 的 padding。把让位带并进滚动容器：
+       负外边距吃掉 .main 的 padding-right，再由自己的 padding-right 补回来。
+       **内容盒宽一格不变**（= 卡宽 − strip − 48 − 滚动条），所以列几何与 Q29–Q35 的两侧缝全部不动；
+       变的只是滚动口——从「卡宽 − strip」变成整卡宽，滚动条因此贴到卡内右缘。
+       与 .main-hd 用的是同一条负边距手法。过渡也必须同一条 0.3s：否则展开/收起时 .main 的 padding
+       在动、负 margin 一步到位，滚动口会短暂比卡还宽（被 overflow:hidden 裁掉、滚动条闪一下）。 */
+    :deep(.dcs-flow.full) {
+      margin-right: calc(-1 * var(--sp-strip, 0px));
+      padding-right: calc(24px + var(--sp-strip, 0px));
+      position: relative;
+      z-index: 1;
+      transition:
+        margin-right 0.3s ease,
+        padding 0.3s ease;
     }
     /* A5 原型：欢迎卡限宽 640。宽屏加宽批 P2 回修（视觉席像素级实锤）：帽+auto 原落在
        .dcs-hero 容器层——flex 里 auto margin 压过 >* 规则的 flex-start，卡片对着整个
@@ -1204,8 +1274,10 @@ onUnmounted(() => {
 @media (max-width: 992px) {
   .dcs-as-session {
     gap: 0;
-    height: calc(100vh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
-    height: calc(100dvh - var(--session-chrome, 58px) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
+    /* Q21 同口径：手机档 padding 8 → 四边同 8；悬浮球在会话路由同样隐藏，不再预留 fab-yield。
+       Q23：呼吸位只靠 padding，公式不再额外减 16（box-sizing=border-box 会叠成 24）。 */
+    height: calc(100vh - var(--app-chrome) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - var(--app-chrome) - var(--sp-top, 0px) - env(safe-area-inset-bottom, 0px));
     padding: 8px;
 
     .side {
@@ -1274,6 +1346,13 @@ onUnmounted(() => {
       /* 手机端不占对话宽度；进度信息在消息流里仍可见 */
       :deep(.stat-panel) {
         display: none;
+      }
+
+      /* Q36：面板隐藏时让位本该是 0，但 StatPanel 仍会按宿主宽写 --sp-strip；
+         这里把负边距收回去，否则滚动口会比卡片宽出一个 strip（被 overflow 裁掉、滚动条看不见） */
+      :deep(.dcs-flow.full) {
+        margin-right: 0;
+        padding-right: 24px;
       }
     }
 

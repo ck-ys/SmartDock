@@ -4,7 +4,14 @@
          透明度淡切（ZCode mini 行常驻子元素），full-body 常驻做 max-height+opacity 过渡；
          原 v-if 双分支卸载重建=宽度/高度/内容三重跳变，是「动画怪」的根因 -->
     <div v-if="turn" ref="panelRoot" class="stat-panel" :class="panelCls" role="status">
-      <button class="capsule" :class="{ ghost: !mini }" :tabindex="mini ? 0 : -1" @click="expandMini()">
+      <button
+        class="capsule"
+        :class="{ ghost: !mini }"
+        :tabindex="mini ? 0 : -1"
+        :title="mini ? capsuleTitle : undefined"
+        :aria-label="mini ? capsuleTitle : undefined"
+        @click="expandMini()"
+      >
         <span class="spdot" :class="dotCls" />
         <span class="cnt">{{ doneSteps }}/{{ turn.steps.length || 1 }}</span>
         <span class="c-last">{{ capsuleText }}</span>
@@ -120,16 +127,73 @@ const SPFOCUS = 4;
  *  --dcs-col-max 动态给（默认 900，宿主 ≥1380 时 1080），展开阈随列帽联动：
  *  colMax + 面板 248 + 边距 28 上下（1080 档=1380 与档位阈同源，不再叠列） */
 const YIELD_PANEL_W = 250;
+/** Q19（2026-10-29）：正文列可让位的最低宽度——让位后低于它就宁可让面板浮在内容上，
+ *  也不把正文挤成一条（实测 1100 宽下胶囊仍在按 196px 让位，正文列只剩 262px） */
+const MIN_COL = 480;
+/* Q20（2026-10-29）：胶囊/面板的横向分配常量——对齐 ZCode 的「面板属于栏、不属于正文」
+   模型（见 conversationLayout.ts 的 24rem 栏与 ConversationStatusPanel 的 w-80）。
+   Q30（2026-10-30 用户两图对质）把「贴正文 + 算缝」整套换成「右栏锚定 + 纯解析」：
+   · GAP 24：canSide 判定用的走廊（列右缘到面板左缘的期望缝，ZCode 1280 档实测 24）
+   · CAP_MAX 168 / CAP_MIN 136：胶囊优先整宽；右栏放不下就按栏宽缩，缩到 136（= 胶囊
+     min-width，再窄「2/2 已完成」就要裁字）仍放不下才退化成 20px 状态点
+   · DOT 20：状态点，与胶囊同一个右锚，不再有「贴字」和「贴边」两套落点 */
+const GAP = 24;
+const PANEL_W = 220;
+const CAP_MAX = 168;
+const CAP_MIN = 112;
+const DOT = 20;
+/* Q26（2026-10-29 用户拍板「只轻微优化间距」）→ Q30 重写：呼吸只剩一个下限。
+   Q26 当时是「左缝 16 / 右留白 12」两个各管一侧的固定值，结果两侧都不由栏宽决定：
+   1920 实测胶囊到正文 16、到页面右缘 31，而正文离左缘 214——右边读起来是「黏在字上」。
+   Q30 起右侧只有一条规则：**胶囊/面板的右缘永远钉在宿主内缘 − PANEL_EDGE**（ZCode
+   `ConversationStatusPanel` 的 `absolute … right-4`，mini 与 panel 同一容器同一锚点），
+   左缝 = 栏宽 − 16 − 胶囊宽，随窗口自然变大；MINI_AIR 只是「栏再窄也不许贴上字」的下限。 */
+const MINI_AIR = 12;
+/** Q35（2026-10-30 用户口径）：「答案区 + 输入框 到左侧、到右侧面板（展开/收起）的距离
+ *  尽量一致，并且随宽度动态变化」——收起态也套展开态那条不变式。
+ *  **strip = 此刻真正渲染的元素宽 + PANEL_EDGE**，代入「列在 [0, w−strip] 居中」即得
+ *  左缝 ≡ 到胶囊的缝（与 w、列帽、胶囊宽都无关）。
+ *  唯一的新代价是「正文让出的宽度」，所以给它一个上限：在列帽之下的富余之外，
+ *  最多再啃 MINI_SHRINK。136 的来历：宽屏胶囊上限 168 − 右内距 16 = 152，
+ *  取 136 意味着 1280 档（宿主 894、无富余）仍能保住 120 宽的胶囊 + 25/25 等距；
+ *  再小就退 20px 点（strip = 36，仍然等距），不会为了等距把正文挤成一条。 */
+const MINI_SHRINK = 136;
+/** 窄档「微让位」上限：只为把 20px 点从贴边挪进栏里，正文列 798→775，肉眼几乎无感。
+ *  Q30 起它只服务点态（胶囊态的让位由 need 整段给），不再用来「凑一个胶囊」。 */
+const MINI_STRIP_MAX = 40;
+/** Q22（2026-10-29 复核）：宽屏「侧栏位」的上限。WIDE_W 300：卡片最多吃到 300
+ *  （ZCode w-80=320 同量级），220 时尾行「智能体 · 小助手 · 本轮未调用工具」会折两行。
+ *  Q29 起「缝」不再是可调项（原 MAX_GAP 240 已删）：列居中后，宽屏多出来的空白
+ *  由居中平分到列两侧，面板只钉宿主内缘 16。 */
+const WIDE_W = 300;
+/** Q29（2026-10-30 用户对质 ZCode 源码）：展开态让位量 = 面板宽 + 这一个右内距，
+ *  让「内容区右缘」与「面板左缘」重合。列居中之后（MsgFlow/Composer 同步改），
+ *  正文到左侧的缝与到面板的缝由同一次居中决定，恒等——这正是用户说的
+ *  「跟左侧的距离 和 面板的距离貌似是一致的」。
+ *  旧值 need = PANEL_W + GAP + 16 = 260 是「贴左」时代的算法：列右缘钉死，
+ *  面板再退 24 的缝，于是多算的 24 只能从正文宽度里扣。
+ *  · PANEL_EDGE 16：面板右缘到宿主内缘（= ZCode 的 right-4）。**Q30 起它同时是胶囊态
+ *    和点态的锚点**——两态同锚，展开/收起只是「贴着右缘往左长」，右边缘一格不动。
+ *  · COL_EDGE 25：列内距（.dcs-comp.full padding 24 + 1px 边框）——列被帽限制时，
+ *    它同时也是列左缘到宿主内缘的距离，故「放得下侧栏」的判定用 2×COL_EDGE */
+const PANEL_EDGE = 16;
+const COL_EDGE = 25;
 
 const panelRoot = ref<HTMLElement | null>(null);
 const containerWide = ref(true);
-/** 追随解算输入：父层（.main/.dw-body）borderBox 宽 + 面板自身实宽（胶囊 min-width 后随内容微变） */
+/** 追随解算输入：父层（.main/.dw-body）borderBox 宽。Q30 起不再需要面板自身实宽——
+ *  胶囊宽度由栏宽解析给出，读自己的 rect 会让「宽度 → 解算 → 宽度」成环 */
 const containerW = ref(0);
-const selfW = ref(220);
 /** 列宽节拍（宽屏加宽批）：列帽档位切换/宿主 resize 会改 .box 实宽——只听宿主宽时
  *  面板不会重算（预览注入实证列变面板不动）。观察 .box 触发本 ref，进 effect 依赖。 */
 const boxTick = ref(0);
 const mini = ref(false);
+/** Q19：面板此刻是否叠在正文列上（走廊放不下时）——叠放态给胶囊加毛玻璃背板，
+ *  免得正文从半透明底后面透出来显脏 */
+const floating = ref(false);
+/** Q20：gutter 放不下最窄胶囊（128）时的「状态点」形态——与 float 解耦：
+ *  圆点可以落在列右 gutter 里（不压字），此时 float=false 但仍要 20px 点样式 */
+const compact = ref(false);
 /** 三席审查回修（m3 P1-1 + dspro P2-3）：用户手动开/收过胶囊——live 相位跳变、
  *  1.6s 自动收、容器宽跨阈三类自动行为均不得覆盖手动选择；新回合重置 */
 const userMini = ref(false);
@@ -145,7 +209,6 @@ const foldOpen = ref(false);
 let collapseTimer: ReturnType<typeof setTimeout> | null = null;
 // Q6-B：观测主列宽度驱动 auto 展开/收胶囊（ResizeObserver 而非 window resize——全屏模态/独立页容器宽 ≠ 窗口宽）
 let widthObserver: ResizeObserver | null = null;
-let selfObserver: ResizeObserver | null = null;
 /** 宽屏加宽批：观测输入卡 .box 实宽（列帽档位切换时触发追随重算） */
 let boxObserver: ResizeObserver | null = null;
 /** 卸载清理兜底（glm53 P2-5）：挂载期捕获宿主引用——v-if 先摘根（turn 置空）再卸载时
@@ -154,7 +217,7 @@ let cleanupHost: HTMLElement | null = null;
 /** 观测条 borderBox 宽（让位 padding 落在被观测父层上时 contentRect 会被自身 padding 缩小，
  *  有「展开→变窄→自动收→变宽」振荡风险——borderBox 不含 padding 语义天然免疫）。
  *  规范坑：ResizeObserverSize 的字段是 inlineSize/blockSize，没有 .width——写 .width 恒
- *  undefined 会静默回退 contentRect（selfW 恒初始值的实锤根因） */
+ *  undefined 会静默回退 contentRect（自观测宽度恒初始值的实锤根因） */
 function borderBoxW(entry: ResizeObserverEntry | undefined | null): number {
   const b = entry?.borderBoxSize;
   const single = Array.isArray(b) ? b[0] : b;
@@ -191,35 +254,38 @@ onMounted(() => {
       boxObserver.observe(box, { box: 'border-box' });
     }
   }
-  if (panelRoot.value && typeof ResizeObserver !== 'undefined') {
-    selfObserver = new ResizeObserver((entries) => {
-      const w = borderBoxW(entries[0]);
-      if (w > 0) {
-        selfW.value = Math.round(w);
-      }
-    });
-    selfObserver.observe(panelRoot.value, { box: 'border-box' });
-  }
 });
 onBeforeUnmount(() => {
   widthObserver?.disconnect();
-  selfObserver?.disconnect();
   boxObserver?.disconnect();
   (cleanupHost ?? panelRoot.value?.parentElement)?.style.removeProperty('--sp-strip');
 });
 
 /**
- * 追随几何（Q5 ZCode 对齐，2026-10-10 二修；2026-10-11 宽屏加宽批三修）：主列左贴 24
- * / 帽=宿主变量 --dcs-col-max（默认 900，宿主 ≥1380 时 1080，Composer 观测写入）——
- * 列右缘不写死（宿主嵌套 padding 各异：会话页实测列右=949 而非 924，写死会把面板叠
- * 进正文列 12px），改为写完 strip 后实测 .box 右缘：
- *  · 中屏（W < 列左+colMax+14+P，放不下「列+面板+缝」）：容器右 padding 让位
- *    （strip=P+28，列被压窄、面板贴容器右缘 r=14，与列右恒 gap 14）——让位阈随列帽
- *    动态（原写死 952=24+900+28，加宽档位下会误判放不下）
- *  · 宽屏（放得下）：strip=0（列按帽封顶），面板贴列右缘外 14px（面板跟列走，
- *    2026-10-11 拍板：不钉窗右缘）
- * strip 写父层 CSS 变量 --sp-strip（消息列与输入框共用）；right 写本组件内联。
- * 实测时机=写完 strip 再读 getBoundingClientRect（强制同步布局，读到的是让位后的列右）。
+ * 追随几何（Q5 ZCode 对齐，2026-10-10；宽屏加宽批三修；Q30 2026-10-30 四修=纯解析）。
+ *
+ * **Q30 为什么要重写这套解算**：Q5 起一直是「先写 --sp-strip，再读 .box 的 rect，
+ * 用实测列右缘反推 right」。三个隐患在用户全屏实测里同时爆了：
+ *  ① 宿主 `.main` 的 padding-right 有 0.3s 过渡，写完变量立刻 getBoundingClientRect()
+ *     读到的是**过渡起点**的几何（同步布局只保证样式生效，不保证过渡走完）。1920 实测：
+ *     收起时 right 应在 16，却按「展开态的列右缘」算成 188px，胶囊左缘压进正文 143px
+ *     ——用户说的「展开、再收起，胶囊就挤进里面了」。
+ *  ② 过渡结束后没有任何东西再触发重算（列帽未变 → .box 宽未变 → boxObserver 不响），
+ *     错误值就永久留在 inline style 上，刷新前都不会回去。
+ *  ③ 决策依赖实测值 → 值与布局互为因果，只能靠「别读自己写过的东西」绕，越绕越脆。
+ * 现在改成**解析几何**：列右缘 = 列内距 + 居中偏移 + 列宽，全部由「宿主宽 w / 列帽
+ * colMax / 让位 strip」三个数算出，与 1920/1680/1440 实测逐像素一致（probe-q30），
+ * 且与过渡进度无关——任何一帧调用都得到终值，不存在中间态污染。
+ *
+ * 形态与落点：
+ *  · 展开（!mini）：canSide 用「列帽 + 两侧内距 + 走廊 + 面板」判；放得下侧栏就 strip =
+ *    面板宽 + 16（此时面板左缘正好压在内容区右缘，列在内容区居中 ⇒ 左缝 ≡ 到面板的缝，
+ *    Q29 的不变式由居中本身保证），否则 strip=0 走浮层。
+ *  · 收起（mini）：右缘仍钉 16，让位量与展开态同一条式子 `胶囊宽 + 16`（Q35）——
+ *    列在「胶囊左侧的剩余区」里居中 ⇒ 左缝 ≡ 到胶囊的缝；胶囊跟着可负担的让位量缩
+ *    （168 → 112），缩不下退 20px 点（strip = 36 仍等距），连 36 都负担不起才用 Q32
+ *    的对称微让位兜底。
+ *  · 两态同锚 ⇒ 展开/收起时右边缘不动，只有左缘在长/缩，不会「换地方」。
  */
 watchEffect(() => {
   // 依赖必须无条件先读（Vue 教训级坑）：若在读取响应式依赖之前因宿主为空早退，
@@ -228,7 +294,6 @@ watchEffect(() => {
   // 三席审查回修：捕获式在挂载瞬间根不在场时会永久丢宿主且无从补救
   // boxTick=列宽节拍（宽屏加宽批）：档位切换改 .box 实宽时本效应须重算（预览实证漏听）
   const w = containerW.value;
-  const p = selfW.value;
   void boxTick.value;
   const hasTurn = !!props.turn;
   const root = panelRoot.value;
@@ -238,17 +303,86 @@ watchEffect(() => {
   }
   if (!hasTurn) {
     host.style.removeProperty('--sp-strip');
+    host.style.removeProperty('--sp-strip-l');
     root.style.removeProperty('right');
+    root.style.removeProperty('--sp-panel-w');
+    root.style.removeProperty('--sp-cap-w');
     return;
   }
-  const box = host.querySelector('.dcs-comp .box');
-  // 让位阈用「列左+列帽」的自然列右（帽是 cap 属性，不受 strip 影响→决策无反馈环）
-  const boxLeft = box ? Math.round(box.getBoundingClientRect().left - host.getBoundingClientRect().left) : 24;
   const colMax = readColMax(host);
-  const strip = w > 0 && w < boxLeft + colMax + 14 + p ? p + 28 : 0;
+  /* Q29：判定与让位量全部改用「列帽 + 列内距」的常数几何，不再读 .box 的实测左缘——
+     列居中之后 boxLeft 会随 strip 漂（1920 未展开 214、展开 56），拿它当阈值会让
+     canSide 在展开瞬间自我翻转。列帽是 cap 属性，与 strip 无关，天然无反馈环。 */
+  const canSide = w >= colMax + COL_EDGE * 2 + GAP + PANEL_W;
+  const panelW = canSide ? WIDE_W : PANEL_W;
+  const need = panelW + PANEL_EDGE;
+  const roomy = w - need - COL_EDGE * 2 >= MIN_COL;
+  /* 列右缘（相对宿主左缘）：stripR / stripL 都吃内距，列在剩余区居中——
+     与 .box 实测的关系在 1920（900 帽）/1680（未溢出）/1440（满宽）三档逐像素对齐。 */
+  const colRightAt = (stripR: number, stripL = 0) => {
+    const avail = Math.max(0, w - stripR - stripL - COL_EDGE * 2);
+    const colW = Math.min(colMax, avail);
+    return stripL + COL_EDGE + (avail - colW) / 2 + colW;
+  };
+  const railAt = (stripR: number, stripL = 0) => Math.max(0, w - colRightAt(stripR, stripL));
+
+  let strip = 0;
+  /** Q32：左侧让位。只有 mini 微让位会用到——必须与右侧等量，否则「列左右等距」被打破 */
+  let stripL = 0;
+  let capW = CAP_MAX;
+  let dot = false;
+  if (mini.value) {
+    /* Q35：strip = 胶囊宽 + PANEL_EDGE ⇒ 左缝 ≡ 到胶囊的缝（代数见 MINI_SHRINK 注释）。
+       可负担量 afford 取两道闸的较小值：① 富余 + MINI_SHRINK；② colNat − MIN_COL。 */
+    const colNat = Math.min(colMax, w - COL_EDGE * 2);
+    const slack = Math.max(0, w - COL_EDGE * 2 - colMax);
+    const afford = Math.max(0, Math.min(slack + MINI_SHRINK, colNat - MIN_COL));
+    const capTry = Math.min(CAP_MAX, Math.floor(afford - PANEL_EDGE));
+    if (capTry >= CAP_MIN) {
+      // 胶囊按可负担量缩，让位量与它同步 ⇒ 两侧恒等
+      capW = capTry;
+      strip = capW + PANEL_EDGE;
+    } else {
+      dot = true;
+      capW = DOT;
+      if (afford >= DOT + PANEL_EDGE) {
+        // 点态也能等距（36 = 20 + 16），不必再动左右内距
+        strip = DOT + PANEL_EDGE;
+      } else {
+        /* 极窄档兜底（Q32）：连「点 + 16」都负担不起——正文本就在 MIN_COL 附近，
+           只把点从贴边挪进栏里，每侧 ≤40 且不低于 MIN_COL。 */
+        const rail = railAt(0);
+        const want = DOT + MINI_AIR + PANEL_EDGE;
+        if (rail < want) {
+          const budget = Math.max(0, Math.min(MINI_STRIP_MAX, (colNat - MIN_COL) / 2));
+          const pad = Math.round(Math.min(budget, want - rail));
+          strip = pad;
+          stripL = pad;
+        }
+      }
+    }
+  } else {
+    strip = roomy ? need : 0;
+  }
+  floating.value = w > 0 && !mini.value && strip === 0;
+  compact.value = dot;
   host.style.setProperty('--sp-strip', `${strip}px`);
-  const colRight = box ? box.getBoundingClientRect().right - host.getBoundingClientRect().left : 948;
-  const right = Math.max(14, Math.round(w - colRight - 14 - p));
+  if (stripL > 0) host.style.setProperty('--sp-strip-l', `${stripL}px`);
+  else host.style.removeProperty('--sp-strip-l');
+  root.style.setProperty('--sp-cap-w', `${capW}px`);
+  // 只在展开态写面板宽：mini 走 --sp-cap-w，留着旧的 168 会在展开那一帧闪窄
+  if (mini.value) root.style.removeProperty('--sp-panel-w');
+  else root.style.setProperty('--sp-panel-w', `${panelW}px`);
+  /* Q30：两态同一个右锚（ZCode right-4）——不再按 gutter/gap 现算，右边缘恒定不动。
+     唯一例外：栏连「元素 + 16」都装不下（1100 实测栏 25、正文 458 已低于 MIN_COL、
+     微让位预算为 0）时退到「刚好出列」——宁可贴栏口，也不许压进正文（用户原话
+     「挤进里面了」）。这条兜底只在极窄档触发，其余所有档恒 16。 */
+  const railEnd = railAt(strip, stripL);
+  const effW = mini.value ? capW : panelW;
+  let right = PANEL_EDGE;
+  if (railEnd - right - effW < 0) {
+    right = Math.max(2, Math.round(railEnd - effW));
+  }
   root.style.right = `${right}px`;
 });
 // 历史回放场景：回合一开始就是终态（无 live 过渡不触发 watch）——挂载即胶囊收起
@@ -335,6 +469,10 @@ const dotCls = computed(() => (live.value ? 'run' : props.turn?.phase === 'error
 /** 面板三态类（批J-2 原型 L405-409）：running/waiting/finish 驱动边框与文案色 */
 const panelCls = computed(() => ({
   mini: mini.value,
+  /** Q19：叠在正文列上（走廊放不下）——胶囊补毛玻璃背板，展开卡补强投影 */
+  float: floating.value,
+  /** Q20：gutter 只够一个点——20px 状态点（与 float 解耦，不压字也要点态） */
+  compact: compact.value,
   running: live.value,
   waiting: props.turn?.phase === 'waiting',
   finish: !live.value && ['done', 'stopped'].includes(props.turn?.phase ?? '')
@@ -363,6 +501,15 @@ const capsuleText = computed(() => {
     return t.phase === 'thinking' ? '思考中' : t.phase === 'writing' ? '撰写中' : (last?.verb ?? '执行中');
   }
   return turnStateWord(t.phase);
+});
+/** Q19-b：浮动胶囊缩成 22px 状态点后，文字信息只能进 title/aria——完整说法放这里 */
+const capsuleTitle = computed(() => {
+  const t = props.turn;
+  if (!t) {
+    return '';
+  }
+  const step = `${doneSteps.value}/${t.steps.length || 1}`;
+  return `${capsuleText.value} · 步骤 ${step}${t.phase === 'waiting' ? ' · 点这里展开' : ''}`;
 });
 const durText = computed(() => {
   const t = props.turn;
@@ -456,8 +603,10 @@ onBeforeUnmount(() => {
 .stat-panel {
   position: absolute;
   top: 60px;
-  right: 14px;
-  width: 220px;
+  /* Q30：默认值与解算同锚（两态一致，脚本注入/离屏首帧都不跳） */
+  right: 16px;
+  /* Q22：展开卡宽度由 canSide 分支写入（220 → 300）；mini 走下面的 --sp-cap-w */
+  width: var(--sp-panel-w, 220px);
   /* Q9（拍板 2026-10-10）：胶囊与展开卡同锚点（ZCode 原装）——mini 只是高度塌缩，
      不换地方；批G 时代「胶囊退流内防遮挡」由宿主父层的常备廊位接棒（sp-capsule/sp-panel） */
   /* Q7（ZCode 对齐，2026-10-10）：同一元素两形态全可插值——mini 显式宽 168（原 auto
@@ -465,13 +614,18 @@ onBeforeUnmount(() => {
      overflow:hidden 让 full-body 的 max-height 塌缩不撑壳 */
   overflow: hidden;
   &.mini {
-    width: 168px;
+    width: var(--sp-cap-w, 168px);
     border: none;
     box-shadow: none;
     background: transparent;
   }
   /* 原型 L376：320px/radius 16/深投影/四属性过渡（mini 变形用）；批J-2 对齐 */
   border-radius: 16px;
+  /* Q28（2026-10-30）：与 ZCode v4 `ConversationStatusPanel` 同口径——面板本体是
+     popover 面（`bg-[var(--color-popover)]` + 1px popover 边框 + shadow-md + 16 圆角），
+     `absolute top-0 right-4` 浮在会话画布上；改的不是卡，是它身后那条带子：
+     会话页 / 抽屉的让位带已按答案区画布色（--el-fill-color-light）铺底（见
+     views/dcs/assistant/session/index.vue 的 .main::after），白卡落上去才看得见轮廓。 */
   background: var(--el-bg-color);
   border: 1px solid var(--dcs-border-color-lighter);
   box-shadow: 0 8px 28px rgb(16 24 40 / 10%);
@@ -510,12 +664,88 @@ onBeforeUnmount(() => {
     border-radius: 999px;
     padding: 0;
   }
+  /* Q19：叠放态——展开卡加更重的投影（读起来是「浮层」而不是「压在文字上的色块」）。
+     Q27（2026-10-30）：中屏让位区也回到这张卡片（白底 / 16 圆角 / 投影 / 高度随内容），
+     与宽屏 canSide 同一套外观；让位带只负责让出宽度，不再被灰底填成通高栏。 */
+  &.float {
+    box-shadow: 0 10px 34px rgb(16 24 40 / 18%);
+  }
+  /* Q20（2026-10-29）：gutter 放不下 128 胶囊时收成 20px 状态点——整颗落进列右
+     25px gutter（20+3+2），不再像 26px 版压住列右缘 8px、在 1280/1100 实测压到字。
+     文案进 title/aria；悬停向左借位展开成 168 胶囊（用户主动看，允许临时压字）。
+     状态色点保留脉冲/成功/告警语义，命中区用伪元素扩到 34px。 */
+  &.compact {
+    box-sizing: border-box;
+    width: 20px;
+    height: 20px;
+    background: color-mix(in srgb, var(--el-bg-color) 88%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 3px 12px rgb(16 24 40 / 16%);
+    transition:
+      width 0.22s ease,
+      height 0.22s ease,
+      right 0.22s ease,
+      background 0.22s;
+
+    .capsule {
+      position: relative;
+      width: 20px;
+      height: 20px;
+      min-width: 0;
+      padding: 0;
+      gap: 0;
+      background: transparent;
+      box-shadow: none;
+      transition:
+        width 0.22s ease,
+        gap 0.22s;
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset: -7px;
+        border-radius: 999px;
+      }
+      .cnt,
+      .c-last {
+        display: none;
+      }
+      .spdot {
+        width: 7px;
+        height: 7px;
+      }
+    }
+    /* 悬停自查：向左借位展开成完整胶囊（右缘锚定不动，不追鼠标） */
+    &:hover {
+      width: 168px;
+      height: 26px;
+
+      .capsule {
+        width: 168px;
+        height: 26px;
+        gap: 6px;
+        padding: 0 10px;
+
+        .cnt,
+        .c-last {
+          display: inline;
+        }
+        .spdot {
+          width: 7px;
+          height: 7px;
+        }
+      }
+    }
+  }
 }
 /* Q7：胶囊常驻淡切（ZCode mini 行 150ms opacity）——非 mini 态绝对定位退出流+隐交互 */
 .capsule {
   /* 三反馈③（拍板 2026-10-10）：定最小宽+内容居中——live 期文本随阶段切换（思考中→查任务→…）
      宽度反复伸缩，右锚定下左缘每秒跳；定宽后宽度稳定，跟随几何（hug）的解算输入也随之稳定 */
-  min-width: 136px;
+  /* Q20：胶囊会随 gutter 缩到 137px——min-width 必须跟 100% 取小，否则 136 内容宽 + 24 padding
+     会撑破壳（overflow:hidden 直接裁字）；border-box 让 padding 计入这 168/137 */
+  box-sizing: border-box;
+  min-width: min(136px, 100%);
   justify-content: center;
   display: flex;
   align-items: center;
@@ -869,6 +1099,9 @@ onBeforeUnmount(() => {
   border-top: 1px solid var(--dcs-border-color-lighter);
   color: var(--dcs-text-placeholder);
   font-size: 11.5px;
+  /* Q27：220 宽卡片里尾注会在「本轮 / 完成」处折出一个孤字——两行均分，
+     不要在第二行只剩两个字（300 宽单行不受影响；不支持则忽略） */
+  text-wrap: balance;
 
   &.sumok {
     color: var(--dcs-color-success);

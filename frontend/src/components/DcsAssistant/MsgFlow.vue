@@ -713,15 +713,20 @@ defineExpose({ jumpToStep, jumpToConfirm });
 
     /* Q7（拍板 2026-10-10）：限宽只作用于内容块——tobot 圆钮保持 34px
        （session 页补 :full 后 >* 会把它撑成 900 宽的条，实测回归）
-       Q5（ZCode 对齐，2026-10-10）：内容块左贴会话列表（align-self 替代父层 center——
-       列左缘恒 24px，与 Composer .box/chips 同几何；批A Q7 2026-10-11 起 tobot
-       水平基准改「内容列中线」——帽豁免只为保 34px 正圆，几何见 .tobot margin 公式）
        宽屏加宽（2026-10-11 用户拍板）：帽改读宿主变量（Composer 观测宿主写入的
-       --dcs-col-max，默认 900；宿主 ≥1380 时 1080）——答案区与输入框同一条列几何 */
+       --dcs-col-max，默认 900；宿主 ≥1380 时 1080）——答案区与输入框同一条列几何
+       Q29（2026-10-30 用户对质 ZCode 源码）：**改回居中**。Q5 当时把
+       `w-[calc(100%-24rem)] + -translate-x-42` 读成「列贴左」，实际那两件套的净效果是
+       「列在剩余区居中」——ZCode 的列容器本身是 `mx-auto`。依据：
+       `packages/ui/src/v4/ConversationTimeline.tsx:1804/1820/1866/1887` 的
+       `relative mx-auto w-full`，加 `conversationLayout.ts:8` 的 `-translate-x-42`。
+       贴左的代价在宽屏最明显：1920 实测列 900 挤在左缘（左 25 / 右 403），
+       和「展开时左缝 = 到面板的缝」自相矛盾——因为列根本不在可用区中间。
+       居中后：胶囊态左右对称；展开态列在「左缘 ~ 面板左缘」之间居中，两缝自然相等。 */
     > *:not(.tobot) {
       width: 100%;
       max-width: var(--dcs-col-max, 900px);
-      align-self: flex-start;
+      align-self: center;
     }
     .mrow-me .me-wrap {
       max-width: 76%;
@@ -978,11 +983,10 @@ defineExpose({ jumpToStep, jumpToConfirm });
 .tobot {
   position: sticky;
   bottom: 14px;
-  /* 批A Q7（拍板 2026-10-11）：水平基准从「滚动容器中线」改「内容列中线」——宽形态列帽
-     限宽靠左时按钮不再钉死整宽正中；窄抽屉无列帽（流宽<900）时 50% 项胜出=原居中不变。
-     margin 百分比按流容器内容宽解析：列中心 = min(容器宽, 列宽)/2，减 17px=按钮半宽 */
-  align-self: flex-start;
-  margin-left: min(calc(50% - 17px), calc(var(--dcs-col-max, 900px) / 2 - 17px));
+  /* 批A Q7（拍板 2026-10-11）：水平基准从「滚动容器中线」改「内容列中线」——
+     Q29 起列回到居中（`>*` align-self: center），列中线与容器中线重合，
+     原来的 margin 公式随之退化成 50%——直接交给 align-self 居中，删掉 margin 项 */
+  align-self: center;
   margin-top: -34px;
   /* Q7（拍板 2026-10-10）：流是纵向 flex 容器，末位子项默认 flex-shrink:1 会被长会话
      纵向压缩成 34×21 扁椭圆——flex:none 保住 34×34 正圆（ZCode 同款居中圆钮） */

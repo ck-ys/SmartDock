@@ -1473,6 +1473,9 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
      并继承放大所有未显式设行高的行——＋面板每行 48px/面板 537px 的根因，这里整树重置 */
   line-height: 1.5;
   font-size: 14px;
+  /* Q24（2026-10-29）：同一条全局 aside 还带 margin-bottom:20px——fixed 且 top/bottom 都钉 0 时，
+     下边距把盒子整体抬高 20px，抽屉底与视口底之间留一条 20px 的透底缝（会话页左卡同因，已一并复位） */
+  margin: 0;
   /* J-2 原型 bg2：灰画布，白头/白气泡/白输入盒在其上分层 */
   background: #f7f8fa;
   /* 助手抽屉是自带浅色工作台（深色换肤不在本批范围）：内部主色钉回近黑，
@@ -1542,10 +1545,48 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
   min-width: 0;
   display: flex;
   flex-direction: column;
+  /* Q20（2026-10-29）：统计面板是 .dw-body 的绝对定位子元素，而 .dcs-dw 是 position:fixed——
+     本层不设 relative 时面板会以整个抽屉（全屏 1280）为基准，实测 1920 下 168 胶囊落在
+     正文列右缘内侧 110px（压字）。同会话页 .main 的定位上下文对齐，让 right 与实测列右同基准 */
+  position: relative;
   /* Q8/Q9/三反馈② 廊位：StatPanel 按容器宽解算写 --sp-strip（抽屉窄形态无面板=不写，
      走 0 兜底）；StatPanel 为 absolute 浮层不吃本层 padding，正文列与聊天框一起让、一起回 */
   padding-right: var(--sp-strip, 0px);
   transition: padding-right 0.3s ease;
+
+  /* Q28（2026-10-30）：让位带与会话页同口径——面板是浮在会话画布上的一层，它身后这条
+     竖带按答案区同一档画布色铺底（--el-fill-color-light），不再是白 gutter；
+     面板 z-index 5 压在伪元素之上。 */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: var(--sp-strip, 0px);
+    background: var(--el-fill-color-light, #f5f7fa);
+    pointer-events: none;
+    transition: width 0.3s ease;
+  }
+
+  /* Q38（2026-10-30 深审）：Q36 那处滚动条病灶在本层有第二宿主。
+     本层同样用 padding-right: var(--sp-strip) 让位，而滚动容器 .dcs-flow 整个坐在
+     padding 里 ⇒ 滚动口 = 内容宽 − strip，滚动条永远差一个让位宽。
+     1920 实测（全屏 1280 居中）：strip 158 / 列右 1738 / 本层内缘 1896，
+     滚动条落在 1728–1738，离最右差 158（会话页 Q36 修复前是同款 187）。
+     解法与 Q36 逐行同构：负外边距吃掉父层 padding，自身 padding 等量补回，
+     内容盒宽不变，滚动容器拉到本层内缘，滚动条贴最右。
+     padding 24 只在全屏成立（抽屉形态 14 且无面板=strip 0），故与 Q36 一样限定 .full。
+     z-index 1 压同层伪元素 ::after（它没设 z，同层按 DOM 序在本层之后绘制，
+     不抬就被让位带灰底盖住滚动条）；.dcs-gate 是 z 20 的同层兄弟，仍恒在其上，
+     不吃影响。谁再动这一行，跟 Composer 的 Q37 层级阶梯对一眼。 */
+  :deep(.dcs-flow.full) {
+    margin-right: calc(-1 * var(--sp-strip, 0px));
+    padding-right: calc(24px + var(--sp-strip, 0px));
+    position: relative;
+    z-index: 1;
+    transition:
+      margin-right 0.3s ease,
+      padding 0.3s ease;
+  }
 }
 /* 波 0.1 续（四席复审 P2）：横屏刘海安全区必须在组件内叠加，不能放全局样式——
    ① 全局 .dcs-dw .dw-body 与本 scoped 规则同特异性，本组件是异步 chunk、加载更晚，
@@ -1564,6 +1605,13 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
   .dcs-dw.full .dw-body {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: calc(var(--sp-strip, 0px) + env(safe-area-inset-right, 0px));
+  }
+
+  /* Q38：本档让位带把刘海安全区也算进去了，负边距必须一并吃回——
+     只吃 --sp-strip 的话滚动条仍会差一个 env(safe-area-inset-right) */
+  .dw-body :deep(.dcs-flow.full) {
+    margin-right: calc(-1 * (var(--sp-strip, 0px) + env(safe-area-inset-right, 0px)));
+    padding-right: calc(24px + var(--sp-strip, 0px) + env(safe-area-inset-right, 0px));
   }
 }
 /* 业务批4 Q2：任务上下文条（紧贴输入框上方）——顶层选择器（原块嵌在 .hd-txt 里是头部

@@ -2081,6 +2081,14 @@ defineExpose({
 <style lang="scss" scoped>
 .dcs-comp {
   flex: none;
+  /* Q37（2026-10-30 用户红圈：滚动到中间时「用量卡上半截不见了」）：
+     输入区的弹层（用量 / 模型 / 思考档）是 `bottom: calc(100% + 8px)` 向上伸的，
+     会压在消息区身上。Q36 为了让滚动条盖过让位带，给 .dcs-flow 加了 `z-index: 1`——
+     于是消息区那层不透明底色反过来盖住了弹层上半截（实测被切 87px，切口正好是 flow 底边）。
+     这里把输入区整体抬到消息区之上（弹层是它的子层，跟着一起上来）；两者在 flex 列里不重叠，
+     抬层不改任何布局。谁再动 .dcs-flow 的 z-index，记得同步这一行。 */
+  position: relative;
+  z-index: 2;
   /* 待确认期间收起（保持挂载，draft/附件/弹层状态不丢） */
   &.blocked {
     display: none;
@@ -2097,17 +2105,19 @@ defineExpose({
     padding: 8px 24px 12px;
     background: var(--el-fill-color-light, #f5f7fa);
 
-    /* Q5（ZCode 对齐，2026-10-10）：主列左贴会话列表（原 900 居中导致主体漂在离左栏
-       半米远的空档；ZCode @1280 段=w-[calc(100%-24rem)]+translate-x-42 同语义=列贴左、
-       右侧让面板）。max-width 900 帽不动，窄容器自然撑满 */
-    /* k3 P1-3 回修（2026-10-11）：列共线——原 margin-left 24px 叠在本层 24px padding
-       之上，输入列左缘=48 而消息列（MsgFlow.full 子块）=24，两条列差 24px 不共线
-       （图-码对质实锤）。去 margin：两列同在 padding 24 轨上；贴左目标更彻底 */
+    /* Q5（ZCode 对齐，2026-10-10）：主列与消息列同一条几何；
+       Q29（2026-10-30 对质 ZCode 源码）：由「贴左」改回**居中**——ZCode 的列容器是
+       `mx-auto`（ConversationTimeline.tsx:1804/1820/1866/1887），`-translate-x-42`
+       只是把居中的列挪到「左缘~面板左缘」之间。贴左会让宽屏正文挤在左缘
+       （1920 实测左 25 / 右 403），展开时也就无法满足「左缝 = 到面板的缝」。
+       max-width 帽不动，窄容器自然撑满 */
+    /* k3 P1-3 回修（2026-10-11）：列共线——输入列与消息列同在 padding 24 轨上
+       （Q29 起两列同为居中，共线由同一条 max-width + auto margin 保证） */
     /* 宽屏加宽（2026-10-11 用户拍板）：帽改读宿主变量（单一真源由本组件 onMounted
        观测宿主写入，默认 900 不变；宿主 ≥1380 时 1080）。答案区/卡片行同步=同一变量 */
     .box {
       max-width: var(--dcs-col-max, 900px);
-      margin: 0 auto 0 0;
+      margin: 0 auto;
     }
 
     /* Q6（用户反馈「卡片挤在左侧不与聊天框齐头」，2026-10-10）：chips/常用/附件条
@@ -2122,7 +2132,7 @@ defineExpose({
     .attbar,
     .queue-bar {
       max-width: var(--dcs-col-max, 900px);
-      margin: 0 auto 8px 0;
+      margin: 0 auto 8px;
     }
   }
 }
