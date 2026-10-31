@@ -7,6 +7,7 @@ import { TenantVO } from '@/api/types';
 import { useUserStore } from '@/store/modules/user';
 import { useWorkspace } from '@/composables/useWorkspace';
 import { clearTenantMirror, readTenantMirror, writeTenantMirror } from '@/composables/tenantMirror';
+import { invalidateSources } from '@/composables/useProfileSources';
 
 /**
  * 超管切换租户：左上品牌行、左下账号菜单共用这一份状态。
@@ -164,6 +165,11 @@ export const useTenantSwitch = () => {
       return;
     }
     apply(target);
+    // 2026-10-30（旧账收口）：切单位必须把画像/分析共用的源清单缓存打掉。
+    // useProfileSources 的 inflight 是模块级单例，成功后永不释放——不清就会拿上一个
+    // 单位的源清单继续渲染八页的数据源下拉（旧账里那条「切换单位后源下拉出现虚列」）。
+    // 清完之后各页 ensureSources() 重拉，拿到的是新单位的真实源。
+    invalidateSources();
     // 题3-⑤ 广播切换单位：侧栏待审徽标等立即拉新单位数据（原来最长等 60s 轮询）
     window.dispatchEvent(new Event('dcs:tenant-changed'));
     try {

@@ -12,6 +12,9 @@
 
 # ===== 本地配置与运行数据 =====
 # 锚定根目录：只忽略仓库根的 config/ data/，不误伤 Java 源码里的 config 包
+# 注意：config/prompts/ 是 PromptAssets 三级加载的 external 级覆盖（运行期提示词），
+# 位置必须相对「启动工作目录」，在仓库根启动就读这里；内容与
+# ruoyi-modules/ruoyi-assistant/src/main/resources/prompts/ 同源，属本机部署配置，不进 git
 /config/
 /data/
 

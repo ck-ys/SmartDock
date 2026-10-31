@@ -212,7 +212,9 @@ const resetState = () => {
   padding: 10px 14px;
   margin-bottom: 8px;
   border: 1px solid #cdd3e1;
-  border-radius: 6px;
+  /* 2026-10-30（旧账收口）：原 6px 不在这套标尺上——全站 --app-radius-base 是 8px，
+     列表项/按钮统一吃 --el-border-radius-base，这里跟齐，别单独留一个 6 */
+  border-radius: var(--el-border-radius-base, 8px);
   background: #fff;
   font: inherit;
   text-align: left;
