@@ -26,16 +26,27 @@ import static org.mockito.Mockito.when;
  * 助手模型解析优先级链单测（批3 Q11，2026-10-09；纯 mock 不连库）。
  *
  * <p>判据（Review Focus ④ 空槽回退）：
- * 助手默认槽（dcs_assistant_model_setting）→ 接口默认解析器（★→最近可用）；
+ * 助手默认槽（dcs_assistant_model_setting）→「上次成功行」→ 接口默认解析器（★→最近可用）；
  * 槽空/槽失效（指向行停用、跨租户、CNY 闸不过）=静默回退接口默认，不抛不 null；
  * 链尾仍无可用行才抛 AiNotConfiguredException（禁静默回退平台侧红线）。</p>
+ *
+ * <p>2026-10-31 修陈测试：Q3-A 在链中插了「上次成功行」一段（5fecc51），本测试没跟上——
+ * Mockito 对包装类型 Long 的默认值是 0（不是 null），于是 resolveConfigById(tenant,0)
+ * 拿到 null 直接返回，后两段根本没走到，6 条断言长期假红。这里显式声明「本租户没有上次行」。</p>
  */
 @Tag("dev")
 class J2AssistantModelChainTest {
 
     private final IDcsAiConfigService aiConfigService = mock(IDcsAiConfigService.class);
     private final AssistantModelSettingService settingService = mock(AssistantModelSettingService.class);
-    private final AssistantModelFactory factory = new AssistantModelFactory(aiConfigService, null, settingService);
+    private final AssistantModelFactory factory = new AssistantModelFactory(aiConfigService, null, settingService,
+        new org.dromara.assistant.core.AssistantModelDegradeSignal());
+
+    /** Mockito 包装类型默认 0：显式置「无上次成功行」，让各用例落在自己声明的链段上 */
+    @org.junit.jupiter.api.BeforeEach
+    void noLastUsedRowByDefault() {
+        when(aiConfigService.latestUsedConfigId(anyString())).thenReturn(null);
+    }
 
     /** 链段1: 助手默认槽有指向且行可用 → 用它, 不查接口默认 */
     @Test

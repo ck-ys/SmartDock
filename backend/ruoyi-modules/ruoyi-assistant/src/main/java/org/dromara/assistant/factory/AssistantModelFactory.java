@@ -98,6 +98,8 @@ public class AssistantModelFactory {
     private final org.dromara.assistant.service.CapabilityService capabilityService;
     /** 批3 Q11：助手默认槽（AI 助手管理页设置，优先于接口默认星标） */
     private final org.dromara.assistant.service.AssistantModelSettingService modelSettingService;
+    /** 题5 案1（2026-10-31）：自选模型回退默认链时给对话落一条提示（不再静默换模型） */
+    private final org.dromara.assistant.core.AssistantModelDegradeSignal degradeSignal;
 
     /**
      * 按租户解析生效 CHAT 配置行（批3 Q11 优先级链）：
@@ -207,26 +209,44 @@ public class AssistantModelFactory {
         if (threadId != null) {
             Long picked = org.dromara.assistant.core.AssistantModelChoiceHolder.get(threadId);
             if (picked != null) {
+                // 题5 案1：三条回退路径都留人话原因，回退完成后落一条对话提示（不再静默换模型）
+                String fallbackReason = null;
                 if (!modelSettingService.allowUserSwitch(tenantId)) {
                     log.warn("[ModelFactory] 自选开关已关, 忽略用户声明模型 tenant={} thread={} configId={}",
                         tenantId, threadId, picked);
+                    fallbackReason = "管理员已关闭模型自选";
                 } else {
                     java.util.Set<Long> scopeIds = modelSettingService.switchScopeIds(tenantId);
                     if (!scopeIds.isEmpty() && !scopeIds.contains(picked)) {
                         log.warn("[ModelFactory] 用户声明模型不在自选范围(switch_scope), 回退默认链 tenant={} thread={} configId={}",
                             tenantId, threadId, picked);
+                        fallbackReason = "你选的模型不在可选范围内";
                     } else {
                         try {
                             return aiConfigService.resolveConfigById(tenantId, picked);
                         } catch (org.dromara.common.core.exception.ServiceException e) {
                             log.warn("[ModelFactory] 用户所选模型失效, 回退默认链 tenant={} thread={} configId={}: {}",
                                 tenantId, threadId, picked, e.getMessage());
+                            fallbackReason = "你选的模型当前不可用";
                         }
                     }
                 }
+                DcsAiConfig fallback = resolveConfig(tenantId);
+                degradeSignal.submit(threadId,
+                    fallbackReason + "，本回合改用「" + modelLabel(fallback) + "」回答");
+                return fallback;
             }
         }
         return resolveConfig(tenantId);
+    }
+
+    /** 降级提示里的模型显示名（模型名优先，空则配置号兜底——绝不显示 null） */
+    public static String modelLabel(DcsAiConfig cfg) {
+        if (cfg == null) {
+            return "默认模型";
+        }
+        String name = cfg.getModelName();
+        return name == null || name.isBlank() ? ("配置 #" + cfg.getConfigId()) : name;
     }
 
     /**

@@ -573,6 +573,38 @@ CREATE UNIQUE INDEX uk_dcs_assistant_skill_tenant ON public.dcs_assistant_skill 
 
 
 --
+-- Name: dcs_assistant_skill_usage; Type: TABLE; Schema: public; Owner: -
+-- 题2 案3（2026-10-31 拍板）：技能使用统计——只记「用了几次 / 最近一次用」，
+-- 按 (tenant_id, skill_id) 唯一。内置技能没有在线行也能统计（不依赖 dcs_assistant_skill）；
+-- 不存逐次调用明细（题2 案3 明确不做归档/扫描）。
+--
+
+CREATE TABLE public.dcs_assistant_skill_usage (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    skill_id character varying(64) NOT NULL,
+    use_count bigint DEFAULT 0 NOT NULL,
+    last_used_at timestamp without time zone,
+    update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: dcs_assistant_skill_usage_pk; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dcs_assistant_skill_usage
+    ADD CONSTRAINT dcs_assistant_skill_usage_pk PRIMARY KEY (id);
+
+
+--
+-- Name: uk_dcs_assistant_skill_usage_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_dcs_assistant_skill_usage_tenant ON public.dcs_assistant_skill_usage (tenant_id, skill_id);
+
+
+--
 -- Name: dcs_assistant_model_setting; Type: TABLE; Schema: public; Owner: -
 --
 

@@ -122,17 +122,36 @@
                   <span class="ui-pill ui-pill--muted">{{ billingModeLabel(row.billingMode) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column min-width="190" show-overflow-tooltip>
+              <!-- 2026-10-31 题5 案1：Token 拆三列（输入/输出/缓存）——费用翻倍时一眼看出是
+                   输入变大还是缓存没命中；缓存为 0 显示 --（无信息量不占视线） -->
+              <el-table-column width="100" align="right" class-name="ui-num">
                 <template #header>
-                  Token
-                  <el-tooltip
-                    placement="top"
-                    content="输入=发送内容消耗的 Token；输出=AI 回答生成的 Token；缓存=命中缓存的输入部分（更便宜，为 0 时不显示）"
-                  >
+                  输入
+                  <el-tooltip placement="top" content="发送给模型的全部 Token（系统提示词 + 历史 + 本轮输入）">
                     <span class="col-info">ⓘ</span>
                   </el-tooltip>
                 </template>
-                <template #default="{ row }">{{ tokenText(row) }}</template>
+                <template #default="{ row }">{{ fmtNum(row.promptTokens) }}</template>
+              </el-table-column>
+              <el-table-column width="100" align="right" class-name="ui-num">
+                <template #header>
+                  输出
+                  <el-tooltip placement="top" content="模型生成的 Token（回答 + 工具调用参数）">
+                    <span class="col-info">ⓘ</span>
+                  </el-tooltip>
+                </template>
+                <template #default="{ row }">{{ fmtNum(row.completionTokens) }}</template>
+              </el-table-column>
+              <el-table-column width="100" align="right" class-name="ui-num">
+                <template #header>
+                  缓存
+                  <el-tooltip placement="top" content="命中缓存的输入部分（更便宜）；0 表示这次没命中缓存">
+                    <span class="col-info">ⓘ</span>
+                  </el-tooltip>
+                </template>
+                <template #default="{ row }">
+                  <span :class="{ muted: !row.cachedPromptTokens }">{{ row.cachedPromptTokens ? fmtNum(row.cachedPromptTokens) : '--' }}</span>
+                </template>
               </el-table-column>
               <el-table-column label="耗时(ms)" prop="latencyMs" width="100" align="right" class-name="ui-num" />
               <el-table-column label="基础成本" width="105" align="right" class-name="ui-num">
@@ -761,8 +780,9 @@ onMounted(loadData);
 }
 
 .usage-table-wrap :deep(.el-table) {
-  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加（2026-10-31 题1 加了「配置」118px） */
-  min-width: 1728px;
+  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加
+     （2026-10-31 题1 加「配置」118px；题5 单列 Token 拆输入/输出/缓存 3×100=+110px） */
+  min-width: 1838px;
   /* 只覆盖 EP 表格 CSS 变量，不重写组件（契约 §2.5） */
   --el-table-header-bg-color: transparent;
   --el-table-tr-bg-color: var(--app-surface);

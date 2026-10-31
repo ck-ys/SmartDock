@@ -47,6 +47,8 @@ public class AssistantSkillAdminController extends BaseController {
     static final int NAME_MAX = 64;
 
     private final AssistantSkillMapper skillMapper;
+    /** 题2 案3（2026-10-31）：技能使用统计（用次 + 最近一次），管理列表只读展示 */
+    private final org.dromara.assistant.service.AssistantSkillUsageService skillUsageService;
 
     /**
      * 当前租户口径（三审 dspro P1-5）：动态租户优先（超管切单位看/改谁家就是谁家），
@@ -71,6 +73,8 @@ public class AssistantSkillAdminController extends BaseController {
     public R<List<Map<String, Object>>> list() {
         String tenantId = currentTenant();
         Map<String, DcsAssistantSkill> dbRows = indexBySkillId(skillMapper.selectAllForTenant(tenantId));
+        // 题2 案3：一次取全租户统计，逐行补 useCount/lastUsedAt（没有统计=0/null）
+        Map<String, Map<String, Object>> usage = skillUsageService.usageOf(tenantId);
         List<Map<String, Object>> out = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (SkillAssets.LoadedSkill s : SkillAssets.skills(tenantId)) {
@@ -88,6 +92,7 @@ public class AssistantSkillAdminController extends BaseController {
             }
             row.put("source", source);
             row.put("builtinMinRole", builtinMinRoleName(s.id()));
+            applyUsage(row, usage, s.id());
             out.add(row);
             seen.add(s.id());
         }
@@ -104,6 +109,7 @@ public class AssistantSkillAdminController extends BaseController {
             row.put("source", builtinMinRoleName(r.getSkillId()).isEmpty()
                 ? "online-disabled" : "builtin-disabled");
             row.put("builtinMinRole", builtinMinRoleName(r.getSkillId()));
+            applyUsage(row, usage, r.getSkillId());
             out.add(row);
             seen.add(r.getSkillId());
         }
@@ -264,6 +270,17 @@ public class AssistantSkillAdminController extends BaseController {
         row.put("minRole", DatabaseSkillRepository.minRoleName(s.minRole()));
         row.put("body", s.body());
         return row;
+    }
+
+    /**
+     * 题2 案3：把使用统计补进行（无统计=0 次 / 从未用过）。
+     * MyBatis 返回的 map 键是 SQL 别名小写（usecount/lastusedat）。
+     */
+    private static void applyUsage(Map<String, Object> row,
+                                   Map<String, Map<String, Object>> usage, String skillId) {
+        Map<String, Object> u = usage.get(skillId);
+        row.put("useCount", u == null || u.get("usecount") == null ? 0L : u.get("usecount"));
+        row.put("lastUsedAt", u == null ? null : u.get("lastusedat"));
     }
 
     /** 内置档名（无内置=空串，纯在线技能） */
