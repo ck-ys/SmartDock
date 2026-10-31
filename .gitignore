@@ -41,3 +41,8 @@ Thumbs.db
 backend/data/
 backend/ruoyi-admin/data/
 frontend/data/
+
+# ===== 施工工具产物（2026-10-31 题4）：这些东西只该进 .workshop/tmp/ =====
+# taste-skill 的巡检截图/报告默认写在项目根；.workbuddy 是另一条线的会话记忆
+.taste-skill/
+.workbuddy/
