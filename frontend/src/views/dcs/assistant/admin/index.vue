@@ -1115,7 +1115,7 @@
               </el-table-column>
               <template #empty>
                 <el-empty
-                  :description="mcpLogLoading ? '加载中…' : auditShowMounts ? '还没有调用或挂载记录' : '还没有真实调用——右上角可打开挂载记录'"
+                  :description="mcpLogLoading ? '加载中…' : mcpLogError ? '加载失败——刷新页面或稍后再试' : auditShowMounts ? '还没有调用或挂载记录' : '还没有真实调用——右上角可打开挂载记录'"
                   :image-size="56"
                 />
               </template>
@@ -1192,7 +1192,7 @@
             </el-table-column>
             <!-- 题4：空态交给表格插槽——原来的表内「暂无数据」+ 表下插画会把「没有」说两遍 -->
             <template #empty>
-              <el-empty :description="fbLoading ? '加载中…' : '还没有反馈——用户在回答尾部点「点踩」时会落到这里'" :image-size="60" />
+              <el-empty :description="fbLoading ? '加载中…' : fbListError ? '加载失败——稍后再试或刷新页面' : '还没有反馈——用户在回答尾部点「点踩」时会落到这里'" :image-size="60" />
             </template>
           </el-table>
           <div v-if="fbTotal > fbRows.length" class="fb-more">
@@ -1325,7 +1325,7 @@
             </el-table-column>
             <!-- 题4：同上，空态只留插槽这一份 -->
             <template #empty>
-              <el-empty description="还没有公告——发布后用户打开 AI 助手即见顶部横幅" :image-size="60" />
+              <el-empty :description="annLoading ? '加载中…' : annListError ? '加载失败——稍后再试或刷新页面' : '还没有公告——发布后用户打开 AI 助手即见顶部横幅'" :image-size="60" />
             </template>
           </el-table>
         </el-card>
@@ -2052,6 +2052,8 @@ async function onNameSave() {
 const fbRows = ref<Array<{ rating: string; note?: string; createTime?: string }>>([]);
 const fbTotal = ref(0);
 const fbLoading = ref(false);
+/** F5（2026-10-31 复审回修）：列表加载失败与「还没有反馈」分开说——空态不再谎报数据不存在 */
+const fbListError = ref(false);
 // AI 缺口批 Q10：反馈聚合统计（好评率/原因分布/周趋势）
 const fbStats = ref<any>(null);
 /** 题4：统计卡自己兜失败态——原来 catch 里把 fbStats 置 null，整张卡跟着消失 */
@@ -2068,12 +2070,14 @@ const reasonPct = (cnt: number) => {
   return Math.round((Number(cnt) / max) * 100);
 };
 async function loadFbStats() {
+  // F3（2026-10-31 复审回修）：进行中直接返回——进运营页签时「守卫兜底发」与「显式发」会同步连发两次，幂等接口也是白费请求
+  if (fbStatsLoading.value) return;
   fbStatsLoading.value = true;
   fbStatsError.value = false;
   try {
     const res: any = await getFeedbackStats(28);
-    // 回修：data 为 null 时落到诚实空态（total=0 → 「还没有样本」），不再永远停在「加载中…」
-    fbStats.value = res?.data ?? { total: 0 };
+    // 回修+F4（2026-10-31 复审回修）：data 为 null 时落到诚实空态，兜底对象补全字段——缺 windowDays/up/down 会渲染出「好评率（近 天）」和孤立的「 · 」
+    fbStats.value = res?.data ?? { total: 0, windowDays: 28, up: 0, down: 0, upRate: null };
   } catch {
     fbStats.value = null;
     fbStatsError.value = true;
@@ -2101,7 +2105,9 @@ async function loadFeedback() {
     };
     fbRows.value = [...fbRows.value, ...(res?.rows ?? [])];
     fbTotal.value = res?.total ?? fbRows.value.length;
+    fbListError.value = false; // F5：成功才清失败标志
   } catch {
+    fbListError.value = true; // F5：失败态空态要说「加载失败」，不说「还没有」
     ElMessage.error('反馈加载失败，请稍后再试');
   } finally {
     fbLoading.value = false;
@@ -2111,6 +2117,8 @@ async function loadFeedback() {
 /* ===== 助手公告页签（批4 Q11）：发布/编辑/撤回，发布即生效；首开加载挂在 onTabChange ===== */
 const annRows = ref<AssistantAnnouncementRow[]>([]);
 const annLoading = ref(false);
+/** F5：公告列表加载失败与「还没有公告」分开说 */
+const annListError = ref(false);
 const annSaving = ref(false);
 const annForm = reactive<{ id?: string; title: string; content: string; style: string }>({
   id: undefined,
@@ -2129,7 +2137,9 @@ async function loadAnnouncements() {
   try {
     const res = (await listAssistantAnnouncements()) as unknown as { rows?: AssistantAnnouncementRow[] };
     annRows.value = res?.rows ?? [];
+    annListError.value = false; // F5：成功才清失败标志
   } catch {
+    annListError.value = true; // F5：失败态空态要说「加载失败」，不说「还没有」
     ElMessage.error('公告加载失败，请稍后再试');
   } finally {
     annLoading.value = false;
@@ -2209,8 +2219,11 @@ async function loadActionLog() {
     logTotal.value = res?.total ?? 0;
     logRenderedPage = logQuery.pageNum;
   } catch {
-    if (seq === logSeq) logQuery.pageNum = logRenderedPage;
-    ElMessage.error('运行记录加载失败，请稍后再试');
+    // F6（2026-10-31 复审回修）：回滚与报错都只认最新一次请求——被序号淘汰的旧请求失败不该弹错
+    if (seq === logSeq) {
+      logQuery.pageNum = logRenderedPage;
+      ElMessage.error('运行记录加载失败，请稍后再试');
+    }
   } finally {
     if (seq === logSeq) logLoading.value = false;
   }
@@ -2877,34 +2890,38 @@ function copyOneSegment() {
 /* ===== 总览：需要处理（只列会影响用户的事，点一下直达对应段） ===== */
 const attentionItems = computed(() => {
   const out: Array<{ level: string; title: string; desc: string; action: string; tab: string }> = [];
-  if (!cfg.value.enabled) {
-    out.push({ level: 'bad', title: '助手是停用状态', desc: '所有用户看不到入口，发消息会被直接拒绝。', action: '去开通', tab: 'rules' });
-  }
-  if (cfg.value.memoryEnabled !== '1') {
-    out.push({ level: 'warn', title: '长期记忆是关闭的', desc: '保存长期记忆这项能力不会出现，用户偏好不会跨会话保留。', action: '去开启', tab: 'rules' });
-  }
-  const openHigh = tgRows.value.filter((r) => r.riskLevel === 'high' && capAvailable(r) && capLevelOf(r, tgDraft.value) === 0);
-  if (openHigh.length) {
-    out.push({
-      level: 'warn',
-      title: `${openHigh.length} 项高危能力对全员开放`,
-      desc: `${openHigh.map((r) => r.displayName).join('、')}——出网或接外部服务，建议收到仅管理员。`,
-      action: '去收紧',
-      tab: 'caps'
-    });
-  }
-  if (auditStats.value.mounts > 0) {
-    out.push({
-      level: 'info',
-      title: '调用记录里大部分是挂载记录',
-      desc: `${auditStats.value.all} 条里 ${auditStats.value.mounts} 条是每次建会话的例行挂载，真正的调用只有 ${auditStats.value.real} 条。`,
-      action: '看真实调用',
-      tab: 'ops'
-    });
-  }
-  const offMcp = mcpRows.value.filter((s) => s.enabled !== '1');
-  if (offMcp.length) {
-    out.push({ level: 'info', title: `${offMcp.length} 个外部服务已停用`, desc: '对应的能力当前不会出现在会话里。', action: '去看看', tab: 'caps' });
+  // F13（2026-10-31 复审回修）：建议全部指向能力/规则/审计段，这几段都只对配置权限开放——
+  // 无权限者点了「去开通/去收紧/去看真实调用」只能白跑一趟，整组不显示
+  if (canConfig.value) {
+    if (!cfg.value.enabled) {
+      out.push({ level: 'bad', title: '助手是停用状态', desc: '所有用户看不到入口，发消息会被直接拒绝。', action: '去开通', tab: 'rules' });
+    }
+    if (cfg.value.memoryEnabled !== '1') {
+      out.push({ level: 'warn', title: '长期记忆是关闭的', desc: '保存长期记忆这项能力不会出现，用户偏好不会跨会话保留。', action: '去开启', tab: 'rules' });
+    }
+    const openHigh = tgRows.value.filter((r) => r.riskLevel === 'high' && capAvailable(r) && capLevelOf(r, tgDraft.value) === 0);
+    if (openHigh.length) {
+      out.push({
+        level: 'warn',
+        title: `${openHigh.length} 项高危能力对全员开放`,
+        desc: `${openHigh.map((r) => r.displayName).join('、')}——出网或接外部服务，建议收到仅管理员。`,
+        action: '去收紧',
+        tab: 'caps'
+      });
+    }
+    if (auditStats.value.mounts > 0) {
+      out.push({
+        level: 'info',
+        title: '调用记录里大部分是挂载记录',
+        desc: `${auditStats.value.all} 条里 ${auditStats.value.mounts} 条是每次建会话的例行挂载，真正的调用只有 ${auditStats.value.real} 条。`,
+        action: '看真实调用',
+        tab: 'ops'
+      });
+    }
+    const offMcp = mcpRows.value.filter((s) => s.enabled !== '1');
+    if (offMcp.length) {
+      out.push({ level: 'info', title: `${offMcp.length} 个外部服务已停用`, desc: '对应的能力当前不会出现在会话里。', action: '去看看', tab: 'caps' });
+    }
   }
   return out;
 });
@@ -3330,6 +3347,8 @@ const mcpLogTotal = ref(0);
 const mcpLogPage = ref(1);
 /** 题5：审计表唯一的加载态缺口——翻页时既要有遮罩，也要挡住连点 */
 const mcpLogLoading = ref(false);
+/** F5：审计表加载失败与「还没有真实调用」分开说 */
+const mcpLogError = ref(false);
 const mcpLogFilter = ref('');
 /** 默认只看真实调用与失败——挂载成功/失败是每次建会话的例行记录，会把真正要看的一屏淹掉 */
 const auditShowMounts = ref(false);
@@ -3380,6 +3399,7 @@ let mcpLogRenderedPage = 1; // 回修：最后一次成功渲染的页码——�
 async function loadMcpCallLog() {
   const seq = ++mcpLogSeq;
   mcpLogLoading.value = true;
+  mcpLogError.value = false; // F5：发起新一轮请求先清失败标志
   try {
     const res = (await pageAssistantMcpCallLog({
       serverName: mcpLogFilter.value || undefined,
@@ -3395,7 +3415,10 @@ async function loadMcpCallLog() {
     if (res.data?.stats) auditStats.value = res.data.stats;
     mcpLogRenderedPage = mcpLogPage.value;
   } catch {
-    if (seq === mcpLogSeq) mcpLogPage.value = mcpLogRenderedPage;
+    if (seq === mcpLogSeq) {
+      mcpLogPage.value = mcpLogRenderedPage;
+      mcpLogError.value = true; // F5：失败态空态要说「加载失败」，不说「还没有」
+    }
     // 同上：request 层已弹
   } finally {
     if (seq === mcpLogSeq) mcpLogLoading.value = false;
@@ -3649,8 +3672,9 @@ async function persistSkill(disabled: boolean) {
     skillNewMode.value = false;
     ElMessage.success(disabled ? '已保存（仍停用）' : '已保存并生效——下一轮新会话起助手就用新内容');
     activeSkillId.value = skillForm.skillId.trim();
-    await loadSkillAdmin();
+    // F7（2026-10-31 复审回修）：保存一成功立刻清脏——列表刷新是网络往返，期间走人会被守卫误弹「未保存」
     markSkillClean();
+    await loadSkillAdmin();
   } catch {
     /* 校验人话报错已由 request 层弹出 */
   } finally {
@@ -4023,9 +4047,6 @@ onMounted(() => {
     void loadToolGate();
     void loadMcpServers();
     void loadMcpCallLog();
-  }
-  if (canFeedback.value) {
-    void loadFbStats();
   }
 });
 </script>
@@ -6356,6 +6377,11 @@ onMounted(() => {
   }
 }
 @media (max-width: 760px) {
+  /* F11（2026-10-31 复审回修）：公告表单在窄屏被按钮挤成一条缝、占位截断——输入放开行内定宽/弹性占满一行，完整可见 */
+  .dcs-as-admin .ann-form .el-input {
+    flex: 1 1 100% !important;
+    width: 100% !important;
+  }
   .dcs-as-admin .adm-bar {
     gap: 8px;
   }
@@ -6530,11 +6556,11 @@ onMounted(() => {
   .dcs-as-admin .fb-reason-name {
     width: 96px;
   }
-  /* 浮层/抽屉：宽度上限＝屏宽（append-to-body，根节点没有 scope id，必须 :global） */
+  /* 浮层/抽屉：宽度上限＝屏宽（append-to-body，根节点没有 scope id，必须 :global）。
+     F14（2026-10-31 复审回修）：原 width !important 会把 500-760 视口区间的弹窗也拉满宽——改只封顶，放得下就保持原宽 */
   :global(.ov-dialog),
   :global(.q-dialog),
   :global(.ws-dialog) {
-    width: calc(100% - 16px) !important;
     max-width: calc(100% - 16px);
   }
   :global(.q-dialog .q-preview),

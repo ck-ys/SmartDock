@@ -561,7 +561,9 @@ public class McpPilotService {
                     callLogMapper, writeTools);
                 // 装饰层：调用级限频 + 双态审计（工具列表/初始化直接委托）
                 toolkit.registerMcpClient(gated).block(Duration.ofMillis(Math.max(remainMs, 1_000)));
-                int mounted = 0;
+                // F8（2026-10-31 复审回修）：remark 的「N 个工具」按本服务自己的清单计数——
+                // 跨服务累计的 added 会拼出「1 个工具 [a工具, b工具]」的自相矛盾文案
+                java.util.Set<String> mountedNames = new java.util.LinkedHashSet<>();
                 for (String name : toolkit.getToolNames()) {
                     if (!before.contains(name)) {
                         // G4-#3：MCP 工具不再无条件 ALLOW——写类（注解 FALSE 或写类服务无注解）
@@ -573,7 +575,7 @@ public class McpPilotService {
                             pb.addAllowRule(name, new PermissionRule(name, "", PermissionBehavior.ALLOW, "dcs-assistant-mcp"));
                         }
                         added.add(name);
-                        mounted++;
+                        mountedNames.add(name);
                     }
                 }
                 // 同会话同服务重挂（会话失效重建）先关旧客户端——旧 toolkit 已随上轮 run 丢弃，
@@ -589,7 +591,7 @@ public class McpPilotService {
                     }
                 }
                 audit(row.getServerName(), tenantId, userId, null, "MOUNT_OK", "1",
-                    null, mounted + " 个工具 " + added);
+                    null, mountedNames.size() + " 个工具 " + mountedNames);
                 raw = null;
             } catch (Exception e) {
                 audit(row.getServerName(), tenantId, userId, null, "MOUNT_ERROR", "0",
@@ -644,10 +646,22 @@ public class McpPilotService {
         l.setStatus(status);
         // 成功行（status=1）的「详情/错误」保持空；失败行保留真错误文本
         l.setErrorMsg("1".equals(status) ? null : errorMsg);
-        java.util.regex.Matcher dm = DURATION_MS.matcher(remark == null ? "" : remark);
-        l.setDurationMs(dm.find() ? Integer.valueOf(dm.group(1)) : null);
+        l.setDurationMs(parseDurationMs(remark));
         l.setCreateTime(new java.util.Date());
         return l;
+    }
+
+    /** F9（2026-10-31 复审回修）：尾缀数字超 int（或非数字）一律置 null——解析失败不能丢整条审计行 */
+    private static Integer parseDurationMs(String remark) {
+        if (remark == null) return null;
+        java.util.regex.Matcher dm = DURATION_MS.matcher(remark);
+        if (!dm.find()) return null;
+        try {
+            long v = Long.parseLong(dm.group(1));
+            return v > Integer.MAX_VALUE ? null : (int) v;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** 挂载行（MOUNT_*）专用：error_msg 写挂载结果详情（如「3 个工具 [a, b]」），成功行也保留；

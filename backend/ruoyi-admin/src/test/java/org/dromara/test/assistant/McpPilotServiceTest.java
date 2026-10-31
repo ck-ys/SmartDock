@@ -120,4 +120,33 @@ class McpPilotServiceTest {
         assertNull(limited.getErrorMsg());
         assertNull(limited.getDurationMs());
     }
+
+    /**
+     * <p>F10（2026-10-31 复审回修）：两处口径漏钉补上——</p>
+     * <p>① 成功行×非空 errorMsg 的「强制置空」分支：现有用例成功行 errorMsg 恒传 null，
+     * 若实现回归为直接 setErrorMsg(errorMsg)，那些断言照样全绿，这一条专门钉死。</p>
+     * <p>② 失败行×带 ms 尾缀 remark：错误保留 + duration 解析；尾缀数字超 int（F9）置 null 且行照常落成。</p>
+     */
+    @Test
+    void buildCallLogClearsErrorMsgOnSuccessEvenIfProvided() {
+        org.dromara.assistant.domain.DcsMcpCallLog ok = org.dromara.assistant.service.McpPilotService.buildCallLog(
+            "weather_demo", "000000", 1L, "get_weather", "CALL_OK", "1", "不应出现的错误", "4ms");
+        assertNull(ok.getErrorMsg(), "成功行即使传了 errorMsg 也必须置空");
+        assertEquals(4, ok.getDurationMs());
+    }
+
+    @Test
+    void buildCallLogParsesFailRemarkMsAndClampsOverflow() {
+        // 失败行带耗时尾缀：错误文本保留，duration 照常解析
+        org.dromara.assistant.domain.DcsMcpCallLog fail = org.dromara.assistant.service.McpPilotService.buildCallLog(
+            "weather_demo", "000000", 1L, "create_task", "CALL_ERROR", "0", "boom", "write 123ms");
+        assertEquals("boom", fail.getErrorMsg());
+        assertEquals(123, fail.getDurationMs());
+
+        // F9：尾缀数字超 int 上限——置 null，不能抛 NumberFormatException 丢整条审计行
+        org.dromara.assistant.domain.DcsMcpCallLog overflow = org.dromara.assistant.service.McpPilotService.buildCallLog(
+            "weather_demo", "000000", 1L, "get_weather", "CALL_ERROR", "0", "boom", "99999999999999ms");
+        assertEquals("boom", overflow.getErrorMsg());
+        assertNull(overflow.getDurationMs(), "超 int 的耗时不该炸行，也不该截断成错值");
+    }
 }
