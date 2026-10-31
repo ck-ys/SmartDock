@@ -506,7 +506,13 @@ const pins = ref<string[]>(JSON.parse(localStorage.getItem(PIN_KEY) ?? '[]'));
 /** DP-1 原型 renderSessions 分组：📌 置顶 + 今天/昨天/更早（关键词只搜标题，与会话页口径一致） */
 const fpGroups = computed(() => {
   const kw = fpKw.value.trim().toLowerCase();
-  const live = fpConvs.value.filter((c) => c.status !== 'ARCHIVED' && (!kw || (c.title ?? '').toLowerCase().includes(kw)));
+  // 搜索同时匹配原始标题与兜底显示名：脏标题在列表里显示成「（未命名会话·MM-DD）」，
+  // 只按 c.title 搜会让用户照着屏上的字也搜不到（2026-10-31 题5 收口补）
+  const live = fpConvs.value.filter(
+    (c) =>
+      c.status !== 'ARCHIVED' &&
+      (!kw || (c.title ?? '').toLowerCase().includes(kw) || displayTitle(c).toLowerCase().includes(kw)),
+  );
   const isPin = (c: FpConv) => pins.value.includes(String(c.id));
   const groups: Array<{ label: string; items: FpConv[] }> = [];
   const pinned = live.filter(isPin);

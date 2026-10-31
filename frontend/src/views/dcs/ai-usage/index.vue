@@ -44,22 +44,25 @@
                 <el-option label="成功" value="1" />
                 <el-option label="失败" value="0" />
               </el-select>
-              <!-- 2026-10-31 题6：板上题15 方案 A 承诺过的两个预留筛选，之前只有查询参数、界面上没有入口 -->
-              <el-input
+              <!-- 2026-10-31 题6：板上题15 方案 A 承诺过的两个预留筛选，之前只有查询参数、界面上没有入口。
+                   场景用下拉（选项取自下面 sceneLabel 的同一套已知段），避免用户照着中文列名去输英文原文却筛不到 -->
+              <el-select
                 v-model="queryParams.scene"
                 class="usage-scene"
                 clearable
-                placeholder="场景含…"
-                aria-label="按场景包含筛选"
-                @keyup.enter="handleQuery"
-                @clear="handleQuery"
-              />
+                placeholder="场景"
+                aria-label="按场景筛选"
+                @change="handleQuery"
+              >
+                <el-option v-for="[value, label] in sceneOptions" :key="value" :label="label" :value="value" />
+              </el-select>
               <el-input
                 v-model="queryParams.configId"
                 class="usage-config"
                 clearable
-                placeholder="配置 ID"
+                placeholder="配置 ID（19 位数字）"
                 aria-label="按配置 ID 精确筛选"
+                @input="queryParams.configId = String(queryParams.configId ?? '').replace(/\D/g, '')"
                 @keyup.enter="handleQuery"
                 @clear="handleQuery"
               />
@@ -304,7 +307,8 @@ const queryParams = reactive({
 const timeRange = ref<[string, string] | []>([]);
 const buildQuery = () => {
   const [begin, end] = timeRange.value || [];
-  // 2026-10-31 题6：配置 ID 是输入框，清空后是空串；后端 BO 的 configId 是 Long，空串会绑定失败
+  // 2026-10-31 题6：配置 ID 是输入框，清空后是空串；后端 BO 的 configId 是 Long，空串/非数字都会绑定失败。
+  // 输入框只放行数字（见模板 @input），这里再把空串归一成 undefined，避免把「没填」当条件发出去。
   const rawConfig = queryParams.configId;
   const configId = rawConfig === '' || rawConfig === null ? undefined : rawConfig;
   return {
@@ -388,6 +392,15 @@ const sceneLabel = (scene?: string): string => {
     })
     .join(' · ');
 };
+
+/** 题6 场景下拉的选项：与 sceneLabel 认得的段一一对应（值仍是库内原文片段，后端按包含匹配）。
+ *  不列「会话调用」——侧车串里也带 assist:chat，选了会把标题生成/追问建议一起捞出来，标签名不副实；
+ *  以后加新场景段时两边一起改。 */
+const sceneOptions: Array<[string, string]> = [
+  ['sidecar:title', '标题生成'],
+  ['sidecar:followup', '追问建议'],
+  ['est', '费用预估'],
+];
 
 const loadList = async () => {
   loading.value = true;

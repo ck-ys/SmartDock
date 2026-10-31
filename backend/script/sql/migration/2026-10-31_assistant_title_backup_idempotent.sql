@@ -4,10 +4,10 @@
 --       这些行没有任何备份，与脚本第 10 行「先整表备份命中行，再置 NULL」的注释不一致。
 --       正常写入路径已被 AssistantTitleService.cleanTitle 堵住，只有「手动重命名标题里带
 --       "title": 字面量」这种极端输入会漏；本脚本把语义补齐，不动已执行过的 10-30 那份。
--- 处置：①备份表若不存在，按与 10-30 迁移完全相同的 5 列形状建一张空表；
---       ②每次执行先把命中行补进备份表（NOT EXISTS 去重，重复执行不会长行）；
+-- 处置：①备份表若不存在，按与 10-30 迁移完全相同的 5 列形状建一张空表（列形状必须一致，否则下方 INSERT 会报列不存在）；
+--       ②每次执行先把命中行补进备份表（按 id + title 去重，重复执行不长行；同一会话后来又被弄脏会补一条新备份）；
 --       ③再把命中行置 NULL。
--- 可重复执行：二次执行 INSERT 0 行、UPDATE 0 行；备份表已存在也不会因列数不符报错。
+-- 可重复执行：二次执行 INSERT 0 行、UPDATE 0 行。
 
 CREATE TABLE IF NOT EXISTS public.dcs_assistant_conversation_title_bak_20261030 AS
 SELECT id, tenant_id, thread_id, title, update_time
@@ -24,7 +24,8 @@ SELECT c.id, c.tenant_id, c.thread_id, c.title, c.update_time
    AND NOT EXISTS (
          SELECT 1
            FROM public.dcs_assistant_conversation_title_bak_20261030 b
-          WHERE b.id = c.id);
+          WHERE b.id = c.id
+            AND b.title IS NOT DISTINCT FROM c.title);
 
 UPDATE public.dcs_assistant_conversation
    SET title = NULL
