@@ -84,4 +84,40 @@ class McpPilotServiceTest {
         assertEquals("ok", org.dromara.assistant.service.McpPilotService.truncate("ok"));
         assertEquals("", org.dromara.assistant.service.McpPilotService.truncate(null));
     }
+
+    /**
+     * 题6（2026-10-30 拍板·案A）调用审计落库口径：成功行「详情/错误」不再把耗时抄一遍，
+     * 耗时只进 duration_ms；失败行保留真错误。
+     *
+     * <p>旧口径 error_msg = errorMsg != null ? errorMsg : remark，成功路径 remark 传的是
+     * "4ms"——前端两列逐行同值（4ms | 4ms），导出/接口消费方同样拿到错口径。</p>
+     */
+    @Test
+    void auditRowKeepsDurationOutOfErrorMsg() {
+        org.dromara.assistant.domain.DcsMcpCallLog ok = org.dromara.assistant.service.McpPilotService.buildCallLog(
+            "weather_demo", "000000", 1L, "get_weather", "CALL_OK", "1", null, "4ms");
+        assertNull(ok.getErrorMsg(), "成功行不该把耗时写进 error_msg");
+        assertEquals(4, ok.getDurationMs());
+        assertEquals("CALL_OK", ok.getAction());
+        assertEquals("weather_demo", ok.getServerName());
+
+        // 写类成功调用 remark 带 "write " 前缀：耗时仍要解析出来（旧坑：endsWith 解析必抛）
+        org.dromara.assistant.domain.DcsMcpCallLog write = org.dromara.assistant.service.McpPilotService.buildCallLog(
+            "weather_demo", "000000", 1L, "create_task", "CALL_OK", "1", null, "write 123ms");
+        assertNull(write.getErrorMsg());
+        assertEquals(123, write.getDurationMs());
+
+        // 失败行：真错误保留，没有耗时尾缀时 durationMs 为空
+        org.dromara.assistant.domain.DcsMcpCallLog bad = org.dromara.assistant.service.McpPilotService.buildCallLog(
+            "weather_demo", "000000", 1L, "get_weather", "CALL_ERROR", "0",
+            "MCP client 'weather_demo' not initialized", null);
+        assertEquals("MCP client 'weather_demo' not initialized", bad.getErrorMsg());
+        assertNull(bad.getDurationMs());
+
+        // 限频行：既无错误文本也无耗时
+        org.dromara.assistant.domain.DcsMcpCallLog limited = org.dromara.assistant.service.McpPilotService.buildCallLog(
+            "weather_demo", "000000", 1L, "get_weather", "RATE_LIMITED", "0", null, null);
+        assertNull(limited.getErrorMsg());
+        assertNull(limited.getDurationMs());
+    }
 }

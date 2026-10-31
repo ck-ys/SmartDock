@@ -495,12 +495,30 @@
                 <span class="cell-note">用户端下次进入页面生效 · 清空=恢复默认</span>
               </div>
             </el-descriptions-item>
-            <el-descriptions-item label="每日回合上限">每人 {{ cfg.dailyRoundLimitPerUser }} 回合 · 明早 0 点恢复</el-descriptions-item>
+            <el-descriptions-item label="每日回合上限">
+              <template v-if="subActive">
+                <template v-if="cfg.dailyRoundLimitPerUser > 0"
+                  >每人 <b>不限</b> 回合 <span class="cell-note">积分消费按积分扣；只有配 0 才是急停</span></template
+                >
+                <template v-else>每人 <b class="q-stopped">已停用</b> <span class="cell-note">租户默认 0 = 急停</span></template>
+              </template>
+              <template v-else>每人 {{ cfg.dailyRoundLimitPerUser }} 回合 · 明早 0 点恢复</template>
+            </el-descriptions-item>
             <!-- 业务批3-④：租户联网默认（每人每日免费次数；0=全租户关停。改值走「用户额度」页单人覆盖或租户配置 API，本页先展示） -->
             <el-descriptions-item label="每日联网次数">
-              每人 {{ cfg.websearchLimitPerUser ?? 20 }} 次<template v-if="(cfg.websearchLimitPerUser ?? 20) === 0"> · 已关停</template>
+              <template v-if="subActive">
+                按套餐档位<span class="cell-note"
+                  >未配档时兜底 {{ cfg.websearchLimitPerUser ?? 20 }} 次{{
+                    (cfg.websearchLimitPerUser ?? 20) === 0 ? ' · 已关停' : ''
+                  }}</span
+                >
+              </template>
+              <template v-else>
+                每人 {{ cfg.websearchLimitPerUser ?? 20 }} 次<template v-if="(cfg.websearchLimitPerUser ?? 20) === 0"> · 已关停</template>
+              </template>
             </el-descriptions-item>
-            <el-descriptions-item label="租户日预算">¥ {{ Number(cfg.dailyBudgetAmount).toFixed(2) }} / 天</el-descriptions-item>
+            <!-- 题3：人民币符号紧贴数字（本页原「¥ 50.00 / ¥1.02」两套写法并存） -->
+            <el-descriptions-item label="租户日预算">¥{{ Number(cfg.dailyBudgetAmount).toFixed(2) }} / 天</el-descriptions-item>
             <!-- 批A-1（2026-10-22 拍板 Q1/Q3）：自动压缩阈值改为只读派生值——按默认模型
                  上下文窗口自动算（窗口 − 输出预留 − 缓冲），管理页不再手改；用户侧也无手动入口 -->
             <el-descriptions-item label="自动压缩">
@@ -709,7 +727,7 @@
                   :data="scopeGroupedRows"
                   size="small"
                   class="scope-table"
-                  max-height="260"
+                  :max-height="isNarrow ? undefined : 260"
                   :span-method="scopeSpanMethod"
                   :row-class-name="scopeRowClass"
                 >
@@ -764,24 +782,76 @@
 
         <section class="adm-sec">
           <div class="sec-head">
-            <div class="sec-ttl"><b>每人每天额度</b></div>
-            <span class="sec-note">先看租户默认，再给个别用户设单人上限；0 = 关停对应能力</span>
+            <div class="sec-ttl">
+              <b>每人每天额度</b>
+              <!-- Q31（2026-10-30 用户反馈 / 2026-10-31 审查回修）：积分消费下回合正数=不限次，但 0 仍是急停、
+                   联网仍按套餐档位每天计数——所以只降噪，不锁编辑入口（锁了会让 0 值急停解不开、联网次数没法重置） -->
+              <el-tag v-if="subActive" size="small" type="info" effect="plain" class="sec-off-tag">积分消费 · 回合不限</el-tag>
+            </div>
+            <span class="sec-note">{{
+              subActive
+                ? '积分消费：回合只要不是 0 就按不限次执行（0 = 急停）；联网按订阅套餐档位、每天照常计数——「重置今日」仍要用'
+                : '先看租户默认，再给个别用户设单人上限；0 = 关停对应能力'
+            }}</span>
           </div>
-        <el-card shadow="never" class="adm-card">
+        <el-card shadow="never" class="adm-card" :class="{ 'quota-off': subActive }">
+          <!-- Q31 回修：原版整区停用会把仍生效的闸关死（回合 0 急停 / 联网日计数），改为「降噪 + 保留编辑入口」 -->
+          <div v-if="subActive" class="quota-offline">
+            <span class="qo-ico">ⓘ</span>
+            <span>
+              当前租户按<b>积分消费</b>：对话扣积分，回合只要不是 0 就按<b>不限次</b>执行；联网每天按<b>套餐档位</b>计数。
+              所以这里的<b>正数</b>在积分态不影响实际限制，但 <b>0 仍然生效</b>——回合填 0（或单人回合设 0）= 对话急停，联网填 0 = 关闭联网。
+              三个入口都保留：<b>「重置今日」会同时清回合和联网计数</b>，联网次数用完必须用它。
+            </span>
+          </div>
           <!-- 概览条：左=租户默认口径（来自本页配置卡数据源）；右=本页速览（口径=当前页，不跨页误导） -->
           <div class="quota-overview">
             <div class="qo-item qo-tenant">
               <span class="qo-k">租户默认</span>
               <span class="qo-v">
-                每人 {{ cfg.dailyRoundLimitPerUser }} 回合/天 · {{ cfg.websearchLimitPerUser ?? 20 }} 次联网/天
-                <span class="qo-note">设过单人上限的不受此默认影响</span>
+                <template v-if="subActive"
+                  ><template v-if="cfg.dailyRoundLimitPerUser > 0"
+                    >每人 <b>不限</b> 回合/天 <span class="qo-note">积分消费按积分扣，正数不设上限</span></template
+                  ><template v-else
+                    >每人 <b class="q-stopped">已停用</b> 回合/天
+                    <span class="qo-note">租户默认配了 0 = 急停，点「改默认」可解除</span></template
+                  >
+                  · {{ cfg.websearchLimitPerUser ?? 20 }} 次联网/天
+                  <span class="qo-note">{{
+                    (cfg.websearchLimitPerUser ?? 20) > 0 ? '套餐配了档位以套餐为准，此处兜底' : '配了 0 = 关闭联网'
+                  }}</span></template
+                >
+                <template v-else
+                  >每人 {{ cfg.dailyRoundLimitPerUser }} 回合/天 · {{ cfg.websearchLimitPerUser ?? 20 }} 次联网/天
+                  <span class="qo-note">设过单人上限的不受此默认影响</span></template
+                >
               </span>
               <!-- 业务批7 Q8：租户默认行内编辑（端点早已存在，此前缺页面入口）。
                    glm53 P2-2 回修：权限串与 PUT /config 端点对齐用 config（quota:edit 菜单
-                   11935 授权 0 角色=对租户管理员不可达，仅超管可见） -->
-              <el-popover v-if="checkPermi(['dcs:assistant:config'])" placement="bottom" :width="340" trigger="click">
+                   11935 授权 0 角色=对租户管理员不可达，仅超管可见）
+                   Q31：积分消费下回合正数不设上限，但 0 仍是急停、联网仍按套餐计数——
+                   保留编辑入口（2026-10-31 审查回修：整区锁死会让 0 值急停解不开、联网次数没法重置） -->
+              <el-popover
+                v-if="checkPermi(['dcs:assistant:config'])"
+                v-model:visible="defaultPopoverOpen"
+                placement="bottom"
+                :width="340"
+                trigger="click"
+                @hide="onDefaultPopoverHide"
+              >
                 <template #reference>
-                  <el-button size="small" text type="primary" class="qo-edit-btn">改默认</el-button>
+                  <el-button
+                    size="small"
+                    text
+                    type="primary"
+                    class="qo-edit-btn"
+                    :title="
+                      subActive
+                        ? '积分消费下：回合 0 = 急停、正数 = 不限；联网 0 = 关闭、正数只在套餐未配档时兜底'
+                        : '改本租户每人每天的回合数 / 联网次数默认值'
+                    "
+                    >改默认</el-button
+                  >
                 </template>
                 <div class="qo-form">
                   <div class="qo-form-row" :class="{ 'qo-danger': defaultEdit.round === 0 }">
@@ -801,8 +871,10 @@
                     >
                     <template v-else>0 = 关停对应能力（紧急刹车）；保存后对全租户未设单人上限的人生效</template>
                   </div>
-                  <!-- Q8 深化：订阅租户提示——Q1 起订阅期回合不限次，回合默认实际空转，不提示会造成"改了没用"的困惑 -->
-                  <div v-if="subActive" class="qo-form-tip">ⓘ 本租户订阅生效中：回合数默认不参与限制（订阅期不限次），联网默认仍生效</div>
+                  <!-- Q8 深化：订阅租户提示——2026-10-31 审查回修：讲清「正数不限 / 0 才急停 / 联网仍计数」 -->
+                  <div v-if="subActive" class="qo-form-tip">
+                    ⓘ 积分消费中：回合数<b>正数不设上限</b>，只有填 <b>0</b> 才是急停（立刻停全租户对话）；联网数 0 = 关闭，正数在套餐未配档时兜底
+                  </div>
                   <!-- Q8 深化：生效预览（与单人上限弹窗 q-preview 同款语义，保存前看得见确切效果） -->
                   <div class="qo-preview">
                     <span class="q-preview-k">保存后生效</span>
@@ -815,13 +887,14 @@
                 </div>
               </el-popover>
             </div>
-            <div class="qo-item">
+            <!-- Q31：积分消费下「已用完 / 快用完」按原始回合上限算会撒谎（实际不限次），停用这两个统计 -->
+            <div v-if="!subActive" class="qo-item">
               <span class="qo-k"><i class="qo-dot qo-red" />已用完</span>
               <span class="qo-v"
                 ><b>{{ quotaPageStats.exhausted }}</b> 人 <span class="qo-note">本页</span></span
               >
             </div>
-            <div class="qo-item">
+            <div v-if="!subActive" class="qo-item">
               <span class="qo-k"><i class="qo-dot qo-orange" />快用完</span>
               <span class="qo-v"
                 ><b>{{ quotaPageStats.near }}</b> 人 <span class="qo-note">本页 · ≥80%</span></span
@@ -856,16 +929,39 @@
                 <span class="quota-sub">{{ row.userName ? '@' + row.userName : '' }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="部门" prop="deptName" width="130" show-overflow-tooltip />
+            <!-- 题6：宽屏下「用户」到「部门」之间曾有约 800px 空白——把「谁能用」（disabled 列的真实语义）
+                 前置成第二列，宽屏第一屏就能读到「这个人现在能不能用」，不靠横滑找最右的状态列 -->
+            <el-table-column label="谁能用" width="96" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.disabled === '1' ? 'danger' : 'success'" size="small">{{ row.disabled === '1' ? '已禁用' : '可用' }}</el-tag>
+              </template>
+            </el-table-column>
+            <!-- 题2：窄屏收起低价值列（部门），把宽度让给「今日用量」与钉右的操作列；桌面不变 -->
+            <el-table-column v-if="!isNarrow" label="部门" prop="deptName" width="130" show-overflow-tooltip />
             <el-table-column label="今日用量" width="170" align="center">
               <template #default="{ row }">
-                <!-- UI-UX 批：比例可视化进度条——蓝(正常)→橙(≥80%)→红(用完)，一眼找出快用完的人 -->
+                <!-- UI-UX 批：比例可视化进度条——蓝(正常)→橙(≥80%)→红(用完)，一眼找出快用完的人
+                     Q31：积分消费下回合不限次，进度条与「x / 上限」都失去意义，改显「已用 / 不限」 -->
                 <div class="quota-turn-cell">
                   <div class="q-usage">
-                    <div class="q-usage-bar">
+                    <div v-if="!subActive" class="q-usage-bar">
                       <i :class="quotaBarTier(row)" :style="{ width: quotaBarPct(row) + '%' }" />
                     </div>
-                    <span :class="{ 'quota-exhausted': row.effectiveRoundLimit > 0 && row.turnsUsedToday >= row.effectiveRoundLimit }">
+                    <span
+                      v-if="subActive"
+                      class="q-unlimited"
+                      :title="
+                        quotaRoundStopped(row)
+                          ? '该用户回合上限为 0 = 对话急停；点「限额」改成 0 以上的数字即可恢复'
+                          : '积分消费按积分扣，回合正数不设上限；今天已用 ' + row.turnsUsedToday + ' 回合'
+                      "
+                      >{{ row.turnsUsedToday }} /
+                      <b v-if="!quotaRoundStopped(row)">不限</b><b v-else class="q-stopped">已停用</b></span
+                    >
+                    <span
+                      v-else
+                      :class="{ 'quota-exhausted': row.effectiveRoundLimit > 0 && row.turnsUsedToday >= row.effectiveRoundLimit }"
+                    >
                       {{ row.turnsUsedToday }} / {{ row.effectiveRoundLimit }}
                     </span>
                   </div>
@@ -875,7 +971,13 @@
                       size="small"
                       type="warning"
                       class="quota-tag"
-                      title="该用户单独设了回合上限，不受租户默认影响"
+                      :title="
+                        !subActive
+                          ? '该用户单独设了回合上限，不受租户默认影响'
+                          : row.roundLimitOverride === 0
+                            ? '积分消费下回合上限 0 = 该用户对话急停；点「限额」改成 0 以上即可恢复'
+                            : '积分消费下回合正数不设上限（只有 0 = 急停）'
+                      "
                       >单人{{ row.roundLimitOverride }}回合</el-tag
                     >
                     <el-tag
@@ -883,7 +985,13 @@
                       size="small"
                       type="warning"
                       class="quota-tag"
-                      title="该用户单独设了联网次数上限，不受租户默认影响"
+                      :title="
+                        !subActive
+                          ? '该用户单独设了联网次数上限，不受租户默认影响'
+                          : row.websearchLimitOverride === 0
+                            ? '积分消费下联网上限 0 = 关闭该用户联网；点「限额」改成 0 以上即可恢复'
+                            : '积分消费下联网按套餐档位计数，正数仅在套餐未配档时兜底'
+                      "
                       >联网单人{{ row.websearchLimitOverride }}</el-tag
                     >
                   </div>
@@ -893,24 +1001,36 @@
             <el-table-column label="本月费用" width="110" align="right">
               <template #default="{ row }">¥{{ fmtMoney(row.monthCost) }}</template>
             </el-table-column>
-            <el-table-column label="状态" width="80" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.disabled === '1' ? 'danger' : 'success'" size="small">{{ row.disabled === '1' ? '已禁用' : '正常' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" align="center">
+            <!-- 题2：操作列钉右用表格原生 fixed（CSS sticky 在列被压缩时会糊到前一列上，原生层会独立留位） -->
+            <el-table-column label="操作" width="200" align="center" fixed="right">
               <template #default="{ row }">
                 <el-button
                   v-if="checkPermi(['dcs:assistant:quota:edit'])"
                   link
                   type="primary"
                   size="small"
-                  :disabled="row.turnsUsedToday === 0"
-                  :title="row.turnsUsedToday === 0 ? '今天还没用过，无需重置' : '把该用户今日已用回合清零'"
+                  :disabled="!subActive && row.turnsUsedToday === 0"
+                  :title="
+                    subActive
+                      ? '清空该用户今日的回合与联网计数——积分消费下联网每天照常计数，用完靠这里重置'
+                      : row.turnsUsedToday === 0
+                        ? '今天还没用过，无需重置'
+                        : '把该用户今日已用回合清零'
+                  "
                   @click="onQuotaReset(row)"
                   >重置今日</el-button
                 >
-                <el-button v-if="checkPermi(['dcs:assistant:quota:edit'])" link type="primary" size="small" @click="openQuotaLimits(row)"
+                <el-button
+                  v-if="checkPermi(['dcs:assistant:quota:edit'])"
+                  link
+                  type="primary"
+                  size="small"
+                  :title="
+                    subActive
+                      ? '给该用户单独设回合 / 联网上限；积分消费下 0 = 停用对应能力，正数不设上限（联网在套餐未配档时兜底）'
+                      : '给该用户单独设回合 / 联网上限'
+                  "
+                  @click="openQuotaLimits(row)"
                   >限额</el-button
                 >
                 <el-button
@@ -925,7 +1045,11 @@
             </el-table-column>
             <template #empty>
               <el-empty
-                description="没找到用户——换个关键词试试；用户额度默认跟随租户设置（每人每天各自的回合数），改过单人的会在这里显示"
+                :description="
+                  subActive
+                    ? '没找到用户——换个关键词试试；积分消费下回合默认不限，改过单人上限（含 0 = 停用）的会在这里显示'
+                    : '没找到用户——换个关键词试试；用户额度默认跟随租户设置（每人每天各自的回合数），改过单人的会在这里显示'
+                "
                 :image-size="60"
               />
             </template>
@@ -964,7 +1088,8 @@
             <span>挂载记录 <b>{{ auditStats.mounts }}</b><em>建会话的例行记录，默认收起</em></span>
           </div>
           <el-card shadow="never" class="adm-card ops-card">
-            <el-table :data="mcpLogRows" size="small" stripe :row-class-name="auditRowClass">
+            <!-- 题5：全页 11 处表格都有加载态，唯独审计表没有——翻页时旧行无提示挂着、还能连点下一页错页 -->
+            <el-table :data="mcpLogRows" v-loading="mcpLogLoading" size="small" stripe :row-class-name="auditRowClass">
               <el-table-column label="时间" width="170">
                 <template #default="{ row }">{{ formatMcpTime(row.createTime) }}</template>
               </el-table-column>
@@ -977,23 +1102,30 @@
                   <el-tag size="small" :type="row.status === '1' ? 'success' : 'danger'">{{ row.status === '1' ? '成功' : '失败' }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="耗时" width="90">
+              <!-- 题2：窄屏收起「耗时」（低价值，已并入钉右的详情列语境）；桌面保留 -->
+              <el-table-column v-if="!isNarrow" label="耗时" width="90">
                 <template #default="{ row }">{{ row.durationMs != null ? row.durationMs + 'ms' : '—' }}</template>
               </el-table-column>
-              <el-table-column label="详情/错误" min-width="220">
-                <template #default="{ row }">{{ row.errorMsg || '—' }}</template>
+              <!-- 题6+回修：调用成功行兜「—」（历史行 error_msg 曾写耗时）；挂载/反问行的 error_msg 是结果详情、
+                   限频失败行没有错误文本——这三类按动作放行显示，不再被「成功=—」一刀切吞掉 -->
+              <el-table-column label="详情/错误" min-width="220" fixed="right">
+                <template #default="{ row }">{{
+                  row.action === 'CALL_OK' ? '—' : row.errorMsg || (row.action === 'RATE_LIMITED' ? '已限频，稍后再试' : '—')
+                }}</template>
               </el-table-column>
               <template #empty>
                 <el-empty
-                  :description="auditShowMounts ? '还没有调用或挂载记录' : '还没有真实调用——右上角可打开挂载记录'"
+                  :description="mcpLogLoading ? '加载中…' : auditShowMounts ? '还没有调用或挂载记录' : '还没有真实调用——右上角可打开挂载记录'"
                   :image-size="56"
                 />
               </template>
             </el-table>
             <div class="mcp-log-pager">
-              <el-button size="small" :disabled="mcpLogPage <= 1" @click="mcpLogPage--; loadMcpCallLog()">上一页</el-button>
+              <el-button size="small" :disabled="mcpLogLoading || mcpLogPage <= 1" @click="mcpLogPage--; loadMcpCallLog()">上一页</el-button>
               <span class="field-hint">第 {{ mcpLogPage }} 页 · 共 {{ mcpLogTotal }} 条</span>
-              <el-button size="small" :disabled="mcpLogPage * 20 >= mcpLogTotal" @click="mcpLogPage++; loadMcpCallLog()">下一页</el-button>
+              <el-button size="small" :disabled="mcpLogLoading || mcpLogPage * 20 >= mcpLogTotal" @click="mcpLogPage++; loadMcpCallLog()"
+                >下一页</el-button
+              >
             </div>
           </el-card>
         </section>
@@ -1006,13 +1138,21 @@
             </div>
             <span class="sec-note">用户在回答尾部点「错答」会落到这里，先看原因分布再决定改哪里</span>
           </div>
-        <el-card v-if="fbStats" shadow="never" class="adm-card">
+        <el-card shadow="never" class="adm-card">
+          <!-- 题4：加载失败不再整卡消失（原 v-if="fbStats" 把卡片一起藏了）——块内给重试入口 -->
+          <div v-if="fbStatsError" class="fb-fail">
+            <span>反馈统计没加载出来——可能是网络抖动，点右侧重试。</span>
+            <el-button size="small" :loading="fbStatsLoading" @click="retryFbStats">重试</el-button>
+          </div>
           <!-- AI 缺口批 Q10：反馈聚合——好评率大数字 + 点踩原因 CSS 横条 + 周趋势小卡 -->
-          <div class="fb-stats">
+          <div v-else-if="fbStats" class="fb-stats" v-loading="fbStatsLoading">
             <div class="fb-rate">
               <div class="fb-rate-num" :class="fbRateTone">{{ fbStats.upRate == null ? '—' : `${fbStats.upRate}%` }}</div>
               <div class="fb-rate-lbl">好评率（近 {{ fbStats.windowDays }} 天）</div>
-              <div class="fb-rate-sub">👍 {{ fbStats.up }} · 👎 {{ fbStats.down }}</div>
+              <!-- 题3：彩色 emoji 换单色拇指图标（与下方评价列、全页线性图标同一套） -->
+              <div class="fb-rate-sub">
+                <IconSpan name="thumbs-up" /> {{ fbStats.up }} · <IconSpan name="thumbs-down" /> {{ fbStats.down }}
+              </div>
             </div>
             <div class="fb-reasons">
               <div class="fb-sec-title">点踩原因分布</div>
@@ -1025,13 +1165,17 @@
             </div>
             <div class="fb-trend">
               <div class="fb-sec-title">近 {{ Math.ceil((fbStats.windowDays || 28) / 7) }} 周趋势</div>
-              <div v-for="w in fbStats.trend || []" :key="w.week" class="fb-trend-row">
-                <span class="fb-trend-week">{{ String(w.week).substring(5) }}</span>
-                <span class="fb-trend-nums">👍{{ w.up }} 👎{{ w.down }}</span>
-              </div>
-              <div v-if="!fbStats.total" class="fb-empty">还没有样本</div>
+              <!-- 题4：没样本时不再摆一串全 0 的行，只留一句引导 -->
+              <template v-if="fbStats.total">
+                <div v-for="w in fbStats.trend || []" :key="w.week" class="fb-trend-row">
+                  <span class="fb-trend-week">{{ String(w.week).substring(5) }}</span>
+                  <span class="fb-trend-nums"><IconSpan name="thumbs-up" />{{ w.up }} <IconSpan name="thumbs-down" />{{ w.down }}</span>
+                </div>
+              </template>
+              <div v-else class="fb-empty">还没有样本——用户点过赞或踩之后这里会出现趋势</div>
             </div>
           </div>
+          <div v-else class="fb-fail"><span>反馈统计加载中…</span></div>
         </el-card>
         <el-card shadow="never" class="adm-card">
           <el-table :data="fbRows" v-loading="fbLoading" size="small">
@@ -1046,11 +1190,14 @@
             <el-table-column label="时间" width="160">
               <template #default="{ row }">{{ fmtIsoTime(row.createTime) }}</template>
             </el-table-column>
+            <!-- 题4：空态交给表格插槽——原来的表内「暂无数据」+ 表下插画会把「没有」说两遍 -->
+            <template #empty>
+              <el-empty :description="fbLoading ? '加载中…' : '还没有反馈——用户在回答尾部点「点踩」时会落到这里'" :image-size="60" />
+            </template>
           </el-table>
           <div v-if="fbTotal > fbRows.length" class="fb-more">
-            <el-button link type="primary" @click="loadFeedback">加载更多（{{ fbRows.length }} / {{ fbTotal }}）</el-button>
+            <el-button link type="primary" :loading="fbLoading" @click="loadFeedback">加载更多（{{ fbRows.length }} / {{ fbTotal }}）</el-button>
           </div>
-          <el-empty v-if="!fbLoading && fbRows.length === 0" description="还没有反馈——用户在回答尾部点「点踩」时会落到这里" :image-size="60" />
         </el-card>
         </section>
 
@@ -1104,6 +1251,20 @@
             <el-table-column label="操作人" prop="userName" width="120">
               <template #default="{ row }">{{ row.userName || '—' }}</template>
             </el-table-column>
+            <!-- 题4：空态分两种——首次进来别预设「你查过了」（原来一进来就说「换个关键词试试」）；
+                 空态交给表格插槽，表内「暂无数据」不再和插画叠两份 -->
+            <template #empty>
+              <el-empty
+                :description="
+                  logLoading
+                    ? '加载中…'
+                    : logSearched
+                      ? '没有符合条件的运行记录——换个关键词或放宽时间范围试试'
+                      : 'AI 替用户执行确认过的写操作（如发催办）会记在这里；现在还没有记录'
+                "
+                :image-size="60"
+              />
+            </template>
           </el-table>
           <div class="log-pager">
             <el-pagination
@@ -1114,11 +1275,6 @@
               @current-change="loadActionLog"
             />
           </div>
-          <el-empty
-            v-if="!logLoading && logRows.length === 0"
-            description="没有符合条件的运行记录——换个关键词或放宽时间范围试试；AI 替用户执行确认过的写操作（如发催办）会记到这里"
-            :image-size="60"
-          />
         </el-card>
         </section>
 
@@ -1167,8 +1323,11 @@
                 <el-button v-if="row.status === '1'" link type="danger" @click="onRevokeAnn(row)">撤回</el-button>
               </template>
             </el-table-column>
+            <!-- 题4：同上，空态只留插槽这一份 -->
+            <template #empty>
+              <el-empty description="还没有公告——发布后用户打开 AI 助手即见顶部横幅" :image-size="60" />
+            </template>
           </el-table>
-          <el-empty v-if="!annLoading && annRows.length === 0" description="还没有公告——发布后用户打开 AI 助手即见顶部横幅" :image-size="60" />
         </el-card>
         </section>
       </div>
@@ -1449,6 +1608,9 @@
     <el-dialog v-model="quotaLimitsDialog" title="设置单人额度上限" width="500px" append-to-body class="q-dialog">
       <el-alert type="info" :closable="false" show-icon class="ov-alert">
         <template #title>每列留空 = 该项跟随租户默认；填数字 = 只对这一个人生效（两列互不影响）</template>
+        <template v-if="subActive" #default>
+          积分消费中：回合上限只有 <b>0</b> 才是急停（正数不设上限）；联网上限 0 = 关闭该用户联网，正数在套餐未配档时兜底。
+        </template>
       </el-alert>
       <el-form label-width="120px">
         <el-form-item label="用户">
@@ -1492,7 +1654,7 @@
     </el-dialog>
 
     <!-- 业务反馈批1015b Q14：替换搜索密钥——先测试后保存（保存走系统配置 API，缓存自动刷新） -->
-    <el-dialog v-model="wsReplace.open" title="替换联网搜索密钥（博查）" width="520px" append-to-body>
+    <el-dialog v-model="wsReplace.open" title="替换联网搜索密钥（博查）" width="520px" append-to-body class="ws-dialog">
       <el-alert type="info" :closable="false" show-icon class="mb-2" title="密钥以 sk- 开头；保存后立即生效，正在进行的对话下一轮就能联网。" />
       <el-form label-width="90px">
         <el-form-item label="新密钥">
@@ -1509,7 +1671,7 @@
       </template>
     </el-dialog>
         <!-- 注册/编辑抽屉 -->
-        <el-drawer v-model="mcpFormVisible" :title="mcpForm.id ? '编辑外部服务' : '注册外部服务'" size="480px">
+        <el-drawer v-model="mcpFormVisible" :title="mcpForm.id ? '编辑外部服务' : '注册外部服务'" size="480px" class="mcp-form-drawer">
           <el-form label-width="92px">
             <el-form-item label="服务名" required>
               <el-input v-model="mcpForm.serverName" placeholder="小写字母/数字/下划线，3-30 位，如 weather_demo" :disabled="!!mcpForm.id" />
@@ -1564,8 +1726,8 @@
  * 知识包页签=链路未建（真需求出现再立项）；运行记录已上线。
  * 权限=dcs:assistant:config（菜单 11927 同源）。
  */
-import { computed, nextTick, reactive, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { checkPermi } from '@/utils/permission';
 import {
@@ -1632,6 +1794,8 @@ import { applyAssistantName } from '@/components/DcsAssistant/nameState';
 
 const userStore = useUserStore();
 const router = useRouter();
+/** 题2：窄屏收起低价值列/放开内层限高都用它（760 是拍板口径，与壳层 992 断点各管一段） */
+const isNarrow = useMediaQuery('(max-width: 760px)');
 
 /** 四段导航：总览 / 能力 / 规则 / 运营（原 8 个平铺页签，同类项合一） */
 const tab = ref('overview');
@@ -1656,6 +1820,12 @@ const walletTxt = ref('—');
    ③ 保存后生效预览（与单人上限弹窗同款语义）；④ 订阅租户提示（Q1 起订阅期回合不限次，默认空转） ===== */
 const defaultEdit = reactive({ round: 50, web: 20 });
 const defaultSaving = ref(false);
+/** 题5：弹层开着时，别处保存（如助手称呼）会整体刷新 cfg，把这里没保存的草稿静默重置回旧值 */
+const defaultPopoverOpen = ref(false);
+const syncDefaultEdit = () => {
+  defaultEdit.round = cfg.value?.dailyRoundLimitPerUser ?? 50;
+  defaultEdit.web = cfg.value?.websearchLimitPerUser ?? 20;
+};
 /** 订阅生效中（billingMode=credits）：回合默认空转，仅提示不阻拦（管理员可能为订阅到期提前配好） */
 const subActive = ref(false);
 /** 消费方式（用户反馈1014：原「服务码价目」死文案改动态）——credits=积分订阅 / wallet=钱包按量 */
@@ -1663,19 +1833,27 @@ const billingMode = ref<'credits' | 'wallet'>('wallet');
 watch(
   cfg,
   (c) => {
-    if (c) {
-      defaultEdit.round = c.dailyRoundLimitPerUser ?? 50;
-      defaultEdit.web = c.websearchLimitPerUser ?? 20;
-    }
+    // 弹层打开期间跳过覆写，关闭后（onDefaultPopoverHide）再对齐最新配置
+    if (c && !defaultPopoverOpen.value) syncDefaultEdit();
   },
   { immediate: true }
 );
-function resetDefaultEdit() {
-  defaultEdit.round = cfg.value?.dailyRoundLimitPerUser ?? 50;
-  defaultEdit.web = cfg.value?.websearchLimitPerUser ?? 20;
+/** 关闭弹层：恢复「跟随配置」，下次打开从最新值起编 */
+function onDefaultPopoverHide() {
+  syncDefaultEdit();
 }
-/** 保存后生效预览：0 直译"关停"，不说"0 回合"这种没人懂的话 */
+function resetDefaultEdit() {
+  syncDefaultEdit();
+}
+/** 保存后生效预览：0 直译"关停"，不说"0 回合"这种没人懂的话；
+ *  Q31 回修（2026-10-31）：积分消费下回合正数=不限（只有 0 是急停），联网正数只在套餐未配档时兜底 */
 const defaultPreviewText = computed(() => {
+  if (subActive.value) {
+    const rt = defaultEdit.round > 0 ? '回合不限（正数不设上限）' : '对话急停（配 0）';
+    const wt =
+      defaultEdit.web > 0 ? `联网按套餐档位（未配档兜底 ${defaultEdit.web} 次/天）` : '联网关闭（配 0）';
+    return `每人 ${rt} · ${wt}`;
+  }
   const rt = defaultEdit.round > 0 ? `${defaultEdit.round} 回合/天` : '对话关停';
   const wt = defaultEdit.web > 0 ? `${defaultEdit.web} 次联网/天` : '联网关停';
   return `每人 ${rt} · ${wt}`;
@@ -1749,7 +1927,7 @@ async function loadConfig() {
     const list = w?.rows ?? w?.data ?? [];
     const main = list.find((x) => x.tenantId === userStore.tenantId && x.walletType === 'MAIN') ?? list.find((x) => x.walletType === 'MAIN');
     if (main) {
-      walletTxt.value = `可用 ¥ ${Number(main.availableAmount).toFixed(2)}`;
+      walletTxt.value = `可用 ¥${Number(main.availableAmount).toFixed(2)}`;
     }
   } catch {
     /* 钱包不可达/无权限保持 — */
@@ -1876,6 +2054,9 @@ const fbTotal = ref(0);
 const fbLoading = ref(false);
 // AI 缺口批 Q10：反馈聚合统计（好评率/原因分布/周趋势）
 const fbStats = ref<any>(null);
+/** 题4：统计卡自己兜失败态——原来 catch 里把 fbStats 置 null，整张卡跟着消失 */
+const fbStatsError = ref(false);
+const fbStatsLoading = ref(false);
 const fbRateTone = computed(() => {
   const r = fbStats.value?.upRate;
   if (r == null) return '';
@@ -1887,15 +2068,29 @@ const reasonPct = (cnt: number) => {
   return Math.round((Number(cnt) / max) * 100);
 };
 async function loadFbStats() {
+  fbStatsLoading.value = true;
+  fbStatsError.value = false;
   try {
     const res: any = await getFeedbackStats(28);
-    fbStats.value = res?.data || null;
+    // 回修：data 为 null 时落到诚实空态（total=0 → 「还没有样本」），不再永远停在「加载中…」
+    fbStats.value = res?.data ?? { total: 0 };
   } catch {
     fbStats.value = null;
+    fbStatsError.value = true;
+  } finally {
+    fbStatsLoading.value = false;
   }
 }
+/** 题4：失败态的重试入口（块内按钮，不弹整屏报错） */
+function retryFbStats() {
+  // 回修：先拉列表再补统计——先把 fbStatsError 清掉的话，loadFeedback 的守卫会连带再发一次统计请求（一次重试打两次）
+  if (fbRows.value.length === 0) void loadFeedback();
+  void loadFbStats();
+}
 async function loadFeedback() {
-  if (fbRows.value.length === 0) {
+  // 题5：进行中直接返回——原来双击「加载更多」会把同一页数据追加两遍
+  if (fbLoading.value) return;
+  if (fbRows.value.length === 0 && !fbStats.value && !fbStatsError.value) {
     void loadFbStats();
   }
   fbLoading.value = true;
@@ -1950,7 +2145,9 @@ async function onPublishAnn() {
     await publishAssistantAnnouncement({
       id: annForm.id,
       title: annForm.title.trim(),
-      content: annForm.content.trim() || undefined,
+      // F1 回修（2026-10-31）：空串照发——原 `|| undefined` 会让「清空正文」被 JSON 丢掉，
+      // 后端拿不到字段就保持旧正文，页面却提示「已更新」。null 才是「本次不改」。
+      content: annForm.content.trim(),
       style: annForm.style
     });
     ElMessage.success(annForm.id ? '公告已更新（用户重开助手可见新内容）' : '公告已发布（用户打开助手即见顶部横幅）');
@@ -1987,8 +2184,13 @@ const logTotal = ref(0);
 const logLoading = ref(false);
 const logQuery = reactive({ pageNum: 1, pageSize: 20, keyword: '', status: '', beginTime: '', endTime: '' });
 const logRange = ref<[string, string] | null>(null);
+/** 题4：空态要分「首次进入」和「查过没结果」两种说法，别一进来就预设用户查过 */
+const logSearched = ref(false);
 // logSt/LOG_ST 批I 收口到 useAssistant 与会话页账本共用（单一真源）
+let logSeq = 0; // 回修：与调用审计同款请求序号——翻页/筛选连点时先发后到的旧响应直接丢弃
+let logRenderedPage = 1; // 回修：最后一次成功渲染的页码——v-model 翻页先改页码再请求，失败回到这里
 async function loadActionLog() {
+  const seq = ++logSeq;
   logLoading.value = true;
   try {
     const res = (await listActionLog({
@@ -2002,16 +2204,20 @@ async function loadActionLog() {
       rows?: AssistantActionLogRow[];
       total?: number;
     };
+    if (seq !== logSeq) return;
     logRows.value = res?.rows ?? [];
     logTotal.value = res?.total ?? 0;
+    logRenderedPage = logQuery.pageNum;
   } catch {
+    if (seq === logSeq) logQuery.pageNum = logRenderedPage;
     ElMessage.error('运行记录加载失败，请稍后再试');
   } finally {
-    logLoading.value = false;
+    if (seq === logSeq) logLoading.value = false;
   }
 }
 /** 查询：daterange → 起止闭区间（当天 00:00:00 ~ 23:59:59），回到第 1 页 */
 function onLogSearch() {
+  logSearched.value = true;
   logQuery.beginTime = logRange.value?.[0] ? logRange.value[0] + ' 00:00:00' : '';
   logQuery.endTime = logRange.value?.[1] ? logRange.value[1] + ' 23:59:59' : '';
   logQuery.pageNum = 1;
@@ -3122,6 +3328,8 @@ const mcpHeadersPlaceholder = computed(() =>
 const mcpLogRows = ref<AssistantMcpCallLog[]>([]);
 const mcpLogTotal = ref(0);
 const mcpLogPage = ref(1);
+/** 题5：审计表唯一的加载态缺口——翻页时既要有遮罩，也要挡住连点 */
+const mcpLogLoading = ref(false);
 const mcpLogFilter = ref('');
 /** 默认只看真实调用与失败——挂载成功/失败是每次建会话的例行记录，会把真正要看的一屏淹掉 */
 const auditShowMounts = ref(false);
@@ -3166,7 +3374,12 @@ function mcpCmdSummary(row: AssistantMcpServerRow): string {
   const script = parts.find((p) => /\.(mjs|cjs|js|py|sh)$/.test(p)) || parts[parts.length - 1];
   return script.split(/[\\/]/).pop() || full;
 }
+/** 题5：翻页/筛选连点时只认最后一次请求，先发后到的旧响应直接丢弃（否则显示错页内容） */
+let mcpLogSeq = 0;
+let mcpLogRenderedPage = 1; // 回修：最后一次成功渲染的页码——按钮是先改页码再请求，失败要回到这里，别让「第 2 页」配第 1 页内容
 async function loadMcpCallLog() {
+  const seq = ++mcpLogSeq;
+  mcpLogLoading.value = true;
   try {
     const res = (await pageAssistantMcpCallLog({
       serverName: mcpLogFilter.value || undefined,
@@ -3176,11 +3389,16 @@ async function loadMcpCallLog() {
     })) as unknown as {
       data?: { rows?: AssistantMcpCallLog[]; total?: number; stats?: { all: number; mounts: number; real: number } };
     };
+    if (seq !== mcpLogSeq) return;
     mcpLogRows.value = res.data?.rows ?? [];
     mcpLogTotal.value = res.data?.total ?? 0;
     if (res.data?.stats) auditStats.value = res.data.stats;
+    mcpLogRenderedPage = mcpLogPage.value;
   } catch {
+    if (seq === mcpLogSeq) mcpLogPage.value = mcpLogRenderedPage;
     // 同上：request 层已弹
+  } finally {
+    if (seq === mcpLogSeq) mcpLogLoading.value = false;
   }
 }
 /** 切换「显示挂载记录」/换服务：回到第 1 页再拉 */
@@ -3316,7 +3534,8 @@ const isBuiltinRow = computed(() => !!activeSkillRow.value && !!activeSkillRow.v
 const builtinRoleLevel = computed(() => SKILL_ROLE_LEVEL[activeSkillRow.value?.builtinMinRole ?? 'member'] ?? 0);
 
 /* ===== 脏检查（5b 清尾·件3）：技能改一半切走不再静默丢——切技能/新增/离能力段先确认 ===== */
-const skillBaseline = ref('');
+// 基线取初始快照而不是空串：没进过能力页签时 snapshotSkill() 也不等于 ''，空串会让路由守卫对没碰过表单的人误弹「未保存」
+const skillBaseline = ref(snapshotSkill());
 function snapshotSkill(): string {
   return JSON.stringify([
     skillForm.skillId.trim(), skillForm.displayName.trim(), skillForm.description.trim(),
@@ -3342,6 +3561,22 @@ async function confirmOpenSkill(row: AssistantSkillAdminRow) {
   if (!(await confirmLeaveIfDirty())) return;
   openSkill(row);
 }
+/** 题5：整页路由离开也要拦——原来只有页内切技能/切段有确认，点侧边菜单走人时正文（最多 2 万字）直接丢。
+ *  只在真有未保存改动时弹，保存后放行；复用同一句确认文案。 */
+onBeforeRouteLeave(async () => {
+  if (!skillDirty.value) return true;
+  return await confirmLeaveIfDirty();
+});
+/** 回修：F5/关标签页不走 vue-router，脏状态下同样要拦——浏览器原生提示，文案无法自定义 */
+onMounted(() => {
+  const onUnload = (e: BeforeUnloadEvent) => {
+    if (!skillDirty.value) return;
+    e.preventDefault();
+    e.returnValue = '';
+  };
+  window.addEventListener('beforeunload', onUnload);
+  onUnmounted(() => window.removeEventListener('beforeunload', onUnload));
+});
 async function confirmNewSkill() {
   if (!(await confirmLeaveIfDirty())) return;
   newSkill();
@@ -3388,7 +3623,10 @@ function newSkill() {
   skillForm.disabled = false;
   markSkillClean();
 }
-function cancelNewSkill() {
+async function cancelNewSkill() {
+  // F2（2026-10-31 深审回修）：新增模式里打了一半的正文（上限 2 万字）也是「未保存的改动」，
+  // 取消新增和切技能/路由离开同口径，先问再丢。
+  if (!(await confirmLeaveIfDirty())) return;
   skillNewMode.value = false;
   if (skillRows.value.length) {
     openSkill(skillRows.value[0]);
@@ -3435,11 +3673,14 @@ function enableSkill() {
   void persistSkill(false);
 }
 /** 恢复内置原文（有内置基线）/ 彻底删除（纯在线新增）——都走删本租户在线行 */
-function onRestoreSkill() {
+async function onRestoreSkill() {
   const row = activeSkillRow.value;
   if (!row) {
     return;
   }
+  // F2（2026-10-31 深审回修）：恢复/删除都会整份重灌表单，未保存编辑会静默丢——
+  // 与切技能/新增/路由离开同一条脏检查，先问再动。
+  if (!(await confirmLeaveIfDirty())) return;
   const restoreBuiltin = !!row.builtinMinRole;
   ElMessageBox.confirm(
     restoreBuiltin
@@ -3481,8 +3722,9 @@ function onTabChange(name: string | number) {
   }
   if (name === 'ops') {
     void loadMcpCallLog();
-    void loadFbStats();
+    // 回修：先拉列表再拉统计——先把 fbStatsError 清掉的话，loadFeedback 的守卫会连带再发一次统计（总览首次失败时进本页签双发）
     if (fbRows.value.length === 0) void loadFeedback();
+    void loadFbStats();
     if (logRows.value.length === 0) void loadActionLog();
     if (annRows.value.length === 0 && !annLoading.value) void loadAnnouncements();
   }
@@ -3520,6 +3762,12 @@ const quotaPageStats = computed(() => {
   return { exhausted, near, disabled };
 });
 
+/** Q31 回修（2026-10-31）：积分消费下只有「0」是真的限制——回合 0 = 急停；正数一律按不限次执行。
+ *  判定口径与后端 billingAwareLimits 一致：单人覆盖 > 租户默认，0 不被套餐/不限覆盖。 */
+function quotaRoundStopped(row: AssistantQuotaRow): boolean {
+  return (row.roundLimitOverride ?? cfg.value?.dailyRoundLimitPerUser ?? 0) <= 0;
+}
+
 /** 用量进度条：百分比封顶 100（上限 0/未知的脏数据不画条只显数字）与色档（蓝正常/橙≥80%/红用完） */
 const quotaBarPct = (row: AssistantQuotaRow): number => {
   if (!row.effectiveRoundLimit || row.effectiveRoundLimit <= 0) return 0;
@@ -3541,6 +3789,24 @@ const fmtMoney = (v?: number | null): string => {
 /** 回修（m3 P1-1）：勾"跟随租户默认"后实时按保存结果展示，不再停留在单人旧值误导；
  *  批④起双列各自跟随（round/websearch 可一列覆盖一列默认，后端四象限分流承接） */
 const quotaLimitsCurrentText = computed(() => {
+  if (subActive.value) {
+    // Q31 回修：积分消费下回合正数=不限、0=急停；联网正数只在套餐未配档时兜底
+    const r = quotaLimitsFollowDefault.value ? null : quotaLimitsForm.roundLimit;
+    const w = quotaLimitsFollowDefault.value ? null : quotaLimitsForm.websearchLimit;
+    const rt =
+      r == null
+        ? `回合不限（租户默认 ${tenantRoundDefault.value > 0 ? '正数' : '0 = 急停'}）`
+        : r === 0
+          ? '回合已停用（0 = 急停）'
+          : '回合不限（正数不设上限）';
+    const wt =
+      w == null
+        ? `联网按套餐档位（未配档兜底 ${tenantWebDefault.value} 次）`
+        : w === 0
+          ? '联网已关闭（0）'
+          : `联网按套餐档位（未配档兜底 ${w} 次）`;
+    return `${rt} · ${wt}`;
+  }
   if (quotaLimitsFollowDefault.value) {
     return `默认 ${tenantRoundDefault.value} 回合 · ${tenantWebDefault.value} 次联网 / 天`;
   }
@@ -3574,7 +3840,9 @@ async function onQuotaReset(row: AssistantQuotaRow) {
   const name = row.nickName || row.userName;
   try {
     await ElMessageBox.confirm(
-      `把「${name}」今天的已用回合（${row.turnsUsedToday} / ${row.effectiveRoundLimit}）清零？清零后 ${name} 今天还能继续聊。`,
+      subActive.value
+        ? `把「${name}」今天的回合与联网计数清零？（积分消费下回合不限次，联网每天按套餐档位计数，用完要靠这里重置）`
+        : `把「${name}」今天的已用回合（${row.turnsUsedToday} / ${row.effectiveRoundLimit}）清零？清零后 ${name} 今天还能继续聊。`,
       '重置今日额度',
       { type: 'warning', confirmButtonText: '确定重置', cancelButtonText: '再想想' }
     );
@@ -3583,7 +3851,11 @@ async function onQuotaReset(row: AssistantQuotaRow) {
   }
   try {
     await resetAssistantQuota(row.userId);
-    ElMessage.success(`已重置——${name} 今天的额度已恢复满额`);
+    ElMessage.success(
+      subActive.value
+        ? `已重置——${name} 今天的回合与联网计数已清零`
+        : `已重置——${name} 今天的额度已恢复满额`
+    );
     await loadQuotaPage();
   } catch {
     ElMessage.error('重置失败，请稍后再试');
@@ -3769,12 +4041,14 @@ onMounted(() => {
 /* AI 缺口批 Q10：反馈统计条 */
 .fb-stats {
   display: flex;
+  flex-wrap: wrap;
   gap: 18px;
   align-items: stretch;
 }
 .fb-rate {
-  flex: none;
-  width: 170px;
+  /* 题2：定宽 170 的块在窄屏会顶破——允许换行、窄屏由媒体查询改整行 */
+  flex: 0 0 170px;
+  max-width: 100%;
   text-align: center;
   padding: 8px 0;
 }
@@ -3804,7 +4078,8 @@ onMounted(() => {
   min-width: 0;
 }
 .fb-sec-title {
-  font-size: 12.5px;
+  /* 题3：小标题与正文同 12px 会失去层级——按就近档升到 13（弱化交给次级灰，不靠缩字号） */
+  font-size: 13px;
   font-weight: 600;
   color: var(--el-text-color-regular);
   margin-bottom: 6px;
@@ -3860,6 +4135,22 @@ onMounted(() => {
   font-size: 12px;
   color: var(--el-text-color-placeholder);
   padding: 6px 0;
+}
+/* 题4：统计卡自己的失败/加载态（块内提示，不整屏报错） */
+.fb-fail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 12px;
+  color: var(--dcs-text-secondary);
+
+  span {
+    min-width: 0;
+  }
+  .el-button {
+    margin-left: auto;
+  }
 }
 .dcs-as-admin {
   /* 方案A追加 2026-10-11：1320→1720 封顶——1920 办公屏内容区(~1670px)完全铺满消灭右侧空白，2K 带鱼屏防过度拉伸 */
@@ -3940,7 +4231,7 @@ onMounted(() => {
         gap: 10px;
 
         b {
-          font-size: 15px;
+          font-size: 16px;
         }
       }
       .health-grid {
@@ -4003,7 +4294,7 @@ onMounted(() => {
         color: var(--dcs-text-primary);
       }
       .head-note {
-        font-size: 12.5px;
+        font-size: 12px;
         color: var(--dcs-text-secondary);
       }
     }
@@ -4017,7 +4308,7 @@ onMounted(() => {
       background: var(--el-fill-color-lighter);
     }
     :deep(.el-descriptions__content) {
-      font-size: 13.5px;
+      font-size: 14px;
       color: var(--dcs-text-regular);
     }
   }
@@ -4033,7 +4324,7 @@ onMounted(() => {
     }
   }
   .cell-note {
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
   }
   /* 批2 Q4 搬家指路：槽行整体搬进画像设置，原位置留删除线标签+灰底指路条（过渡期） */
@@ -4051,7 +4342,7 @@ onMounted(() => {
   }
   .cell-sub {
     margin-top: 6px;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.7;
     color: var(--dcs-text-secondary);
   }
@@ -4065,7 +4356,7 @@ onMounted(() => {
       justify-content: space-between;
       align-items: center;
       margin-bottom: 6px;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--dcs-text-secondary);
     }
     .scope-table {
@@ -4127,11 +4418,36 @@ onMounted(() => {
     flex-wrap: wrap;
     row-gap: 8px;
     margin-bottom: 12px;
+
+    /* 题6：EP 的 .el-input__wrapper{flex-grow:1} 也命中日期框，1920 实测被吃到 1048px——
+       只改 width 无效，必须同时压掉 flex-grow（frontend/AGENTS.md：attribute 值≠渲染值） */
+    :deep(.el-date-editor) {
+      flex-grow: 0 !important;
+      width: 340px !important;
+      max-width: 100%;
+    }
   }
   .log-pager {
     display: flex;
     justify-content: flex-end;
     padding-top: 12px;
+  }
+  /* 题3：全局 theme-framed.scss:802 把「所有文字按钮」统一染灰（.el-button.is-link），
+     压过了按钮自己声明的 danger——只在本页把它们提回危险红，不动全局主题 */
+  :deep(.el-button.is-link.el-button--danger),
+  :deep(.el-button.is-text.el-button--danger) {
+    color: var(--el-color-danger) !important;
+
+    &:hover {
+      color: var(--el-color-danger) !important;
+    }
+  }
+  /* 题2：操作列钉右改用 el-table 原生 fixed="right"（EP 会自己铺定位层与分隔线）。
+     曾试过 CSS position: sticky 版本，768 下操作列会压在「本月费用」列的文字上——别回退这条路。 */
+  /* 题6：宽屏清单只有两三列信息，拉满 1640px 中间上千像素空白——清单区收一个上限 */
+  .cap-tbl,
+  .svc-list {
+    max-width: 1200px;
   }
 
   /* ===== 能力全景（批C） ===== */
@@ -4158,7 +4474,7 @@ onMounted(() => {
       padding: 14px 18px;
       max-height: 320px;
       overflow: auto;
-      font-size: 12.5px;
+      font-size: 12px;
       line-height: 1.8;
       color: var(--dcs-text-regular);
       white-space: pre-wrap;
@@ -4177,7 +4493,7 @@ onMounted(() => {
         gap: 10px;
         padding: 8px 12px;
         background: var(--el-fill-color);
-        font-size: 12.5px;
+        font-size: 12px;
 
         .seg-title {
           color: var(--dcs-text-primary);
@@ -4202,7 +4518,7 @@ onMounted(() => {
     gap: 2px;
 
     .tool-name {
-      font-size: 13.5px;
+      font-size: 14px;
       color: var(--dcs-text-primary);
     }
     .tool-code {
@@ -4226,7 +4542,7 @@ onMounted(() => {
         color: var(--dcs-text-primary);
       }
       .head-note {
-        font-size: 12.5px;
+        font-size: 12px;
         color: var(--dcs-text-secondary);
       }
     }
@@ -4351,7 +4667,7 @@ onMounted(() => {
       flex: none;
     }
     .q-preview-v {
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 600;
       color: var(--dcs-text-primary);
     }
@@ -4390,6 +4706,16 @@ onMounted(() => {
   .qo-tenant {
     flex: 1;
     min-width: 260px;
+    /* Q31：原「改默认」没有定位，会作为行内元素掉到文案下面、悬在条子中间；
+       改成钉在租户默认条的右上角（钱包态/停用态都读得出来这是个控件） */
+    position: relative;
+    padding-right: 84px;
+    .qo-edit-btn {
+      position: absolute;
+      right: 8px;
+      top: 6px;
+      margin: 0;
+    }
   }
   .qo-k {
     font-size: 12px;
@@ -4399,16 +4725,16 @@ onMounted(() => {
     gap: 5px;
   }
   .qo-v {
-    font-size: 13.5px;
+    font-size: 14px;
     color: var(--dcs-text-primary);
     b {
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--dcs-text-primary);
     }
   }
   .qo-note {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-placeholder);
     font-weight: 400;
     margin-left: 4px;
@@ -4438,7 +4764,7 @@ onMounted(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     padding: 2px 4px;
     border-radius: var(--app-control-radius);
@@ -4450,7 +4776,7 @@ onMounted(() => {
     }
   }
   .qo-form-tip {
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.6;
     color: var(--dcs-text-placeholder);
 
@@ -4475,7 +4801,7 @@ onMounted(() => {
       flex: none;
     }
     .q-preview-v {
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 600;
       color: var(--dcs-text-primary);
     }
@@ -4489,7 +4815,7 @@ onMounted(() => {
 /* 共 N 人：筛选行右缘的轻量计数（与 total 分页口径一致） */
 .qo-total {
   margin-left: 16px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--dcs-text-secondary);
   align-self: center;
 }
@@ -4500,6 +4826,58 @@ onMounted(() => {
   align-items: center;
   gap: 3px;
   line-height: 1.3;
+}
+/* Q31：积分消费下「已用 / 不限」——只读口径，用灰字压一档，别读成正常额度 */
+.q-usage .q-unlimited {
+  color: var(--dcs-text-secondary);
+  b {
+    color: var(--el-color-primary);
+    font-weight: 600;
+  }
+}
+/* Q31 回修（2026-10-31）：0 = 急停的行不显示「不限」，改「已停用」危险色 */
+.q-stopped {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+.q-usage .q-unlimited b.q-stopped {
+  color: var(--el-color-danger);
+}
+/* Q31：积分消费停用态——额度相关的两块统一降噪（仍可读），
+   「禁用/启用」是账号闸不是额度闸，保持可用、不受此规则影响 */
+.quota-off {
+  .quota-overview {
+    opacity: 0.72;
+    filter: grayscale(40%);
+  }
+  .quota-turn-cell {
+    opacity: 0.78;
+  }
+}
+.quota-offline {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--el-color-info-light-7);
+  border-radius: var(--app-control-radius);
+  background: var(--el-color-info-light-9);
+  color: var(--dcs-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  b {
+    color: var(--dcs-text-primary);
+    font-weight: 600;
+  }
+  .qo-ico {
+    color: var(--el-color-info);
+    flex: none;
+  }
+}
+.sec-off-tag {
+  margin-left: 8px;
+  font-weight: 400;
 }
 .q-badges {
   display: flex;
@@ -4682,7 +5060,7 @@ onMounted(() => {
   }
   .adm-sub {
     margin-left: auto;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
   }
   /* 段内小节：不再套第二层页签，用标题把内容分开 */
@@ -4708,7 +5086,7 @@ onMounted(() => {
     flex-wrap: wrap;
 
     b {
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 600;
       color: var(--dcs-text-primary);
     }
@@ -4724,7 +5102,7 @@ onMounted(() => {
     font-variant-numeric: tabular-nums;
   }
   .sec-note {
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
   }
   .sec-acts {
@@ -4788,13 +5166,13 @@ onMounted(() => {
       min-width: 0;
 
       b {
-        font-size: 13.5px;
+        font-size: 14px;
         font-weight: 600;
         color: var(--dcs-text-primary);
       }
       p {
         margin: 2px 0 0;
-        font-size: 12.5px;
+        font-size: 12px;
         line-height: 1.65;
         color: var(--dcs-text-secondary);
       }
@@ -4826,11 +5204,11 @@ onMounted(() => {
       gap: 2px;
 
       b {
-        font-size: 13.5px;
+        font-size: 14px;
         font-weight: 600;
       }
       span {
-        font-size: 12.5px;
+        font-size: 12px;
         color: var(--dcs-text-secondary);
       }
     }
@@ -4839,7 +5217,7 @@ onMounted(() => {
   /* ---- 能力清单 ---- */
   .cap-note {
     margin-bottom: 10px;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.7;
     color: var(--dcs-text-secondary);
   }
@@ -4875,7 +5253,7 @@ onMounted(() => {
       align-items: center;
       gap: 2px;
       flex-wrap: wrap;
-      font-size: 12.5px;
+      font-size: 12px;
 
       button {
         padding: 0;
@@ -4902,7 +5280,7 @@ onMounted(() => {
     .health-link.el-button {
       height: auto;
       padding: 0 4px;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--dcs-text-secondary);
 
       &:hover {
@@ -4939,7 +5317,7 @@ onMounted(() => {
     display: inline-block;
     padding: 0 7px;
     border-radius: 8px;
-    font-size: 11.5px;
+    font-size: 12px;
     font-style: normal;
     font-weight: 500;
     line-height: 18px;
@@ -5004,7 +5382,7 @@ onMounted(() => {
   .cap-thead {
     padding: 0 2px 5px;
     border-bottom: 1px solid var(--el-border-color);
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
 
     span:nth-child(2),
@@ -5031,7 +5409,7 @@ onMounted(() => {
     }
     .hint {
       margin-left: auto;
-      font-size: 11.5px;
+      font-size: 12px;
       color: var(--el-text-color-placeholder);
     }
   }
@@ -5089,7 +5467,7 @@ onMounted(() => {
     min-width: 0;
   }
   .lowrisk {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--el-text-color-placeholder);
   }
   .cap-gate {
@@ -5118,7 +5496,7 @@ onMounted(() => {
     }
   }
   .cap-chev {
-    font-size: 15px;
+    font-size: 16px;
     line-height: 1;
     text-align: right;
     color: var(--el-text-color-placeholder);
@@ -5156,7 +5534,7 @@ onMounted(() => {
     border-bottom: 1px solid var(--el-border-color-lighter);
 
     b {
-      font-size: 13.5px;
+      font-size: 14px;
       font-weight: 600;
       color: var(--dcs-text-primary);
     }
@@ -5221,7 +5599,7 @@ onMounted(() => {
 
     .fold-arr {
       flex: none;
-      font-size: 10px;
+      font-size: 12px;
       color: var(--el-text-color-placeholder);
       transition: transform 0.15s;
     }
@@ -5261,7 +5639,7 @@ onMounted(() => {
       color: var(--dcs-text-primary);
     }
     .arr {
-      font-size: 10px;
+      font-size: 12px;
       color: var(--el-text-color-placeholder);
       transition: transform 0.15s;
     }
@@ -5314,7 +5692,7 @@ onMounted(() => {
     border: 1px solid var(--el-color-primary-light-7);
     border-radius: var(--app-control-radius);
     background: var(--el-color-primary-light-9);
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-primary);
 
     b {
@@ -5370,7 +5748,7 @@ onMounted(() => {
       i {
         grid-row: span 2;
         font-style: normal;
-        font-size: 11.5px;
+        font-size: 12px;
         line-height: 18px;
         text-align: center;
         color: var(--el-text-color-placeholder);
@@ -5380,7 +5758,7 @@ onMounted(() => {
         color: var(--dcs-text-primary);
       }
       .pf {
-        font-size: 11px;
+        font-size: 12px;
         color: var(--el-text-color-placeholder);
         overflow: hidden;
         text-overflow: ellipsis;
@@ -5411,7 +5789,7 @@ onMounted(() => {
       color: var(--dcs-text-primary);
     }
     .pd-file {
-      font-size: 11.5px;
+      font-size: 12px;
       color: var(--el-text-color-placeholder);
     }
     .sp {
@@ -5423,7 +5801,7 @@ onMounted(() => {
     padding: 7px 10px;
     border-radius: var(--app-control-radius);
     background: var(--el-fill-color-lighter);
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.7;
     color: var(--dcs-text-secondary);
   }
@@ -5472,7 +5850,7 @@ onMounted(() => {
     padding: 12px 14px;
     max-height: 520px;
     overflow: auto;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.8;
     color: var(--dcs-text-regular);
     white-space: pre-wrap;
@@ -5488,18 +5866,18 @@ onMounted(() => {
     gap: 18px;
     flex-wrap: wrap;
     margin-bottom: 10px;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
 
     b {
-      font-size: 15px;
+      font-size: 16px;
       color: var(--dcs-text-primary);
       font-variant-numeric: tabular-nums;
     }
     em {
       margin-left: 5px;
       font-style: normal;
-      font-size: 11.5px;
+      font-size: 12px;
       color: var(--el-text-color-placeholder);
     }
   }
@@ -5528,7 +5906,7 @@ onMounted(() => {
     padding: 12px 14px;
     max-height: 420px;
     overflow: auto;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.8;
     color: var(--dcs-text-regular);
     white-space: pre-wrap;
@@ -5690,7 +6068,7 @@ onMounted(() => {
       padding: 0 5px;
       border-radius: 4px;
       background: var(--el-fill-color);
-      font-size: 10.5px;
+      font-size: 12px;
       font-weight: 500;
       line-height: 15px;
       color: var(--dcs-text-secondary);
@@ -5723,7 +6101,7 @@ onMounted(() => {
   }
   .cd-tech {
     margin-top: 16px;
-    font-size: 12.5px;
+    font-size: 12px;
 
     summary {
       color: var(--dcs-text-secondary);
@@ -5735,7 +6113,7 @@ onMounted(() => {
     display: flex;
     gap: 10px;
     padding: 4px 0;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
 
     span {
@@ -5773,7 +6151,7 @@ onMounted(() => {
 .reco-dialog {
   .reco-sub {
     margin: -4px 0 12px;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.7;
     color: var(--dcs-text-secondary);
   }
@@ -5804,7 +6182,7 @@ onMounted(() => {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 13.5px;
+      font-size: 14px;
       color: var(--dcs-text-primary);
     }
     p {
@@ -5817,7 +6195,7 @@ onMounted(() => {
       padding: 0 6px;
       border-radius: 8px;
       background: var(--el-color-primary);
-      font-size: 10.5px;
+      font-size: 12px;
       font-weight: 500;
       line-height: 16px;
       color: #fff;
@@ -5839,7 +6217,7 @@ onMounted(() => {
     color: var(--dcs-text-primary);
 
     b {
-      font-size: 15px;
+      font-size: 16px;
       font-variant-numeric: tabular-nums;
       color: var(--el-color-primary);
     }
@@ -5851,7 +6229,7 @@ onMounted(() => {
   .preset-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12.5px;
+    font-size: 12px;
 
     th {
       padding: 6px 8px;
@@ -5888,7 +6266,7 @@ onMounted(() => {
       padding: 0 5px;
       border-radius: 4px;
       background: var(--el-color-warning-light-9);
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 500;
       line-height: 16px;
       color: var(--el-color-warning-dark-2);
@@ -5899,12 +6277,12 @@ onMounted(() => {
   }
   .preset-none {
     padding: 14px 4px;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
   }
   .rule-box {
     margin-top: 10px;
-    font-size: 12.5px;
+    font-size: 12px;
 
     summary {
       color: var(--dcs-text-secondary);
@@ -5954,6 +6332,12 @@ onMounted(() => {
 @media (max-width: 1100px) {
   .dcs-as-admin .ov-grid {
     grid-template-columns: 1fr;
+  }
+}
+/* 题6：统计条补 992 断点（与同卡健康格子同档）——768 落在 761-1100 无人管区间，费用一长就撑破卡片 */
+@media (max-width: 992px) {
+  .dcs-as-admin .stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 900px) {
@@ -6083,6 +6467,84 @@ onMounted(() => {
   }
   .reco-dialog .preset-foot .sec-note {
     display: none;
+  }
+
+  /* ===== 题1：≤760 窄屏规则包——设置表堆叠 / 下拉满宽 / 弹层不超屏 / 分页只留前后页 ===== */
+  .dcs-as-admin .adm-desc :deep(.el-descriptions__table),
+  .dcs-as-admin .adm-desc :deep(.el-descriptions__body) {
+    display: block;
+    width: 100%;
+  }
+  /* tbody/tr 没有类名，只改 table 的 display 不够——行仍是 table-row，格子会被行宽撑到 611px */
+  .dcs-as-admin .adm-desc :deep(.el-descriptions__body table > tbody),
+  .dcs-as-admin .adm-desc :deep(.el-descriptions__body table > tbody > tr) {
+    display: block;
+    width: 100%;
+  }
+  .dcs-as-admin .adm-desc :deep(.el-descriptions__cell) {
+    display: block;
+    width: 100%;
+  }
+  .dcs-as-admin .adm-desc :deep(.el-descriptions__label) {
+    width: 100%;
+    min-width: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+  }
+  .dcs-as-admin .adm-desc :deep(.el-descriptions__content) {
+    width: 100%;
+  }
+  /* 默认模型下拉在模板里 inline 写死 340px——窄屏必须 !important 才压得住 */
+  .dcs-as-admin .cell-flex :deep(.el-select),
+  .dcs-as-admin .cell-flex :deep(.el-input) {
+    width: 100% !important;
+    max-width: 100%;
+  }
+  /* 分页器：窄屏只留 上一页 / 页码 / 下一页 */
+  .dcs-as-admin .log-pager {
+    justify-content: center;
+  }
+  .dcs-as-admin .log-pager :deep(.el-pagination__total),
+  .dcs-as-admin .log-pager :deep(.el-pagination__jump) {
+    display: none;
+  }
+  /* 页签按钮 28×36 → 44 高（窄屏是手指在点） */
+  .dcs-as-admin .adm-seg button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 2px;
+  }
+  /* 反馈统计条：横排三块挤压、标题断行 → 纵向三段 */
+  .dcs-as-admin .fb-stats {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .dcs-as-admin .fb-rate,
+  .dcs-as-admin .fb-reasons,
+  .dcs-as-admin .fb-trend {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+  }
+  .dcs-as-admin .fb-reason-name {
+    width: 96px;
+  }
+  /* 浮层/抽屉：宽度上限＝屏宽（append-to-body，根节点没有 scope id，必须 :global） */
+  :global(.ov-dialog),
+  :global(.q-dialog),
+  :global(.ws-dialog) {
+    width: calc(100% - 16px) !important;
+    max-width: calc(100% - 16px);
+  }
+  :global(.q-dialog .q-preview),
+  :global(.q-dialog .field-hint) {
+    margin-left: 0;
+    padding-left: 0;
+  }
+  :global(.mcp-form-drawer.el-drawer) {
+    width: 100vw !important;
+    max-width: 100vw;
   }
 }
 

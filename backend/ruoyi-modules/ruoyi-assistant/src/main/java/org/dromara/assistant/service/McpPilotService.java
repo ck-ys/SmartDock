@@ -617,6 +617,41 @@ public class McpPilotService {
         return msg.length() > 480 ? msg.substring(0, 480) : msg;
     }
 
+    /** 耗时尾缀（"4ms" / "write 123ms"）：写类调用带 write 前缀，取尾部数字才不丢审计行 */
+    private static final Pattern DURATION_MS = Pattern.compile("(\\d+)ms$");
+
+    /**
+     * 调用审计行的落库口径（纯函数，供单测直接断言）：成功行「详情/错误」只留真错误，
+     * 耗时与写标记一律只进 duration_ms。
+     *
+     * <p>2026-10-30 题6 之前这里把 remark（成功路径传的是 "4ms"）兜底写进 error_msg——
+     * 前端「详情/错误」列与「耗时」列逐行同值，导出与接口消费方也拿到错口径。
+     * 历史行不做数据清洗（前端成功行已兜成「—」），仅新数据归位。</p>
+     *
+     * <p>口径只覆盖工具调用行（CALL_* / RATE_LIMITED）。挂载行（MOUNT_*，走实例 audit()）与
+     * 反问行（ELICIT_*，走 AssistantElicitationBridge）的 error_msg 列承载结果详情
+     * （挂载工具清单 / 确认文案），成功行也保留——这是该列对非调用行的既定语义，
+     * 勿按本函数「成功置空」口径去纠正。</p>
+     */
+    public static DcsMcpCallLog buildCallLog(String serverName, String tenantId, Long userId, String toolName,
+                                             String action, String status, String errorMsg, String remark) {
+        DcsMcpCallLog l = new DcsMcpCallLog();
+        l.setTenantId(tenantId);
+        l.setUserId(userId);
+        l.setServerName(serverName);
+        l.setToolName(toolName);
+        l.setAction(action);
+        l.setStatus(status);
+        // 成功行（status=1）的「详情/错误」保持空；失败行保留真错误文本
+        l.setErrorMsg("1".equals(status) ? null : errorMsg);
+        java.util.regex.Matcher dm = DURATION_MS.matcher(remark == null ? "" : remark);
+        l.setDurationMs(dm.find() ? Integer.valueOf(dm.group(1)) : null);
+        l.setCreateTime(new java.util.Date());
+        return l;
+    }
+
+    /** 挂载行（MOUNT_*）专用：error_msg 写挂载结果详情（如「3 个工具 [a, b]」），成功行也保留；
+     *  不走 buildCallLog 的「成功置空」口径——那是工具调用行的语义，详见其 javadoc。 */
     void audit(String serverName, String tenantId, Long userId, String toolName,
                String action, String status, String errorMsg, String remark) {
         try {
@@ -726,22 +761,9 @@ public class McpPilotService {
         static void audit(DcsMcpCallLogMapper mapper, String serverName, String tenantId, Long userId,
                           String toolName, String action, String status, String errorMsg, String remark) {
             try {
-                DcsMcpCallLog l = new DcsMcpCallLog();
-                l.setTenantId(tenantId);
-                l.setUserId(userId);
-                l.setServerName(serverName);
-                l.setToolName(toolName);
-                l.setAction(action);
-                l.setStatus(status);
-                l.setErrorMsg(errorMsg != null ? errorMsg : remark);
-                // G4 三审回修（双席共识 P1）：remark 可能带 write 前缀（"write 123ms"）——
-                // 原 endsWith("ms")+replace 解析必抛 NumberFormatException 且被吞 →
-                // 写类成功调用审计行 100% 丢失；改尾部数字提取，前缀天然兼容
-                java.util.regex.Matcher dm = java.util.regex.Pattern.compile("(\\d+)ms$")
-                    .matcher(remark == null ? "" : remark);
-                l.setDurationMs(dm.find() ? Integer.valueOf(dm.group(1)) : null);
-                l.setCreateTime(new java.util.Date());
-                mapper.insert(l);
+                // 落库口径统一收在 buildCallLog（题6：成功行不再把耗时当错误信息写进 error_msg）
+                mapper.insert(McpPilotService.buildCallLog(serverName, tenantId, userId, toolName,
+                    action, status, errorMsg, remark));
             } catch (Exception e) {
                 log.warn("[McpPilot] 调用审计写入失败（不连坐）：{}", e.getMessage());
             }

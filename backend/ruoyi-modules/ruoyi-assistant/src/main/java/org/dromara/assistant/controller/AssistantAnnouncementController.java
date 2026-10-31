@@ -117,7 +117,10 @@ public class AssistantAnnouncementController extends BaseController {
                 throw new ServiceException("公告不存在或不属于当前租户", 403);
             }
             existing.setTitle(bo.getTitle().trim());
-            existing.setContent(StrUtil.trimToNull(bo.getContent()));
+            // F1（2026-10-31 深审回修）：空串是「清空正文」的显式语义，必须原样落库。
+            // null 才是「本次不改」——不能 trimToNull：MP 全局 updateStrategy=NOT_NULL
+            // 会把 null 字段整列跳过，旧正文留着而接口返回成功（假成功）。
+            existing.setContent(bo.getContent() == null ? null : bo.getContent().trim());
             existing.setStyle(style);
             existing.setStatus("1");
             existing.setPublishBy(LoginHelper.getUserId());
