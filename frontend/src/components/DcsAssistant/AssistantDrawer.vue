@@ -93,7 +93,7 @@
                       @keydown.esc.stop.prevent="cancelRename"
                       @blur="commitRename(c)"
                     />
-                    <template v-else>{{ c.title || '（未命名会话）' }}</template>
+                    <template v-else>{{ displayTitle(c) }}</template>
                   </div>
                   <div class="fp-time">{{ fpRowStatus(c) === 'answering' ? '正在回答…' : fpDayTime(c.lastMessageTime) }}</div>
                 </div>
@@ -125,7 +125,7 @@
               >
                 <span v-if="fpRowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
                 <div class="fp-mid">
-                  <div class="fp-t">{{ c.title || '（未命名会话）' }}</div>
+                  <div class="fp-t">{{ displayTitle(c) }}</div>
                   <div class="fp-time">{{ fpRowStatus(c) === 'answering' ? '正在回答…' : fpDayTime(c.lastMessageTime) }}</div>
                 </div>
                 <button class="fp-more" title="会话操作" aria-label="会话操作" @click.stop="openSessMenu(c)">⋯</button>
@@ -139,7 +139,7 @@
             <div v-if="arcOpen" class="fp-arcbox">
               <div v-for="c in fpArchived" :key="'a' + c.id" class="fp-item arc" @click="onFpOpen(c)">
                 <div class="fp-mid">
-                  <div class="fp-t">{{ c.title || '（未命名会话）' }}</div>
+                  <div class="fp-t">{{ displayTitle(c) }}</div>
                   <div class="fp-time">{{ fpDayTime(c.lastMessageTime) }}</div>
                 </div>
                 <button class="fp-more" title="恢复会话" aria-label="恢复会话" @click.stop="restoreConv(c)">
@@ -377,6 +377,7 @@ import type { AssistantBindings, AssistantTurn } from './useAssistant';
 import { roleOf, roleLabelOf, pageNameOf, taskCtxOf, suggestionsFor } from './assistantCtx';
 import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
+import { displayTitle } from '@/utils/assistantTitle';
 import { assistantName } from './nameState';
 import MsgFlow from './MsgFlow.vue';
 import HitlDock from './HitlDock.vue';
