@@ -40,7 +40,7 @@ SmartDock 是一套**通用智能体引擎**与**用户画像引擎**的参考�
   <a href="docs/profile-integration.md"><b>业务接入指南</b></a>
 </p>
 
-<sub>截图更新于 v3.34.1（单源重构 M1 批末，内部协作演示故事）；界面数据由 `backend/script/demo/seed-internal-ops-demo.js` 生成的合成演示数据，不含真实个人信息。</sub>
+<sub>截图更新于 v3.40.0（2026-10-31 重拍；05 模型与钥匙、06 AI 助手、11 写操作确认三张因本机模型与外网余额接口不可用未能重拍，沿用 v3.34.1 旧图——界面与当前版本一致，仅演示数字略旧）；界面数据由 `backend/script/demo/seed-internal-ops-demo.js` 生成的合成演示数据，不含真实个人信息。</sub>
 
 ## 目录
 
