@@ -96,21 +96,49 @@
         @keydown="onKey"
       />
       <div class="brow">
-        <!-- ➕ 添加面板（原型 addPop：每次都问/联网/查库/附件/引用/快捷能力）；bicon=28×28 无边框形态（左组独占） -->
+        <!-- ➕ 添加面板（原型 addPop：联网/查库/附件/引用/快捷能力）；bicon=28×28 无边框形态（左组独占） -->
         <button class="btool bicon" aria-label="添加" aria-haspopup="dialog" :aria-expanded="addOpen" title="添加" @click="addOpen = !addOpen">
           <IconSpan name="plus" :size="15" />
         </button>
 
-        <!-- R1 联网一步钮（2026-10-13 用户提议「放 ➕ 旁边」）：常驻灰图标，点一下开/关；
-             开态钮变蓝即状态显示（原「联网 ✕」状态签撤并——同一件事不标两遍），
-             三分支语义与批④一致（未开放/用完见 title 与 toast） -->
+        <!-- 题9 案1（2026-10-31）：自主权档位=输入条常驻按钮（紧挨＋），不再藏进「＋」面板。
+             档位真生效由后端权限规则执行（全自动放行动作类 / 同类只问一次按工具名记键），
+             前端只负责把选择随请求上行；弹层锚在本钮上方（.modewrap 定位） -->
+        <span class="modewrap">
+          <button
+            class="btool bmode"
+            :class="{ warn: autoIdx === 2 }"
+            aria-haspopup="dialog"
+            :aria-expanded="autoPopOpen"
+            :aria-label="`自主权：${autoCur.title}（${autoCur.desc}）`"
+            :title="`${autoCur.title}：${autoCur.desc}`"
+            @click="autoPopOpen = !autoPopOpen"
+          >
+            <IconSpan :name="autoCur.icon" :size="14" />
+            <span class="mlab">{{ autoCur.mch }}</span>
+            <IconSpan name="chevron-down" :size="11" />
+          </button>
+          <div v-if="autoPopOpen" ref="autoPopRef" class="autopop" role="dialog" aria-label="自主权">
+            <button v-for="(a, i) in AUTO_LV" :key="a.key" class="apopt" :class="{ on: i === autoIdx }" @click="pickAuto(i)">
+              <span class="apic"><IconSpan :name="a.icon" :size="15" /></span>
+              <span class="aptx"
+                ><b>{{ a.popT }}</b
+                ><span>{{ a.popD }}</span></span
+              >
+              <span v-if="i === autoIdx" class="apck"><IconSpan name="check" :size="14" /></span>
+            </button>
+          </div>
+        </span>
+
+        <!-- R1 联网一步钮（题10 案1 2026-10-31 反转：默认自动，点一下=停用/恢复）：
+             常驻灰图标，开态（自动）钮变蓝；已停用=灰。语义分支（未开放/用完）见 title 与 toast -->
         <button
           class="btool bicon wbtn"
           :class="{ on: webOn && !webDisabled }"
           role="switch"
           :aria-checked="webOn && !webDisabled"
           :aria-disabled="webDisabled || undefined"
-          :aria-label="`联网搜索开关（${webOn && !webDisabled ? '已开' : '已关'}）`"
+          :aria-label="`联网搜索（${webOn && !webDisabled ? '自动' : '已停用'}）`"
           :title="wbtnTitle"
           @click="toggleWeb(!webOn)"
         >
@@ -400,17 +428,13 @@
       <div v-if="addOpen" ref="addpopRef" class="addpop" role="dialog" aria-label="添加">
         <div class="ah">添加</div>
         <div class="alist">
-          <!-- 自主权行（原型 apAuto：行首恒 🤖，三处文案随档同步，档2 小签 .hot；desc 溢出 ellipsis=原型同款，悬停看全文） -->
-          <button class="arow" :aria-expanded="autoPopOpen" :title="autoCur.desc" @click="autoPopOpen = !autoPopOpen">
-            <IconSpan name="bot" />
-            <b>{{ autoCur.title }}</b>
-            <span>{{ autoCur.desc }}</span>
-            <span class="mch" :class="{ hot: autoIdx === 2 }">{{ autoCur.mch }} <IconSpan name="chevron-down" :size="12" /></span>
-          </button>
+          <!-- 题9 案1（2026-10-31）：自主权三档从「＋」面板搬成输入条常驻按钮（见 brow 里的 bmode），
+               面板里不再留这一行——两层入口=同一个设置标两遍 -->
           <!-- F-D2（2026-10-06）：联网/查库已真实上线，摘「即将上线」占位——
                联网=问外部知识自动启用（管理员未配 key 时助手会明说不可用）；
                查库=AI 默认查库回答，二者无前端开关，点击给说明而非死行 -->
-          <!-- 业务批3-④ #17：联网会话级开关（默认关，grill Q6 定稿）；状态存
+          <!-- 题10 案1（2026-10-31）：联网从「默认关的手动开关」改为「模型判断 + 可停用」；
+               文案只剩两态——自动 / 已停用。状态存
                dcs:assistant:webOn:{userId}:{threadId}（webOnState 单一真源，runTurn 出口注入） -->
           <div
             class="arow webrow"
@@ -418,13 +442,13 @@
               webDisabled
                 ? '联网搜索未开放（额度为 0），请联系管理员'
                 : webOn
-                  ? `联网已开 · 今天还能搜 ${webLeft} 次`
-                  : '默认关闭；开启后问外部知识（新闻/天气/政策）会搜索网页并带来源，每天 ' + webLimit + ' 次免费额度'
+                  ? `联网自动 · 今天还能搜 ${webLeft} 次（问了外部知识才消耗）· 点击停用`
+                  : '已停用：本会话不再搜网页（站内数据问答不受影响）· 点击恢复自动'
             "
           >
             <IconSpan name="globe" /><b>联网搜索</b>
             <span class="tagline" :class="{ on: webOn && !webDisabled }">{{
-              webDisabled ? '未开放' : webOn ? `剩 ${webLeft} 次` : `每天 ${webLimit} 次`
+              webDisabled ? '未开放' : webOn ? '自动' : '已停用'
             }}</span>
             <button class="wsw" :class="{ on: webOn }" role="switch" :aria-checked="webOn" aria-label="联网搜索开关" @click="toggleWeb(!webOn)">
               <i />
@@ -463,18 +487,6 @@
             <i class="atile cast">播</i><b>广播任务解读</b><span>业务概念一句话讲清</span>
           </button>
         </div>
-        <!-- 三档自主权弹层（原型 autoPop(apAutoLab,1)：三选+对勾+选中 700ms 收；alignend=右锚。
-             必须是 addpop 直接子级——放 .alist 内会被滚动容器 overflow 裁掉（用户实锤「弹窗没出来」） -->
-        <div v-if="autoPopOpen" class="autopop alignend" role="dialog" aria-label="自主权">
-          <button v-for="(a, i) in AUTO_LV" :key="a.key" class="apopt" :class="{ on: i === autoIdx }" @click="pickAuto(i)">
-            <span class="apic"><IconSpan :name="a.icon" :size="15" /></span>
-            <span class="aptx"
-              ><b>{{ a.popT }}</b
-              ><span>{{ a.popD }}</span></span
-            >
-            <span v-if="i === autoIdx" class="apck"><IconSpan name="check" :size="14" /></span>
-          </button>
-        </div>
         <div class="afoot">
           <span><span class="akey">@</span>引用任务</span>
           <span><span class="akey">/</span>命令</span>
@@ -491,8 +503,8 @@
 <script setup lang="ts">
 /**
  * 输入区（批E → PROTO PARITY 批B 全家桶，原型 .box.btools 形态）：
- * ➕添加面板（每次都问/联网/查库/附件=即将上线、@引用任务、快捷能力）+余量环（status 实值）
- * +思考三档（forwardedProps 透传）+发送键状态机（dim/橙+角标/title 三态）+占位轮换（身份词典 5s）
+ * ➕添加面板（联网/查库/附件、@引用任务、快捷能力）+余量环（status 实值）
+ * +自主权档位按钮（题9）+思考三档（forwardedProps 透传）+发送键状态机（dim/橙+角标/title 三态）+占位轮换（身份词典 5s）
  * +/命令与@引用 cmdPop（↑↓EnterEsc）+ArrowUp 召回上一问+IME 守卫+拖文件虚线高亮。
  */
 import { getAssistantStatus, getAssistantModelChoice, getAssistantSkillCatalog, type AssistantModelChoice } from '@/api/dcs/assistant';
@@ -856,9 +868,9 @@ const AUTO_LV = [
     icon: 'rocket',
     title: '全自动',
     mch: '全自动',
-    desc: '不确认直接执行，事后通知可撤回',
+    desc: '不确认直接执行，执行完在对话里留痕',
     popT: '全自动 + 事后通知',
-    popD: '不再弹确认，执行完通知可撤回'
+    popD: '不再弹确认，执行完在对话里留痕可回看'
   }
 ] as const;
 const autoIdx = computed(() => AUTO_LV.findIndex((a) => a.key === props.state.autoLevel));
@@ -869,6 +881,8 @@ let autoPopTimer: ReturnType<typeof setTimeout> | null = null;
 const thinkPopOpen = ref(false);
 let thinkPopTimer: ReturnType<typeof setTimeout> | null = null;
 const addpopRef = ref<HTMLDivElement>();
+/** 题9：档位弹层已移出 addpop，点外关闭要单独认它（否则 mousedown 先收、click 落空） */
+const autoPopRef = ref<HTMLDivElement>();
 
 /** 回填输入框（BN-5 收藏/B 快捷问句共用：原型 quick()=回填+聚焦，不直接发） */
 function fillDraft(t: string) {
@@ -1004,8 +1018,8 @@ const ctxEmptyHint = computed(() =>
   (ctxWindow.value ?? 0) <= 0 ? '模型上下文窗口未知（待管理员在模型配置补全后可测量）' : '本会话还没有可测量记录（回答完成后即显示）'
 );
 
-/* ---- 业务批3-④ #17：联网搜索会话级开关（默认关）+联网配额展示 ---- */
-const webOn = ref(false);
+/* ---- 题10 案1（2026-10-31）：联网搜索默认自动（模型判断搜不搜）+ 可停用 + 配额展示 ---- */
+const webOn = ref(true);
 const webUsed = ref(0);
 const webLimit = ref(20);
 
@@ -1032,25 +1046,26 @@ const webPct = computed(() => (webLimit.value > 0 ? Math.min(1, webUsed.value / 
 const webDisabled = computed(() => webLimit.value <= 0);
 /** R1：用户级禁用闸（抽屉 banner='disabled' 传导）——输入只读+置灰，发送在 onSend 拦截 */
 const disabled = computed(() => props.state.banner === 'disabled');
-/** R1 联网钮三态 title（语义与批④面板行/状态弹窗一致） */
+/** 联网钮两态 title（自动/已停用，未开放见第一分支；语义与面板行/状态弹窗一致） */
 const wbtnTitle = computed(() =>
   webDisabled.value
     ? '联网搜索未开放（额度为 0）'
     : webOn.value
-      ? `联网已开 · 今天还能搜 ${webLeft.value} 次 · 点击关闭`
-      : `联网搜索 · 点击开启（每天 ${webLimit.value} 次免费，问了外部知识才消耗）`
+      ? `联网自动 · 今天还能搜 ${webLeft.value} 次 · 点击停用`
+      : `联网搜索已停用 · 点击恢复自动（每天 ${webLimit.value} 次免费，问了外部知识才消耗）`
 );
 /** R1 跨 tab 同步：localStorage 'storage' 事件只在其它 tab 修改时触发本 tab（浏览器语义，
- *  本 tab 写不回环）；最新写入胜出=登记不修口径，同一会话两个 tab 开关态实时一致 */
+ *  本 tab 写不回环）；最新写入胜出=登记不修口径，同一会话两个 tab 开关态实时一致。
+ *  题10 起只有 '0'=停用，删键/其它值都算自动。 */
 function onWebOnStorage(e: StorageEvent) {
   if (e.key === webOnKey(userStore.userId, props.state.threadId)) {
-    webOn.value = e.newValue === '1';
+    webOn.value = e.newValue !== '0';
   } else if (isSkillKey(e.key ?? '')) {
     // R1 技能跨 tab 同步：整键重读真源（另一 tab 勾选/取消即对齐）
     readSkillSync();
   }
 }
-/** 会话切换按 localStorage 重建开关态（webOnState 单一真源；新会话无键=默认关） */
+/** 会话切换按 localStorage 重建开关态（webOnState 单一真源；新会话无键=默认自动） */
 function readWebOnSync() {
   webOn.value = readWebOn(userStore.userId, props.state.threadId, localStorage);
 }
@@ -1060,9 +1075,9 @@ function toggleWeb(on: boolean) {
   pushToast(
     on
       ? webDisabled.value
-        ? '联网已开，但本租户未开放联网搜索（额度为 0），暂时搜不了外部资料'
-        : `联网已开：外部知识问答会搜网页带来源（今天剩 ${webLeft.value} 次）`
-      : '联网已关：继续问系统内的数据不受影响',
+        ? '联网已恢复自动，但本租户未开放联网搜索（额度为 0），暂时搜不了外部资料'
+        : `联网已自动：外部知识问题由模型判断是否搜网，出答案会带来源（今天剩 ${webLeft.value} 次）`
+      : '联网已停用：本会话不再搜网页，站内数据问答不受影响',
     'ok'
   );
 }
@@ -1355,7 +1370,8 @@ function onDocMdown(e: MouseEvent) {
   const t = e.target as HTMLElement;
   const host = addpopRef.value;
   // 点在面板外且不在 ➕/🧠 钮上（钮自身的 click 会 toggle，先关再开会闪）→ 全收
-  if ((addOpen.value || autoPopOpen.value) && !host?.contains(t) && !t.closest('.bicon')) {
+  if ((addOpen.value || autoPopOpen.value) && !host?.contains(t) && !autoPopRef.value?.contains(t) && !t.closest('.bicon')
+      && !t.closest('.modewrap')) {
     addOpen.value = false;
     autoPopOpen.value = false;
   }
@@ -2525,6 +2541,38 @@ defineExpose({
   .bpill .tlabel {
     font-size: 13px;
   }
+  /* 题9 案1：自主权档位常驻按钮（紧挨＋，图标+档名+下拉箭头）——弹层锚在按钮上方 */
+  .modewrap {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+  }
+  .btool.bmode {
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dcs-text-regular);
+    background: var(--el-fill-color-light);
+    padding: 0 7px;
+
+    .mlab {
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    /* 全自动档=黄字警示（ZCode 对危险档同款），不是装饰 */
+    &.warn {
+      background: #fff4e5;
+      color: #8a5a12;
+
+      &:hover {
+        background: #ffefd9;
+        color: #74490c;
+      }
+    }
+  }
+  .modewrap .autopop {
+    width: min(268px, 78vw);
+  }
   /* R1 技能胶囊：蓝底亮态=正在生效；× 内钮独立 hover（点主体开 ➕ 面板，点 × 停用） */
   .bpill.spill {
     background: #e8f3ff;
@@ -3257,6 +3305,11 @@ defineExpose({
 
     .bpill:not(.mpill) .tlabel,
     .bpill:not(.mpill) .bchev {
+      display: none;
+    }
+
+    /* 题9 三席 P2：档位按钮窄档只留图标（≈95px 会挤发送键；256px 内容盒必溢出） */
+    .modewrap .bmode .mlab {
       display: none;
     }
   }

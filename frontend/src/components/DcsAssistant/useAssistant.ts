@@ -47,6 +47,8 @@ export const ACT: Record<string, string> = {
   web_search: '联网搜索',
   act_remind: '发催办',
   read_attachment: '读附件',
+  // 题7（2026-10-31）：工作区回读，漏登记会英文直出 read file
+  read_file: '读归档',
   query_unsubmitted_by_dept: '查未交汇总',
   submit_plan: '出计划',
   save_memory: '存记忆',
@@ -715,6 +717,43 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           if (steps.length > 0) {
             turn.plan = { title: typeof v.title === 'string' ? v.title : undefined, steps };
           }
+        } else if (name === 'model_degrade' && value && typeof value === 'object') {
+          // 2026-10-31 题5 案1：自选模型失效回退默认链时后端不再静默——提示「为什么模型变了」
+          const v = value as { message?: unknown };
+          if (typeof v.message === 'string' && v.message) toast(v.message, 'info');
+        } else if (name === 'tool_denied' && value && typeof value === 'object') {
+          // 题8 案1（三席回修）：计划态硬拒的可视化——中间件自产的工具结果事件框架不发布，
+          // 后端改走本帧；把对应步骤标「已拒绝」，找不到步骤就补一条，避免工具卡永远转圈
+          const v = value as { toolCallId?: unknown; toolName?: unknown; message?: unknown };
+          const did = typeof v.toolCallId === 'string' ? v.toolCallId : '';
+          const dname = typeof v.toolName === 'string' ? v.toolName : '';
+          const dmsg = typeof v.message === 'string' && v.message ? v.message : '计划阶段不执行写操作';
+          let ds = did ? turn.steps.find((x) => x.id === did) : undefined;
+          if (!ds && did) {
+            for (let i = state.turns.length - 1; i >= 0 && !ds; i--) {
+              ds = state.turns[i].steps.find((x) => x.id === did);
+            }
+          }
+          if (ds) {
+            ds.status = 'err';
+            ds.brief = dmsg;
+            ds.resultFull = dmsg;
+            ds.durMs = ds.startedAt > 0 ? Date.now() - ds.startedAt : 0;
+          } else {
+            turn.steps.push({
+              id: did || `denied-${evSeq}`,
+              name: dname,
+              verb: ACT[dname] ?? dname.replace(/_/g, ' '),
+              argsText: '',
+              brief: dmsg,
+              resultFull: dmsg,
+              status: 'err',
+              startedAt: Date.now(),
+              durMs: 0,
+              seq: evSeq++
+            });
+          }
+          toast('计划还没确认，这一步写操作已拒绝', 'info');
         } else if (name === 'elicitation' && value && typeof value === 'object') {
           // G3-A1：MCP 外部工具执行中反问（server 侧在飞挂起，run 保持 RUNNING）——
           // 卡随本回合渲染，作答走独立端点（不走 resolveHitl/resume）；多 server 可同时反问
@@ -955,16 +994,36 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   }
 
   /**
-   * 业务批3-④ #17：联网开关单一真源注入——Composer 开关行写
+   * 联网开关单一真源注入——Composer 开关行写
    * dcs:assistant:webOn:{userId}:{threadId}（webOnState 模块），快捷提问/须知门放行/
-   * 队列补发等内部路径不走 Composer，统一在 runTurn 出口注入（currentModelPin 同坑同修）
+   * 队列补发等内部路径不走 Composer，统一在 runTurn 出口注入（currentModelPin 同坑同修）。
+   *
+   * 题10 案1（2026-10-31）：默认自动（模型判断搜不搜），只有用户显式停用才是 false；
+   * 无 persistKey 也用默认 true——「有开关才联网」的旧口径已废。
    */
   function currentWebOn(): boolean {
     if (!persistKey) {
-      return false;
+      return true;
     }
     const uid = persistKey.split(':').pop() ?? '';
     return readWebOn(uid, state.threadId, localStorage);
+  }
+
+  /**
+   * 题8 案1（三席回修）：计划卡三键意图——后端硬闸只在用户明确动作后解除，
+   * 不再按回合边界自动放。确认/改计划由三键发出的固定文案识别，取消由宿主显式上报。
+   */
+  const PLAN_CONFIRM_TEXT = '按刚才的计划开始执行';
+  const PLAN_ADJUST_PREFIX = '按这个计划执行：';
+  let planDecisionNext: 'confirm' | 'cancel' | 'adjust' | null = null;
+  /** 宿主取消计划卡时调用（下一次请求带上 cancel 解闸，避免写操作被关到 TTL） */
+  function notePlanDecision(kind: 'confirm' | 'cancel' | 'adjust') {
+    planDecisionNext = kind;
+  }
+  function takePlanDecision(): 'confirm' | 'cancel' | 'adjust' | null {
+    const v = planDecisionNext;
+    planDecisionNext = null;
+    return v;
   }
 
   /**
@@ -987,6 +1046,15 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       return;
     }
     const turn = reactive<AssistantTurn>(emptyTurn(q));
+    // 题8 案1（三席回修）：计划卡三键意图随请求上行——确认/改计划的固定文案在此识别，
+    // 取消由宿主 notePlanDecision('cancel') 上报；不带=计划卡仍挂着，后端继续硬拒写操作
+    const qTrim = q.trim();
+    if (qTrim === PLAN_CONFIRM_TEXT) {
+      planDecisionNext = 'confirm';
+    } else if (qTrim.startsWith(PLAN_ADJUST_PREFIX)) {
+      planDecisionNext = 'adjust';
+    }
+    const planDecision = takePlanDecision();
     turn.stamp = stamp;
     // 二审 P1：尾部悬挂的压缩/熔断标记由新回合接管（否则横幅永远漂在最新回答下面）
     if (state.lastCompaction) {
@@ -1021,8 +1089,12 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       state: {},
       forwardedProps: {
         thinkTier: currentThinkTier(),
+        // 题9 案1（2026-10-31）：自主权档位随请求上行——后端按档位重建权限规则，不再只存前端
+        autoLevel: state.autoLevel,
         ...(currentModelPin() ? { modelConfigId: currentModelPin() } : {}),
-        ...(currentWebOn() ? { webSearchEnabled: true } : {}),
+        // 题10 案1：联网默认自动——永远显式带值，停用发 false 让后端撤掉搜索工具
+        webSearchEnabled: currentWebOn(),
+        ...(planDecision ? { planDecision } : {}),
         ...(currentSkillId() ? { skillId: currentSkillId() } : {}),
         ...fwd
       }
@@ -1078,12 +1150,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       scheduleFollowupPull(lastTurn);
     }
     const hitlKey = lastTurn?.hitl ? hitlToolKey(lastTurn.hitl) : '';
-    // 批W2（SPEC §3.1'）：act_ 前缀动作类永不自动放行——「全自动」档与「同类只问一次」
-    // 对写操作整条关闭（确认卡必弹），防自主权档位放大误操作面。
-    // 判定双源：metadata.toolName（真实帧）与 reason（旧形态帧 reason=工具名）都认
-    const lastIsActTool = isActToolHitl(lastTurn?.hitl ?? null);
+    // 题9 案1（2026-10-31 拍板）：撤批W2 的「act_ 一律不自动放行」——档位改由后端权限规则
+    // 真执行（全自动=写类也放行 / 同类只问一次=同名确认过即放行），前端只省掉「问你」这一步；
+    // 真正做到等价，前端不能留旧的一刀切，否则卡照弹、档位还是装饰
     const autoOk =
-      !lastIsActTool &&
       lastTurn?.hitl &&
       lastTurn.hitl.cardState === 'pending' &&
       // 业务批7 Q14：勾过「本会话不再逐次确认」的 key 直接放行——不再叠加档位门槛
@@ -1091,7 +1161,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       // 偏好、与卡面「本会话内」文案冲突——resolveHitl 里的升档段已同步摘除，k3 P2-3 修正史实）
       (state.autoLevel === 'auto' || (!!hitlKey && state.autoApproved.includes(hitlKey)));
     if (result === 'finished' && autoOk) {
-      toast(state.autoLevel === 'auto' ? '已按「全自动」直接执行，完成见回答（可回面板调回）' : '同类操作只问一次：已自动确认执行', 'ok');
+      toast(state.autoLevel === 'auto' ? '已按「全自动」直接执行，完成见回答（点输入条档位可调回）' : '同类操作只问一次：已自动确认执行', 'ok');
       resolveHitl(true);
       return;
     }
@@ -1111,15 +1181,6 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
     const seg = h.interruptId.split(':')[1];
     return seg || h.reason || '';
-  }
-
-  /**
-   * 批W2（SPEC §3.1'）：动作类工具判定——act_ 前缀永不走免确认通道。
-   * 双源判定：metadata.toolName（真实帧 reason=tool_call 时唯一工具名来源）+
-   * reason（旧形态帧直接放工具名）；reason='tool_call' 不是工具名不误伤。
-   */
-  function isActToolHitl(h: HitlAsk | null): boolean {
-    return (h?.toolName ?? '').startsWith('act_') || (h?.reason ?? '').startsWith('act_');
   }
 
   /** 队列六条④前的统一消费口（v3.18）：草稿自动排队→补发队首→全部答完回执 */
@@ -1347,9 +1408,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       turn.hitl.cancelled = true;
     } else {
       const key = hitlToolKey(turn.hitl);
-      // 批W2（SPEC §3.1'）：act_ 动作类不入 autoApproved——即使「同类只问一次」档
-      // 或卡面勾选（卡面对 act_* 已不渲染勾选，此处是数据层二道闸）
-      if (!isActToolHitl(turn.hitl) && key && !state.autoApproved.includes(key)) {
+      // 题9 案1：动作类同样记「同类已确认」——不再一刀切排除（后端按 autoLevel 同步放行）
+      if (key && !state.autoApproved.includes(key)) {
         // 档1 确认即记同类（第二次起免问）；档0 勾「本会话内不再逐次确认」也记
         //（k3 P2-3：勾选不再升档改全局偏好——消费端 autoOk 已按 autoApproved 放行，
         // 升档+persistAutoLevel 属「本会话内」文案之外的越权副作用，整段摘除）
@@ -1369,15 +1429,17 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       threadId: state.threadId,
       messages: [...history],
       state: {},
-      // 业务批3-④：HITL 确认后的补跑也是一次 /agui/run——不带 webSearchEnabled 会让
-      // resolver 误判开关翻转而失效重建 agent（开着联网的会话在确认后掉 web_search）。
-      // R4a E2E 实锤同款缺陷扩面：modelPin/thinkTier 不注入=确认补跑静默回落默认模型
-      // （用户 pin 了可用模型、默认模型故障时确认必挂；批7 快捷提问丢参同族）——
-      // 与 runTurn 出口同款四件套统一注入
+      // HITL 确认后的补跑也是一次 /agui/run——参数必须带全：题10 起联网默认自动，
+      // 停用的会话若补跑不带 false 会被后端当默认开（用户停用失效）；开着的不带则
+      // resolver 误判开关翻转而失效重建 agent。R4a E2E 实锤同款缺陷扩面：
+      // modelPin/thinkTier 不注入=确认补跑静默回落默认模型（用户 pin 了可用模型、
+      // 默认模型故障时确认必挂；批7 快捷提问丢参同族）——与 runTurn 出口同款四件套统一注入
       forwardedProps: {
         thinkTier: currentThinkTier(),
+        autoLevel: state.autoLevel,
         ...(currentModelPin() ? { modelConfigId: currentModelPin() } : {}),
-        ...(currentWebOn() ? { webSearchEnabled: true } : {}),
+        // 题10 案1：联网默认自动——永远显式带值，停用发 false 让后端撤掉搜索工具
+        webSearchEnabled: currentWebOn(),
         ...(currentSkillId() ? { skillId: currentSkillId() } : {})
       }
     };
@@ -1943,6 +2005,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     resumeSay,
     resolveHitl,
     setAutoLevel,
+    /** 题8（三席回修）：宿主取消计划卡时上报，下一次请求带 planDecision=cancel 解闸 */
+    notePlanDecision,
     queueEdit,
     queueGo,
     queueDrop,

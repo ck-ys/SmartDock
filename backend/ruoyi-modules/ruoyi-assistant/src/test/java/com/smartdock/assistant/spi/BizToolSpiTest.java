@@ -148,7 +148,8 @@ class BizToolSpiTest {
         // 批3 微核心化: ToolDeps 只剩平台依赖, 业务工具全走 SPI——全 null 依赖即可装配
         org.dromara.assistant.core.ToolRegistry.ToolDeps emptyDeps =
             new org.dromara.assistant.core.ToolRegistry.ToolDeps(
-                null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null, null);
+                null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null, null,
+                java.nio.file.Path.of("."));
         Toolkit toolkit = new Toolkit();
         Set<String> registered = org.dromara.assistant.core.ToolRegistry.registerAll(toolkit,
             identity(2, Set.of("*:*:*")), emptyDeps, PermissionContextState.builder(), null);
@@ -156,8 +157,9 @@ class BizToolSpiTest {
         assertThat(registered).doesNotContain("query_my_todos", "query_my_missions", "act_remind",
             "act_forward", "act_audit", "act_create_mission", "act_create_template",
             "query_pending_reviews", "search_user", "query_dashboard");
-        // 平台工具仍注册(记忆关=save_memory 不在; 联网开关关=web_search 不在)
-        assertThat(registered).contains("view_skill", "submit_plan", "todo_write", "read_attachment");
+        // 平台工具仍注册(记忆关=save_memory 不在; 联网默认可用, 本用例不注册 web_search 是因空依赖服务读不到租户 key)
+        assertThat(registered).contains("view_skill", "submit_plan", "todo_write", "read_attachment",
+            "read_file");
     }
 
     @Test

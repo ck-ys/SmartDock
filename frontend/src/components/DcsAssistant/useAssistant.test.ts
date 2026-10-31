@@ -1063,7 +1063,7 @@ describe('三档自主权（批I-2，原型 autoPop：always/once/auto）', () =
     await vi.waitFor(() => expect(a.state.sending).toBe(false));
   });
 
-  it("批W2 SPEC §3.1'：act_* 写操作 auto 档不自动放行——卡停 pending，不入 autoApproved（数据层二道闸）", async () => {
+  it('题9 案1（2026-10-31）：act_* 写操作同样适用三档——auto 档直接放行，不再一刀切强制确认', async () => {
     const { a, toasts } = setup();
     a.state.gateDone = true;
     a.state.autoLevel = 'auto';
@@ -1072,22 +1072,19 @@ describe('三档自主权（批I-2，原型 autoPop：always/once/auto）', () =
     // metadata 形态（真实帧）：toolName=act_audit
     interruptAskTool('act_audit', 'call_00_aud');
     finishTurn();
-    await vi.waitFor(() => expect(a.state.sending).toBe(false));
-    await new Promise((r) => setTimeout(r, 30));
-    expect(a.cur()!.hitl?.cardState).toBe('pending');
-    expect(lastInput?.resume).toBeUndefined();
-    expect(toasts.some((t) => t.includes('全自动'))).toBe(false);
-    // 手动确认（带 remember=true 模拟绕过卡面）：不入 autoApproved，resume 正常带 approved
-    void a.resolveHitl(true, true);
-    await Promise.resolve();
-    expect(a.state.autoApproved).not.toContain('act_audit');
-    expect(lastInput?.resume).toEqual([{ interruptId: 'th-1:call_00_aud', status: 'resolved', payload: { approved: true } }]);
+    // 拍板口径：三档对所有写类工具一视同仁（auto=直接执行）——不再有 act_ 前缀二道闸
+    await vi.waitFor(() =>
+      expect(lastInput?.resume).toEqual([
+        { interruptId: 'th-1:call_00_aud', status: 'resolved', payload: { approved: true } }
+      ])
+    );
+    expect(toasts.some((t) => t.includes('全自动'))).toBe(true);
     liveHandlers!.onFinished?.(undefined);
     finishTurn();
     await vi.waitFor(() => expect(a.state.sending).toBe(false));
   });
 
-  it("批W2 SPEC §3.1'：旧形态帧（reason=act_remind，无 metadata）同样不自动放行", async () => {
+  it('题9 案1：旧形态帧（reason=act_remind，无 metadata）在 auto 档同样直接放行', async () => {
     const { a } = setup();
     a.state.gateDone = true;
     a.state.autoLevel = 'auto';
@@ -1095,13 +1092,13 @@ describe('三档自主权（批I-2，原型 autoPop：always/once/auto）', () =
     await Promise.resolve();
     interruptRemind();
     finishTurn();
+    await vi.waitFor(() => expect(lastInput?.resume?.length).toBe(1));
+    liveHandlers!.onFinished?.(undefined);
+    finishTurn();
     await vi.waitFor(() => expect(a.state.sending).toBe(false));
-    await new Promise((r) => setTimeout(r, 30));
-    expect(a.cur()!.hitl?.cardState).toBe('pending');
-    expect(lastInput?.resume).toBeUndefined();
   });
 
-  it("批F2 SPEC §3.1'：act_create_mission（表单卡）auto 档同样不自动放行", async () => {
+  it('题9 案1：act_create_mission（表单卡）在 auto 档同样直接放行', async () => {
     const { a } = setup();
     a.state.gateDone = true;
     a.state.autoLevel = 'auto';
@@ -1109,11 +1106,14 @@ describe('三档自主权（批I-2，原型 autoPop：always/once/auto）', () =
     await Promise.resolve();
     interruptAskTool('act_create_mission', 'call_00_cre');
     finishTurn();
+    await vi.waitFor(() =>
+      expect(lastInput?.resume).toEqual([
+        { interruptId: 'th-1:call_00_cre', status: 'resolved', payload: { approved: true } }
+      ])
+    );
+    liveHandlers!.onFinished?.(undefined);
+    finishTurn();
     await vi.waitFor(() => expect(a.state.sending).toBe(false));
-    await new Promise((r) => setTimeout(r, 30));
-    expect(a.cur()!.hitl?.cardState).toBe('pending');
-    expect(lastInput?.resume).toBeUndefined();
-    expect(a.state.autoApproved).not.toContain('act_create_mission');
   });
 
   it('默认 always 且未 remember：interrupt 停在确认卡不自动执行', async () => {

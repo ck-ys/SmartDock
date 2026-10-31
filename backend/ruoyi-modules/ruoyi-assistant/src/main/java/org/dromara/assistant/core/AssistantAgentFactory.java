@@ -95,6 +95,8 @@ public class AssistantAgentFactory {
     private final ProviderToolRegistry providerToolRegistry;
 
     private final org.dromara.assistant.service.McpPilotService mcpPilotService;
+    /** 题2 案3（2026-10-31）：技能使用统计——取用一次记一行，管理页展示「用了几次/最近一次」 */
+    private final org.dromara.assistant.service.AssistantSkillUsageService skillUsageService;
     /** 压缩工作区(批17 Q2: 中间件卸载归档用, AssistantWorkspaceConfig 装配) */
     private final io.agentscope.harness.agent.workspace.WorkspaceManager workspaceManager;
 
@@ -132,6 +134,9 @@ public class AssistantAgentFactory {
         // N3 三审回修：租户从登录快照显式带下（异步 supplier 线程无 Sa-Token 上下文）
         boolean webSearchOn = org.dromara.assistant.core.AssistantWebSearchHolder.isOn(aguiThreadId);
         org.dromara.assistant.core.AssistantWebSearchHolder.markBuilt(aguiThreadId, webSearchOn);
+        // 题9 案1：自主权档位同款回写——权限规则建时固化，档位翻转由 resolver 判缓存失效
+        org.dromara.assistant.core.AssistantAutonomyHolder.markBuilt(aguiThreadId,
+            org.dromara.assistant.core.AssistantAutonomyHolder.level(aguiThreadId));
         // 二站④ AU-53：租户开长期记忆才装配记忆链路（注入装饰器+save_memory 工具+§13 提示词）
         // 三审回修（dspro P2-6）：租户配置一次读全（此前 memoryOn/toolGate/compaction 各查一次，
         // 三次快照有半新半旧窗口）——toolGate 在下方注册面消费，compaction 在压缩中间件消费
@@ -182,17 +187,24 @@ public class AssistantAgentFactory {
         // S-3 单点化：工具注册+权限规则同循环生成（ToolRegistry 唯一登记处，
         // 替代原 toolkit.registerTool 散调 + buildPermissionContext 硬编码名数组）
         PermissionContextState.Builder pb = PermissionContextState.builder();
+        // 题7 三席回修：驱逐落盘与 read_file 根都按「租户/用户/会话」分目录——
+        // 工作区是进程级单例，不分目录=全租户共用一盘，任何会话拿到路径就能读别人的工具结果
+        java.nio.file.Path threadWorkspace = threadWorkspace(user.getTenantId(), user.getUserId(), aguiThreadId);
         Set<String> registered = ToolRegistry.registerAll(toolkit, identity,
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
                 planSignal, memoryService, memoryOn, aguiThreadId, user.getTenantId(),
-                todoSignal, conversationService, webSearchQuota, quotaService, tenantCfg.toolGate()), pb,
+                todoSignal, conversationService, webSearchQuota, quotaService, tenantCfg.toolGate(),
+                // 题7 案1：工作区根 = 本会话驱逐落盘目录（read_file 只在此根下回读）
+                threadWorkspace), pb,
             // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
             // 管理员改完下一轮建会话即生效（注册面即时消失）
             tenantCfg.toolGate());
         // 批2 SPI 化: BizToolProvider 通道(内置优先, 撞名让位)——注册与权限规则同循环;
         // 批3 起业务工具唯一来路（微核心 DcsToolProvider 在此挂载）
-        registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb));
+        // 题9 案1：写类工具是否按用户档位直接放行（全自动/同类已确认）——运行前档位在 Holder 里
+        registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb,
+            name -> org.dromara.assistant.core.AssistantAutonomyHolder.autoAllows(aguiThreadId, name)));
         // 批2 Q2=A：MCP 外部工具试点挂载（平台级启用行；单服务失败=审计+warn 跳过，绝不连坐会话）
         // G4-#4：租户工具闸随行传入（mcp:<server> 键，off/admin 生效于挂载面）+ 用户角色档
         registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
@@ -229,12 +241,28 @@ public class AssistantAgentFactory {
             // 官方预留通道：dynamicSkillsEnabled(false)=由我们子类接管技能动态段
             // （builder.skillRepository 自动装的是基类，读不到矩阵）
             .dynamicSkillsEnabled(false)
+            .middleware(new AssistantPlanGateMiddleware(planSignal,
+                name -> {
+                    io.agentscope.core.tool.AgentTool t = toolkit.getTool(name);
+                    return t != null && t.isReadOnly();
+                }, aguiThreadId))
             .middleware(skillGate)
+            // 题2 案3（2026-10-31）：技能取用统计——官方 load_skill_through_path 与遗留
+            // view_skill 成功返回才 +1；租户显式传入（运行时线程无 Sa-Token）
+            .middleware(new AssistantSkillUsageMiddleware(skillUsageService, user.getTenantId(),
+                identity.getRoleLevel(), tenantCfg.toolGate()))
             // 稳流① Q1（2026-10-20 拍板 A①）：流层真事件心跳——20s 一帧 dcs-heartbeat
             // CUSTOM 帧（合法静默期也出网：联网搜索/慢首 token/自动压缩摘要期），喂前端
             // 600s 看门狗+刷新 Recorder lastEventAt（工具/压缩段豁免的事件层实现）。
             // order=0 链位最外层，包住压缩中间件的 onReasoning
             .middleware(new DcsHeartbeatMiddleware())
+            // 题7 案1（2026-10-31）：超大工具结果驱逐——单条结果超 8 万字符时落盘
+            // 工作区 large_tool_results/<agent>/，上下文只留头 2000 字预览 + 路径，
+            // 模型追问细节用 read_file 分页回读（ToolRegistry 同名工具）。
+            // 排在压缩中间件之前：先把单条超大结果卸掉，压缩只处理消息条数问题。
+            .middleware(new io.agentscope.harness.agent.middleware.ToolResultEvictionMiddleware(
+                new io.agentscope.harness.agent.filesystem.local.LocalFilesystem(threadWorkspace),
+                io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig.defaults()))
             // 批A-1（2026-10-22 拍板 Q1/Q5）：自动压缩通道——触发线按当前模型窗口派生
             // （窗口 − 输出预留 2.1 万 − 缓冲 1.3 万），不再读租户固定阈值；尾窗按轮保留
             // 最后 1 轮原文。配置双显式（trigger+keep），不依赖模型自报窗口（P14 Step5
@@ -280,6 +308,33 @@ public class AssistantAgentFactory {
             runRecorder.finalizeBuildFailure(entry.runId(), "agent-build-failed");
             throw e;
         }
+    }
+
+    /**
+     * 本会话的工作区子目录（题7 三席回修）：{@code s/<租户>/<用户>/<会话>}。
+     * 驱逐落盘与 read_file 共用这一个根，跨租户/跨会话互不可见；目录不存在则建（失败只降级
+     * 到原共享根之外建不了——照旧返回路径，读工具会按「文件不存在」人话兜底，不炸会话）。
+     */
+    private java.nio.file.Path threadWorkspace(String tenantId, Long userId, String threadId) {
+        java.nio.file.Path base = workspaceManager.getWorkspace();
+        String scope = "s/" + safeSegment(tenantId) + "/" + (userId == null ? "0" : userId)
+            + "/" + safeSegment(threadId);
+        java.nio.file.Path dir = base.resolve(scope).normalize();
+        try {
+            java.nio.file.Files.createDirectories(dir);
+        } catch (Exception e) {
+            log.debug("[AgentFactory] 工作区子目录创建失败（读工具会按不存在兜底）: {}", e.getMessage());
+        }
+        return dir;
+    }
+
+    /** 路径段净化：只留字母数字与 _-，其余换 _；空段给 anon，最长 80 字符 */
+    private static String safeSegment(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "anon";
+        }
+        String s = raw.replaceAll("[^A-Za-z0-9_-]", "_");
+        return s.length() > 80 ? s.substring(0, 80) : s;
     }
 
     /**

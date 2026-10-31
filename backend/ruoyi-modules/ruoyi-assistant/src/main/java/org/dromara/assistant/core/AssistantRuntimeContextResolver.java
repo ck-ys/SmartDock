@@ -58,6 +58,8 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     private final org.dromara.assistant.factory.AssistantModelFactory modelFactory;
     /** N3：搜索 Key 可用性进装配指纹（管理员刚配好 Key 时缓存会话下一请求即重建） */
     private final org.dromara.common.core.service.ConfigService sysConfigService;
+    /** 题8 案1（三席回修）：计划待确认态的解除口子（前端 planDecision 上报） */
+    private final AssistantPlanSignal planSignal;
 
     @Override
     public RuntimeContext resolve(AguiRuntimeContextRequest<?> request) {
@@ -144,8 +146,21 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         String aguiThreadId = input == null ? null : input.getThreadId();
         AssistantThinkingTierHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("thinkTier"));
         AssistantModelChoiceHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("modelConfigId"));
-        // 业务批3-④ #17：联网开关逐请求上行（默认关=不传/非真值），工具注册闸读它裁 web_search
+        // 题10 案1（2026-10-31 反转）：联网开关逐请求上行——默认自动（模型判断），
+        // 只有显式 false/0/no/off 才是「本会话停用」；缺省不改现状（旧前端不带键不会误恢复联网）
         AssistantWebSearchHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("webSearchEnabled"));
+        // 题8 案1（三席回修）：计划待确认态靠用户动作解除——前端点「直接执行/改计划/取消」
+        // 时随请求带 planDecision，这里清闸；不带=计划卡还挂着，写操作继续被硬拒（TTL 30 分钟兜底）
+        if (input != null) {
+            Object planDecision = input.getForwardedProp("planDecision");
+            String pd = planDecision == null ? "" : String.valueOf(planDecision).trim().toLowerCase(java.util.Locale.ROOT);
+            if ("confirm".equals(pd) || "cancel".equals(pd) || "adjust".equals(pd)) {
+                planSignal.clearPending(aguiThreadId);
+            }
+        }
+        // 题9 案1：自主权档位逐请求上行（always/once/auto；非法值回落 always，不能靠伪造参数放宽）
+        org.dromara.assistant.core.AssistantAutonomyHolder.set(aguiThreadId,
+            input == null ? null : input.getForwardedProp("autoLevel"));
         // 五需求批 R1：技能选择逐请求上行（未选=不传）。与 thinkTier/model 不同，装饰器每次
         // 模型调用现读 holder——换选/摘掉下一轮即生效，无需失效缓存 agent。
         // 5b 三审回修（dspro P1-3）：判存必须带租户——本方法跑在框架流线程，Sa-Token 上下文
@@ -165,6 +180,8 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         AssistantModelSettingService.ScopeAndDefault sd = modelSettingService.scopeAndDefault(tenantId);
         boolean rebuildNeeded = AssistantModelChoiceHolder.needsRebuild(aguiThreadId)
             || AssistantWebSearchHolder.needsRebuild(aguiThreadId)
+            // 题9 案1：档位翻转=权限规则要重算，缓存 agent 必须重建
+            || org.dromara.assistant.core.AssistantAutonomyHolder.needsRebuild(aguiThreadId)
             || AssistantModelChoiceHolder.needsScopeRebuild(aguiThreadId,
                 AssistantModelChoiceHolder.defaultAwareFingerprint(sd.scopeIds(), sd.defaultConfigId(), sd.usableSignature()))
             // G1 遗留#3：工具闸/记忆/压缩配置变化同样失效重建（与 Factory 建侧同源指纹）。

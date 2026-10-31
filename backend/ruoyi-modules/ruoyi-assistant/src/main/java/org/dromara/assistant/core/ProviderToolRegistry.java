@@ -48,6 +48,18 @@ public class ProviderToolRegistry {
      */
     public Set<String> registerProviders(Toolkit toolkit, ToolIdentity identity, String threadId,
                                          PermissionContextState.Builder pb) {
+        return registerProviders(toolkit, identity, threadId, pb, null);
+    }
+
+    /**
+     * 题9 案1（2026-10-31）：带自主权判定的注册入口。
+     *
+     * @param autoAllow 写类工具是否可按用户档位（全自动 / 同类已确认）直接放行；
+     *                  null=老口径（写类一律弹确认卡）
+     */
+    public Set<String> registerProviders(Toolkit toolkit, ToolIdentity identity, String threadId,
+                                         PermissionContextState.Builder pb,
+                                         java.util.function.Predicate<String> autoAllow) {
         Set<String> registered = new LinkedHashSet<>();
         Set<String> builtinNames = org.dromara.assistant.core.ToolRegistry.allToolNames();
         for (BizToolProvider provider : providers) {
@@ -85,13 +97,20 @@ public class ProviderToolRegistry {
                 }
                 try {
                     toolkit.registerAgentTool(new BizToolAgentAdapter(provider, spec, identity, threadId));
-                    PermissionBehavior behavior = spec.isReadOnly() ? PermissionBehavior.ALLOW : PermissionBehavior.ASK;
+                    // 题9 案1：只读恒放行；写类按自主权档位决定放行/弹卡（审计在 run 记录与日志留痕）
+                    boolean auto = !spec.isReadOnly() && autoAllow != null && autoAllow.test(name);
+                    PermissionBehavior behavior = spec.isReadOnly() || auto
+                        ? PermissionBehavior.ALLOW : PermissionBehavior.ASK;
                     PermissionRule rule = new PermissionRule(name, "", behavior,
                         "biz-provider:" + provider.namespace());
-                    if (spec.isReadOnly()) {
+                    if (behavior == PermissionBehavior.ALLOW) {
                         pb.addAllowRule(name, rule);
                     } else {
                         pb.addAskRule(name, rule);
+                    }
+                    if (auto) {
+                        log.info("[Autonomy] 写类工具按用户档位自动放行 tenant={} user={} thread={} tool={}",
+                            identity.getTenantId(), identity.getUserId(), threadId, name);
                     }
                     registered.add(name);
                 } catch (Exception e) {

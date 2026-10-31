@@ -18,8 +18,8 @@ import java.util.function.BiFunction;
  *
  * <p><b>批3 口径</b>：业务域工具（查任务/催办/审核/建任务等 18 个）随旧 dcs
  * 一起退役，业务能力一律走 {@link ProviderToolRegistry} 的 BizToolProvider
- * SPI（微核心提供 DcsToolProvider）。本表只剩 6 个平台工具：联网搜索、
- * 读附件、计划卡、TODO 清单、长期记忆、技能自取——全部与具体业务域无关，
+ * SPI（微核心提供 DcsToolProvider）。本表只剩 7 个平台工具：联网搜索、
+ * 读附件、计划卡、TODO 清单、长期记忆、技能自取、工作区回读——全部与具体业务域无关，
  * 任何业务模块缺席都不影响其注册。</p>
  *
  * <p><b>怎么加新平台工具</b>：在 {@link #SPECS} 加一条 ToolSpec——工具类带
@@ -51,7 +51,9 @@ public final class ToolRegistry {
         org.dromara.assistant.limiter.AssistantWebSearchQuota webSearchQuota,
         org.dromara.assistant.service.AssistantUserQuotaService quotaService,
         /** 三审回修 P1-1：view_skill 自取过闸用的租户矩阵快照 */
-        java.util.Map<String, String> toolGate
+        java.util.Map<String, String> toolGate,
+        /** 题7 案1：驱逐中间件落盘目录（助手工作区）；read_file 只在此根下回读 */
+        java.nio.file.Path workspaceRoot
     ) {
     }
 
@@ -75,8 +77,8 @@ public final class ToolRegistry {
 
     /** 全部平台工具的唯一清单（顺序即注册顺序，新增工具只改这里；守卫测试直读）。 */
     public static final List<ToolSpec> SPECS = List.of(
-        // 联网搜索（业务批3-④ #17 + N3 2026-10-23）：用户会话开关开着、且本租户已配置
-        // 可用搜索 key 才注册 schema（任一不满足=模型看不见）；工具内仍保留 DISABLED 兜底
+        // 联网搜索（题10 案1 2026-10-31：默认可用，可停用）：会话未被用户显式停用、且本租户
+        // 已配置可用搜索 key 才注册 schema（任一不满足=模型看不见）；工具内仍保留 DISABLED 兜底
         // 处理会话期间 key 被清空。执行链再过日配额闸（单人覆盖>租户默认 20 次/天，上游失败补偿）
         new ToolSpec(Set.of("web_search"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
@@ -111,7 +113,13 @@ public final class ToolRegistry {
         // 技能自取（五需求批 R1，2026-10-13）：全角色注册；目录按角色裁剪+体内 minRole 兜底
         new ToolSpec(Set.of("view_skill"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
-            (id, d) -> new org.dromara.assistant.tools.SkillTools(id, d.toolGate()), null)
+            (id, d) -> new org.dromara.assistant.tools.SkillTools(id, d.toolGate()), null),
+        // 工作区回读（题7 案1，2026-10-31）：驱逐中间件把超大工具结果落盘后，
+        // 模型用 read_file 按路径回读；名字必须与驱逐占位文案里的 read_file 对齐。
+        // 只读、仅工作区根内（拒绝对路径/.. 逃逸/符号链接逃逸）。
+        new ToolSpec(Set.of("read_file"),
+            PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
+            (id, d) -> new org.dromara.assistant.tools.WorkspaceReadTools(d.workspaceRoot()), null)
     );
 
     /** 权限通配三态口径单点(批2 glm53 P2-8 收敛): null 拒; 裸 * / *:*:* / 精确串 放行。
@@ -234,14 +242,15 @@ public final class ToolRegistry {
 
     /**
      * 工具名 → 中文展示元数据。gateDesc 空=恒可用；save_memory 随租户记忆开关注册；
-     * web_search 随会话联网开关注册（业务批3-④）。
+     * web_search 默认可用（题10 案1），用户在本会话显式停用或租户无可用 key 时不注册。
      */
     public static final java.util.Map<String, ToolMeta> TOOL_META = java.util.Map.ofEntries(
-        java.util.Map.entry("web_search", new ToolMeta("联网搜索", "查询", 1, "会话开启联网后", "high")),
+        java.util.Map.entry("web_search", new ToolMeta("联网搜索", "查询", 1, "会话停用联网或租户未配 key 时不注册", "high")),
         java.util.Map.entry("read_attachment", new ToolMeta("读会话附件", "查询", 1, "", "low")),
         java.util.Map.entry("submit_plan", new ToolMeta("计划卡", "交互", 2, "", "low")),
         java.util.Map.entry("save_memory", new ToolMeta("保存长期记忆", "交互", 2, "租户开启长期记忆后", "mid")),
         java.util.Map.entry("todo_write", new ToolMeta("任务清单", "交互", 3, "", "low")),
-        java.util.Map.entry("view_skill", new ToolMeta("查看技能指引", "交互", 3, "", "low"))
+        java.util.Map.entry("view_skill", new ToolMeta("查看技能指引", "交互", 3, "", "low")),
+        java.util.Map.entry("read_file", new ToolMeta("回读工作区文件", "查询", 1, "", "low"))
     );
 }

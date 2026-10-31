@@ -35,10 +35,11 @@ public final class AssistantCompactionPolicy {
     /** 微压缩占位符（与 ZCode 清理文案同义，便于跨系统对照排查） */
     public static final String MICROCOMPACT_CLEARED_TEXT = "[Old tool result content cleared]";
     /** 微压缩不清理的结果：读取类/记忆类结果语义密度高，清掉等于删证据。
-     *  二审 P2：只列本仓 ToolRegistry 真实存在的工具名（read_attachment/save_memory/view_skill）——
-     *  ZCode 名单里的 read_file/memory_search/memory_get/session_search 本仓没有，虚名空转且误导 */
+     *  二审 P2：只列本仓 ToolRegistry 真实存在的工具名（read_attachment/save_memory/view_skill）；
+     *  题7 上线的工作区回读 read_file 同样属读取类，一并豁免（memory 系列与 session_search 本仓没有，
+     *  不登记虚名防误导） */
     public static final java.util.Set<String> MICROCOMPACT_EXCLUDED_TOOLS =
-        java.util.Set.of("read_attachment", "save_memory", "view_skill");
+        java.util.Set.of("read_attachment", "save_memory", "view_skill", "read_file");
 
     /** 生效窗口：配置值 > 0 才认，否则 20 万兜底 */
     public static int effectiveContextWindow(Integer configuredWindow) {

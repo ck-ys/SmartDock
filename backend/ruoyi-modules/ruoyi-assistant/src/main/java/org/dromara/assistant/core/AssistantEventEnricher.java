@@ -56,6 +56,8 @@ public class AssistantEventEnricher implements AguiEventEnricher {
     private final AssistantElicitationBridge elicitationBridge;
     /** B 批题5「续看」：进行中 run 事件广播汇——出网最终视图（闸后）喂汇，供刷新后 attach 重放 */
     private final AssistantRunStreamHub runStreamHub;
+    /** 题5 案1（2026-10-31）：自选模型回退默认链的提示信号，本批事件前转 model_degrade CUSTOM 帧 */
+    private final AssistantModelDegradeSignal modelDegradeSignal;
 
     @Override
     public List<AguiEvent> enrich(AgentEvent rawEvent, List<AguiEvent> events,
@@ -64,6 +66,18 @@ public class AssistantEventEnricher implements AguiEventEnricher {
         // toolCall 与用户 reason；断连/超时不发此事件，天然区分拒绝与掉线）。
         // E2E 实证（2026-10-21）：本事件无 AGUI 转换器→events 恒空，必须放在
         // isEmpty 早退之前，否则拒绝轮永远静默跳过（audit 只依赖 rawEvent，不依赖出网帧）
+        // 题9 案1（2026-10-31）：「同类只问一次」——用户确认过的工具名记进本会话，
+        // 下一轮建权限规则时直接放行。与拒绝留痕分开：这条不依赖动作账本/run 归属反查
+        if (rawEvent instanceof io.agentscope.core.event.UserConfirmResultEvent confirmed
+            && context != null && context.getThreadId() != null
+            && AssistantAutonomyHolder.ONCE.equals(AssistantAutonomyHolder.level(context.getThreadId()))) {
+            for (io.agentscope.core.event.ConfirmResult cr : confirmed.getConfirmResults()) {
+                if (cr.isConfirmed() && cr.getToolCall() != null) {
+                    AssistantAutonomyHolder.rememberApproved(
+                        context.getThreadId(), cr.getToolCall().getName());
+                }
+            }
+        }
         if (actionService != null
             && rawEvent instanceof io.agentscope.core.event.UserConfirmResultEvent ucr
             && context != null && context.getRunId() != null) {
@@ -112,6 +126,28 @@ public class AssistantEventEnricher implements AguiEventEnricher {
                 value.put("steps", steps);
                 out = new java.util.ArrayList<>(out);
                 out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(), "plan", value));
+            }
+        }
+        // 题8 案1（2026-10-31 三席回修）：计划态硬拒回执——中间件自产的 ToolResult 事件框架
+        // 不发布，拒绝可见性走 CUSTOM 'tool_denied'（每拒绝一个工具一帧），前端把步骤标「已拒绝」
+        if (planSignal != null && context != null && context.getThreadId() != null) {
+            java.util.List<java.util.Map<String, Object>> denials = planSignal.takeDenied(context.getThreadId());
+            if (denials != null && !denials.isEmpty()) {
+                out = new java.util.ArrayList<>(out);
+                for (int i = denials.size() - 1; i >= 0; i--) {
+                    out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
+                        "tool_denied", denials.get(i)));
+                }
+            }
+        }
+        // 题5 案1（2026-10-31）：模型降级提示——用户自选模型失效回退默认链时，本回合
+        // 第一帧前带一条 model_degrade，前端弹系统提示（不再「悄悄换模型」）
+        if (modelDegradeSignal != null && context != null && context.getThreadId() != null) {
+            String notice = modelDegradeSignal.take(context.getThreadId());
+            if (notice != null) {
+                out = new java.util.ArrayList<>(out);
+                out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
+                    "model_degrade", java.util.Map.of("message", notice)));
             }
         }
         // ZCode 对齐 Q2（批A）：todo_write 落的清单信号同线程下一批事件前转发——前端
