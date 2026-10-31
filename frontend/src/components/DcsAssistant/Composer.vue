@@ -97,7 +97,7 @@
       />
       <div class="brow">
         <!-- ➕ 添加面板（原型 addPop：联网/查库/附件/引用/快捷能力）；bicon=28×28 无边框形态（左组独占） -->
-        <button class="btool bicon" aria-label="添加" aria-haspopup="dialog" :aria-expanded="addOpen" title="添加" @click="addOpen = !addOpen">
+        <button class="btool bicon" aria-label="添加" aria-haspopup="dialog" :aria-expanded="addOpen" title="添加" @click="toggleAddPop()">
           <IconSpan name="plus" :size="15" />
         </button>
 
@@ -112,7 +112,7 @@
             :aria-expanded="autoPopOpen"
             :aria-label="`自主权：${autoCur.title}（${autoCur.desc}）`"
             :title="`${autoCur.title}：${autoCur.desc}`"
-            @click="autoPopOpen = !autoPopOpen"
+            @click="toggleAutoPop()"
           >
             <IconSpan :name="autoCur.icon" :size="14" />
             <span class="mlab">{{ autoCur.mch }}</span>
@@ -360,10 +360,7 @@
           class="btool bpill"
           :title="thinkTitle"
           :aria-expanded="thinkPopOpen"
-          @click="
-            modelPopOpen = false;
-            thinkPopOpen = !thinkPopOpen;
-          "
+          @click="toggleThinkPop()"
         >
           <IconSpan name="brain" :size="14" />
           <i class="tprog"><i class="tfill" :style="{ height: ((thinkLevel + 1) / 3) * 100 + '%' }" /></i>
@@ -847,9 +844,9 @@ const dragover = ref(false);
 const AUTO_LV = [
   {
     key: 'always',
-    icon: 'bell',
+    icon: 'help',
     title: '每次都问',
-    mch: '都问',
+    mch: '每次都问',
     desc: '写操作前先经我确认',
     popT: '每次执行前都问我',
     popD: '默认。写操作每次出确认卡'
@@ -1596,11 +1593,28 @@ function pickModel(cid: string | null) {
   thinkPopOpen.value = false;
   void refreshCapability();
 }
+/** 输入条弹层互斥（视觉席实证：档位弹层与＋面板能同时展开、叠层露半截） */
+function closePops(keep: 'add' | 'auto' | 'think' | 'model' | null) {
+  if (keep !== 'add') addOpen.value = false;
+  if (keep !== 'auto') autoPopOpen.value = false;
+  if (keep !== 'think') thinkPopOpen.value = false;
+  if (keep !== 'model') modelPopOpen.value = false;
+}
+function toggleAddPop() {
+  addOpen.value = !addOpen.value;
+  if (addOpen.value) closePops('add');
+}
+function toggleAutoPop() {
+  autoPopOpen.value = !autoPopOpen.value;
+  if (autoPopOpen.value) closePops('auto');
+}
+function toggleThinkPop() {
+  thinkPopOpen.value = !thinkPopOpen.value;
+  if (thinkPopOpen.value) closePops('think');
+}
 function toggleModelPop() {
   modelPopOpen.value = !modelPopOpen.value;
-  if (modelPopOpen.value) {
-    thinkPopOpen.value = false;
-  }
+  if (modelPopOpen.value) closePops('model');
 }
 /** 当前生效模型行（思考能力判定用）：用户 pin > 助手默认 > ★接口默认（options[0]）。
  *  业务批5 Q3-A ③：末段 opts[0] 回退只是能力判定/环分母的近似兜底，显示层见 defaultMissing——
