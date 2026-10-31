@@ -87,6 +87,7 @@
                       v-if="renamingId === c.id"
                       v-model="renameVal"
                       class="fp-rename"
+                      placeholder="给这个会话起个名字"
                       :ref="fpRenameFocus"
                       @click.stop
                       @keydown.enter.prevent="commitRename(c)"
@@ -377,7 +378,7 @@ import type { AssistantBindings, AssistantTurn } from './useAssistant';
 import { roleOf, roleLabelOf, pageNameOf, taskCtxOf, suggestionsFor } from './assistantCtx';
 import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
-import { displayTitle } from '@/utils/assistantTitle';
+import { displayTitle, renameSeed } from '@/utils/assistantTitle';
 import { assistantName } from './nameState';
 import MsgFlow from './MsgFlow.vue';
 import HitlDock from './HitlDock.vue';
@@ -583,7 +584,8 @@ function startRename(c: FpConv) {
   }
   sessMenuId.value = null;
   renamingId.value = c.id;
-  renameVal.value = c.title ?? '';
+  // 2026-10-31 题2：脏标题别把残片塞进输入框（列表上显示的是「未命名会话」，编辑时却看到 JSON）
+  renameVal.value = renameSeed(c);
 }
 function cancelRename() {
   renamingId.value = null;

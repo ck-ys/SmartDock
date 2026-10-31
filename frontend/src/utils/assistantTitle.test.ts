@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayTitle } from './assistantTitle';
+import { displayTitle, renameSeed } from './assistantTitle';
 
 /**
  * 题3 标题兜底（2026-10-30）：残片要藏，用户手写的标题一个字都不能动。
@@ -24,5 +24,26 @@ describe('displayTitle', () => {
     expect(displayTitle({ title: null })).toBe('（未命名会话）');
     expect(displayTitle({ title: '   ', lastMessageTime: '2026-10-29 08:50:00' })).toBe('（未命名会话·10-29）');
     expect(displayTitle({})).toBe('（未命名会话）');
+  });
+});
+
+/**
+ * 题2（2026-10-31）：重命名输入框的初值——脏标题回填空串，正常标题原样回填。
+ */
+describe('renameSeed', () => {
+  it('脏标题回填空串（不让残片进输入框）', () => {
+    expect(renameSeed({ title: '{"title":"按周复盘适合的' })).toBe('');
+    expect(renameSeed({ title: '[{"title":"数组残片' })).toBe('');
+    expect(renameSeed({ title: '复盘 {"title": 变量' })).toBe('');
+  });
+
+  it('正常标题原样回填，用户手写的方括号标题不动', () => {
+    expect(renameSeed({ title: '查询待办事项' })).toBe('查询待办事项');
+    expect(renameSeed({ title: '[草稿] 周报' })).toBe('[草稿] 周报');
+  });
+
+  it('空标题回填空串', () => {
+    expect(renameSeed({ title: null })).toBe('');
+    expect(renameSeed({ title: '   ' })).toBe('');
   });
 });

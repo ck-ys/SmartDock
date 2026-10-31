@@ -23,3 +23,13 @@ export function displayTitle(c: TitleSource): string {
   const stamp = (c.lastMessageTime ?? '').slice(5, 10);
   return stamp ? `（未命名会话·${stamp}）` : '（未命名会话）';
 }
+
+/**
+ * 重命名输入框的初值（2026-10-31 题2）：脏标题回填空串，别把 JSON 残片塞进输入框——
+ * 否则用户看到的是「（未命名会话）」，编辑时看到的是残片，直接回车还会因为「没变化」被静默忽略，
+ * 看起来就是改名失败。
+ */
+export function renameSeed(c: TitleSource): string {
+  const raw = (c.title ?? '').trim();
+  return raw && !TITLE_FRAGMENT.test(raw) ? raw : '';
+}

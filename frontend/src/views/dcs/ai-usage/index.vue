@@ -101,6 +101,22 @@
                 <template #default="{ row }">{{ sceneLabel(row.scene) }}</template>
               </el-table-column>
               <el-table-column label="模型" prop="modelName" min-width="150" show-overflow-tooltip />
+              <!-- 2026-10-31 题1：配置 ID 在界面上一直没有出处，筛选框成了「得先知道值才能用」的死入口。
+                   这里只显示尾 6 位（19 位整串会把列撑破），悬停看全串，点一下复制，直接粘到上方筛选框 -->
+              <el-table-column width="118" align="center">
+                <template #header>
+                  配置
+                  <el-tooltip placement="top" content="这条调用用的是哪一条模型配置；点尾号复制完整 ID，粘到上方「配置 ID」筛选框即可">
+                    <span class="col-info">ⓘ</span>
+                  </el-tooltip>
+                </template>
+                <template #default="{ row }">
+                  <el-tooltip v-if="row.configId" placement="top" :content="String(row.configId)">
+                    <span class="cfg-id" @click="copyConfigId(row.configId)">…{{ configTail(row.configId) }}</span>
+                  </el-tooltip>
+                  <span v-else class="muted">--</span>
+                </template>
+              </el-table-column>
               <el-table-column label="计费模式" width="120" align="center">
                 <template #default="{ row }">
                   <span class="ui-pill ui-pill--muted">{{ billingModeLabel(row.billingMode) }}</span>
@@ -258,6 +274,7 @@
 </template>
 
 <script setup lang="ts">
+import { ElMessage } from 'element-plus';
 import * as echarts from 'echarts';
 import { Search, Refresh, RefreshLeft, Download } from '@element-plus/icons-vue';
 import { humanizeAiError } from '@/utils/aiErrorText';
@@ -391,6 +408,22 @@ const sceneLabel = (scene?: string): string => {
       return seg;
     })
     .join(' · ');
+};
+
+/** 配置 ID 只露尾 6 位：19 位整串会把列撑破；完整值走悬停与点击复制 */
+const configTail = (id?: string | number | null) => String(id ?? '').slice(-6);
+
+/** 点尾号把完整配置 ID 复制走，粘到上方「配置 ID」筛选框就能按这条配置筛 */
+const copyConfigId = async (id?: string | number | null) => {
+  const text = String(id ?? '');
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success(`已复制配置 ID ${text}`);
+  } catch {
+    // 非 https / 无剪贴板权限时退回提示，让用户能手动选中
+    ElMessage.warning(`复制没成功，配置 ID 是 ${text}`);
+  }
 };
 
 /** 题6 场景下拉的选项：与 sceneLabel 认得的段一一对应（值仍是库内原文片段，后端按包含匹配）。
@@ -705,6 +738,18 @@ onMounted(loadData);
   width: 120px;
 }
 
+/* 题1：表内配置尾号——等宽、弱化，点一下复制 */
+.cfg-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--app-faint);
+  cursor: pointer;
+  border-bottom: 1px dashed var(--app-rule);
+}
+.cfg-id:hover {
+  color: var(--app-muted);
+}
+
 .usage-range {
   width: 250px;
 }
@@ -716,8 +761,8 @@ onMounted(loadData);
 }
 
 .usage-table-wrap :deep(.el-table) {
-  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加 */
-  min-width: 1610px;
+  /* 列宽之和：外层容器一处横滚，避免与 el-table 内部滚动条叠加（2026-10-31 题1 加了「配置」118px） */
+  min-width: 1728px;
   /* 只覆盖 EP 表格 CSS 变量，不重写组件（契约 §2.5） */
   --el-table-header-bg-color: transparent;
   --el-table-tr-bg-color: var(--app-surface);
