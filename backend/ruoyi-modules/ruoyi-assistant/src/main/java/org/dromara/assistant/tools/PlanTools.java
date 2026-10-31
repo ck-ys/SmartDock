@@ -38,7 +38,7 @@ public class PlanTools {
         description = "把多步操作计划做成计划卡展示给用户确认（不执行任何操作）。"
             + "触发时机见系统提示词：用户显式要方案/催办影响面大（≥10人或跨≥2部门科目）/预计连做≥3步。"
             + "调用后计划卡立即出现在用户界面，本轮到此收尾（一句话说明等用户选择即可），"
-            + "禁止调用后再继续执行计划里的任何动作。",
+            + "禁止调用后再继续执行计划里的任何动作——计划待确认期间系统会硬拒绝写操作，别去试。",
         readOnly = true)
     public String submitPlan(
         @ToolParam(name = "title", required = false, description = "计划标题，一句话概括（可省略）") String title,
