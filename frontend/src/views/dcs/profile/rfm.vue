@@ -137,7 +137,7 @@
           <el-button @click="search">查询</el-button>
           <el-button @click="resetQuery">重置</el-button>
         </div>
-        <el-table v-loading="tableLoading" class="ui-table" :data="rows" row-key="subjectId">
+        <el-table v-loading="tableLoading" class="ui-table dcs-table-only" :data="rows" row-key="subjectId">
           <template #empty>
             <div class="ui-empty">
               <p class="ui-empty__title">当前筛选下没有评分主体</p>
@@ -190,6 +190,25 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 1070px 宽表的横滑 -->
+        <mobile-row-list :rows="rows" row-key="subjectId">
+          <template #title="{ row }">{{ row.displayName || row.subjectId }}</template>
+          <template #badge="{ row }">
+            <el-tag :type="levelTagType(row.level)" effect="light">{{ row.level || '未分层' }}</el-tag>
+          </template>
+          <template #meta="{ row }">
+            <span>{{ row.subjectType }} · {{ row.subjectId }}</span>
+            <span>分 {{ formatScore(row.normalizedScore) }}</span>
+            <span>{{ row.eventCount }} 次事件</span>
+            <span v-for="item in binChips(row)" :key="item.code" class="bin-chip">{{ item.code }} <strong>{{ item.score }}</strong></span>
+          </template>
+          <template #foot="{ row }">{{ row.calcTime || '—' }}</template>
+          <template #actions="{ row }">
+            <el-button size="small" @click="openSubject(row)">详情</el-button>
+            <el-button size="small" @click="goProfile(row)">完整画像</el-button>
+          </template>
+        </mobile-row-list>
         <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="loadSubjects" />
       </el-card>
     </template>
@@ -562,6 +581,7 @@
 </template>
 
 <script setup name="DcsProfileRfm" lang="ts">
+import MobileRowList from '@/components/MobileRowList/index.vue';
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart } from 'echarts/charts';

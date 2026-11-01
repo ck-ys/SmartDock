@@ -62,7 +62,7 @@
         </div>
       </div>
 
-      <el-table v-loading="loading" class="ui-table" :data="rows" row-key="subjectId">
+      <el-table v-loading="loading" class="ui-table dcs-table-only" :data="rows" row-key="subjectId">
         <template #empty>
           <div class="ui-empty">
             <p class="ui-empty__title">{{ identity === 'user' ? '本单位还没有用户' : '这个身份下还没有数据' }}</p>
@@ -130,6 +130,27 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 1070px 宽表的横滑 -->
+      <mobile-row-list :rows="rows" row-key="subjectId">
+        <template #title="{ row }">{{ row.displayName || row.subjectId }}</template>
+        <template #badge="{ row }">
+          <span v-if="row.pendingReview" class="ui-pill ui-pill--warn">待联系</span>
+          <span v-else-if="!Number(row.eventCount ?? 0)" class="ui-pill ui-pill--muted">还没用</span>
+        </template>
+        <template #meta="{ row }">
+          <span>{{ row.userName || row.subjectId }}</span>
+          <span v-if="row.deptName">{{ row.deptName }}</span>
+          <span>{{ Number(row.eventCount ?? 0) }} 次操作</span>
+          <span v-if="row.totalScore != null && !row.noDimensions">评分 {{ formatScore(row.totalScore) }}</span>
+        </template>
+        <template #foot="{ row }">{{ row.lastEventTime ? fmtTime(row.lastEventTime) : '还没开始用' }}</template>
+        <template #actions="{ row }">
+          <el-button size="small" @click="goDetail(row)">看画像</el-button>
+          <el-button v-if="Number(row.eventCount ?? 0) > 0" size="small" @click="openBasis(row)">依据</el-button>
+          <el-button v-else size="small" @click="openGuide(row)">引导</el-button>
+        </template>
+      </mobile-row-list>
       <pagination v-show="total > 0" v-model:page="query.pageNum" v-model:limit="query.pageSize" :total="total" @pagination="loadList" />
     </el-card>
 
@@ -209,6 +230,7 @@
 </template>
 
 <script setup name="DcsProfile" lang="ts">
+import MobileRowList from '@/components/MobileRowList/index.vue';
 import {
   getEngineConfig,
   getOverview,

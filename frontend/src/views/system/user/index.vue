@@ -2,7 +2,7 @@
   <div class="p-2">
     <el-row :gutter="20">
       <!-- 部门树 -->
-      <el-col :lg="4" :xs="24" style="">
+      <el-col :lg="4" :xs="24" class="user-dept-col">
         <el-card shadow="hover">
           <!-- P3(2026-10-27 拍板A)：6 字提示在 90px 可用宽被切半截，改 4 字短文案零布局风险 -->
           <el-input v-model="deptName" placeholder="搜索部门" prefix-icon="Search" clearable />
@@ -107,7 +107,7 @@
           </template>
 
           <div class="dcs-ops-table-wrap">
-            <el-table v-loading="loading" class="ui-table" :data="userList" @selection-change="handleSelectionChange">
+            <el-table v-loading="loading" class="ui-table dcs-table-only" :data="userList" @selection-change="handleSelectionChange">
               <el-table-column type="selection" width="50" align="center" />
               <el-table-column v-if="columns[0].visible" key="userId" label="用户编号" align="center" prop="userId" />
               <el-table-column
@@ -186,6 +186,30 @@
                 <div class="ui-empty">暂无用户</div>
               </template>
             </el-table>
+
+            <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 560px 宽表的横滑 -->
+            <mobile-row-list :rows="userList" row-key="userId">
+              <template #title="{ row }">{{ row.nickName || row.userName }}</template>
+              <template #badge="{ row }">
+                <el-switch
+                  v-model="row.status"
+                  active-value="0"
+                  inactive-value="1"
+                  :disabled="row.userId === 1"
+                  @change="handleStatusChange(row)"
+                />
+              </template>
+              <template #meta="{ row }">
+                <span>{{ row.userName }}</span>
+                <span v-if="row.phonenumber">{{ row.phonenumber }}</span>
+                <span v-if="row.deptName">{{ deptDisplay(row) }}</span>
+              </template>
+              <template #foot="{ row }">{{ row.createTime }}</template>
+              <template #actions="{ row }">
+                <el-button v-if="row.userId !== 1" v-hasPermi="['system:user:edit']" size="small" @click="handleUpdate(row)">编辑</el-button>
+                <el-button v-if="row.userId !== 1" v-hasPermi="['system:user:remove']" size="small" type="danger" plain @click="handleDelete(row)">删除</el-button>
+              </template>
+            </mobile-row-list>
           </div>
 
           <pagination
@@ -365,6 +389,7 @@ import { optionselect } from '@/api/system/post';
 import { checkPermi } from '@/utils/permission';
 import { useUserStore } from '@/store/modules/user';
 import InviteLinkDialog from './components/InviteLinkDialog.vue';
+import MobileRowList from '@/components/MobileRowList/index.vue';
 import { buildLoginNameChangeConfirmMessage, shouldConfirmLoginNameChange } from './utils/userNameChangePolicy';
 
 const router = useRouter();
@@ -372,7 +397,8 @@ const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const { sys_normal_disable, sys_user_sex, sys_user_level } = toRefs<any>(proxy?.useDict('sys_normal_disable', 'sys_user_sex', 'sys_user_level'));
 const userList = ref<UserVO[]>();
 const loading = ref(true);
-const showSearch = ref(true);
+// 2026-11-01 Q3=乙：手机档默认收起筛选区（否则表格/行卡要滚过一整屏表单才看得到）
+const showSearch = ref(!window.matchMedia('(max-width: 992px)').matches);
 /** 批3 邀请注册(2026-09-26): 邀请链接弹窗显隐 */
 const inviteVisible = ref(false);
 const ids = ref<Array<number | string>>([]);
@@ -790,6 +816,13 @@ async function handleDeptChange(value: number | string) {
 
 <style lang="scss" scoped>
 /* 数据权限裁剪后补齐的祖先部门仅作层级展示(disabled): 置灰且不可点(点击行为由 el-tree disabled 拦截) */
+/* 2026-11-01 Q3=乙：手机档部门树占满整屏，先让位给行卡片 */
+@media (max-width: 992px) {
+  .user-dept-col {
+    display: none;
+  }
+}
+
 .dept-tree-node.is-ancestor-only {
   color: var(--el-text-color-placeholder);
   cursor: not-allowed;

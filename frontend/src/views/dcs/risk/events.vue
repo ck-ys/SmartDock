@@ -50,7 +50,7 @@
       </el-form>
 
       <div class="dcs-ops-table-wrap">
-        <el-table v-loading="loading" :data="eventList" class="ui-table risk-table">
+        <el-table v-loading="loading" :data="eventList" class="ui-table risk-table dcs-table-only">
           <el-table-column label="时间" prop="createdTime" width="150">
             <template #default="{ row }">{{ formatTime(row.createdTime) }}</template>
           </el-table-column>
@@ -92,6 +92,24 @@
             </div>
           </template>
         </el-table>
+
+        <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 1060px 宽表的横滑 -->
+        <mobile-row-list :rows="eventList" row-key="eventId" empty-text="暂无风险事件" empty-hint="调整筛选条件或换一个时间区间再试">
+          <template #title="{ row }">{{ EVENT_TYPE_LABELS[row.eventType] || row.eventType }}</template>
+          <template #badge="{ row }">
+            <span class="ui-num">+{{ row.riskScore }}</span>
+          </template>
+          <template #meta="{ row }">
+            <span>{{ row.nickName || row.userName || row.userId || '-' }}</span>
+            <span>{{ EVENT_SOURCE_LABELS[row.source] || row.source }}</span>
+            <span>{{ row.ip || '-' }}</span>
+          </template>
+          <template #foot="{ row }">{{ formatTime(row.createdTime) }}</template>
+          <template #actions="{ row }">
+            <el-button size="small" @click="openDetail(row)">查看详情</el-button>
+            <el-button v-if="row.userId" size="small" @click="viewProfile(row.userId)">查看画像</el-button>
+          </template>
+        </mobile-row-list>
       </div>
 
       <div class="risk-list-pagination">
@@ -137,6 +155,7 @@
 </template>
 
 <script setup lang="ts">
+import MobileRowList from '@/components/MobileRowList/index.vue';
 import { Refresh, RefreshLeft, Search } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';

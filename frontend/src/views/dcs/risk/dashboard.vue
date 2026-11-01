@@ -100,7 +100,7 @@
                 </div>
               </template>
               <div class="dcs-ops-table-wrap">
-                <el-table :data="contentRiskEvents" class="ui-table risk-table">
+                <el-table :data="contentRiskEvents" class="ui-table risk-table dcs-table-only">
                   <el-table-column v-if="isEventColumnVisible('time')" label="时间" width="96">
                     <template #default="{ row }">{{ formatTime(row.createdTime) }}</template>
                   </el-table-column>
@@ -132,6 +132,21 @@
                     </div>
                   </template>
                 </el-table>
+
+                <!-- 2026-11-01 Q3=乙：手机档两行列表 -->
+                <mobile-row-list :rows="contentRiskEvents" empty-text="暂无内容风险事件" empty-hint="机检未命中的时候，这里不会有记录">
+                  <template #title="{ row }">{{ maskSensitiveDetail(row.detail || '-') }}</template>
+                  <template #badge="{ row }">
+                    <span class="ui-pill" :class="row.detail?.startsWith('内容机检:命中BLOCK') ? 'ui-pill--neg' : 'ui-pill--warn'">
+                      {{ row.detail?.startsWith('内容机检:命中BLOCK') ? '阻断级' : '复核级' }}
+                    </span>
+                  </template>
+                  <template #meta="{ row }">
+                    <span>{{ EVENT_SOURCE_LABELS[row.source] || row.source }}</span>
+                    <el-link v-if="row.refId" :underline="false" @click="gotoMission(row.refId)">查看任务</el-link>
+                  </template>
+                  <template #foot="{ row }">{{ formatTime(row.createdTime) }}</template>
+                </mobile-row-list>
               </div>
             </el-card>
           </el-col>
@@ -319,6 +334,7 @@
 </template>
 
 <script setup lang="ts">
+import MobileRowList from '@/components/MobileRowList/index.vue';
 import * as echarts from 'echarts';
 import { Lock, ArrowRight, Refresh, CircleCloseFilled, CircleCheckFilled } from '@element-plus/icons-vue';
 import DcsOperationsPageHeader from '@/components/DcsOperationsPageHeader/index.vue';

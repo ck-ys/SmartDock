@@ -20,7 +20,8 @@
  * 口径：>992 只显示表格；≤992 表格隐藏、卡片单列；641–992 卡片两列（避免单卡过宽）。
  * 卡片只承载「身份 + 状态 + 主操作」，次要字段进 meta 行，操作按钮保持 44px 触控高度。
  */
-.dcs-mobile-list {
+.dcs-mobile-list,
+.dcs-mobile-empty.ui-empty {
   display: none;
 }
 
@@ -116,6 +117,10 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .dcs-mobile-empty.ui-empty {
+    display: block;
   }
 
   .dcs-card-actions .el-button,
