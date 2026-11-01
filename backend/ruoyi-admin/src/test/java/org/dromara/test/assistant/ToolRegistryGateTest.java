@@ -30,7 +30,11 @@ class ToolRegistryGateTest {
     @Test
     void corruptedJsonFailsClosedToAllOff() {
         Map<String, String> gate = AssistantConfigService.parseToolGate("{\"web_search\": \"of");
-        assertEquals(ToolRegistry.allToolNames().size() + 1, gate.size(), "坏 JSON=全工具兜底+哨兵");
+        // B 批三审回修 P2-1 起兜底表还包含技能行（skill:<id>），期望值必须与 allOffGate 同源；
+        // 旧断言只算工具名，2026-11-01 本地测试实测 9 vs 13 发现漏算
+        assertEquals(ToolRegistry.allToolNames().size()
+                + org.dromara.assistant.core.SkillAssets.skills().size() + 1,
+            gate.size(), "坏 JSON=全工具+技能兜底+哨兵");
         assertTrue(gate.containsKey(AssistantConfigService.POISONED_GATE_SENTINEL), "兜底表必含 __poisoned__ 哨兵");
         for (String v : gate.values()) {
             assertEquals("off", v, "兜底值一律 off（fail-closed）");

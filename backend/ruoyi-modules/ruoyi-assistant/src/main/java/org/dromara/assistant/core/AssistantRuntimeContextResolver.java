@@ -160,7 +160,26 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
             Object planDecision = input.getForwardedProp("planDecision");
             String pd = planDecision == null ? "" : String.valueOf(planDecision).trim().toLowerCase(java.util.Locale.ROOT);
             if ("confirm".equals(pd) || "cancel".equals(pd) || "adjust".equals(pd)) {
-                planSignal.clearPending(aguiThreadId, user.getTenantId(), userId);
+                Object planIdRaw = input.getForwardedProp("planId");
+                String planId = planIdRaw == null ? null : String.valueOf(planIdRaw).trim();
+                String decision = switch (pd) {
+                    case "confirm" -> "confirmed";
+                    case "adjust" -> "adjusted";
+                    default -> "cancelled";
+                };
+                boolean consumed = planSignal.decide(aguiThreadId, user.getTenantId(), userId, planId, decision);
+                if ("confirm".equals(pd) && !consumed) {
+                    // 旧卡/第二次抢点：pending 已被另一处消费或 planId 不匹配，禁止再跑一轮。
+                    // 二审回修（dspro-P1-3）：persistUserSide 已落 RUNNING run + 扣回合，这里抛错
+                    // 前必须条件收尾并退还——否则该 run 零事件挂 60 秒，期间同 thread 新消息被
+                    // 双 RUNNING 门挡住，用户以为系统坏了。
+                    java.util.List<org.dromara.assistant.domain.DcsAssistantRun> closed =
+                        conversationService.finalizeStalledRun(user.getTenantId(), input.getRunId());
+                    for (org.dromara.assistant.domain.DcsAssistantRun row : closed) {
+                        dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+                    }
+                    throw new ServiceException("这张计划卡已经处理过了，请刷新后再试", 409);
+                }
             }
         }
         // 题9 案1：自主权档位逐请求上行（always/once/auto；非法值回落 always，不能靠伪造参数放宽）

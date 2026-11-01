@@ -59,6 +59,10 @@ public class AssistantConversationController extends BaseController {
     private final org.dromara.assistant.core.AssistantAskUserBridge askUserBridge;
     /** ②（2026-10-31）：计划卡取消立即解锁——点「取消」当场清闸的信号仓 */
     private final org.dromara.assistant.core.AssistantPlanSignal planSignal;
+    /** 多实例批 2：判断这轮 run 是不是落在别的活实例上（别再盲打本机内存） */
+    private final org.dromara.assistant.core.AssistantInstanceContext instanceContext;
+    /** 二审回修：停止端点条件收尾 run 时退回合，口径与收割器一致 */
+    private final org.dromara.assistant.limiter.AssistantDailyQuota dailyQuota;
 
     /**
      * B 批题5「续看」（2026-10-27 拍板 甲案）：刷新/掉线后重新挂上进行中的回答流。
@@ -259,15 +263,45 @@ public class AssistantConversationController extends BaseController {
         java.util.List<org.dromara.assistant.domain.DcsAssistantRun> latest =
             runMapper.selectByThread(tenantId, threadId, userId, 1);
         boolean running = !latest.isEmpty() && "RUNNING".equals(latest.get(0).getStatus());
-        threadSessionManager.getSession(rcUserId, threadId).ifPresent(session -> {
-            if (running && session.getAgent() instanceof io.agentscope.core.ReActAgent agent) {
-                // 先打 run 级停止标记再 interrupt——优雅收尾事件流与自然完成无异，终局分类靠标记覆写
-                org.dromara.assistant.persist.AssistantRunRecorder.markUserStop(latest.get(0).getRunId());
-                agent.interrupt(rcUserId, threadId);
-                log.info("[AssistantStop] 服务端打断在跑 run thread={} run={} user={}",
-                    threadId, latest.get(0).getRunId(), rcUserId);
+        if (!running) {
+            askUserBridge.cancelThread(tenantId, userId, threadId);
+            return R.ok();
+        }
+        org.dromara.assistant.domain.DcsAssistantRun run = latest.get(0);
+        String owner = run.getOwnerInstance();
+        boolean ownedHere = owner == null || owner.isBlank() || owner.equals(instanceContext.current());
+        // 多实例批 2：这轮在另一台活实例上——本机没有它的 AgentSession，盲打就是假成功，
+        // 必须回人话让用户刷新（LB 按 X-Thread-Id 粘回去后就能真的停）
+        if (!ownedHere && instanceContext.isAlive(owner)) {
+            throw new org.dromara.common.core.exception.ServiceException(
+                "这轮回答在另一台服务上，刷新页面后再点停止", 409);
+        }
+        var session = threadSessionManager.getSession(rcUserId, threadId);
+        // 二审回修（glm53-P1 / dspro-P2-7 / dsflash-P2-7）：走到这里只有两种「停不了」：
+        // ①owner 已死（实例下线/重启，含固定 instance.id 重启后自己名下的旧进程）；
+        // ②owner 是自己但本机会话没了（进程重启/会话被清）。两种情况 run 都真的断了，
+        // 正确动作是条件迁移收尾 + 退回合 + 释放挂起卡，而不是假装 interrupt 成功、
+        // 也不是回 409 把 RUNNING 幽灵行留给收割器（期间同 thread 新消息会被双 RUNNING 门挡）。
+        if (!ownedHere || session.isEmpty()) {
+            java.util.List<org.dromara.assistant.domain.DcsAssistantRun> closed =
+                conversationService.finalizeStalledRun(tenantId, run.getRunId());
+            for (org.dromara.assistant.domain.DcsAssistantRun row : closed) {
+                dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
             }
-        });
+            if (!closed.isEmpty()) {
+                log.info("[AssistantStop] 本机已无在跑会话，条件收尾 run thread={} run={} 已退回合",
+                    threadId, run.getRunId());
+            }
+            askUserBridge.cancelThread(tenantId, userId, threadId);
+            return R.ok();
+        }
+        if (session.get().getAgent() instanceof io.agentscope.core.ReActAgent agent) {
+            // 先打 run 级停止标记再 interrupt——优雅收尾事件流与自然完成无异，终局分类靠标记覆写
+            org.dromara.assistant.persist.AssistantRunRecorder.markUserStop(run.getRunId());
+            agent.interrupt(rcUserId, threadId);
+            log.info("[AssistantStop] 服务端打断在跑 run thread={} run={} user={}",
+                threadId, run.getRunId(), rcUserId);
+        }
         // 题12 案1：停止后挂起的结构化反问已不可能被模型用上——立即按取消收尾释放工具线程。
         // 不释放的话：卡片留在屏上、作答端点还能「成功」，但 run 已终局=答案被静默吞掉
         askUserBridge.cancelThread(tenantId, userId, threadId);
@@ -289,7 +323,8 @@ public class AssistantConversationController extends BaseController {
     @RepeatSubmit(interval = 1000)
     @Log(title = "AI助手-取消计划", businessType = BusinessType.OTHER)
     @PostMapping("/plan/cancel")
-    public R<Void> cancelPlan(@RequestParam String threadId) {
+    public R<Void> cancelPlan(@RequestParam String threadId,
+                              @RequestParam(required = false) String planId) {
         DcsAssistantConversation conv = conversationService.conversationByThread(
             TenantHelper.getTenantId(), threadId);
         Long me = LoginHelper.getUserId();
@@ -298,11 +333,28 @@ public class AssistantConversationController extends BaseController {
             throw new org.dromara.common.core.exception.ServiceException("这个会话不是你的，不能操作", 403);
         }
         if (action == PlanCancelAction.CLEAR) {
-            // 清闸租户=登录快照（owner 三元组与 submit 同源，见方法 javadoc）
-            planSignal.clearPending(threadId, LoginHelper.getLoginUser().getTenantId(), me);
+            // 清闸租户=登录快照（owner 三元组与 submit 同源，见方法 javadoc）；
+            // planId 可选：带则只清这张卡，不带则兼容旧前端按 thread 清
+            planSignal.decide(threadId, LoginHelper.getLoginUser().getTenantId(), me, planId, "cancelled");
         }
         // NOOP（他租户 threadId / 不存在）与 CLEAR 都恒 R.ok——端点幂等，无 pending 也无事发生
         return R.ok();
+    }
+
+    /**
+     * 计划卡状态查询（多实例批 4）：前端另一标签页/另一实例轮询用。
+     * 只返回 status + planId，不泄露计划正文；非本人会话一律 none（不暴露存在性）。
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/plan/state")
+    public R<org.dromara.assistant.core.AssistantPlanSignal.PlanState> planState(
+        @RequestParam String threadId) {
+        DcsAssistantConversation conv = conversationService.conversationByThread(
+            TenantHelper.getTenantId(), threadId);
+        if (conv == null || !conv.getUserId().equals(LoginHelper.getUserId())) {
+            return R.ok(new org.dromara.assistant.core.AssistantPlanSignal.PlanState("none", null));
+        }
+        return R.ok(planSignal.state(threadId));
     }
 
     /** 取消计划归属决策三态（纯函数，单测锚点） */

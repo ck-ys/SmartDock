@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.agui.adapter.strategy.AguiStreamContext;
 import io.agentscope.core.agui.event.AguiEvent;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.assistant.core.AssistantRunContext;
 import org.dromara.assistant.domain.DcsAssistantConversation;
@@ -12,6 +11,7 @@ import org.dromara.assistant.domain.DcsAssistantRun;
 import org.dromara.assistant.limiter.AssistantDailyQuota;
 import org.dromara.assistant.security.AssistantPiiFilter;
 import org.dromara.assistant.service.AssistantConversationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -54,7 +54,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class AssistantRunRecorder {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -68,8 +67,43 @@ public class AssistantRunRecorder {
     /** 批5 Q7-3：回答完成后发追问侧车（生成 3 条贴题追问异步回写消息行） */
     private final org.dromara.assistant.service.AssistantFollowupService followupService;
 
+    /** 多实例批 3：run 登记归属实例；收割只碰自己或 owner 租约已死的 run */
+    private final org.dromara.assistant.core.AssistantInstanceContext instanceContext;
+
     /** 批B B1：末次模型调用 tokens 快照（上下文环数据源），终态 clearLastUsage */
     private final org.dromara.assistant.billing.AssistantCostLedger costLedger;
+
+    /** Spring 唯一注入构造：必须显式 @Autowired——类里另有一个单测兼容构造，
+     *  若两个构造器都不标注，Spring 会退回无参构造并启动失败（三审 A/B 实证）。 */
+    @Autowired
+    public AssistantRunRecorder(AssistantConversationService conversationService,
+                                AssistantDailyQuota dailyQuota,
+                                AssistantPendingInterruptCache pendingInterrupts,
+                                AssistantPiiFilter piiFilter,
+                                org.dromara.assistant.service.AssistantFollowupService followupService,
+                                org.dromara.assistant.core.AssistantInstanceContext instanceContext,
+                                org.dromara.assistant.billing.AssistantCostLedger costLedger) {
+        this.conversationService = conversationService;
+        this.dailyQuota = dailyQuota;
+        this.pendingInterrupts = pendingInterrupts;
+        this.piiFilter = piiFilter;
+        this.followupService = followupService;
+        this.instanceContext = instanceContext;
+        this.costLedger = costLedger;
+    }
+
+    /**
+     * 纯单测兼容构造（无 Spring 容器）：旧测试只关心本机冲刷/收割，不模拟实例归属；
+     * instanceContext=null 时归属守卫整体跳过，行为与批 3 之前一致。
+     */
+    public AssistantRunRecorder(AssistantConversationService conversationService,
+                                AssistantDailyQuota dailyQuota,
+                                AssistantPendingInterruptCache pendingInterrupts,
+                                AssistantPiiFilter piiFilter,
+                                org.dromara.assistant.service.AssistantFollowupService followupService,
+                                org.dromara.assistant.billing.AssistantCostLedger costLedger) {
+        this(conversationService, dailyQuota, pendingInterrupts, piiFilter, followupService, null, costLedger);
+    }
 
     /** 记录专用有界池（dspro P2-1 修：CallerRuns——终态写/refund 任务绝不能被静默丢弃，
      *  打满时借流线程执行，短阻塞优于丢终态） */
@@ -118,6 +152,10 @@ public class AssistantRunRecorder {
     // ===== 批6-#2 五张追踪表（005 测试接缝：包内可见供单测直取播种，见 thinkBuffers 先例） =====
     /** 每 run 末次事件时刻（收割判据：停滞超 STALL_MS=失联） */
     final Map<String, Long> lastEventAt = new ConcurrentHashMap<>();
+
+    /** 每 run 末次落库 touch 时刻（多实例收割判据；10s 节流，避免每事件一次 UPDATE） */
+    final Map<String, Long> lastLeaseTouchAt = new ConcurrentHashMap<>();
+    private static final long LEASE_TOUCH_MS = 10_000L;
 
     /** G1 乙类#5（三审回修 P1：键由 threadId 改 runId）：用户显式停止标记（stopAt 毫秒）。
      * thread 级键在「停止晚到/终态走收割或 RUN_ERROR」时永不消费→残留标记把同 thread
@@ -700,6 +738,7 @@ public class AssistantRunRecorder {
     /** 批6-#2：run 侧跟踪键清理（终道/收割共用；stepBuffers 族仍按既有语义单独管） */
     private void clearRunTracking(String runId) {
         lastEventAt.remove(runId);
+        lastLeaseTouchAt.remove(runId);
         runStepKeys.remove(runId);
         lastPartialFlushAt.remove(runId);
         lastPartialLen.remove(runId);
@@ -788,6 +827,7 @@ public class AssistantRunRecorder {
         for (Map.Entry<String, Long> entry : lastEventAt.entrySet()) {
             String runId = entry.getKey();
             try {
+                maybeTouchRun(runId, now);
                 boolean stalled = now - entry.getValue() >= STALL_MS;
                 // glm53 审查 P2-1（纯心跳收割）：lastEventAt 被心跳无限喂养永不 stalled，
                 // 服务端真挂起（工具/模型死锁）会被拖到 15min RetentionJob 兜底——
@@ -831,6 +871,32 @@ public class AssistantRunRecorder {
     }
 
     /**
+     * run 末次事件时间心跳（多实例批 3）：本机还在看着这个 run，就每 10 秒把
+     * {@code last_event_at} 推到数据库——故障转移后别的实例用这个时间判断“它是不是
+     * 真的停了”，而不是只看 create_time 把长回答误杀。DB 抖动仅告警，不影响本机收割。
+     */
+    private void maybeTouchRun(String runId, long now) {
+        if (instanceContext == null) {
+            return;
+        }
+        if (now - lastLeaseTouchAt.getOrDefault(runId, 0L) < LEASE_TOUCH_MS) {
+            return;
+        }
+        lastLeaseTouchAt.put(runId, now);
+        try {
+            conversationService.touchRun(runId);
+        } catch (Exception e) {
+            log.debug("[AssistantRecorder] run 末次事件时间心跳失败 runId={}: {}", runId, e.getMessage());
+        }
+    }
+
+    /** 旧数据（无 owner）保护期：30 分钟后仍无归属，按死单收 */
+    private static boolean legacyOwnerExpired(DcsAssistantRun run) {
+        java.util.Date ref = run.getLastEventAt() != null ? run.getLastEventAt() : run.getCreateTime();
+        return ref != null && System.currentTimeMillis() - ref.getTime() >= 30L * 60 * 1000;
+    }
+
+    /**
      * 业务批10 #2（2026-10-14）：零事件 run 兜底收割。
      *
      * <p>背景（本批库内实锤）：框架部分失败路径（网关侧同步异常走 contractErrorEvents
@@ -851,6 +917,19 @@ public class AssistantRunRecorder {
                 String runId = run.getRunId();
                 if (runId == null || lastEventAt.containsKey(runId) || terminalWritePending.contains(runId)) {
                     continue;
+                }
+                // 多实例批 3：owner 为空（旧数据）不碰；owner 是别的实例且租约还活着 → 绝不抢收。
+                // 少了这道门，B 实例会把 A 实例正在跑的长回答当成“零事件”收掉。
+                if (instanceContext != null) {
+                    String owner = run.getOwnerInstance();
+                    if (owner == null || owner.isBlank()) {
+                        // 旧数据：升级期先让旧实例跑完，30 分钟后仍无归属才按死单收
+                        if (!legacyOwnerExpired(run)) {
+                            continue;
+                        }
+                    } else if (!owner.equals(instanceContext.current()) && instanceContext.isAlive(owner)) {
+                        continue;
+                    }
                 }
                 if (costLedger.isInFlight(run.getThreadId())) {
                     continue;

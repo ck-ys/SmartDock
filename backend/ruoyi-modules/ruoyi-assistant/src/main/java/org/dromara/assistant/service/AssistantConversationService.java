@@ -46,6 +46,8 @@ public class AssistantConversationService {
     private final org.dromara.assistant.mapper.AssistantAttachmentMapper attachmentMapper;
     private final AssistantPiiFilter piiFilter;
     private final JdbcTemplate jdbcTemplate;
+    /** 多实例批 3：run 登记时写入归属实例，收割时据此判断“别人的活别碰” */
+    private final org.dromara.assistant.core.AssistantInstanceContext instanceContext;
 
     /**
      * thread 归属首绑（G4 Ownership 处置链）：返回会话 id。
@@ -90,11 +92,15 @@ public class AssistantConversationService {
         row.setUserId(userId);
         row.setThreadId(threadId);
         row.setRunId(runId);
+        row.setOwnerInstance(instanceContext.current());
         int inserted = runMapper.insertIgnoreRun(row);
         DcsAssistantRun bound = runMapper.selectByRunId(runId);
         if (bound != null && (!bound.getUserId().equals(userId) || !bound.getTenantId().equals(tenantId))) {
             throw new ServiceException("请求不合法（runId 归属校验失败）", 403);
         }
+        // 二审回修（dspro-P2-1）：这里原本给重放的 RUNNING 行刷 owner，但 persistUserRound
+        // 在 !freshRun 时立刻抛 409 → 事务回滚，刷了也白刷；runId 每轮新生成，正常路径不存在
+        // 换主重放。删掉这次无效 UPDATE，别让维护者误以为故障转移已由这里兜住。
         return inserted > 0;
     }
 
@@ -593,9 +599,19 @@ public class AssistantConversationService {
         }
     }
 
-    /** 悬挂 run 兜底通道（retention job 每分钟调；dspro P1-1）：迁移成功的行才返回 */
-    public List<DcsAssistantRun> closeStuckRuns(int minutes) {
-        return runMapper.closeStuck(minutes);
+    /** 悬挂 run 候选（retention job 每分钟调；调用方先过滤 owner 仍活着的行） */
+    public List<DcsAssistantRun> listStuckRuns(int minutes) {
+        return runMapper.selectStuck(minutes);
+    }
+
+    /** 条件迁移悬挂 run（只迁 RUNNING；迁移成功的行才返回，供退回合） */
+    public List<DcsAssistantRun> finalizeStuckRun(String tenantId, String runId) {
+        return runMapper.finalizeStuck(tenantId, runId);
+    }
+
+    /** run 末次事件时间心跳（多实例收割判据；只续 RUNNING 行） */
+    public void touchRun(String runId) {
+        runMapper.touch(runId);
     }
 
     /** 业务批10 #2：RUNNING 超时行扫描（收割器零事件二扫；调用方按 lastEventAt 差集过滤） */

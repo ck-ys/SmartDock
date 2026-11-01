@@ -67,7 +67,14 @@ public class AssistantElicitationController extends BaseController {
         String err = elicitationBridge.answer(
             LoginHelper.getTenantId(), LoginHelper.getUserId(),
             body.getThreadId(), body.getId(), body.getAction(), body.getContent());
-        return err == null ? R.ok() : R.fail(err);
+        if (err == null) {
+            return R.ok();
+        }
+        // 多实例批 2：同 ask_user——卡失效/不属本会话时回 HTTP 409 人话，提示刷新粘回原实例
+        if (err.contains("已失效") || err.contains("不属于当前会话")) {
+            throw new org.dromara.common.core.exception.ServiceException(err, 409);
+        }
+        return R.fail(err);
     }
 
     private static boolean isBlank(String s) {

@@ -1,5 +1,6 @@
 package org.dromara.assistant.persist;
 
+import com.baomidou.lock.annotation.Lock4j;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.assistant.domain.DcsAssistantRun;
@@ -34,7 +35,12 @@ public class AssistantRetentionJob {
     /** 二站 T3：悬挂缓存报读（只读，不删悬挂条目） */
     private final AssistantPendingInterruptCache pendingInterrupts;
     private final AssistantRunRecorder runRecorder;
+    /** 多实例：只有自己或 owner 租约已死的 run 才允许本实例收尸 */
+    private final org.dromara.assistant.core.AssistantInstanceContext instanceContext;
+    /** 多实例：收尸后补跑陈旧 ASKING 自愈（run 刚变 INTERRUPTED，启动期扫描错过的那批） */
+    private final AssistantStaleAskingRecovery staleAskingRecovery;
 
+    @Lock4j(keys = {"'assistant-retention-daily'"})
     @Scheduled(cron = "0 40 3 * * ?")
     public void sweep() {
         try {
@@ -49,20 +55,47 @@ public class AssistantRetentionJob {
         sweep();
     }
 
+    @Lock4j(keys = {"'assistant-stuck-runs'"})
     @Scheduled(fixedDelay = 60_000, initialDelay = 120_000)
     public void sweepStuckRuns() {
         try {
-            List<DcsAssistantRun> closed = conversationService.closeStuckRuns(15);
-            for (DcsAssistantRun r : closed) {
-                dailyQuota.refundTurn(r.getTenantId(), r.getUserId());
+            List<DcsAssistantRun> candidates = conversationService.listStuckRuns(15);
+            int closedCount = 0;
+            for (DcsAssistantRun r : candidates) {
+                String owner = r.getOwnerInstance();
+                // owner 为空的旧数据：升级期先保护（旧实例可能还在跑），但超过 30 分钟
+                // 仍无归属就按死单收——否则会话列表永久“正在回答”，额度也不退
+                if (owner == null || owner.isBlank()) {
+                    if (!legacyOwnerExpired(r)) {
+                        continue;
+                    }
+                } else if (!owner.equals(instanceContext.current()) && instanceContext.isAlive(owner)) {
+                    // 这轮还在别的活实例手上，绝不抢收
+                    continue;
+                }
+                List<DcsAssistantRun> closed = conversationService.finalizeStuckRun(r.getTenantId(), r.getRunId());
+                for (DcsAssistantRun row : closed) {
+                    dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+                    closedCount++;
+                }
             }
-            if (!closed.isEmpty()) {
+            if (closedCount > 0) {
                 log.warn("[AssistantRetention] 悬挂 run 兜底迁移 {} 行(15 分钟无终态事件, 已退回合)",
-                    closed.size());
+                    closedCount);
             }
+            // 二审回修（glm53-P2-2）：每轮固定补扫，不再挂在 closedCount>0 上——HITL 挂起的
+            // run 本来就是 INTERRUPTED，永远进不了 closedCount；若实例死后没有新实例启动，
+            // 坏主留下的 ASKING 会话就再没人扫。方法幂等，代价只是一次 LIKE 查询。
+            staleAskingRecovery.recoverGoneOwners();
         } catch (Exception e) {
             log.error("[AssistantRetention] 悬挂 run 兜底失败(下一轮重试, 幂等安全)", e);
         }
+    }
+
+    /** 旧数据（无 owner）保护期：30 分钟后仍无归属，按死单收 */
+    private static boolean legacyOwnerExpired(DcsAssistantRun r) {
+        java.util.Date ref = r.getLastEventAt() != null ? r.getLastEventAt() : r.getCreateTime();
+        return ref != null && System.currentTimeMillis() - ref.getTime() >= 30L * 60 * 1000;
     }
 
     /**
@@ -88,6 +121,7 @@ public class AssistantRetentionJob {
      * 二站② AU-42：agentscope 清除补偿重试——purge 四表已删但框架表清理失败时
      * 登记进 Redis 集合，这里每分钟重试直至干净（防 GDPR 半清除态复活旧历史）。
      */
+    @Lock4j(keys = {"'assistant-purge-compensation'"})
     @Scheduled(fixedDelay = 60_000, initialDelay = 240_000)
     public void retryPurgeCompensation() {
         try {

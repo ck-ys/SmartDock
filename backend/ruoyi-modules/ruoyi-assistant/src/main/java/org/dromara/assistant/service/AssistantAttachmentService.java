@@ -181,12 +181,33 @@ public class AssistantAttachmentService {
 
     /**
      * G4(批G 1008)：启动恢复——进程重启会丢 PARSE_EXECUTOR 内存队列，滞留的
-     * PENDING/PARSING 行永无终态（前端永远「解析中」）。启动时全量重排队自愈，
+     * PENDING/PARSING 行永无终态（前端永远「解析中」）。启动时原子认领并重排队自愈，
      * 重跑 parse 幂等覆盖状态；源文件已删的行直接判 FAILED 人话。
+     *
+     * <p>多实例批 3：认领用 UPDATE...RETURNING，另一个实例同时启动也只可能有一边
+     * 拿到同一行。启动口径（二审回修 dsflash-P2-4）：PENDING 不等年龄（本机队列已丢，
+     * 立刻重排；CRASH 前刚上传的行也不再让用户白等 5 分钟），PARSING 仍要超 10 分钟
+     * 才抢（别的实例可能正在解析）。</p>
      */
     @PostConstruct
     public void recoverPendingOnStartup() {
-        List<DcsAssistantAttachment> stuck = attachmentMapper.listStuck();
+        recoverStale(0, 10);
+    }
+
+    /** 每分钟巡检：原子认领超龄滞留行并重排解析（幂等，可多个实例同时跑） */
+    @Scheduled(fixedDelay = 60_000, initialDelay = 300_000)
+    public void recoverStaleAttachments() {
+        recoverStale(5, 10);
+    }
+
+    private void recoverStale(int pendingMins, int parsingMins) {
+        List<DcsAssistantAttachment> stuck;
+        try {
+            stuck = attachmentMapper.claimStale(200, pendingMins, parsingMins);
+        } catch (Exception e) {
+            log.warn("[AssistantAttachment] 滞留解析行认领失败(下一轮重试): {}", e.getMessage());
+            return;
+        }
         for (DcsAssistantAttachment row : stuck) {
             SysOssVo oss = sysOssService.getById(row.getOssId());
             if (oss == null || oss.getOssId() == null) {
@@ -197,7 +218,7 @@ public class AssistantAttachmentService {
             submitParse(row.getId(), oss);
         }
         if (!stuck.isEmpty()) {
-            log.info("[AssistantAttachment] 启动恢复：重排队 {} 条滞留解析行", stuck.size());
+            log.info("[AssistantAttachment] 滞留解析行原子认领：重排队 {} 条", stuck.size());
         }
     }
 

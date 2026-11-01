@@ -45,6 +45,34 @@ public final class AssistantAutonomyHolder {
     private static final Map<String, Boolean> RULE_INSTALL_PENDING = new ConcurrentHashMap<>();
     private static final int CAP = 50_000;
 
+    /**
+     * 跨实例共享后端（多实例批 1）：redis 模式读共享；dual/local 读本机。
+     * 由 {@link AssistantAutonomySharedState} 在启动时绑定，纯单测不绑定=全本机。
+     */
+    public interface SharedBackend {
+        boolean redisReadPreferred();
+
+        Set<String> approved(String threadId);
+
+        long approvedGen(String threadId);
+
+        void approve(String threadId, String toolName);
+
+        void markRuleInstallPending(String threadId);
+
+        boolean consumeRuleInstallPending(String threadId);
+    }
+
+    private static volatile SharedBackend shared;
+
+    public static void bindShared(SharedBackend backend) {
+        shared = backend;
+    }
+
+    private static SharedBackend shared() {
+        return shared;
+    }
+
     private AssistantAutonomyHolder() {
     }
 
@@ -90,12 +118,31 @@ public final class AssistantAutonomyHolder {
         evictIfCrowded();
         APPROVED.computeIfAbsent(threadId, k -> ConcurrentHashMap.newKeySet()).add(toolName);
         APPROVED_GEN.merge(threadId, 1, Integer::sum);
+        SharedBackend backend = shared();
+        if (backend != null) {
+            try {
+                backend.approve(threadId, toolName);
+            } catch (Exception e) {
+                // 共享写失败：本机已记；redis 模式下一次跨实例可能又问一次，但不 fail-open
+                org.slf4j.LoggerFactory.getLogger(AssistantAutonomyHolder.class)
+                    .warn("[autonomy] 共享批准写入失败 thread={} tool={}: {}", threadId, toolName, e.getMessage());
+            }
+        }
     }
 
     /** 本会话该工具是否已确认过 */
     public static boolean isApproved(String threadId, String toolName) {
         if (threadId == null || toolName == null) {
             return false;
+        }
+        SharedBackend backend = shared();
+        if (backend != null && backend.redisReadPreferred()) {
+            try {
+                return backend.approved(threadId).contains(toolName);
+            } catch (Exception e) {
+                // 读不到共享批准=按未批准处理（最多再问一次，绝不误放行）
+                return false;
+            }
         }
         Set<String> set = APPROVED.get(threadId);
         return set != null && set.contains(toolName);
@@ -120,7 +167,17 @@ public final class AssistantAutonomyHolder {
         }
         evictIfCrowded();
         LAST_BUILT.put(threadId, levelAtBuild == null ? ALWAYS : levelAtBuild);
-        BUILT_GEN.put(threadId, APPROVED_GEN.getOrDefault(threadId, 0));
+        SharedBackend backend = shared();
+        long gen = APPROVED_GEN.getOrDefault(threadId, 0);
+        if (backend != null && backend.redisReadPreferred()) {
+            try {
+                gen = backend.approvedGen(threadId);
+            } catch (Exception e) {
+                // 读不到就按本机基准；下一次请求 needsRebuild 会再判
+                gen = APPROVED_GEN.getOrDefault(threadId, 0);
+            }
+        }
+        BUILT_GEN.put(threadId, (int) Math.min(Integer.MAX_VALUE, gen));
     }
 
     /**
@@ -140,6 +197,15 @@ public final class AssistantAutonomyHolder {
             return true;
         }
         int builtGen = BUILT_GEN.getOrDefault(threadId, 0);
+        SharedBackend backend = shared();
+        if (backend != null && backend.redisReadPreferred()) {
+            try {
+                return builtGen != (int) Math.min(Integer.MAX_VALUE, backend.approvedGen(threadId));
+            } catch (Exception e) {
+                // 读不到共享代次：宁可重建一次（重算规则），不能沿用旧规则 fail-open
+                return true;
+            }
+        }
         return builtGen != APPROVED_GEN.getOrDefault(threadId, 0);
     }
 
@@ -153,6 +219,15 @@ public final class AssistantAutonomyHolder {
         }
         evictIfCrowded();
         RULE_INSTALL_PENDING.put(threadId, Boolean.TRUE);
+        SharedBackend backend = shared();
+        if (backend != null) {
+            try {
+                backend.markRuleInstallPending(threadId);
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(AssistantAutonomyHolder.class)
+                    .warn("[autonomy] 共享规则装回标记写入失败 thread={}: {}", threadId, e.getMessage());
+            }
+        }
     }
 
     /** AgentFactory 消费：取走并清除（一次重建只装一次；无标记=false 不装） */
@@ -160,6 +235,16 @@ public final class AssistantAutonomyHolder {
         if (threadId == null) {
             return false;
         }
-        return Boolean.TRUE.equals(RULE_INSTALL_PENDING.remove(threadId));
+        boolean local = Boolean.TRUE.equals(RULE_INSTALL_PENDING.remove(threadId));
+        SharedBackend backend = shared();
+        if (backend != null && backend.redisReadPreferred()) {
+            try {
+                return backend.consumeRuleInstallPending(threadId) || local;
+            } catch (Exception e) {
+                // 读不到共享标记：强制装一次当前规则，避免旧规则 fail-open
+                return true;
+            }
+        }
+        return local;
     }
 }

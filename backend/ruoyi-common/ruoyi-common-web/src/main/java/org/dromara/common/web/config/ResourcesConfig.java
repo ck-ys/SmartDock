@@ -60,6 +60,8 @@ public class ResourcesConfig implements WebMvcConfigurer {
         config.addAllowedHeader("*");
         // 设置访问源请求方法
         config.addAllowedMethod("*");
+        // 多实例验收：把“这轮由哪台实例服务”的响应头暴露给浏览器 JS
+        config.addExposedHeader("X-Assistant-Instance");
         // 有效期 1800秒
         config.setMaxAge(1800L);
         // 添加映射路径，拦截一切请求

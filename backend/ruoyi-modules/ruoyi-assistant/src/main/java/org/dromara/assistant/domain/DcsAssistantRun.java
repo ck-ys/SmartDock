@@ -43,6 +43,12 @@ public class DcsAssistantRun implements Serializable {
     /** 终态原因（interrupt/error/normal） */
     private String endReason;
 
+    /** 归属实例 id（多实例批 3：只有自己或 owner 租约已死的 run 才允许本实例收割） */
+    private String ownerInstance;
+
+    /** 末次事件时间（多实例收割判据；为空时回退 create_time） */
+    private Date lastEventAt;
+
     /** 创建时间 */
     private Date createTime;
 

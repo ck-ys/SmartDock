@@ -1,5 +1,6 @@
 package org.dromara.assistant.service;
 
+import com.baomidou.lock.annotation.Lock4j;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.tool.Toolkit;
@@ -117,9 +118,10 @@ public class McpPilotService {
 
     /** G4-#5：审计保留期清理（90 天）——分批 5000 行防长事务锁表。cron 03:55：
      *  G4 三审回修（dspro P2）错峰——03:40 已被 AssistantRetentionJob/ProfileRetentionJob
-     *  占用；单实例口径（多节点部署时再引分布式锁，登记池） */
+     *  占用；多实例批 3 起加 @Lock4j 单跑，防多节点同时删同一批。 */
+    @Lock4j(keys = {"'assistant-mcp-call-log-sweep'"})
     @Scheduled(cron = "0 55 3 * * ?")
-    void sweepExpiredCallLogs() {
+    public void sweepExpiredCallLogs() {
         try {
             java.util.Date cutoff = new java.util.Date(
                 System.currentTimeMillis() - 90L * 24 * 3600 * 1000);

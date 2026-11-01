@@ -39,10 +39,25 @@ public interface AssistantAttachmentMapper extends BaseMapper<DcsAssistantAttach
         + " update_time=CURRENT_TIMESTAMP WHERE id=#{id} AND del_flag='1'")
     int revive(@Param("id") Long id, @Param("fileName") String fileName, @Param("suffix") String suffix);
 
-    /** G4(批G 1008)：启动恢复——滞留未终态行（进程重启丢内存队列）重新入队自愈用 */
-    @Select("SELECT * FROM dcs_assistant_attachment WHERE parse_status IN ('PENDING','PARSING')"
-        + " AND del_flag='0'")
-    List<DcsAssistantAttachment> listStuck();
+    /**
+     * 多实例批 3：原子认领滞留解析行——谁 UPDATE 到谁解析，两个实例同时启动/巡检
+     * 不会把同一行各排一遍。阈值由调用方给（分钟）：启动恢复用 PENDING 0 分钟（进程
+     * 重启丢的是本机队列，PENDING 行立刻可以重排）+ PARSING 10 分钟（别台还在跑的长
+     * 解析不抢）；每分钟巡检用 5/10 分钟。UPDATE...RETURNING 保证并发下每行只归一个实例。
+     */
+    @Select("UPDATE dcs_assistant_attachment SET parse_status='PARSING', update_time=CURRENT_TIMESTAMP"
+        + " WHERE id IN (SELECT id FROM dcs_assistant_attachment"
+        + "   WHERE del_flag='0' AND ("
+        + "     (parse_status='PENDING' AND update_time < CURRENT_TIMESTAMP - make_interval(mins => #{pendingMins}))"
+        + "     OR (parse_status='PARSING' AND update_time < CURRENT_TIMESTAMP - make_interval(mins => #{parsingMins})))"
+        + "   ORDER BY update_time LIMIT #{batch})"
+        + " AND del_flag='0' AND ("
+        + "   (parse_status='PENDING' AND update_time < CURRENT_TIMESTAMP - make_interval(mins => #{pendingMins}))"
+        + "   OR (parse_status='PARSING' AND update_time < CURRENT_TIMESTAMP - make_interval(mins => #{parsingMins})))"
+        + " RETURNING *")
+    List<DcsAssistantAttachment> claimStale(@Param("batch") int batch,
+                                            @Param("pendingMins") int pendingMins,
+                                            @Param("parsingMins") int parsingMins);
 
     /** 随会话保留期清理：按上限分批物理删（附件>180 天，与 conversation 同口径） */
     @Delete("DELETE FROM dcs_assistant_attachment WHERE id IN (SELECT id FROM dcs_assistant_attachment"

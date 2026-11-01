@@ -641,6 +641,8 @@ CREATE TABLE public.dcs_assistant_run (
     run_id character varying(128) NOT NULL,
     status character varying(20) DEFAULT 'RUNNING'::character varying NOT NULL,
     end_reason character varying(64),
+    owner_instance character varying(128),
+    last_event_at timestamp without time zone,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -3155,6 +3157,13 @@ CREATE INDEX idx_dcs_asst_run_thread ON public.dcs_assistant_run USING btree (te
 --
 
 CREATE INDEX idx_dcs_asst_run_user_status ON public.dcs_assistant_run USING btree (tenant_id, user_id, status);
+
+
+--
+-- Name: idx_dcs_asst_run_status_event_ref; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_asst_run_status_event_ref ON public.dcs_assistant_run USING btree (status, COALESCE(last_event_at, create_time));
 
 
 --

@@ -52,7 +52,15 @@ public class AssistantAskUserController extends BaseController {
         String err = askUserBridge.answer(
             LoginHelper.getTenantId(), LoginHelper.getUserId(),
             body.getThreadId(), body.getId(), body.getAction(), body.getAnswers());
-        return err == null ? R.ok() : R.fail(err);
+        if (err == null) {
+            return R.ok();
+        }
+        // 多实例批 2：卡已失效/不在本会话 = 多半是请求落到了没有挂起现场的另一台实例。
+        // 回 HTTP 409 人话（而不是 200 包错误），前端能引导刷新后粘回原实例。
+        if (err.contains("已失效") || err.contains("不属于当前会话")) {
+            throw new org.dromara.common.core.exception.ServiceException(err, 409);
+        }
+        return R.fail(err);
     }
 
     private static boolean isBlank(String s) {

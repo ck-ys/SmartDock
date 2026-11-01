@@ -323,6 +323,19 @@ dcs:
     # 「过程显示」偏好。运维全局关停用（如带宽紧张），默认 true
     reasoning-display:
       enabled: ${DCS_ASSISTANT_REASONING_DISPLAY:true}
+    # 多实例部署开关（单机保持默认 local/false，零 Redis 依赖）
+    # shared-state.mode: local=本机 / dual=双写并比对（灰度）/ redis=跨实例
+    # sticky.require-header: true 时跟“正在跑的这一轮”绑定的端点必须带 X-Thread-Id；
+    #   前置条件=负载均衡按 X-Thread-Id 做一致性哈希（nginx hash $http_x_thread_id consistent）
+    shared-state:
+      mode: ${DCS_ASSISTANT_SHARED_STATE_MODE:local}
+    sticky:
+      require-header: ${DCS_ASSISTANT_STICKY_REQUIRE_HEADER:false}
+    instance:
+      # 留空=hostname:pid:随机短码；固定值便于运维识别（同一时刻必须全集群唯一）
+      id: ${DCS_ASSISTANT_INSTANCE_ID:}
+      lease-seconds: ${DCS_ASSISTANT_INSTANCE_LEASE_SECONDS:45}
+      heartbeat-ms: ${DCS_ASSISTANT_INSTANCE_HEARTBEAT_MS:15000}
   schedule:
     # 总开关：false 时定时扫描跳过（手动触发接口仍可用）
     enabled: true

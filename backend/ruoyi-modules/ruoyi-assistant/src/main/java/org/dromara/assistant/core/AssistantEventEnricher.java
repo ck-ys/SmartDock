@@ -122,6 +122,7 @@ public class AssistantEventEnricher implements AguiEventEnricher {
                     steps.add(java.util.Map.of("label", s, "state", "pending"));
                 }
                 java.util.Map<String, Object> value = new java.util.HashMap<>();
+                value.put("planId", plan.planId());
                 if (plan.title() != null) {
                     value.put("title", plan.title());
                 }

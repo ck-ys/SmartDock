@@ -16,8 +16,8 @@ import org.dromara.assistant.domain.DcsAssistantRun;
 public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
 
     /** runId 登记制首绑（唯一索引吸收并发；重放同 runId 换人=service 校验 403） */
-    @Insert("INSERT INTO dcs_assistant_run (id, tenant_id, user_id, thread_id, run_id, status, create_time)"
-        + " VALUES (#{r.id}, #{r.tenantId}, #{r.userId}, #{r.threadId}, #{r.runId}, 'RUNNING', CURRENT_TIMESTAMP)"
+    @Insert("INSERT INTO dcs_assistant_run (id, tenant_id, user_id, thread_id, run_id, status, owner_instance, create_time)"
+        + " VALUES (#{r.id}, #{r.tenantId}, #{r.userId}, #{r.threadId}, #{r.runId}, 'RUNNING', #{r.ownerInstance}, CURRENT_TIMESTAMP)"
         + " ON CONFLICT (run_id) DO NOTHING")
     int insertIgnoreRun(@Param("r") DcsAssistantRun run);
 
@@ -43,6 +43,11 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
     @Update("UPDATE dcs_assistant_run SET status=#{status}, end_reason=#{endReason}, update_time=CURRENT_TIMESTAMP"
         + " WHERE run_id=#{runId} AND status='RUNNING'")
     int finish(@Param("runId") String runId, @Param("status") String status, @Param("endReason") String endReason);
+
+    /** 末次事件时间心跳（多实例收割判据）：只续 RUNNING 行，不碰终态 */
+    @Update("UPDATE dcs_assistant_run SET last_event_at=CURRENT_TIMESTAMP"
+        + " WHERE run_id=#{runId} AND status='RUNNING'")
+    int touch(@Param("runId") String runId);
 
     /** 按 thread 查 run（断线恢复列表，最新在前） */
     @Select("SELECT * FROM dcs_assistant_run WHERE tenant_id=#{tenantId} AND thread_id=#{threadId} AND user_id=#{userId}"
@@ -70,15 +75,18 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
 
     /**
      * 悬挂 run 兜底（dspro P1-1）：resolve 已落库但事件流未产出任何终态（打错
-     * agentId/框架侧同步异常走 SSE 错误帧路径）→ RUNNING 永挂。超时行迁移
-     * INTERRUPTED 并 RETURNING 归属供 job 退回合——UPDATE...RETURNING 走 @Select
-     * 执行器（PG 允许 executeQuery 携带 RETURNING），迁移成功的行才退，天然防双退。
+     * agentId/框架侧同步异常走 SSE 错误帧路径）→ RUNNING 永挂。超时行先由 job 选候选，
+     * 过滤掉 owner 仍活着的 run，再按 runId 条件迁移（RETURNING 防双退）。
      */
+    @Select("SELECT * FROM dcs_assistant_run WHERE status='RUNNING'"
+        + " AND COALESCE(last_event_at, create_time) < (CURRENT_TIMESTAMP - make_interval(mins => #{minutes}))")
+    java.util.List<DcsAssistantRun> selectStuck(@Param("minutes") int minutes);
+
+    /** 条件迁移悬挂 run（只迁 RUNNING；RETURNING 让迁移成功的行才退回合） */
     @Select("UPDATE dcs_assistant_run SET status='INTERRUPTED', end_reason='no-terminal-event',"
-        + " update_time=CURRENT_TIMESTAMP WHERE status='RUNNING'"
-        + " AND create_time < (CURRENT_TIMESTAMP - make_interval(mins => #{minutes}))"
+        + " update_time=CURRENT_TIMESTAMP WHERE run_id=#{runId} AND tenant_id=#{tenantId} AND status='RUNNING'"
         + " RETURNING tenant_id, user_id, run_id")
-    java.util.List<DcsAssistantRun> closeStuck(@Param("minutes") int minutes);
+    java.util.List<DcsAssistantRun> finalizeStuck(@Param("tenantId") String tenantId, @Param("runId") String runId);
 
     /**
      * 批6-#2 失联收割（刷新/断网拆链的 run）：RunRecorder 实测「事件停滞超阈值」后
@@ -94,10 +102,11 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
 
     /**
      * 业务批10 #2：RUNNING 超时行扫描（收割器零事件二扫用）。建行后从未有 enricher
-     * 事件的 run 不在记录器 lastEventAt 表里，停滞收割失明（15min closeStuck 才兜底）；
-     * 按 create_time 捞出候选，收割器差集过滤后条件迁移。
+     * 事件的 run 不在记录器 lastEventAt 表里，停滞收割失明（15min 兜底才收）；
+     * 多实例批 3 起按 COALESCE(last_event_at, create_time) 捞候选，避免别的实例
+     * 明明在出事件、本实例却因本机 Map 为空把它误收。
      */
     @Select("SELECT * FROM dcs_assistant_run WHERE status='RUNNING'"
-        + " AND create_time < (CURRENT_TIMESTAMP - make_interval(secs => #{seconds}))")
+        + " AND COALESCE(last_event_at, create_time) < (CURRENT_TIMESTAMP - make_interval(secs => #{seconds}))")
     java.util.List<DcsAssistantRun> selectRunningOlderThan(@Param("seconds") int seconds);
 }
