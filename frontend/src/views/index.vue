@@ -279,15 +279,18 @@ const chart = computed(() => {
   // 手机档换窄画布：viewBox 随宽度缩时字会一起缩到看不清，宁可少画几列像素
   const w = viewportWidth.value <= 768 ? 322 : 560;
   const h = 170;
-  const padL = 34;
-  /* 2026-11-01 Q8=乙：末端数值标在最后一个点右侧 8px，原来 padR 只有 26 时文字会顶出
-     viewBox 被裁掉半个数字；留到 52，最后一个点连同末尾日期都完整落在画布内 */
-  const padR = 52;
   const padT = 16;
   const padB = 24;
   const maxRaw = Math.max(1, ...vals);
   const step = maxRaw <= 10 ? 2 : maxRaw <= 50 ? 10 : maxRaw <= 200 ? 50 : 100;
   const max = Math.ceil(maxRaw / step) * step;
+  /* 2026-11-01 Q8 深挖席 P1：两侧留白原来都是死值，数字位数一变就被 viewBox 裁掉首位——
+     纵轴刻度被裁读到的是小 10/100 倍的假量级，比右边更危险。
+     12px 数字约 7.2 单位/位，两侧各按实际位数留（3 位数时与原值一致，画面不变） */
+  const tickChars = Math.max(...[0, max / 2, max].map((v) => String(Number(v.toFixed(2))).length));
+  const padL = Math.max(34, Math.ceil(tickChars * 7.2) + 10);
+  const endChars = String(vals[vals.length - 1] ?? 0).length;
+  const padR = Math.max(52, Math.ceil(endChars * 7.2) + 14);
   const x = (i: number) => padL + (i * (w - padL - padR)) / Math.max(1, vals.length - 1);
   const y = (v: number) => padT + (1 - v / max) * (h - padT - padB);
   const labelIdx = vals.length > 4 ? [0, 2, 4, 6] : vals.map((_, i) => i);

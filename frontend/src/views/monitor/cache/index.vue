@@ -100,7 +100,7 @@
       <el-col :xs="24" :sm="12" class="card-box">
         <el-card shadow="hover">
           <template #header>
-            <PieChart style="width: 1em; height: 1em; vertical-align: middle" />
+            <Histogram style="width: 1em; height: 1em; vertical-align: middle" />
             <span style="vertical-align: middle">命令统计</span>
           </template>
           <div class="el-table el-table--enable-row-hover el-table--medium">
@@ -173,7 +173,8 @@ const hasMemoryLimit = computed(() => maxMemoryMb.value > 0);
 /** 2026-11-01 Q8=乙：命令统计从玫瑰图改横向条形 TOP10——
     玫瑰图扇区角度不可比、命令名还得靠图例对，换成条形后「谁在吃 Redis」一眼看得出 */
 const topCommands = computed(() => {
-  const list = (cache.value.commandStats || []) as unknown as Array<{ name: string; value: number }>;
+  // value 后端是字符串（INFO 里取的），这里保留联合类型，排序处统一 Number()
+  const list = (cache.value.commandStats || []) as Array<{ name: string; value: string | number }>;
   return [...list].sort((a, b) => Number(b.value) - Number(a.value)).slice(0, 10);
 });
 const commandTotal = computed(() => (cache.value.commandStats || []).reduce((sum: number, x: any) => sum + (Number(x?.value) || 0), 0));
@@ -187,6 +188,14 @@ const renderCharts = () => {
   const top = topCommands.value.slice().reverse();
   const total = commandTotal.value || 1;
   commandstatsIns = commandstatsIns || echarts.init(commandstats.value);
+  /* 一条命令都没有时别画空坐标系：画布上留一句人话（Q8 回归席 P2-3） */
+  if (!top.length) {
+    commandstatsIns.setOption(
+      { graphic: [{ type: 'text', left: 'center', top: 'middle', style: { text: '还没有命令统计', fill: ct.value.faint, fontSize: 13 } }] },
+      true
+    );
+    return;
+  }
   commandstatsIns.setOption(
     {
       color: ct.value.series,
@@ -197,7 +206,7 @@ const renderCharts = () => {
         formatter: (params: any) => {
           const it = Array.isArray(params) ? params[0] : params;
           const v = Number(it?.value) || 0;
-          return `${it?.name}<br/>调用 ${v} 次（占 ${((v / total) * 100).toFixed(1)}%）`;
+          return `${it?.name}<br/>调用 ${v} 次（占 ${((v / total) * 100).toFixed(1)}%，全量 ${commandTotal.value} 次）`;
         }
       },
       grid: { left: 4, right: 64, top: 6, bottom: 6, containLabel: true },
@@ -223,7 +232,19 @@ const renderCharts = () => {
           barMaxWidth: 14,
           data: top.map((x) => Number(x.value) || 0),
           itemStyle: { borderRadius: [0, 3, 3, 0] },
-          label: { show: true, position: 'right', color: ct.value.muted, formatter: '{c}' },
+          /* 条尾数值压成万/亿：9 位数（9 位起 64px 装不下）原来会被画布裁掉末位，
+             读出来正好还像个正常数字。精确值在 tooltip 里 */
+          label: {
+            show: true,
+            position: 'right',
+            color: ct.value.muted,
+            formatter: (p: any) => {
+              const v = Number(p.value) || 0;
+              if (v >= 1e8) return `${(v / 1e8).toFixed(2)}亿`;
+              if (v >= 1e4) return `${(v / 1e4).toFixed(1)}万`;
+              return String(v);
+            }
+          },
           animationEasing: 'cubicInOut',
           animationDuration: 1000
         }
