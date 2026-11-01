@@ -64,6 +64,18 @@ public class AssistantConversationController extends BaseController {
     /** 二审回修：停止端点条件收尾 run 时退回合，口径与收割器一致 */
     private final org.dromara.assistant.limiter.AssistantDailyQuota dailyQuota;
 
+    /** 退款口径（三审回修 dspro-P2-1）：credits 订阅租户建侧 tryTurn 本就跳过，退回合须同口径
+     *  跳过（同 AssistantRunRecorder#refundIfWallet）；查不到模式按钱包口径退（fail-open）。 */
+    private boolean creditsMode(String tenantId, Long userId) {
+        try {
+            var quotaService = org.dromara.common.core.utils.SpringUtils.getBean(
+                org.dromara.assistant.service.AssistantUserQuotaService.class);
+            return quotaService.billingAwareLimits(tenantId, userId).creditsMode();
+        } catch (Exception ignore) {
+            return false;
+        }
+    }
+
     /**
      * B 批题5「续看」（2026-10-27 拍板 甲案）：刷新/掉线后重新挂上进行中的回答流。
      *
@@ -91,7 +103,7 @@ public class AssistantConversationController extends BaseController {
         var fluxOpt = runStreamHub.attach(runId);
         if (fluxOpt.isEmpty()) {
             return org.springframework.http.ResponseEntity.ok(
-                R.fail("本轮不可续看（服务重启过或已超保留窗），稍后自动接终态"));
+                R.fail("本轮不可续看（可能不在当前服务上、服务重启过或已超保留窗），刷新页面后重试"));
         }
         final org.dromara.assistant.domain.DcsAssistantRun run = latest.get(0);
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
@@ -270,6 +282,17 @@ public class AssistantConversationController extends BaseController {
         org.dromara.assistant.domain.DcsAssistantRun run = latest.get(0);
         String owner = run.getOwnerInstance();
         boolean ownedHere = owner == null || owner.isBlank() || owner.equals(instanceContext.current());
+        // 三审回修（dspro-P1-2 / dsflash-P2-2）：owner 为空是升级期旧版本实例写的行，旧进程
+        // 可能还在跑。收割器对这类行刻意留 30 分钟保护（AssistantRetentionJob），停止端点
+        // 不能反着来——否则滚动升级时点停止会「谎报成功」：旧实例继续出字烧钱，本机还白退额度，
+        // 随后 finish 条件落空留下 run=INTERRUPTED 却有完整回答的自相矛盾态。
+        if (owner == null || owner.isBlank()) {
+            java.util.Date ref = run.getLastEventAt() != null ? run.getLastEventAt() : run.getCreateTime();
+            if (ref != null && System.currentTimeMillis() - ref.getTime() < 30L * 60 * 1000) {
+                throw new org.dromara.common.core.exception.ServiceException(
+                    "这轮可能还在旧版本服务上，稍等一分钟刷新后再试", 409);
+            }
+        }
         // 多实例批 2：这轮在另一台活实例上——本机没有它的 AgentSession，盲打就是假成功，
         // 必须回人话让用户刷新（LB 按 X-Thread-Id 粘回去后就能真的停）
         if (!ownedHere && instanceContext.isAlive(owner)) {
@@ -285,8 +308,10 @@ public class AssistantConversationController extends BaseController {
         if (!ownedHere || session.isEmpty()) {
             java.util.List<org.dromara.assistant.domain.DcsAssistantRun> closed =
                 conversationService.finalizeStalledRun(tenantId, run.getRunId());
-            for (org.dromara.assistant.domain.DcsAssistantRun row : closed) {
-                dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+            if (!creditsMode(tenantId, userId)) {
+                for (org.dromara.assistant.domain.DcsAssistantRun row : closed) {
+                    dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+                }
             }
             if (!closed.isEmpty()) {
                 log.info("[AssistantStop] 本机已无在跑会话，条件收尾 run thread={} run={} 已退回合",

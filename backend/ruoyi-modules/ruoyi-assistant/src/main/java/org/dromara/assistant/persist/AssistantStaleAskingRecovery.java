@@ -113,6 +113,12 @@ public class AssistantStaleAskingRecovery implements SmartInitializingSingleton 
             return false;
         }
         DcsAssistantRun run = latest.get(0);
+        // 三审回修（dspro-P2-3）：HITL 挂起期间流侧出错会落 FAILED，但持久态仍停在 asking
+        // （错误分支明确不清缓存）——这种会话没有任何在飞工作，直接可救；否则重启也救不回来，
+        // 之后每条消息都被框架「Agent is paused for human-in-the-loop」拒绝。
+        if ("FAILED".equals(run.getStatus())) {
+            return true;
+        }
         if (!"INTERRUPTED".equals(run.getStatus())) {
             return false;
         }

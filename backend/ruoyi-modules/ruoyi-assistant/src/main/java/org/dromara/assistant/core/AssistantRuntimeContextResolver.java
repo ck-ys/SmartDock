@@ -173,10 +173,15 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
                     // 二审回修（dspro-P1-3）：persistUserSide 已落 RUNNING run + 扣回合，这里抛错
                     // 前必须条件收尾并退还——否则该 run 零事件挂 60 秒，期间同 thread 新消息被
                     // 双 RUNNING 门挡住，用户以为系统坏了。
+                    // 三审回修（dspro-P1-1）：run 行是按动态租户 tenantId 落的（见上方 persistUserSide），
+                    // 这里若用登录快照 user.getTenantId()，超管切租户时恒 0 行=收尾失败；
+                    // 退款同口径跳过 credits 订阅（否则会误退钱包期计数，见 resolver catch 补偿注释）。
                     java.util.List<org.dromara.assistant.domain.DcsAssistantRun> closed =
-                        conversationService.finalizeStalledRun(user.getTenantId(), input.getRunId());
-                    for (org.dromara.assistant.domain.DcsAssistantRun row : closed) {
-                        dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+                        conversationService.finalizeStalledRun(tenantId, input.getRunId());
+                    if (!limits.creditsMode()) {
+                        for (org.dromara.assistant.domain.DcsAssistantRun row : closed) {
+                            dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+                        }
                     }
                     throw new ServiceException("这张计划卡已经处理过了，请刷新后再试", 409);
                 }

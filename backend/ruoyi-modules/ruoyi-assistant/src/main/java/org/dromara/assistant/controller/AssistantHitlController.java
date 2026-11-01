@@ -8,6 +8,7 @@ import org.dromara.assistant.mapper.AssistantRunMapper;
 import org.dromara.assistant.persist.AssistantPendingInterruptCache;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,7 +47,9 @@ public class AssistantHitlController extends BaseController {
     @SaCheckPermission("dcs:assistant:use")
     @GetMapping("/pending")
     public R<List<PendingHitlVo>> pending(@RequestParam String threadId) {
-        String tenantId = LoginHelper.getTenantId();
+        // 三审回修（dspro-P1-1 旁证）：租户取动态值，与 conversation/stop 等端点同源——
+        // 超管切租户后登录快照仍是原租户，用快照查 run 表恒空=恒 403（新增的 409 分支也不可达）
+        String tenantId = TenantHelper.getTenantId();
         Long userId = LoginHelper.getUserId();
         // 归属校验：run 表首绑登记（thread 无任何当前用户 run=非本人会话，403）
         var latest = runMapper.selectByThread(tenantId, threadId, userId, 1);

@@ -284,7 +284,12 @@ public class AssistantPlanSignal {
         }
         PendingState local = pending.get(threadId);
         if (valid(local) && ownerMatches(local, tenantId, userId) && planMatches(local, planId)) {
-            pending.remove(threadId);
+            // 三审回修（glm53-P2-4）：local 模式没有 Redis 的 Lua 原子性，get→remove 之间
+            // 两个标签页同毫秒抢点会双双成功。按 remove 返回的实例比对，只有真正摘到
+            // 自己看到的那份 pending 才算消费成功（被并发替换/抢走则返回 false）。
+            if (pending.remove(threadId) != local) {
+                return false;
+            }
             rememberDecision(threadId, local.planId(), decision);
             if (sharedWrites()) {
                 try {

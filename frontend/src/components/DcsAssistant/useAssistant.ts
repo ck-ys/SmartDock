@@ -1173,6 +1173,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   function applyPlanStatus(planId: string, status: 'confirmed' | 'cancelled' | 'adjusted' | 'expired') {
     for (const t of state.turns) {
       if (t.plan?.planId === planId) {
+        // 三审回修（dsflash-P2-5）：模型确认后重新 submit_plan 时，thread 里会出现新 planId，
+        // 旧卡轮询会拿到「不匹配→expired」；已经确认/取消的卡不能被降级覆写成“已过期”。
+        if (status === 'expired' && (t.plan.status === 'confirmed' || t.plan.status === 'cancelled')) {
+          continue;
+        }
         t.plan.status = status;
       }
     }
@@ -1473,6 +1478,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // 有未处理的确认时禁止新消息——发新轮会冲掉服务端 interrupt，
     // 停靠区只能确认或取消（输入框此时已收起，这里挡快捷问/主动卡/程序化入口）
     if (hasPendingHitl()) {
+      // 三审回修（dsflash-P2-3）：消息被拦下没发出去，计划卡意图不能留到下一次发送
+      // （否则一条无关提问会带着 confirm+planId 把计划闸消费掉）
+      planDecisionNext = null;
+      editPlanId = undefined;
       toast('请先确认或取消上面的操作，再继续提问', 'info');
       return;
     }
