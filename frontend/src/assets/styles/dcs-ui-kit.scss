@@ -523,8 +523,9 @@ html.density-compact {
    2026-11-01 Q7=乙：视觉一寸不改，把可点范围撑到 32×32。
    文字按钮/链接的文字本身只有 17–20px 高，手指点不中会误触旁边的「删除」；
    用透明的 ::after 撑开命中区（伪元素属于元素自身，点击照常触发）。
-   只在 ≤992 生效：桌面用鼠标，不需要，也不该让热区互相压住。 */
-@media (max-width: 992px) {
+   生效范围：≤992 的手机/平板档，以及任何「粗指针」设备（平板横屏、触屏本）——
+   按宽度分流会漏掉 iPad 横屏这类触屏大屏（Q7 深挖席 P2-3）；鼠标设备不受影响。 */
+@media (max-width: 992px), (pointer: coarse) {
   .el-button.is-link,
   .el-button.is-text,
   .el-link {
@@ -533,7 +534,7 @@ html.density-compact {
 
   .el-button.is-link::after,
   .el-button.is-text::after,
-  .el-link::after {
+  .el-link:not(.is-underline)::after {
     content: '';
     position: absolute;
     /* 竖向固定外扩 8px（16px 文字 → 32 高，图标按钮 20 → 36）。
@@ -560,21 +561,25 @@ html.density-compact {
     overflow: visible;
   }
 
-  /* 表格行勾选框 14×14：标签外包一层透明热区，点勾选框附近也能选中 */
-  .el-checkbox__input {
-    position: relative;
-  }
-
+  /* 表格行勾选框 14×14：标签外包一层透明热区，点勾选框附近也能选中。
+     `.el-checkbox__input` 的 position:relative 由 Element 自带，不再重复声明 */
   .el-checkbox__input::before {
     content: '';
     position: absolute;
     inset: -9px;
   }
 
-  /* 分页在手机档用 small 尺寸（24px），同样补到 32 */
-  .el-pagination .btn-prev,
-  .el-pagination .btn-next,
-  .el-pagination .el-pager li {
+  /* 树节点的勾选框左边紧贴展开箭头：热区不往左扩。
+     否则点箭头右缘 1/4 会变成「勾选/取消」——角色权限树默认父子联动，一次误触动一整枝（Q7 深挖席 P1） */
+  .el-tree .el-checkbox__input::before {
+    inset: -9px -9px -9px 0;
+  }
+
+  /* 分页默认尺寸本来就是 32（Element 默认值），只有 small 档是 24——
+     只补 small，别重复声明默认值（Q7 深挖席 P2-1：原来那条是空转） */
+  .el-pagination--small .btn-prev,
+  .el-pagination--small .btn-next,
+  .el-pagination--small .el-pager li {
     min-width: 32px;
     height: 32px;
     line-height: 32px;
