@@ -57,6 +57,8 @@ public class AssistantConversationController extends BaseController {
     private final org.dromara.assistant.core.AssistantRunStreamHub runStreamHub;
     /** 题12 案1：结构化反问桥——停止生成时释放该线程挂起卡（工具线程不空等 240s） */
     private final org.dromara.assistant.core.AssistantAskUserBridge askUserBridge;
+    /** ②（2026-10-31）：计划卡取消立即解锁——点「取消」当场清闸的信号仓 */
+    private final org.dromara.assistant.core.AssistantPlanSignal planSignal;
 
     /**
      * B 批题5「续看」（2026-10-27 拍板 甲案）：刷新/掉线后重新挂上进行中的回答流。
@@ -270,6 +272,55 @@ public class AssistantConversationController extends BaseController {
         // 不释放的话：卡片留在屏上、作答端点还能「成功」，但 run 已终局=答案被静默吞掉
         askUserBridge.cancelThread(tenantId, userId, threadId);
         return R.ok();
+    }
+
+    /**
+     * ②（2026-10-31 拍板）：计划卡取消立即解锁。原先点「取消」只收卡，服务端清闸要等
+     * 下一条消息带 planDecision=cancel——用户取消后立刻让助手做写操作会被硬拒到下一条消息
+     * 才放开。本端点点「取消」当场清闸；幂等（无 pending=无事发生恒 R.ok），失败兜底链路
+     * （下一条消息 planDecision）原样保留。
+     *
+     * <p>归属三路：他租户/不存在=no-op R.ok（不暴露会话存在性）；同租户异主=403 人话；
+     * 本人=清闸。会话行查找用动态优先租户（与 stop 同口径——超管切租户后会话行落动态租户）；
+     * 清闸 owner 的租户=登录快照（与 PlanTools submit 的 ToolIdentity.from 同源，超管
+     * 切换态下动态 B≠快照 A，用动态值 owner 匹配不上=清不掉）。</p>
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @RepeatSubmit(interval = 1000)
+    @Log(title = "AI助手-取消计划", businessType = BusinessType.OTHER)
+    @PostMapping("/plan/cancel")
+    public R<Void> cancelPlan(@RequestParam String threadId) {
+        DcsAssistantConversation conv = conversationService.conversationByThread(
+            TenantHelper.getTenantId(), threadId);
+        Long me = LoginHelper.getUserId();
+        PlanCancelAction action = planCancelAction(conv == null ? null : conv.getUserId(), me);
+        if (action == PlanCancelAction.FORBIDDEN) {
+            throw new org.dromara.common.core.exception.ServiceException("这个会话不是你的，不能操作", 403);
+        }
+        if (action == PlanCancelAction.CLEAR) {
+            // 清闸租户=登录快照（owner 三元组与 submit 同源，见方法 javadoc）
+            planSignal.clearPending(threadId, LoginHelper.getLoginUser().getTenantId(), me);
+        }
+        // NOOP（他租户 threadId / 不存在）与 CLEAR 都恒 R.ok——端点幂等，无 pending 也无事发生
+        return R.ok();
+    }
+
+    /** 取消计划归属决策三态（纯函数，单测锚点） */
+    public enum PlanCancelAction {
+        /** 会话行不存在（他租户 threadId / 未创建）——幂等 no-op，不清闸 */
+        NOOP,
+        /** 会话属于别人——403 拒绝 */
+        FORBIDDEN,
+        /** 本人会话——执行清闸 */
+        CLEAR
+    }
+
+    /** 归属决策纯函数：convOwner=null→NOOP；convOwner≠me→FORBIDDEN；本人→CLEAR */
+    public static PlanCancelAction planCancelAction(Long convOwner, Long me) {
+        if (convOwner == null) {
+            return PlanCancelAction.NOOP;
+        }
+        return convOwner.equals(me) ? PlanCancelAction.CLEAR : PlanCancelAction.FORBIDDEN;
     }
 
     /** 当前会话 TODO 清单（ZCode 对齐 Q2，批A：前端打开会话时恢复状态面板分区） */

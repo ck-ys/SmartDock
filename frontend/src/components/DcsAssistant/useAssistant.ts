@@ -18,7 +18,7 @@ import { ElMessageBox } from 'element-plus';
 import { readWebOn } from './webOnState';
 import { readSkillId } from './skillState';
 import { createAguiClient, type AguiClientOptions, type AguiTurnHandle } from '@/api/dcs/assistant/aguiClient';
-import { getPendingHitl, getConversationTodo, getFollowups, type PendingHitlItem } from '@/api/dcs/assistant';
+import { getPendingHitl, getConversationTodo, getFollowups, revokeAssistantAction, type PendingHitlItem } from '@/api/dcs/assistant';
 import type { AguiResume } from '@/api/dcs/assistant/types';
 import { humanizeAiError } from '@/utils/aiErrorText';
 import type { AguiHandlers, AguiMessage, AguiRunInput } from '@/api/dcs/assistant/types';
@@ -54,6 +54,8 @@ export const ACT: Record<string, string> = {
   // 题12（2026-10-31）：结构化反问卡（漏登记会英文直出 ask user）
   ask_user: '请用户选择',
   save_memory: '存记忆',
+  // 三批④（2026-11-01）：业务写工具落账本/完成通知卡显示用——漏登记会英文直出 dcs create task
+  dcs_create_task: '建任务',
   // ZCode 对齐 Q2 批A 引入（k3 P1-2 回修：漏登记致面板步骤行英文 todo write 直出）
   todo_write: '更新清单',
   // 批W1 写工具三件（2026-10-12）：同上漏登记=英文直出教训
@@ -66,14 +68,16 @@ export const ACT: Record<string, string> = {
   act_create_template: '创建模板'
 };
 
-/** 账本状态→中文（批I 账本两列：真实落库值 DONE/EXECUTING/FAILED/REJECTED/PENDING——
- * 会话页旧按不存在的 SUCCESS 判色永不命中+英文直出；admin 页与 session 页共用此表） */
+/** 账本状态→中文（批I 账本两列：真实落库值 DONE/EXECUTING/FAILED/REJECTED/PENDING/REVOKED——
+ *  会话页旧按不存在的 SUCCESS 判色永不命中+英文直出；admin 页与 session 页共用此表） */
 export const LOG_ST: Record<string, { label: string; type: 'success' | 'warning' | 'danger' | 'info' }> = {
   DONE: { label: '已完成', type: 'success' },
   EXECUTING: { label: '执行中', type: 'warning' },
   FAILED: { label: '失败', type: 'danger' },
   REJECTED: { label: '已拒绝', type: 'info' },
-  PENDING: { label: '待执行', type: 'info' }
+  PENDING: { label: '待执行', type: 'info' },
+  /** 三批④（2026-11-01）：完成卡撤回留痕行（审计页可见，业务对象已删） */
+  REVOKED: { label: '已撤回', type: 'info' }
 };
 export function logSt(status: string): { label: string; type: 'success' | 'warning' | 'danger' | 'info' } {
   return LOG_ST[status] ?? { label: status || '—', type: 'info' };
@@ -203,6 +207,11 @@ export interface AssistantTurn {
   /** 题12 案1：内置结构化反问卡（CUSTOM 'ask_user' 帧，run 内挂起随本回合走）；
    *  作答走独立端点，答完工具结果回到模型继续跑，过期本地收卡 */
   askUsers: import('@/api/dcs/assistant').AssistantAskUserCard[];
+  /** 三批④（2026-11-01）：全自动档完成通知卡（CUSTOM 'auto_done' 帧——仅 auto 档且
+   *  RUN_FINISHED 非 interrupt 收尾时后端按 run 查可撤行下发；save_memory/dcs_create_task
+   *  才有行）。id=动作账本行 id（撤回端点锚点）；卡片随回合内存态走——刷新后历史回放
+   *  不重放 CUSTOM 帧=卡片消失，属预期（对齐 plan/todo 帧口径）；撤回走 revokeAutoDone */
+  autoDone?: Array<{ id: string; toolName: string; summary?: string }>;
   /** 批5 Q7-3：LLM 生成的贴题追问（侧车异步回写消息行）；空=前端回退角色静态池 */
   followups?: string[];
   /** 自查回修：追问侧车三次拉取全部落空才置 true——「本轮未生成贴题追问」灰字只在这之后显示，
@@ -594,6 +603,26 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
   }
 
+  /**
+   * 三批④（2026-11-01）：完成卡撤回——调独立端点删业务对象（save_memory 删记忆行 /
+   * dcs_create_task 删 DRAFT 任务）+ 账本 REVOKED 留痕；成功移除该条+toast，
+   * 失败提示由 request 层统一弹后端人话（如「任务已发布或已推进，不能撤回」——
+   * 双弹教训 k3 P2），条目保留可看清失败原因。id 全局唯一跨回合安全移除。
+   */
+  async function revokeAutoDone(id: string) {
+    try {
+      await revokeAssistantAction(id);
+      for (const t of state.turns) {
+        if (t.autoDone?.length) {
+          t.autoDone = t.autoDone.filter((a) => a.id !== id);
+        }
+      }
+      toast('已撤回', 'ok');
+    } catch {
+      /* 失败 toast 交给 request 层（后端人话已弹）；此处只保住条目不误删 */
+    }
+  }
+
   function handlers(turn: AssistantTurn): AguiHandlers {
     return {
       // R3(2026-10-10 拍板A)：思考分段——START 到达即开新段（上一段已 done 才开，防重复 START 双段）；
@@ -839,6 +868,28 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           if (items.length > 0 && state.sending) {
             state.todoItems = items;
           }
+        } else if (name === 'auto_done' && value && typeof value === 'object') {
+          // 三批④（2026-11-01）：全自动完成通知——后端 RUN_FINISHED 非 interrupt 收尾时按 run
+          // 查可撤行下发；坏载荷忽略、按 id 去重（续看重放路径重复帧不双记）
+          const v = value as { items?: Array<{ id?: unknown; toolName?: unknown; summary?: unknown }> };
+          const items = (Array.isArray(v.items) ? v.items : [])
+            .filter((it) => it && typeof it.id === 'string' && it.id && typeof it.toolName === 'string' && it.toolName)
+            .slice(0, 10)
+            .map((it) => ({
+              id: String(it.id),
+              toolName: String(it.toolName),
+              summary: typeof it.summary === 'string' && it.summary ? it.summary : undefined
+            }));
+          if (items.length > 0) {
+            const seen = new Set((turn.autoDone ?? []).map((a) => a.id));
+            const merged = [...(turn.autoDone ?? [])];
+            for (const it of items) {
+              if (!seen.has(it.id)) {
+                merged.push(it);
+              }
+            }
+            turn.autoDone = merged;
+          }
         } else if (name === 'dcs-resume-truncated') {
           // 题5 续看溢出提示帧（后端 attach 首帧）：单轮事件超保留窗 4096——重放从中间
           // 开始，头部内容稍后从历史消息看全文（终态后轮询重开拉全量）
@@ -1071,6 +1122,17 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   /** 宿主取消计划卡时调用（下一次请求带上 cancel 解闸，避免写操作被关到 TTL） */
   function notePlanDecision(kind: 'confirm' | 'cancel' | 'adjust') {
     planDecisionNext = kind;
+  }
+  /**
+   * ②（2026-10-31）：点「取消」当场通知服务端清闸——不等下一条消息的 planDecision 兜底，
+   * 取消后立刻让助手做写操作即放行。fire-and-forget：失败静默（stop 同款），
+   * 收卡不被网络问题阻塞；兜底链路（notePlanDecision→下一条消息）原样保留。
+   */
+  function cancelPlanOnServer() {
+    if (!state.threadId) {
+      return;
+    }
+    import('@/api/dcs/assistant').then((m) => m.cancelAssistantPlan(state.threadId)).catch(() => {});
   }
   function takePlanDecision(): 'confirm' | 'cancel' | 'adjust' | null {
     const v = planDecisionNext;
@@ -2058,11 +2120,15 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     resumeStreamingPlaceholder,
     removeElicitationCard,
     removeAskUserCard,
+    /** 三批④：全自动完成卡撤回（TurnBlock 撤回按钮经 getAssistant 单例自治直达） */
+    revokeAutoDone,
     resumeSay,
     resolveHitl,
     setAutoLevel,
     /** 题8（三席回修）：宿主取消计划卡时上报，下一次请求带 planDecision=cancel 解闸 */
     notePlanDecision,
+    /** ②（2026-10-31）：宿主取消计划卡时当场清服务端闸（失败静默，planDecision 仍兜底） */
+    cancelPlanOnServer,
     queueEdit,
     queueGo,
     queueDrop,

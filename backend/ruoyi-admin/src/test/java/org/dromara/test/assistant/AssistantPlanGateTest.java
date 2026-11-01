@@ -27,21 +27,22 @@ class AssistantPlanGateTest {
         AssistantPlanSignal signal = new AssistantPlanSignal();
         assertFalse(signal.isPending("th-1"), "初始不在计划态");
 
-        signal.submit("th-1", "本周复核周报", List.of("汇总复核", "记住偏好", "出周报"));
+        // ②（2026-10-31）：submit/clearPending 补 owner 实参（tenantId+userId），断言语义不变
+        signal.submit("th-1", "000000", 1L, "本周复核周报", List.of("汇总复核", "记住偏好", "出周报"));
         assertTrue(signal.isPending("th-1"), "submit_plan 后进入待确认态");
         assertFalse(signal.isPending("th-2"), "其它线程不受影响（会话隔离）");
 
-        signal.clearPending("th-1");
+        signal.clearPending("th-1", "000000", 1L);
         assertFalse(signal.isPending("th-1"), "回合结束/确认后放开");
     }
 
     @Test
     void emptySubmitDoesNotArmGate() {
         AssistantPlanSignal signal = new AssistantPlanSignal();
-        signal.submit("th-3", null, List.of());
+        signal.submit("th-3", "000000", 1L, null, List.of());
         assertFalse(signal.isPending("th-3"), "空计划不置闸（submit_plan 自身会返回错误）");
-        signal.submit(null, "x", List.of("a"));
-        signal.submit(" ", "x", List.of("a"));
+        signal.submit(null, "000000", 1L, "x", List.of("a"));
+        signal.submit(" ", "000000", 1L, "x", List.of("a"));
         assertFalse(signal.isPending(null));
     }
 

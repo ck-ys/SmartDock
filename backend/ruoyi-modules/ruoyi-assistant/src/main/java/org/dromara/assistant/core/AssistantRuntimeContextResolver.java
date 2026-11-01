@@ -153,11 +153,14 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         AssistantWebSearchHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("webSearchEnabled"));
         // 题8 案1（三席回修）：计划待确认态靠用户动作解除——前端点「直接执行/改计划/取消」
         // 时随请求带 planDecision，这里清闸；不带=计划卡还挂着，写操作继续被硬拒（TTL 30 分钟兜底）
+        // ②（2026-10-31）：清闸 owner 必须用 user.getTenantId() 登录快照（与 PlanTools submit
+        // 的 ToolIdentity.from 同源）——不能用 resolveTenantId 的动态值：超管切换态下动态 B≠快照 A，
+        // owner 匹配不上=本人清不掉只剩 TTL。该路径上游 persistUserSide 异主 403 已挡，owner 属纵深防御
         if (input != null) {
             Object planDecision = input.getForwardedProp("planDecision");
             String pd = planDecision == null ? "" : String.valueOf(planDecision).trim().toLowerCase(java.util.Locale.ROOT);
             if ("confirm".equals(pd) || "cancel".equals(pd) || "adjust".equals(pd)) {
-                planSignal.clearPending(aguiThreadId);
+                planSignal.clearPending(aguiThreadId, user.getTenantId(), userId);
             }
         }
         // 题9 案1：自主权档位逐请求上行（always/once/auto；非法值回落 always，不能靠伪造参数放宽）

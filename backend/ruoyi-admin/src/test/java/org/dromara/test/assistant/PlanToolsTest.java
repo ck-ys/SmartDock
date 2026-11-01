@@ -71,8 +71,9 @@ class PlanToolsTest {
     @Test
     void signalStoreRejectsBlankThreadAndDrainsIsolated() {
         AssistantPlanSignal signal = new AssistantPlanSignal();
-        signal.submit(null, "t", java.util.List.of("a"));
-        signal.submit("  ", "t", java.util.List.of("a"));
+        // ②（2026-10-31）：submit 补 owner 实参（tenantId+userId），断言语义不变
+        signal.submit(null, "000000", 1L, "t", java.util.List.of("a"));
+        signal.submit("  ", "000000", 1L, "t", java.util.List.of("a"));
         assertNull(signal.take(null));
         assertNull(signal.take("thread-x"), "无记录返回 null");
     }
@@ -81,7 +82,7 @@ class PlanToolsTest {
     void enricherPlanFrameShapeMatchesFrontendContract() {
         // 前端 onCustom('plan') 契约：steps=[{label:string, state}]，title 可缺省
         AssistantPlanSignal signal = new AssistantPlanSignal();
-        signal.submit("thread-4", "计划", java.util.List.of("a", "b"));
+        signal.submit("thread-4", "000000", 1L, "计划", java.util.List.of("a", "b"));
         AssistantPlanSignal.PlanPayload p = signal.take("thread-4");
         java.util.List<java.util.Map<String, String>> steps = new java.util.ArrayList<>();
         for (String s : p.steps()) {

@@ -650,6 +650,8 @@ function onPlanCancel() {
   // 题8（三席回修）：取消也是明确动作——下一次请求带 planDecision=cancel 解闸，
   // 否则后端硬闸要等 30 分钟 TTL 才放开写操作
   getAssistant(userStore.userId).notePlanDecision('cancel');
+  // ②（2026-10-31）：当场打清闸端点立即解闸，不等下一条消息；失败静默（上面的兜底仍有效）
+  getAssistant(userStore.userId).cancelPlanOnServer();
 }
 
 function onNewSession() {

@@ -60,7 +60,8 @@ public class PlanTools {
         if (parsed.size() > MAX_STEPS) {
             parsed = new java.util.ArrayList<>(parsed.subList(0, MAX_STEPS));
         }
-        planSignal.submit(aguiThreadId, title, parsed);
+        // owner 记 ToolIdentity 的登录快照租户（2026-10-31 ②：清闸路端点/resolver 同源比对）
+        planSignal.submit(aguiThreadId, identity.getTenantId(), identity.getUserId(), title, parsed);
         out.put("status", "OK");
         out.put("stepCount", parsed.size());
         out.put("message", "计划卡已展示给用户（" + parsed.size() + " 步）。本轮到此收尾：用一句话告诉用户"

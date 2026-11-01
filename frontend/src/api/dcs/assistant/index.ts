@@ -3,7 +3,7 @@
  * AssistantStatusController / AssistantConversationController / AssistantFeedbackController。
  * 全部走 utils/request.ts（鉴权/防重/错误 toast 统一）。
  */
-import request from '@/utils/request';
+import request, { download } from '@/utils/request';
 
 /** 悬浮球出现条件+今日概况数据源（G1 status 端点；灰球=enabled 无模型） */
 export interface AssistantStatus {
@@ -448,6 +448,53 @@ export function listActionLog(params?: {
 }) {
   return request({ url: '/dcs/assistant/action/log', method: 'get', params });
 }
+
+/* ============ 三批③（2026-11-01）：写操作审计（独立菜单页，动作账本四维查询/CSV 导出） ============ */
+
+/** 审计行 = 运行记录行 + 放行方式/操作人 id（args_json 不出网） */
+export interface AssistantActionAuditRow extends AssistantActionLogRow {
+  /** confirm=确认卡放行 / once=同类已确认 / auto=全自动 / allow=平台放行；REJECTED 行与历史行为空（页面显示「—」） */
+  releaseMode?: string;
+  userId?: number | string;
+}
+
+/** 写操作审计分页（perm=dcs:assistant:audit:query；keyword=成员昵称模糊，toolName/releaseMode 精确，时间闭区间） */
+export function pageAssistantActionAudit(params: {
+  pageNum?: number;
+  pageSize?: number;
+  keyword?: string;
+  toolName?: string;
+  releaseMode?: string;
+  beginTime?: string;
+  endTime?: string;
+}) {
+  return request<{ rows: AssistantActionAuditRow[]; total: number }>({
+    url: '/dcs/assistant/action/audit/page',
+    method: 'get',
+    params
+  });
+}
+
+/** 写操作审计 CSV 导出（与分页同筛选口径；列=时间/成员/工具/放行方式/状态/结果摘要，无工具参数） */
+export function exportAssistantActionAudit(params: {
+  keyword?: string;
+  toolName?: string;
+  releaseMode?: string;
+  beginTime?: string;
+  endTime?: string;
+}) {
+  const day = new Date().toISOString().slice(0, 10);
+  return download('/dcs/assistant/action/audit/export', params, `助手写操作审计-${day}.csv`);
+}
+
+/* ============ 三批④（2026-11-01）：全自动完成卡撤回（删业务对象 + 账本 REVOKED 留痕） ============ */
+
+/** 撤回 AI 自动执行的操作（perm=dcs:assistant:use，仅本人行——save_memory 删记忆行 /
+ *  dcs_create_task 删 DRAFT 任务；已发布任务后端 CAS 拒绝回人话）。
+ *  id=动作账本行雪花 id（19 位超 JS 安全整数，字符串承载，后端 Long.parseLong 承接）。 */
+export function revokeAssistantAction(id: string) {
+  return request({ url: '/dcs/assistant/action/revoke', method: 'post', data: { id } });
+}
 /** 二站④ AU-53：本人长期记忆（记忆页真数据；memory:manage 权限） */
 export interface AssistantMemoryRow {
   id: number | string;
@@ -525,6 +572,12 @@ export function removeAssistantFavorite(content: string) {
 /** G1 乙类#5：停止生成=服务端真取消（定向 interrupt 在跑 run；断连不打断不受影响） */
 export function stopAssistantRun(threadId: string) {
   return request({ url: '/dcs/assistant/conversation/stop', method: 'post', params: { threadId } });
+}
+
+/** ②（2026-10-31）：计划卡点「取消」当场清闸（幂等，无 pending 也 R.ok）——
+ *  原先要等下一条消息带 planDecision=cancel 才解闸，取消后立刻让助手做写操作会被硬拒 */
+export function cancelAssistantPlan(threadId: string) {
+  return request({ url: '/dcs/assistant/plan/cancel', method: 'post', params: { threadId } });
 }
 
 /** 二站-B 悬挂确认卡视图（换设备/刷新后重建 turn.hitl；空数组=无悬挂不重建） */
