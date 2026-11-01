@@ -120,37 +120,17 @@
         </div>
       </div>
 
-      <!-- ============ 能力：体检条 + 能力清单 + 外部服务（技能库/总纲收成底部出口） ============ -->
+      <!-- ============ 能力：一条控制台（工具栏 + 表格 + 行内改档 + 勾选批量 + 底部出口） ============ -->
       <div v-show="tab === 'caps'" v-if="canConfig" class="adm-pane">
-        <!-- 体检条：先说「现在合不合规」，策略入口只在最右端（告警=一键收紧，无事=一键推荐） -->
-        <div v-if="capOpenHigh.length" class="cap-health">
-          <span class="ch-dot"></span>
-          <b class="ch-lead">{{ capOpenHigh.length }} 项高危能力对全员开放</b>
-          <span class="ch-names">
-            <button v-for="r in capOpenHigh" :key="r.key" type="button" @click="openCapDetail(r)">{{ r.displayName }}</button>
-          </span>
-          <span class="acts">
-            <el-button size="small" @click="openPreset('conservative')">一键收紧</el-button>
-          </span>
-        </div>
-        <div v-else class="cap-health ok2">
-          <span class="ch-dot"></span>
-          <span class="ch-lead">
-            {{ capOvDraftCount ? `已收紧 ${capOvDraftCount} 项 · 其余跟随平台默认` : '能力全部跟随平台默认' }}
-          </span>
-          <span class="acts">
-            <el-button link size="small" class="health-link" @click="openPreset('standard')">一键推荐</el-button>
-          </span>
-        </div>
-
-        <section class="adm-sec">
-          <div class="sec-head">
-            <div class="sec-ttl">
-              <b>能力清单</b>
-              <span class="sec-cnt">{{ capAvailCount }} 项</span>
-              <span class="sec-note">另有 {{ tgRows.length - capAvailCount }} 项因配置未开暂不出现（见下方折叠区）</span>
+        <section class="adm-sec cap-card">
+          <!-- 工具栏：位置永远固定（搜能力 / 按角色看 / 只看高危 / 一键收紧） -->
+          <div class="cap-bar">
+            <div class="cap-bar-ttl">
+              <b>能力</b>
+              <span class="cap-bar-cnt">{{ capAvailCount }} 项<template v-if="capHighCount"> · {{ capHighCount }} 项高危</template></span>
             </div>
-            <div class="sec-acts">
+            <div class="cap-bar-tools">
+              <el-input v-model="capQuery" class="cap-search" size="small" clearable placeholder="搜能力名" />
               <div class="cap-lens" role="group" aria-label="按角色看">
                 <button
                   v-for="p in CAP_LENS"
@@ -163,56 +143,112 @@
                 </button>
               </div>
               <el-checkbox v-model="capHighOnly" label="只看高危" size="small" />
+              <el-button size="small" @click="openPreset(capOpenHigh.length ? 'conservative' : 'standard')">
+                {{ capOpenHigh.length ? '一键收紧' : '一键推荐' }}
+              </el-button>
             </div>
           </div>
 
-          <div class="cap-note">
-            <template v-if="capLens === 'all'">
-              「谁能用」是门槛：选中这个角色，以及比它更高的角色都能用；只能收紧，不能放宽。点一行就能改。
+          <!-- 体检一句话：合规状态先说，处理动作在工具栏右端（不再单独占一条色带） -->
+          <div class="cap-health" :class="{ ok2: !capOpenHigh.length }">
+            <span class="ch-dot"></span>
+            <template v-if="capOpenHigh.length">
+              <b class="ch-lead">{{ capOpenHigh.length }} 项高危能力对全员开放</b>
+              <span class="ch-names">
+                <button v-for="r in capOpenHigh" :key="r.key" type="button" @click="openCapDetail(r)">{{ r.displayName }}</button>
+              </span>
             </template>
-            <template v-else>
-              正在以「{{ capLensName }}」的身份看：✓ 是能用的行，× 写了它需要的最低角色；暗掉的行这个角色用不到。
-            </template>
+            <span v-else class="ch-lead">
+              {{ capOvDraftCount ? `已收紧 ${capOvDraftCount} 项 · 其余跟随平台默认` : '能力全部跟随平台默认' }}
+            </span>
+            <span class="sp" />
+            <span class="ch-hint">保存后对下一轮新会话生效</span>
           </div>
 
           <div v-if="!tgLoading && tgRows.length === 0" class="cap-empty">能力清单加载失败——切换页签重试</div>
 
           <div v-if="capGroups.length" class="cap-tbl">
-            <div class="cap-thead"><span>能力</span><span>风险</span><span>谁能用</span><span></span></div>
+            <div class="cap-thead">
+              <el-checkbox
+                class="cap-cb"
+                :model-value="capAllSel"
+                :indeterminate="capSomeSel"
+                aria-label="全选当前可见能力"
+                @change="toggleCapAll"
+              />
+              <span>能力</span>
+              <span>出现条件</span>
+              <span>风险</span>
+              <span>谁能用<span class="th-tip">（点一下就能改）</span></span>
+              <span>本租户</span>
+              <span class="th-det">详情</span>
+            </div>
             <template v-for="g in capGroups" :key="g.name">
               <div class="cap-ghead">
                 <b>{{ g.name }}</b>
                 <span class="n">{{ g.rows.length }} 项</span>
                 <span class="hint">{{ CAP_GROUP_HINT[g.name] || '' }}</span>
               </div>
-              <div
-                v-for="row in g.rows"
-                :key="row.key"
-                class="cap-row"
-                :class="{ closed: capLevelOf(row, tgDraft) < 0, dim: capLensDim(row) }"
-                tabindex="0"
-                @click="openCapDetail(row)"
-                @keydown.enter="openCapDetail(row)"
-              >
-                <div class="cap-name">
-                  <b>{{ row.displayName }}</b>
-                  <span class="cap-sub">{{ capSub(row) }}</span>
+              <template v-for="row in g.rows" :key="row.key">
+                <div
+                  class="cap-row"
+                  :class="{ closed: capLevelOf(row, tgDraft) < 0, dim: capLensDim(row), sel: capSel.has(row.key) }"
+                  tabindex="0"
+                  @click="openCapDetail(row)"
+                  @keydown="onCapRowKey($event, row)"
+                >
+                  <el-checkbox
+                    class="cap-cb"
+                    :model-value="capSel.has(row.key)"
+                    :aria-label="`选择 ${row.displayName}`"
+                    @click.stop
+                    @change="toggleCapSel(row)"
+                  />
+                  <div class="cap-name"><b>{{ row.displayName }}</b></div>
+                  <div class="cap-cond" :title="capSub(row)">{{ capSub(row) }}</div>
+                  <div class="cap-risk">
+                    <span v-if="row.riskLevel !== 'low'" class="risk-badge" :class="row.riskLevel">{{ RISK_LABEL[row.riskLevel] }}</span>
+                    <span v-else class="lowdot" role="img" aria-label="低危" title="低危" />
+                  </div>
+                  <div class="cap-gate">
+                    <button
+                      type="button"
+                      class="gate-btn"
+                      :class="{ 'gate-no': capLensDim(row), 'gate-off': capLevelOf(row, tgDraft) < 0 }"
+                      :aria-expanded="capOpenGate === row.key"
+                      :aria-label="`${row.displayName}的可用范围：${capGateText(row)}，点开可以改`"
+                      @click.stop="toggleCapGate(row)"
+                    >
+                      {{ capGateText(row) }}<span class="car">▾</span>
+                    </button>
+                  </div>
+                  <div class="cap-own" :class="{ chg: capRowValue(row) !== 'default' }">{{ capOwnText(row) }}</div>
+                  <div class="cap-det" @click.stop="openCapDetail(row)">查看 ›</div>
                 </div>
-                <div class="cap-risk">
-                  <span v-if="row.riskLevel !== 'low'" class="risk-badge" :class="row.riskLevel">{{ RISK_LABEL[row.riskLevel] }}</span>
-                  <span v-else class="lowrisk">低危</span>
+                <div v-if="capOpenGate === row.key" class="cap-x">
+                  <span class="lbl">改成</span>
+                  <button
+                    v-for="o in capOptionsFor(row)"
+                    :key="o.key"
+                    type="button"
+                    class="xopt"
+                    :class="{ on: o.key === capRowValue(row), dis: o.disabled }"
+                    :disabled="o.disabled"
+                    @click.stop="pickCapOption(row, o)"
+                  >
+                    {{ o.label }}<span v-if="o.key === capRowValue(row)" class="cur">（当前）</span>
+                  </button>
+                  <span class="kbd">选完即收起；点底部「保存」才生效</span>
                 </div>
-                <div class="cap-gate">
-                  <span v-if="capLevelOf(row, tgDraft) < 0" class="g-closed">已关闭</span>
-                  <span v-else-if="capLens === 'all'" class="g-lv">{{ LEVEL_LABEL[capLevelOf(row, tgDraft)] }}</span>
-                  <span v-else-if="capLensDim(row)" class="g-no">× 需{{ LEVEL_LABEL[capLevelOf(row, tgDraft)] }}</span>
-                  <span v-else class="g-yes">✓ 可用</span>
-                </div>
-                <span class="cap-chev">›</span>
-              </div>
+              </template>
             </template>
           </div>
-          <div v-else-if="tgRows.length" class="cap-empty">没有符合条件的能力</div>
+          <!-- 有清单但筛空才说「没有符合条件」；清单本身为空时以上一条「加载失败」为准，不再两句同屏 -->
+          <div v-else-if="tgRows.length && !tgLoading" class="cap-empty">没有符合条件的能力</div>
+
+          <div v-if="capLens !== 'all'" class="cap-note">
+            正在以「{{ capLensName }}」的身份看：✓ 是能用的行，× 写了它需要的最低角色；暗掉的行这个角色用不到。
+          </div>
 
           <div class="cap-foot">
             <span>{{ capOvSavedCount ? `已保存 ${capOvSavedCount} 处覆盖` : '全部跟随平台默认' }}</span>
@@ -240,25 +276,46 @@
             业务工具（查任务、查待办、待审列表、建任务等）不在这张表里——它们由角色菜单权限控制，见「系统管理 → 角色管理」。
           </div>
 
-          <div v-if="tgDirty" class="cap-save">
-            <span>有 <b>{{ tgDirtyCount }}</b> 项未保存改动，保存后对下一轮新会话生效</span>
-            <el-button size="small" :disabled="tgSaving" @click="resetToolGate">放弃改动</el-button>
-            <el-button size="small" type="primary" :loading="tgSaving" @click="onSaveToolGate">保存 {{ tgDirtyCount }} 项</el-button>
+          <!-- 底部出口：低频编辑区不再各占一段，点开在下方展开 -->
+          <div class="cap-exits">
+            <span class="ex-lb">更多</span>
+            <button type="button" @click="openCapMore('svc')">外部服务 <b>{{ mcpRows.length }}</b></button>
+            <button type="button" @click="openCapMore('skill')">技能库 <b>{{ skillRows.length }}</b></button>
+            <button type="button" @click="openCapMore('pano')">行为总纲 <b>{{ panoSegments.length }} 段</b></button>
+          </div>
+
+          <!-- 底部吸附区：勾选批量与未保存改动都停在这里，滚到哪都看得见（不遮表格内容） -->
+          <div v-if="capSel.size || tgDirty" class="cap-dock">
+            <div v-if="capSel.size" class="cap-batch">
+              <span class="n">已选 <b>{{ capSel.size }}</b> 项</span>
+              <el-button size="small" @click="batchCapSet('admin')">批量收紧</el-button>
+              <el-button size="small" @click="batchCapSet('off')">批量关闭</el-button>
+              <el-button link size="small" @click="clearCapSel">清除选择</el-button>
+              <span class="kbd">↑↓ 移动 · 回车看详情 · 空格勾选</span>
+            </div>
+            <div v-if="tgDirty" class="cap-save">
+              <span>有 <b>{{ tgDirtyCount }}</b> 项未保存改动，保存后对下一轮新会话生效</span>
+              <el-button size="small" :disabled="tgSaving" @click="resetToolGate">放弃改动</el-button>
+              <el-button size="small" type="primary" :loading="tgSaving" @click="onSaveToolGate">保存 {{ tgDirtyCount }} 项</el-button>
+            </div>
           </div>
         </section>
 
-        <section class="adm-sec">
-          <div class="sec-head">
+        <section class="adm-sec cap-fold cap-more cap-more-svc" :class="{ open: mcpOpen }">
+          <div class="sec-head cap-fold-head" @click="mcpOpen = !mcpOpen">
+            <span class="fold-arr">▶</span>
             <div class="sec-ttl">
               <b>外部服务</b>
               <span class="sec-cnt">{{ mcpRows.length }} 个</span>
+              <span class="sec-note">只读的 MCP 服务；挂上之后它带来的能力才会出现在上面的清单里</span>
             </div>
-            <div class="sec-acts">
+            <div class="sec-acts" @click.stop>
               <el-button size="small" type="primary" @click="openMcpForm()">注册服务</el-button>
             </div>
           </div>
+          <div v-show="mcpOpen" class="cap-fold-body">
           <div class="cap-note">
-            只读的外部 MCP 服务：挂上之后它带来的能力才会出现在上面的清单里；服务停用或离线时，那一组能力整体消失。改动对下一轮新会话生效。
+            服务停用或离线时，那一组能力整体消失。改动对下一轮新会话生效。
           </div>
           <div v-loading="mcpLoading" class="svc-list">
             <div v-for="row in mcpRows" :key="row.id" class="svc-line" :class="{ off: row.enabled !== '1' }">
@@ -277,10 +334,11 @@
             </div>
             <div v-if="!mcpRows.length && !mcpLoading" class="cap-empty">还没有注册外部服务</div>
           </div>
+          </div>
         </section>
 
         <!-- ============ 5b 批：技能库（低频编辑区，默认收起，标题即出口） ============ -->
-        <section class="adm-sec cap-fold" :class="{ open: skillOpen }">
+        <section class="adm-sec cap-fold cap-more cap-more-skill" :class="{ open: skillOpen }">
           <div class="sec-head cap-fold-head" @click="skillOpen = !skillOpen">
             <span class="fold-arr">▶</span>
             <div class="sec-ttl">
@@ -412,7 +470,7 @@
           </div>
         </section>
 
-        <section class="adm-sec cap-fold" :class="{ open: panoOpen }">
+        <section class="adm-sec cap-fold cap-more cap-more-pano" :class="{ open: panoOpen }">
           <div class="sec-head cap-fold-head" @click="panoOpen = !panoOpen">
             <span class="fold-arr">▶</span>
             <div class="sec-ttl">
@@ -2965,6 +3023,14 @@ const tgSaved = ref<Record<string, string>>({});
 /** 草稿覆盖——保存时整份提交（后端全量覆盖语义，空表=全恢复默认） */
 const tgDraft = ref<Record<string, string>>({});
 const capHighOnly = ref(false);
+/** 搜能力名（2026-11-01 丁案）：匹配显示名 / 出现条件 / 分组名，三个字就能缩小范围 */
+const capQuery = ref('');
+/** 勾选批量：存 row.key（toolNames.join('/')），重载清单时清空避免留陈旧键 */
+const capSel = ref<Set<string>>(new Set());
+/** 行内改档：当前展开的那一行（同一时刻只开一条，不遮别的行） */
+const capOpenGate = ref<string | null>(null);
+/** 底部出口（外部服务）与技能库/总纲同一个折叠口径，默认收起 */
+const mcpOpen = ref(false);
 /** 按角色看：全部 / 成员 / 发布人 / 管理员。只换「谁能用」那一列的读法，不另起一套版式 */
 const capLens = ref<'all' | '0' | '1' | '2'>('all');
 const CAP_LENS = [
@@ -3016,11 +3082,15 @@ function setRowValue(row: TgRowUi, v: string) {
 const CAP_CAT_GROUP: Record<string, string> = { 查询: '平台工具', 交互: '平台工具', 技能: '技能', 外部工具: '挂进来的外部服务' };
 const capGroups = computed<CapGroup[]>(() => {
   const order = ['平台工具', '技能', '挂进来的外部服务'];
+  const q = capQuery.value.trim().toLowerCase();
   const map = new Map<string, TgRowUi[]>();
   for (const r of tgRows.value) {
     if (!capAvailable(r)) continue;
     if (capHighOnly.value && r.riskLevel !== 'high') continue;
     const name = CAP_CAT_GROUP[r.category] ?? r.category;
+    // 搜名字 / 出现条件 / 分组名：拼的是列里真正显示的那句话（capSub），
+    // 否则用户照着屏幕搜「只读」「自动执行」会搜不到，看起来像坏了
+    if (q && !`${r.displayName} ${capSub(r)} ${name}`.toLowerCase().includes(q)) continue;
     const list = map.get(name) ?? [];
     list.push(r);
     map.set(name, list);
@@ -3031,6 +3101,9 @@ const capGroups = computed<CapGroup[]>(() => {
   }
   return out;
 });
+/** 当前可见的全部行（全选/键盘上下都按这个顺序走，和屏幕上看到的一致） */
+const capFlatRows = computed<TgRowUi[]>(() => capGroups.value.flatMap((g) => g.rows));
+const capHighCount = computed(() => tgRows.value.filter((r) => r.riskLevel === 'high' && capAvailable(r)).length);
 
 /** 出现条件（人话）：配置没开/服务没起时说清「当前不会出现」，别让管理员对着开关猜 */
 function capCondition(row: TgRowUi): string {
@@ -3048,7 +3121,7 @@ function capAvailable(row: TgRowUi): boolean {
   return !capCondition(row).includes('不会出现');
 }
 const capAvailCount = computed(() => tgRows.value.filter((r) => capAvailable(r)).length);
-/** 低危行不挂徽章（风险列已写「低危」），小字只交代什么时候出现 */
+/** 出现条件列的一句话（风险列低危只画灰点，这里的「只读」就是唯一文字说明） */
 function capSub(row: TgRowUi): string {
   const base = capCondition(row) || (row.askConfirm ? '执行前会弹确认卡' : '自动执行');
   return row.riskLevel === 'low' ? `${base} · 只读` : base;
@@ -3062,6 +3135,117 @@ function capLensDim(row: TgRowUi): boolean {
 const capLensName = computed(() => CAP_LENS.find((p) => p.v === capLens.value)?.label ?? '全部');
 function capGroupName(row: TgRowUi): string {
   return CAP_CAT_GROUP[row.category] ?? row.category;
+}
+/** 「谁能用」单元格文案：全部分角色读法都收在这一处，模板里不堆三元 */
+function capGateText(row: TgRowUi): string {
+  const lv = capLevelOf(row, tgDraft.value);
+  if (lv < 0) return '已关闭';
+  if (capLens.value === 'all') return LEVEL_LABEL[lv] ?? '';
+  return capLensDim(row) ? `× 需${LEVEL_LABEL[lv]}` : '✓ 可用';
+}
+/** 「本租户」列：说清这一行是跟着平台、还是本租户收紧/关掉了 */
+function capOwnText(row: TgRowUi): string {
+  const v = capRowValue(row);
+  return v === 'off' ? '已关闭' : v === 'admin' ? '已收紧' : '跟随平台';
+}
+/** 行内改档开合：同一时刻只开一条；点行本身仍然进抽屉看详情 */
+function toggleCapGate(row: TgRowUi) {
+  capOpenGate.value = capOpenGate.value === row.key ? null : row.key;
+}
+/** 行内选档：只改草稿，等底部保存才落库（与抽屉同一套草稿语义） */
+function pickCapOption(row: TgRowUi, o: { key: 'default' | 'admin' | 'off'; disabled?: boolean }) {
+  if (o.disabled || tgSaving.value) return;
+  setRowValue(row, o.key);
+  capOpenGate.value = null;
+}
+/* ===== 勾选批量（2026-11-01 丁案）：勾几行一起收紧/关闭，仍然只改草稿 ===== */
+function toggleCapSel(row: TgRowUi) {
+  const next = new Set(capSel.value);
+  if (next.has(row.key)) next.delete(row.key);
+  else next.add(row.key);
+  capSel.value = next;
+}
+function clearCapSel() {
+  capSel.value = new Set();
+}
+const capAllSel = computed(() => capFlatRows.value.length > 0 && capFlatRows.value.every((r) => capSel.value.has(r.key)));
+const capSomeSel = computed(() => !capAllSel.value && capFlatRows.value.some((r) => capSel.value.has(r.key)));
+/**
+ * 表头全选只动「当前可见」的行：先勾了 5 行再搜索，点全选不会把那 5 行静默丢掉
+ * （之前是整体替换，筛选一开就丢；计数又按全量算，两头语义打架）。
+ */
+function toggleCapAll() {
+  const next = new Set(capSel.value);
+  if (capAllSel.value) {
+    for (const r of capFlatRows.value) next.delete(r.key);
+  } else {
+    for (const r of capFlatRows.value) next.add(r.key);
+  }
+  capSel.value = next;
+}
+/** 批量改档：一次只算一份草稿，锁死/已是最严的行跳过并说清跳了几项 */
+function batchCapSet(kind: 'admin' | 'off') {
+  if (tgSaving.value) return; // 保存请求在飞时不再改草稿（否则新改动会被乐观标记成已保存）
+  const next = { ...tgDraft.value };
+  let changed = 0;
+  let skipped = 0;
+  for (const row of tgRows.value) {
+    if (!capSel.value.has(row.key)) continue;
+    // 已经不在清单里的行（服务停用/配置关了）不参与批量，避免改到看不见的能力
+    if (!capAvailable(row)) {
+      skipped++;
+      continue;
+    }
+    if (row.locked || (kind === 'admin' && row.builtinLevel >= 2)) {
+      skipped++;
+      continue;
+    }
+    // 已关闭比「仅管理员」更严：批量收紧不能把 off 反向放开
+    if (kind === 'admin' && capLevelOf(row, tgDraft.value) < 0) {
+      skipped++;
+      continue;
+    }
+    if (capRowValue(row) === kind) continue;
+    for (const n of row.toolNames) {
+      if (kind === 'off') next[n] = 'off';
+      else if (kind === 'admin') next[n] = 'admin';
+    }
+    changed++;
+  }
+  if (!changed) {
+    ElMessage.info(skipped ? `选中的 ${skipped} 项由代码强制或已是最严，没得改` : '选中的能力和当前一样，没有变化');
+    return;
+  }
+  tgDraft.value = next;
+  ElMessage.success(`已把 ${changed} 项加入待保存改动${skipped ? `（${skipped} 项跳过）` : ''}——点底部「保存」才生效`);
+}
+/** 键盘操作：↑↓ 换行、回车看详情、空格勾选（只在行本身聚焦时接管，子元素不抢） */
+function onCapRowKey(e: KeyboardEvent, row: TgRowUi) {
+  if (e.target !== e.currentTarget) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    openCapDetail(row);
+    return;
+  }
+  if (e.key === ' ' || e.key === 'Spacebar') {
+    e.preventDefault();
+    toggleCapSel(row);
+    return;
+  }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  const rows = [...(e.currentTarget as HTMLElement).closest('.cap-tbl')?.querySelectorAll<HTMLElement>('.cap-row') ?? []];
+  const i = rows.indexOf(e.currentTarget as HTMLElement);
+  rows[i + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
+}
+/** 底部出口：打开对应折叠区并滚过去（都是同一个页面里的低频编辑区） */
+function openCapMore(kind: 'svc' | 'skill' | 'pano') {
+  if (kind === 'svc') mcpOpen.value = true;
+  else if (kind === 'skill') skillOpen.value = true;
+  else panoOpen.value = true;
+  void nextTick(() => {
+    document.querySelector(`.cap-more-${kind}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 const CAP_GROUP_HINT: Record<string, string> = {
   平台工具: '会话里随时可用',
@@ -3207,18 +3391,19 @@ const capDraftKey = ref<'default' | 'admin' | 'off'>('default');
 function openCapDetail(row: TgRowUi) {
   capDetailRow.value = row;
   capDraftKey.value = capRowValue(row) as 'default' | 'admin' | 'off';
+  capOpenGate.value = null;
   capDetailOpen.value = true;
 }
 /**
  * 能选的档只有后端真支持的三种：跟随平台 / 仅管理员 / 关闭。
  * 内置档是「发布人及以上」时不给「成员」选项（effectiveMinRoleSingle 只升不降，给了就是假开关）。
+ * 抽屉与行内展开共用这一份（capOptionsFor），两处选项永远一致。
  */
-const capLevelOptions = computed(() => {
-  const row = capDetailRow.value;
-  type Opt = { key: 'default' | 'admin' | 'off'; label: string; desc: string; tag?: string; disabled?: boolean };
-  if (!row) return [] as Opt[];
+type CapOpt = { key: 'default' | 'admin' | 'off'; label: string; desc: string; tag?: string; disabled?: boolean };
+function capOptionsFor(row: TgRowUi | null): CapOpt[] {
+  if (!row) return [];
   const b = row.builtinLevel;
-  const opts: Opt[] = [
+  const opts: CapOpt[] = [
     {
       key: 'default',
       label: `跟随平台 · ${LEVEL_LABEL[b]}`,
@@ -3229,7 +3414,8 @@ const capLevelOptions = computed(() => {
   if (b < 2 && !row.locked) opts.push({ key: 'admin', label: '仅管理员', desc: '只有管理员能让助手做这件事' });
   if (!row.locked) opts.push({ key: 'off', label: '关闭这项能力', desc: '任何会话里都不会再出现' });
   return opts;
-});
+}
+const capLevelOptions = computed(() => capOptionsFor(capDetailRow.value));
 const capDrawerDirty = computed(() => !!capDetailRow.value && capDraftKey.value !== capRowValue(capDetailRow.value));
 const capDraftText = computed(() => {
   if (capDraftKey.value === 'off') return '本租户设为关闭';
@@ -3306,6 +3492,9 @@ async function loadToolGate() {
     }
     tgSaved.value = saved;
     tgDraft.value = { ...saved };
+    // 重载后旧的勾选键可能已经不存在（服务删了/能力改名），清掉免得批量改到看不见的行
+    capSel.value = new Set();
+    capOpenGate.value = null;
   } catch {
     // 具体错误 request 层已弹；失败态由页面空态文案兜底（切换页签可重试）
   } finally {
@@ -3316,10 +3505,14 @@ function resetToolGate() {
   tgDraft.value = { ...tgSaved.value };
 }
 async function onSaveToolGate(): Promise<boolean> {
+  // 快照必须在 await 之前取：请求在飞时用户又改了草稿，不能把没发出去的那份记成「已保存」（会静默丢改动）
+  const payload = { ...tgDraft.value };
   tgSaving.value = true;
   try {
-    await saveAssistantToolGate(tgDraft.value);
-    tgSaved.value = { ...tgDraft.value };
+    await saveAssistantToolGate(payload);
+    tgSaved.value = { ...payload };
+    // 保存成功即收掉批量勾选：这批动作已经提交，留着容易对同一批再点一次
+    capSel.value = new Set();
     ElMessage.success('已保存——下一轮新会话起生效');
     return true;
   } catch {
@@ -3590,11 +3783,14 @@ const skillDirty = computed(() => snapshotSkill() !== skillBaseline.value);
 function markSkillClean() {
   skillBaseline.value = snapshotSkill();
 }
-/** 未保存时确认离开：真离开返回 true，用户留下返回 false */
-async function confirmLeaveIfDirty(): Promise<boolean> {
-  if (!skillDirty.value) return true;
+/** 未保存时确认离开：真离开返回 true，用户留下返回 false。
+ *  page 模式把「能力权限草稿」也算进来（批量勾几行很容易攒下一堆没保存的改动）。 */
+async function confirmLeaveIfDirty(mode: 'skill' | 'page' = 'skill'): Promise<boolean> {
+  const dirty = mode === 'page' ? skillDirty.value || tgDirty.value : skillDirty.value;
+  if (!dirty) return true;
+  const what = skillDirty.value && tgDirty.value ? '技能编辑和能力权限改动都' : skillDirty.value ? '编辑内容还' : '能力权限改动还';
   try {
-    await ElMessageBox.confirm('编辑内容还没保存，离开会丢掉这些改动。', '有未保存的改动',
+    await ElMessageBox.confirm(`${what}没保存，离开会丢掉这些改动。`, '有未保存的改动',
       { type: 'warning', confirmButtonText: '离开并丢弃', cancelButtonText: '继续编辑' });
     return true;
   } catch {
@@ -3608,13 +3804,13 @@ async function confirmOpenSkill(row: AssistantSkillAdminRow) {
 /** 题5：整页路由离开也要拦——原来只有页内切技能/切段有确认，点侧边菜单走人时正文（最多 2 万字）直接丢。
  *  只在真有未保存改动时弹，保存后放行；复用同一句确认文案。 */
 onBeforeRouteLeave(async () => {
-  if (!skillDirty.value) return true;
-  return await confirmLeaveIfDirty();
+  if (!skillDirty.value && !tgDirty.value) return true;
+  return await confirmLeaveIfDirty('page');
 });
 /** 回修：F5/关标签页不走 vue-router，脏状态下同样要拦——浏览器原生提示，文案无法自定义 */
 onMounted(() => {
   const onUnload = (e: BeforeUnloadEvent) => {
-    if (!skillDirty.value) return;
+    if (!skillDirty.value && !tgDirty.value) return;
     e.preventDefault();
     e.returnValue = '';
   };
@@ -5268,21 +5464,25 @@ onMounted(() => {
     line-height: 1.7;
     color: var(--dcs-text-secondary);
   }
+  /* 体检一句：卡内一条安静的状态行（不再单独一条色带，分割感从这里开始收） */
   .cap-health {
     display: flex;
     align-items: center;
     gap: 9px;
     flex-wrap: wrap;
-    min-height: 40px;
-    margin-bottom: 11px;
-    padding: 6px 8px 6px 12px;
-    border: 1px solid var(--el-color-warning-light-8);
-    border-radius: 9px;
-    background: var(--el-color-warning-light-9);
+    min-height: 28px;
+    padding: 0 2px 8px;
     font-size: 13px;
     line-height: 1.65;
-    color: var(--el-color-warning-dark-2);
+    color: var(--dcs-text-secondary);
 
+    .sp {
+      flex: 1;
+    }
+    .ch-hint {
+      font-size: 12.5px;
+      color: var(--dcs-text-secondary);
+    }
     .ch-dot {
       flex: none;
       width: 6px;
@@ -5293,7 +5493,7 @@ onMounted(() => {
     .ch-lead {
       font-size: 13px;
       font-weight: 600;
-      color: var(--el-color-warning-dark-2);
+      color: var(--dcs-text-primary);
     }
     .ch-names {
       display: inline-flex;
@@ -5318,31 +5518,8 @@ onMounted(() => {
         }
       }
     }
-    .acts {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-left: auto;
-    }
-    .health-link.el-button {
-      height: auto;
-      padding: 0 4px;
-      font-size: 12px;
-      color: var(--dcs-text-secondary);
-
-      &:hover {
-        color: var(--dcs-text-primary);
-        text-decoration: underline;
-      }
-    }
-    /* 无事态：不占一条带色横幅，退回一行安静的说明 */
+    /* 无事态：绿点 + 一句话，语气放平 */
     &.ok2 {
-      min-height: 28px;
-      margin-bottom: 4px;
-      padding-left: 2px;
-      border-color: transparent;
-      background: transparent;
-
       .ch-dot {
         background: var(--el-color-success);
       }
@@ -5376,7 +5553,8 @@ onMounted(() => {
     }
     &.mid {
       background: var(--el-color-warning-light-9);
-      color: var(--el-color-warning-dark-2);
+      /* 原 #b88230 在中危底色上只有 3.1:1，压深到 5.5:1 */
+      color: #8a5a10;
     }
     &.low {
       background: var(--el-fill-color-light);
@@ -5416,51 +5594,99 @@ onMounted(() => {
   }
 
   /* 能力表：名字左、属性右（风险 + 谁能用成簇），整行可点进抽屉 */
+  /* 能力卡（2026-11-01 丁案）：本卡内二级文字统一提到 ≥4.5:1（原 #64748b 在浅灰底上只有 4.3:1） */
+  .cap-card {
+    --dcs-text-secondary: #5b6673;
+    --el-text-color-secondary: #5b6673;
+  }
+  /* 工具栏（丁案）：卡片第一行，位置永远固定 */
+  .cap-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-bottom: 8px;
+  }
+  .cap-bar-ttl {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+
+    b {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--dcs-text-primary);
+    }
+  }
+  .cap-bar-cnt {
+    font-size: 12.5px;
+    color: var(--dcs-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .cap-bar-tools {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .cap-search {
+    width: 168px;
+  }
+
+  /* 能力表：列永远对齐，行内就能改档；整表收在 1200px 内，宽屏不拉稀 */
   .cap-tbl {
-    margin-top: 8px;
+    margin-top: 4px;
+    max-width: 1200px;
   }
   .cap-thead,
   .cap-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 62px 152px 12px;
-    gap: 10px;
+    grid-template-columns: 26px minmax(170px, 1.35fr) minmax(0, 1.6fr) 62px 158px 78px 52px;
+    gap: 12px;
     align-items: center;
   }
   .cap-thead {
-    padding: 0 2px 5px;
+    padding: 0 2px 6px;
     border-bottom: 1px solid var(--el-border-color);
     font-size: 12px;
     color: var(--dcs-text-secondary);
 
-    span:nth-child(2),
-    span:nth-child(3) {
+    .th-tip {
+      margin-left: 2px;
+      color: var(--dcs-text-secondary);
+    }
+    .th-det {
       text-align: right;
     }
+  }
+  .cap-cb {
+    height: auto;
+    margin: 0;
   }
   .cap-ghead {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 2px;
-    border-bottom: 1px solid var(--el-border-color-lighter);
-    background: var(--el-fill-color-lighter);
+    padding: 7px 2px 4px;
+    font-size: 12px;
 
     b {
       font-size: 12px;
       font-weight: 600;
       color: var(--dcs-text-secondary);
     }
-    .n {
+    .n,
+    .hint {
       font-size: 12px;
-      color: var(--el-text-color-placeholder);
+      color: var(--dcs-text-secondary);
     }
     .hint {
       margin-left: auto;
-      font-size: 12px;
-      color: var(--el-text-color-placeholder);
     }
   }
   .cap-row {
+    min-height: 46px;
     padding: 6px 2px;
     border-bottom: 1px solid var(--el-border-color-lighter);
     cursor: pointer;
@@ -5469,6 +5695,9 @@ onMounted(() => {
     &:hover {
       background: var(--el-fill-color-lighter);
     }
+    &.sel {
+      background: var(--el-color-primary-light-9);
+    }
     &:focus-visible {
       outline: 2px solid var(--el-color-primary);
       outline-offset: -2px;
@@ -5476,7 +5705,7 @@ onMounted(() => {
     &.closed .cap-name b {
       color: var(--dcs-text-secondary);
       text-decoration: line-through;
-      text-decoration-color: var(--el-text-color-placeholder);
+      text-decoration-color: var(--dcs-text-placeholder);
     }
     &.dim {
       opacity: 0.62;
@@ -5485,7 +5714,7 @@ onMounted(() => {
       opacity: 1;
     }
   }
-  /* 行与灰行共用的一套名字/条件排版（同一页只有一档字号，别各写一套） */
+  /* 行与灰行共用的一套名字排版（同一页只有一档字号，别各写一套） */
   .cap-name {
     display: flex;
     flex-direction: column;
@@ -5501,8 +5730,17 @@ onMounted(() => {
       text-overflow: ellipsis;
     }
   }
+  .cap-cond {
+    min-width: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--dcs-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .cap-sub {
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--dcs-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -5510,46 +5748,188 @@ onMounted(() => {
   }
   .cap-risk {
     display: flex;
-    justify-content: flex-end;
+    justify-content: flex-start;
     min-width: 0;
   }
-  .lowrisk {
-    font-size: 12px;
-    color: var(--el-text-color-placeholder);
+  .lowdot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-left: 2px;
+    border-radius: 50%;
+    background: #6b7280;
   }
   .cap-gate {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 6px;
     min-width: 0;
     font-size: 13px;
     font-variant-numeric: tabular-nums;
+  }
+  .gate-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    font: inherit;
+    color: var(--dcs-text-regular);
+    white-space: nowrap;
+    cursor: pointer;
 
-    .g-lv {
-      color: var(--dcs-text-regular);
-      white-space: nowrap;
+    &:hover {
+      border-color: var(--el-border-color);
+      background: var(--el-bg-color);
     }
-    .g-yes {
-      color: var(--el-color-success);
-      font-weight: 600;
-    }
-    .g-no {
+    .car {
+      font-size: 10px;
       color: var(--dcs-text-secondary);
-      white-space: nowrap;
     }
-    .g-closed {
-      color: var(--el-text-color-placeholder);
+    &.gate-no {
+      color: var(--dcs-text-secondary);
+    }
+    &.gate-off {
+      color: var(--dcs-text-secondary);
+      text-decoration: line-through;
+      text-decoration-color: var(--dcs-text-placeholder);
     }
   }
-  .cap-chev {
-    font-size: 16px;
-    line-height: 1;
-    text-align: right;
-    color: var(--el-text-color-placeholder);
-  }
-  .cap-row:hover .cap-chev {
+  .cap-own {
+    font-size: 12.5px;
     color: var(--dcs-text-secondary);
+    white-space: nowrap;
+
+    &.chg {
+      color: var(--el-color-primary);
+      font-weight: 500;
+    }
+  }
+  .cap-det {
+    font-size: 12.5px;
+    text-align: right;
+    color: var(--dcs-text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--el-color-primary);
+    }
+  }
+  /* 抽屉抬头仍用文字（列表里低危改灰点，不再写「低危」两个字） */
+  .lowrisk {
+    font-size: 12px;
+    color: var(--dcs-text-secondary);
+  }
+  /* 行内改档：在行下方展开，不弹层、不遮别的行 */
+  .cap-x {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 10px 10px 38px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+    background: var(--el-fill-color-lighter);
+
+    .lbl {
+      font-size: 12.5px;
+      color: var(--dcs-text-secondary);
+    }
+    .xopt {
+      padding: 3px 10px;
+      border: 1px solid var(--el-border-color);
+      border-radius: 6px;
+      background: var(--el-bg-color);
+      font: inherit;
+      font-size: 12.5px;
+      color: var(--dcs-text-regular);
+      cursor: pointer;
+
+      &:hover {
+        border-color: var(--el-color-primary-light-5);
+        color: var(--el-color-primary);
+      }
+      &.on {
+        border-color: var(--el-color-primary-light-5);
+        background: var(--el-color-primary-light-9);
+        color: #1d4ed8;
+        font-weight: 500;
+      }
+      &.dis {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+    .kbd {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--dcs-text-secondary);
+    }
+  }
+  /* 底部吸附区：批量条与保存条同住一层，一起停在视口底部 */
+  .cap-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  /* 勾选批量条：勾了才出现，不占地 */
+  .cap-batch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 7px 10px;
+    border: 1px solid var(--el-color-primary-light-7);
+    border-radius: 7px;
+    background: var(--el-color-primary-light-9);
+    font-size: 12.5px;
+    color: var(--dcs-text-regular);
+
+    .n b {
+      font-variant-numeric: tabular-nums;
+    }
+    .kbd {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--dcs-text-secondary);
+    }
+  }
+  /* 底部出口：三个链接一行，点开在下面展开 */
+  .cap-exits {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--el-border-color-lighter);
+    font-size: 12.5px;
+
+    .ex-lb {
+      color: var(--dcs-text-secondary);
+    }
+    button {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      font: inherit;
+      /* 主色 #2f6feb 在浅灰底上只有 4.15:1，链接文字压深一档 */
+      color: #1d4ed8;
+      cursor: pointer;
+
+      b {
+        margin-left: 2px;
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+      }
+      &:hover {
+        text-decoration: underline;
+      }
+    }
   }
   .cap-foot {
     display: flex;
@@ -5687,7 +6067,7 @@ onMounted(() => {
     }
     .arr {
       font-size: 12px;
-      color: var(--el-text-color-placeholder);
+      color: var(--dcs-text-secondary);
       transition: transform 0.15s;
     }
     &:hover b {
@@ -5704,7 +6084,7 @@ onMounted(() => {
     padding: 6px 2px 2px;
     font-size: 12px;
     line-height: 1.7;
-    color: var(--el-text-color-placeholder);
+    color: var(--dcs-text-secondary);
   }
   .fold-empty {
     height: 44px;
@@ -5727,14 +6107,10 @@ onMounted(() => {
     }
   }
   .cap-save {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
     display: flex;
     align-items: center;
     gap: 12px;
     flex-wrap: wrap;
-    margin-top: 12px;
     padding: 10px 14px;
     border: 1px solid var(--el-color-primary-light-7);
     border-radius: var(--app-control-radius);
@@ -6468,42 +6844,72 @@ onMounted(() => {
     display: none;
   }
   .dcs-as-admin .cap-row {
-    grid-template-columns: minmax(0, 1fr) auto auto 10px;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
     grid-template-areas:
-      'name risk gate chev'
-      'sub sub sub sub';
-    row-gap: 1px;
+      'cb name risk'
+      'cb cond cond'
+      'cb gate own';
+    gap: 2px 8px;
     padding: 9px 2px;
 
+    .cap-cb {
+      grid-area: cb;
+      align-self: start;
+      margin-top: 2px;
+    }
     .cap-name {
-      display: contents;
-    }
-    .cap-name b {
       grid-area: name;
-      min-width: 0;
     }
-    .cap-sub {
-      grid-area: sub;
+    .cap-cond {
+      grid-area: cond;
       white-space: normal;
     }
     .cap-risk {
       grid-area: risk;
+      justify-content: flex-end;
     }
     .cap-gate {
       grid-area: gate;
     }
-    .cap-chev {
-      grid-area: chev;
-      align-self: center;
+    .cap-own {
+      grid-area: own;
+      justify-self: end;
     }
+    .cap-det {
+      display: none;
+    }
+  }
+  .dcs-as-admin .cap-x {
+    padding-left: 30px;
+
+    .kbd {
+      display: none;
+    }
+  }
+  /* 手机上把复选框与「谁能用」的点击面积放大到指头够得着 */
+  .dcs-as-admin .cap-cb {
+    padding: 6px 0;
+  }
+  .dcs-as-admin .gate-btn {
+    padding: 6px 8px;
+    margin-left: -6px;
+  }
+  .dcs-as-admin .cap-health .ch-hint {
+    display: none;
+  }
+  .dcs-as-admin .cap-batch .kbd {
+    display: none;
+  }
+  .dcs-as-admin .cap-bar-tools {
+    width: 100%;
+    gap: 8px;
+  }
+  .dcs-as-admin .cap-search {
+    flex: 1 1 100%;
+    width: auto;
   }
   .dcs-as-admin .cap-ghead .hint {
     display: none;
-  }
-  .dcs-as-admin .cap-health .acts {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-end;
   }
   .dcs-as-admin .svc-line .acts {
     width: 100%;
