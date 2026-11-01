@@ -39,4 +39,25 @@ class AssistantSkillUsageMiddlewareTest {
         assertNull(AssistantSkillUsageMiddleware.skillIdOf("view_skill", null));
         assertNull(AssistantSkillUsageMiddleware.skillIdOf("view_skill", Map.of("skill_id", "  ")));
     }
+
+    @Test
+    void skipsDoubleCountWhenManualPickAlreadyRecorded() {
+        // 手动胶囊已由 resolver 记过同一技能 → 工具再取不重复记账
+        org.junit.jupiter.api.Assertions.assertFalse(
+            AssistantSkillUsageMiddleware.shouldRecordToolUse("report-weekly", "report-weekly"));
+        // 未手动选、或模型自取的是另一个技能 → 照记
+        org.junit.jupiter.api.Assertions.assertTrue(
+            AssistantSkillUsageMiddleware.shouldRecordToolUse(null, "report-weekly"));
+        org.junit.jupiter.api.Assertions.assertTrue(
+            AssistantSkillUsageMiddleware.shouldRecordToolUse("report-weekly", "sql-review"));
+    }
+
+    @Test
+    void hitlResumeIsNotANewManualPick() {
+        // HITL 确认/取消的补跑仍带 skillId：hasResume=true 不能再记一次
+        org.junit.jupiter.api.Assertions.assertFalse(
+            AssistantSkillUsageMiddleware.shouldRecordManualPick(true));
+        org.junit.jupiter.api.Assertions.assertTrue(
+            AssistantSkillUsageMiddleware.shouldRecordManualPick(false));
+    }
 }

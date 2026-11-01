@@ -305,9 +305,20 @@
                 :class="{ on: !skillNewMode && activeSkillId === row.skillId }"
                 @click="confirmOpenSkill(row)"
               >
-                <i>{{ (row.displayName || row.skillId).slice(0, 1) }}</i>
+                <i class="ski">{{ (row.displayName || row.skillId).slice(0, 1) }}</i>
                 <span class="pt">{{ row.displayName || row.skillId }}</span>
                 <span class="pf">{{ SKILL_SOURCE_TXT[row.source] || row.source }} · {{ SKILL_ROLE_TXT[row.minRole] }}</span>
+                <!-- 题2 案3：技能取用统计（用次 / 最近一次，两列键值；无记录=0/从未） -->
+                <span
+                  class="pu"
+                  :class="{ 'pu-zero': !row.useCount && !row.lastUsedAt }"
+                  :title="`本租户累计取用 ${row.useCount ?? 0} 次；最近一次 ${row.lastUsedAt ? row.lastUsedAt : '从未使用'}`"
+                >
+                  <span class="pu-k">用次</span>
+                  <span class="pu-v">{{ row.useCount ?? 0 }}</span>
+                  <span class="pu-k">最近一次</span>
+                  <span class="pu-v">{{ skillLastUsedText(row.lastUsedAt) }}</span>
+                </span>
               </button>
               <button v-if="skillNewMode" type="button" class="on">
                 <i>＋</i>
@@ -1791,6 +1802,7 @@ import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import { ACT, LOG_ST, logSt } from '@/components/DcsAssistant/useAssistant';
 import { fmtIsoTime } from '@/components/DcsAssistant/util';
 import { applyAssistantName } from '@/components/DcsAssistant/nameState';
+import { skillLastUsedText } from './skillUsageText';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -3530,6 +3542,7 @@ const SKILL_SOURCE_TXT: Record<string, string> = {
 };
 const SKILL_ROLE_TXT: Record<string, string> = { member: '成员及以上', publisher: '发布人及以上', admin: '仅管理员' };
 const SKILL_ROLE_LEVEL: Record<string, number> = { member: 0, publisher: 1, admin: 2 };
+
 const SKILL_ROLE_OPTS = [
   { v: 'member', label: '成员及以上', level: 0 },
   { v: 'publisher', label: '发布人及以上', level: 1 },
@@ -5774,6 +5787,10 @@ onMounted(() => {
         text-align: center;
         color: var(--el-text-color-placeholder);
       }
+      /* 技能行多一块统计键值（第三行），序号图标要跨满三行 */
+      i.ski {
+        grid-row: span 3;
+      }
       .pt {
         font-size: 13px;
         color: var(--dcs-text-primary);
@@ -5784,6 +5801,32 @@ onMounted(() => {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+      /* 题2 案3：两列键值（用次 / 最近一次），窄栏也放得下；数字用等宽。
+         11px 小字用常规墨色保证可读；无记录时数值降到占位色，避免和真实数据同权 */
+      .pu {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 2px 8px;
+        font-size: 11px;
+        color: var(--el-text-color-regular);
+        font-variant-numeric: tabular-nums;
+        span {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .pu-k {
+          color: var(--el-text-color-regular);
+        }
+        .pu-v {
+          text-align: right;
+          font-weight: 500;
+        }
+        &.pu-zero .pu-v {
+          color: var(--el-text-color-placeholder);
+          font-weight: 400;
+        }
       }
     }
     .faint {

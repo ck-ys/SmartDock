@@ -252,9 +252,10 @@ public class AssistantAgentFactory {
                 }, aguiThreadId))
             .middleware(skillGate)
             // 题2 案3（2026-10-31）：技能取用统计——官方 load_skill_through_path 与遗留
-            // view_skill 成功返回才 +1；租户显式传入（运行时线程无 Sa-Token）
+            // view_skill 成功返回才 +1；租户显式传入（运行时线程无 Sa-Token）。
+            // 收口回修：手动胶囊已由 resolver 按请求记过，同会话同技能这里去重
             .middleware(new AssistantSkillUsageMiddleware(skillUsageService, user.getTenantId(),
-                identity.getRoleLevel(), tenantCfg.toolGate()))
+                identity.getRoleLevel(), tenantCfg.toolGate(), aguiThreadId))
             // 稳流① Q1（2026-10-20 拍板 A①）：流层真事件心跳——20s 一帧 dcs-heartbeat
             // CUSTOM 帧（合法静默期也出网：联网搜索/慢首 token/自动压缩摘要期），喂前端
             // 600s 看门狗+刷新 Recorder lastEventAt（工具/压缩段豁免的事件层实现）。

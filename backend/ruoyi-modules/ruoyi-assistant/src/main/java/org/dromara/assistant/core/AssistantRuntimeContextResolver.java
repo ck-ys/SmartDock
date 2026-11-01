@@ -60,6 +60,8 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     private final org.dromara.common.core.service.ConfigService sysConfigService;
     /** 题8 案1（三席回修）：计划待确认态的解除口子（前端 planDecision 上报） */
     private final AssistantPlanSignal planSignal;
+    /** 题2 案3（收口回修）：技能取用统计——手动胶囊选中也要记（原先只统计模型自取会漏主路径） */
+    private final org.dromara.assistant.service.AssistantSkillUsageService skillUsageService;
 
     @Override
     public RuntimeContext resolve(AguiRuntimeContextRequest<?> request) {
@@ -168,6 +170,21 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         // 静默清除（胶囊还挂着但正文永远不注入）
         AssistantSkillHolder.set(aguiThreadId,
             input == null ? null : input.getForwardedProp("skillId"), tenantId);
+        // 题2 案3 收口回修（dspro P1）：手动胶囊选中同样是「取用」——统计原先只挂模型自取
+        // 工具（load_skill_through_path/view_skill），而输入框选技能才是主路径，不补这一笔
+        // 管理页会恒显示「0 / 从未」。口径=一个请求记一次；与注入装饰器同过租户可见闸
+        // （角色不达标/租户已关闭的技能本轮不注入，这里也不记）。
+        // 三席回修（dspro P1-1）：HITL 确认/取消的补跑也走 /agui/run 且仍带 skillId，
+        // 不跳过会把同一轮记成 2 次、点取消也记一次。hasResume=true 只算续跑，不算新取用。
+        // 已知取舍：刷新丢卡后发新消息时，ResumeUnlockFilter 会注入 resume=cancelled，
+        // 这一条新消息会少记一次（罕见恢复路径，登记为已知口径，不为此改过滤器）。
+        String pickedSkill = AssistantSkillHolder.get(aguiThreadId);
+        if (pickedSkill != null && AssistantSkillUsageMiddleware.shouldRecordManualPick(input != null && input.hasResume())
+            && AssistantSkillGateMiddleware.visibleTo(pickedSkill,
+                org.dromara.assistant.tools.ToolIdentity.from(user).getRoleLevel(),
+                cfg.toolGate(), tenantId)) {
+            skillUsageService.record(tenantId, pickedSkill);
+        }
         // 批8-3 回修（dspro P1-1，javap 字节码实证）：agent 会话键=(复合用户"t:租户:用户", threadId)，
         // removeSession 单参版本按 ("__anon__",threadId) 查键恒 miss（原实现=死代码）——必须双参直指；
         // 「跟随默认」(声明 null)也参与差异判定（Holder.needsRebuild 已同步修），未命中返回 false 记 debug。
