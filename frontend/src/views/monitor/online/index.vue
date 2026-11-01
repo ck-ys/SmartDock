@@ -63,9 +63,12 @@
           </el-table-column>
           <template #empty>
             <div class="ui-empty">
-              <p class="ui-empty__title">暂无在线用户</p>
-              <p class="ui-empty__hint">只有当前会话未超时的人会出现在这里；刚登录的人可能需要几秒才出现。</p>
-              <el-button plain @click="getList">刷新列表</el-button>
+              <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的在线用户' : '暂无在线用户' }}</p>
+              <p class="ui-empty__hint">
+                {{ hasFilter ? '换个地址或用户名试试，也可以清空筛选看全部。' : '只有当前会话未超时的人会出现在这里；刚登录的人可能需要几秒才出现。' }}
+              </p>
+              <el-button v-if="hasFilter" type="primary" plain @click="resetQuery">清空筛选，看全部</el-button>
+              <el-button v-else plain @click="getList">刷新列表</el-button>
             </div>
           </template>
         </el-table>
@@ -97,14 +100,20 @@ const queryParams = ref<OnlineQuery>({
   ipaddr: '',
   userName: ''
 });
+/* 空态要分得清「本来就没有」和「筛没了」（2026-11-01 Q6 深挖席 P2-8） */
+const hasFilter = computed(() => !!queryParams.value.ipaddr || !!queryParams.value.userName);
 
 /** 查询登录日志列表 */
 const getList = async () => {
   loading.value = true;
-  const res = await initData(queryParams.value);
-  onlineList.value = res.rows;
-  total.value = res.total;
-  loading.value = false;
+  try {
+    const res = await initData(queryParams.value);
+    onlineList.value = res.rows;
+    total.value = res.total;
+  } finally {
+    // 失败也要收掉转圈，否则空态永远不可见（Q6 深挖席 P2-8）
+    loading.value = false;
+  }
 };
 /** 搜索按钮操作 */
 const handleQuery = () => {

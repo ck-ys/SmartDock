@@ -14,7 +14,7 @@
     <el-card shadow="never" class="mission-card">
       <el-form :inline="true" class="ui-toolbar mission-filter" @submit.prevent>
         <el-form-item label="标题">
-          <el-input v-model="query.title" class="mission-filter__input" placeholder="按标题模糊" clearable @keyup.enter="load" />
+          <el-input v-model="query.title" class="mission-filter__input" placeholder="按标题模糊" clearable @keyup.enter="onSearch" />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" class="mission-filter__select" clearable>
@@ -24,7 +24,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button icon="Search" @click="load">查询</el-button>
+          <el-button icon="Search" @click="onSearch">查询</el-button>
           <el-button icon="Refresh" @click="reset">重置</el-button>
         </el-form-item>
       </el-form>
@@ -61,7 +61,7 @@
             <div class="ui-empty">
               <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的任务' : '暂无任务' }}</p>
               <p class="ui-empty__hint">
-                {{ hasFilter ? `当前筛选 0 条；全部任务还有 ${totalAll} 条。` : '还没有建过任务，新建一个就能开始分派。' }}
+                {{ hasFilter ? `当前筛选 ${total} 条；全部任务还有 ${totalAll} 条。` : '还没有建过任务，新建一个就能开始分派。' }}
               </p>
               <el-button v-if="hasFilter" type="primary" plain @click="reset">清空筛选，看全部</el-button>
               <el-button v-else v-hasPermi="['dcs:task:add']" type="primary" @click="openCreate">新建任务</el-button>
@@ -71,10 +71,10 @@
       </div>
       <!-- ≤992：表格改卡片（身份+状态+主操作；次要字段进 meta 行） -->
       <div class="dcs-mobile-list mission-mobile">
-        <div v-if="rows.length === 0" class="ui-empty">
+        <div v-if="rows.length === 0 && !loading" class="ui-empty">
           <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的任务' : '暂无任务' }}</p>
           <p class="ui-empty__hint">
-            {{ hasFilter ? `当前筛选 0 条；全部任务还有 ${totalAll} 条。` : '还没有建过任务，新建一个就能开始分派。' }}
+            {{ hasFilter ? `当前筛选 ${total} 条；全部任务还有 ${totalAll} 条。` : '还没有建过任务，新建一个就能开始分派。' }}
           </p>
           <el-button v-if="hasFilter" type="primary" plain @click="reset">清空筛选，看全部</el-button>
           <el-button v-else v-hasPermi="['dcs:task:add']" type="primary" @click="openCreate">新建任务</el-button>
@@ -186,11 +186,15 @@ const query = reactive<any>({ pageNum: 1, pageSize: 10, title: '', status: '' })
 /* 2026-11-01 Q6=乙：「任务总数」钉死全量。筛选后列表接口的 total 是筛选结果，
    另起一次 pageSize=1 的全量请求取总数；筛选结果单独显示「当前筛选」。 */
 const totalAll = ref(0);
-const hasFilter = computed(() => !!query.title || !!query.status);
+/* 2026-11-01 Q6 深挖席 P1-2：页头/空态按「已提交的查询」说话，不跟输入框实时值走 */
+const appliedFilter = ref(false);
+const hasFilter = computed(() => appliedFilter.value);
 const headerMetrics = computed(() => {
-  const list: Array<{ label: string; value: number }> = [{ label: '任务总数', value: totalAll.value }];
+  const list: Array<{ label: string; value: number; hint?: string }> = [
+    { label: '任务总数', value: totalAll.value, hint: '不受筛选影响' }
+  ];
   if (hasFilter.value) list.push({ label: '当前筛选', value: total.value });
-  list.push({ label: '本页草稿', value: draftCount.value }, { label: '本页收集中', value: collectingCount.value });
+  list.push({ label: '本页草稿', value: draftCount.value, hint: '本页范围' }, { label: '本页收集中', value: collectingCount.value, hint: '本页范围' });
   return list;
 });
 
@@ -274,19 +278,34 @@ const loadAssigneeOptions = async (ids: Array<string | number>) => {
 };
 const rules = { title: [{ required: true, message: '请输入标题', trigger: 'blur' }] };
 
+/* 2026-11-01 Q6 深挖席 P1-3：并发序号，过期响应直接丢 */
+let loadSeq = 0;
 const load = async () => {
+  const seq = ++loadSeq;
+  const title = String(query.title || '').trim();
+  appliedFilter.value = !!title || !!query.status;
   loading.value = true;
   try {
-    const res = await pageTasks({ ...query, title: query.title || undefined, status: query.status || undefined });
+    const res = await pageTasks({ ...query, title: title || undefined, status: query.status || undefined });
+    if (seq !== loadSeq) return;
     rows.value = res.rows;
     total.value = res.total;
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
-  if (hasFilter.value || !totalAll.value) {
-    const all = await pageTasks({ pageNum: 1, pageSize: 1 });
-    totalAll.value = Number(all.total) || 0;
+  if (seq !== loadSeq) return;
+  if (!hasFilter.value) {
+    // 无筛选时列表 total 即全量，直接用，省一次请求也避免页头 0→N 闪
+    totalAll.value = Number(total.value) || 0;
+  } else {
+    // 筛选态每次校准全量：筛选中新建任务后总数不能停在旧值（深挖席 P1-1）
+    const all = await pageTasks({ pageNum: 1, pageSize: 1 }).catch(() => undefined);
+    if (seq === loadSeq && all) totalAll.value = Number(all.total) || 0;
   }
+};
+const onSearch = () => {
+  query.pageNum = 1;
+  load();
 };
 const reset = () => {
   query.pageNum = 1;

@@ -9,7 +9,7 @@
 
     <el-card shadow="never" class="notice-list-card">
       <div class="ui-toolbar notice-toolbar">
-        <el-radio-group v-model="query.readFlag" :disabled="markingAll" @change="load">
+        <el-radio-group v-model="query.readFlag" :disabled="markingAll" @change="onFilterChange">
           <el-radio-button value="">全部</el-radio-button>
           <el-radio-button value="0">未读</el-radio-button>
           <el-radio-button value="1">已读</el-radio-button>
@@ -49,7 +49,7 @@
             <div class="ui-empty">
               <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的消息' : '暂无消息' }}</p>
               <p class="ui-empty__hint">
-                {{ hasFilter ? `当前筛选 0 条；全部消息还有 ${totalAll} 条。` : '任务分派、审核结果与系统提醒都会显示在这里。' }}
+                {{ hasFilter ? `当前筛选 ${total} 条；全部消息还有 ${totalAll} 条。` : '任务分派、审核结果与系统提醒都会显示在这里。' }}
               </p>
               <el-button v-if="hasFilter" type="primary" plain @click="clearFilter">清空筛选，看全部</el-button>
               <el-button v-else plain @click="load">刷新</el-button>
@@ -59,10 +59,10 @@
       </div>
       <!-- ≤992：表格改卡片；标读同样改成显式按钮 -->
       <div class="dcs-mobile-list notice-mobile">
-        <div v-if="rows.length === 0" class="ui-empty">
+        <div v-if="rows.length === 0 && !loading" class="ui-empty">
           <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的消息' : '暂无消息' }}</p>
           <p class="ui-empty__hint">
-            {{ hasFilter ? `当前筛选 0 条；全部消息还有 ${totalAll} 条。` : '任务分派、审核结果与系统提醒都会显示在这里。' }}
+            {{ hasFilter ? `当前筛选 ${total} 条；全部消息还有 ${totalAll} 条。` : '任务分派、审核结果与系统提醒都会显示在这里。' }}
           </p>
           <el-button v-if="hasFilter" type="primary" plain @click="clearFilter">清空筛选，看全部</el-button>
           <el-button v-else plain @click="load">刷新</el-button>
@@ -106,17 +106,18 @@ const unreadCount = computed(() => rows.value.filter((r) => r.readFlag === '0').
    筛选态下另起一次 pageSize=1 的请求取全量数（列表接口的 total 是筛选后的），
    筛选结果单独显示为「当前筛选」一个数。 */
 const totalAll = ref(0);
-const hasFilter = computed(() => !!query.readFlag);
+/* 2026-11-01 Q6 深挖席 P1-2：筛选态取「已提交查询」的快照，不取输入框实时值——
+   否则切页签的瞬间页头/空态已经按新筛选说话，表格里还是旧结果。 */
+const appliedFilter = ref(false);
+const hasFilter = computed(() => appliedFilter.value);
 const headerMetrics = computed(() => {
-  const list: Array<{ label: string; value: number }> = [{ label: '消息总数', value: totalAll.value }];
+  const list: Array<{ label: string; value: number; hint?: string }> = [
+    { label: '消息总数', value: totalAll.value, hint: '不受筛选影响' }
+  ];
   if (hasFilter.value) list.push({ label: '当前筛选', value: total.value });
-  list.push({ label: '本页未读', value: unreadCount.value });
+  list.push({ label: '本页未读', value: unreadCount.value, hint: '本页范围' });
   return list;
 });
-const loadAllTotal = async () => {
-  const res = await myNotices({ pageNum: 1, pageSize: 1 });
-  totalAll.value = Number(res.total) || 0;
-};
 const clearFilter = () => {
   query.readFlag = '';
   query.pageNum = 1;
@@ -138,17 +139,34 @@ const TYPE_LABEL: Record<string, string> = {
 const typeBadge = (t: string) => TYPE_LABEL[t] || '[通知]';
 const readPill = (row: DcsNoticeRow) => (row.readFlag === '0' ? 'ui-pill--warn' : 'ui-pill--muted');
 
+/* 2026-11-01 Q6 深挖席 P1-3：连点/快切页签会并发，用序号丢弃过期响应 */
+let loadSeq = 0;
 const load = async () => {
+  const seq = ++loadSeq;
+  appliedFilter.value = !!query.readFlag;
   loading.value = true;
   try {
     const res = await myNotices({ ...query, readFlag: query.readFlag || undefined });
+    if (seq !== loadSeq) return;
     rows.value = res.rows;
     total.value = res.total;
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
-  // 全量数只在筛选态下才会被看到；首次进来也取一次，保证「消息总数」一上来就是全量
-  if (hasFilter.value || !totalAll.value) await loadAllTotal().catch(() => undefined);
+  if (seq !== loadSeq) return;
+  // 无筛选时列表的 total 本身就是全量，直接拿来用：省一次请求，也避免页头先闪一个 0
+  if (!hasFilter.value) {
+    totalAll.value = Number(total.value) || 0;
+  } else {
+    // 筛选态每次都要校准全量：筛选中新建/标读后总数不能停在旧值（深挖席 P1-1）
+    const all = await myNotices({ pageNum: 1, pageSize: 1 }).catch(() => undefined);
+    if (seq === loadSeq && all) totalAll.value = Number(all.total) || 0;
+  }
+};
+/* 切页签先回第 1 页：停在第 3 页切到「未读」常常只剩 0 条，看起来像筛选坏了 */
+const onFilterChange = () => {
+  query.pageNum = 1;
+  load();
 };
 
 const read = async (row: DcsNoticeRow) => {

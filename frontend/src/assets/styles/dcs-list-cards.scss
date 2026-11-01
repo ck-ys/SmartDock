@@ -134,4 +134,9 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  /* 平板两列时，空态不该挤在左半边一格（2026-11-01 Q6 深挖席 P2-7） */
+  .dcs-mobile-list > .ui-empty {
+    grid-column: 1 / -1;
+  }
 }

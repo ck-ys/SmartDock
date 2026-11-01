@@ -87,7 +87,7 @@
               <div v-else class="ui-empty">
                 <p class="ui-empty__title">近 7 天没有内容风险事件</p>
                 <p class="ui-empty__hint">机检没命中，或者内容机检还没启用；启用后新提交会自动过机检。</p>
-                <el-button plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
+                <el-button v-hasPermi="['dcs:risk:config']" plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
               </div>
             </el-card>
 
@@ -133,7 +133,7 @@
                     <div class="ui-empty">
                       <p class="ui-empty__title">暂无内容风险事件</p>
                       <p class="ui-empty__hint">机检未命中或内容机检未启用时，这里不会有记录</p>
-                      <el-button plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
+                      <el-button v-hasPermi="['dcs:risk:config']" plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
                     </div>
                   </template>
                 </el-table>
@@ -143,7 +143,7 @@
                   <template #empty>
                     <p class="ui-empty__title">暂无内容风险事件</p>
                     <p class="ui-empty__hint">机检未命中或内容机检未启用时，这里不会有记录</p>
-                    <el-button plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
+                    <el-button v-hasPermi="['dcs:risk:config']" plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
                   </template>
                   <template #title="{ row }">{{ maskSensitiveDetail(row.detail || '-') }}</template>
                   <template #badge="{ row }">
@@ -183,7 +183,7 @@
               <div v-else class="ui-empty">
                 <p class="ui-empty__title">近 7 天没有命中词</p>
                 <p class="ui-empty__hint">词库为空或内容都没踩到词；先补词库，命中才会有排行。</p>
-                <el-button plain @click="router.push('/risk/sensitive-word')">去维护敏感词</el-button>
+                <el-button v-hasPermi="['dcs:sensitive-word:list']" plain @click="router.push('/risk/sensitive-word')">去维护敏感词</el-button>
               </div>
             </el-card>
 
