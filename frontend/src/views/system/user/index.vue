@@ -188,7 +188,7 @@
             </el-table>
 
             <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 560px 宽表的横滑 -->
-            <mobile-row-list :rows="userList" row-key="userId">
+            <mobile-row-list :rows="userList" row-key="userId" :loading="loading" empty-text="暂无用户">
               <template #title="{ row }">{{ row.nickName || row.userName }}</template>
               <template #badge="{ row }">
                 <el-switch

@@ -134,7 +134,7 @@
                 </el-table>
 
                 <!-- 2026-11-01 Q3=乙：手机档两行列表 -->
-                <mobile-row-list :rows="contentRiskEvents" empty-text="暂无内容风险事件" empty-hint="机检未命中的时候，这里不会有记录">
+                <mobile-row-list :rows="contentRiskEvents" row-key="eventId" empty-text="暂无内容风险事件" empty-hint="机检未命中的时候，这里不会有记录">
                   <template #title="{ row }">{{ maskSensitiveDetail(row.detail || '-') }}</template>
                   <template #badge="{ row }">
                     <span class="ui-pill" :class="row.detail?.startsWith('内容机检:命中BLOCK') ? 'ui-pill--neg' : 'ui-pill--warn'">

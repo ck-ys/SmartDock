@@ -1,12 +1,13 @@
 <template>
-  <div v-if="!list.length" class="ui-empty dcs-mobile-empty">
+  <div v-if="loading && !list.length" class="ui-empty dcs-mobile-empty"><p class="ui-empty__title">加载中…</p></div>
+  <div v-else-if="!list.length" class="ui-empty dcs-mobile-empty">
     <slot name="empty">
       <p class="ui-empty__title">{{ emptyText }}</p>
       <p v-if="emptyHint" class="ui-empty__hint">{{ emptyHint }}</p>
     </slot>
   </div>
   <div v-else class="dcs-mobile-list">
-    <div v-for="row in list" :key="keyOf(row)" class="dcs-mobile-card">
+    <div v-for="(row, i) in list" :key="keyOf(row, i)" class="dcs-mobile-card">
       <div class="dcs-card-head">
         <span class="dcs-card-title"><slot name="title" :row="row" /></span>
         <span class="dcs-card-badge"><slot name="badge" :row="row" /></span>
@@ -37,8 +38,10 @@ const props = withDefaults(
     /** 空态标题（表格隐藏后，表格自带的 #empty 也一起看不见了，这里补一个） */
     emptyText?: string;
     emptyHint?: string;
+    /** 加载中：没有行时不显示「暂无数据」，避免首帧误导 */
+    loading?: boolean;
   }>(),
-  { rowKey: 'id', emptyText: '暂无数据', emptyHint: '' },
+  { rowKey: 'id', emptyText: '暂无数据', emptyHint: '', loading: false },
 );
 
 /** 数据源可能是 undefined（页面首次渲染时还没取到列表），一律兜成空数组，避免整页白屏 */

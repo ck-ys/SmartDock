@@ -94,7 +94,7 @@
         </el-table>
 
         <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 1060px 宽表的横滑 -->
-        <mobile-row-list :rows="eventList" row-key="eventId" empty-text="暂无风险事件" empty-hint="调整筛选条件或换一个时间区间再试">
+        <mobile-row-list :rows="eventList" row-key="eventId" :loading="loading" empty-text="暂无风险事件" empty-hint="调整筛选条件或换一个时间区间再试">
           <template #title="{ row }">{{ EVENT_TYPE_LABELS[row.eventType] || row.eventType }}</template>
           <template #badge="{ row }">
             <span class="ui-num">+{{ row.riskScore }}</span>

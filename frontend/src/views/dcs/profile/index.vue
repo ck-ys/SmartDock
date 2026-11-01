@@ -132,7 +132,7 @@
       </el-table>
 
       <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 1070px 宽表的横滑 -->
-      <mobile-row-list :rows="rows" row-key="subjectId">
+      <mobile-row-list :rows="rows" row-key="subjectId" :loading="loading" empty-text="本单位还没有用户">
         <template #title="{ row }">{{ row.displayName || row.subjectId }}</template>
         <template #badge="{ row }">
           <span v-if="row.pendingReview" class="ui-pill ui-pill--warn">待联系</span>

@@ -192,7 +192,7 @@
         </el-table>
 
         <!-- 2026-11-01 Q3=乙：手机档两行列表，替代 1070px 宽表的横滑 -->
-        <mobile-row-list :rows="rows" row-key="subjectId">
+        <mobile-row-list :rows="rows" row-key="subjectId" :loading="tableLoading" empty-text="当前筛选下没有评分主体">
           <template #title="{ row }">{{ row.displayName || row.subjectId }}</template>
           <template #badge="{ row }">
             <el-tag :type="levelTagType(row.level)" effect="light">{{ row.level || '未分层' }}</el-tag>
