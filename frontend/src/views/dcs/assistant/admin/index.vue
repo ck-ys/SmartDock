@@ -103,15 +103,15 @@
               <div class="sec-ttl"><b>这一页管什么</b></div>
             </div>
             <ul class="guide-list">
-              <li>
+              <li v-if="canConfig">
                 <div class="gl-tx"><b>能力</b><span>助手会什么、谁能用、哪项危险</span></div>
                 <el-button link type="primary" size="small" @click="jumpTo('caps')">打开 →</el-button>
               </li>
-              <li>
+              <li v-if="canConfig">
                 <div class="gl-tx"><b>规则</b><span>租户开关、模型与费用、每人每天额度</span></div>
                 <el-button link type="primary" size="small" @click="jumpTo('rules')">打开 →</el-button>
               </li>
-              <li>
+              <li v-if="canConfig || canFeedback">
                 <div class="gl-tx"><b>运营</b><span>真实调用与失败、错答反馈、运行记录、公告</span></div>
                 <el-button link type="primary" size="small" @click="jumpTo('ops')">打开 →</el-button>
               </li>
@@ -3443,11 +3443,19 @@ function reloadMcpLog() {
 }
 /** 外部服务行里的「审计」：带着服务名跳到运营段（离开编辑先过脏检查） */
 async function openMcpAudit(serverName: string) {
-  if (tab.value === 'caps' && !(await confirmLeaveIfDirty())) return;
+  // 走 jumpTo 统一入口：脏检查 + 运营段懒加载。只设 tab 会绕过 onTabChange，
+  // 反馈统计/公告/运行记录永远停在「加载中」或假空态（三审 P1）
+  const prevFilter = mcpLogFilter.value;
+  const prevPage = mcpLogPage.value;
   mcpLogFilter.value = serverName;
   mcpLogPage.value = 1;
-  tab.value = 'ops';
-  void loadMcpCallLog();
+  await jumpTo('ops');
+  // 跳转被脏检查拦下（用户选「继续编辑」留下）时恢复原值：别让残留的服务名在之后
+  // 手动进运营时悄悄过滤调用记录（缺失审计 L1，2026-11-01）
+  if (tab.value !== 'ops') {
+    mcpLogFilter.value = prevFilter;
+    mcpLogPage.value = prevPage;
+  }
 }
 /** 失败行标红：真实调用里最该看的就是失败 */
 function auditRowClass({ row }: { row: AssistantMcpCallLog }): string {
@@ -3746,24 +3754,29 @@ async function onRestoreSkill() {
     .catch(() => undefined);
 }
 
-/** 四段导航的懒加载（总览首屏已带齐数字/健康/能力快照，其余段进到才拉） */
+/** 四段导航的懒加载（总览首屏已带齐数字/健康/能力快照，其余段进到才拉）。
+ *  三审 P1：按各段权限分别收口——单一权限角色进段不该对无权端点连发请求（每条 403 都会弹通知）。 */
 function onTabChange(name: string | number) {
-  if (name === 'caps') {
+  if (name === 'caps' && canConfig.value) {
     if (tgRows.value.length === 0 && !tgLoading.value) void loadToolGate();
     if (panoSegments.value.length === 0 && !panoLoading.value) void loadPanorama();
     if (mcpRows.value.length === 0 && !mcpLoading.value) void loadMcpServers();
     if (skillRows.value.length === 0 && !skillLoading.value) void loadSkillAdmin();
   }
-  if (name === 'rules' && quotaRows.value.length === 0 && !quotaLoading.value) {
+  if (name === 'rules' && canConfig.value && quotaRows.value.length === 0 && !quotaLoading.value) {
     void loadQuotaPage();
   }
   if (name === 'ops') {
-    void loadMcpCallLog();
-    // 回修：先拉列表再拉统计——先把 fbStatsError 清掉的话，loadFeedback 的守卫会连带再发一次统计（总览首次失败时进本页签双发）
-    if (fbRows.value.length === 0) void loadFeedback();
-    void loadFbStats();
-    if (logRows.value.length === 0) void loadActionLog();
-    if (annRows.value.length === 0 && !annLoading.value) void loadAnnouncements();
+    if (canConfig.value) {
+      void loadMcpCallLog();
+      if (logRows.value.length === 0) void loadActionLog();
+      if (annRows.value.length === 0 && !annLoading.value) void loadAnnouncements();
+    }
+    if (canFeedback.value) {
+      // 回修：先拉列表再拉统计——先把 fbStatsError 清掉的话，loadFeedback 的守卫会连带再发一次统计（总览首次失败时进本页签双发）
+      if (fbRows.value.length === 0) void loadFeedback();
+      void loadFbStats();
+    }
   }
 }
 

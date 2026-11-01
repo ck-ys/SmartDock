@@ -197,7 +197,7 @@ onMounted(() => {
     border-radius: 4px;
     color: var(--app-faint);
     font-family: inherit;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 17px;
   }
 }
