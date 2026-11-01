@@ -236,7 +236,6 @@ watch(
   --el-table-header-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);
   --el-table-text-color: var(--app-muted);
-  --el-table-border-color: var(--app-rule);
   --el-table-row-hover-bg-color: var(--app-raised);
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;

@@ -252,7 +252,6 @@ onMounted(getList);
   --el-table-header-bg-color: transparent;
   --el-table-tr-bg-color: var(--app-surface);
   --el-table-row-hover-bg-color: var(--app-raised);
-  --el-table-border-color: var(--app-rule);
   --el-table-header-text-color: var(--app-faint);
   --el-table-text-color: var(--app-muted);
 }

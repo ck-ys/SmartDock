@@ -156,12 +156,9 @@
   --el-menu-text-color: var(--app-muted);
   --el-menu-hover-bg-color: var(--app-raised);
   --el-menu-active-color: var(--app-text);
-  --el-table-header-bg-color: transparent;
-  --el-table-header-text-color: var(--app-faint);
-  --el-table-row-hover-bg-color: var(--app-raised);
-  --el-table-border-color: var(--app-rule);
-  --el-table-bg-color: transparent;
-  --el-table-tr-bg-color: transparent;
+  /* 表格变量不在这里声明：Element 自己在 .el-table 元素上写了同名变量，
+     元素级声明必压过继承值，写 :root 等于死声明（2026-11-01 Q4 审查实锤）。
+     唯一声明点 = dcs-ui-kit.scss 的 .el-table 块。 */
 
   /* EP 主色 = 皮肤 acc 及其衍生档（acc #2f6feb；浅色阶梯向白混 N*10%） */
   --el-color-primary: #2f6feb;
@@ -1011,6 +1008,20 @@ html.dark .el-switch {
 /* 2026-11-01 Q4=甲：竖线全部去掉（只有传了 border 属性的表才有） */
 .el-table--border .el-table__cell {
   border-right: 0 !important;
+}
+
+/* border 表的外沿还有三条线是伪元素画的，`border-right:0` 盖不到：
+   左右两条 1px 竖线 + 左上角补丁块。配对地一起抹掉，否则深色下外圈会留一道竖线 */
+.el-table--border::before,
+.el-table--border::after,
+.el-table__border-left-patch {
+  background-color: transparent;
+}
+
+/* 拖列宽时的位置参考线：它吃的是 `--el-table-border`（已改极淡），
+   太淡等于拖的时候看不到自己拖到哪，单独还给旧的一档线色 */
+.el-table__column-resize-proxy {
+  border-left-color: var(--app-rule);
 }
 
 .el-table__inner-wrapper::before {

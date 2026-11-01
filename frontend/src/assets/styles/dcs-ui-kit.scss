@@ -290,21 +290,16 @@ html.density-compact {
   --el-table-row-hover-bg-color: var(--app-raised);
 }
 
-.el-table th.el-table__cell {
-  background-color: transparent;
-}
-
-/* EP 的斑马纹权重是 (0,4,2)，这里补满层级才压得住 */
+/* EP 的斑马纹权重是 (0,4,2)，这里补满层级才压得住（表头去底色带那条在
+   theme-framed.scss，带 !important，这里不再重复声明） */
 .el-table.el-table--striped .el-table__body tr.el-table__row--striped > td.el-table__cell,
 .el-table.el-table--striped .el-table__body tr.el-table__row--striped:hover > td.el-table__cell,
 .el-table.el-table--striped .el-table__body tr.el-table__row--striped.hover-row > td.el-table__cell {
   background-color: transparent;
 }
 
-/* 竖线：只有传了 border 属性的表才有，统一去掉 */
-.el-table.el-table--border .el-table__cell {
-  border-right: 0;
-}
+/* 竖线：只有传了 border 属性的表才有。真正清零在 theme-framed.scss（含冻结列/嵌套表
+   这些高权重场景，必须带 !important），这里不重复写一条压不住的规则 */
 
 .ui-table {
   width: 100%;
@@ -330,15 +325,6 @@ html.density-compact {
   height: var(--dcs-density-row-h);
   padding: 0;
   border-bottom: 1px solid var(--app-table-rule);
-}
-
-/* 页面即使误传 stripe 也不出现斑马纹。
-   Element 自己的选择器是 `.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell`
-   （权重 0,4,2），只写 .ui-table 后代会被它压掉——这里补满层级才真的生效 */
-.ui-table.el-table .el-table__body tr.el-table__row--striped > td.el-table__cell,
-.ui-table.el-table .el-table__body tr.el-table__row--striped:hover > td.el-table__cell,
-.ui-table.el-table .el-table__body tr.el-table__row--striped.hover-row > td.el-table__cell {
-  background-color: transparent;
 }
 
 .ui-table .is-right,

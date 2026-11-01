@@ -591,7 +591,6 @@ onUnmounted(() => {
 
 /* 表格只覆盖 Element Plus 变量与行线，不重写组件内部结构 */
 .risk-table {
-  --el-table-border-color: var(--app-rule);
   --el-table-header-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);

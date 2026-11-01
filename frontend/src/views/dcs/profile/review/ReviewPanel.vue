@@ -446,7 +446,6 @@ onMounted(loadAll);
 }
 /* el-table 走 CSS 变量：表头无底带、行线走令牌、正文灰阶（不重写组件） */
 .review-panel :deep(.el-table) {
-  --el-table-border-color: var(--app-rule);
   --el-table-header-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);
   --el-table-text-color: var(--app-muted);

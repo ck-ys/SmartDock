@@ -966,7 +966,6 @@ onMounted(() => {
    属性，顶层 scoped 规则即可命中。 */
 
 .file-review-table {
-  --el-table-border-color: var(--app-rule);
   --el-table-header-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);

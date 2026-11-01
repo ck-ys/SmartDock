@@ -1035,7 +1035,6 @@ onMounted(async () => {
   visibility: hidden;
 }
 .segment-page :deep(.el-table) {
-  --el-table-border-color: var(--app-rule);
   --el-table-header-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);
   --el-table-text-color: var(--app-muted);

@@ -619,7 +619,6 @@ onMounted(reload);
 
 /* 表格变量与抽屉内元素走顶层规则：抽屉 append-to-body，祖先 .sensitive-word-page 匹配不到 */
 .risk-table {
-  --el-table-border-color: var(--app-rule);
   --el-table-header-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-table-header-text-color: var(--app-faint);

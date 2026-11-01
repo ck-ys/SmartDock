@@ -378,8 +378,6 @@ onMounted(getList);
 }
 /* 表格规格走 Element Plus 变量：表头无底带 / 行线令牌 / 行 hover 中性底 / 冻结列无阴影 */
 .ui-table {
-  --el-table-border-color: var(--app-rule);
-  --el-table-border: 1px solid var(--app-rule);
   --el-table-text-color: var(--app-muted);
   --el-table-header-text-color: var(--app-faint);
   --el-table-header-bg-color: transparent;
