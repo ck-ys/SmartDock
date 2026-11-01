@@ -62,7 +62,11 @@
             </template>
           </el-table-column>
           <template #empty>
-            <div class="ui-empty">暂无在线用户</div>
+            <div class="ui-empty">
+              <p class="ui-empty__title">暂无在线用户</p>
+              <p class="ui-empty__hint">只有当前会话未超时的人会出现在这里；刚登录的人可能需要几秒才出现。</p>
+              <el-button plain @click="getList">刷新列表</el-button>
+            </div>
           </template>
         </el-table>
       </div>

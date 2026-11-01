@@ -36,14 +36,19 @@
           <template #empty>
             <div class="ui-empty">
               <p class="ui-empty__title">暂无待审核提交</p>
-              <p class="ui-empty__hint">成员提交后，待审记录会出现在这里</p>
+              <p class="ui-empty__hint">成员提交后，待审记录会出现在这里；刚提交的稍等几秒再刷新。</p>
+              <el-button plain @click="load">刷新列表</el-button>
             </div>
           </template>
         </el-table>
       </div>
       <!-- ≤992：表格改卡片 -->
       <div class="dcs-mobile-list">
-        <el-empty v-if="rows.length === 0" description="暂无数据" :image-size="64" />
+        <div v-if="rows.length === 0" class="ui-empty">
+          <p class="ui-empty__title">暂无待审核提交</p>
+          <p class="ui-empty__hint">成员提交后，待审记录会出现在这里；刚提交的稍等几秒再刷新。</p>
+          <el-button plain @click="load">刷新列表</el-button>
+        </div>
         <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
           <div class="dcs-card-head">
             <span class="dcs-card-title">{{ row.taskTitle || `任务 #${String(row.taskId).slice(-6)}` }}</span>

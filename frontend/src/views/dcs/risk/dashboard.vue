@@ -84,7 +84,11 @@
                   <span class="source-cnt ui-num">{{ item.cnt }} 次</span>
                 </div>
               </div>
-              <el-empty v-else description="近 7 天暂无内容风险事件（机检未命中或未启用）" :image-size="80" />
+              <div v-else class="ui-empty">
+                <p class="ui-empty__title">近 7 天没有内容风险事件</p>
+                <p class="ui-empty__hint">机检没命中，或者内容机检还没启用；启用后新提交会自动过机检。</p>
+                <el-button plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
+              </div>
             </el-card>
 
             <!-- 近期内容风险事件: 只看 TASK_CONTENT_RISK, 词面打码 -->
@@ -129,12 +133,18 @@
                     <div class="ui-empty">
                       <p class="ui-empty__title">暂无内容风险事件</p>
                       <p class="ui-empty__hint">机检未命中或内容机检未启用时，这里不会有记录</p>
+                      <el-button plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
                     </div>
                   </template>
                 </el-table>
 
                 <!-- 2026-11-01 Q3=乙：手机档两行列表 -->
-                <mobile-row-list :rows="contentRiskEvents" row-key="eventId" empty-text="暂无内容风险事件" empty-hint="机检未命中的时候，这里不会有记录">
+                <mobile-row-list :rows="contentRiskEvents" row-key="eventId">
+                  <template #empty>
+                    <p class="ui-empty__title">暂无内容风险事件</p>
+                    <p class="ui-empty__hint">机检未命中或内容机检未启用时，这里不会有记录</p>
+                    <el-button plain @click="router.push('/risk/config/content-config')">去内容机检设置</el-button>
+                  </template>
                   <template #title="{ row }">{{ maskSensitiveDetail(row.detail || '-') }}</template>
                   <template #badge="{ row }">
                     <span class="ui-pill" :class="row.detail?.startsWith('内容机检:命中BLOCK') ? 'ui-pill--neg' : 'ui-pill--warn'">
@@ -170,7 +180,11 @@
                   <span class="word-cnt ui-num">{{ item.cnt }} 次</span>
                 </div>
               </div>
-              <el-empty v-else description="近 7 天暂无命中词" :image-size="80" />
+              <div v-else class="ui-empty">
+                <p class="ui-empty__title">近 7 天没有命中词</p>
+                <p class="ui-empty__hint">词库为空或内容都没踩到词；先补词库，命中才会有排行。</p>
+                <el-button plain @click="router.push('/risk/sensitive-word')">去维护敏感词</el-button>
+              </div>
             </el-card>
 
             <!-- 防线状态: 开关直读, 三态语义色 -->

@@ -4,10 +4,7 @@
       title="我的消息"
       subtitle="任务分派、审核结果与系统提醒都在这里"
       eyebrow="任务中心"
-      :metrics="[
-        { label: '消息总数', value: total },
-        { label: '本页未读', value: unreadCount }
-      ]"
+      :metrics="headerMetrics"
     />
 
     <el-card shadow="never" class="notice-list-card">
@@ -50,8 +47,12 @@
           </el-table-column>
           <template #empty>
             <div class="ui-empty">
-              <p class="ui-empty__title">暂无消息</p>
-              <p class="ui-empty__hint">任务分派、审核结果与系统提醒都会显示在这里。</p>
+              <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的消息' : '暂无消息' }}</p>
+              <p class="ui-empty__hint">
+                {{ hasFilter ? `当前筛选 0 条；全部消息还有 ${totalAll} 条。` : '任务分派、审核结果与系统提醒都会显示在这里。' }}
+              </p>
+              <el-button v-if="hasFilter" type="primary" plain @click="clearFilter">清空筛选，看全部</el-button>
+              <el-button v-else plain @click="load">刷新</el-button>
             </div>
           </template>
         </el-table>
@@ -59,8 +60,12 @@
       <!-- ≤992：表格改卡片；标读同样改成显式按钮 -->
       <div class="dcs-mobile-list notice-mobile">
         <div v-if="rows.length === 0" class="ui-empty">
-          <p class="ui-empty__title">暂无消息</p>
-          <p class="ui-empty__hint">任务分派、审核结果与系统提醒都会显示在这里。</p>
+          <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的消息' : '暂无消息' }}</p>
+          <p class="ui-empty__hint">
+            {{ hasFilter ? `当前筛选 0 条；全部消息还有 ${totalAll} 条。` : '任务分派、审核结果与系统提醒都会显示在这里。' }}
+          </p>
+          <el-button v-if="hasFilter" type="primary" plain @click="clearFilter">清空筛选，看全部</el-button>
+          <el-button v-else plain @click="load">刷新</el-button>
         </div>
         <div v-for="row in rows" :key="row.id" class="dcs-mobile-card notice-card">
           <div class="dcs-card-head">
@@ -97,6 +102,27 @@ const total = ref(0);
 const query = reactive<any>({ pageNum: 1, pageSize: 20, readFlag: '' });
 const unreadCount = computed(() => rows.value.filter((r) => r.readFlag === '0').length);
 
+/* 2026-11-01 Q6=乙：「消息总数」必须是全量，不能跟着筛选走。
+   筛选态下另起一次 pageSize=1 的请求取全量数（列表接口的 total 是筛选后的），
+   筛选结果单独显示为「当前筛选」一个数。 */
+const totalAll = ref(0);
+const hasFilter = computed(() => !!query.readFlag);
+const headerMetrics = computed(() => {
+  const list: Array<{ label: string; value: number }> = [{ label: '消息总数', value: totalAll.value }];
+  if (hasFilter.value) list.push({ label: '当前筛选', value: total.value });
+  list.push({ label: '本页未读', value: unreadCount.value });
+  return list;
+});
+const loadAllTotal = async () => {
+  const res = await myNotices({ pageNum: 1, pageSize: 1 });
+  totalAll.value = Number(res.total) || 0;
+};
+const clearFilter = () => {
+  query.readFlag = '';
+  query.pageNum = 1;
+  load();
+};
+
 const TYPE_LABEL: Record<string, string> = {
   TASK_PUBLISHED: '[新任务]',
   SUBMITTED: '[新提交]',
@@ -121,6 +147,8 @@ const load = async () => {
   } finally {
     loading.value = false;
   }
+  // 全量数只在筛选态下才会被看到；首次进来也取一次，保证「消息总数」一上来就是全量
+  if (hasFilter.value || !totalAll.value) await loadAllTotal().catch(() => undefined);
 };
 
 const read = async (row: DcsNoticeRow) => {

@@ -4,11 +4,7 @@
       title="任务管理"
       subtitle="发布、编辑、关闭任务，并跟踪成员填报进度"
       eyebrow="任务中心"
-      :metrics="[
-        { label: '任务总数', value: total },
-        { label: '本页草稿', value: draftCount },
-        { label: '本页收集中', value: collectingCount }
-      ]"
+      :metrics="headerMetrics"
     >
       <template #actions>
         <el-button v-hasPermi="['dcs:task:add']" type="primary" icon="Plus" @click="openCreate">新建任务</el-button>
@@ -63,8 +59,12 @@
           </el-table-column>
           <template #empty>
             <div class="ui-empty">
-              <p class="ui-empty__title">暂无任务</p>
-              <p class="ui-empty__hint">换个筛选条件，或点右上角「新建任务」。</p>
+              <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的任务' : '暂无任务' }}</p>
+              <p class="ui-empty__hint">
+                {{ hasFilter ? `当前筛选 0 条；全部任务还有 ${totalAll} 条。` : '还没有建过任务，新建一个就能开始分派。' }}
+              </p>
+              <el-button v-if="hasFilter" type="primary" plain @click="reset">清空筛选，看全部</el-button>
+              <el-button v-else v-hasPermi="['dcs:task:add']" type="primary" @click="openCreate">新建任务</el-button>
             </div>
           </template>
         </el-table>
@@ -72,8 +72,12 @@
       <!-- ≤992：表格改卡片（身份+状态+主操作；次要字段进 meta 行） -->
       <div class="dcs-mobile-list mission-mobile">
         <div v-if="rows.length === 0" class="ui-empty">
-          <p class="ui-empty__title">暂无任务</p>
-          <p class="ui-empty__hint">换个筛选条件，或点右上角「新建任务」。</p>
+          <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的任务' : '暂无任务' }}</p>
+          <p class="ui-empty__hint">
+            {{ hasFilter ? `当前筛选 0 条；全部任务还有 ${totalAll} 条。` : '还没有建过任务，新建一个就能开始分派。' }}
+          </p>
+          <el-button v-if="hasFilter" type="primary" plain @click="reset">清空筛选，看全部</el-button>
+          <el-button v-else v-hasPermi="['dcs:task:add']" type="primary" @click="openCreate">新建任务</el-button>
         </div>
         <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
           <div class="dcs-card-head">
@@ -179,6 +183,17 @@ const draftCount = computed(() => rows.value.filter((r) => r.status === 'DRAFT')
 const collectingCount = computed(() => rows.value.filter((r) => r.status === 'COLLECTING').length);
 const query = reactive<any>({ pageNum: 1, pageSize: 10, title: '', status: '' });
 
+/* 2026-11-01 Q6=乙：「任务总数」钉死全量。筛选后列表接口的 total 是筛选结果，
+   另起一次 pageSize=1 的全量请求取总数；筛选结果单独显示「当前筛选」。 */
+const totalAll = ref(0);
+const hasFilter = computed(() => !!query.title || !!query.status);
+const headerMetrics = computed(() => {
+  const list: Array<{ label: string; value: number }> = [{ label: '任务总数', value: totalAll.value }];
+  if (hasFilter.value) list.push({ label: '当前筛选', value: total.value });
+  list.push({ label: '本页草稿', value: draftCount.value }, { label: '本页收集中', value: collectingCount.value });
+  return list;
+});
+
 const dialog = reactive({ visible: false, id: '' });
 const saving = ref(false);
 const formRef = ref();
@@ -267,6 +282,10 @@ const load = async () => {
     total.value = res.total;
   } finally {
     loading.value = false;
+  }
+  if (hasFilter.value || !totalAll.value) {
+    const all = await pageTasks({ pageNum: 1, pageSize: 1 });
+    totalAll.value = Number(all.total) || 0;
   }
 };
 const reset = () => {
