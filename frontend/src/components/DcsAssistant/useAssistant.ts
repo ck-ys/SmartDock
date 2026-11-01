@@ -51,6 +51,8 @@ export const ACT: Record<string, string> = {
   read_file: '读归档',
   query_unsubmitted_by_dept: '查未交汇总',
   submit_plan: '出计划',
+  // 题12（2026-10-31）：结构化反问卡（漏登记会英文直出 ask user）
+  ask_user: '请用户选择',
   save_memory: '存记忆',
   // ZCode 对齐 Q2 批A 引入（k3 P1-2 回修：漏登记致面板步骤行英文 todo write 直出）
   todo_write: '更新清单',
@@ -198,6 +200,9 @@ export interface AssistantTurn {
   /** G3-A1：MCP elicitation 反问卡（CUSTOM 'elicitation' 帧，run 内挂起随本回合走）；
    *  作答走独立端点不走 resolveHitl；过期前端本地收卡（后端超时 CANCEL 兜底闭环） */
   elicitations: import('@/api/dcs/assistant').AssistantElicitationCard[];
+  /** 题12 案1：内置结构化反问卡（CUSTOM 'ask_user' 帧，run 内挂起随本回合走）；
+   *  作答走独立端点，答完工具结果回到模型继续跑，过期本地收卡 */
+  askUsers: import('@/api/dcs/assistant').AssistantAskUserCard[];
   /** 批5 Q7-3：LLM 生成的贴题追问（侧车异步回写消息行）；空=前端回退角色静态池 */
   followups?: string[];
   /** 自查回修：追问侧车三次拉取全部落空才置 true——「本轮未生成贴题追问」灰字只在这之后显示，
@@ -370,7 +375,8 @@ function emptyTurn(question: string): AssistantTurn {
     toolCalls: 0,
     hitl: null,
     plan: null,
-    elicitations: []
+    elicitations: [],
+    askUsers: []
   };
 }
 
@@ -566,6 +572,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       // G3 三审回修（dsflash P2-13）：反问卡是 run 内挂起（tools/call 在飞）——run
       // 终态/契约失效即死卡（作答必得「已失效」），与 HITL 不同没有 resume 续命，全清
       t.elicitations = [];
+      t.askUsers = [];
     }
   }
 
@@ -574,6 +581,15 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     for (const t of state.turns) {
       if (t.elicitations.length > 0) {
         t.elicitations = t.elicitations.filter((c) => c.id !== id);
+      }
+    }
+  }
+
+  /** 题12 案1：结构化反问卡收卡（用户提交/关闭/超时；与 elicitation 同机制） */
+  function removeAskUserCard(id: string) {
+    for (const t of state.turns) {
+      if (t.askUsers.length > 0) {
+        t.askUsers = t.askUsers.filter((c) => c.id !== id);
       }
     }
   }
@@ -766,6 +782,42 @@ export function useAssistant(options: UseAssistantOptions = {}) {
               requestedSchema: (v.requestedSchema && typeof v.requestedSchema === 'object' ? v.requestedSchema : {}) as Record<string, unknown>,
               remainingMs: typeof v.remainingMs === 'number' ? v.remainingMs : 300_000
             });
+          }
+        } else if (name === 'ask_user' && value && typeof value === 'object') {
+          // 题12 案1：内置结构化反问（ask_user 工具在飞挂起，run 保持 RUNNING）——
+          // 卡片随本回合渲染，作答走独立端点；坏载荷/已收过的 id 直接忽略
+          const v = value as { id?: unknown; questions?: unknown; remainingMs?: unknown };
+          if (typeof v.id === 'string' && v.id && !turn.askUsers.some((c) => c.id === v.id)) {
+            const qs = (Array.isArray(v.questions) ? v.questions : [])
+              .filter((q) => q && typeof q === 'object')
+              .slice(0, 4)
+              .map((q) => {
+                const one = q as { question?: unknown; header?: unknown; options?: unknown; multiSelect?: unknown };
+                return {
+                  question: typeof one.question === 'string' ? one.question : '',
+                  header: typeof one.header === 'string' && one.header ? one.header : '请选择',
+                  options: (Array.isArray(one.options) ? one.options : [])
+                    .filter((o) => o && typeof o === 'object')
+                    .slice(0, 4)
+                    .map((o) => {
+                      const op = o as { label?: unknown; description?: unknown };
+                      return {
+                        label: typeof op.label === 'string' ? op.label : '',
+                        ...(typeof op.description === 'string' && op.description ? { description: op.description } : {})
+                      };
+                    })
+                    .filter((o) => o.label),
+                  multiSelect: one.multiSelect === true
+                };
+              })
+              .filter((q) => q.question && q.options.length >= 2);
+            if (qs.length > 0) {
+              turn.askUsers.push({
+                id: v.id,
+                questions: qs,
+                remainingMs: typeof v.remainingMs === 'number' ? v.remainingMs : 240_000
+              });
+            }
           }
         } else if (name === 'todo' && value && typeof value === 'object') {
           // ZCode 对齐 Q2（批B）：todo_write 整表替换清单——enricher 转发帧，
@@ -1112,6 +1164,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       return;
     }
     turn.durMs = Date.now() - turn.startedAt;
+    // 题12 案1（三席 P1）：run 已到终态，未作答的反问卡已不可能被模型用上——
+    // 后端停止时已按取消收尾，前端再留着只会让用户点出一笔「成功但模型收不到」的假提交
+    turn.askUsers = [];
     // assistant 回复入 history 镜像（AGUI 每轮全量重传——多轮上下文；E2E 实证缺此步二轮即失忆）
     if (turn.bufText && !turn.hitl) {
       history.push({ id: 'a' + seq, role: 'assistant', content: turn.bufText });
@@ -2002,6 +2057,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     attachRunning,
     resumeStreamingPlaceholder,
     removeElicitationCard,
+    removeAskUserCard,
     resumeSay,
     resolveHitl,
     setAutoLevel,

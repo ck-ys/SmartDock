@@ -97,6 +97,8 @@ public class AssistantAgentFactory {
     private final org.dromara.assistant.service.McpPilotService mcpPilotService;
     /** 题2 案3（2026-10-31）：技能使用统计——取用一次记一行，管理页展示「用了几次/最近一次」 */
     private final org.dromara.assistant.service.AssistantSkillUsageService skillUsageService;
+    /** 题12 案1：结构化反问桥（ask_user 挂起等用户点选） */
+    private final org.dromara.assistant.core.AssistantAskUserBridge askUserBridge;
     /** 压缩工作区(批17 Q2: 中间件卸载归档用, AssistantWorkspaceConfig 装配) */
     private final io.agentscope.harness.agent.workspace.WorkspaceManager workspaceManager;
 
@@ -196,7 +198,9 @@ public class AssistantAgentFactory {
                 planSignal, memoryService, memoryOn, aguiThreadId, user.getTenantId(),
                 todoSignal, conversationService, webSearchQuota, quotaService, tenantCfg.toolGate(),
                 // 题7 案1：工作区根 = 本会话驱逐落盘目录（read_file 只在此根下回读）
-                threadWorkspace), pb,
+                threadWorkspace,
+                // 题12 案1：结构化反问桥（ask_user）
+                askUserBridge), pb,
             // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
             // 管理员改完下一轮建会话即生效（注册面即时消失）
             tenantCfg.toolGate());

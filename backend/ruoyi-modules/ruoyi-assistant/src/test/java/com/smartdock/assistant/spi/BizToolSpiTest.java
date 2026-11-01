@@ -149,7 +149,7 @@ class BizToolSpiTest {
         org.dromara.assistant.core.ToolRegistry.ToolDeps emptyDeps =
             new org.dromara.assistant.core.ToolRegistry.ToolDeps(
                 null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null, null,
-                java.nio.file.Path.of("."));
+                java.nio.file.Path.of("."), null);
         Toolkit toolkit = new Toolkit();
         Set<String> registered = org.dromara.assistant.core.ToolRegistry.registerAll(toolkit,
             identity(2, Set.of("*:*:*")), emptyDeps, PermissionContextState.builder(), null);

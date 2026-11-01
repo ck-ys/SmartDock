@@ -210,6 +210,7 @@
             @mdnav="onMdNav"
             @draft-set="onDraftSet"
             @plan-cancel="onPlanCancel"
+            @ask-user-done="removeAskUserCard"
             @tour="startTour"
           />
 
@@ -982,6 +983,7 @@ const {
   resumeStreamingPlaceholder,
   resumeSay,
   resolveHitl,
+  removeAskUserCard,
   setAutoLevel,
   queueEdit,
   queueGo,

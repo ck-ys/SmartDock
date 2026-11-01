@@ -178,6 +178,16 @@
       @done="(id) => emit('elicit-done', id)"
     />
 
+    <!-- 题12 案1：内置结构化反问卡（ask_user 在飞挂起，run 保持 RUNNING）——用户在卡上点选，
+         结果作为工具结果回到模型继续跑；done 后本地移除（后端超时按未作答收尾） -->
+    <ask-user-card
+      v-for="ac in turn.askUsers"
+      :key="ac.id"
+      :card="ac"
+      :thread-id="sessionThreadId ?? ''"
+      @done="(id) => emit('ask-user-done', id)"
+    />
+
     <!-- 正文气泡：流式=纯文本+光标（S-23 仅末段增量）；完成=全量 md；
          UI 专项批1：卡内「已完成」章删除——与顶部状态胶囊重复报状态（视觉评审 7.4 轮实锤），成功语义只留胶囊+浅绿描边 -->
     <div v-if="turn.bufText || turn.answerHtml" class="bub" :class="{ 'g-ok': turn.phase === 'done' && turn.toolCalls > 0 }">
@@ -415,6 +425,7 @@ import FormCard from './FormCard.vue';
 import TemplateCard from './TemplateCard.vue';
 import PlanCard from './PlanCard.vue';
 import ElicitCard from './ElicitationCard.vue';
+import AskUserCard from './AskUserCard.vue';
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
 import { turnStateWord } from './assistantCtx';
@@ -470,6 +481,8 @@ const emit = defineEmits<{
   /** G3 反问卡收卡（作答/超时）上浮宿主 store 移除——不在子组件里改 prop（eslint
    *  vue/no-mutating-props，三审回修） */
   'elicit-done': [id: string];
+  /** 题12 案1：结构化反问卡收卡（提交/关闭/超时） */
+  'ask-user-done': [id: string];
   'resolve-hitl': [approved: boolean, remember?: boolean, edits?: HitlEdits];
   'new-session': [];
   /** AU-35：错误卡「恢复挂起的确认」——上浮到状态机 recoverInterrupt（peek 悬挂缓存重建卡） */

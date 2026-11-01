@@ -329,6 +329,45 @@ export function answerElicitation(threadId: string, id: string, action: 'accept'
     data: { threadId, id, action, content: content ?? {} } });
 }
 
+/** 题12 案1：内置结构化反问卡（CUSTOM 'ask_user' 帧载荷，AssistantAskUserBridge.cardPayload 同构） */
+export interface AssistantAskUserOption {
+  label: string;
+  description?: string;
+}
+
+export interface AssistantAskUserQuestion {
+  question: string;
+  header: string;
+  options: AssistantAskUserOption[];
+  multiSelect: boolean;
+}
+
+export interface AssistantAskUserCard {
+  id: string;
+  questions: AssistantAskUserQuestion[];
+  /** 服务端下发的剩余可答时长（毫秒）——相对时长免疫两端时钟偏差 */
+  remainingMs: number;
+}
+
+/** 单题作答：picked=点选的预设项 label；other=「其它」补充文字（两者可同时有） */
+export interface AssistantAskUserAnswer {
+  header: string;
+  question: string;
+  picked: string[];
+  other?: string;
+}
+
+/** 题12 案1：结构化反问作答——内置工具在飞挂起，答完作为工具结果回到模型继续跑 */
+export function answerAskUser(
+  threadId: string,
+  id: string,
+  action: 'answer' | 'cancel',
+  answers?: AssistantAskUserAnswer[]
+) {
+  return request({ url: '/dcs/assistant/ask/answer', method: 'post',
+    data: { threadId, id, action, answers: answers ?? [] } });
+}
+
 /** 批5 Q7-3：本会话最新回答的 LLM 追问建议（回答完成后延时拉一次；空=回退静态池）。
  *  泛型=整个 body（request 层不脱壳，getConversationTodo 同款）；messageId 是字符串——
  *  雪花 19 位超 JS 安全整数，后端 BigNumberSerializer 序列化为 string */

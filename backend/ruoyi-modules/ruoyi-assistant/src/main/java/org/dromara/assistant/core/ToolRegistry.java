@@ -53,7 +53,9 @@ public final class ToolRegistry {
         /** 三审回修 P1-1：view_skill 自取过闸用的租户矩阵快照 */
         java.util.Map<String, String> toolGate,
         /** 题7 案1：驱逐中间件落盘目录（助手工作区）；read_file 只在此根下回读 */
-        java.nio.file.Path workspaceRoot
+        java.nio.file.Path workspaceRoot,
+        /** 题12 案1：结构化反问桥（ask_user 挂起等用户点选） */
+        org.dromara.assistant.core.AssistantAskUserBridge askUserBridge
     ) {
     }
 
@@ -98,6 +100,12 @@ public final class ToolRegistry {
         new ToolSpec(Set.of("submit_plan"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
             (id, d) -> new org.dromara.assistant.tools.PlanTools(id, d.planSignal(), d.aguiThreadId()), null),
+        // 结构化反问（题12 案1 2026-10-31）：只读工具、全角色可用；用户点选后结果作为工具结果
+        // 返回模型继续跑（卡走 CUSTOM ask_user 帧，作答走独立端点，不进 HITL resume）
+        new ToolSpec(Set.of("ask_user"),
+            PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
+            (id, d) -> new org.dromara.assistant.tools.AskUserTools(d.askUserBridge(), d.tenantId(),
+                id.getUserId(), d.aguiThreadId()), null),
         // TODO 清单（ZCode 对齐 Q2，批A）：全角色可用——整表替换式工作计划，
         // 落会话行 todo_items 列 + enricher 转 todo CUSTOM 帧，前端 StatPanel 分区
         new ToolSpec(Set.of("todo_write"),
@@ -248,6 +256,7 @@ public final class ToolRegistry {
         java.util.Map.entry("web_search", new ToolMeta("联网搜索", "查询", 1, "会话停用联网或租户未配 key 时不注册", "high")),
         java.util.Map.entry("read_attachment", new ToolMeta("读会话附件", "查询", 1, "", "low")),
         java.util.Map.entry("submit_plan", new ToolMeta("计划卡", "交互", 2, "", "low")),
+        java.util.Map.entry("ask_user", new ToolMeta("结构化反问", "交互", 2, "", "low")),
         java.util.Map.entry("save_memory", new ToolMeta("保存长期记忆", "交互", 2, "租户开启长期记忆后", "mid")),
         java.util.Map.entry("todo_write", new ToolMeta("任务清单", "交互", 3, "", "low")),
         java.util.Map.entry("view_skill", new ToolMeta("查看技能指引", "交互", 3, "", "low")),

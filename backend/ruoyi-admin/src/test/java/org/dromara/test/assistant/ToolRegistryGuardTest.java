@@ -42,8 +42,8 @@ class ToolRegistryGuardTest {
      *  批3 微核心化：18 个业务域工具退役（走 SPI），平台自留 6 个；
      *  题7（2026-10-31）加 read_file 工作区回读 = 7 个。 */
     private static final Set<String> EXPECTED_ALL = Set.of(
-        "web_search", "read_attachment", "submit_plan", "save_memory", "todo_write", "view_skill",
-        "read_file");
+        "web_search", "read_attachment", "submit_plan", "ask_user", "save_memory", "todo_write",
+        "view_skill", "read_file");
 
     private static ToolIdentity identity(int level) {
         return new ToolIdentity(1L, "000000", level, null);
@@ -68,7 +68,9 @@ class ToolRegistryGuardTest {
             KEY_CONFIG, null, null,
             null, null, memoryEnabled, threadId, "000000", null, null, null, null, null,
             // 题7：read_file 构造只存根路径，不读盘
-            java.nio.file.Path.of("."));
+            java.nio.file.Path.of("."),
+            // 题12：ask_user 只存桥引用
+            null);
     }
 
     /** ①清单完整：全局名字无重复，与预期全集全等；每条 spec 字段齐。 */

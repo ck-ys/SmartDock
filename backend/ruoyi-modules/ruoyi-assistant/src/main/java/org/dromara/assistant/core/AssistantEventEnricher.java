@@ -54,6 +54,8 @@ public class AssistantEventEnricher implements AguiEventEnricher {
     private final org.dromara.assistant.service.AssistantActionService actionService;
     /** G3-A1：MCP elicitation 反问卡——桥里挂起的卡信号在本批事件前转发 CUSTOM 帧 */
     private final AssistantElicitationBridge elicitationBridge;
+    /** 题12 案1：结构化反问卡（ask_user）信号仓 */
+    private final AssistantAskUserBridge askUserBridge;
     /** B 批题5「续看」：进行中 run 事件广播汇——出网最终视图（闸后）喂汇，供刷新后 attach 重放 */
     private final AssistantRunStreamHub runStreamHub;
     /** 题5 案1（2026-10-31）：自选模型回退默认链的提示信号，本批事件前转 model_degrade CUSTOM 帧 */
@@ -137,6 +139,18 @@ public class AssistantEventEnricher implements AguiEventEnricher {
                 for (int i = denials.size() - 1; i >= 0; i--) {
                     out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
                         "tool_denied", denials.get(i)));
+                }
+            }
+        }
+        // 题12 案1（2026-10-31）：结构化反问卡——ask_user 挂起时桥里排队，本批转发 CUSTOM 'ask_user'
+        // （一卡一帧；作答走独立端点，run 保持 RUNNING），前端 AskUserCard 渲染
+        if (askUserBridge != null && context != null && context.getThreadId() != null) {
+            java.util.List<java.util.Map<String, Object>> cards = askUserBridge.take(context.getThreadId());
+            if (cards != null && !cards.isEmpty()) {
+                out = new java.util.ArrayList<>(out);
+                for (int i = cards.size() - 1; i >= 0; i--) {
+                    out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
+                        "ask_user", cards.get(i)));
                 }
             }
         }

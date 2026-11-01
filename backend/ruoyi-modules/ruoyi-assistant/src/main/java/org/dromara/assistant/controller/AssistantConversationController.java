@@ -55,6 +55,8 @@ public class AssistantConversationController extends BaseController {
     private final org.dromara.assistant.mapper.AssistantRunMapper runMapper;
     /** B 批题5「续看」：进行中 run 事件广播汇 */
     private final org.dromara.assistant.core.AssistantRunStreamHub runStreamHub;
+    /** 题12 案1：结构化反问桥——停止生成时释放该线程挂起卡（工具线程不空等 240s） */
+    private final org.dromara.assistant.core.AssistantAskUserBridge askUserBridge;
 
     /**
      * B 批题5「续看」（2026-10-27 拍板 甲案）：刷新/掉线后重新挂上进行中的回答流。
@@ -264,6 +266,9 @@ public class AssistantConversationController extends BaseController {
                     threadId, latest.get(0).getRunId(), rcUserId);
             }
         });
+        // 题12 案1：停止后挂起的结构化反问已不可能被模型用上——立即按取消收尾释放工具线程。
+        // 不释放的话：卡片留在屏上、作答端点还能「成功」，但 run 已终局=答案被静默吞掉
+        askUserBridge.cancelThread(tenantId, userId, threadId);
         return R.ok();
     }
 
