@@ -110,6 +110,10 @@ export interface AssistantSkillAdminRow {
   source: 'builtin' | 'online-overwrite' | 'online-new' | 'builtin-disabled' | 'online-disabled';
   /** 内置档名（空串=纯在线技能，没有内置基线）；覆写只升不降的比对基准 */
   builtinMinRole: string;
+  /** 题2 案3：本租户累计取用次数（无统计=0）——管理页列展示待 admin/index.vue 他窗收口后接 */
+  useCount?: number;
+  /** 题2 案3：最近一次被取用时间（无统计=null） */
+  lastUsedAt?: string | null;
 }
 
 /** 详情出参：列表行 + 本租户在线行（编辑回填/恢复预览用；无在线行=undefined） */
