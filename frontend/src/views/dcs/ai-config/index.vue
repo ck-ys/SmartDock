@@ -835,12 +835,12 @@
                 }}</span>
               </div>
               <el-row :gutter="16">
-                <el-col :span="6">
+                <el-col :span="12">
                   <el-form-item label="租户">
                     <el-input v-model="inlinePriceForm.tenantId" placeholder="000000 表示全局" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="6">
+                <el-col :span="12">
                   <el-form-item label="币种">
                     <el-select
                       v-model="inlinePriceForm.currency"
@@ -858,12 +858,12 @@
                     <div class="field-hint">默认按浏览器语言匹配，也可直接输入三位币种代码</div>
                   </el-form-item>
                 </el-col>
-                <el-col :span="6">
+                <el-col :span="12">
                   <el-form-item label="厂商">
                     <el-input :model-value="getProviderName(form.provider || '')" disabled />
                   </el-form-item>
                 </el-col>
-                <el-col :span="6">
+                <el-col :span="12">
                   <el-form-item label="模型">
                     <el-input v-model="inlinePriceForm.modelName" placeholder="具体模型或 *" />
                   </el-form-item>
@@ -977,7 +977,7 @@
           <span>{{ tenantNameOf(String(accessForm.tenantId)) }} · {{ getProviderName(String(accessForm.provider)) }}</span>
         </el-form-item>
         <el-form-item label="钥匙标签" prop="label">
-          <el-input v-model="accessForm.label" placeholder="如「主号 / 备1」，留空自动编号" style="width: 320px" />
+          <el-input v-model="accessForm.label" placeholder="如「主号 / 备1」，留空自动编号" style="width: 100%" />
         </el-form-item>
         <el-form-item label="Base URL" prop="baseUrl">
           <!-- 批1(2026-10-21 用户需求)：选了厂商就不该让人手填 URL——标准厂商按官方地址
@@ -1137,10 +1137,11 @@
         </el-form-item>
         <el-form-item label="价格 JSON">
           <el-input v-model="importForm.json" type="textarea" :rows="12" :placeholder="importJsonSample" />
+          <div class="field-hint">字段：provider / modelName / input / output / cachedInput（每百万 token 单价）/ currency / manualOverride</div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <span class="import-foot-hint">字段：provider / modelName / input / output / cachedInput（每百万 token 单价）/ currency / manualOverride</span>
+        <span class="import-foot-hint">统一按每百万 token 计价</span>
         <el-button @click="importDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="importSubmitting" @click="submitImport">导入</el-button>
       </template>
@@ -3635,10 +3636,6 @@ onUnmounted(() => {
 }
 
 .ai-config-dialog {
-  :deep(.el-dialog) {
-    max-width: calc(100vw - 32px);
-  }
-
   :deep(.el-dialog__body) {
     max-height: calc(100vh - 180px);
     overflow-y: auto;
@@ -3753,6 +3750,15 @@ onUnmounted(() => {
   color: var(--el-text-color-secondary);
   flex: none;
 }
+/* 2026-11-01 Q5 回归席 P2：footer 里这行字段说明被按钮挤成 284px 三行，给它占满左侧剩余宽度 */
+.el-dialog__footer .import-foot-hint {
+  flex: 1;
+  min-width: 0;
+  margin-right: auto;
+  text-align: left;
+  line-height: 1.5;
+}
+
 .import-foot-hint {
   font-size: 12px;
   color: var(--el-text-color-secondary);

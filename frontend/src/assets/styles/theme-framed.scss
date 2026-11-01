@@ -1096,8 +1096,10 @@ html.dark .el-year-table td.current:not(.disabled) .el-date-table-cell__text {
 
 .el-dialog__footer {
   /* 2026-11-01 Q5=乙：底部按钮区统一 60 高（原来 71）。按钮本身 32–36 两种，
-     靠 padding 凑不出同一个数，改成定高 + 垂直居中，含顶部分隔线共 60 */
-  height: 60px;
+     靠 padding 凑不出同一个数，改成定高 + 垂直居中，含顶部分隔线共 60。
+     用 min-height 而非 height：带左侧提示文字的底栏（如「一键收紧」）折行后要能自动长高，
+     定高会把按钮压出弹窗底边（Q5 回归席 P1 实锤 66 > 59）。纯按钮底栏仍被撑到 60。 */
+  min-height: 60px;
   padding: 0 24px;
   box-sizing: border-box;
   display: flex;
@@ -1107,12 +1109,14 @@ html.dark .el-year-table td.current:not(.disabled) .el-date-table-cell__text {
   border-top: 1px solid var(--app-rule);
 }
 
+/* Element 自带 .el-button + .el-button { margin-left: 12px }，会和上面的 gap 叠成 20px（Q5 深挖席 P2-2） */
+.el-dialog__footer .el-button + .el-button {
+  margin-left: 0;
+}
+
 /* 抽屉最多铺满视口：480 档在 390 屏上不越出屏幕，手机上等于全宽 */
 .el-drawer {
   max-width: 100vw;
-}
-
-.el-drawer {
   background: var(--app-surface);
 }
 

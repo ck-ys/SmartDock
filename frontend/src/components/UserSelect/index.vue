@@ -3,7 +3,7 @@
     <el-dialog v-model="userDialog.visible.value" :title="userDialog.title.value" width="760px" append-to-body>
       <el-row :gutter="20">
         <!-- 部门树 -->
-        <el-col :lg="4" :xs="24" style="">
+        <el-col :lg="6" :xs="24">
           <el-card shadow="hover">
             <el-input v-model="deptName" placeholder="请输入部门名称" prefix-icon="Search" clearable />
             <el-tree
@@ -24,7 +24,7 @@
             </el-tree>
           </el-card>
         </el-col>
-        <el-col :lg="20" :xs="24">
+        <el-col :lg="18" :xs="24">
           <transition :enter-active-class="proxy?.animate.searchAnimate.enter" :leave-active-class="proxy?.animate.searchAnimate.leave">
             <div v-show="showSearch" class="mb-[10px]">
               <el-card shadow="hover">

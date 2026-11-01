@@ -225,8 +225,9 @@
           </div>
         </template>
         <!-- 2026-10-30 题13（方案A）：六列最小 810px 塞 720px 抽屉，「最近事件」被固定操作列盖住——
-             命中原因收进行内展开（想知道再点开），操作列不再固定，时间一眼看全 -->
-        <el-table-column type="expand" width="40">
+             命中原因收进行内展开（想知道再点开），操作列不再固定，时间一眼看全。
+             2026-11-01 Q5 深挖席 P1-4：抽屉按档位收到 640，可用 600px，列宽同步收到 586px 塞得下 -->
+        <el-table-column type="expand" width="36">
           <template #default="{ row }">
             <div class="member-detail">
               <span class="member-detail__label">命中原因</span>
@@ -234,7 +235,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="主体" min-width="180">
+        <el-table-column label="主体" min-width="150">
           <template #default="{ row }">
             <div class="subject-cell">
               <span class="subject-name">{{ row.displayName || row.subjectId }}</span>
@@ -245,8 +246,8 @@
         <el-table-column label="总分" width="90" align="right">
           <template #default="{ row }">{{ formatScore(row.totalScore) }}</template>
         </el-table-column>
-        <el-table-column prop="eventCount" label="事件数" width="80" align="right" />
-        <el-table-column label="最近事件" width="170">
+        <el-table-column prop="eventCount" label="事件数" width="70" align="right" />
+        <el-table-column label="最近事件" width="150">
           <template #default="{ row }">{{ row.lastEventTime || '—' }}</template>
         </el-table-column>
         <el-table-column label="操作" width="90">

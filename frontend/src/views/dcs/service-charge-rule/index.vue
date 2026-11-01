@@ -78,7 +78,7 @@
     </el-card>
 
     <!-- 新增 / 编辑 -->
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="760px" append-to-body>
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="640px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-row :gutter="16">
           <el-col :span="12">

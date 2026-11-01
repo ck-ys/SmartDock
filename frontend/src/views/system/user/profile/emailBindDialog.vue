@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     :title="props.current ? '更换邮箱' : '绑定邮箱'"
-   width="640px"
+    width="640px"
     append-to-body
     :close-on-click-modal="false"
     class="email-bind"

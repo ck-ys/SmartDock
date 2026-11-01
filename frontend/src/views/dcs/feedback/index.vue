@@ -218,6 +218,7 @@ import { feedbackStatusSummary, getFeedback, handleFeedback, listFeedback } from
 import type { FeedbackRow, FeedbackStatus, FeedbackType } from '@/api/dcs/feedback/types';
 import { listByIds } from '@/api/system/oss';
 import type { OssVO } from '@/api/system/oss/types';
+import { useWindowSize } from '@vueuse/core';
 import { checkPermi } from '@/utils/permission';
 import SupportPageHead from '@/views/dcs/support/components/SupportPageHead.vue';
 import FeedbackDialog from './components/FeedbackDialog.vue';
@@ -277,7 +278,10 @@ const emptyHint = computed(() =>
 );
 
 const drawerVisible = ref(false);
-const drawerSize = computed(() => (window.innerWidth < 768 ? '100%' : '560px'));
+/* 2026-11-01 Q5 深挖席 P2-1：原来读 window.innerWidth 的 computed 没有响应式依赖，
+   求值一次就永久缓存，桌面拖窄后不跟随；换成 vueuse 的响应式宽度 */
+const { width: winWidth } = useWindowSize();
+const drawerSize = computed(() => (winWidth.value < 768 ? '100%' : '640px'));
 const current = ref<FeedbackRow | null>(null);
 const detailLoading = ref(false);
 const images = ref<OssVO[]>([]);
