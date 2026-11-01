@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="邀请注册" width="940px" append-to-body destroy-on-close>
+  <el-dialog v-model="visible" title="邀请注册" width="760px" append-to-body destroy-on-close>
     <div class="invite-dialog">
       <!-- 生成表单 -->
       <el-form :inline="true" class="generate-form" @submit.prevent>

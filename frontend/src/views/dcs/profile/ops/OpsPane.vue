@@ -156,7 +156,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="createVisible" title="发起回放" width="min(480px, 94%)" append-to-body>
+    <el-dialog v-model="createVisible" title="发起回放" width="640px" append-to-body>
       <el-form label-width="90px">
         <el-form-item label="业务源">
           <el-input v-model="source" disabled style="width: 200px" />

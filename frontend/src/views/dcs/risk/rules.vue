@@ -106,7 +106,7 @@
       </div>
 
       <!-- Req 7.2: 新增规则对话框; 事件类型改可建词下拉(2026-08-23, 替代手输英文枚举) -->
-      <el-dialog v-model="addDialog.visible" title="新增风控规则" width="min(520px, calc(100vw - 32px))">
+      <el-dialog v-model="addDialog.visible" title="新增风控规则" width="760px">
         <el-form :model="addDialog.form" label-width="110px">
           <el-form-item label="事件类型" required>
             <el-select

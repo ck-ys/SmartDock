@@ -118,7 +118,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <!-- 创建订单 -->
-    <el-dialog v-model="createDialog.visible" title="创建充值订单" width="500px" append-to-body>
+    <el-dialog v-model="createDialog.visible" title="创建充值订单" width="640px" append-to-body>
       <el-form ref="formRef" :model="createDialog.form" :rules="rules" label-width="90px">
         <el-form-item label="钱包ID" prop="walletId">
           <el-input-number v-model="createDialog.form.walletId" :min="1" controls-position="right" style="width: 100%" placeholder="目标钱包ID" />

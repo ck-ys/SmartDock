@@ -118,7 +118,7 @@
     </el-card>
 
     <!-- 事件详情弹窗 -->
-    <el-dialog v-model="detailDialog.visible" title="事件详情" width="min(560px, calc(100vw - 32px))" append-to-body>
+    <el-dialog v-model="detailDialog.visible" title="事件详情" width="640px" append-to-body>
       <el-descriptions v-if="detailDialog.data" :column="2" border>
         <el-descriptions-item label="事件 ID">{{ detailDialog.data.eventId }}</el-descriptions-item>
         <el-descriptions-item label="时间">{{ formatTime(detailDialog.data.createdTime) }}</el-descriptions-item>

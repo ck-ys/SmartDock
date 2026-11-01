@@ -72,7 +72,7 @@
     <el-dialog
       v-model="formDialog.visible"
       :title="formDialog.editingId ? '编辑白名单' : '新增白名单'"
-      width="min(480px, calc(100vw - 32px))"
+     width="640px"
       append-to-body
     >
       <el-form ref="formRef" :model="formDialog.form" :rules="formRules" label-width="80px">

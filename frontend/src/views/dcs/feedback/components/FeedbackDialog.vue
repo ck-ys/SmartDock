@@ -2,7 +2,7 @@
   <el-dialog
     v-model="open"
     class="feedback-dialog"
-    width="720px"
+   width="640px"
     top="7vh"
     append-to-body
     :close-on-click-modal="false"

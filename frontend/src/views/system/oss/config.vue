@@ -86,7 +86,7 @@
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
     <!-- 添加或修改对象存储配置对话框 -->
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="800px" append-to-body>
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="760px" append-to-body>
       <el-form ref="ossConfigFormRef" :model="form" :rules="rules" label-width="120px">
         <el-form-item label="配置key" prop="configKey">
           <el-input v-model="form.configKey" placeholder="请输入配置key" />

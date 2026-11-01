@@ -1,6 +1,6 @@
 <template>
   <el-row>
-    <el-dialog v-model="visible" title="选择用户" width="800px" top="5vh" append-to-body>
+    <el-dialog v-model="visible" title="选择用户" width="760px" top="5vh" append-to-body>
       <el-form ref="queryFormRef" :model="queryParams" :inline="true">
         <el-form-item label="用户名称" prop="userName">
           <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable @keyup.enter="handleQuery" />

@@ -63,7 +63,7 @@
     <div class="dd-footnote">识别域名是文档识别的供给侧配置——控制哪些外部域名的内容允许被解析为 AI 文档来源，与模型/钥匙同属识别链路的运维项。</div>
 
     <!-- 新增 / 编辑 -->
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="600px" append-to-body>
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="640px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="域名" prop="domain">
           <el-input v-model="form.domain" placeholder="如 example.com" />

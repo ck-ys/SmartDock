@@ -92,7 +92,7 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="dialog.visible" :title="dialog.title" destroy-on-close append-to-bod width="750px">
+    <el-dialog v-model="dialog.visible" :title="dialog.title" destroy-on-close append-to-body width="760px">
       <el-form ref="menuFormRef" :model="form" :rules="rules" label-width="100px">
         <el-row>
           <el-col :span="24">
@@ -288,7 +288,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="deleteDialog.visible" :title="deleteDialog.title" destroy-on-close append-to-bod width="750px">
+    <el-dialog v-model="deleteDialog.visible" :title="deleteDialog.title" destroy-on-close append-to-body width="480px">
       <el-tree
         ref="menuTreeRef"
         class="tree-border"

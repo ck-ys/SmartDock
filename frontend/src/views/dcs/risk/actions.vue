@@ -117,7 +117,7 @@
       </div>
     </el-card>
 
-    <el-drawer v-model="detailVisible" title="处置详情" size="min(520px, calc(100vw - 16px))">
+    <el-drawer v-model="detailVisible" title="处置详情" size="640px">
       <template v-if="selected">
         <el-alert
           :title="ACTION_LABELS[selected.actionType]"
@@ -140,7 +140,7 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="reviewDialog.visible" :title="dialogTitle" width="min(520px, calc(100vw - 32px))" append-to-body>
+    <el-dialog v-model="reviewDialog.visible" :title="dialogTitle" width="640px" append-to-body>
       <el-alert
         v-if="reviewDialog.mode === 'release' || reviewDialog.mode === 'batch-release'"
         title="解除后立即恢复相关操作，请确认已有充分依据。"

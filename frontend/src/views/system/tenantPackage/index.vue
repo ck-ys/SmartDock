@@ -76,7 +76,7 @@
     </el-card>
 
     <!-- 添加或修改租户套餐对话框 -->
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="500px" append-to-body>
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="640px" append-to-body>
       <el-form ref="tenantPackageFormRef" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="套餐名称" prop="packageName">
           <el-input v-model="form.packageName" placeholder="请输入套餐名称" />

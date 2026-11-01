@@ -63,7 +63,7 @@
     <p class="cl-foot">想了解某次变化怎么用，可以直接问右下角的小助手。</p>
 
     <!-- 新建 / 编辑版本 -->
-    <el-dialog v-model="editorVisible" :title="editing ? `编辑 ${form.version}` : '新建版本'" width="760px" append-to-body top="6vh">
+    <el-dialog v-model="editorVisible" :title="editing ? `编辑 ${form.version}` : '新建版本'" width="640px" append-to-body top="6vh">
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="cl-form">
         <div class="cl-form__row">
           <el-form-item label="版本号" prop="version" class="cl-form__ver">

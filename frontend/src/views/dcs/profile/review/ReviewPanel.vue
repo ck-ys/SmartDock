@@ -141,7 +141,7 @@
     </el-card>
 
     <!-- 复核处理 -->
-    <el-dialog v-model="actionVisible" :title="actionMode === 'confirm' ? '确认低分' : '驳回复核'" width="min(520px, 94%)" destroy-on-close append-to-body>
+    <el-dialog v-model="actionVisible" :title="actionMode === 'confirm' ? '确认低分' : '驳回复核'" width="480px" destroy-on-close append-to-body>
       <div v-if="activeReview" class="action-summary">
         <div>
           <span class="muted">主体</span>
@@ -192,7 +192,7 @@
     </el-dialog>
 
     <!-- 复核详情 -->
-    <el-drawer v-model="detailVisible" title="复核详情" size="560px" destroy-on-close append-to-body>
+    <el-drawer v-model="detailVisible" title="复核详情" size="640px" destroy-on-close append-to-body>
       <template v-if="activeReview">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="主体">{{ activeReview.displayName || activeReview.subjectId }}</el-descriptions-item>

@@ -214,7 +214,7 @@
     </template>
 
     <!-- 模型新建/编辑 -->
-    <el-dialog v-model="modelDialogVisible" :title="modelForm.modelId ? '编辑评分模型' : '新建评分模型'" width="min(760px, 94%)" destroy-on-close>
+    <el-dialog v-model="modelDialogVisible" :title="modelForm.modelId ? '编辑评分模型' : '新建评分模型'" width="760px" destroy-on-close>
       <el-form label-width="96px">
         <el-row :gutter="12">
           <el-col :span="12">
@@ -273,7 +273,7 @@
     </el-dialog>
 
     <!-- 主体分箱详情 -->
-    <el-drawer v-model="drawerVisible" :title="drawerTitle" size="min(620px, 92vw)" destroy-on-close>
+    <el-drawer v-model="drawerVisible" :title="drawerTitle" size="640px" destroy-on-close>
       <div v-loading="drawerLoading" class="drawer-body">
         <template v-if="subjectDetail?.latest">
           <div class="drawer-score">
@@ -334,7 +334,7 @@
     </el-drawer>
 
     <!-- 试算预览（草稿影子计算，不落快照） -->
-    <el-drawer v-model="dryVisible" title="试算预览（影子计算，不落快照）" size="min(720px, 92vw)" destroy-on-close>
+    <el-drawer v-model="dryVisible" title="试算预览（影子计算，不落快照）" size="640px" destroy-on-close>
       <div v-loading="dryLoading" class="drawer-body">
         <template v-if="dryResult">
           <el-alert :type="psiAlertType(dryResult.psi?.verdict)" :closable="false" show-icon class="psi-alert">
@@ -421,7 +421,7 @@
     </el-drawer>
 
     <!-- 版本对比（两个已完成 run） -->
-    <el-drawer v-model="compareVisible" title="版本对比" size="min(720px, 92vw)" destroy-on-close>
+    <el-drawer v-model="compareVisible" title="版本对比" size="640px" destroy-on-close>
       <div class="compare-picker">
         <el-select v-model="compareRunA" placeholder="旧版本 run" style="width: 300px" @change="loadCompare">
           <el-option
@@ -539,7 +539,7 @@
     </el-drawer>
 
     <!-- 配置历史（发布存档 + 回滚） -->
-    <el-dialog v-model="snapshotsVisible" title="配置版本历史" width="min(680px, 94%)" destroy-on-close>
+    <el-dialog v-model="snapshotsVisible" title="配置版本历史" width="640px" destroy-on-close>
       <el-table v-loading="snapshotsLoading" class="ui-table" :data="snapshots">
         <template #empty>
           <div class="ui-empty">
@@ -574,7 +574,7 @@
     </el-dialog>
 
     <!-- 存档配置查看 -->
-    <el-dialog v-model="snapshotConfigVisible" :title="`配置 JSON · ${activeSnapshotVersion}`" width="min(680px, 94%)" destroy-on-close>
+    <el-dialog v-model="snapshotConfigVisible" :title="`配置 JSON · ${activeSnapshotVersion}`" width="640px" destroy-on-close>
       <el-input :model-value="activeSnapshotJson" type="textarea" :rows="18" readonly class="mono config-area" spellcheck="false" />
     </el-dialog>
   </div>

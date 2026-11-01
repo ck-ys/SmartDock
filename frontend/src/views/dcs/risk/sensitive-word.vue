@@ -122,7 +122,7 @@
       </div>
     </el-card>
 
-    <el-drawer v-model="drawerOpen" :title="drawerTitle" size="min(560px, calc(100vw - 16px))" append-to-body>
+    <el-drawer v-model="drawerOpen" :title="drawerTitle" size="480px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" class="word-form">
         <el-form-item label="词条" prop="wordText">
           <el-input v-model="form.wordText" :disabled="editingBuiltin" maxlength="100" show-word-limit placeholder="请输入敏感词" />
@@ -154,7 +154,7 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="importOpen" title="批量导入敏感词" width="min(520px, calc(100vw - 32px))" append-to-body>
+    <el-dialog v-model="importOpen" title="批量导入敏感词" width="640px" append-to-body>
       <el-alert title="单次最多 500 条；批内与库内重复词条自动跳过，非法词条跳过并计数。" type="info" :closable="false" show-icon class="mb-4" />
       <el-form label-width="86px">
         <el-form-item label="分类">
@@ -181,7 +181,7 @@
     </el-dialog>
 
     <!-- 命中自测抽屉(2026-08-24): 真实过滤规则只读验证, 不产生风险事件; 结果为管理员验证场景, 命中词明文展示 -->
-    <el-drawer v-model="testOpen" title="命中测试" size="min(560px, calc(100vw - 16px))" append-to-body>
+    <el-drawer v-model="testOpen" title="命中测试" size="480px" append-to-body>
       <el-alert
         title="粘贴文本就地验证词库效果：与真实链路同一套规则，选择场景后按该场景装载词库（含系统基线·仅聊天场景），仅测试不记分。"
         type="info"

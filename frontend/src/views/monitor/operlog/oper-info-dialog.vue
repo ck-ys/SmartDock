@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="open" title="操作日志详细" width="700px" append-to-body close-on-click-modal @closed="info = null">
+  <el-dialog v-model="open" title="操作日志详细" width="640px" append-to-body close-on-click-modal @closed="info = null">
     <el-descriptions v-if="info" :column="1" border>
       <el-descriptions-item label="操作状态">
         <template #default>

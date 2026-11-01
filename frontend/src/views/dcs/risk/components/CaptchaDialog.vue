@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     title="发送前安全验证"
-    width="min(440px, calc(100vw - 32px))"
+   width="480px"
     :close-on-click-modal="false"
     :close-on-press-escape="!busy"
     :show-close="!busy"

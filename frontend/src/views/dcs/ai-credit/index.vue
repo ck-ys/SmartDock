@@ -172,7 +172,7 @@
     </el-card>
 
     <!-- 业务批8 Q4：套餐编辑弹窗（任何参数可改，仅超管；kind/planCode 技术键只读防断链） -->
-    <el-dialog v-model="planEdit.visible" :title="`编辑套餐 · ${planEdit.form.planCode || ''}`" width="520px" append-to-body>
+    <el-dialog v-model="planEdit.visible" :title="`编辑套餐 · ${planEdit.form.planCode || ''}`" width="760px" append-to-body>
       <el-alert
         v-if="planEdit.activeCount > 0"
         type="warning"

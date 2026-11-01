@@ -342,7 +342,7 @@
     </el-card>
 
     <!-- 场景模板导入(F 片) -->
-    <el-dialog v-model="importDialogVisible" title="导入模板 JSON" width="min(640px, 94%)" destroy-on-close>
+    <el-dialog v-model="importDialogVisible" title="导入模板 JSON" width="640px" destroy-on-close>
       <p class="muted small" style="margin-top: 0">
         粘贴导出的模板 JSON（或选文件），校验通过后存进「我的模板」。编码不能与内置模板或已有模板重复。
       </p>
@@ -362,7 +362,7 @@
     </el-dialog>
 
     <!-- 维度编辑 -->
-    <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="min(780px, 94%)" top="4vh" destroy-on-close>
+    <el-dialog v-model="dimDialogVisible" :title="dimForm.dimensionId ? '编辑维度' : '新建维度'" width="760px" top="4vh" destroy-on-close>
       <!-- 题4 简版: 新建先挑模板, 点一下预填全部字段(事件名是 dcs 的真实示例, 换成你自己的) -->
       <div v-if="!dimForm.dimensionId" class="tpl-zone">
         <div class="tpl-caption muted">从模板开始，点一下预填全部字段——不想用模板就选「空白自建」</div>
@@ -565,7 +565,7 @@
     </el-dialog>
 
     <!-- 试算 -->
-    <el-dialog v-model="previewVisible" title="维度试算（不落快照）" width="min(620px, 94%)" destroy-on-close>
+    <el-dialog v-model="previewVisible" title="维度试算（不落快照）" width="640px" destroy-on-close>
       <el-form label-width="92px">
         <el-form-item label="主体类型">
           <el-select v-model="previewForm.subjectType" style="width: 100%">
@@ -617,7 +617,7 @@
     </el-dialog>
 
     <!-- 发布 -->
-    <el-dialog v-model="publishVisible" title="发布权重版本" width="min(520px, 94%)" destroy-on-close>
+    <el-dialog v-model="publishVisible" title="发布权重版本" width="640px" destroy-on-close>
       <el-form label-width="88px">
         <el-form-item label="版本号">
           <el-input v-model="publishForm.version" maxlength="32" placeholder="如 v2026.10.19" />
@@ -639,7 +639,7 @@
     </el-dialog>
 
     <!-- 规则校验 / 对比 / 影响 -->
-    <el-dialog v-model="resultVisible" :title="resultTitle" width="min(720px, 94%)" destroy-on-close>
+    <el-dialog v-model="resultVisible" :title="resultTitle" width="640px" destroy-on-close>
       <template v-if="resultMode === 'validate'">
         <el-alert
           :type="validation?.valid ? 'success' : 'error'"

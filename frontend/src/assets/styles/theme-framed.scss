@@ -1072,6 +1072,9 @@ html.dark .el-year-table td.current:not(.disabled) .el-date-table-cell__text {
   border-radius: var(--app-card-radius);
   box-shadow: 0 24px 64px rgba(19, 20, 22, 0.18);
   padding: 0;
+  /* 2026-11-01 Q5=乙：窄屏左右各留 12px（弹窗自带 margin:auto，clamp 后自然居中）。
+     桌面端三档宽 480/640/760 都小于视口，这条不生效。 */
+  max-width: calc(100vw - 24px);
 }
 
 .el-dialog__header {
@@ -1092,8 +1095,21 @@ html.dark .el-year-table td.current:not(.disabled) .el-date-table-cell__text {
 }
 
 .el-dialog__footer {
-  padding: 14px 24px 20px;
+  /* 2026-11-01 Q5=乙：底部按钮区统一 60 高（原来 71）。按钮本身 32–36 两种，
+     靠 padding 凑不出同一个数，改成定高 + 垂直居中，含顶部分隔线共 60 */
+  height: 60px;
+  padding: 0 24px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   border-top: 1px solid var(--app-rule);
+}
+
+/* 抽屉最多铺满视口：480 档在 390 屏上不越出屏幕，手机上等于全宽 */
+.el-drawer {
+  max-width: 100vw;
 }
 
 .el-drawer {

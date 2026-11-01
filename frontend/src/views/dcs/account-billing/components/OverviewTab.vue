@@ -118,7 +118,7 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
     <!-- 初始化钱包 -->
-    <el-dialog v-model="initDialog.visible" title="初始化钱包" width="460px" append-to-body>
+    <el-dialog v-model="initDialog.visible" title="初始化钱包" width="480px" append-to-body>
       <el-form :model="initDialog.form" label-width="90px">
         <el-form-item label="租户ID">
           <el-input v-model="initDialog.form.tenantId" placeholder="留空则初始化当前租户" clearable />
@@ -131,7 +131,7 @@
     </el-dialog>
 
     <!-- 充值 / 扣减 -->
-    <el-dialog v-model="opDialog.visible" :title="opDialog.title" width="480px" append-to-body>
+    <el-dialog v-model="opDialog.visible" :title="opDialog.title" width="640px" append-to-body>
       <el-form :model="opDialog.form" label-width="90px">
         <el-form-item label="钱包">
           <span>{{ opDialog.row?.walletId }} ({{ opDialog.row?.tenantId }})</span>
@@ -153,7 +153,7 @@
     </el-dialog>
 
     <!-- 调阈值 -->
-    <el-dialog v-model="thresholdDialog.visible" title="调整低余额阈值" width="460px" append-to-body>
+    <el-dialog v-model="thresholdDialog.visible" title="调整低余额阈值" width="640px" append-to-body>
       <el-form :model="thresholdDialog.form" label-width="110px">
         <el-form-item label="钱包">
           <span>{{ thresholdDialog.row?.walletId }} ({{ thresholdDialog.row?.tenantId }})</span>

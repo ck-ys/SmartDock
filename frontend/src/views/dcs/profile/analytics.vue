@@ -724,7 +724,7 @@
     </el-tabs>
 
     <!-- 会话详情抽屉 -->
-    <el-drawer v-model="sessionDrawer" size="min(560px, 92vw)" :title="sessionDetail?.session?.displayName || sessionDetail?.session?.visitorId || '使用详情'">
+    <el-drawer v-model="sessionDrawer" size="640px" :title="sessionDetail?.session?.displayName || sessionDetail?.session?.visitorId || '使用详情'">
       <template v-if="sessionDetail">
         <el-descriptions :column="2" border size="small">
           <el-descriptions-item label="开始时间">{{ sessionDetail.session.startedAt }}</el-descriptions-item>
@@ -774,7 +774,7 @@
     </el-drawer>
 
     <!-- 漏斗编辑 -->
-    <el-dialog v-model="funnelDialog" :title="funnelForm.funnelId ? '编辑漏斗' : '新建漏斗'" width="min(620px, 94%)">
+    <el-dialog v-model="funnelDialog" :title="funnelForm.funnelId ? '编辑漏斗' : '新建漏斗'" width="640px">
       <el-form :model="funnelForm" label-width="96px">
         <el-form-item label="漏斗名称">
           <el-input v-model="funnelForm.funnelName" placeholder="例如：上手转化（登录→发布→提交）" />

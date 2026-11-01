@@ -28,7 +28,7 @@
       <template v-if="fileSize">图片大小不超过 {{ fileSize }}MB</template><template v-if="fileSize && fileType">，</template><template v-if="fileType">支持 {{ fileType.join('/') }} 格式</template>
     </div>
 
-    <el-dialog v-model="dialogVisible" title="预览" width="800px" append-to-body>
+    <el-dialog v-model="dialogVisible" title="预览" width="760px" append-to-body>
       <img :src="dialogImageUrl" style="display: block; max-width: 100%; margin: 0 auto" />
     </el-dialog>
   </div>

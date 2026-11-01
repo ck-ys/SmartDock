@@ -88,7 +88,7 @@
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
     <!-- 添加或修改客户端管理对话框 -->
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="500px" append-to-body>
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="640px" append-to-body>
       <el-form ref="clientFormRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="客户端key" prop="clientKey">
           <el-input v-model="form.clientKey" :disabled="form.id != null" placeholder="请输入客户端key" />

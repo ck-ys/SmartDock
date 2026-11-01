@@ -1408,7 +1408,7 @@
     </div>
 
     <!-- ===== 能力抽屉：一行的全部信息 + 唯一的改档入口（技术名只在这里出现） ===== -->
-    <el-drawer v-model="capDetailOpen" size="460px" append-to-body class="cap-detail-drawer" :with-header="false">
+    <el-drawer v-model="capDetailOpen" size="480px" append-to-body class="cap-detail-drawer" :with-header="false">
       <div v-if="capDetailRow" class="cd">
         <div class="cd-head">
           <div class="cd-head-tx">
@@ -1518,7 +1518,7 @@
     </el-drawer>
 
     <!-- 一键推荐：3 档策略 × 风险档规则，整列预览后再应用 -->
-    <el-dialog v-model="presetOpen" :title="presetTitle" width="720px" append-to-body class="reco-dialog">
+    <el-dialog v-model="presetOpen" :title="presetTitle" width="640px" append-to-body class="reco-dialog">
       <div class="reco-sub">按风险档一次改一批。先看「现在 → 改成」再应用；选比现在松的档，就是撤销之前的收紧。</div>
       <div class="pol-grid">
         <button
@@ -1598,7 +1598,7 @@
     </el-dialog>
 
     <!-- 批6(Q13): 能力覆盖弹窗——三模板(三档可调/仅开·关/不支持), 只影响本租户, 官方 seed 升级不冲掉 -->
-    <el-dialog v-model="ovDialog" title="覆盖该模型的能力映射" width="560px" append-to-body class="ov-dialog">
+    <el-dialog v-model="ovDialog" title="覆盖该模型的能力映射" width="640px" append-to-body class="ov-dialog">
       <el-alert type="info" :closable="false" show-icon class="ov-alert">
         <template #title>只影响本租户；「恢复官方」可随时回到官方目录。覆盖的是模型事实（有哪些档），用户选哪档仍由聊天输入条决定。</template>
       </el-alert>
@@ -1679,7 +1679,7 @@
     </el-dialog>
 
     <!-- 业务批3-③(#16)+批④(#17)：单人限额覆盖弹窗——两列独立「留空=跟随租户默认」 -->
-    <el-dialog v-model="quotaLimitsDialog" title="设置单人额度上限" width="500px" append-to-body class="q-dialog">
+    <el-dialog v-model="quotaLimitsDialog" title="设置单人额度上限" width="640px" append-to-body class="q-dialog">
       <el-alert type="info" :closable="false" show-icon class="ov-alert">
         <template #title>每列留空 = 该项跟随租户默认；填数字 = 只对这一个人生效（两列互不影响）</template>
         <template v-if="subActive" #default>
@@ -1728,7 +1728,7 @@
     </el-dialog>
 
     <!-- 业务反馈批1015b Q14：替换搜索密钥——先测试后保存（保存走系统配置 API，缓存自动刷新） -->
-    <el-dialog v-model="wsReplace.open" title="替换联网搜索密钥（博查）" width="520px" append-to-body class="ws-dialog">
+    <el-dialog v-model="wsReplace.open" title="替换联网搜索密钥（博查）" width="480px" append-to-body class="ws-dialog">
       <el-alert type="info" :closable="false" show-icon class="mb-2" title="密钥以 sk- 开头；保存后立即生效，正在进行的对话下一轮就能联网。" />
       <el-form label-width="90px">
         <el-form-item label="新密钥">

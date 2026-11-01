@@ -356,7 +356,7 @@ onMounted(() => {
   <el-dialog
     v-model="pickerVisible"
     :title="t('login.pickTenantTitle')"
-    width="420px"
+   width="480px"
     append-to-body
     class="tenant-picker"
     :close-on-click-modal="false"

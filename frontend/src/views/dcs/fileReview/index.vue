@@ -307,7 +307,7 @@
     </el-card>
 
     <!-- ============ 驳回弹窗 ============ -->
-    <el-dialog v-model="rejectVisible" title="驳回文件" width="min(520px, calc(100vw - 32px))" append-to-body>
+    <el-dialog v-model="rejectVisible" title="驳回文件" width="480px" append-to-body>
       <div v-if="rejectTarget" class="file-review-reject-file">
         <div class="file-review-icon">
           <el-icon><component :is="categoryIcon(rejectTarget.fileCategory)" /></el-icon>
@@ -347,7 +347,7 @@
     </el-dialog>
 
     <!-- ============ 设置弹窗（改版：两页签分家，Q5=A） ============ -->
-    <el-dialog v-model="configVisible" title="文件审核设置" width="min(600px, calc(100vw - 32px))" append-to-body>
+    <el-dialog v-model="configVisible" title="文件审核设置" width="640px" append-to-body>
       <div v-loading="configLoading">
         <el-tabs v-model="configTab" class="file-review-config-tabs">
           <!-- ===== 页签一：内容审核（人审尺度） ===== -->

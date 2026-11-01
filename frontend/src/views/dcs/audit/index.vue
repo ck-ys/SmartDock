@@ -73,7 +73,7 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="rejectDialog.visible" title="退回提交" width="min(480px, calc(100vw - 32px))">
+    <el-dialog v-model="rejectDialog.visible" title="退回提交" width="480px">
       <el-input v-model="rejectDialog.comment" type="textarea" :rows="3" placeholder="退回理由（将通知提交人）" maxlength="500" />
       <template #footer>
         <el-button @click="rejectDialog.visible = false">取消</el-button>
@@ -81,7 +81,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="trailDialog.visible" title="审核轨迹" width="min(640px, calc(100vw - 32px))">
+    <el-dialog v-model="trailDialog.visible" title="审核轨迹" width="640px">
       <el-timeline>
         <el-timeline-item v-for="t in trailDialog.rows" :key="t.id" :timestamp="t.createTime" :type="t.decision === 'PASS' ? 'success' : 'danger'">
           {{ t.decision === 'PASS' ? '通过' : '退回' }} · 审核人 {{ t.auditorUserId }}

@@ -2,7 +2,7 @@
   <el-dialog
     v-model="visible"
     :title="t('login.forgotTitle')"
-    width="420px"
+   width="480px"
     append-to-body
     :close-on-click-modal="false"
     class="forgot-pwd"

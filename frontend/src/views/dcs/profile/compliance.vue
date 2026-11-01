@@ -186,7 +186,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="piiDialog" :title="editingPii ? '编辑 PII 字段' : '新增 PII 字段'" width="min(460px, 94%)">
+    <el-dialog v-model="piiDialog" :title="editingPii ? '编辑 PII 字段' : '新增 PII 字段'" width="640px">
       <el-form :model="piiForm" label-width="80px">
         <el-form-item label="键名" required>
           <el-input v-model="piiForm.fieldKey" :disabled="editingPii" placeholder="如 phone / search_term" maxlength="64" />
@@ -209,7 +209,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="confirmDialog" title="确认删除主体" width="min(440px, 94%)">
+    <el-dialog v-model="confirmDialog" title="确认删除主体" width="480px">
       <el-alert
         type="error"
         :closable="false"

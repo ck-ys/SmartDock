@@ -120,7 +120,7 @@
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
     </el-card>
     <!-- 添加或修改OSS对象存储对话框 -->
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="500px" append-to-body>
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="480px" append-to-body>
       <el-form ref="ossFormRef" :model="form" :rules="rules" label-width="80px">
         <el-form-item label="文件名">
           <fileUpload v-if="type === 0" v-model="form.file" />

@@ -482,7 +482,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="1080px" append-to-body class="ai-config-dialog">
+    <el-dialog v-model="dialog.visible" :title="dialog.title" width="760px" append-to-body class="ai-config-dialog">
       <el-alert type="info" :closable="false" show-icon class="mb-4">
         <template #title>
           API Key 已加密存储在「厂商接入」里——同厂商加第二个模型不用再填 Key；已有密钥可直接获取模型、查询余额和测速。换 Key
@@ -962,7 +962,7 @@
 
     <!-- 业务反馈批1015b Q5：钥匙编辑抽屉（原 820px 弹窗拆成「钥匙管理页签 + 本抽屉表单」；
          新增入口在页签工具栏「新增钥匙」，不再用「改为添加新钥匙」模式开关） -->
-    <el-drawer v-model="keyDrawer.visible" :title="keyDrawer.title" size="500px" append-to-body class="ai-key-drawer">
+    <el-drawer v-model="keyDrawer.visible" :title="keyDrawer.title" size="480px" append-to-body class="ai-key-drawer">
       <el-alert type="info" :closable="false" show-icon class="mb-2">
         <template #title>
           {{
@@ -1025,7 +1025,7 @@
       </template>
     </el-drawer>
 
-    <el-dialog v-model="priceDialog.visible" :title="priceDialog.title" width="720px" append-to-body>
+    <el-dialog v-model="priceDialog.visible" :title="priceDialog.title" width="760px" append-to-body>
       <el-form ref="priceFormRef" :model="priceForm" label-width="120px">
         <el-row :gutter="16">
           <el-col :span="12">
@@ -1126,7 +1126,7 @@
     </el-dialog>
 
     <!-- Q6(2026-10-23)：JSON 导入——批量补价格（自建价目表/厂商对账表导出后直接粘贴） -->
-    <el-dialog v-model="importDialog.visible" title="JSON 导入价格" width="680px" append-to-body>
+    <el-dialog v-model="importDialog.visible" title="JSON 导入价格" width="480px" append-to-body>
       <el-alert type="info" :closable="false" show-icon class="mb-2">
         <template #title>粘贴价格数组，按 租户+厂商+模型 有则更新无则新增；标记 manualOverride=true 的行不会被 models.dev 同步覆盖。</template>
       </el-alert>

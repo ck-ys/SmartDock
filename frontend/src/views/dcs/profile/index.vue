@@ -155,7 +155,7 @@
     </el-card>
 
     <!-- 查看依据（单主体画像摘要） -->
-    <el-drawer v-model="basisVisible" title="画像依据" size="560px" destroy-on-close>
+    <el-drawer v-model="basisVisible" title="画像依据" size="640px" destroy-on-close>
       <div v-loading="basisLoading" class="drawer-body">
         <template v-if="basisData">
           <template v-if="basisData.found">
@@ -210,7 +210,7 @@
         </template>
       </div>
     </el-drawer>
-    <el-drawer v-model="reviewVisible" title="低分复核" size="72%" destroy-on-close class="review-drawer">
+    <el-drawer v-model="reviewVisible" title="低分复核" size="640px" destroy-on-close class="review-drawer">
       <ReviewPanel source="dcs" />
     </el-drawer>
     <!-- 题4: 接入指南常驻入口(有数据时的文案分叉) -->
@@ -218,7 +218,7 @@
       <AccessGuideCard variant="sharpen" />
     </el-drawer>
     <!-- 题5 动作列: 没上手的同事 → 复制一段引导话术(诚实动作, 不假装已发送) -->
-    <el-dialog v-model="guideMsgVisible" :title="`引导 ${guideTargetName} 上手`" width="min(520px, 94%)" append-to-body>
+    <el-dialog v-model="guideMsgVisible" :title="`引导 ${guideTargetName} 上手`" width="640px" append-to-body>
       <p class="muted guide-msg-hint">下面是一段可以直接发给对方的话术（复制后通过你习惯的方式发送）。对方产生真实操作后，这里的采用度会自动更新。</p>
       <el-input type="textarea" :rows="5" :model-value="guideMessage" readonly />
       <template #footer>

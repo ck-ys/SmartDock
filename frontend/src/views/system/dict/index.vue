@@ -214,7 +214,7 @@
     </el-row>
 
     <!-- 字典类型对话框 -->
-    <el-dialog v-model="typeDialog.visible" :title="typeDialog.title" width="500px" append-to-body>
+    <el-dialog v-model="typeDialog.visible" :title="typeDialog.title" width="640px" append-to-body>
       <el-form ref="typeFormRef" :model="typeForm" :rules="typeRules" label-width="100px">
         <el-form-item label="字典名称" prop="dictName">
           <el-input v-model="typeForm.dictName" placeholder="请输入字典名称" />
@@ -243,7 +243,7 @@
     </el-dialog>
 
     <!-- 字典数据对话框 -->
-    <el-dialog v-model="dataDialog.visible" :title="dataDialog.title" width="500px" append-to-body>
+    <el-dialog v-model="dataDialog.visible" :title="dataDialog.title" width="640px" append-to-body>
       <el-form ref="dataFormRef" :model="dataForm" :rules="dataRules" label-width="80px">
         <el-form-item label="字典类型">
           <el-input v-model="dataForm.dictType" :disabled="true" />

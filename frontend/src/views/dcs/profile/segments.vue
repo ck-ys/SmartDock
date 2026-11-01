@@ -90,7 +90,7 @@
     </div>
 
     <!-- 新建/编辑 -->
-    <el-dialog v-model="dialogVisible" :title="form.segmentId ? '编辑分群' : '新建分群'" width="min(780px, 94%)" destroy-on-close>
+    <el-dialog v-model="dialogVisible" :title="form.segmentId ? '编辑分群' : '新建分群'" width="760px" destroy-on-close>
       <el-form label-width="92px">
         <el-row :gutter="12">
           <el-col :span="12">
@@ -185,7 +185,7 @@
     </el-dialog>
 
     <!-- 静态名单导入 -->
-    <el-dialog v-model="importVisible" title="导入分群名单" width="min(560px, 94%)" destroy-on-close>
+    <el-dialog v-model="importVisible" title="导入分群名单" width="640px" destroy-on-close>
       <el-form label-width="88px">
         <el-form-item label="导入方式">
           <el-radio-group v-model="importForm.mode">
@@ -211,7 +211,7 @@
     </el-dialog>
 
     <!-- 成员 -->
-    <el-drawer v-model="memberVisible" :title="`成员 · ${activeSegment?.segmentName || ''}`" size="min(720px, 92vw)" destroy-on-close>
+    <el-drawer v-model="memberVisible" :title="`成员 · ${activeSegment?.segmentName || ''}`" size="640px" destroy-on-close>
       <div class="drawer-toolbar">
         <el-input v-model="memberQuery.keyword" placeholder="主体 ID / 名称" clearable style="width: 220px" @keyup.enter="loadMembers" />
         <el-button type="primary" @click="loadMembers">查询</el-button>
@@ -265,7 +265,7 @@
     </el-drawer>
 
     <!-- 运行记录（含人数趋势） -->
-    <el-drawer v-model="runVisible" :title="`运行记录 · ${activeSegment?.segmentName || ''}`" size="min(720px, 92vw)" destroy-on-close>
+    <el-drawer v-model="runVisible" :title="`运行记录 · ${activeSegment?.segmentName || ''}`" size="640px" destroy-on-close>
       <v-chart v-if="runs.length >= 2" class="run-trend-chart" :option="runTrendOption" autoresize />
       <el-table v-loading="runLoading" class="ui-table" :data="runs">
         <template #empty>
@@ -295,7 +295,7 @@
     </el-drawer>
 
     <!-- 发通知向导（预览 → 发送） -->
-    <el-dialog v-model="reachVisible" :title="`发通知 · ${reachSegment?.segmentName || ''}`" width="min(620px, 94%)" destroy-on-close>
+    <el-dialog v-model="reachVisible" :title="`发通知 · ${reachSegment?.segmentName || ''}`" width="640px" destroy-on-close>
       <div v-loading="reachPreviewLoading" class="drawer-body">
         <template v-if="reachPreviewData">
           <div class="reach-summary">
@@ -344,7 +344,7 @@
     </el-dialog>
 
     <!-- 触达/导出记录 -->
-    <el-drawer v-model="recordsVisible" :title="`触达与导出记录 · ${activeSegment?.segmentName || ''}`" size="min(760px, 92vw)" destroy-on-close>
+    <el-drawer v-model="recordsVisible" :title="`触达与导出记录 · ${activeSegment?.segmentName || ''}`" size="640px" destroy-on-close>
       <el-table
         v-loading="recordsLoading"
         class="ui-table"
@@ -426,7 +426,7 @@
     </el-drawer>
 
     <!-- 导出成员 -->
-    <el-dialog v-model="exportVisible" :title="`导出成员 · ${activeSegment?.segmentName || ''}`" width="min(480px, 94%)" destroy-on-close>
+    <el-dialog v-model="exportVisible" :title="`导出成员 · ${activeSegment?.segmentName || ''}`" width="480px" destroy-on-close>
       <el-form label-width="100px">
         <el-form-item label="脱敏导出">
           <el-switch v-model="exportForm.masked" active-text="隐藏中间字符" inactive-text="明文（会记审计）" />

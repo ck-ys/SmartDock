@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-dialog v-model="userDialog.visible.value" :title="userDialog.title.value" width="80%" append-to-body>
+    <el-dialog v-model="userDialog.visible.value" :title="userDialog.title.value" width="760px" append-to-body>
       <el-row :gutter="20">
         <!-- 部门树 -->
         <el-col :lg="4" :xs="24" style="">
