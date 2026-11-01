@@ -156,6 +156,8 @@
         @pgoto="onPageGoto"
         @mdnav="(u) => router.push(u)"
         @draft-set="onDraftSet"
+        @plan-confirm="onPlanConfirm"
+        @plan-edit="onPlanEdit"
         @plan-cancel="onPlanCancel"
         @elicit-done="removeElicitationCard"
         @ask-user-done="removeAskUserCard"
@@ -642,16 +644,27 @@ function onDraftSet(text: string, append: boolean) {
   composerRef.value?.setDraft(curText ? curText + '\n' + text : text);
   composerRef.value?.focus();
 }
-function onPlanCancel() {
-  const t = cur();
+/** 多实例批 4：确认/改计划都带这张卡的 planId，旧卡重复点击由后端 409 挡住 */
+function onPlanConfirm(p: { planId?: string; text: string }) {
+  getAssistant(userStore.userId).notePlanDecision('confirm', p.planId);
+  onSend(p.text, '');
+}
+/** 二审回修：「改计划」=回填输入框并记住这张卡的 planId（用户改完自己发），不立即发送 */
+function onPlanEdit(p: { planId?: string; text: string }) {
+  getAssistant(userStore.userId).notePlanEdit(p.planId);
+  onResend(p.text);
+}
+function onPlanCancel(planId?: string) {
+  // 二审回修（dspro-P2-2）：按 planId 定位被点的那张卡，多卡同屏不误清新卡
+  const t = planId ? state.turns.find((x) => x.plan?.planId === planId) : cur();
   if (t) {
     t.plan = null;
   }
   // 题8（三席回修）：取消也是明确动作——下一次请求带 planDecision=cancel 解闸，
   // 否则后端硬闸要等 30 分钟 TTL 才放开写操作
-  getAssistant(userStore.userId).notePlanDecision('cancel');
+  getAssistant(userStore.userId).notePlanDecision('cancel', planId);
   // ②（2026-10-31）：当场打清闸端点立即解闸，不等下一条消息；失败静默（上面的兜底仍有效）
-  getAssistant(userStore.userId).cancelPlanOnServer();
+  getAssistant(userStore.userId).cancelPlanOnServer(planId);
 }
 
 function onNewSession() {

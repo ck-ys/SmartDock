@@ -18,7 +18,7 @@ import { ElMessageBox } from 'element-plus';
 import { readWebOn } from './webOnState';
 import { readSkillId } from './skillState';
 import { createAguiClient, type AguiClientOptions, type AguiTurnHandle } from '@/api/dcs/assistant/aguiClient';
-import { getPendingHitl, getConversationTodo, getFollowups, revokeAssistantAction, type PendingHitlItem } from '@/api/dcs/assistant';
+import { getPendingHitl, getConversationTodo, getFollowups, revokeAssistantAction, getAssistantPlanState, type PendingHitlItem } from '@/api/dcs/assistant';
 import type { AguiResume } from '@/api/dcs/assistant/types';
 import { humanizeAiError } from '@/utils/aiErrorText';
 import type { AguiHandlers, AguiMessage, AguiRunInput } from '@/api/dcs/assistant/types';
@@ -199,8 +199,15 @@ export interface AssistantTurn {
   durMs: number;
   toolCalls: number;
   hitl: HitlAsk | null;
-  /** 计划卡（P1-3）：CUSTOM plan 事件驱动；后端无触发源时恒 null 不渲染 */
-  plan: { title?: string; steps: Array<{ label: string; state: 'pending' | 'run' | 'done' | 'edit' }> } | null;
+  /** 计划卡（P1-3）：CUSTOM plan 事件驱动；后端无触发源时恒 null 不渲染。
+   *  多实例批 4：planId 用于精确确认/取消（旧卡重复点击返回 409）；status 由
+   *  /plan/state 轮询回填（另一标签页确认后本页旧卡自动置灰）。 */
+  plan: {
+    planId?: string;
+    title?: string;
+    steps: Array<{ label: string; state: 'pending' | 'run' | 'done' | 'edit' }>;
+    status?: 'pending' | 'confirmed' | 'cancelled' | 'adjusted' | 'expired';
+  } | null;
   /** G3-A1：MCP elicitation 反问卡（CUSTOM 'elicitation' 帧，run 内挂起随本回合走）；
    *  作答走独立端点不走 resolveHitl；过期前端本地收卡（后端超时 CANCEL 兜底闭环） */
   elicitations: import('@/api/dcs/assistant').AssistantElicitationCard[];
@@ -747,7 +754,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           turn.tokens = v.tokens ?? null;
         } else if (name === 'plan' && value && typeof value === 'object') {
           // 计划卡（P1-3 拍板补做）：CUSTOM plan 事件带步骤数组；后端无触发源期间组件就绪不出现
-          const v = value as { title?: string; steps?: Array<{ label?: unknown; state?: unknown }> };
+          const v = value as { planId?: unknown; title?: string; steps?: Array<{ label?: unknown; state?: unknown }> };
           const steps = (Array.isArray(v.steps) ? v.steps : [])
             .filter((s) => s && typeof s.label === 'string' && s.label)
             .slice(0, 8)
@@ -760,7 +767,12 @@ export function useAssistant(options: UseAssistantOptions = {}) {
                 | 'edit'
             }));
           if (steps.length > 0) {
-            turn.plan = { title: typeof v.title === 'string' ? v.title : undefined, steps };
+            const planId = typeof v.planId === 'string' && v.planId ? v.planId : undefined;
+            turn.plan = { planId, title: typeof v.title === 'string' ? v.title : undefined, steps, status: 'pending' };
+            // 多实例批 4：另一标签页/另一实例确认或取消后，本页旧卡要跟着置灰
+            if (planId) {
+              watchPlanStatus(planId, state.threadId);
+            }
           }
         } else if (name === 'model_degrade' && value && typeof value === 'object') {
           // 2026-10-31 题5 案1：自选模型失效回退默认链时后端不再静默——提示「为什么模型变了」
@@ -1118,26 +1130,113 @@ export function useAssistant(options: UseAssistantOptions = {}) {
    */
   const PLAN_CONFIRM_TEXT = '按刚才的计划开始执行';
   const PLAN_ADJUST_PREFIX = '按这个计划执行：';
-  let planDecisionNext: 'confirm' | 'cancel' | 'adjust' | null = null;
-  /** 宿主取消计划卡时调用（下一次请求带上 cancel 解闸，避免写操作被关到 TTL） */
-  function notePlanDecision(kind: 'confirm' | 'cancel' | 'adjust') {
-    planDecisionNext = kind;
+  let planDecisionNext: { kind: 'confirm' | 'cancel' | 'adjust'; planId?: string } | null = null;
+  /**
+   * 二审回修（三席共识 P1）：「改计划」是回填输入框，不是立即发送——planId 在这里暂存，
+   * 等用户真的把（改过的）计划发出来时再凭 PLAN_ADJUST_PREFIX 认领，避免点一下就把
+   * 未修改的原文直接执行掉。只认最近一次点击；新会话/新确认会覆盖。
+   */
+  let editPlanId: string | undefined;
+  /** 宿主计划卡动作时调用（带上这张卡的 planId，旧卡重复点击会被后端 409 挡住） */
+  function notePlanDecision(kind: 'confirm' | 'cancel' | 'adjust', planId?: string) {
+    planDecisionNext = { kind, planId };
+  }
+  /** 「改计划」：只记住卡号，不发送 */
+  function notePlanEdit(planId?: string) {
+    editPlanId = planId;
   }
   /**
    * ②（2026-10-31）：点「取消」当场通知服务端清闸——不等下一条消息的 planDecision 兜底，
    * 取消后立刻让助手做写操作即放行。fire-and-forget：失败静默（stop 同款），
    * 收卡不被网络问题阻塞；兜底链路（notePlanDecision→下一条消息）原样保留。
    */
-  function cancelPlanOnServer() {
+  function cancelPlanOnServer(planId?: string) {
     if (!state.threadId) {
       return;
     }
-    import('@/api/dcs/assistant').then((m) => m.cancelAssistantPlan(state.threadId)).catch(() => {});
+    import('@/api/dcs/assistant').then((m) => m.cancelAssistantPlan(state.threadId, planId)).catch(() => {});
   }
-  function takePlanDecision(): 'confirm' | 'cancel' | 'adjust' | null {
+  function takePlanDecision(): { kind: 'confirm' | 'cancel' | 'adjust'; planId?: string } | null {
     const v = planDecisionNext;
     planDecisionNext = null;
     return v;
+  }
+
+  /** 计划状态轮询定时器（planId → timer）；会话重置/销毁时统一清 */
+  const planPollTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** 轮询代次：clear 时自增，在途 tick 回来发现代次变了就不再重排（防清理被复活） */
+  let planPollGen = 0;
+  const PLAN_POLL_MS = 3000;
+  const PLAN_POLL_MAX = 100;
+
+  /** 把某个 planId 的最新状态回填到所有回合（旧卡跨标签页同步） */
+  function applyPlanStatus(planId: string, status: 'confirmed' | 'cancelled' | 'adjusted' | 'expired') {
+    for (const t of state.turns) {
+      if (t.plan?.planId === planId) {
+        t.plan.status = status;
+      }
+    }
+  }
+
+  /**
+   * 多实例批 4：轮询 /plan/state。本页确认/取消后接口会立刻返回非 pending；
+   * 另一标签页确认也靠它把本页旧卡置灰。只轮询有 planId 的卡，最多 5 分钟。
+   */
+  function watchPlanStatus(planId: string, threadId: string) {
+    if (!planId || !threadId || planPollTimers.has(planId)) {
+      return;
+    }
+    let ticks = 0;
+    const myGen = planPollGen;
+    const tick = async () => {
+      planPollTimers.delete(planId);
+      // 二审回修（三席共识 P2）：会话已重置/销毁——在途请求回来也不再重排，
+      // 否则 clearPlanPollers 清掉的是旧 timer，这里会把它复活继续打旧 thread
+      if (myGen !== planPollGen) {
+        return;
+      }
+      if (ticks++ >= PLAN_POLL_MAX) {
+        return;
+      }
+      try {
+        const raw = (await getAssistantPlanState(threadId)) as unknown as {
+          data?: { status?: string; planId?: string };
+          status?: string;
+          planId?: string;
+        };
+        const body = raw?.data ?? raw;
+        const st = body?.status;
+        // 三审 P2：状态必须对得上这张卡；thread 已换成新计划时，旧卡直接标过期，
+        // 不能把新计划的 confirmed/cancelled 贴到旧卡上
+        if (body?.planId && body.planId !== planId) {
+          applyPlanStatus(planId, 'expired');
+          return;
+        }
+        if (st === 'confirmed' || st === 'cancelled' || st === 'adjusted' || st === 'expired') {
+          applyPlanStatus(planId, st);
+          return;
+        }
+        if (st === 'none') {
+          // 处理结果只保留 5 分钟；超时后不再轮询，避免无意义空转
+          return;
+        }
+      } catch {
+        /* 网络抖动：下一轮再试 */
+      }
+      if (myGen !== planPollGen) {
+        return;
+      }
+      planPollTimers.set(planId, setTimeout(tick, PLAN_POLL_MS));
+    };
+    planPollTimers.set(planId, setTimeout(tick, PLAN_POLL_MS));
+  }
+
+  function clearPlanPollers() {
+    planPollGen += 1;
+    for (const timer of planPollTimers.values()) {
+      clearTimeout(timer);
+    }
+    planPollTimers.clear();
   }
 
   /**
@@ -1164,9 +1263,14 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // 取消由宿主 notePlanDecision('cancel') 上报；不带=计划卡仍挂着，后端继续硬拒写操作
     const qTrim = q.trim();
     if (qTrim === PLAN_CONFIRM_TEXT) {
-      planDecisionNext = 'confirm';
+      // 三审 P1：按钮路径已通过 notePlanDecision 写入 planId；这里只补 kind，
+      // 不能整个覆盖，否则旧卡精确拒绝的 planId 在真实点击路径上永远丢失
+      planDecisionNext = { kind: 'confirm', planId: planDecisionNext?.planId };
+      editPlanId = undefined;
     } else if (qTrim.startsWith(PLAN_ADJUST_PREFIX)) {
-      planDecisionNext = 'adjust';
+      // 二审回修：「改计划」只暂存卡号，用户改完发出来才在这里认领
+      planDecisionNext = { kind: 'adjust', planId: editPlanId ?? planDecisionNext?.planId };
+      editPlanId = undefined;
     }
     const planDecision = takePlanDecision();
     turn.stamp = stamp;
@@ -1208,7 +1312,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         ...(currentModelPin() ? { modelConfigId: currentModelPin() } : {}),
         // 题10 案1：联网默认自动——永远显式带值，停用发 false 让后端撤掉搜索工具
         webSearchEnabled: currentWebOn(),
-        ...(planDecision ? { planDecision } : {}),
+        ...(planDecision
+          ? { planDecision: planDecision.kind, ...(planDecision.planId ? { planId: planDecision.planId } : {}) }
+          : {}),
         ...(currentSkillId() ? { skillId: currentSkillId() } : {}),
         ...fwd
       }
@@ -1743,6 +1849,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
 
   function resetForNewSession() {
     convGen += 1;
+    // 多实例批 4：切会话/销毁时停掉旧卡的状态轮询，别让旧线程的定时器继续跑
+    clearPlanPollers();
+    // 三审 P2：未发出的计划决策不能跨会话残留（否则新会话第一条消息被 409）
+    planDecisionNext = null;
+    editPlanId = undefined;
     // 题5：续看流随会话重置断开让位（旧回合占位即将被清/换，attach 不得再写任何 turn）
     attachCtl?.abort();
     attachCtl = null;
@@ -2127,6 +2238,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     setAutoLevel,
     /** 题8（三席回修）：宿主取消计划卡时上报，下一次请求带 planDecision=cancel 解闸 */
     notePlanDecision,
+    /** 二审回修：「改计划」只暂存卡号并回填输入框，不直接发送 */
+    notePlanEdit,
     /** ②（2026-10-31）：宿主取消计划卡时当场清服务端闸（失败静默，planDecision 仍兜底） */
     cancelPlanOnServer,
     queueEdit,

@@ -89,7 +89,9 @@
         @fill="(t) => emit('fill', t)"
         @pgoto="(p) => emit('pgoto', p)"
         @mdnav="(u) => emit('mdnav', u)"
-        @plan-cancel="emit('plan-cancel')"
+        @plan-confirm="(p) => emit('plan-confirm', p)"
+        @plan-edit="(p) => emit('plan-edit', p)"
+        @plan-cancel="(id) => emit('plan-cancel', id)"
       />
     </template>
     <!-- Q2A：排队消息上屏灰气泡（半透明+排队中；发送时转正=shift 出队）。
@@ -174,7 +176,11 @@ const emit = defineEmits<{
   pgoto: [payload: { missionId: string; missionName: string }];
   /** 批3 Q6 站内链导航（TurnBlock 转发；抽屉宿主收抽屉再跳） */
   mdnav: [url: string];
-  'plan-cancel': [];
+  /** 多实例批 4：计划卡三键必须原样上浮（planId 不能在这一层被剥掉） */
+  'plan-confirm': [payload: { planId?: string; text: string }];
+  /** 二审回修：改计划仍回填输入框，planId 只暂存不发送 */
+  'plan-edit': [payload: { planId?: string; text: string }];
+  'plan-cancel': [planId?: string];
   /** 选区条：填入输入框（append=true 追加；false 覆盖聚焦） */
   'draft-set': [text: string, append: boolean];
   /** BN-6：新手「帮我填一句」=回填输入框（不直接发，原型 stepsTry） */

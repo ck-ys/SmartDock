@@ -4,6 +4,7 @@
  * 全部走 utils/request.ts（鉴权/防重/错误 toast 统一）。
  */
 import request, { download } from '@/utils/request';
+import { threadHeaders } from './threadHeaders';
 
 /** 悬浮球出现条件+今日概况数据源（G1 status 端点；灰球=enabled 无模型） */
 export interface AssistantStatus {
@@ -62,7 +63,8 @@ export function getAssistantStatus(threadId?: string) {
   return request<AssistantStatus>({
     url: '/dcs/assistant/status',
     method: 'get',
-    params: threadId ? { threadId } : undefined
+    params: threadId ? { threadId } : undefined,
+    headers: threadHeaders(threadId)
   });
 }
 
@@ -313,7 +315,12 @@ export interface AssistantTodoItem {
 }
 
 export function getConversationTodo(threadId: string) {
-  return request<AssistantTodoItem[]>({ url: '/dcs/assistant/conversation/todo', method: 'get', params: { threadId } });
+  return request<AssistantTodoItem[]>({
+    url: '/dcs/assistant/conversation/todo',
+    method: 'get',
+    params: { threadId },
+    headers: threadHeaders(threadId)
+  });
 }
 
 /** G3-A1：MCP elicitation 反问卡（CUSTOM 'elicitation' 帧载荷，bridge cardPayload 同构） */
@@ -330,6 +337,7 @@ export interface AssistantElicitationCard {
  *  （accept=提交表单 / decline=拒绝提供 / cancel=关闭） */
 export function answerElicitation(threadId: string, id: string, action: 'accept' | 'decline' | 'cancel', content?: Record<string, unknown>) {
   return request({ url: '/dcs/assistant/elicitation/answer', method: 'post',
+    headers: threadHeaders(threadId),
     data: { threadId, id, action, content: content ?? {} } });
 }
 
@@ -369,6 +377,7 @@ export function answerAskUser(
   answers?: AssistantAskUserAnswer[]
 ) {
   return request({ url: '/dcs/assistant/ask/answer', method: 'post',
+    headers: threadHeaders(threadId),
     data: { threadId, id, action, answers: answers ?? [] } });
 }
 
@@ -379,13 +388,19 @@ export function getFollowups(threadId: string) {
   return request<{ code: number; msg: string; data: { messageId: number | string; followups: string[] } }>({
     url: '/dcs/assistant/conversation/followups',
     method: 'get',
-    params: { threadId }
+    params: { threadId },
+    headers: threadHeaders(threadId)
   });
 }
 
 /** 动作账本（断线重连恢复/催办进度数据源，G3） */
 export function listActions(params: { runId?: string; threadId?: string }) {
-  return request<AssistantAction[]>({ url: '/dcs/assistant/action/list', method: 'get', params });
+  return request<AssistantAction[]>({
+    url: '/dcs/assistant/action/list',
+    method: 'get',
+    params,
+    headers: threadHeaders(params.threadId)
+  });
 }
 
 /** 业务反馈批1015c Q15b：创建模板卡「猜你要建」推荐项 */
@@ -414,7 +429,8 @@ export function getTemplateRecommendations(threadId?: string) {
   const req = request<TemplateRecommendItem[]>({
     url: '/dcs/assistant/conversation/template-recommendations',
     method: 'get',
-    params: threadId ? { threadId } : undefined
+    params: threadId ? { threadId } : undefined,
+    headers: threadHeaders(threadId)
   }) as Promise<{ data?: TemplateRecommendItem[] }>;
   // 失败清缓存须核对还是同一个 promise（三审 P2）：无条件清会把更新的在途请求误踢出缓存
   req.catch(() => {
@@ -540,18 +556,33 @@ export interface AssistantAttachmentItem {
 
 /** 登记并同步解析（上传两步的第二步：通用 OSS 上传拿 ossId 后调这里） */
 export function registerAssistantAttachment(data: { ossId: number | string; threadId: string }) {
-  return request<AssistantAttachmentItem>({ url: '/dcs/assistant/attachment/register', method: 'post', data });
+  return request<AssistantAttachmentItem>({
+    url: '/dcs/assistant/attachment/register',
+    method: 'post',
+    headers: threadHeaders(data.threadId),
+    data
+  });
 }
 
 /** 会话附件清单（旧→新；文件卡回放渲染） */
 export function listAssistantAttachments(threadId: string) {
-  return request<AssistantAttachmentItem[]>({ url: '/dcs/assistant/attachment/list', method: 'get', params: { threadId } });
+  return request<AssistantAttachmentItem[]>({
+    url: '/dcs/assistant/attachment/list',
+    method: 'get',
+    params: { threadId },
+    headers: threadHeaders(threadId)
+  });
 }
 
 /** 移除会话附件（AU-05A：腾挂载位；属主软删——超限提示「先移除旧文件」的兑现通道） */
-export function removeAssistantAttachment(attachmentId: number | string) {
+export function removeAssistantAttachment(attachmentId: number | string, threadId?: string) {
   // 2026-10-16 DELETE→POST（铁律#21：WAF 只放行 GET/POST）
-  return request({ url: `/dcs/assistant/attachment/${attachmentId}`, method: 'post' });
+  // 多实例批 2：移除同样要带会话标识，否则 require-header 模式下必 400
+  return request({
+    url: `/dcs/assistant/attachment/${attachmentId}`,
+    method: 'post',
+    headers: threadHeaders(threadId)
+  });
 }
 
 /** C2 收藏跨设备：用户常用问句（新→旧，上限 6） */
@@ -571,13 +602,40 @@ export function removeAssistantFavorite(content: string) {
 
 /** G1 乙类#5：停止生成=服务端真取消（定向 interrupt 在跑 run；断连不打断不受影响） */
 export function stopAssistantRun(threadId: string) {
-  return request({ url: '/dcs/assistant/conversation/stop', method: 'post', params: { threadId } });
+  return request({
+    url: '/dcs/assistant/conversation/stop',
+    method: 'post',
+    params: { threadId },
+    headers: threadHeaders(threadId)
+  });
 }
 
 /** ②（2026-10-31）：计划卡点「取消」当场清闸（幂等，无 pending 也 R.ok）——
  *  原先要等下一条消息带 planDecision=cancel 才解闸，取消后立刻让助手做写操作会被硬拒 */
-export function cancelAssistantPlan(threadId: string) {
-  return request({ url: '/dcs/assistant/plan/cancel', method: 'post', params: { threadId } });
+export function cancelAssistantPlan(threadId: string, planId?: string) {
+  return request({
+    url: '/dcs/assistant/plan/cancel',
+    method: 'post',
+    params: planId ? { threadId, planId } : { threadId },
+    headers: threadHeaders(threadId)
+  });
+}
+
+/** 计划卡状态查询（多实例批 4）：另一标签页确认/取消后，本页 3 秒内显示“已在另一处处理” */
+export interface AssistantPlanState {
+  status: 'pending' | 'confirmed' | 'cancelled' | 'adjusted' | 'expired' | 'none' | 'unavailable';
+  planId?: string;
+}
+
+export function getAssistantPlanState(threadId: string) {
+  return request<AssistantPlanState>({
+    url: '/dcs/assistant/plan/state',
+    method: 'get',
+    params: { threadId },
+    headers: threadHeaders(threadId),
+    // 3 秒一次的后台轮询：失败静默，别连弹 100 次 toast
+    custom: { silent: true }
+  });
 }
 
 /** 二站-B 悬挂确认卡视图（换设备/刷新后重建 turn.hitl；空数组=无悬挂不重建） */
@@ -590,7 +648,12 @@ export interface PendingHitlItem {
 
 /** 查询当前 thread 悬挂的 HITL 确认卡 */
 export function getPendingHitl(threadId: string) {
-  return request<PendingHitlItem[]>({ url: '/dcs/assistant/hitl/pending', method: 'get', params: { threadId } });
+  return request<PendingHitlItem[]>({
+    url: '/dcs/assistant/hitl/pending',
+    method: 'get',
+    params: { threadId },
+    headers: threadHeaders(threadId)
+  });
 }
 
 /** 批7 Q5/Q12-④：用户侧模型自选视图（dcs:assistant:use 普通用户权限）

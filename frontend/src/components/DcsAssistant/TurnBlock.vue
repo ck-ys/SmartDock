@@ -163,9 +163,9 @@
     <plan-card
       v-if="turn.plan"
       :plan="turn.plan"
-      @confirm-plan="emit('ask', '按刚才的计划开始执行')"
-      @edit-plan="(t) => emit('resend', t)"
-      @cancel-plan="emit('plan-cancel')"
+      @confirm-plan="(planId) => emit('plan-confirm', { planId, text: '按刚才的计划开始执行' })"
+      @edit-plan="(t, planId) => emit('plan-edit', { planId, text: t })"
+      @cancel-plan="(planId) => emit('plan-cancel', planId)"
     />
 
     <!-- G3-A1：MCP 外部工具反问卡（server 在飞挂起，run 保持 RUNNING）——作答走独立端点，
@@ -518,13 +518,17 @@ const emit = defineEmits<{
   'resend-run': [text: string];
   branch: [turn: AssistantTurn];
   ask: [text: string];
+  /** 多实例批 4：计划卡三键带 planId 上浮（确认/改计划走新回合一并带上计划标识） */
+  'plan-confirm': [payload: { planId?: string; text: string }];
+  /** 二审回修：改计划=回填输入框（不直接发送），planId 暂存给下一次发送 */
+  'plan-edit': [payload: { planId?: string; text: string }];
+  'plan-cancel': [planId?: string];
   /** 业务批(1015) Q10：追问 chip 点击=回填输入框不直接发（复用 HeroWelcome「帮我填一句」通道） */
   fill: [text: string];
   pgoto: [payload: { missionId: string; missionName: string }];
   /** 批3 Q6 站内链/任务卡导航（回修 P1-2：上浮宿主——抽屉态要先收抽屉再跳转，
    *  直接 router.push 会把目标页压在抽屉遮罩后面；session 页直接 push） */
   mdnav: [url: string];
-  'plan-cancel': [];
 }>();
 
 /** 👎问卷三选一（原型 fbpop 固定文案） */

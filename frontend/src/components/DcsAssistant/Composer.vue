@@ -635,7 +635,7 @@ function pickFile() {
 /** 移除附件（AU-05A）：软删腾挂载位，成功后刷新 chip 条 */
 async function removeAttachment(a: AssistantAttachmentItem) {
   try {
-    await removeAssistantAttachment(a.id);
+    await removeAssistantAttachment(a.id, props.state.threadId);
     pushToast(`已移除 ${shortName(a.fileName)}`, 'ok');
     await refreshAttachments();
   } catch (err: any) {

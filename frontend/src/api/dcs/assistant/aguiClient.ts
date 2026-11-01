@@ -20,6 +20,7 @@
  */
 import { AGUI_EVENT, type AguiEventFrame, type AguiHandlers, type AguiRunInput } from './types';
 import { getToken } from '@/utils/auth';
+import { threadHeaders } from './threadHeaders';
 
 export interface AguiClientOptions {
   /** 完整端点；默认 import.meta.env.VITE_APP_BASE_API + '/agui/run/dcs-assistant' */
@@ -324,7 +325,8 @@ export function createAguiClient(options: AguiClientOptions = {}) {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
           Authorization: 'Bearer ' + getToken(),
-          clientid: import.meta.env.VITE_APP_CLIENT_ID as string
+          clientid: import.meta.env.VITE_APP_CLIENT_ID as string,
+          ...threadHeaders(input.threadId)
         },
         body: JSON.stringify(input),
         signal
@@ -451,7 +453,8 @@ export function createAguiClient(options: AguiClientOptions = {}) {
           headers: {
             Accept: 'text/event-stream',
             Authorization: 'Bearer ' + getToken(),
-            clientid: import.meta.env.VITE_APP_CLIENT_ID as string
+            clientid: import.meta.env.VITE_APP_CLIENT_ID as string,
+            ...threadHeaders(threadId)
           },
           signal: controller.signal
         });
