@@ -195,7 +195,7 @@
               </template>
             </el-table>
           </div>
-          <!-- U-09：≤992 调用明细表改卡片（12 列 min-width 1610px，手机上不再整表横滑） -->
+          <!-- U-09：≤992 调用明细表改卡片（15 列 min-width 1838px，手机上不再整表横滑；加列/改列宽要同步这里与 .usage-table-wrap 的 min-width） -->
           <div class="dcs-mobile-list">
             <div v-if="usageList.length === 0" class="ui-empty">
               <p class="ui-empty__title">当前筛选下没有调用明细</p>
@@ -217,6 +217,10 @@
                 <span>Token {{ tokenText(row) }}</span>
                 <span>{{ row.latencyMs }}ms</span>
                 <span :class="{ 'cost-zero': Number(row.costAmount || 0) === 0 }">消耗 {{ money(row.costAmount, row.currency) }}</span>
+              </div>
+              <!-- 2026-11-01：桌面有「配置」列，卡片也得看得见尾号并能复制，否则手机上方的配置 ID 筛选框只能靠先知值 -->
+              <div v-if="row.configId" class="dcs-card-meta">
+                <span>配置 <span class="cfg-id" @click="copyConfigId(row.configId)">…{{ configTail(row.configId) }}</span></span>
               </div>
               <div v-if="row.errorMsg" class="dcs-card-foot">
                 <span class="dcs-card-time" :title="row.errorMsg">错误：{{ humanizeAiError(row.errorMsg).title }}</span>
@@ -432,16 +436,44 @@ const sceneLabel = (scene?: string): string => {
 /** 配置 ID 只露尾 6 位：19 位整串会把列撑破；完整值走悬停与点击复制 */
 const configTail = (id?: string | number | null) => String(id ?? '').slice(-6);
 
-/** 点尾号把完整配置 ID 复制走，粘到上方「配置 ID」筛选框就能按这条配置筛 */
+/** 点尾号把完整配置 ID 复制走，粘到上方「配置 ID」筛选框就能按这条配置筛。
+ *  2026-11-01：局域网 http 打开时 navigator.clipboard 不存在（非安全上下文），原先只能弹一条「复制没成功」；
+ *  补一条 textarea + execCommand 的旧式兜底，再不行才提示手动选中。 */
 const copyConfigId = async (id?: string | number | null) => {
   const text = String(id ?? '');
   if (!text) return;
-  try {
-    await navigator.clipboard.writeText(text);
+  if (await writeClipboard(text)) {
     ElMessage.success(`已复制配置 ID ${text}`);
+    return;
+  }
+  ElMessage.warning(`复制没成功，配置 ID 是 ${text}`);
+};
+
+const writeClipboard = async (text: string): Promise<boolean> => {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
   } catch {
-    // 非 https / 无剪贴板权限时退回提示，让用户能手动选中
-    ElMessage.warning(`复制没成功，配置 ID 是 ${text}`);
+    // 落到旧式兜底
+  }
+  let ta: HTMLTextAreaElement | null = null;
+  try {
+    ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-1000px';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    // select/execCommand 个别浏览器会抛异常，节点放 finally 里摘，避免失败一次就在 body 里留一个隐藏框
+    ta?.remove();
   }
 };
 
