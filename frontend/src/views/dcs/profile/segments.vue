@@ -1083,6 +1083,11 @@ onMounted(async () => {
 .segment-card :deep(.el-card__body) {
   padding: 16px 18px;
 }
+/* auto-fit 下只剩 1 张卡时轨道是整行 1632，卡会拉成横幅；只对独苗卡收一个上限，
+   多张卡时仍按轨道吃满（2 张卡 1920 各 810、2560 各 858） */
+.segment-card:only-child {
+  max-width: 820px;
+}
 .segment-top {
   display: flex;
   justify-content: space-between;
