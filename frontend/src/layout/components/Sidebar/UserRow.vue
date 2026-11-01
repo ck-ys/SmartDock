@@ -329,7 +329,8 @@ onMounted(load);
 
 .sidebar-user__chev {
   flex: none;
-  color: var(--app-faint);
+  /* 2026-11-01 审查 P1：这行也是深底，跟单位名一起迁 side-faint */
+  color: var(--app-side-faint);
   font-size: 12px;
 }
 

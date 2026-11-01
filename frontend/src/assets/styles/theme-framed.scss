@@ -127,6 +127,9 @@
   --el-text-color-regular: var(--app-muted);
   --el-text-color-secondary: var(--app-faint);
   --el-text-color-placeholder: #6b7280;
+  /* 2026-11-01 审查 P1：占位抬亮后，已填值必须回到正文墨色，否则空/已填分不出来
+     （深色主题里 regular 与 placeholder 同值，下拉框是否已选零线索） */
+  --el-input-text-color: var(--app-text);
   --el-border-color: var(--app-border);
   --el-border-color-light: var(--app-border);
   --el-border-color-lighter: var(--app-rule);
@@ -180,7 +183,7 @@
   --app-control: #e2e5ea;
   --app-text: #14202d;
   --app-muted: #5f7083;
-  --app-faint: #64748b;
+  --app-faint: #4b5563;
   --app-accent: #2f6feb;
   --app-accent-soft: #e8f0fe;
   --app-primary: #2f6feb;
@@ -225,7 +228,7 @@ html[data-skin='t7'] :is(.login-page, .register-page, .agreement-page, .dcs-dw, 
   --app-control: #e3e6eb;
   --app-text: #181818;
   --app-muted: #5e6d82;
-  --app-faint: #8996a8;
+  --app-faint: #4b5563;
   --app-accent: #0052d9;
   --app-accent-soft: #e8f3ff;
   --app-primary: #0052d9;
