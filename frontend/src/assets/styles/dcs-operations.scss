@@ -37,7 +37,7 @@
 }
 
 .dcs-ops-header__subtitle {
-  max-width: 760px;
+  /* 行宽由 dcs-ui-kit.scss 统一（那边是 max-width:none），这里别写第二套 */
   margin: 7px 0 0;
   color: var(--el-text-color-secondary);
   font-size: 14px;

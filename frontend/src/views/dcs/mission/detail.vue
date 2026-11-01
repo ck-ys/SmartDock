@@ -1,5 +1,5 @@
 <template>
-  <div class="app-container">
+  <div class="app-container mission-detail-page">
     <dcs-operations-page-header :title="detail?.task?.title || '任务详情'" subtitle="查看任务说明与我的提交，退回后可重新填报" eyebrow="任务中心">
       <template #actions>
         <span v-if="detail?.task" class="ui-pill" :class="statusPill(detail.task.status)">{{ statusLabel(detail.task.status) }}</span>
@@ -242,13 +242,13 @@ watch(
   --el-table-tr-bg-color: transparent;
 }
 
-.detail-alert {
-  max-width: 640px;
-  margin-bottom: 12px;
+/* width-exception: 任务详情=详情+窄表单，整页收成阅读列，卡内不再套第二层上限 */
+.mission-detail-page {
+  max-width: 960px;
 }
 
-.detail-form {
-  max-width: 640px;
+.detail-alert {
+  margin-bottom: 12px;
 }
 
 .detail-number {

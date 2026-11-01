@@ -91,6 +91,8 @@
 
   /* 度量（rad=8px；阴影走 spec shadow） */
   --app-sidebar-w: 256px;
+  /* 2026-11-01 Q2=乙：全站唯一的内容宽度上限（视口 >2016 才生效） */
+  --app-content-max: 1760px;
   --app-topbar-h: 64px;
   --app-sheet-radius: 8px;
   /* 2026-10-27 拍板 Q5=丙：外卡不再是一张「浮在灰底上的白纸」，改成整片灰画布。
@@ -636,10 +638,16 @@ body {
 .app-container {
   background: transparent;
   box-shadow: none;
-  /* 2026-11-01 Q2=乙：一条宽度口径——列表/管理/看板吃满内容区，
-     只有超宽屏（视口 >2016，内容区 >1760）才收 1760 居中。
-     纯阅读/窄表单页在自己的页面样式里另给 max-width（同特异性、后加载，会盖掉这条） */
-  max-width: 1760px;
+}
+
+/* 2026-11-01 Q2=乙：一条宽度口径——列表/管理/看板吃满内容区，
+   只有超宽屏（视口 >2016，内容区 >1760）才收 --app-content-max 居中。
+   站内三类页面根：.app-container / .dcs-ops-page / 遗留 RuoYi 页的 .p-2（只匹配页面根，别碰深层节点）。
+   纯阅读/窄表单页在页面样式里另给 max-width，并注明 width-exception 理由 */
+.app-container,
+.dcs-ops-page,
+#app .app-main > .p-2 {
+  max-width: var(--app-content-max);
   margin-inline: auto;
 }
 

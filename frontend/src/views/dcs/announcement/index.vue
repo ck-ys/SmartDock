@@ -212,7 +212,6 @@ onMounted(load);
 
 <style lang="scss" scoped>
 .announcement-page {
-  max-width: 1600px;
   margin: 0 auto;
 }
 

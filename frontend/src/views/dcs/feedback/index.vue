@@ -437,7 +437,6 @@ onMounted(load);
 
 <style lang="scss" scoped>
 .feedback-page {
-  max-width: 1600px;
   margin: 0 auto;
 }
 

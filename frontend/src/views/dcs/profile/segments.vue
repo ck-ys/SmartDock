@@ -15,7 +15,7 @@
       </template>
     </dcs-operations-page-header>
 
-    <div v-loading="loading" class="segment-grid">
+    <div v-loading="loading" class="segment-grid" :class="{ 'is-single': segments.length === 1 }">
       <el-card v-for="segment in segments" :key="segment.segmentId" shadow="hover" class="segment-card">
         <div class="segment-top">
           <div>
@@ -1085,8 +1085,10 @@ onMounted(async () => {
 }
 /* auto-fit 下只剩 1 张卡时轨道是整行 1632，卡会拉成横幅；只对独苗卡收一个上限，
    多张卡时仍按轨道吃满（2 张卡 1920 各 810、2560 各 858） */
-.segment-card:only-child {
-  max-width: 820px;
+/* 独苗卡与「两张卡时的单卡宽」对齐，不再拉成整行横幅；
+   用数据类判定而不是 :only-child——EP 的 v-loading 遮罩是 grid 的直接子节点，会打掉 :only-child */
+.segment-grid.is-single > .segment-card {
+  max-width: calc(50% - 6px);
 }
 .segment-top {
   display: flex;
