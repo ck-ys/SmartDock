@@ -2,6 +2,7 @@ package com.smartdock.dcs.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.smartdock.dcs.domain.DcsTask;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -46,8 +47,14 @@ public interface DcsTaskMapper extends BaseMapper<DcsTask> {
 
     /** 状态迁移 CAS: 仅当当前状态=from 才迁到 to; 0 行=状态已被并发改变 */
     @Update("UPDATE dcs_task SET status = #{to}, "
-        + "publish_time = CASE WHEN #{to} = 'COLLECTING' THEN CURRENT_TIMESTAMP ELSE publish_time END, "
-        + "update_time = CURRENT_TIMESTAMP "
-        + "WHERE id = #{id} AND status = #{from}")
+        + " publish_time = CASE WHEN #{to} = 'COLLECTING' THEN CURRENT_TIMESTAMP ELSE publish_time END, "
+        + " update_time = CURRENT_TIMESTAMP "
+        + " WHERE id = #{id} AND status = #{from}")
     int transitionStatus(@Param("id") Long id, @Param("from") String from, @Param("to") String to);
+
+    /** 三批④（2026-11-01）: 撤回草稿条件删除 CAS——仅 DRAFT 且本人发布才物理删
+     *  （检查+删除原子化, 与 updateDraftJsonb 同构）; 0 行=已发布/竞态已推进,
+     *  已发布任务在任何时序下不会被连字段定义一起误删 */
+    @Delete("DELETE FROM dcs_task WHERE id=#{id} AND status='DRAFT' AND publisher_user_id=#{userId}")
+    int deleteDraftOwned(@Param("id") Long id, @Param("userId") Long userId);
 }

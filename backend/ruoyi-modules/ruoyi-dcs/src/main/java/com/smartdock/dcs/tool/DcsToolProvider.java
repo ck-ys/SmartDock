@@ -98,6 +98,40 @@ public class DcsToolProvider implements BizToolProvider {
         }
     }
 
+    /**
+     * 三批④（2026-11-01）：撤回 dcs_create_task 建的 DRAFT 任务——条件删除 CAS
+     * （仅 DRAFT+本人发布才删，发布竞态 0 行=人话拒绝，已发布任务绝不被物理删）。
+     * 租户=账本行归属快照经 withTenant 包裹；其余工具落接口 default（不支持撤回）。
+     * 可撤工具双处清单另半边：助手侧 AssistantActionService.REVOCABLE_TOOLS。
+     *
+     * <p><b>先存后还</b>（AGENTS 铁律）：撤回发生在 HTTP 登录线程（execute 是工具
+     * 线程无登录态，clearDynamic 只清 ThreadLocal 无害；这里不同）——dynamic 尾部
+     * clearDynamic 会连超管「切换单位」的持久态一起删，撤一次就把超管静默弹回默认
+     * 视角。照 AnalyticsService 重建同款：先取 getDynamic 存底，finally 里
+     * setDynamic(prev, true) 还原。</p>
+     */
+    @Override
+    public BizToolResult revoke(String toolName, Long refId, BizToolCall call) {
+        if (!"dcs_create_task".equals(toolName) || refId == null) {
+            return BizToolResult.fail("该操作不支持撤回");
+        }
+        String prevDynamic = TenantHelper.getDynamic();
+        try {
+            return withTenant(call, () -> {
+                try {
+                    taskService.deleteDraft(refId, call.getUserId());
+                    return BizToolResult.ok("草稿已删除");
+                } catch (org.dromara.common.core.exception.ServiceException e) {
+                    return BizToolResult.fail(e.getMessage());
+                }
+            });
+        } finally {
+            if (prevDynamic != null) {
+                TenantHelper.setDynamic(prevDynamic, true);
+            }
+        }
+    }
+
     private BizToolResult dispatch(BizToolCall call) {
         Long me = call.getUserId();
         return switch (call.getToolName()) {

@@ -152,6 +152,19 @@ public class DcsTaskService {
         }
     }
 
+    /** 三批④（2026-11-01）：AI 建的草稿任务撤回（对话内完成卡撤回按钮）。
+     *  条件删除 CAS：仅 DRAFT 且本人发布才物理删（AI 草稿无业务数据，物理删=撤回语义，
+     *  与 update() 重存字段行的物理删同口径）；发布竞态下 CAS 0 行=人话拒绝、事务回滚，
+     *  已发布任务在任何时序下不会被误删；字段行仅在任务行 CAS 成功后同事务清理。 */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteDraft(Long taskId, Long userId) {
+        requireOwned(taskId, userId);
+        if (taskMapper.deleteDraftOwned(taskId, userId) == 0) {
+            throw new ServiceException("任务已发布或已推进，不能撤回；请到任务管理页手动处理");
+        }
+        fieldMapper.deleteByTask(taskId);
+    }
+
     /** 关闭(DRAFT/COLLECTING → CLOSED): 停止收集, 已有提交留痕可查。
      *  三审 dspro P1-4: 在途 PENDING_AUDIT 拦截——关了任务待审就永远无入口, 先审完再关 */
     @Transactional(rollbackFor = Exception.class)

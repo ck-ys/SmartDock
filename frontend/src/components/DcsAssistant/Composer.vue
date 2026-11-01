@@ -865,9 +865,10 @@ const AUTO_LV = [
     icon: 'rocket',
     title: '全自动',
     mch: '全自动',
-    desc: '不确认直接执行，执行完在对话里留痕',
-    popT: '全自动 + 事后通知',
-    popD: '不再弹确认，执行完在对话里留痕可回看'
+    // 三批④（2026-11-01）：完成通知+可撤回落地——文案恢复「通知+可撤回（部分操作）」口径
+    desc: '不确认直接执行，完成后通知，部分可撤回',
+    popT: '全自动 + 完成通知',
+    popD: '不再弹确认；执行完在对话里通知，保存记忆/创建任务可撤回'
   }
 ] as const;
 const autoIdx = computed(() => AUTO_LV.findIndex((a) => a.key === props.state.autoLevel));

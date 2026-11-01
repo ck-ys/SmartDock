@@ -2,6 +2,7 @@ package com.smartdock.assistant.spi;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.dromara.assistant.core.AssistantActionLedgerHook;
 import org.dromara.assistant.core.BizToolAgentAdapter;
 import org.dromara.assistant.core.JsonSchemaBuilder;
 import org.dromara.assistant.core.ProviderToolRegistry;
@@ -10,6 +11,7 @@ import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.tool.AgentTool;
 import io.agentscope.core.tool.Toolkit;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -149,7 +151,7 @@ class BizToolSpiTest {
         org.dromara.assistant.core.ToolRegistry.ToolDeps emptyDeps =
             new org.dromara.assistant.core.ToolRegistry.ToolDeps(
                 null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null, null,
-                java.nio.file.Path.of("."), null);
+                java.nio.file.Path.of("."), null, null);
         Toolkit toolkit = new Toolkit();
         Set<String> registered = org.dromara.assistant.core.ToolRegistry.registerAll(toolkit,
             identity(2, Set.of("*:*:*")), emptyDeps, PermissionContextState.builder(), null);
@@ -186,6 +188,41 @@ class BizToolSpiTest {
         assertThat((Map<String, Object>) props.get("count")).containsEntry("type", "number");
         assertThat((Map<String, Object>) props.get("dry")).containsEntry("type", "boolean");
         assertThat(schema.get("required")).isEqualTo(List.of("level"));
+    }
+
+    /** 三批③终审回修：只读工具不落写操作审计（hook.open/finish 均不被调用）；写类工具照常落行收口 */
+    @Test
+    void v7_readOnlyToolSkipsAuditLedger() {
+        List<String> opened = new ArrayList<>();
+        List<Long> finished = new ArrayList<>();
+        AssistantActionLedgerHook hook = new AssistantActionLedgerHook(new AssistantActionLedgerHook.Port() {
+            @Override
+            public Long open(String tenantId, Long userId, String runId, String threadId, String toolName,
+                             String argsJson, String idempotencyKey, String releaseMode) {
+                opened.add(toolName + ":" + releaseMode);
+                return 1L;
+            }
+
+            @Override
+            public void finish(Long rowId, boolean ok, String summary, Long refId) {
+                finished.add(rowId);
+            }
+        }, "000000", 1L, "t-audit", null);
+
+        List<BizToolSpec> specs = new ToyProvider().tools();
+        ToolIdentity ident = identity(0, Set.of());
+        // 只读 echo：执行成功但审计落零行（只读无放行语义——查询类每次 AI 调用都执行，落行=假写操作）
+        BizToolAgentAdapter echo = new BizToolAgentAdapter(new ToyProvider(), specs.get(0), ident, "t-audit", hook);
+        io.agentscope.core.message.ToolResultBlock out = echo.doExecute(Map.of("text", "hi"));
+        assertThat(out.getOutput()).hasSize(1);
+        assertThat(opened).isEmpty();
+        assertThat(finished).isEmpty();
+
+        // 写类 poke：照常落行（无放行集→confirm 兜底）并 DONE 收口——写路径不回归
+        BizToolAgentAdapter poke = new BizToolAgentAdapter(new ToyProvider(), specs.get(1), ident, "t-audit", hook);
+        poke.doExecute(Map.of("times", 3));
+        assertThat(opened).containsExactly("toy_poke:confirm");
+        assertThat(finished).containsExactly(1L);
     }
 
     /** 门控测试 provider: 公开 / 高档 / 权限串 三件 */

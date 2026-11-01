@@ -205,6 +205,30 @@
       <div v-if="turn.interrupted" class="cut-mark">回答被中断 · 以上是已生成的部分，内容可能不完整</div>
     </div>
 
+    <!-- 三批④（2026-11-01）：全自动档完成通知卡（auto_done CUSTOM 帧，RUN_FINISHED 非
+         interrupt 收尾时后端按 run 查可撤行下发）——逐条列出本轮 AI 自动执行且可撤回的
+         操作（只有存记忆/建任务可撤）；卡片随回合内存态（刷新消失属预期） -->
+    <div v-if="autoDoneRows.length" class="autodone">
+      <div class="ad-head"><IconSpan name="check-circle" cls="ok-ic" :size="13" /> 已自动执行 {{ autoDoneRows.length }} 项操作</div>
+      <div v-for="a in autoDoneRows" :key="a.id" class="ad-row">
+        <span class="ad-verb">{{ ACT[a.toolName] ?? a.toolName.replace(/_/g, ' ') }}</span>
+        <span v-if="adSummary(a.summary)" class="ad-sum" :title="adSummary(a.summary)">{{ adSummary(a.summary) }}</span>
+        <button
+          class="ad-revoke"
+          type="button"
+          :disabled="revokeBusyId === a.id"
+          :title="
+            a.toolName === 'save_memory'
+              ? '撤销这条记忆：记忆页同步删除，审计页留「已撤回」记录'
+              : '撤销这个任务草稿：草稿删除（已发布的不能撤），审计页留「已撤回」记录'
+          "
+          @click="onRevokeAutoDone(a.id)"
+        >
+          撤回
+        </button>
+      </div>
+    </div>
+
     <!-- 业务批10 #2/#4：空回答轮诚实化——done 却无正文无工具=模型没吐过一个字（零事件卡死被
          收割/重放悬挂轮），不再假装"已完成"绿胶囊+静态推荐题；给人话结论+一键重问出路 -->
     <div v-if="emptyFail" class="ecard">
@@ -418,6 +442,7 @@ const favHostDead = reactive(new Set<string>());
  * + 👎问卷（submitFeedback 落库）+ ⭐收藏（favBar）+ 代码卡复制（事件委托）。
  */
 import type { AssistantStep, AssistantTurn, HitlEdits, ThinkSeg } from './useAssistant';
+import { ACT, getAssistant } from './useAssistant';
 import { createVNode, defineAsyncComponent, render, watch } from 'vue';
 import ConfirmCard from './ConfirmCard.vue';
 import DataCard from './DataCard.vue';
@@ -432,6 +457,7 @@ import { turnStateWord } from './assistantCtx';
 import { renderMd, renderStream } from './md';
 import { parseToolJson, summarizeArgs } from './toolJson';
 import { submitFeedback, listConversations, listMessages, exportAssistantReport } from '@/api/dcs/assistant';
+import { useUserStore } from '@/store/modules/user';
 import { pushToast } from './toastStore';
 import { useFavs } from './favStore';
 import { findVisibleHitlDock } from './util';
@@ -838,6 +864,27 @@ function openCitation(url: string) {
 /** 业务反馈批1015c Q10(拍板A)：只显示后端侧车生成的贴题追问（≤3 条）；
  *  静态角色池已删——生成失败该区不渲染（宁缺毋滥，对齐行业做法） */
 const followups = computed(() => props.turn.followups ?? []);
+
+/* ---- 三批④（2026-11-01）：全自动完成通知卡撤回。自治模式（同 ElicitCard/AskUserCard
+ *      卡内直接触后端的口径）：经 getAssistant 单例直达 store.revokeAutoDone（api 调用+
+ *      条目移除+toast 都在 store 单点），不上浮事件到 MsgFlow/宿主——撤回只按账本行 id
+ *      （全局唯一），不依赖 threadId。useUserStore 在点击时才取（组件测试不点撤回不触 pinia）。 ---- */
+const autoDoneRows = computed(() => props.turn.autoDone ?? []);
+/** 完成卡摘要去掉账本回执尾段「（记录 #id）」——雪花 id 是后端撤回锚点，不该上屏 */
+const adSummary = (s?: string) => (s ?? '').replace(/（记录 #\d+）$/, '');
+const revokeBusyId = ref('');
+function onRevokeAutoDone(id: string) {
+  if (revokeBusyId.value) {
+    return;
+  }
+  revokeBusyId.value = id;
+  // 失败 toast 由 request 层弹后端人话（store 侧同口径），此处只复位按钮防连点
+  getAssistant(useUserStore().userId)
+    .revokeAutoDone(id)
+    .finally(() => {
+      revokeBusyId.value = '';
+    });
+}
 /** 业务反馈批1015c Q5(拍板A)：分支保持可用，首次点击教学一次（会话级，同 thinkOpenByThread 模式）；
  *  用户曾因"看不懂"要求置灰——教学替代置灰，功能不藏 */
 function onBranch() {
@@ -1326,6 +1373,69 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   }
   .hitl-detail {
     margin-top: 8px;
+  }
+
+  /* 三批④（2026-11-01）：全自动完成通知卡——hitl 回执同款安静边框口径（design-taste
+     app-screens：细边框+浅底常态，无渐变/辉光/阴影）；行内动词+摘要+撤回钮 */
+  .autodone {
+    margin-top: 6px;
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 10px;
+    background: var(--el-fill-color-lighter, #f5f7fa);
+    border: 1px solid var(--el-border-color-lighter, #ebeef5);
+    border-radius: 8px;
+
+    .ad-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--dcs-text-secondary);
+    }
+    .ad-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--dcs-text-regular);
+    }
+    .ad-verb {
+      flex: none;
+      font-weight: 500;
+    }
+    .ad-sum {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--dcs-text-secondary);
+    }
+    .ad-revoke {
+      flex: none;
+      border: 1px solid var(--dcs-border-color-light);
+      background: var(--el-bg-color);
+      color: var(--dcs-text-secondary);
+      border-radius: 4px;
+      padding: 1px 8px;
+      font-size: 11px;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--el-color-primary);
+        border-color: var(--el-color-primary-light-5);
+      }
+      &:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+    }
   }
 
   /* 批3 Q6/Q7（回修 P2-1）：站内链/任务卡/表格容器挂根级 :deep——正文气泡 .md 与

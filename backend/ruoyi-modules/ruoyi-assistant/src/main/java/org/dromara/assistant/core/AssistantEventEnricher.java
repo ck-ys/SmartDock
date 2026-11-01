@@ -215,6 +215,37 @@ public class AssistantEventEnricher implements AguiEventEnricher {
                     "cost_meta", value));
             }
         }
+        // 三批④（2026-11-01）：全自动档完成通知帧 auto_done——判据钉死：本批含 RUN_FINISHED
+        // 且该收尾非 interrupt outcome（用户停止/HITL 挂起收尾不出「已自动执行」卡，与
+        // cost_meta 不判 interrupt 的取舍同处：interrupt 收尾的留痕走账本/审计页）且档位
+        // =auto 时，直接用 context.getRunId() 全局直查可撤行（不做任何租户解析——run 登记
+        // 行=动态租户/账本执行行=登录快照/REJECTED 行=run 租户三源并存，超管切租户态带
+        // 租户会查空→卡静默不发）；查不到/异常=无帧不连坐。帧只随本批出网：刷新后历史
+        // 回放不重放 CUSTOM 帧，卡片随回合内存态消失=预期（对齐 plan/todo 帧口径）
+        if (actionService != null && context != null && context.getRunId() != null
+            && AssistantAutonomyHolder.AUTO.equals(AssistantAutonomyHolder.level(context.getThreadId()))
+            && events.stream().anyMatch(e -> e.getType() == AguiEventType.RUN_FINISHED)
+            && events.stream().noneMatch(e -> e instanceof AguiEvent.RunFinished fin
+                && fin.outcome() instanceof AguiEvent.RunFinishedInterruptOutcome)) {
+            try {
+                List<org.dromara.assistant.domain.DcsAssistantAction> rows =
+                    actionService.listRevocableByRun(context.getRunId());
+                if (!rows.isEmpty()) {
+                    java.util.List<java.util.Map<String, Object>> items = new java.util.ArrayList<>();
+                    for (org.dromara.assistant.domain.DcsAssistantAction r : rows) {
+                        items.add(java.util.Map.of(
+                            "id", String.valueOf(r.getId()),
+                            "toolName", r.getToolName() == null ? "" : r.getToolName(),
+                            "summary", r.getResultSummary() == null ? "" : r.getResultSummary()));
+                    }
+                    out = new java.util.ArrayList<>(out);
+                    out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
+                        "auto_done", java.util.Map.of("items", items)));
+                }
+            } catch (Exception e) {
+                log.warn("[AssistantAutoDone] 完成帧查询失败（不连坐事件流）：{}", e.getMessage());
+            }
+        }
         // gate 可空守卫（纯逻辑单测直构 null=视为开闸透传；生产由 Spring 注入恒非空）
         List<AguiEvent> finalOut = out;
         if (gate != null && !gate.isEnabled()) {
