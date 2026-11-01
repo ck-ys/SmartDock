@@ -280,7 +280,9 @@ const chart = computed(() => {
   const w = viewportWidth.value <= 768 ? 322 : 560;
   const h = 170;
   const padL = 34;
-  const padR = 26;
+  /* 2026-11-01 Q8=乙：末端数值标在最后一个点右侧 8px，原来 padR 只有 26 时文字会顶出
+     viewBox 被裁掉半个数字；留到 52，最后一个点连同末尾日期都完整落在画布内 */
+  const padR = 52;
   const padT = 16;
   const padB = 24;
   const maxRaw = Math.max(1, ...vals);

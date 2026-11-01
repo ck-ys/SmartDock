@@ -170,28 +170,60 @@ const maxMemoryMb = computed(() => memToMb(cache.value.info?.maxmemory_human));
 /** 0 = 不限（Redis 语义），此时表盘没有意义 */
 const hasMemoryLimit = computed(() => maxMemoryMb.value > 0);
 
+/** 2026-11-01 Q8=乙：命令统计从玫瑰图改横向条形 TOP10——
+    玫瑰图扇区角度不可比、命令名还得靠图例对，换成条形后「谁在吃 Redis」一眼看得出 */
+const topCommands = computed(() => {
+  const list = (cache.value.commandStats || []) as unknown as Array<{ name: string; value: number }>;
+  return [...list].sort((a, b) => Number(b.value) - Number(a.value)).slice(0, 10);
+});
+const commandTotal = computed(() => (cache.value.commandStats || []).reduce((sum: number, x: any) => sum + (Number(x?.value) || 0), 0));
+
 /* 画布读不到 CSS 变量：文字/配色从主题 token 取，切深色时重画 */
 const renderCharts = () => {
   if (!commandstats.value || !cache.value.commandStats) {
     return;
   }
+  /* 类目轴自下而上画：反转一次，让调用次数最多的排在最上面 */
+  const top = topCommands.value.slice().reverse();
+  const total = commandTotal.value || 1;
   commandstatsIns = commandstatsIns || echarts.init(commandstats.value);
   commandstatsIns.setOption(
     {
       color: ct.value.series,
       textStyle: { color: ct.value.faint },
       tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b} : {c} ({d}%)'
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const it = Array.isArray(params) ? params[0] : params;
+          const v = Number(it?.value) || 0;
+          return `${it?.name}<br/>调用 ${v} 次（占 ${((v / total) * 100).toFixed(1)}%）`;
+        }
+      },
+      grid: { left: 4, right: 64, top: 6, bottom: 6, containLabel: true },
+      xAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: ct.value.rule } },
+        // 数值已经标在条尾，横轴刻度只留网格线，省一条重复读数的文字带
+        axisLabel: { show: false },
+        axisLine: { show: false },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'category',
+        data: top.map((x) => x.name),
+        axisLabel: { color: ct.value.muted, width: 96, overflow: 'truncate' },
+        axisLine: { show: false },
+        axisTick: { show: false }
       },
       series: [
         {
           name: '命令',
-          type: 'pie',
-          roseType: 'radius',
-          radius: [15, 95],
-          center: ['50%', '38%'],
-          data: cache.value.commandStats,
+          type: 'bar',
+          barMaxWidth: 14,
+          data: top.map((x) => Number(x.value) || 0),
+          itemStyle: { borderRadius: [0, 3, 3, 0] },
+          label: { show: true, position: 'right', color: ct.value.muted, formatter: '{c}' },
           animationEasing: 'cubicInOut',
           animationDuration: 1000
         }
