@@ -536,15 +536,21 @@ html.density-compact {
   .el-link::after {
     content: '';
     position: absolute;
-    /* 四边外扩：20px 图标按钮 → 32×36，30×18 文字按钮 → 42×34。
-       横向只扩 6px：相邻按钮间距 12px，扩 10 会让两块热区重叠、右边的抢走点击 */
-    inset: -8px -6px;
+    /* 竖向固定外扩 8px（16px 文字 → 32 高，图标按钮 20 → 36）。
+       横向改成「居中 + 宽度取 max(自身, 32)」：纯图标按钮的定位盒只有 18px（border-box 20
+       减两侧 1px 边框），用 inset -6 只能到 30，差 2px 不达标（Q7 回归席 P1 实测）；
+       居中撑到 32 后，两侧各出 6px，相邻按钮 12px 间距下两块正好相接、不重叠 */
+    top: -8px;
+    bottom: -8px;
+    left: 50%;
+    width: max(100%, 32px);
+    transform: translateX(-50%);
     /* 不画任何东西，只当热区；pointer-events 保持 auto 才能接住点击 */
     background: transparent;
   }
 
-  /* 相邻文字按钮保持 Element 默认 12px 间距：热区横向扩 6px 后两块刚好接上；
-     压到 8px 时实测「编辑」右侧 15px 已落在「删除」上，点谁全看后渲染的那块 */
+  /* 相邻按钮保持 Element 默认 12px 间距：热区宽度封顶 32 后两块刚好相接；
+     压到 8px 时实测「编辑」右侧已落在「删除」上，点谁全看后渲染的那块 */
 
   /* 表格单元格自带 `overflow:hidden`（给省略号用），会把透明热区竖着裁掉——
      只对「放按钮/勾选框的格子」放开裁剪，含长文本的格子不动，省略号照旧 */
