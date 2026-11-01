@@ -26,8 +26,10 @@
   --app-rule: #e2e5ea;
   --app-control: #e2e5ea;
   --app-text: #14202d;
-  --app-muted: #5f7083;
-  /* 2026-10-27 重构 Q5=甲：原 #8494a6 在 11–12px 上只有 3.10:1，压到 4.76:1（仍比 muted 浅一档） */
+  /* 2026-11-01 Q1=乙 三档排位（灰画布口径）：正文 16.5 > 常规 10.2 > 次要 7.6 > 占位 4.8
+     原 muted #5f7083 只有 5.1，比次要还浅一档，次序是反的 */
+  --app-muted: #374151;
+  /* 次要档：7.56:1（白底）/ 6.86:1（灰画布），仍比常规浅一档 */
   --app-faint: #4b5563;
 
   /* 数据与主操作（acc #2f6feb；主按钮即 acc，墨色 accFg） */
@@ -126,7 +128,7 @@
   --el-text-color-primary: var(--app-text);
   --el-text-color-regular: var(--app-muted);
   --el-text-color-secondary: var(--app-faint);
-  --el-text-color-placeholder: #6b7280;
+  --el-text-color-placeholder: #667085;
   /* 2026-11-01 审查 P1：占位抬亮后，已填值必须回到正文墨色，否则空/已填分不出来
      （深色主题里 regular 与 placeholder 同值，下拉框是否已选零线索） */
   --el-input-text-color: var(--app-text);
@@ -182,7 +184,7 @@
   --app-rule: #e2e5ea;
   --app-control: #e2e5ea;
   --app-text: #14202d;
-  --app-muted: #5f7083;
+  --app-muted: #374151;
   --app-faint: #4b5563;
   --app-accent: #2f6feb;
   --app-accent-soft: #e8f0fe;
@@ -227,7 +229,7 @@ html[data-skin='t7'] :is(.login-page, .register-page, .agreement-page, .dcs-dw, 
   --app-rule: #e3e6eb;
   --app-control: #e3e6eb;
   --app-text: #181818;
-  --app-muted: #5e6d82;
+  --app-muted: #374151;
   --app-faint: #4b5563;
   --app-accent: #0052d9;
   --app-accent-soft: #e8f3ff;
@@ -348,8 +350,8 @@ html.dark {
   /* 控件描边比 rule 提一档：#1b2027 卡面上 #2f3641 只有 1.34，输入框描边要扫到即知 */
   --app-control: #414a57;
   --app-text: #e4ecf4;
-  --app-muted: #8fa0b3;
-  --app-faint: #8b9aab;
+  --app-muted: #a3b3c4;
+  --app-faint: #95a6b8;
 
   /* acc #4a8cf7，主按钮墨色取 accFg #061426 */
   --app-accent: #4a8cf7;
@@ -422,8 +424,8 @@ html.dark {
   --el-bg-color-overlay: #131a23;
   --el-text-color-primary: #e4ecf4;
   --el-text-color-regular: #8fa0b3;
-  --el-text-color-secondary: #8fa0b3;
-  --el-text-color-placeholder: #8fa0b3;
+  --el-text-color-secondary: var(--app-faint);
+  --el-text-color-placeholder: #8496a9;
   --el-border-color: #212b36;
   --el-border-color-light: #212b36;
   --el-border-color-lighter: #1c2530;
@@ -451,7 +453,7 @@ html[data-skin='t7'] {
   --app-rule: #e3e6eb;
   --app-control: #e3e6eb;
   --app-text: #181818;
-  --app-muted: #5e6d82;
+  --app-muted: #374151;
   --app-faint: #4b5563;
 
   --app-accent: #0052d9;
@@ -510,8 +512,8 @@ html[data-skin='t7'] {
   --el-bg-color-overlay: #ffffff;
   --el-text-color-primary: #181818;
   --el-text-color-regular: #5e6d82;
-  --el-text-color-secondary: #4b5563;
-  --el-text-color-placeholder: #6b7280;
+  --el-text-color-secondary: var(--app-faint);
+  --el-text-color-placeholder: #667085;
   --el-border-color: #e3e6eb;
   --el-border-color-light: #e3e6eb;
   --el-border-color-lighter: #e9ecf0;
@@ -538,8 +540,8 @@ html[data-skin='t7'].dark {
   --app-rule: #333333;
   --app-control: #454545;
   --app-text: #e7e7e7;
-  --app-muted: #a0a0a0;
-  --app-faint: #a0a0a0;
+  --app-muted: #b5b5b5;
+  --app-faint: #a8a8a8;
 
   --app-accent: #4583ff;
   --app-accent-soft: #1b2b45;
@@ -600,8 +602,8 @@ html[data-skin='t7'].dark {
   --el-bg-color-overlay: #242424;
   --el-text-color-primary: #e7e7e7;
   --el-text-color-regular: #a0a0a0;
-  --el-text-color-secondary: #a0a0a0;
-  --el-text-color-placeholder: #a0a0a0;
+  --el-text-color-secondary: var(--app-faint);
+  --el-text-color-placeholder: #969696;
   --el-border-color: #333333;
   --el-border-color-light: #333333;
   --el-border-color-lighter: #2c2c2c;

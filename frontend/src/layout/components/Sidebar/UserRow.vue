@@ -315,12 +315,12 @@ onMounted(load);
   font-weight: 400;
   font-size: 12px;
   /* 2026-11-01 Q1=乙：侧栏是深底 #1e2a38，必须用侧栏专用灰，不能蹭页面上的浅底灰 */
-  color: var(--app-side-faint);
+  color: var(--app-side-faint, var(--app-side-text));
 }
 
 .sidebar-user__meta {
   overflow: hidden;
-  color: var(--app-side-faint);
+  color: var(--app-side-faint, var(--app-side-text));
   font-size: 12px;
   font-weight: 400;
   white-space: nowrap;
@@ -330,7 +330,7 @@ onMounted(load);
 .sidebar-user__chev {
   flex: none;
   /* 2026-11-01 审查 P1：这行也是深底，跟单位名一起迁 side-faint */
-  color: var(--app-side-faint);
+  color: var(--app-side-faint, var(--app-side-text));
   font-size: 12px;
 }
 
