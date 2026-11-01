@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayTitle, renameSeed } from './assistantTitle';
+import { displayTitle, renameSeed, shouldRename } from './assistantTitle';
 
 /**
  * 题3 标题兜底（2026-10-30）：残片要藏，用户手写的标题一个字都不能动。
@@ -45,5 +45,34 @@ describe('renameSeed', () => {
   it('空标题回填空串', () => {
     expect(renameSeed({ title: null })).toBe('');
     expect(renameSeed({ title: '   ' })).toBe('');
+  });
+});
+
+/**
+ * 题8（2026-11-01）：提交前的「没变化」判据必须和回填用同一把尺子（renameSeed），
+ * 否则脏标题原样回车会白发一次请求、带首尾空白的正常标题会被当成改名。
+ */
+describe('shouldRename', () => {
+  it('和回填同源：脏标题原样回车不发请求', () => {
+    expect(shouldRename('', { title: '{"title":"按周复盘适合的' })).toBe(false);
+    expect(shouldRename('   ', { title: '[{"title":"数组残片' })).toBe(false);
+  });
+
+  it('正常标题没改就不发请求（首尾空白不算改动）', () => {
+    expect(shouldRename('查询待办事项', { title: '查询待办事项' })).toBe(false);
+    expect(shouldRename('  查询待办事项  ', { title: '查询待办事项' })).toBe(false);
+    expect(shouldRename('[草稿] 周报', { title: '[草稿] 周报' })).toBe(false);
+  });
+
+  it('真改了才发请求（脏标题也能被改成正常名字）', () => {
+    expect(shouldRename('周复盘', { title: '查询待办事项' })).toBe(true);
+    expect(shouldRename('新名字', { title: '{"title":"按周复盘适合的' })).toBe(true);
+    expect(shouldRename('新名字', { title: null })).toBe(true);
+  });
+
+  it('空输入一律不发请求（清空标题不是合法改名）', () => {
+    expect(shouldRename('', { title: null })).toBe(false);
+    expect(shouldRename(undefined, { title: '查询待办事项' })).toBe(false);
+    expect(shouldRename(null, { title: '查询待办事项' })).toBe(false);
   });
 });

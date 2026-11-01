@@ -268,7 +268,7 @@ import { getAssistant, ACT, logSt, tryAcquireRemoteWatch, releaseRemoteWatch } f
 import type { AssistantBindings } from '@/components/DcsAssistant/useAssistant';
 import { useHelpModal } from '@/components/DcsAssistant/helpModal';
 import { relTime, cnEpoch, cnDayDiff } from '@/components/DcsAssistant/time';
-import { displayTitle } from '@/utils/assistantTitle';
+import { displayTitle, renameSeed, shouldRename } from '@/utils/assistantTitle';
 import { pushToast } from '@/components/DcsAssistant/toastStore';
 import { assistantName } from '@/components/DcsAssistant/nameState';
 import MsgFlow from '@/components/DcsAssistant/MsgFlow.vue';
@@ -330,7 +330,8 @@ function startRename(c: AssistantConversation) {
     return;
   }
   renamingId.value = c.id;
-  renameVal.value = c.title ?? '';
+  // 2026-11-01 题8：脏标题回填空串（与抽屉同一把尺子），别把 JSON 残片塞进输入框
+  renameVal.value = renameSeed(c);
   nextTick(() => (renameRef.value as HTMLInputElement[] | undefined)?.at(-1)?.focus());
 }
 async function saveRename(c: AssistantConversation) {
@@ -339,7 +340,8 @@ async function saveRename(c: AssistantConversation) {
   }
   const t = renameVal.value.trim();
   renamingId.value = '';
-  if (!t || t === c.title) {
+  // 回填写的是 renameSeed（脏标题空串），提交判据必须同源，否则原样回车会白发一次请求
+  if (!shouldRename(t, c)) {
     return;
   }
   try {
@@ -390,9 +392,14 @@ async function restoreConv(c: AssistantConversation) {
   }
 }
 
-/** 列表视图：置顶优先 → 今天/昨天/更早；归档独立折叠 */
+/** 列表视图：置顶优先 → 今天/昨天/更早；归档独立折叠
+ *  2026-11-01：搜索同时认原始标题与兜底显示名——脏标题在列表里显示「（未命名会话）」，只搜原文就搜不到。 */
 const filtered = computed(() =>
-  conversations.value.filter((c) => !kw.value.trim() || (c.title ?? '').toLowerCase().includes(kw.value.trim().toLowerCase()))
+  conversations.value.filter((c) => {
+    const q = kw.value.trim().toLowerCase();
+    if (!q) return true;
+    return (c.title ?? '').toLowerCase().includes(q) || displayTitle(c).toLowerCase().includes(q);
+  })
 );
 const archived = computed(() => filtered.value.filter((c) => c.status === 'ARCHIVED'));
 const archivedExpanded = computed(() => (archOpen.value ? archived.value : []));

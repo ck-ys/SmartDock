@@ -33,3 +33,14 @@ export function renameSeed(c: TitleSource): string {
   const raw = (c.title ?? '').trim();
   return raw && !TITLE_FRAGMENT.test(raw) ? raw : '';
 }
+
+/**
+ * 提交改名前的「没变化」判据（2026-11-01 题8）：必须和回填用同一把尺子。
+ * 回填写的是 `renameSeed`（脏标题给空串），若这里拿原文 `c.title` 比，
+ * 用户对脏标题原样回车会被判成「有变化」而白发一次请求；反过来正常标题
+ * 带首尾空白（`" 周报 "`）又会被判成「有变化」而改掉用户没改的名称。
+ */
+export function shouldRename(next: string | null | undefined, c: TitleSource): boolean {
+  const t = (next ?? '').trim();
+  return !!t && t !== renameSeed(c);
+}

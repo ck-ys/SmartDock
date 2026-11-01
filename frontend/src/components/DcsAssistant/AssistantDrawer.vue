@@ -211,6 +211,7 @@
             @draft-set="onDraftSet"
             @plan-cancel="onPlanCancel"
             @ask-user-done="removeAskUserCard"
+            @elicit-done="removeElicitationCard"
             @tour="startTour"
           />
 
@@ -380,7 +381,7 @@ import type { AssistantBindings, AssistantTurn } from './useAssistant';
 import { roleOf, roleLabelOf, pageNameOf, taskCtxOf, suggestionsFor } from './assistantCtx';
 import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
-import { displayTitle, renameSeed } from '@/utils/assistantTitle';
+import { displayTitle, renameSeed, shouldRename } from '@/utils/assistantTitle';
 import { assistantName } from './nameState';
 import MsgFlow from './MsgFlow.vue';
 import HitlDock from './HitlDock.vue';
@@ -606,7 +607,8 @@ async function commitRename(c: FpConv) {
   }
   const t = renameVal.value.trim();
   renamingId.value = null;
-  if (!t || t === (c.title ?? '')) {
+  // 2026-11-01 题8：与输入框回填同一判据（renameSeed）——脏标题回填空串后原样回车不该发请求
+  if (!shouldRename(t, c)) {
     return;
   }
   try {
@@ -984,6 +986,7 @@ const {
   resumeSay,
   resolveHitl,
   removeAskUserCard,
+  removeElicitationCard,
   setAutoLevel,
   queueEdit,
   queueGo,
