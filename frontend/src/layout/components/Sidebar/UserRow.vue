@@ -314,12 +314,13 @@ onMounted(load);
 .sidebar-user__name-unit {
   font-weight: 400;
   font-size: 12px;
-  color: var(--app-faint);
+  /* 2026-11-01 Q1=乙：侧栏是深底 #1e2a38，必须用侧栏专用灰，不能蹭页面上的浅底灰 */
+  color: var(--app-side-faint);
 }
 
 .sidebar-user__meta {
   overflow: hidden;
-  color: var(--app-muted);
+  color: var(--app-side-faint);
   font-size: 12px;
   font-weight: 400;
   white-space: nowrap;

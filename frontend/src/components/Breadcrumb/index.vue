@@ -77,13 +77,19 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .app-breadcrumb.el-breadcrumb {
+  :deep(.el-breadcrumb__separator) {
+    /* 2026-11-01：EP 默认取占位色，落在灰画布上只有 4.39:1 */
+    color: var(--app-faint);
+  }
+
   display: inline-block;
   font-size: 14px;
   line-height: 50px;
   margin-left: 8px;
 
   .no-redirect {
-    color: #97a8be;
+    /* 2026-11-01 Q1=乙：原 #97a8be 在灰画布上只有 2.2:1，跟次要文字一档 */
+    color: var(--app-faint);
     cursor: text;
   }
 }

@@ -28,7 +28,7 @@
   --app-text: #14202d;
   --app-muted: #5f7083;
   /* 2026-10-27 重构 Q5=甲：原 #8494a6 在 11–12px 上只有 3.10:1，压到 4.76:1（仍比 muted 浅一档） */
-  --app-faint: #64748b;
+  --app-faint: #4b5563;
 
   /* 数据与主操作（acc #2f6feb；主按钮即 acc，墨色 accFg） */
   --app-accent: #2f6feb;
@@ -52,6 +52,7 @@
      和主按钮抢同一块注意力；短条足够回答“我在哪”，把蓝色留给操作 */
   --app-shell: #1e2a38;
   --app-side-text: #c7d2de;
+  --app-side-faint: #94a3b8;
   --app-side-hover: #263545;
   --app-side-active-bg: #2c3b4d;
   --app-side-active-text: #ffffff;
@@ -125,7 +126,7 @@
   --el-text-color-primary: var(--app-text);
   --el-text-color-regular: var(--app-muted);
   --el-text-color-secondary: var(--app-faint);
-  --el-text-color-placeholder: #9aa6b4;
+  --el-text-color-placeholder: #6b7280;
   --el-border-color: var(--app-border);
   --el-border-color-light: var(--app-border);
   --el-border-color-lighter: var(--app-rule);
@@ -260,7 +261,7 @@ html[data-skin='t7'] .login-page {
   --el-text-color-primary: #131416;
   --el-text-color-regular: #5d5f60;
   --el-text-color-secondary: #6b6b6b;
-  --el-text-color-placeholder: #a8abb2;
+  --el-text-color-placeholder: #667085;
   --el-text-color-disabled: #c0c4cc;
   --el-bg-color: #ffffff;
   --el-bg-color-page: #f7f8fa;
@@ -277,7 +278,7 @@ html[data-skin='t7'] .login-page {
   --dcs-text-primary: #131416;
   --dcs-text-regular: #5d5f60;
   --dcs-text-secondary: #6b6b6b;
-  --dcs-text-placeholder: #a8abb2;
+  --dcs-text-placeholder: #667085;
   --dcs-bg-page: #f7f8fa;
   --dcs-bg-card: #ffffff;
   --dcs-bg-fill-light: #f4f6f8;
@@ -364,6 +365,7 @@ html.dark {
 
   --app-shell: #10151b;
   --app-side-text: #aebdcb;
+  --app-side-faint: #8fa0b3;
   --app-side-hover: #1a212a;
   /* 选中与亮色同口径：浅一档底 + 白字 + 2px 蓝短条（深色下“浅一档”= 比 shell 亮） */
   --app-side-active-bg: #243040;
@@ -417,8 +419,8 @@ html.dark {
   --el-bg-color-overlay: #131a23;
   --el-text-color-primary: #e4ecf4;
   --el-text-color-regular: #8fa0b3;
-  --el-text-color-secondary: #6f8094;
-  --el-text-color-placeholder: #6f8094;
+  --el-text-color-secondary: #8fa0b3;
+  --el-text-color-placeholder: #8fa0b3;
   --el-border-color: #212b36;
   --el-border-color-light: #212b36;
   --el-border-color-lighter: #1c2530;
@@ -447,7 +449,7 @@ html[data-skin='t7'] {
   --app-control: #e3e6eb;
   --app-text: #181818;
   --app-muted: #5e6d82;
-  --app-faint: #8996a8;
+  --app-faint: #4b5563;
 
   --app-accent: #0052d9;
   --app-accent-soft: #e8f3ff;
@@ -465,6 +467,7 @@ html[data-skin='t7'] {
 
   --app-shell: #ffffff;
   --app-side-text: #333d4b;
+  --app-side-faint: #4b5563;
   --app-side-hover: #f5f7fa;
   --app-side-active-bg: var(--app-accent);
   --app-side-active-text: #ffffff;
@@ -504,8 +507,8 @@ html[data-skin='t7'] {
   --el-bg-color-overlay: #ffffff;
   --el-text-color-primary: #181818;
   --el-text-color-regular: #5e6d82;
-  --el-text-color-secondary: #8996a8;
-  --el-text-color-placeholder: #98a3b2;
+  --el-text-color-secondary: #4b5563;
+  --el-text-color-placeholder: #6b7280;
   --el-border-color: #e3e6eb;
   --el-border-color-light: #e3e6eb;
   --el-border-color-lighter: #e9ecf0;
@@ -533,7 +536,7 @@ html[data-skin='t7'].dark {
   --app-control: #454545;
   --app-text: #e7e7e7;
   --app-muted: #a0a0a0;
-  --app-faint: #7d7d7d;
+  --app-faint: #a0a0a0;
 
   --app-accent: #4583ff;
   --app-accent-soft: #1b2b45;
@@ -551,6 +554,7 @@ html[data-skin='t7'].dark {
 
   --app-shell: #1a1a1a;
   --app-side-text: #b9b9b9;
+  --app-side-faint: #a0a0a0;
   --app-side-hover: #262626;
   /* 同 T1 深色口径：accent(#4583ff) 白字 3.5:1 不够，选中块取深一档蓝（5.2:1） */
   --app-side-active-bg: #2b66d9;
@@ -593,8 +597,8 @@ html[data-skin='t7'].dark {
   --el-bg-color-overlay: #242424;
   --el-text-color-primary: #e7e7e7;
   --el-text-color-regular: #a0a0a0;
-  --el-text-color-secondary: #7d7d7d;
-  --el-text-color-placeholder: #7d7d7d;
+  --el-text-color-secondary: #a0a0a0;
+  --el-text-color-placeholder: #a0a0a0;
   --el-border-color: #333333;
   --el-border-color-light: #333333;
   --el-border-color-lighter: #2c2c2c;
