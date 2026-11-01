@@ -48,7 +48,7 @@
       <div class="dcs-ops-table-wrap">
         <el-table v-loading="loading" :data="clientList" border class="ui-table" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="55" align="center" />
-          <el-table-column v-if="true" label="id" align="center" prop="id" :show-overflow-tooltip="true" />
+          <el-table-column v-if="true" label="id" align="center" prop="id" width="190" :show-overflow-tooltip="true" />
           <el-table-column label="客户端id" align="center" prop="clientId" width="160" :show-overflow-tooltip="true" />
           <el-table-column label="客户端key" align="center" prop="clientKey" />
           <el-table-column label="客户端秘钥" align="center" prop="clientSecret" />
