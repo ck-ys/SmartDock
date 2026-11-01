@@ -34,6 +34,15 @@ public class AssistantActionLogVo implements Serializable {
     /** 操作人昵称（左连缺行=空串） */
     private String userName;
 
+    /**
+     * 放行方式（三批③）：confirm/once/auto/allow；REJECTED 行与历史行为空（前端显示「—」）。
+     * 旧 /action/log 消费方多出的字段自动忽略。
+     */
+    private String releaseMode;
+
+    /** 操作人 userId（三批③审计页出参；雪花全局唯一） */
+    private Long userId;
+
     /** 时间 */
     private Date createTime;
 }

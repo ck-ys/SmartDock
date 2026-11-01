@@ -55,7 +55,10 @@ public final class ToolRegistry {
         /** 题7 案1：驱逐中间件落盘目录（助手工作区）；read_file 只在此根下回读 */
         java.nio.file.Path workspaceRoot,
         /** 题12 案1：结构化反问桥（ask_user 挂起等用户点选） */
-        org.dromara.assistant.core.AssistantAskUserBridge askUserBridge
+        org.dromara.assistant.core.AssistantAskUserBridge askUserBridge,
+        /** 三批③：写操作审计挂钩（只传 hook 本身，不传任何集合——AuditScope 内含在 hook 里；
+         *  null=不挂账本，测试路径。record 无重载，构造点必须回填末位实参） */
+        org.dromara.assistant.core.AssistantActionLedgerHook actionLedger
     ) {
     }
 
@@ -114,9 +117,10 @@ public final class ToolRegistry {
                 d.conversationService(), d.aguiThreadId()), null),
         // 长期记忆（二站④ AU-53）：仅租户 memoryEnabled='1' 时注册——
         // 未开启租户模型不可见 save_memory，也拿不到记忆注入（工厂侧同开关）
+        // 三批③（2026-11-01）：save_memory 挂动作账本（平台放行 release_mode=allow）
         new ToolSpec(Set.of("save_memory"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
-            (id, d) -> new org.dromara.assistant.tools.MemoryTools(id, d.memoryService()),
+            (id, d) -> new org.dromara.assistant.tools.MemoryTools(id, d.memoryService(), d.actionLedger()),
             d -> Boolean.TRUE.equals(d.memoryEnabled())),
         // 技能自取（五需求批 R1，2026-10-13）：全角色注册；目录按角色裁剪+体内 minRole 兜底
         new ToolSpec(Set.of("view_skill"),

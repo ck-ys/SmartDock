@@ -44,4 +44,20 @@ public interface BizToolProvider {
      * 写工具须幂等(超时后模型重试会二次执行)。</p>
      */
     BizToolResult execute(BizToolCall call);
+
+    /**
+     * 撤回一次已执行成功的写操作（三批④, 2026-11-01）。
+     *
+     * <p>refId=动作账本回执锚点（execute 成功时业务侧回填的业务行 id, 如 dcs_create_task
+     * 回填 taskId）；call 为撤回时刻重建的调用上下文——tenant/user 取自账本行归属
+     * （tenant=建 agent 登录快照、user=本人）, threadId=账本行会话, 不是原执行的原始
+     * 上下文, 实现只读身份三元组即可, args 恒为空。</p>
+     *
+     * <p>default=不支持撤回（人话失败）——现有 provider 零编译改动；可撤工具须<b>双处登记</b>：
+     * 助手侧 {@code AssistantActionService.REVOCABLE_TOOLS} 白名单 + 本实现 override,
+     * 两处注释互相锚定防清单漂移。</p>
+     */
+    default BizToolResult revoke(String toolName, Long refId, BizToolCall call) {
+        return BizToolResult.fail("该操作不支持撤回");
+    }
 }

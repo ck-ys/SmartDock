@@ -322,7 +322,10 @@ CREATE TABLE public.dcs_assistant_action (
     result_summary character varying(500),
     idempotency_key character varying(128) NOT NULL,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    release_mode character varying(16),
+    revoked_by bigint,
+    revoked_at timestamp without time zone
 );
 
 

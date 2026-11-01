@@ -70,6 +70,8 @@ class ToolRegistryGuardTest {
             // 题7：read_file 构造只存根路径，不读盘
             java.nio.file.Path.of("."),
             // 题12：ask_user 只存桥引用
+            null,
+            // 三批③：账本 hook 测试不注入（save_memory 构造只存引用，null 不触发调用）
             null);
     }
 

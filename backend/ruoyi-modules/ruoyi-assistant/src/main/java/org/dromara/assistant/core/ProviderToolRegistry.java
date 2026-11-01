@@ -11,9 +11,11 @@ import org.dromara.assistant.tools.ToolIdentity;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * BizToolProvider 注册器(批2 SPI 化): 收集全部 provider Bean, 按会话身份注册工具。
@@ -42,6 +44,42 @@ public class ProviderToolRegistry {
     }
 
     /**
+     * 三批③（2026-11-01）：写操作审计口径快照（建 agent 时算一次，hook 据此判 release_mode）。
+     *
+     * <ul>
+     *   <li>writeTools：本会话按过滤链真实可注册的<b>写类</b>业务工具名全集（与
+     *       {@link #registerProviders} 同一条过滤链共用，见 {@link #eligibleSpecs}）；</li>
+     *   <li>autonomyAllowed：writeTools 中建时按档位直接放行（autoAllow.test==true）的子集
+     *       ——autoAllow 由 AgentFactory 传与 registerProviders 完全同款的谓词实例，
+     *       快照口径=与实际装进引擎的权限规则一致。</li>
+     * </ul>
+     */
+    public record AuditScope(Set<String> writeTools, Set<String> autonomyAllowed) {
+    }
+
+    /**
+     * 审计口径快照计算：只读工具不进集合（它们无放行语义）；autoAllow=null=全集空
+     * （等价 always 档——写类全走确认卡，release_mode 恒 confirm）。
+     */
+    public AuditScope auditScope(ToolIdentity identity, String threadId, Predicate<String> autoAllow) {
+        Set<String> write = new LinkedHashSet<>();
+        for (Eligible e : eligibleSpecs(identity)) {
+            if (!e.spec().isReadOnly()) {
+                write.add(e.spec().getName());
+            }
+        }
+        Set<String> auto = new LinkedHashSet<>();
+        if (autoAllow != null) {
+            for (String name : write) {
+                if (autoAllow.test(name)) {
+                    auto.add(name);
+                }
+            }
+        }
+        return new AuditScope(Set.copyOf(write), Set.copyOf(auto));
+    }
+
+    /**
      * 按会话身份注册全部达标工具(在 ToolRegistry.registerAll 之后调用, 内置优先)。
      *
      * @return 实际注册的工具名集合(守卫断言用)
@@ -59,9 +97,61 @@ public class ProviderToolRegistry {
      */
     public Set<String> registerProviders(Toolkit toolkit, ToolIdentity identity, String threadId,
                                          PermissionContextState.Builder pb,
-                                         java.util.function.Predicate<String> autoAllow) {
+                                         Predicate<String> autoAllow) {
+        return registerProviders(toolkit, identity, threadId, pb, autoAllow, null);
+    }
+
+    /**
+     * 三批③：带自主权判定+写操作审计挂钩的注册入口（AgentFactory 主链用）。
+     *
+     * @param actionLedger 写操作账本挂钩（null=不挂账本——测试/旧路径，行为与题9 完全一致）
+     */
+    public Set<String> registerProviders(Toolkit toolkit, ToolIdentity identity, String threadId,
+                                         PermissionContextState.Builder pb,
+                                         Predicate<String> autoAllow,
+                                         AssistantActionLedgerHook actionLedger) {
         Set<String> registered = new LinkedHashSet<>();
+        for (Eligible e : eligibleSpecs(identity)) {
+            BizToolProvider provider = e.provider();
+            BizToolSpec spec = e.spec();
+            String name = spec.getName();
+            try {
+                toolkit.registerAgentTool(new BizToolAgentAdapter(provider, spec, identity, threadId, actionLedger));
+                // 题9 案1：只读恒放行；写类按自主权档位决定放行/弹卡（审计在 run 记录与日志留痕）
+                boolean auto = !spec.isReadOnly() && autoAllow != null && autoAllow.test(name);
+                PermissionBehavior behavior = spec.isReadOnly() || auto
+                    ? PermissionBehavior.ALLOW : PermissionBehavior.ASK;
+                PermissionRule rule = new PermissionRule(name, "", behavior,
+                    "biz-provider:" + provider.namespace());
+                if (behavior == PermissionBehavior.ALLOW) {
+                    pb.addAllowRule(name, rule);
+                } else {
+                    pb.addAskRule(name, rule);
+                }
+                if (auto) {
+                    log.info("[Autonomy] 写类工具按用户档位自动放行 tenant={} user={} thread={} tool={}",
+                        identity.getTenantId(), identity.getUserId(), threadId, name);
+                }
+                registered.add(name);
+            } catch (Exception ex) {
+                log.warn("[Assistant] provider tool {} register failed: {}", name, ex.getMessage());
+            }
+        }
+        return registered;
+    }
+
+    /** provider 与其 spec 的配对（eligibleSpecs 产出——注册与审计快照共用） */
+    private record Eligible(BizToolProvider provider, BizToolSpec spec) {
+    }
+
+    /**
+     * 达标工具全集（注册与 auditScope 共用的同一条过滤链）：
+     * 非 blank / 不撞内置名 / provider 间撞名先到先得 / minRole / 权限串。
+     */
+    private List<Eligible> eligibleSpecs(ToolIdentity identity) {
+        List<Eligible> out = new ArrayList<>();
         Set<String> builtinNames = org.dromara.assistant.core.ToolRegistry.allToolNames();
+        Set<String> seen = new LinkedHashSet<>();
         for (BizToolProvider provider : providers) {
             List<BizToolSpec> specs;
             try {
@@ -83,42 +173,21 @@ public class ProviderToolRegistry {
                     log.warn("[Assistant] provider tool {} conflicts with builtin, provider yields", name);
                     continue;
                 }
-                if (!registered.add(name)) {
+                if (!seen.add(name)) {
                     // provider 间撞名: 先到先得, 后来者让位(避免静默覆盖)
                     log.warn("[Assistant] provider tool {} duplicated across providers, first wins", name);
                     continue;
                 }
-                registered.remove(name); // add 仅用于判重, 真正登记在注册成功后
                 if (identity.getRoleLevel() < spec.getMinRoleLevel()) {
                     continue;
                 }
                 if (!permissionSatisfied(spec.getRequiredPermission(), identity)) {
                     continue;
                 }
-                try {
-                    toolkit.registerAgentTool(new BizToolAgentAdapter(provider, spec, identity, threadId));
-                    // 题9 案1：只读恒放行；写类按自主权档位决定放行/弹卡（审计在 run 记录与日志留痕）
-                    boolean auto = !spec.isReadOnly() && autoAllow != null && autoAllow.test(name);
-                    PermissionBehavior behavior = spec.isReadOnly() || auto
-                        ? PermissionBehavior.ALLOW : PermissionBehavior.ASK;
-                    PermissionRule rule = new PermissionRule(name, "", behavior,
-                        "biz-provider:" + provider.namespace());
-                    if (behavior == PermissionBehavior.ALLOW) {
-                        pb.addAllowRule(name, rule);
-                    } else {
-                        pb.addAskRule(name, rule);
-                    }
-                    if (auto) {
-                        log.info("[Autonomy] 写类工具按用户档位自动放行 tenant={} user={} thread={} tool={}",
-                            identity.getTenantId(), identity.getUserId(), threadId, name);
-                    }
-                    registered.add(name);
-                } catch (Exception e) {
-                    log.warn("[Assistant] provider tool {} register failed: {}", name, e.getMessage());
-                }
+                out.add(new Eligible(provider, spec));
             }
         }
-        return registered;
+        return out;
     }
 
     /**

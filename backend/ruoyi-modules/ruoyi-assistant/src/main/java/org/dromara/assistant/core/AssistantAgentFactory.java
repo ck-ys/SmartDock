@@ -93,6 +93,8 @@ public class AssistantAgentFactory {
     private final org.dromara.assistant.service.AssistantUserQuotaService quotaService;
     /** 批2 SPI 化: BizToolProvider 注册器(零 provider 时为空表, 助手无业务模块也能起) */
     private final ProviderToolRegistry providerToolRegistry;
+    /** 动作账本(三批③ 2026-11-01: 写操作审计 hook 落行/收口的 service 依赖) */
+    private final org.dromara.assistant.service.AssistantActionService actionService;
 
     private final org.dromara.assistant.service.McpPilotService mcpPilotService;
     /** 题2 案3（2026-10-31）：技能使用统计——取用一次记一行，管理页展示「用了几次/最近一次」 */
@@ -192,6 +194,16 @@ public class AssistantAgentFactory {
         // 题7 三席回修：驱逐落盘与 read_file 根都按「租户/用户/会话」分目录——
         // 工作区是进程级单例，不分目录=全租户共用一盘，任何会话拿到路径就能读别人的工具结果
         java.nio.file.Path threadWorkspace = threadWorkspace(user.getTenantId(), user.getUserId(), aguiThreadId);
+        // 三批③（2026-11-01）：写操作审计——建时快照放行口径。autoAllow 谓词与下方
+        // registerProviders 传同一条实例（=与实际装进引擎的权限规则一致）；hook 内含
+        // AuditScope（writeTools/autonomyAllowed 两集合）与建时档位，release_mode 据此判定——
+        // always 档经确认卡放行的工具不在快照集，必记 confirm 不误记 auto/once
+        java.util.function.Predicate<String> autoAllow =
+            name -> org.dromara.assistant.core.AssistantAutonomyHolder.autoAllows(aguiThreadId, name);
+        ProviderToolRegistry.AuditScope auditScope =
+            providerToolRegistry.auditScope(identity, aguiThreadId, autoAllow);
+        AssistantActionLedgerHook actionLedgerHook = new AssistantActionLedgerHook(
+            actionService, user.getTenantId(), user.getUserId(), aguiThreadId, auditScope);
         Set<String> registered = ToolRegistry.registerAll(toolkit, identity,
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
@@ -200,15 +212,18 @@ public class AssistantAgentFactory {
                 // 题7 案1：工作区根 = 本会话驱逐落盘目录（read_file 只在此根下回读）
                 threadWorkspace,
                 // 题12 案1：结构化反问桥（ask_user）
-                askUserBridge), pb,
+                askUserBridge,
+                // 三批③：写操作审计挂钩（save_memory 平台放行也落账本）
+                actionLedgerHook), pb,
             // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
             // 管理员改完下一轮建会话即生效（注册面即时消失）
             tenantCfg.toolGate());
         // 批2 SPI 化: BizToolProvider 通道(内置优先, 撞名让位)——注册与权限规则同循环;
         // 批3 起业务工具唯一来路（微核心 DcsToolProvider 在此挂载）
         // 题9 案1：写类工具是否按用户档位直接放行（全自动/同类已确认）——运行前档位在 Holder 里
+        // 三批③：同一条 autoAllow 谓词 + 审计 hook 传入（写类业务工具执行前后落账本）
         registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb,
-            name -> org.dromara.assistant.core.AssistantAutonomyHolder.autoAllows(aguiThreadId, name)));
+            autoAllow, actionLedgerHook));
         // 批2 Q2=A：MCP 外部工具试点挂载（平台级启用行；单服务失败=审计+warn 跳过，绝不连坐会话）
         // G4-#4：租户工具闸随行传入（mcp:<server> 键，off/admin 生效于挂载面）+ 用户角色档
         registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
@@ -261,13 +276,17 @@ public class AssistantAgentFactory {
             // 600s 看门狗+刷新 Recorder lastEventAt（工具/压缩段豁免的事件层实现）。
             // order=0 链位最外层，包住压缩中间件的 onReasoning
             .middleware(new DcsHeartbeatMiddleware())
-            // 题7 案1（2026-10-31）：超大工具结果驱逐——单条结果超 8 万字符时落盘
+            // 题7 案1（2026-10-31）：超大工具结果驱逐——单条结果超阈值（默认 8 万字符）时落盘
             // 工作区 large_tool_results/<agent>/，上下文只留头 2000 字预览 + 路径，
             // 模型追问细节用 read_file 分页回读（ToolRegistry 同名工具）。
             // 排在压缩中间件之前：先把单条超大结果卸掉，压缩只处理消息条数问题。
+            // 题①（2026-10-31 拍板 B）：阈值=sys_config 两级读取（本租户→默认租户→80000），
+            // 刻意不进装配指纹——缓存 agent 不重建，只影响新建会话。
             .middleware(new io.agentscope.harness.agent.middleware.ToolResultEvictionMiddleware(
                 new io.agentscope.harness.agent.filesystem.local.LocalFilesystem(threadWorkspace),
-                io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig.defaults()))
+                io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig.builder()
+                    .maxResultChars(AssistantEvictionThreshold.read(configService, user.getTenantId()))
+                    .build()))
             // 批A-1（2026-10-22 拍板 Q1/Q5）：自动压缩通道——触发线按当前模型窗口派生
             // （窗口 − 输出预留 2.1 万 − 缓冲 1.3 万），不再读租户固定阈值；尾窗按轮保留
             // 最后 1 轮原文。配置双显式（trigger+keep），不依赖模型自报窗口（P14 Step5

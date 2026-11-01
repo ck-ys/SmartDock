@@ -40,11 +40,24 @@ public class AssistantMemoryService {
     /** digest 缓存：key=tenant:user → [0]=过期时刻, [1]=digest（null=查过无记忆） */
     private final Map<String, Object[]> digestCache = new ConcurrentHashMap<>();
 
-    /** save_memory 工具入口：脱敏→截断→去重→容量闸→落库；返回给人话结果供模型转告 */
+    /**
+     * 落库结果（三批③，2026-11-01）：message=人话结果（与旧 {@link #save} 返回一致）；
+     * memoryId=落库行雪花 id（MyBatis-Plus ASSIGN_ID insert 后回填，供动作账本回执锚点），
+     * 未落库（空内容/重复/满员）=null。
+     */
+    public record SaveOutcome(String message, Long memoryId) {
+    }
+
+    /** save_memory 工具入口（旧签名，兼容存量调用）：只取人话结果 */
     public String save(String tenantId, Long userId, String raw) {
+        return saveReturningId(tenantId, userId, raw).message();
+    }
+
+    /** save_memory 工具入口：脱敏→截断→去重→容量闸→落库；返回人话结果+落库行 id 供模型转告/审计回执 */
+    public SaveOutcome saveReturningId(String tenantId, Long userId, String raw) {
         String content = raw == null ? "" : raw.trim();
         if (content.isEmpty()) {
-            return "内容是空的，没有保存";
+            return new SaveOutcome("内容是空的，没有保存", null);
         }
         if (content.length() > MAX_CONTENT) {
             content = content.substring(0, MAX_CONTENT);
@@ -52,10 +65,10 @@ public class AssistantMemoryService {
         // PII 脱敏（手机号/身份证不进长期记忆——记忆页用户可见，更要守住）
         content = piiFilter.mask(content, tenantId);
         if (memoryMapper.countByContent(tenantId, userId, content) > 0) {
-            return "这条已经记过了，不重复保存";
+            return new SaveOutcome("这条已经记过了，不重复保存", null);
         }
         if (memoryMapper.countByUser(tenantId, userId) >= MAX_PER_USER) {
-            return "记忆最多存 " + MAX_PER_USER + " 条：请在「AI 助手记忆」页删掉不再需要的，再让我记新的";
+            return new SaveOutcome("记忆最多存 " + MAX_PER_USER + " 条：请在「AI 助手记忆」页删掉不再需要的，再让我记新的", null);
         }
         DcsAssistantMemory row = new DcsAssistantMemory();
         row.setTenantId(tenantId);
@@ -66,9 +79,9 @@ public class AssistantMemoryService {
         row.setCreateTime(new Date());
         memoryMapper.insert(row);
         evict(tenantId, userId);
-        log.info("[AssistantMemory] 已保存 tenant={} user={} contentLen={}",
-            tenantId, userId, content.length());
-        return "已记住：" + content;
+        log.info("[AssistantMemory] 已保存 tenant={} user={} contentLen={} memoryId={}",
+            tenantId, userId, content.length(), row.getId());
+        return new SaveOutcome("已记住：" + content, row.getId());
     }
 
     /** 记忆页清单（新→旧） */

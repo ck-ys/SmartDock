@@ -53,6 +53,20 @@ public class DcsAssistantAction implements Serializable {
     /** 幂等键（唯一索引） */
     private String idempotencyKey;
 
+    /**
+     * 放行方式（三批③，2026-11-01）：confirm=确认卡放行 / once=同类已确认 / auto=全自动 /
+     * allow=平台放行（如 save_memory）；REJECTED 行与历史行为空。
+     */
+    private String releaseMode;
+
+    /**
+     * 撤回人（三批④，2026-11-01）：status=REVOKED 时非空，与行 user_id 同源（本人撤自己的）。
+     */
+    private Long revokedBy;
+
+    /** 撤回时刻（三批④）：status=REVOKED 时非空 */
+    private Date revokedAt;
+
     /** 创建时间 */
     private Date createTime;
 

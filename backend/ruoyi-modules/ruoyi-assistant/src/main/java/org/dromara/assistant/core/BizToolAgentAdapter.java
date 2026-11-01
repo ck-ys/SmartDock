@@ -40,8 +40,11 @@ public class BizToolAgentAdapter extends ToolBase {
     private final BizToolSpec spec;
     private final ToolIdentity identity;
     private final String threadId;
+    /** 三批③：写操作审计挂钩（可空——null 时执行行为与无审计完全一致） */
+    private final AssistantActionLedgerHook actionLedger;
 
-    public BizToolAgentAdapter(BizToolProvider provider, BizToolSpec spec, ToolIdentity identity, String threadId) {
+    public BizToolAgentAdapter(BizToolProvider provider, BizToolSpec spec, ToolIdentity identity, String threadId,
+                               AssistantActionLedgerHook actionLedger) {
         // ToolBase 9 参序: (name, description, inputSchema, readOnly, concurrencySafe, mcp, mcpName, externalTool, stateInjected)
         // 三审回修：description 空兜底""（ToolBase 对三参 requireNonNull，provider 漏配会让工具静默消失）；
         // concurrencySafe=false=有意从框架裸 AgentTool 默认并行收紧为串行（写类+HITL 天然逐个）
@@ -51,6 +54,7 @@ public class BizToolAgentAdapter extends ToolBase {
         this.spec = spec;
         this.identity = identity;
         this.threadId = threadId;
+        this.actionLedger = actionLedger;
     }
 
     @Override
@@ -77,24 +81,54 @@ public class BizToolAgentAdapter extends ToolBase {
 
     /**
      * 同步执行核心(单测直入; callAsync 只是 Mono 包装)。
+     * 三批③：provider.execute 前后包写操作审计挂钩（open→EXECUTING；ok/异常→DONE/FAILED
+     * 收口）；hook=null 或 open 失败（返回 null 行 id）时原行为不变。
+     * 三批③终审回修：只读工具（spec.isReadOnly()）不落审计行——只读无放行语义
+     * （auditScope 同口径：write 集只收非只读），且查询类工具每次 AI 调用都会执行，
+     * 无条件落行会刷出大量「确认后执行」的假写操作记录污染审计页与 CSV。
+     * 行 id=null 时 finishAudit 各收口点均为 no-op，finish 侧无需另判。
      */
     public ToolResultBlock doExecute(Map<String, Object> input) {
+        Long auditRow = (actionLedger == null || spec.isReadOnly()) ? null
+            : actionLedger.open(spec.getName(), argsJsonOf(input));
         try {
             // buildCall 一并收进 try(dspro P2-7): provider 配置缺陷(如 params=null)
             // 也走错误块, 不让 NPE 逃进 Reactor 错误通道炸会话
             BizToolCall call = buildCall(input);
             BizToolResult result = provider.execute(call);
             if (result == null) {
+                finishAudit(auditRow, false, "provider returned null", null);
                 return ToolResultBlock.error(getName(), "provider returned null");
             }
             if (result.isOk()) {
                 Object data = result.getData() == null ? Map.of() : result.getData();
+                finishAudit(auditRow, true,
+                    result.getMessage() == null || result.getMessage().isBlank() ? "执行完成" : result.getMessage(),
+                    AssistantActionLedgerHook.refIdOf(result.getData()));
                 return ToolResultBlock.text(serializer.apply(data));
             }
-            return ToolResultBlock.error(getName(),
-                result.getMessage() == null ? "tool failed" : result.getMessage());
+            String failMsg = result.getMessage() == null ? "tool failed" : result.getMessage();
+            finishAudit(auditRow, false, failMsg, null);
+            return ToolResultBlock.error(getName(), failMsg);
         } catch (Exception e) {
+            finishAudit(auditRow, false, "tool error: " + e.getMessage(), null);
             return ToolResultBlock.error(getName(), "tool error: " + e.getMessage());
+        }
+    }
+
+    /** 审计收口薄封装（hook/行 id 任一为空=no-op） */
+    private void finishAudit(Long auditRow, boolean ok, String summary, Long refId) {
+        if (actionLedger != null) {
+            actionLedger.finish(auditRow, ok, summary, refId);
+        }
+    }
+
+    /** 审计用参数快照（schema 声明过滤后的干净入参）；序列化失败不阻断落行（args_json 可空） */
+    private String argsJsonOf(Map<String, Object> input) {
+        try {
+            return serializer.apply(filterDeclaredArgs(input));
+        } catch (Exception e) {
+            return null;
         }
     }
 
