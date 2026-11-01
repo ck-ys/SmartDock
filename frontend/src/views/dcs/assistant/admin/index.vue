@@ -5594,10 +5594,13 @@ onMounted(() => {
   }
 
   /* 能力表：名字左、属性右（风险 + 谁能用成簇），整行可点进抽屉 */
-  /* 能力卡（2026-11-01 丁案）：本卡内二级文字统一提到 ≥4.5:1（原 #64748b 在浅灰底上只有 4.3:1） */
+  /* 能力卡（2026-11-01 丁案）：本卡内二级/常规文字统一提到 ≥4.5:1。
+     选中行与批量条是浅蓝底（primary-light-9），运行态的 #5f7083 在上面只有 4.45:1，这里一并压深。 */
   .cap-card {
     --dcs-text-secondary: #5b6673;
     --el-text-color-secondary: #5b6673;
+    --dcs-text-regular: #4b5563;
+    --el-text-color-regular: #4b5563;
   }
   /* 工具栏（丁案）：卡片第一行，位置永远固定 */
   .cap-bar {
@@ -5801,7 +5804,8 @@ onMounted(() => {
     white-space: nowrap;
 
     &.chg {
-      color: var(--el-color-primary);
+      /* 主色 #2f6feb 在浅蓝底（选中行/批量条）上只有 4:1，压深一档 */
+      color: #1d4ed8;
       font-weight: 500;
     }
   }
@@ -5891,6 +5895,10 @@ onMounted(() => {
 
     .n b {
       font-variant-numeric: tabular-nums;
+    }
+    /* 链接按钮在浅蓝底上同样压深一档（EP 的 link 色不跟卡内 token） */
+    .el-button.is-link {
+      color: #1d4ed8;
     }
     .kbd {
       margin-left: auto;
@@ -6119,7 +6127,8 @@ onMounted(() => {
     color: var(--dcs-text-primary);
 
     b {
-      color: var(--el-color-primary);
+      /* 数量在浅蓝底上，#2f6feb 只有 4:1，压深一档 */
+      color: #1d4ed8;
     }
     .el-button {
       margin-left: auto;
