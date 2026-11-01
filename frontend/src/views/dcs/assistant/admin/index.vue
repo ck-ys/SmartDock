@@ -186,67 +186,69 @@
                 <span class="hint">{{ CAP_GROUP_HINT[g.name] || '' }}</span>
               </div>
               <template v-for="row in g.rows" :key="row.key">
-                <div
-                  class="cap-row"
-                  :class="{ closed: capLevelOf(row, tgDraft) < 0, dim: capLensDim(row), sel: capSel.has(row.key) }"
-                  tabindex="0"
-                  @click="openCapDetail(row)"
-                  @keydown="onCapRowKey($event, row)"
-                >
-                  <el-checkbox
-                    class="cap-cb"
-                    :model-value="capSel.has(row.key)"
-                    :aria-label="`选择 ${row.displayName}`"
-                    @click.stop
-                    @change="toggleCapSel(row)"
-                  />
-                  <div class="cap-main">
-                    <div class="cap-line">
-                      <b class="cap-nm">{{ row.displayName }}</b>
-                      <span v-if="row.riskLevel !== 'low'" class="risk-badge" :class="row.riskLevel">
-                        {{ RISK_LABEL[row.riskLevel] }}
-                      </span>
-                      <span v-else class="lowdot" role="img" aria-label="低危" title="低危" />
-                      <span v-if="capCondition(row)" class="cap-when" :title="capCondition(row)">· {{ capCondition(row) }}</span>
-                    </div>
-                    <div class="cap-sub" :title="capDesc(row)">
-                      {{ capDesc(row) }}<span v-if="capCondition(row)" class="cap-when-m"> · {{ capCondition(row) }}</span>
-                    </div>
-                  </div>
-                  <div class="cap-act">
-                    <button
-                      type="button"
-                      class="gate-btn"
-                      :class="{ 'gate-no': capLensDim(row), 'gate-off': capLevelOf(row, tgDraft) < 0 }"
-                      :aria-expanded="capOpenGate === row.key"
-                      :aria-label="`${row.displayName}的可用范围：${capGateText(row)}，点开可以改`"
-                      @click.stop="toggleCapGate(row)"
-                    >
-                      {{ capGateText(row) }}
-                      <span v-if="capRowValue(row) === 'admin'" class="gate-own">· 已收紧</span>
-                      <svg class="car" viewBox="0 0 12 12" aria-hidden="true">
-                        <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-                      </svg>
-                    </button>
-                    <svg class="cap-go" viewBox="0 0 12 12" aria-hidden="true">
-                      <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                  </div>
-                </div>
-                <div v-if="capOpenGate === row.key" class="cap-x">
-                  <span class="lbl">改成</span>
-                  <button
-                    v-for="o in capOptionsFor(row)"
-                    :key="o.key"
-                    type="button"
-                    class="xopt"
-                    :class="{ on: o.key === capRowValue(row), dis: o.disabled }"
-                    :disabled="o.disabled"
-                    @click.stop="pickCapOption(row, o)"
+                <div class="cap-item">
+                  <div
+                    class="cap-row"
+                    :class="{ closed: capLevelOf(row, tgDraft) < 0, dim: capLensDim(row), sel: capSel.has(row.key) }"
+                    tabindex="0"
+                    @click="openCapDetail(row)"
+                    @keydown="onCapRowKey($event, row)"
                   >
-                    {{ o.label }}<span v-if="o.key === capRowValue(row)" class="cur">（当前）</span>
-                  </button>
-                  <span class="kbd">选完即收起；点底部「保存」才生效</span>
+                    <el-checkbox
+                      class="cap-cb"
+                      :model-value="capSel.has(row.key)"
+                      :aria-label="`选择 ${row.displayName}`"
+                      @click.stop
+                      @change="toggleCapSel(row)"
+                    />
+                    <div class="cap-main">
+                      <div class="cap-line">
+                        <b class="cap-nm">{{ row.displayName }}</b>
+                        <span v-if="row.riskLevel !== 'low'" class="risk-badge" :class="row.riskLevel">
+                          {{ RISK_LABEL[row.riskLevel] }}
+                        </span>
+                        <span v-else class="lowdot" role="img" aria-label="低危" title="低危" />
+                        <span v-if="capCondition(row)" class="cap-when" :title="capCondition(row)">· {{ capCondition(row) }}</span>
+                      </div>
+                      <div class="cap-sub" :title="capDesc(row)">
+                        {{ capDesc(row) }}<span v-if="capCondition(row)" class="cap-when-m"> · {{ capCondition(row) }}</span>
+                      </div>
+                    </div>
+                    <div class="cap-act">
+                      <button
+                        type="button"
+                        class="gate-btn"
+                        :class="{ 'gate-no': capLensDim(row), 'gate-off': capLevelOf(row, tgDraft) < 0 }"
+                        :aria-expanded="capOpenGate === row.key"
+                        :aria-label="`${row.displayName}的可用范围：${capGateText(row)}，点开可以改`"
+                        @click.stop="toggleCapGate(row)"
+                      >
+                        {{ capGateText(row) }}
+                        <span v-if="capRowValue(row) === 'admin'" class="gate-own">· 已收紧</span>
+                        <svg class="car" viewBox="0 0 12 12" aria-hidden="true">
+                          <path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </button>
+                      <svg class="cap-go" viewBox="0 0 12 12" aria-hidden="true">
+                        <path d="M4.5 2.5 8 6l-3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div v-if="capOpenGate === row.key" class="cap-x">
+                    <span class="lbl">改成</span>
+                    <button
+                      v-for="o in capOptionsFor(row)"
+                      :key="o.key"
+                      type="button"
+                      class="xopt"
+                      :class="{ on: o.key === capRowValue(row), dis: o.disabled }"
+                      :disabled="o.disabled"
+                      @click.stop="pickCapOption(row, o)"
+                    >
+                      {{ o.label }}<span v-if="o.key === capRowValue(row)" class="cur">（当前）</span>
+                    </button>
+                    <span class="kbd">选完即收起；点底部「保存」才生效</span>
+                  </div>
                 </div>
               </template>
             </template>
@@ -1180,7 +1182,7 @@
               </el-table-column>
               <!-- 题6+回修：调用成功行兜「—」（历史行 error_msg 曾写耗时）；挂载/反问行的 error_msg 是结果详情、
                    限频失败行没有错误文本——这三类按动作放行显示，不再被「成功=—」一刀切吞掉 -->
-              <el-table-column label="详情/错误" min-width="220" fixed="right">
+              <el-table-column label="详情/错误" min-width="220" :fixed="isNarrow ? 'right' : false">
                 <template #default="{ row }">{{
                   row.action === 'CALL_OK' ? '—' : row.errorMsg || (row.action === 'RATE_LIMITED' ? '已限频，稍后再试' : '—')
                 }}</template>
@@ -4391,10 +4393,10 @@ onMounted(() => {
   }
 }
 .dcs-as-admin {
-  /* 2026-11-01 二稿：整页收成 1240 阅读列居中——页头、页签、能力清单共用一条左边缘。
-     1920 办公屏不再把 12 行短文本摊到 1600px（右半屏空成一片），也不再出现
-     「表 1200、卡片 1632」的错位；1440 及以下内容区本来就 ≤1240，布局不变。 */
-  max-width: 1240px;
+  /* 2026-11-01 三稿：二稿的 1240 阅读列在 1920 上成了「窄列居中岛」（两侧各空 212px），
+     用户点名太居中。改成：1920 内容区（1664）内不再封顶，超宽屏才收到 1760；
+     ≥1600 视口能力清单摊成两列，让内容真实占住宽度。1440 及以下本来 ≤1240，版式不变。 */
+  max-width: 1760px;
   margin-inline: auto;
 
   .adm-head {
@@ -5650,6 +5652,30 @@ onMounted(() => {
      分组靠留白分，不靠色带；行间不画满宽横线，靠两行文字自己的节奏分条（悬停才给浅底）。 */
   .cap-tbl {
     margin-top: 2px;
+  }
+  /* 2026-11-01 三稿：宽屏两列。分组标题横跨两列，每条「行 + 行内改档」留在自己那一列，
+     不用再靠居中留白撑版面；1440 及以下保持单列（二稿版式）。 */
+  @media (min-width: 1600px) {
+    .cap-tbl {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 32px;
+      align-items: start;
+    }
+    .cap-ghead {
+      grid-column: 1 / -1;
+    }
+    /* 两列后单行只剩 ~620px，长说明允许折两行——宁可行高不均，也不把说明截成半句。
+       选择器多带一层 .cap-tbl：基础 .cap-sub（nowrap）写在后面，同权重会被它压掉。 */
+    .cap-tbl .cap-sub {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      white-space: normal;
+    }
+  }
+  .cap-item {
+    min-width: 0;
   }
   .cap-cb {
     height: auto;
