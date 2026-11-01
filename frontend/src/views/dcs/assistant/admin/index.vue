@@ -996,7 +996,7 @@
             <el-button type="primary" :loading="quotaLoading" @click="loadQuotaPage">查询</el-button>
             <span class="qo-total">共 {{ quotaTotal }} 人（全量）</span>
           </div>
-          <el-table :data="quotaRows" v-loading="quotaLoading" stripe>
+          <el-table :data="quotaRows" v-loading="quotaLoading">
             <el-table-column label="用户" min-width="150">
               <template #default="{ row }">
                 <span>{{ row.nickName || row.userName }}</span>
@@ -1163,7 +1163,7 @@
           </div>
           <el-card shadow="never" class="adm-card ops-card">
             <!-- 题5：全页 11 处表格都有加载态，唯独审计表没有——翻页时旧行无提示挂着、还能连点下一页错页 -->
-            <el-table :data="mcpLogRows" v-loading="mcpLogLoading" size="small" stripe :row-class-name="auditRowClass">
+            <el-table :data="mcpLogRows" v-loading="mcpLogLoading" size="small" :row-class-name="auditRowClass">
               <el-table-column label="时间" width="170">
                 <template #default="{ row }">{{ formatMcpTime(row.createTime) }}</template>
               </el-table-column>

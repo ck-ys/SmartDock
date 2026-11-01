@@ -279,6 +279,33 @@ html.density-compact {
 
 /* ============================ 表格 ============================ */
 /* 表头 12px 灰、无底带；行高 44；行线 1px；禁斑马。数字列加 `.ui-num`。 */
+/* ============================ 表格口径（全站） ============================
+   2026-11-01 Q4=甲：去斑马纹、去竖线，只留一条极淡的行分隔线；表头不加底色带。
+   按 .el-table 兜底（不只 .ui-table），否则没挂 ui-table 的表会漏。 */
+.el-table {
+  --el-table-border-color: var(--app-table-rule);
+  --el-table-border: 1px solid var(--app-table-rule);
+  --el-table-header-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: var(--app-raised);
+}
+
+.el-table th.el-table__cell {
+  background-color: transparent;
+}
+
+/* EP 的斑马纹权重是 (0,4,2)，这里补满层级才压得住 */
+.el-table.el-table--striped .el-table__body tr.el-table__row--striped > td.el-table__cell,
+.el-table.el-table--striped .el-table__body tr.el-table__row--striped:hover > td.el-table__cell,
+.el-table.el-table--striped .el-table__body tr.el-table__row--striped.hover-row > td.el-table__cell {
+  background-color: transparent;
+}
+
+/* 竖线：只有传了 border 属性的表才有，统一去掉 */
+.el-table.el-table--border .el-table__cell {
+  border-right: 0;
+}
+
 .ui-table {
   width: 100%;
   min-width: 0;
@@ -296,13 +323,13 @@ html.density-compact {
   color: var(--app-faint);
   font-size: var(--dcs-font-sm);
   font-weight: 400;
-  border-bottom: 1px solid var(--app-rule);
+  border-bottom: 1px solid var(--app-table-rule);
 }
 
 .ui-table td.el-table__cell {
   height: var(--dcs-density-row-h);
   padding: 0;
-  border-bottom: 1px solid var(--app-rule);
+  border-bottom: 1px solid var(--app-table-rule);
 }
 
 /* 页面即使误传 stripe 也不出现斑马纹。

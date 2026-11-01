@@ -24,6 +24,8 @@
   --app-active: #e8f0fe; /* 内容面选中底 = accSoft；侧栏选中另有 side-active-* 令牌 */
   --app-border: #e2e5ea;
   --app-rule: #e2e5ea;
+  /* 2026-11-01 Q4=甲：表格行分隔线比卡片描边再淡一档 */
+  --app-table-rule: #f1f3f6;
   --app-control: #e2e5ea;
   --app-text: #14202d;
   /* 2026-11-01 Q1=乙 三档排位（灰画布口径）：正文 16.5 > 常规 10.2 > 次要 7.6 > 占位 4.8
@@ -184,6 +186,8 @@
   --app-active: #e8f0fe;
   --app-border: #e2e5ea;
   --app-rule: #e2e5ea;
+  /* 2026-11-01 Q4=甲：表格行分隔线比卡片描边再淡一档 */
+  --app-table-rule: #f1f3f6;
   --app-control: #e2e5ea;
   --app-text: #14202d;
   --app-muted: #374151;
@@ -229,6 +233,7 @@ html[data-skin='t7'] :is(.login-page, .register-page, .agreement-page, .dcs-dw, 
   --app-active: #e8f3ff;
   --app-border: #e3e6eb;
   --app-rule: #e3e6eb;
+  --app-table-rule: #f1f3f6;
   --app-control: #e3e6eb;
   --app-text: #181818;
   --app-muted: #374151;
@@ -349,6 +354,7 @@ html.dark {
   --app-active: #1d2a3d; /* accSoft 做内容面选中底 */
   --app-border: #2f3641;
   --app-rule: #2f3641;
+  --app-table-rule: #1f2833;
   /* 控件描边比 rule 提一档：#1b2027 卡面上 #2f3641 只有 1.34，输入框描边要扫到即知 */
   --app-control: #414a57;
   --app-text: #e4ecf4;
@@ -453,6 +459,7 @@ html[data-skin='t7'] {
   --app-active: #e8f3ff;
   --app-border: #e3e6eb;
   --app-rule: #e3e6eb;
+  --app-table-rule: #f1f3f6;
   --app-control: #e3e6eb;
   --app-text: #181818;
   --app-muted: #374151;
@@ -540,6 +547,7 @@ html[data-skin='t7'].dark {
   --app-active: #1b2b45;
   --app-border: #333333;
   --app-rule: #333333;
+  --app-table-rule: #262626;
   --app-control: #454545;
   --app-text: #e7e7e7;
   --app-muted: #b5b5b5;
@@ -986,7 +994,8 @@ html.dark .el-switch {
   font-size: var(--app-fs-1);
   font-weight: 400;
   height: var(--app-table-head-h) !important;
-  border-bottom: 1px solid var(--app-rule) !important;
+  /* 2026-11-01 Q4=甲：表头不加底色带，行线用极淡的 table-rule */
+  border-bottom: 1px solid var(--app-table-rule) !important;
 }
 
 /* 行高 46 = 20px 行盒 + 上下各 13px（2026-10-27 重构 Q5=甲）；
@@ -996,15 +1005,16 @@ html.dark .el-switch {
 .el-table td.el-table__cell {
   padding: 13px 0;
   line-height: 20px;
-  border-bottom: 1px solid var(--app-rule) !important;
+  border-bottom: 1px solid var(--app-table-rule) !important;
 }
 
+/* 2026-11-01 Q4=甲：竖线全部去掉（只有传了 border 属性的表才有） */
 .el-table--border .el-table__cell {
-  border-right: 1px solid var(--app-rule) !important;
+  border-right: 0 !important;
 }
 
 .el-table__inner-wrapper::before {
-  background-color: var(--app-rule);
+  background-color: var(--app-table-rule);
 }
 
 .el-table__empty-text {
