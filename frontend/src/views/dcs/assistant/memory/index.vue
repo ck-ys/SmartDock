@@ -116,7 +116,7 @@ onMounted(load);
 
 <style lang="scss" scoped>
 .dcs-as-memory {
-  max-width: 720px;
+  /* 2026-11-01 Q2=乙：原 720 左对齐，1920 下右边空 944px；改为跟随全局宽度口径 */
 
   .mem-head {
     display: flex;

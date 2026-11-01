@@ -1073,7 +1073,9 @@ onMounted(async () => {
 }
 .segment-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  /* 2026-11-01 Q2=乙：auto-fill 会为空的列也留轨道（2 张卡 1920 下各 399、右半屏空 822）；
+     auto-fit 只按实际张数分列 */
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 12px;
   min-height: 120px;
   min-width: 0;

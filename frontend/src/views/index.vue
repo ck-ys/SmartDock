@@ -258,8 +258,11 @@ const kpis = computed(() => {
   return list;
 });
 
-/** 窄档让 KPI 条吃满宽度（两列排布），宽档按格数封顶，避免 1-2 格拉成一张巨卡 */
-const kpiMaxWidth = computed(() => (viewportWidth.value <= 768 ? 'none' : `${kpis.value.length * 320}px`));
+/** 窄档让 KPI 条吃满宽度（两列排布）；3 格以上也吃满内容区（否则 1920 下 4 格只到 1280，
+    比下面的图表窄一截）；只有 1-2 格才按格数封顶，避免拉成一张巨卡 */
+const kpiMaxWidth = computed(() =>
+  viewportWidth.value <= 768 || kpis.value.length >= 3 ? 'none' : `${kpis.value.length * 320}px`,
+);
 
 const avgDuration = computed(() => {
   const sec = Number(pulse.value?.avgDuration ?? 0);
@@ -472,8 +475,8 @@ onMounted(loadAll);
 
 <style scoped lang="scss">
 .cockpit {
-  /* 蓝本 shadcn-admin：超宽屏内容封顶 1280 居中（上下 24 / 左右 16 覆写 .app-container 的统一 16） */
-  max-width: 1280px;
+  /* 2026-11-01 Q2=乙：撤掉蓝本的 1280 封顶——1920 下两侧各空 192、屏越宽缩得越狠。
+     现在跟着全局口径走（吃满内容区，超宽屏才收 1760），这里只管内边距 */
   margin: 0 auto;
   padding: 24px 16px;
   display: flex;
