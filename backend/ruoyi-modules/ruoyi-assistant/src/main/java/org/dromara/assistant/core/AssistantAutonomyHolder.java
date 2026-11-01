@@ -34,6 +34,15 @@ public final class AssistantAutonomyHolder {
     private static final Map<String, String> LAST_BUILT = new ConcurrentHashMap<>();
     /** threadId → 建 agent 时的批准代次（与 LAST_BUILT 配套，任一变化都重建） */
     private static final Map<String, Integer> BUILT_GEN = new ConcurrentHashMap<>();
+    /**
+     * threadId → 权限面变化待装标记（符合性审查 dspro P1，2026-10-31）。
+     *
+     * <p>框架 {@code loadOrCreateAgentStateForSlot} 对已有会话直接复用持久化 state——
+     * 缓存 agent 重建后，建侧新算的权限规则进不了旧 state（auto→always 降级方向 fail-open）。
+     * resolver 判定「权限面变化触发的重建」时置位，AgentFactory 建完 agent 消费：
+     * 调官方 {@code replacePermissionContext} 把新规则装进该会话持久化 state。</p>
+     */
+    private static final Map<String, Boolean> RULE_INSTALL_PENDING = new ConcurrentHashMap<>();
     private static final int CAP = 50_000;
 
     private AssistantAutonomyHolder() {
@@ -41,12 +50,13 @@ public final class AssistantAutonomyHolder {
 
     private static void evictIfCrowded() {
         if (LEVEL.size() > CAP || LAST_BUILT.size() > CAP || APPROVED.size() > CAP
-            || APPROVED_GEN.size() > CAP || BUILT_GEN.size() > CAP) {
+            || APPROVED_GEN.size() > CAP || BUILT_GEN.size() > CAP || RULE_INSTALL_PENDING.size() > CAP) {
             LEVEL.clear();
             LAST_BUILT.clear();
             APPROVED.clear();
             APPROVED_GEN.clear();
             BUILT_GEN.clear();
+            RULE_INSTALL_PENDING.clear();
         }
     }
 
@@ -131,5 +141,25 @@ public final class AssistantAutonomyHolder {
         }
         int builtGen = BUILT_GEN.getOrDefault(threadId, 0);
         return builtGen != APPROVED_GEN.getOrDefault(threadId, 0);
+    }
+
+    /**
+     * 权限面变化触发的重建：resolver 置位（档位翻转 / 批准代次 / 租户装配指纹变化），
+     * 提示 AgentFactory 建完 agent 后必须把新规则装回旧会话的持久化 state。
+     */
+    public static void markRuleInstallPending(String threadId) {
+        if (threadId == null || threadId.isBlank()) {
+            return;
+        }
+        evictIfCrowded();
+        RULE_INSTALL_PENDING.put(threadId, Boolean.TRUE);
+    }
+
+    /** AgentFactory 消费：取走并清除（一次重建只装一次；无标记=false 不装） */
+    public static boolean consumeRuleInstallPending(String threadId) {
+        if (threadId == null) {
+            return false;
+        }
+        return Boolean.TRUE.equals(RULE_INSTALL_PENDING.remove(threadId));
     }
 }

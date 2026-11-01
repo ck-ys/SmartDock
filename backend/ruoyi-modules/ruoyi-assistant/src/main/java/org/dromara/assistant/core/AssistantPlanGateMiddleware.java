@@ -44,7 +44,11 @@ import java.util.function.Predicate;
  */
 public class AssistantPlanGateMiddleware implements HarnessRuntimeMiddleware {
 
-    /** 计划控制/清单类工具：与只读工具一样放行（它们不改变业务数据） */
+    /**
+     * 计划控制/清单类工具：与只读工具一样放行（它们不改变业务数据）。
+     * plan_enter/plan_write/plan_exit 是防御性占位——题11 拍板「不做计划模式」，当前
+     * 未注册同名工具；万一将来注册（或模型幻觉叫出这名），它们属清单动作，天然该放行。
+     */
     public static final Set<String> ALWAYS_ALLOWED = Set.of(
         "submit_plan", "todo_write", "plan_enter", "plan_write", "plan_exit",
         "load_skill_through_path", "view_skill");

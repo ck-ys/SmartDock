@@ -13,8 +13,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 题8 案1（2026-10-31）：计划待确认态的生命周期。
  *
- * <p>硬闸判定只看这个开关：submit_plan 置真、回合结束清掉。置错会出两种事故——
- * 一边是计划期写操作照跑（闸没生效），另一边是计划确认后写操作还被拒（闸没放开）。</p>
+ * <p>硬闸判定只看这个开关：submit_plan 置真；清闸只认用户动作（点「直接执行/改计划/
+ * 取消」随请求上报 planDecision、新 submit_plan 覆盖）+ 30 分钟 TTL 兜底——
+ * <b>不按回合边界清</b>（用户放着计划卡不点、随口聊别的，写操作必须继续被拒）。
+ * 置错会出两种事故——一边是计划期写操作照跑（闸没生效），另一边是计划确认后
+ * 写操作还被拒（闸没放开）。</p>
  */
 @Tag("local")
 class AssistantPlanGateTest {

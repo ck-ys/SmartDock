@@ -79,4 +79,23 @@ class AssistantAutonomyHolderTest {
         AssistantAutonomyHolder.markBuilt("q9-t5", AssistantAutonomyHolder.AUTO);
         assertFalse(AssistantAutonomyHolder.needsRebuild("q9-t5"));
     }
+
+    /**
+     * 符合性审查修复（dspro P1，2026-10-31）：旧会话档位翻转后，重建 agent 的新权限规则
+     * 必须装回持久化 state（框架默认复用旧 state=降级方向 fail-open）。这里钉「待装规则」
+     * 信号的语义：resolver 置位 → Factory 消费一次即清（一次重建只装一次）、无标记不装。
+     */
+    @Test
+    void ruleInstallPendingIsOneShotPerRebuild() {
+        assertFalse(AssistantAutonomyHolder.consumeRuleInstallPending("q9-t7"), "无标记不装");
+        assertFalse(AssistantAutonomyHolder.consumeRuleInstallPending(null), "空会话键不装");
+
+        AssistantAutonomyHolder.markRuleInstallPending("q9-t7");
+        assertTrue(AssistantAutonomyHolder.consumeRuleInstallPending("q9-t7"), "置位后首次消费=要装");
+        assertFalse(AssistantAutonomyHolder.consumeRuleInstallPending("q9-t7"), "消费即清，二次不再装");
+
+        AssistantAutonomyHolder.markRuleInstallPending(null);
+        AssistantAutonomyHolder.markRuleInstallPending(" ");
+        assertFalse(AssistantAutonomyHolder.consumeRuleInstallPending(" "), "空/空白键置位被拒（不装）");
+    }
 }

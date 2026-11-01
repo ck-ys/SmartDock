@@ -285,6 +285,24 @@ public class AssistantAgentFactory {
             .build();
         log.debug("[dcs-assistant] 为租户 {} 用户 {} 创建会话 agent（含 {} 个工具, 长期记忆={})",
             user.getTenantId(), user.getUserId(), registered.size(), memoryOn ? "开" : "关");
+        // 符合性审查修复（dspro P1，2026-10-31）：框架 loadOrCreateAgentStateForSlot 对已有会话
+        // 直接复用持久化 state——builder 上的新 permissionContext 进不了旧 state，旧会话档位
+        // 翻转后规则仍是旧的（auto→always 降级方向 fail-open）。官方口子 replacePermissionContext：
+        // 把建侧新规则装进该会话持久化 state 并刷新引擎缓存。只在「权限面变化触发的重建」
+        // （resolver 置标记：档位翻转/批准代次/租户装配指纹）时做——普通模型切换重建不动旧
+        // state，避免抹掉框架运行期可能记下的放行决定。
+        if (aguiThreadId != null && !aguiThreadId.isBlank()
+            && org.dromara.assistant.core.AssistantAutonomyHolder.consumeRuleInstallPending(aguiThreadId)) {
+            try {
+                agent.replacePermissionContext("t:" + user.getTenantId() + ":" + user.getUserId(),
+                    aguiThreadId, pb.build());
+                log.info("[AgentRebuild] 权限面变化, 新规则已装回旧会话 state thread={}", aguiThreadId);
+            } catch (Exception e) {
+                // 装载失败不阻断会话（本实例引擎缓存已带新规则，本次运行仍按新规则），
+                // 但持久化可能停留旧规则——warn 留痕，重启后如再翻转会重新装
+                log.warn("[AgentRebuild] 权限规则装回旧会话 state 失败 thread={}：{}", aguiThreadId, e.getMessage());
+            }
+        }
         return agent;
     }
 

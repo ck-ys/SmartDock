@@ -195,27 +195,37 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         // 侧同源）——管理员换助手默认后缓存会话下一条消息即用新模型，不吃会话超时延迟
         // 业务批5 回修：组合读一次同帧取白名单+默认指向（原先两次独立 selectOne，热路径翻倍且可半新半旧）
         AssistantModelSettingService.ScopeAndDefault sd = modelSettingService.scopeAndDefault(tenantId);
+        // 题9 案1：档位翻转=权限规则要重算，缓存 agent 必须重建。
+        // 符合性审查（dspro P1，2026-10-31）：档位/批准代次变化属「权限面变化」——重建后
+        // 新规则必须装回旧会话持久化 state（框架复用旧 state，不装=auto→always 降级失效）
+        boolean autonomyChanged = org.dromara.assistant.core.AssistantAutonomyHolder.needsRebuild(aguiThreadId);
+        // G1 遗留#3：工具闸/记忆/压缩配置变化同样失效重建（与 Factory 建侧同源指纹）。
+        // 三审回修（dspro P1-5）：比对侧必须用 Factory 落标同款租户源（user 登录快照）——
+        // 原用 resolveTenantId 的动态租户，超管切租户且两租户配置有差时每请求恒失配=空转重建。
+        // 工具闸也改权限面（off 工具的 ALLOW/ASK 规则随指纹重算），同列「权限面变化」
+        boolean configChanged = AssistantModelChoiceHolder.needsConfigRebuild(aguiThreadId,
+            AssistantModelChoiceHolder.assemblyFingerprint(assistantConfigService.effective(user.getTenantId()),
+                derivedTriggerTokens(user.getTenantId(), aguiThreadId),
+                AssistantWebSearchHolder.isOn(aguiThreadId)
+                    && org.dromara.assistant.tools.WebSearchTools
+                        .hasUsableTenantKey(sysConfigService, user.getTenantId())));
         boolean rebuildNeeded = AssistantModelChoiceHolder.needsRebuild(aguiThreadId)
             || AssistantWebSearchHolder.needsRebuild(aguiThreadId)
-            // 题9 案1：档位翻转=权限规则要重算，缓存 agent 必须重建
-            || org.dromara.assistant.core.AssistantAutonomyHolder.needsRebuild(aguiThreadId)
+            || autonomyChanged
             || AssistantModelChoiceHolder.needsScopeRebuild(aguiThreadId,
                 AssistantModelChoiceHolder.defaultAwareFingerprint(sd.scopeIds(), sd.defaultConfigId(), sd.usableSignature()))
-            // G1 遗留#3：工具闸/记忆/压缩配置变化同样失效重建（与 Factory 建侧同源指纹）。
-            // 三审回修（dspro P1-5）：比对侧必须用 Factory 落标同款租户源（user 登录快照）——
-            // 原用 resolveTenantId 的动态租户，超管切租户且两租户配置有差时每请求恒失配=空转重建
-            || AssistantModelChoiceHolder.needsConfigRebuild(aguiThreadId,
-                AssistantModelChoiceHolder.assemblyFingerprint(assistantConfigService.effective(user.getTenantId()),
-                    derivedTriggerTokens(user.getTenantId(), aguiThreadId),
-                    AssistantWebSearchHolder.isOn(aguiThreadId)
-                        && org.dromara.assistant.tools.WebSearchTools
-                            .hasUsableTenantKey(sysConfigService, user.getTenantId())));
+            || configChanged;
         if (aguiThreadId != null && rebuildNeeded) {
             boolean removed = threadSessionManager.removeSession("t:" + tenantId + ":" + userId, aguiThreadId);
             if (removed) {
                 log.info("[AgentRebuild] 模型选择/联网开关/自选范围变化, 失效缓存 agent 重建 thread={}", aguiThreadId);
             } else {
                 log.debug("[AgentRebuild] 声明变化但无可失效缓存(首次构建/已过期) thread={}", aguiThreadId);
+            }
+            // P1 修复配套：权限面变化的重建置「待装规则」标记，AgentFactory 建完 agent
+            // 消费并调 replacePermissionContext 把新规则装进旧会话 state
+            if (autonomyChanged || configChanged) {
+                org.dromara.assistant.core.AssistantAutonomyHolder.markRuleInstallPending(aguiThreadId);
             }
         }
         return RuntimeContext.builder()
