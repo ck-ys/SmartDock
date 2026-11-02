@@ -35,9 +35,8 @@ SmartDock 是一套**开源通用智能体引擎**，附带一条可独立使用
 
 <table>
 <tr>
-<td width="33%"><img src="docs/images/screenshots/06-assistant.png" alt="AI 助手"><br><sub>AI 助手：工具调用链，查不到就说查不到</sub></td>
-<td width="33%"><img src="docs/images/screenshots/01-overview.png" alt="首页总览"><br><sub>首页总览：智能体与画像两条引擎的运行态</sub></td>
-<td width="33%"><img src="docs/images/screenshots/02-analytics.png" alt="数据分析中心"><br><sub>数据分析中心：使用次数 / 人数 / 会话 / 单页离开率</sub></td>
+<td width="50%"><img src="docs/images/screenshots/06-assistant.png" alt="AI 助手"><br><sub>AI 助手：工具调用链，查不到就说查不到</sub></td>
+<td width="50%"><img src="docs/images/screenshots/01-overview.png" alt="首页总览"><br><sub>首页总览：智能体与画像两条引擎的运行态</sub></td>
 </tr>
 </table>
 
