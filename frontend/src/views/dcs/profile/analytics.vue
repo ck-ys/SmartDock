@@ -63,6 +63,9 @@
             placeholder="eventName,anonymousId,sessionId,occurredTime,pageUrl&#10;page_view,demo-visitor,demo-session,2026-10-19 10:00:00,/home"
           />
           <div class="import-actions">
+            <!-- 「问数据」批·题6①：选文件读入文本框，走同一条导入链路（5MB/5000 行上限沿用后端口径） -->
+            <input ref="csvFileInput" type="file" accept=".csv,text/csv" style="display: none" @change="onCsvFileChosen" />
+            <el-button @click="pickCsvFile">选择文件</el-button>
             <el-button @click="fillCsvSample">填入示例</el-button>
             <el-button @click="csvText = ''">清空</el-button>
             <el-button v-hasPermi="['analytics:center:edit']" type="primary" :loading="importing" @click="submitCsv">导入</el-button>
@@ -1130,6 +1133,50 @@ const customLoading = ref(false);
 
 const csvText = ref('');
 const importing = ref(false);
+/* 「问数据」批·题6①：CSV 选文件入口——读成文本进文本框走原导入链路（不再只能手动粘贴） */
+const csvFileInput = ref<HTMLInputElement | null>(null);
+const pickCsvFile = () => {
+  csvFileInput.value?.click();
+};
+const onCsvFileChosen = (e: Event) => {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  // 复位让同一文件可重复选择
+  input.value = '';
+  if (!file) {
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.warning('文件超过 5MB 上限（与后端一致），请拆分后再导入');
+    return;
+  }
+  // 审查席 P1：编码探测——中文 Excel 默认导出 GBK，硬编码 utf-8 会静默乱码入库（append-only 不可逆）。
+  // 先严格 UTF-8 解码，失败回退 GBK 并提示核对；两者都不行则拒收。
+  file.arrayBuffer().then((buf) => {
+    let text: string;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(buf);
+    } catch {
+      try {
+        text = new TextDecoder('gbk').decode(buf);
+        ElMessage.warning('检测到非 UTF-8 编码（常见于 Excel 直接导出），已按 GBK 读入，请核对中文是否正常');
+      } catch {
+        ElMessage.error('文件编码无法识别，请用 UTF-8 另存后再导入');
+        return;
+      }
+    }
+    const lines = text ? text.replace(/\r/g, '').split('\n').filter((l) => l.trim()).length : 0;
+    // 先校验后赋值（审查席 P2：超限文件先进文本框再拦，用户随手点导入就绕过了前端这道闸）
+    if (lines > 5000) {
+      ElMessage.warning(`文件约 ${lines} 行，超过 5000 行上限（与后端一致），请拆分后再导入`);
+      return;
+    }
+    csvText.value = text;
+    ElMessage.success(`已读入「${file.name}」（约 ${lines} 行），确认内容后点「导入」`);
+  }).catch(() => {
+    ElMessage.error('文件读取失败，请重试');
+  });
+};
 
 const dimensionLabels: Record<string, string> = {
   day: '日期',

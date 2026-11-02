@@ -128,6 +128,7 @@ const TYPE_LABEL: Record<string, string> = {
   TASK_PUBLISHED: '[新任务]',
   SUBMITTED: '[新提交]',
   AUDIT_RESULT: '[审核结果]',
+  TASK_DIGEST: '[每日摘要]',
   FILE_REVIEW_REJECT: '[文件驳回]',
   WALLET_LOW_BALANCE: '[余额]',
   WALLET_EXHAUSTED: '[余额]',

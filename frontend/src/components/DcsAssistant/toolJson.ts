@@ -20,6 +20,8 @@ export interface ToolRowsShape {
   truncated?: boolean;
   userTotal?: number | null;
   caliberWarning?: string;
+  /** 「问数据」批·题4A：分析类工具的口径脚注（后端拼好，前端原样展示不编数） */
+  sourceNote?: string;
 }
 
 /** 值位置 15 位以上整数加引号（工具结果里计数类字段不可能达 15 位，安全） */

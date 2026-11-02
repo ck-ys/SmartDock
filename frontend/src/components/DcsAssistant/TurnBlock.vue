@@ -1098,7 +1098,9 @@ function toggleStep(id: string) {
   openSteps.value = s;
 }
 
-/** rows 型工具判定（来源区升级为 DataCard 数据原件；解析失败回退文本摘要） */
+/** rows 型工具判定（来源区升级为 DataCard 数据原件；解析失败回退文本摘要）。
+ *  「问数据」批：analytics 三个带 rows 的工具同样升卡（DataCard 的 TOOL_CARDS
+ *  已配列定义与 sourceNote 脚注；总览/留存/路径无 rows 仍走文本摘要，设计如此） */
 const ROWS_TOOLS = new Set([
   'query_my_todos',
   'query_my_missions',
@@ -1106,7 +1108,10 @@ const ROWS_TOOLS = new Set([
   'query_submission_status',
   'query_deadline_alerts',
   'query_unsubmitted',
-  'query_unsubmitted_by_dept'
+  'query_unsubmitted_by_dept',
+  'analytics_trend',
+  'analytics_funnel',
+  'analytics_custom'
 ]);
 function isRowsStep(s: { name: string; resultFull: string }): boolean {
   if (!ROWS_TOOLS.has(s.name) || !s.resultFull) {

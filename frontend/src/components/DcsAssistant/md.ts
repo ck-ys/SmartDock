@@ -9,7 +9,8 @@
  * 行内代码内容先换占位符再跑链/粗体替换（批3回修：code 里的链语法不该变成可点链）。</p>
  * 图片等富元素不支持——工作面信息密度优先。表格=AI 数据回答刚需，批3 起包 .tbl 容器
  * 带「复制」钮（TSV 进剪贴板，Q7-2），窄容器横向滚。批4 Q5：```chart 围栏（简化 JSON，
- * type∈bar/line/pie/gauge）转 .dcs-chart 占位 div 由宿主挂 ECharts，畸形 JSON 降级代码卡。</p>
+ * type∈bar/line/pie/gauge；「问数据」批·题4A 扩至 funnel/sankey/retention 七类型）转
+ * .dcs-chart 占位 div 由宿主挂 ECharts，畸形 JSON 降级代码卡。</p>
  */
 
 function esc(s: string): string {

@@ -23,6 +23,8 @@ public class DcsNotice implements Serializable {
     public static final String TYPE_TASK_PUBLISHED = "TASK_PUBLISHED";
     public static final String TYPE_SUBMITTED = "SUBMITTED";
     public static final String TYPE_AUDIT_RESULT = "AUDIT_RESULT";
+    /** 「问数据」批·题6②: 每日摘要（08:00 给有进行中任务的发布人推未交摘要） */
+    public static final String TYPE_TASK_DIGEST = "TASK_DIGEST";
 
     @TableId
     private Long id;

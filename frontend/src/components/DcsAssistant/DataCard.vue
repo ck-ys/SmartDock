@@ -130,6 +130,8 @@
       </button>
       <span v-else class="cnt">共 {{ filteredRows.length }} 行<template v-if="card.truncated">（工具侧已截断）</template></span>
     </div>
+    <!-- 「问数据」批·题4A：口径脚注（数字来源/时间窗/口径一句话，来自工具返回，前端不编） -->
+    <div v-if="card.sourceNote" class="dsrc">{{ card.sourceNote }}</div>
     <div v-if="firstMission" class="pgolink" @click="onRow({ missionId: firstMission.missionId, missionName: firstMission.missionName })">
       <IconSpan name="arrow-up-right" /> 在页面上查看「{{ firstMission.missionName }}」 ›
     </div>
@@ -254,10 +256,40 @@ const TOOL_CARDS: Record<string, { title: string; columns: Col[] }> = {
       { key: 'publisherName', label: '发布人' },
       { key: 'totalCount', label: '总数' },
       { key: 'completedCount', label: '已完成' },
-      { key: 'pendingAuditCount', label: '待审核' },
+      { key: 'pendingAuditCount', label: '待审' },
       { key: 'draftCount', label: '草稿' },
       { key: 'notStartedCount', label: '未开始' },
       { key: 'terminatedCount', label: '已终止' }
+    ]
+  },
+  // 「问数据」批·题4A：分析类明细卡——只有带 rows 的三工具走卡（总览/留存/路径无 rows, 来源区文本摘要）；
+  // 卡底 sourceNote 口径脚注与正文同源（工具返回真数，禁前端编数）
+  analytics_trend: {
+    title: '每日数据',
+    columns: [
+      { key: 'date', label: '日期', mono: true },
+      { key: 'uv', label: '活跃访客', sortable: true, mono: true },
+      { key: 'pv', label: '浏览量', sortable: true, mono: true },
+      { key: 'visits', label: '访问次数', sortable: true, mono: true },
+      { key: 'events', label: '事件数', sortable: true, mono: true },
+      { key: 'newVisitors', label: '新访客', sortable: true, mono: true }
+    ]
+  },
+  analytics_funnel: {
+    title: '漏斗步骤',
+    columns: [
+      { key: 'name', label: '步骤' },
+      { key: 'count', label: '人数', sortable: true, mono: true },
+      { key: 'rate', label: '整体占比', sortable: true, mono: true, fmt: (v) => `${v}%` },
+      { key: 'stepRate', label: '步转化', sortable: true, mono: true, fmt: (v) => `${v}%` },
+      { key: 'avgSeconds', label: '平均耗时(秒)', sortable: true, mono: true }
+    ]
+  },
+  analytics_custom: {
+    title: '自定义查询结果',
+    columns: [
+      { key: 'label', label: '维度值' },
+      { key: 'value', label: '指标值', sortable: true, mono: true }
     ]
   }
 };
@@ -301,6 +333,7 @@ const card = computed(() => {
     truncated: !!j.truncated,
     userTotal: typeof j.userTotal === 'number' ? j.userTotal : null,
     caliberNote: typeof j.caliberWarning === 'string' ? j.caliberWarning : '',
+    sourceNote: typeof j.sourceNote === 'string' ? j.sourceNote : '',
     rows
   };
 });
@@ -679,11 +712,18 @@ tr.dr {
     }
   }
 }
+/* 口径脚注（「问数据」批·题4A）：数字来源/时间窗一句话 */
+.dsrc {
+  padding: 6px 12px 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+  font-size: 11.5px;
+  color: var(--dcs-text-secondary, #909399);
+  text-align: left;
+}
 .dfoot {
   padding: 7px 10px;
   text-align: center;
   border-top: 1px solid var(--el-border-color-lighter);
-
   .more {
     border: none;
     background: none;
