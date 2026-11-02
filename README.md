@@ -1,7 +1,7 @@
 # SmartDock
 
 <p align="center">
-  <img src="docs/images/banner.svg" alt="SmartDock：通用智能体引擎 × 用户画像引擎" width="100%">
+  <img src="docs/images/banner.svg" alt="SmartDock：通用智能体引擎（附带用户画像引擎）" width="100%">
 </p>
 
 <p align="center">
