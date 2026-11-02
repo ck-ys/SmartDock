@@ -1336,9 +1336,18 @@ html.dark .el-menu--popup .el-sub-menu__title {
    .gray（租户未配模型）是状态语义，排除在外保持灰球 */
 body .dcs-fab:not(.gray) .fab-core {
   color: var(--app-fab-fg) !important;
-  background: var(--app-fab) !important;
-  border: 1px solid var(--app-fab-border) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16) !important;
+  /* 2026-11-01 用户拍板（Q1）：静止状态半透明。做法是「底色半透明 + 背后磨砂」，
+     不是整颗调 opacity——整颗调淡会让底下的文字透上来糊住机器人的脸。 */
+  background: color-mix(in srgb, var(--app-fab) 70%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--app-fab-border) 70%, transparent) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition:
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s,
+    background-color 0.2s,
+    border-color 0.2s !important;
 
   svg {
     filter: none !important;
@@ -1347,6 +1356,18 @@ body .dcs-fab:not(.gray) .fab-core {
   &:hover {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
   }
+}
+
+/* 用户靠近 / 键盘聚焦 / 菜单或提醒卡展开 / 拖拽时恢复实色，半透明只是静止态。
+   只改观感，不动位置与热区——半透明照样接住点击，遮挡问题仍按问题板另行处理。 */
+body .dcs-fab:not(.gray):hover .fab-core,
+body .dcs-fab:not(.gray):focus-within .fab-core,
+body .dcs-fab:not(.gray):active .fab-core,
+body .dcs-fab.dragging .fab-core,
+body .dcs-fab:has(.ballmenu) .fab-core,
+body .dcs-fab:has(.proactive) .fab-core {
+  background: var(--app-fab) !important;
+  border-color: var(--app-fab-border) !important;
 }
 
 body .dcs-fab .fab-halo {
