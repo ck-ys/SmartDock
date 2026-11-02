@@ -258,6 +258,14 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 > 前端一律 `npx vite --port 5188 --host --strictPort` 直起（strictPort：端口被占就报错清理，不许自动跳号）；
 > 重启前端前先确认旧实例进程已退（Windows 下 npx 的 vite 子进程会残留占端口，导致新实例跳号）；
 > 后端也固定 8090 单实例。任何文档/提示词/验收步骤写端口只写 5188 / 8090。
+> **进程卫生铁律（2026-11-01 用户追问后加）**：ZCode 每开一个会话/子智能体会拉起一套
+> `cmd → npx → node` MCP（vision/z_ai/playwright/context7/dcs-pg/dcs-ssh），Windows 下
+> 子智能体结束后包装器不一定回收；多席审查/工作流跑多了会堆出上百个孤儿进程。
+> 每批收口/长会话结束必须跑 `.workshop/scripts/cleanup-stale-mcp.ps1 -Hours 6`
+> （默认只清 npx 系、保留当前会话；连旧 dcs-pg/dcs-ssh 一起清加 `-IncludeDcs`），
+> 并 `netstat` 复核除 5188/8090 外无项目监听。
+> **禁止**用 `python -m http.server` 等临时静态服务看拍板页——直接 `file://` 打开，
+> Playwright 用 `page.goto('file:///...')`；此类服务既违反端口铁律，也会留孤儿进程。
 > 高频入口：`.workshop/tmp/package-backend.ps1`（mvn 打包，内部已带本地仓+JDK21）、
 > `.workshop/tmp/start-backend-8090.ps1`、前端 `npx vite --port 5188 --host` 直起。
 > 工具降级（默认无 MCP/skill）：数据库 node+pg 或 psql（`PGCLIENTENCODING=UTF8`）、HTTP curl/node fetch、
