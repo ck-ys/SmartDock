@@ -110,6 +110,12 @@ public class AssistantSharedState {
         bucket.set(value, ttl);
     }
 
+    /** 原子占位（不存在才写）：实例 id 唯一性校验用，两个进程同 id 只能有一个成功 */
+    public boolean setIfAbsent(String key, String value, Duration ttl) {
+        RBucket<String> bucket = client.getBucket(key, StringCodec.INSTANCE);
+        return bucket.setIfAbsent(value, ttl);
+    }
+
     public void delete(String key) {
         client.getBucket(key, StringCodec.INSTANCE).delete();
     }

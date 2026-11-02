@@ -284,10 +284,10 @@ public class AssistantPlanSignal {
         }
         PendingState local = pending.get(threadId);
         if (valid(local) && ownerMatches(local, tenantId, userId) && planMatches(local, planId)) {
-            // 三审回修（glm53-P2-4）：local 模式没有 Redis 的 Lua 原子性，get→remove 之间
-            // 两个标签页同毫秒抢点会双双成功。按 remove 返回的实例比对，只有真正摘到
-            // 自己看到的那份 pending 才算消费成功（被并发替换/抢走则返回 false）。
-            if (pending.remove(threadId) != local) {
+            // 四审回修（dsflash-P2-6）：用 Map.remove(key, value) 原子条件删。原先
+            // get→remove(key) 之间若模型刚好 submit 了新计划，remove 会摘走“新”那份并
+            // 返回 false——新卡还挂在屏上，但闸已经被放行。条件删只摘自己看到的那份。
+            if (!pending.remove(threadId, local)) {
                 return false;
             }
             rememberDecision(threadId, local.planId(), decision);

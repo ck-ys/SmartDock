@@ -63,14 +63,14 @@ public class AssistantConversationController extends BaseController {
     private final org.dromara.assistant.core.AssistantInstanceContext instanceContext;
     /** 二审回修：停止端点条件收尾 run 时退回合，口径与收割器一致 */
     private final org.dromara.assistant.limiter.AssistantDailyQuota dailyQuota;
+    /** 四审回修（dsflash-P2-7）：直接注入，不再 SpringUtils.getBean + 失败回落钱包 */
+    private final org.dromara.assistant.service.AssistantUserQuotaService quotaLookup;
 
     /** 退款口径（三审回修 dspro-P2-1）：credits 订阅租户建侧 tryTurn 本就跳过，退回合须同口径
      *  跳过（同 AssistantRunRecorder#refundIfWallet）；查不到模式按钱包口径退（fail-open）。 */
     private boolean creditsMode(String tenantId, Long userId) {
         try {
-            var quotaService = org.dromara.common.core.utils.SpringUtils.getBean(
-                org.dromara.assistant.service.AssistantUserQuotaService.class);
-            return quotaService.billingAwareLimits(tenantId, userId).creditsMode();
+            return quotaLookup.billingAwareLimits(tenantId, userId).creditsMode();
         } catch (Exception ignore) {
             return false;
         }
@@ -276,7 +276,7 @@ public class AssistantConversationController extends BaseController {
             runMapper.selectByThread(tenantId, threadId, userId, 1);
         boolean running = !latest.isEmpty() && "RUNNING".equals(latest.get(0).getStatus());
         if (!running) {
-            askUserBridge.cancelThread(tenantId, userId, threadId);
+            askUserBridge.cancelThread(bridgeTenant(tenantId), userId, threadId);
             return R.ok();
         }
         org.dromara.assistant.domain.DcsAssistantRun run = latest.get(0);
@@ -290,7 +290,7 @@ public class AssistantConversationController extends BaseController {
             java.util.Date ref = run.getLastEventAt() != null ? run.getLastEventAt() : run.getCreateTime();
             if (ref != null && System.currentTimeMillis() - ref.getTime() < 30L * 60 * 1000) {
                 throw new org.dromara.common.core.exception.ServiceException(
-                    "这轮可能还在旧版本服务上，稍等一分钟刷新后再试", 409);
+                    "这轮可能还在旧版本服务上，最多 30 分钟内会自动收尾；请稍后刷新再试", 409);
             }
         }
         // 多实例批 2：这轮在另一台活实例上——本机没有它的 AgentSession，盲打就是假成功，
@@ -317,7 +317,7 @@ public class AssistantConversationController extends BaseController {
                 log.info("[AssistantStop] 本机已无在跑会话，条件收尾 run thread={} run={} 已退回合",
                     threadId, run.getRunId());
             }
-            askUserBridge.cancelThread(tenantId, userId, threadId);
+            askUserBridge.cancelThread(bridgeTenant(tenantId), userId, threadId);
             return R.ok();
         }
         if (session.get().getAgent() instanceof io.agentscope.core.ReActAgent agent) {
@@ -329,8 +329,23 @@ public class AssistantConversationController extends BaseController {
         }
         // 题12 案1：停止后挂起的结构化反问已不可能被模型用上——立即按取消收尾释放工具线程。
         // 不释放的话：卡片留在屏上、作答端点还能「成功」，但 run 已终局=答案被静默吞掉
-        askUserBridge.cancelThread(tenantId, userId, threadId);
+        askUserBridge.cancelThread(bridgeTenant(tenantId), userId, threadId);
         return R.ok();
+    }
+
+    /**
+     * 四审回修（dspro-P2-6）：桥接的挂起卡按 ToolIdentity.from(user) 的登录快照租户登记，
+     * 而 stop 的会话/run 行按动态租户查。超管切租户时两者不一致，按动态租户 cancelThread
+     * 匹配不上，工具线程要等 240s 超时才释放。桥接调用统一回登录快照租户（查不到才回落）。
+     */
+    private String bridgeTenant(String fallback) {
+        try {
+            var user = LoginHelper.getLoginUser();
+            return user != null && user.getTenantId() != null && !user.getTenantId().isBlank()
+                ? user.getTenantId() : fallback;
+        } catch (Exception ignore) {
+            return fallback;
+        }
     }
 
     /**

@@ -52,6 +52,9 @@ public class DcsAssistantAttachment implements Serializable {
     /** PENDING(排队)/PARSING(解析中,G4 批G 1008)/PARSED/TRUNCATED/FAILED */
     private String parseStatus;
 
+    /** 解析认领实例 id（多实例防重复解析；空=未认领） */
+    private String parseOwner;
+
     /** FAILED 时人话原因（前端提示） */
     private String parseError;
 

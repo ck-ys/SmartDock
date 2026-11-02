@@ -361,6 +361,7 @@ CREATE TABLE public.dcs_assistant_attachment (
     file_size bigint NOT NULL,
     suffix character varying(16) NOT NULL,
     parse_status character varying(16) DEFAULT 'PENDING'::character varying NOT NULL,
+    parse_owner character varying(64),
     parse_error character varying(500),
     parsed_text text,
     line_count integer,

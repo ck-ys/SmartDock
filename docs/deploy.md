@@ -52,7 +52,39 @@ POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... docker compose up -d
    与 `backend/.../application.yml` 的 `jwt-secret-key`、`api-decrypt`（仓库内是可公开的演示默认值）；
 5. （可选）调低 JVM：编辑 compose 的 `JAVA_OPTS`。
 
-## 5. 裸机部署（不用 Docker）
+## 5. 多实例部署（AI 助手水平扩容）
+
+单机默认 `local` 模式，零 Redis 依赖。要让两台以上后端同时服务 AI 助手，必须满足下面四条，
+缺一条就会出现「确认卡在 A、作答落到 B」「停止只停了个提示」这类假成功：
+
+1. **全集群同一个共享状态模式**：所有节点都设 `DCS_ASSISTANT_SHARED_STATE_MODE=redis`；
+   不要一部分 `local`、一部分 `redis`（`local` 节点会把别台的活 run 判死并收尾）。
+2. **每台实例 id 唯一**：`DCS_ASSISTANT_INSTANCE_ID=backend-a` / `backend-b`（或用默认的
+   `hostname:pid:随机码`）。同一个 id 起两个进程会被启动校验拒绝——否则两边都认
+   「owner 是我」，互相收掉对方的活 run。
+3. **入口按会话粘性分流**：nginx 必须按 `X-Thread-Id` 做一致性哈希，并把
+   `DCS_ASSISTANT_STICKY_REQUIRE_HEADER=true` 打开（缺头直接 400，避免静默落错机）：
+
+   ```nginx
+   upstream smartdock_backend {
+       hash $http_x_thread_id consistent;
+       server 10.0.0.11:8090;
+       server 10.0.0.12:8090;
+   }
+   ```
+
+   没有一致性哈希时，`/agui/run`、HITL 确认卡、反问作答、续看都可能落到没有现场的另一台；
+   此时助手会回「刷新页面后再试」的人话，但体验仍然会坏。
+4. **数据库先升级再放流量**：先执行 `backend/script/sql/migration/` 里本期新增的脚本
+   （至少 `2026-11-01_assistant_run_owner.sql` 与 `2026-11-01_assistant_attachment_owner.sql`），
+   再滚动重启后端；滚动期间先把旧节点从 upstream 摘掉，避免旧版本（没有 owner 字段）
+   和新版本混跑。
+
+> 计划卡、确认结果、实例租约放在 Redis 的 `global:smartdock:asst:` 前缀下；
+> 回答正文、用户作答内容不落 Redis。本机仍保留 `threadSessionManager` 的会话现场，
+> 所以「会话固定回原机器」是正确性前提，不是性能优化。
+
+## 6. 裸机部署（不用 Docker）
 
 1. PostgreSQL 17：建空库后按序执行 `backend/script/sql/baseline/` 的七个 SQL（01→07；05 为可选演示数据，不需要时移出该目录）；
 2. Redis 7：设置 requirepass；
@@ -68,13 +100,13 @@ POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... docker compose up -d
 4. 前端 `npm run build:prod` 后把 `dist/` 交给任意静态服务器，`/prod-api` 反代到 8090
    （参考 `deploy/frontend/nginx.conf`，注意保留 SSE 关缓冲配置）。
 
-## 6. 升级
+## 7. 升级
 
 - 后端：重新 `mvn package` 后 `docker compose up -d --build backend`；
 - 数据库：本基线之后的结构变更一律新增 `NNN_*.sql` 增量脚本，按序执行；
 - 回滚：镜像钉版 + 数据卷常驻，`docker compose down`（不加 `-v`）可安全回退。
 
-## 7. 健康检查
+## 8. 健康检查
 
 调试/监控端点经 nginx 一律 404（等保口径，见 nginx.conf），健康状态看容器层：
 

@@ -15,9 +15,9 @@ import java.util.Set;
  * {@code autoLevel} 本来就是每请求上行，搬 Redis 没有收益。local 模式不绑定，
  * 保持原来的本机静态 Map 行为。</p>
  *
- * <p>键：{@code smartdock:asst:autonomy:approved:{thread}}（集合）、
- * {@code ...:gen:{thread}}（代次）、{@code ...:rule:{thread}}（规则装回标记），
- * 统一 24 小时过期。</p>
+ * <p>键：{@code global:smartdock:asst:autonomy:approved:{thread}}（集合）、
+ * {@code ...:autonomy:gen:{thread}}（代次）、{@code ...:autonomy:rule:{thread}}（规则装回标记），
+ * 统一 24 小时过期。{@code global:} 用于绕开多租户前缀，与计划/租约键同源。</p>
  */
 @Slf4j
 @Component

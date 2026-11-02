@@ -1140,6 +1140,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   /** 宿主计划卡动作时调用（带上这张卡的 planId，旧卡重复点击会被后端 409 挡住） */
   function notePlanDecision(kind: 'confirm' | 'cancel' | 'adjust', planId?: string) {
     planDecisionNext = { kind, planId };
+    // 四审回修（dspro-P2-2）：点击当下先乐观置位。此前只有 3s 轮询会写 confirmed/cancelled，
+    // 用户确认 A 后模型在首个 tick 前又出计划 B，轮询看到 planId 不匹配会把 A 误标“已过期”。
+    if (planId && kind !== 'adjust') {
+      applyPlanStatus(planId, kind === 'confirm' ? 'confirmed' : 'cancelled');
+    }
   }
   /** 「改计划」：只记住卡号，不发送 */
   function notePlanEdit(planId?: string) {
@@ -1164,6 +1169,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
 
   /** 计划状态轮询定时器（planId → timer）；会话重置/销毁时统一清 */
   const planPollTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** 四审回修（dsflash-P2-9）：正在轮询的 planId 登记表——定时器在 tick 间会短暂为空，
+   *  只靠 planPollTimers.has 挡不住同一张卡的重复渲染/重放再起一条链。 */
+  const planPolling = new Set<string>();
   /** 轮询代次：clear 时自增，在途 tick 回来发现代次变了就不再重排（防清理被复活） */
   let planPollGen = 0;
   const PLAN_POLL_MS = 3000;
@@ -1188,19 +1196,25 @@ export function useAssistant(options: UseAssistantOptions = {}) {
    * 另一标签页确认也靠它把本页旧卡置灰。只轮询有 planId 的卡，最多 5 分钟。
    */
   function watchPlanStatus(planId: string, threadId: string) {
-    if (!planId || !threadId || planPollTimers.has(planId)) {
+    if (!planId || !threadId || planPollTimers.has(planId) || planPolling.has(planId)) {
       return;
     }
+    planPolling.add(planId);
     let ticks = 0;
     const myGen = planPollGen;
-    const tick = async () => {
+    const stopPoll = () => {
+      planPolling.delete(planId);
       planPollTimers.delete(planId);
+    };
+    const tick = async () => {
       // 二审回修（三席共识 P2）：会话已重置/销毁——在途请求回来也不再重排，
       // 否则 clearPlanPollers 清掉的是旧 timer，这里会把它复活继续打旧 thread
       if (myGen !== planPollGen) {
+        stopPoll();
         return;
       }
       if (ticks++ >= PLAN_POLL_MAX) {
+        stopPoll();
         return;
       }
       try {
@@ -1215,20 +1229,24 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         // 不能把新计划的 confirmed/cancelled 贴到旧卡上
         if (body?.planId && body.planId !== planId) {
           applyPlanStatus(planId, 'expired');
+          stopPoll();
           return;
         }
         if (st === 'confirmed' || st === 'cancelled' || st === 'adjusted' || st === 'expired') {
           applyPlanStatus(planId, st);
+          stopPoll();
           return;
         }
         if (st === 'none') {
           // 处理结果只保留 5 分钟；超时后不再轮询，避免无意义空转
+          stopPoll();
           return;
         }
       } catch {
         /* 网络抖动：下一轮再试 */
       }
       if (myGen !== planPollGen) {
+        stopPoll();
         return;
       }
       planPollTimers.set(planId, setTimeout(tick, PLAN_POLL_MS));
@@ -1242,6 +1260,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       clearTimeout(timer);
     }
     planPollTimers.clear();
+    planPolling.clear();
   }
 
   /**
@@ -1267,17 +1286,24 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // 题8 案1（三席回修）：计划卡三键意图随请求上行——确认/改计划的固定文案在此识别，
     // 取消由宿主 notePlanDecision('cancel') 上报；不带=计划卡仍挂着，后端继续硬拒写操作
     const qTrim = q.trim();
-    if (qTrim === PLAN_CONFIRM_TEXT) {
+    // 四审回修（dspro-P2-3）：固定确认文案只认按钮路径带来的 planId。此前任何来源的
+    // 同句文本都会注入 confirm，且无 planId 时后端 planMatches 对 null 放行——队列里
+    // 一条重复确认文本可能消费掉模型刚出的下一张计划（用户从未点过它）。
+    if (qTrim === PLAN_CONFIRM_TEXT && planDecisionNext?.planId) {
       // 三审 P1：按钮路径已通过 notePlanDecision 写入 planId；这里只补 kind，
       // 不能整个覆盖，否则旧卡精确拒绝的 planId 在真实点击路径上永远丢失
-      planDecisionNext = { kind: 'confirm', planId: planDecisionNext?.planId };
+      planDecisionNext = { kind: 'confirm', planId: planDecisionNext.planId };
       editPlanId = undefined;
-    } else if (qTrim.startsWith(PLAN_ADJUST_PREFIX)) {
+    } else if (qTrim.startsWith(PLAN_ADJUST_PREFIX) && (editPlanId || planDecisionNext?.planId)) {
       // 二审回修：「改计划」只暂存卡号，用户改完发出来才在这里认领
       planDecisionNext = { kind: 'adjust', planId: editPlanId ?? planDecisionNext?.planId };
       editPlanId = undefined;
     }
     const planDecision = takePlanDecision();
+    // 四审回修（dspro-P2-2 同族）：改计划真正发出时立刻置“已调整”，防新计划先到时被误判过期
+    if (planDecision?.kind === 'adjust' && planDecision.planId) {
+      applyPlanStatus(planDecision.planId, 'adjusted');
+    }
     turn.stamp = stamp;
     // 二审 P1：尾部悬挂的压缩/熔断标记由新回合接管（否则横幅永远漂在最新回答下面）
     if (state.lastCompaction) {
@@ -1526,7 +1552,14 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // G1 乙类#5：服务端真取消（fire-and-forget——本地断流照旧先行，后端秒级落终态
     // 而非等 60s 收割；失败静默：会话已不在/已停=幂等无事发生）
     if (state.threadId) {
-      import('@/api/dcs/assistant').then((m) => m.stopAssistantRun(state.threadId)).catch(() => {});
+      import('@/api/dcs/assistant').then((m) => m.stopAssistantRun(state.threadId)).catch((e: any) => {
+        // 四审回修（dsflash-P2-5）：409=这轮在另一台实例上，本机没有它的现场。本地已断流，
+        // 但对端还在出字——必须让人知道要刷新回去再停，不能只弹一条通用错误。
+        const code = e?.code ?? e?.response?.data?.code;
+        if (code === 409) {
+          toast('这轮回答在另一台服务上，刷新页面后再点停止', 'err');
+        }
+      });
     }
   }
 

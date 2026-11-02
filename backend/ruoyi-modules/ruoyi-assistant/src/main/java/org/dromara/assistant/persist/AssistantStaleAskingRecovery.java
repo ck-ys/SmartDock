@@ -116,15 +116,23 @@ public class AssistantStaleAskingRecovery implements SmartInitializingSingleton 
         // 三审回修（dspro-P2-3）：HITL 挂起期间流侧出错会落 FAILED，但持久态仍停在 asking
         // （错误分支明确不清缓存）——这种会话没有任何在飞工作，直接可救；否则重启也救不回来，
         // 之后每条消息都被框架「Agent is paused for human-in-the-loop」拒绝。
+        // 四审回修（dspro-P2-5）：FAILED 也不能无条件救——owner 仍活时内存里的协调器/悬挂
+        // 缓存可能还在等用户作答，翻库会造成“内存 asking、落盘 allowed”分叉；仍按租约判死。
         if ("FAILED".equals(run.getStatus())) {
-            return true;
+            return ownerIsGone(run, true);
         }
         if (!"INTERRUPTED".equals(run.getStatus())) {
             return false;
         }
+        return ownerIsGone(run, false);
+    }
+
+    /** owner 为空=旧数据（INTERRUPTED 按原口径不碰；FAILED 沿用旧口径可救）；
+     *  自己名下看是否早于本进程启动；他机看租约 */
+    private boolean ownerIsGone(DcsAssistantRun run, boolean unknownIsGone) {
         String owner = run.getOwnerInstance();
         if (owner == null || owner.isBlank()) {
-            return false;
+            return unknownIsGone;
         }
         if (owner.equals(instanceContext.current())) {
             // 二审回修（dsflash-P2-8）：固定 instance.id 部署时，重启后同一 id 名下的旧进程

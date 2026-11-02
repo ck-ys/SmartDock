@@ -39,6 +39,8 @@ public class AssistantRetentionJob {
     private final org.dromara.assistant.core.AssistantInstanceContext instanceContext;
     /** 多实例：收尸后补跑陈旧 ASKING 自愈（run 刚变 INTERRUPTED，启动期扫描错过的那批） */
     private final AssistantStaleAskingRecovery staleAskingRecovery;
+    /** 四审（dsflash-P2-7）：直接注入配额服务，退款口径与 stop/resolver 同源 */
+    private final org.dromara.assistant.service.AssistantUserQuotaService quotaLookup;
 
     @Lock4j(keys = {"'assistant-retention-daily'"})
     @Scheduled(cron = "0 40 3 * * ?")
@@ -75,20 +77,50 @@ public class AssistantRetentionJob {
                 }
                 List<DcsAssistantRun> closed = conversationService.finalizeStuckRun(r.getTenantId(), r.getRunId());
                 for (DcsAssistantRun row : closed) {
-                    dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+                    // 四审回修（dspro-P2-1）：credits 订阅租户建侧 tryTurn 本就跳过，这里
+                    // 无条件退会把没扣过的回合退掉（钱包期计数一起被减）。与 stop/resolver
+                    // 同口径；查不到模式按钱包口径退（fail-open，宁可多退不吞用户次数）。
+                    if (!creditsMode(row.getTenantId(), row.getUserId())) {
+                        dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
+                    }
                     closedCount++;
                 }
             }
             if (closedCount > 0) {
                 log.warn("[AssistantRetention] 悬挂 run 兜底迁移 {} 行(15 分钟无终态事件, 已退回合)",
                     closedCount);
+                // 四审回修（dspro-P1-1）：只在本轮真收过尸时补扫——刚迁成 INTERRUPTED 的死主
+                // 会话需要立刻翻转，否则启动期扫描会因当时还是 RUNNING 而跳过。
+                staleAskingRecovery.recoverGoneOwners();
             }
-            // 二审回修（glm53-P2-2）：每轮固定补扫，不再挂在 closedCount>0 上——HITL 挂起的
-            // run 本来就是 INTERRUPTED，永远进不了 closedCount；若实例死后没有新实例启动，
-            // 坏主留下的 ASKING 会话就再没人扫。方法幂等，代价只是一次 LIKE 查询。
-            staleAskingRecovery.recoverGoneOwners();
         } catch (Exception e) {
             log.error("[AssistantRetention] 悬挂 run 兜底失败(下一轮重试, 幂等安全)", e);
+        }
+    }
+
+    /**
+     * 陈旧 ASKING 定期自愈（四审回修 dspro-P1-1）：原先把这次扫描无条件挂在每分钟的
+     * 收尸 job 上，而它的检出 SQL 是 {@code state_data LIKE '%...%'}（text 列、无法走索引）
+     * ——稳态每分钟一次整表顺序扫描，会话存量越大越慢，还会和心跳抢 2 线程调度池。
+     * 改为：收尸成功时立即补扫 + 每 10 分钟兜底一次。HITL 挂起跨实例死主没有“收尸事件”，
+     * 10 分钟窗口仍能救；代价从 1440 次/天降到 144 次/天。
+     */
+    @Lock4j(keys = {"'assistant-stale-asking'"})
+    @Scheduled(fixedDelay = 600_000, initialDelay = 180_000)
+    public void recoverStaleAsking() {
+        try {
+            staleAskingRecovery.recoverGoneOwners();
+        } catch (Exception e) {
+            log.error("[AssistantRetention] 陈旧 ASKING 定期自愈失败(下一轮重试, 幂等安全)", e);
+        }
+    }
+
+    /** 退款口径：credits 订阅租户不占每日回合数，收尸时不能退（与 stop/resolver 同口径） */
+    private boolean creditsMode(String tenantId, Long userId) {
+        try {
+            return quotaLookup.billingAwareLimits(tenantId, userId).creditsMode();
+        } catch (Exception ignore) {
+            return false;
         }
     }
 

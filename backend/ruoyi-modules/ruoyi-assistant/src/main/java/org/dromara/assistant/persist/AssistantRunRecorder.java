@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.agui.adapter.strategy.AguiStreamContext;
 import io.agentscope.core.agui.event.AguiEvent;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.assistant.core.AssistantRunContext;
 import org.dromara.assistant.domain.DcsAssistantConversation;
@@ -12,7 +14,6 @@ import org.dromara.assistant.limiter.AssistantDailyQuota;
 import org.dromara.assistant.security.AssistantPiiFilter;
 import org.dromara.assistant.service.AssistantConversationService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -24,7 +25,9 @@ import java.time.Clock;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -114,6 +117,28 @@ public class AssistantRunRecorder {
             t.setDaemon(true);
             return t;
         }, new ThreadPoolExecutor.CallerRunsPolicy());
+
+    /** 收流专用守护线程（四审 dspro-P1-3）：3 秒冲刷要刷新 run 的 last_event_at，
+     *  和业务 @Scheduled 抢 2 线程池会因夜间清理被拖住——别的实例见 last_event_at
+     *  不再前进，会把仍在出字的活 run 当失联收掉。独立线程与调度池彻底隔离。 */
+    private ScheduledExecutorService flushScheduler;
+
+    @PostConstruct
+    void startFlushScheduler() {
+        flushScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "assistant-run-flush");
+            t.setDaemon(true);
+            return t;
+        });
+        flushScheduler.scheduleWithFixedDelay(this::flushAndReap, 90, 3, TimeUnit.SECONDS);
+    }
+
+    @PreDestroy
+    void stopFlushScheduler() {
+        if (flushScheduler != null) {
+            flushScheduler.shutdownNow();
+        }
+    }
 
     /** run 内消息缓冲（runId → messageId → 增量累积）；run 终态后移除。
      *  005 测试接缝：包内可见供单测直取播种（flushAndReap 的 merged 内容源）。 */
@@ -804,7 +829,7 @@ public class AssistantRunRecorder {
     }
 
     /**
-     * 批6-#2 增量冲刷+失联收割（每 3s 一轮，@Scheduled 调度线程）：
+     * 批6-#2 增量冲刷+失联收割（每 3s 一轮，独立守护线程 {@link #startFlushScheduler()}）：
      * <ul>
      *   <li>存活 run（事件停滞 &lt; STALL_MS）：内容有变且过 FLUSH_MS 节流 → upsert
      *       partial 行（含工具步骤+思考段快照）——刷新/断网回来立刻看到已生成部分；</li>
@@ -817,7 +842,6 @@ public class AssistantRunRecorder {
      * StringBuilder 与流线程并发读写存在撕裂读可能：catch 后下一 tick 以最新内容重试，
      * 内容保全以终道路径为准，冲刷属 best-effort。
      */
-    @Scheduled(fixedDelay = 3_000, initialDelay = 90_000)
     public void flushAndReap() {
         flushAndReap(clock.millis());
     }

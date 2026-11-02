@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.assistant.domain.DcsAssistantAttachment;
 import org.dromara.assistant.domain.DcsAssistantConversation;
+import org.dromara.assistant.core.AssistantInstanceContext;
 import org.dromara.assistant.mapper.AssistantAttachmentMapper;
 import org.dromara.assistant.mapper.AssistantConversationMapper;
 import org.dromara.common.core.exception.ServiceException;
@@ -69,11 +70,15 @@ public class AssistantAttachmentService {
     /** 088/ISSUE-F14-08 修：在跑解析登记（毒丸自愈用）——id→开工时刻/future */
     private final ConcurrentHashMap<Long, Long> runningSince = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Future<?>> runningFutures = new ConcurrentHashMap<>();
+    /** 四审（dspro-P1-2）：在跑任务的认领实例，看门狗只收自己认领的行（被换主则放弃） */
+    private final ConcurrentHashMap<Long, String> runningOwners = new ConcurrentHashMap<>();
 
     private final AssistantAttachmentMapper attachmentMapper;
     private final AssistantConversationMapper conversationMapper;
     private final ISysOssService sysOssService;
     private final OssTextExtractor textExtractor;
+    /** 多实例：附件认领归属=实例 id，防止别台抢走排队行/迟到任务覆盖终态 */
+    private final AssistantInstanceContext instanceContext;
 
     /**
      * 登记并异步解析：幂等（同会话同文件返回现状；软删行复活重解析 G2）；后缀白名单；
@@ -172,8 +177,13 @@ public class AssistantAttachmentService {
                 r.setParseStatus("FAILED");
                 r.setParseError("解析超时（可能上传后服务重启），请移除后重新上传");
                 // R14-F14-04 修：显式列失败回写，不再 updateById 整实体（快照 del_flag='0'
-                // 会把读取间隙被移除的行写活）
-                attachmentMapper.finishParseFailure(r.getId(), r.getParseError());
+                // 会把读取间隙被移除的行写活）。四审（dspro-P1-2）：带认领实例——别台正在
+                // 解析的长任务不能被本页的读时兜底抢先判失败。
+                if (r.getParseOwner() == null || r.getParseOwner().isBlank()) {
+                    attachmentMapper.finishParseFailure(r.getId(), r.getParseError());
+                } else {
+                    attachmentMapper.finishParseFailureOwned(r.getId(), r.getParseOwner(), r.getParseError());
+                }
             }
         }
         return rows;
@@ -203,7 +213,7 @@ public class AssistantAttachmentService {
     private void recoverStale(int pendingMins, int parsingMins) {
         List<DcsAssistantAttachment> stuck;
         try {
-            stuck = attachmentMapper.claimStale(200, pendingMins, parsingMins);
+            stuck = attachmentMapper.claimStale(200, pendingMins, parsingMins, instanceContext.current());
         } catch (Exception e) {
             log.warn("[AssistantAttachment] 滞留解析行认领失败(下一轮重试): {}", e.getMessage());
             return;
@@ -212,7 +222,8 @@ public class AssistantAttachmentService {
             SysOssVo oss = sysOssService.getById(row.getOssId());
             if (oss == null || oss.getOssId() == null) {
                 // R14-F14-04 修：显式列失败回写，不整实体（快照 del_flag 复活面同上）
-                attachmentMapper.finishParseFailure(row.getId(), "源文件已删除，请移除后重新上传");
+                attachmentMapper.finishParseFailureOwned(row.getId(), instanceContext.current(),
+                    "源文件已删除，请移除后重新上传");
                 continue;
             }
             submitParse(row.getId(), oss);
@@ -239,21 +250,39 @@ public class AssistantAttachmentService {
             }
             Future<?> f = runningFutures.get(id);
             if (f != null && f.cancel(true)) {
-                attachmentMapper.finishParseFailure(id, "解析超时（文件过大或服务器繁忙），请移除后重新上传");
+                String owner = runningOwners.get(id);
+                if (owner != null) {
+                    attachmentMapper.finishParseFailureOwned(id, owner,
+                        "解析超时（文件过大或服务器繁忙），请移除后重新上传");
+                } else {
+                    attachmentMapper.finishParseFailure(id,
+                        "解析超时（文件过大或服务器繁忙），请移除后重新上传");
+                }
                 log.warn("[AssistantAttachment] 看门狗取消超时解析 id={}（{} 分钟），队列已让位", id, PENDING_STALE_MS / 60_000);
             }
         });
     }
 
-    /** 统一入队口（088 修）：登记在跑任务供看门狗取消；finally 摘除防泄漏 */
+    /** 统一入队口（088 修）：先按实例认领归属，再登记在跑任务供看门狗取消；finally 摘除防泄漏。
+     *  四审（dspro-P1-2）：认领失败=别台已换主/已终态/已删除，直接放弃，绝不重复解析。 */
     private void submitParse(Long id, SysOssVo oss) {
+        String owner = instanceContext.current();
+        if (attachmentMapper.claimForParse(id, owner) == 0) {
+            return;
+        }
+        submitParse(id, oss, owner);
+    }
+
+    private void submitParse(Long id, SysOssVo oss, String owner) {
         Future<?> f = PARSE_EXECUTOR.submit(() -> {
             runningSince.put(id, System.currentTimeMillis());
+            runningOwners.put(id, owner);
             try {
-                parse(id, oss);
+                parse(id, oss, owner);
             } finally {
                 runningSince.remove(id);
                 runningFutures.remove(id);
+                runningOwners.remove(id);
             }
         });
         runningFutures.put(id, f);
@@ -281,8 +310,9 @@ public class AssistantAttachmentService {
      *  finishParseSuccess/finishParseFailure），全程不 updateById 整实体——复活行的
      *  del_flag='1' 快照不再被写回（自毁），读取间隙被移除的行不再被快照写活，
      *  HTTP 线程返回的实体与解析线程彻底解耦。 */
-    private void parse(Long id, SysOssVo oss) {
-        if (attachmentMapper.markParsing(id) == 0) {
+    private void parse(Long id, SysOssVo oss, String owner) {
+        if (attachmentMapper.markParsing(id, owner) == 0) {
+            // 四审（dspro-P1-2）：认领被别台换走/行已终态/已删除——本机迟到任务放弃
             return;
         }
         String status;
@@ -307,9 +337,9 @@ public class AssistantAttachmentService {
             parseError = hasCjk ? msg : "文件解析失败：格式不支持或文件损坏，请换标准格式（docx/xlsx/pptx/pdf/txt）重试";
         }
         if ("FAILED".equals(status)) {
-            attachmentMapper.finishParseFailure(id, parseError);
+            attachmentMapper.finishParseFailureOwned(id, owner, parseError);
         } else {
-            attachmentMapper.finishParseSuccess(id, status, parsedText, lineCount);
+            attachmentMapper.finishParseSuccess(id, owner, status, parsedText, lineCount);
         }
     }
 
