@@ -1347,7 +1347,8 @@ body .dcs-fab:not(.gray) .fab-core {
     transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.25s,
     background-color 0.2s,
-    border-color 0.2s !important;
+    border-color 0.2s,
+    opacity 0.2s !important;
 
   svg {
     filter: none !important;
@@ -1363,9 +1364,17 @@ body .dcs-fab:not(.gray) .fab-core {
 body .dcs-fab:not(.gray):hover .fab-core,
 body .dcs-fab:not(.gray):focus-within .fab-core,
 body .dcs-fab:not(.gray):active .fab-core,
-body .dcs-fab.dragging .fab-core,
-body .dcs-fab:has(.ballmenu) .fab-core,
-body .dcs-fab:has(.proactive) .fab-core {
+body .dcs-fab.dragging .fab-core {
+  background: var(--app-fab) !important;
+  border-color: var(--app-fab-border) !important;
+}
+
+/* 菜单/提醒卡展开时也回到实色。:has() 单独成条：
+   浏览器矩阵里 Chrome 87–104、Safari 14–15.3 不认它，写成同一个选择器列表会整条作废，
+   连带上面的 hover/focus/active 一起失效（CSS 选择器列表「一坏全废」），所以拆开写。
+   老浏览器丢掉这两行只是展开时仍保持半透明，不影响点击。 */
+body .dcs-fab:not(.gray):has(.ballmenu) .fab-core,
+body .dcs-fab:not(.gray):has(.proactive) .fab-core {
   background: var(--app-fab) !important;
   border-color: var(--app-fab-border) !important;
 }

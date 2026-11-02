@@ -510,6 +510,10 @@ html.density-compact {
   /* 2026-11-01 视觉评审 ⑥：3 张卡在手机档排成等宽三列时，最后一张回到正常一格，不再通栏 */
   .dcs-ops-metrics--trio > .dcs-ops-metric:last-child:nth-child(odd) {
     grid-column: auto;
+    /* 三列时第 3 格仍是「奇数格」：上面 nth-child(odd) 会抹掉它的左边线（2|3 之间没分隔），
+       它又不在前两格之列而留着上边线。补回竖线、去掉这条只属于它一格的横线 */
+    border-left: 1px solid var(--app-rule);
+    border-top: 0;
   }
 
   .ui-kpi__label,

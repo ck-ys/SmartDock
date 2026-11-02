@@ -215,8 +215,9 @@ const tableWrapRef = ref<HTMLElement>();
 const scrollHint = ref(false);
 const updateScrollHint = () => {
   const el = tableWrapRef.value;
-  if (!el) return;
-  scrollHint.value = el.scrollWidth - el.clientWidth - el.scrollLeft > 8;
+  /* keep-alive 摘下时元素还在但已脱离文档，scrollWidth/clientWidth 全读成 0，别拿这个值改写状态 */
+  if (!el || !el.isConnected) return;
+  scrollHint.value = (roleList.value?.length ?? 0) > 0 && el.scrollWidth - el.clientWidth - el.scrollLeft > 8;
 };
 const refreshScrollHint = () => nextTick(updateScrollHint);
 watch(roleList, refreshScrollHint);
@@ -520,6 +521,9 @@ onMounted(() => {
   refreshScrollHint();
   window.addEventListener('resize', refreshScrollHint);
 });
+
+/* 从 keep-alive 缓存回来时按当前宽度重算：离开期间没有 resize 的话，hint 会停在离开那一刻的旧值 */
+onActivated(refreshScrollHint);
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', refreshScrollHint);
