@@ -97,11 +97,6 @@
                   </template>
                 </el-dropdown>
               </el-col>
-              <el-col :span="1.5">
-                <el-button v-has-permi="['system:user:invite']" type="warning" plain icon="Promotion" @click="inviteVisible = true"
-                  >邀请注册</el-button
-                >
-              </el-col>
               <right-toolbar v-model:show-search="showSearch" :columns="columns" :search="true" @query-table="getList"></right-toolbar>
             </el-row>
           </template>
@@ -376,8 +371,6 @@
         </div>
       </template>
     </el-dialog>
-    <!-- 批3 邀请注册(2026-09-26): 工具栏入口弹窗, 生成/作废邀请链接 -->
-    <invite-link-dialog v-model="inviteVisible" />
   </div>
 </template>
 
@@ -392,7 +385,6 @@ import { to } from 'await-to-js';
 import { optionselect } from '@/api/system/post';
 import { checkPermi } from '@/utils/permission';
 import { useUserStore } from '@/store/modules/user';
-import InviteLinkDialog from './components/InviteLinkDialog.vue';
 import MobileRowList from '@/components/MobileRowList/index.vue';
 import { buildLoginNameChangeConfirmMessage, shouldConfirmLoginNameChange } from './utils/userNameChangePolicy';
 
@@ -403,8 +395,6 @@ const userList = ref<UserVO[]>();
 const loading = ref(true);
 // 2026-11-01 Q3=乙：手机档默认收起筛选区（否则表格/行卡要滚过一整屏表单才看得到）
 const showSearch = ref(!window.matchMedia('(max-width: 992px)').matches);
-/** 批3 邀请注册(2026-09-26): 邀请链接弹窗显隐 */
-const inviteVisible = ref(false);
 const ids = ref<Array<number | string>>([]);
 const single = ref(true);
 const multiple = ref(true);

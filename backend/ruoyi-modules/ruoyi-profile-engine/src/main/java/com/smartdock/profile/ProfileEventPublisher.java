@@ -27,7 +27,11 @@ public interface ProfileEventPublisher {
     /**
      * 单条发布。
      *
-     * @return true = 新写入; false = 重复(event_uid 已存在), 幂等跳过
+     * <p>返回 true 的口径(小修包件5 + 三席回修):
+     * 非事务上下文 = 已落账; 事务上下文 = 已受理(校验/身份解析在调用线程完成, 账本等外层提交后写入),
+     * 外层回滚则整条丢弃——「事务成了才记账」。</p>
+     *
+     * @return true = 新写入/已受理; false = 重复(event_uid 已存在)或自监控关闭, 幂等跳过
      */
     boolean publish(ProfileEventBo event);
 
@@ -43,7 +47,10 @@ public interface ProfileEventPublisher {
     /**
      * 批量发布(逐条幂等, 不整体事务——事件允许部分成功, 自然键保证可重放补齐)。
      *
-     * @return 新写入条数
+     * <p>计数口径: 非事务上下文=新写入条数; 事务上下文=受理条数(逐条复用 {@link #publish})。
+     * 需要精确区分"新写入/重复/失败"请用 {@link #publishBatchDetailed}。</p>
+     *
+     * @return 新写入(或已受理)条数
      */
     int publishBatch(List<ProfileEventBo> events);
 

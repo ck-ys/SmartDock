@@ -267,8 +267,13 @@ export interface AnalyticsAdoption {
   newUsers: number;
   /** 本周新同事里, 首见后 7 天内完成过任一核心操作的人数 */
   activated: number;
-  /** 首周激活率; 新同事为 0 时后端给 null 显示「—」(RuoYi 把 BigDecimal 序列化成字符串, 前端按串处理) */
+  /** 首周激活率; 新同事为 0 时后端给 null 显示「—」(RuoYi 把 BigDecimal 序列化成字符串, 前端按串处理);
+   * 分母只含已定性者(小修包件6) */
   activationRate: number | string | null;
+  /** 首周观察期未满且还没做核心动作的人数(不进激活率分母, 前端单列提示);
+   * 边界按「截至今日」计——首见+7 天正好等于今天零点的人已定性, 与后端窗口口径一致;
+   * 可选: 滚动升级期旧实例不返回该字段, 前端按缺省不显示 */
+  observing?: number;
   /** 所选窗口内登录过的人数 */
   loginUsers: number;
   /** 所选窗口内完成过核心操作的人数 */

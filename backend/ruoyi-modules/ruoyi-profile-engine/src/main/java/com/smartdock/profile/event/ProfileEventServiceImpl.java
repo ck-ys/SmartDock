@@ -17,6 +17,8 @@ import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
@@ -76,12 +78,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
 
     @Override
     public boolean publish(ProfileEventBo bo) {
-        ProfileEvent written = publishIsolated(bo);
-        if (written == null) {
-            return false;
-        }
-        afterWritten(written);
-        return true;
+        return publishInternal(bo, false);
     }
 
     /**
@@ -92,12 +89,63 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
      */
     @Override
     public boolean publishQuiet(ProfileEventBo bo) {
+        // 自监控开关必须按调用线程的租户判定: 延迟到 afterCommit 时 dynamic 租户上下文已被清理
         String eventName = firstNonBlank(bo.getEventName(), bo.getEventType());
         if (SelfMonitorEvents.isSelfMonitor(eventName)
             && !configService.selfMonitorEnabled(currentTenant(), ProfileSources.UNIFIED)) {
             return false;
         }
-        ProfileEvent written = publishIsolated(bo);
+        return publishInternal(bo, true);
+    }
+
+    /**
+     * 小修包件5(孤儿事件防线): 业务事务里发事件, 外层回滚会把已落账的事件变成孤儿
+     * (账本是 REQUIRES_NEW, 先于外层提交)。挂到 afterCommit 再写账本, 语义=「事务成了才记账」;
+     * 非事务上下文直写, 行为不变。
+     *
+     * <p>三席回修(dspro P1-1): 事件必须在<b>调用线程</b>定型——afterCommit 执行时
+     * {@code TenantHelper.dynamic} 的租户 ThreadLocal 已被 finally 清掉, 延迟到那时解析
+     * 会把事件写进操作者自己的租户(跨租户污染), 缺省发生时间也会漂移。因此租户/长度校验/
+     * Schema 校验/身份解析全部提前到 {@link #prepare}, afterCommit 只做写入。</p>
+     *
+     * <p>返回值契约(三席回修 dspro P1-2): 非事务上下文 true=已落账、false=重复(同步判定);
+     * 事务上下文 true=已受理(外层提交后写入, 重复也在提交后才判——调用方拿到的 false 只代表
+     * "已判定重复"的老口径), 无效事件(缺字段/超长/Schema 不过)在调用线程同步抛错。</p>
+     */
+    private boolean publishInternal(ProfileEventBo bo, boolean quiet) {
+        PreparedEvent prepared = prepare(bo);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        if (quiet) {
+                            writeQuiet(prepared);
+                        } else {
+                            write(prepared);
+                        }
+                    } catch (Exception e) {
+                        // 三席回修(glm53 P2-3): 打全栈——只打 message 时这类静默丢事件查不到根因
+                        log.error("[Profile] afterCommit publish failed uid={}", prepared.event().getEventUid(), e);
+                    }
+                }
+            });
+            return true;
+        }
+        return quiet ? writeQuiet(prepared) : write(prepared);
+    }
+
+    private boolean write(PreparedEvent prepared) {
+        ProfileEvent written = writePrepared(prepared);
+        if (written == null) {
+            return false;
+        }
+        afterWritten(written);
+        return true;
+    }
+
+    private boolean writeQuiet(PreparedEvent prepared) {
+        ProfileEvent written = writePrepared(prepared);
         if (written == null) {
             return false;
         }
@@ -140,7 +188,7 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         if (events != null) {
             for (ProfileEventBo bo : events) {
                 try {
-                    ProfileEvent event = publishIsolated(bo);
+                    ProfileEvent event = writePrepared(prepare(bo));
                     if (event == null) {
                         duplicated++;
                         continue;
@@ -166,14 +214,14 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
     }
 
     /**
-     * 单条事件隔离写入。
+     * 事件定型: 租户/时间戳/长度校验/Schema 校验/身份解析——全部在调用线程完成。
      *
-     * <p>批10 顺手修(双连接收敛): schema 校验与身份解析在事件事务外执行——
+     * <p>批10 顺手修(双连接收敛): schema 校验与身份解析不开事件事务——
      * 身份解析自身是 REQUIRES_NEW, 嵌在事件事务里同一事件会同时占两条连接,
      * 批量导入时连接池翻倍占用。现在身份链接与事件账本是先后两个独立短事务:
      * 两步之间崩溃只丢索引不丢账本, 下一条事件会补链接。</p>
      */
-    private ProfileEvent publishIsolated(ProfileEventBo bo) {
+    private PreparedEvent prepare(ProfileEventBo bo) {
         ProfileEvent e = toEntity(bo);
 
         // 已注册 schema 才校验; 未注册/旧库/解析失败一律放行
@@ -185,7 +233,24 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
 
         // 身份解析失败不阻断事件(链接表是索引, 事件是账本); 下一条事件会再补
         e.setSubjectId(resolveCanonicalSubject(e, bo));
+        return new PreparedEvent(e, bo);
+    }
 
+    /**
+     * 幂等写账本 + 两条旁路写(主体登记/首见物化)。
+     *
+     * <p>批末回修(dspro P1-1): 两条旁路写必须在账本事务提交之后执行——
+     * 之前它们与账本同事务且各自 catch, 一条语句失败会把 PG 事务置为 aborted,
+     * COMMIT 静默变 ROLLBACK: 账本丢行而 publish 仍返回成功。</p>
+     *
+     * <p>三席回修(dspro P0): 旁路写移出账本事务后, 在 afterCommit 阶段会落到"已提交但
+     * 仍绑在调用线程"的外层连接上(Spring 明示 afterCommit 里不带新事务的写仍参与原事务,
+     * 且不会再有提交), cleanup 时连接按脏状态回滚——账本成功、主体索引与首见永久丢失。
+     * {@link #runSideWrite} 在事务/afterCommit 上下文各自开独立短事务, 非事务上下文保持
+     * 自动提交, 语义仍是"旁路失败只丢索引, 下一条事件会再补"。</p>
+     */
+    private ProfileEvent writePrepared(PreparedEvent prepared) {
+        ProfileEvent e = prepared.event();
         ProfileEvent inserted = requiresNew.execute(status -> {
             int rows = eventMapper.insertIgnore(e);
             return rows == 0 ? null : e;
@@ -193,16 +258,29 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         if (inserted == null) {
             return null;
         }
-        // 批末回修(dspro P1-1): 主体/首见两条旁路写必须在账本事务提交之后执行——
-        // 之前它们与账本同事务且各自 catch, 一条语句失败会把 PG 事务置为 aborted,
-        // COMMIT 静默变 ROLLBACK: 账本丢行而 publish 仍返回成功。移出后失败只丢
-        // 索引(下一条事件会再补), 与"登记是索引"的既有语义真正一致。
-        upsertSubject(e, bo);
+        runSideWrite(() -> upsertSubject(inserted, prepared.bo()));
         // E 片统一事件流口径: 首见=该用户键的首次使用(登录也是使用)——
         // 持续使用分析/首周激活都以它为分母。C 片曾按自监控跳过(防登录污染 web 访客指标),
         // 访客指标退役后该守卫反转, 存量库由重建补齐
-        upsertFirstSeen(e);
+        runSideWrite(() -> upsertFirstSeen(inserted));
         return inserted;
+    }
+
+    /** 旁路写: 事务/afterCommit 上下文必须独立短事务(原因见 writePrepared 注释), 非事务上下文直写。 */
+    private void runSideWrite(Runnable write) {
+        try {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                requiresNew.executeWithoutResult(status -> write.run());
+            } else {
+                write.run();
+            }
+        } catch (Exception ex) {
+            log.warn("[Profile] side write failed (non-fatal) err={}", ex.getMessage());
+        }
+    }
+
+    /** 定型后的事件与其原始入参(旁路写要用 traits/displayName 元数据)。 */
+    private record PreparedEvent(ProfileEvent event, ProfileEventBo bo) {
     }
 
     /**

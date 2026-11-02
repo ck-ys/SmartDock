@@ -91,7 +91,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 概念 | 一句话口径 |
 |------|-----------|
 | 事件信封 | `ProfileEventBo`：eventName/eventUid/主体/会话/上下文/属性；一切业务喂事件只走 `ProfileEventPublisher` 门面 |
-| eventUid 幂等 | (tenant, source, event_uid) 重复投递返回 false 不报错；事件账本 append-only，重放可补齐 |
+| eventUid 幂等 | (tenant, source, event_uid) 重复投递返回 false 不报错；事务内调用返回 true=已受理（提交后才落账、重复也在那时判），精确对账走 `publishBatchDetailed`；事件账本 append-only，重放可补齐 |
 | 身份图谱 | 匿名 ID ↔ 登录主体经 `resolveAndLink` 归并；共享浏览器换账号只改挂匿名链接，**绝不搬走对方身份**；分析优先认登录人 |
 | 会话口径 | 显式 sessionId 优先，否则 30 分钟无操作切分；隐式会话键**锚定首事件**；新访客=该源首次会话；跳出=单页会话（有搜索不算跳出；page_leave 不算"继续"） |
 | 评分模型 | 指标→分箱→权重→等级，整份 JSON 配置；每次计算进快照，`prev_snapshot_id` 串趋势链；RFM 只是内置预设 |

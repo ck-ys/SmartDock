@@ -52,7 +52,7 @@
           </el-col>
           <el-col :span="1.5">
             <el-button
-              v-hasPermi="['system:oss:edit']"
+              v-hasPermi="['system:config:edit']"
               :type="previewListResource ? 'danger' : 'warning'"
               plain
               @click="handlePreviewListResource(!previewListResource)"

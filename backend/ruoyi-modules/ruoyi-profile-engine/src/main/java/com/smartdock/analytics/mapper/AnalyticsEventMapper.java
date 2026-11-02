@@ -344,6 +344,7 @@ public interface AnalyticsEventMapper {
      * 三席回修: ①newUsers/activated 都要求该键在事件账本里真实存在(防合并残留/删事件留下的幽灵首见行);
      * ②coreUsers 带 EXISTS 登录嵌套——漏斗第二步必须是第一步的子集, 否则长会话(登录在窗口外)会让上手率 &gt;100%;
      * ③activated 子查询上下界钉到固定参数(weekFrom/activationEnd), 让规划器走范围扫描而不是逐行相关子查询。
+     * 小修包件6: 加 pendingObservers——首周观察期未满且还没做核心动作的人(判决未下, 不进激活率分母)。
      */
     @Select("""
         <script>
@@ -371,6 +372,23 @@ public interface AnalyticsEventMapper {
                      AND pe.occurred_time &gt;= #{weekFrom}
                      AND pe.occurred_time &lt; fs.first_seen + interval '7 days'
                      AND pe.occurred_time &lt; #{activationEnd})) AS "activated",
+          (SELECT count(*) FROM analytics_visitor_first_seen fs
+             WHERE fs.tenant_id = #{tenantId} AND fs.source = #{source}
+               AND fs.first_seen &gt;= #{weekFrom} AND fs.first_seen &lt; #{to}
+               AND fs.first_seen + interval '7 days' &gt; #{to}
+               AND EXISTS (SELECT 1 FROM profile_event pe
+                   WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source} AND pe.del_flag = '0'
+                     AND COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) = fs.visitor_key
+                     AND pe.occurred_time &gt;= #{weekFrom} AND pe.occurred_time &lt; #{to})
+               AND NOT EXISTS (SELECT 1 FROM profile_event pe
+                   WHERE pe.tenant_id = #{tenantId} AND pe.source = #{source} AND pe.del_flag = '0'
+                     AND COALESCE(NULLIF(pe.anonymous_id, ''), pe.subject_id) = fs.visitor_key
+                     AND pe.event_name IN
+                     <foreach collection="coreNames" item="n" open="(" separator="," close=")">#{n}</foreach>
+                     AND pe.occurred_time &gt;= fs.first_seen
+                     AND pe.occurred_time &gt;= #{weekFrom}
+                     AND pe.occurred_time &lt; fs.first_seen + interval '7 days'
+                     AND pe.occurred_time &lt; #{activationEnd})) AS "pendingObservers",
           (SELECT count(DISTINCT COALESCE(NULLIF(anonymous_id, ''), subject_id))
              FROM profile_event
              WHERE tenant_id = #{tenantId} AND source = #{source} AND del_flag = '0'

@@ -645,11 +645,14 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
     }
 
     /**
-     * 单点解析器（J 批一期，2026-10-08；批3 星标化改造）：全系统唯一的「租户当前生效 AI 配置」口径。
+     * 单点解析器（J 批一期，2026-10-08；批3 星标化改造；小修包件4 健康闸）：全系统唯一的
+     * 「租户当前生效 AI 配置」口径。
      *
      * <p>批3(Q4:A) 起选择序=①★默认行（is_default='1' 且可用）→②回退任意可用行
      * （update_time DESC, config_id DESC——星空缺时管理员最近动过的可用行生效，兼容
      * 「从未点星」的存量租户）。enabled 已是纯状态位（可用性），不再是选择器。
+     * 小修包件4 起先在①/②之前剔除「巡检 FAIL 且连败>=2」的死钥匙；全部行都不健康时
+     * 放开健康闸按原序取（巡检可能滞后，拒绝服务比 401 更糟）。
      * 含 CNY 闸（拍板 A 上收）：钱包仅支持人民币计费，非 CNY 价格行的模型全系统统一拒
      * （助手路/单发路/嵌入路同闸）；唯一豁免=FIXED_PER_CALL 且按次单价显式为 0
      * （真免费模型，「免费」由单价 0 表达）。</p>
@@ -659,30 +662,21 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
      */
     @Override
     public DcsAiConfig resolveEnabledConfig(String tenantId, String useType) {
-        // ① ★默认行优先（partial 索引保证每租户每用途至多一颗星；del_flag 由 MP 逻辑删除自动追加）
-        DcsAiConfig config = TenantHelper.ignore(() -> aiConfigMapper.selectOne(
-            new LambdaQueryWrapper<DcsAiConfig>()
-                .eq(DcsAiConfig::getTenantId, tenantId)
-                .eq(DcsAiConfig::getEnabled, ENABLED)
-                .eq(DcsAiConfig::getIsDefault, "1")
-                // useType null=兼容旧 no-arg 语义（任意用途取一条）
-                .eq(useType != null, DcsAiConfig::getUseType, useType)
-                // Q5：非 Chat Completions 行只做连通测试，不能当对话默认
-                .and(w -> w.isNull(DcsAiConfig::getApiFormat)
-                    .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
-                .last("limit 1")));
+        // 健康闸(小修包件4): 巡检 FAIL 且连败>=2 的死钥匙先排除——演示库曾出现死钥匙排第一,
+        // 追问侧车每轮 401。全排除时回退原序(全部不健康也返回一行, 报错语义不劣化于改动前)。
+        java.util.Set<Long> unhealthy = unhealthyConfigIds(tenantId);
+        // ① ★默认行优先(partial 索引保证每租户每用途至多一颗星; del_flag 由 MP 逻辑删除自动追加)
+        DcsAiConfig config = selectEnabledRow(tenantId, useType, unhealthy, true);
         if (config == null) {
-            // ② 星空缺回退：任意可用行按最近动过排序（Q11 优先级链的接口默认兜底段）
-            config = TenantHelper.ignore(() -> aiConfigMapper.selectOne(
-                new LambdaQueryWrapper<DcsAiConfig>()
-                    .eq(DcsAiConfig::getTenantId, tenantId)
-                    .eq(DcsAiConfig::getEnabled, ENABLED)
-                    .eq(useType != null, DcsAiConfig::getUseType, useType)
-                    .and(w -> w.isNull(DcsAiConfig::getApiFormat)
-                        .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
-                    .orderByDesc(DcsAiConfig::getUpdateTime)
-                    .orderByDesc(DcsAiConfig::getConfigId)
-                    .last("limit 1")));
+            // ② 星空缺回退: 任意可用行按最近动过排序(Q11 优先级链的接口默认兜底段)
+            config = selectEnabledRow(tenantId, useType, unhealthy, false);
+        }
+        if (config == null && !unhealthy.isEmpty()) {
+            // ③ 全部行都不健康: 放开健康闸按原序取(巡检可能滞后, 拒绝服务比 401 更糟)
+            config = selectEnabledRow(tenantId, useType, null, true);
+            if (config == null) {
+                config = selectEnabledRow(tenantId, useType, null, false);
+            }
         }
         if (config == null) {
             throw new ServiceException(useType == null
@@ -692,6 +686,51 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         enforceCnyGate(config);
         hydrate(config);
         return config;
+    }
+
+    /** 启用行查询(件4 抽取): defaultOnly=★默认段, 否则按最近动过兜底; excludeIds=健康闸排除集 */
+    private DcsAiConfig selectEnabledRow(String tenantId, String useType,
+                                         Collection<Long> excludeIds, boolean defaultOnly) {
+        return TenantHelper.ignore(() -> aiConfigMapper.selectOne(
+            new LambdaQueryWrapper<DcsAiConfig>()
+                .eq(DcsAiConfig::getTenantId, tenantId)
+                .eq(DcsAiConfig::getEnabled, ENABLED)
+                .eq(defaultOnly, DcsAiConfig::getIsDefault, "1")
+                // useType null=兼容旧 no-arg 语义（任意用途取一条）
+                .eq(useType != null, DcsAiConfig::getUseType, useType)
+                // Q5：非 Chat Completions 行只做连通测试，不能当对话默认
+                .and(w -> w.isNull(DcsAiConfig::getApiFormat)
+                    .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
+                .notIn(excludeIds != null && !excludeIds.isEmpty(), DcsAiConfig::getConfigId, excludeIds)
+                .orderByDesc(DcsAiConfig::getUpdateTime)
+                .orderByDesc(DcsAiConfig::getConfigId)
+                .last("limit 1")));
+    }
+
+    /** 健康闸(件4): 最近一次巡检 FAIL 且连败>=2 的配置——单次抖动不排除, 连败才算死钥匙 */
+    private java.util.Set<Long> unhealthyConfigIds(String tenantId) {
+        try {
+            List<DcsAiModelHealth> rows = TenantHelper.ignore(() ->
+                healthMapper.selectList(new LambdaQueryWrapper<DcsAiModelHealth>()
+                    .select(DcsAiModelHealth::getConfigId)
+                    .eq(DcsAiModelHealth::getTenantId, tenantId)
+                    .eq(DcsAiModelHealth::getStatus, "FAIL")
+                    .ge(DcsAiModelHealth::getFailStreak, 2)
+                    // 三席审查(dspro P2-2): 配置删除后巡检行仍留着, 排除集会无界增长且把
+                    // NOT IN 撑大——只认还活着的配置行(逻辑删除口径与查询侧一致)
+                    .exists("SELECT 1 FROM dcs_ai_config c WHERE c.config_id = dcs_ai_model_health.config_id"
+                        + " AND c.del_flag = '0'")));
+            if (rows == null || rows.isEmpty()) {
+                return java.util.Collections.emptySet();
+            }
+            return rows.stream().map(DcsAiModelHealth::getConfigId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        } catch (Exception ex) {
+            // 三席审查(dsflash P2-4): 健康闸是"锦上添花"——巡检表查询失败时退化为无排除,
+            // 保住改动前的选路行为, 不让一个附属查询把整条 AI 链路打成不可用
+            log.warn("[AI] health gate skipped tenant={} err={}", tenantId, ex.getMessage());
+            return java.util.Collections.emptySet();
+        }
     }
 
     /**
@@ -724,20 +763,12 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
     /** 业务反馈批1015b Q2：最便宜启用行（追问侧车轻快模型）。null=无可用（调用方回退默认链），闸不过也返回 null 不抛 */
     @Override
     public DcsAiConfig resolveCheapestEnabledConfig(String tenantId, String useType) {
-        DcsAiConfig config = TenantHelper.ignore(() -> aiConfigMapper.selectOne(
-            new LambdaQueryWrapper<DcsAiConfig>()
-                .eq(DcsAiConfig::getTenantId, tenantId)
-                .eq(DcsAiConfig::getEnabled, ENABLED)
-                .eq(useType != null, DcsAiConfig::getUseType, useType)
-                .and(w -> w.isNull(DcsAiConfig::getApiFormat)
-                    .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
-                // 倍率是项目自己的档位信号（免费×1/flash×2/旗舰×4~6）：倍率低=又轻又省，
-                // NULL 视同 1 且 PG ASC 默认 NULLS LAST 天然排后；同倍率比按次单价，再比最近动过
-                .orderByAsc(DcsAiConfig::getCreditMultiplier)
-                .orderByAsc(DcsAiConfig::getUnitPricePerCall)
-                .orderByDesc(DcsAiConfig::getUpdateTime)
-                .orderByDesc(DcsAiConfig::getConfigId)
-                .last("limit 1")));
+        // 健康闸(件4): 死钥匙(FAIL 且连败>=2)先排除; 全排除回退原序
+        java.util.Set<Long> unhealthy = unhealthyConfigIds(tenantId);
+        DcsAiConfig config = selectCheapestRow(tenantId, useType, unhealthy);
+        if (config == null && !unhealthy.isEmpty()) {
+            config = selectCheapestRow(tenantId, useType, null);
+        }
         if (config == null) {
             return null;
         }
@@ -748,6 +779,24 @@ public class DcsAiConfigServiceImpl implements IDcsAiConfigService {
         }
         hydrate(config);
         return config;
+    }
+
+    /** 最便宜可用行(件4 抽取): 倍率是项目自己的档位信号（免费×1/flash×2/旗舰×4~6）：倍率低=又轻又省，
+     *  NULL 视同 1 且 PG ASC 默认 NULLS LAST 天然排后；同倍率比按次单价，再比最近动过 */
+    private DcsAiConfig selectCheapestRow(String tenantId, String useType, Collection<Long> excludeIds) {
+        return TenantHelper.ignore(() -> aiConfigMapper.selectOne(
+            new LambdaQueryWrapper<DcsAiConfig>()
+                .eq(DcsAiConfig::getTenantId, tenantId)
+                .eq(DcsAiConfig::getEnabled, ENABLED)
+                .eq(useType != null, DcsAiConfig::getUseType, useType)
+                .and(w -> w.isNull(DcsAiConfig::getApiFormat)
+                    .or().eq(DcsAiConfig::getApiFormat, com.smartdock.enums.DcsAiApiFormat.CHAT_COMPLETIONS.name()))
+                .notIn(excludeIds != null && !excludeIds.isEmpty(), DcsAiConfig::getConfigId, excludeIds)
+                .orderByAsc(DcsAiConfig::getCreditMultiplier)
+                .orderByAsc(DcsAiConfig::getUnitPricePerCall)
+                .orderByDesc(DcsAiConfig::getUpdateTime)
+                .orderByDesc(DcsAiConfig::getConfigId)
+                .last("limit 1")));
     }
 
     /** 按主键解析指定配置行（批3 Q11 助手默认槽供值）：存在/租户/可用校验 + 同一 CNY 闸 */

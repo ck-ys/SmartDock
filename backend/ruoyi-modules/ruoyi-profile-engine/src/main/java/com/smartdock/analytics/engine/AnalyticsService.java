@@ -400,8 +400,11 @@ public class AnalyticsService {
         Map<String, Object> out = new LinkedHashMap<>(row);
         long newUsers = longValue(row.get("newUsers"));
         long activated = longValue(row.get("activated"));
-        // 分母为零不显百分比(前端落「—」), 不造 0%
-        out.put("activationRate", newUsers > 0 ? rate(activated, newUsers) : null);
+        // 小修包件6: 激活率只判已定性的人——观察期未满且还没做核心动作的(pendingObservers)不进分母,
+        // 前端单列「仍在首周观察期」。纯函数 maturedActivationRate 另配单测。
+        long observing = longValue(row.get("pendingObservers"));
+        out.put("activationRate", maturedActivationRate(activated, newUsers, observing));
+        out.put("observing", observing);
         out.put("source", source);
         out.put("days", clampedDays);
         return out;
@@ -1837,6 +1840,16 @@ public class AnalyticsService {
 
     private BigDecimal rate(long part, long total) {
         return percent(part, total);
+    }
+
+    /**
+     * 小修包件6 纯函数: 首周激活率分母只含已定性者——观察期未满且未激活的(observing)剔除;
+     * 全员观察中时返回 null(前端显「—」, 不造 0%); max 兜底防病理边界下率&gt;100%。
+     */
+    static BigDecimal maturedActivationRate(long activated, long newUsers, long observing) {
+        long judged = Math.max(newUsers - observing, activated);
+        return judged > 0 ? BigDecimal.valueOf(activated * 100)
+            .divide(BigDecimal.valueOf(judged), 2, RoundingMode.HALF_UP) : null;
     }
 
     private BigDecimal avg(long sum, long count) {

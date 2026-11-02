@@ -204,6 +204,57 @@ public interface ProfileSubjectMapper extends BaseMapperPlus<ProfileSubject, Pro
                                                     @Param("keyword") String keyword);
 
     /**
+     * 小修包件7: 主视图手写 count(与主查询同过滤)——MP 自动 count 会把 LATERAL+EXISTS 的
+     * 整条重查询再跑一遍, 大租户下纯浪费。联表均为 1:1(sys_user 主表/agg GROUP BY/LATERAL LIMIT 1),
+     * 不放大行数, sys_user 直数即总数。
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        <script>
+        SELECT count(*) FROM sys_user u
+        WHERE u.tenant_id = #{tenantId} AND u.del_flag = '0'
+        <if test="keyword != null and keyword != ''">
+          AND (u.user_name ILIKE CONCAT('%', #{keyword}, '%')
+               OR u.nick_name ILIKE CONCAT('%', #{keyword}, '%')
+               OR u.user_id::text ILIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        </script>
+        """)
+    long countUserMainPage(@Param("tenantId") String tenantId, @Param("keyword") String keyword);
+
+    /**
+     * 小修包件7: 非 user 主视图手写 count——只复刻影响行数的两段(agg 分组 + 关键词过滤里的
+     * 显示名 LATERAL), 快照/复核 LATERAL 不参与计数。
+     * 三席审查(dspro P2-3): 显示名 LATERAL 只在带关键词时才需要, 无关键词不跑。
+     */
+    @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
+    @Select("""
+        <script>
+        SELECT count(*) FROM (
+            SELECT subject_id FROM profile_subject
+            WHERE tenant_id = #{tenantId} AND subject_type = #{subjectType} AND del_flag = '0'
+            GROUP BY subject_type, subject_id
+        ) agg
+        <if test="keyword != null and keyword != ''">
+        LEFT JOIN LATERAL (
+            SELECT display_name FROM profile_subject n
+            WHERE n.tenant_id = #{tenantId} AND n.subject_type = #{subjectType}
+              AND n.subject_id = agg.subject_id AND n.del_flag = '0'
+            ORDER BY n.last_event_time DESC NULLS LAST, n.id DESC
+            LIMIT 1
+        ) nm ON TRUE
+        </if>
+        WHERE 1=1
+        <if test="keyword != null and keyword != ''">
+          AND (agg.subject_id ILIKE CONCAT('%', #{keyword}, '%')
+               OR nm.display_name ILIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        </script>
+        """)
+    long countSubjectMainPage(@Param("tenantId") String tenantId, @Param("subjectType") String subjectType,
+                              @Param("keyword") String keyword);
+
+    /**
      * 最新快照排行: dimension 为空按总分, 否则按该维度分数。
      */
     @Select("""

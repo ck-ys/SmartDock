@@ -133,6 +133,34 @@ class ProfileMainViewPageTest {
             Mockito.eq("user"), Mockito.isNull(), Mockito.eq(10));
     }
 
+    @Test
+    void handWrittenCountFeedsTotalNotAutoCount() {
+        // 小修包件7: 总数来自手写同过滤 count, 不再让 MP 把重查询再跑一遍
+        stubUserPage(row("1", "88"));
+        Mockito.when(subjectMapper.countUserMainPage("000000", null)).thenReturn(42L);
+
+        TableDataInfo<ProfileMainViewRow> out = service.mainViewPage("user", null, new PageQuery(10, 1));
+
+        assertEquals(42L, out.getTotal());
+        Mockito.verify(subjectMapper).countUserMainPage("000000", null);
+        ArgumentCaptor<IPage<ProfileMainViewRow>> captor = ArgumentCaptor.forClass(IPage.class);
+        Mockito.verify(subjectMapper).selectUserMainPage(captor.capture(), eq("000000"), isNull());
+        // 自动 count 关死: 分页拦截器不再重复执行重查询
+        assertTrue(!captor.getValue().searchCount());
+    }
+
+    @Test
+    void nonUserViewCountUsesTypedCountQuery() {
+        Mockito.when(subjectMapper.selectSubjectMainPage(any(), any(), any(), any()))
+            .thenAnswer(inv -> pageWith(inv.getArgument(0), row("m-9", "62")));
+        Mockito.when(subjectMapper.countSubjectMainPage("000000", "member", "李四")).thenReturn(7L);
+
+        TableDataInfo<ProfileMainViewRow> out = service.mainViewPage("member", "李四", new PageQuery(10, 1));
+
+        assertEquals(7L, out.getTotal());
+        Mockito.verify(subjectMapper).countSubjectMainPage("000000", "member", "李四");
+    }
+
     private void stubUserPage(ProfileMainViewRow row) {
         Mockito.when(subjectMapper.selectUserMainPage(any(), any(), any()))
             .thenAnswer(inv -> pageWith(inv.getArgument(0), row));

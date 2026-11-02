@@ -23,8 +23,9 @@ import java.util.Map;
  * <p>落位裁决（批4 定稿）：适配器放 admin 组合根是<b>终位</b>而非过渡位——risk 保持
  * 零业务依赖（不依赖 profile-engine），缝合只发生在装配层；同包还有 MissionReviewProbe /
  * WalletAlertNotice / FileReviewNotice 四件套。语义与旧实现一致：
- * 同步写入、不随调用方事务回滚、userId 空=内部跳过；事件失败只 warn 不抛
- * （埋点不属于业务主事务）。</p>
+ * userId 空=内部跳过；事件失败只 warn 不抛（埋点不属于业务主事务）。
+ * 小修包件5 起发布门面统一「外层事务提交后才写账本」——埋点跟着业务事务成败走，
+ * 不再产生"业务回滚、埋点已落"的孤儿事件（三席审查 P2-4 同步口径）。</p>
  */
 @Slf4j
 @Component

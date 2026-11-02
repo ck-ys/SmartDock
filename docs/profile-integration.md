@@ -50,7 +50,10 @@ public class BizEventReporter {
         e.getProps().put("amountFen", amountFen);  // 数值必须放数字类型，不能放字符串
         e.getProps().put("payChannel", channel);
         try {
-            eventPublisher.publish(e);   // 返回 false = 编号重复被幂等跳过，不算错误
+            eventPublisher.publish(e);   // 返回 false = 编号重复被幂等跳过，不算错误；
+                                         // 在 @Transactional 方法里调用时，true = 已受理——
+                                         // 事件等外层提交成功后才落账，重复也在提交后才判；
+                                         // 需要逐条对账(新写入/重复/失败)请走 publishBatchDetailed
         } catch (Exception ex) {
             log.warn("[MyApp] 画像事件发送失败 {}: {}", e.getEventUid(), ex.getMessage()); // 失败不阻断业务
         }

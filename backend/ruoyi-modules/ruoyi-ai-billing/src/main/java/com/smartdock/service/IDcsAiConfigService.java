@@ -82,9 +82,10 @@ public interface IDcsAiConfigService {
     DcsAiConfig currentTenantEnabledConfig(String useType);
 
     /**
-     * 单点解析器(J 批一期, 2026-10-08): 全系统唯一的「租户当前生效 AI 配置」口径。
-     * 排序=update_time DESC, config_id DESC; 含 CNY 闸(FIXED_PER_CALL 单价 0 豁免,
-     * 其余必须有 CNY 价格行, 拍板 A 全系统统一拒美元模型)。
+     * 单点解析器(J 批一期, 2026-10-08; 小修包件4 补健康闸): 全系统唯一的「租户当前生效 AI 配置」口径。
+     * 选择序=★默认行优先 → 回退任意可用行(update_time DESC, config_id DESC);
+     * 先剔除巡检 FAIL 且连败>=2 的死钥匙, 全不健康时放开闸回退原序。
+     * 含 CNY 闸(FIXED_PER_CALL 单价 0 豁免, 其余必须有 CNY 价格行, 拍板 A 全系统统一拒美元模型)。
      *
      * @throws ServiceException 无启用行或 CNY 闸不过(HTTP 单发路沿袭的异常类型)
      */

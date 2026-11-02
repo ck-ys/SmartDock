@@ -111,7 +111,7 @@
           <div class="ui-kpi">
             <span class="ui-kpi__label">新同事（近 7 天）</span>
             <strong class="ui-kpi__value">{{ formatNumber(adoption?.newUsers) }}</strong>
-            <span class="ui-kpi__hint">首周激活 {{ formatNumber(adoption?.activated) }} 人 · {{ activationRateText }}</span>
+            <span class="ui-kpi__hint">首周激活 {{ formatNumber(adoption?.activated) }} 人 · {{ activationRateText }}{{ observingText }}</span>
           </div>
           <div class="ui-kpi">
             <span class="ui-kpi__label">使用次数</span>
@@ -332,7 +332,7 @@
           </div>
           <p class="muted small" style="margin-top: 8px">
             核心动作名单：发布任务、提交数据、完成审核、关闭任务（审核结果不算提交人的动作）。上手率 = 完成核心动作的人数 ÷
-            登录过的人数。首周激活按入职后自然 7 天计，刚入职几天的同事仍在观察期，读数偏低属正常。
+            登录过的人数。首周激活按入职后自然 7 天计，观察期未满、还没做核心动作的同事单列出来，不算进分母。
           </p>
         </el-card>
 
@@ -913,6 +913,10 @@ const adoption = ref<AnalyticsAdoption | null>(null);
 const adoptionLoading = ref(false);
 const activationRateText = computed(() =>
   adoption.value?.activationRate == null ? '激活率 —' : `激活率 ${formatPercent(adoption.value.activationRate)}`
+);
+/** 小修包件6: 激活率只判已定性的人, 还在首周观察期的单列提示(没人观察就不占版面) */
+const observingText = computed(() =>
+  adoption.value?.observing ? ` · ${adoption.value.observing} 人观察期未满、尚未上手` : ''
 );
 /** 两步上手率 = 完成核心动作人数 ÷ 登录人数(后端已保证分子⊆分母, 前端再夹一层 ≤100% 兜底);
  * 没人登录时显示「—」, 不造 0% */

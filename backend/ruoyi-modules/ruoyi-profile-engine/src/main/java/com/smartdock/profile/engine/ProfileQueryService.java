@@ -82,9 +82,15 @@ public class ProfileQueryService {
         }
         Page<com.smartdock.profile.query.ProfileMainViewRow> page = pageQuery.build();
         page.setOptimizeCountSql(false);
-        IPage<com.smartdock.profile.query.ProfileMainViewRow> result = SubjectTypes.DEFAULT.equals(type)
+        // 小修包件7: 手写同过滤 count 喂总数——自动 count 会把 LATERAL 重查询整个再跑一遍
+        page.setSearchCount(false);
+        boolean userView = SubjectTypes.DEFAULT.equals(type);
+        IPage<com.smartdock.profile.query.ProfileMainViewRow> result = userView
             ? subjectMapper.selectUserMainPage(page, currentTenant(), kw)
             : subjectMapper.selectSubjectMainPage(page, currentTenant(), type, kw);
+        result.setTotal(userView
+            ? subjectMapper.countUserMainPage(currentTenant(), kw)
+            : subjectMapper.countSubjectMainPage(currentTenant(), type, kw));
         if (!piiService.canViewScore()) {
             result.getRecords().forEach(row -> row.setTotalScore(null));
         }
