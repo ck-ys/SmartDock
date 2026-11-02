@@ -156,11 +156,21 @@
         @pgoto="onPageGoto"
         @mdnav="(u) => router.push(u)"
         @draft-set="onDraftSet"
-        @plan-confirm="onPlanConfirm"
-        @plan-edit="onPlanEdit"
-        @plan-cancel="onPlanCancel"
         @elicit-done="removeElicitationCard"
         @ask-user-done="removeAskUserCard"
+      />
+
+      <!-- 计划待确认：输入框有字时只出细条，不抢输入（Q6-A）；点开后才占输入框位置 -->
+      <plan-tip v-if="showPlanTip && activePlan" :plan="activePlan" :busy="state.sending" full @open="openPlanDock" />
+      <plan-dock
+        v-if="showPlanDock && activePlan"
+        :plan="activePlan"
+        full
+        :can-collapse="draftText.trim().length > 0"
+        @confirm="onPlanConfirm"
+        @adjust="onPlanAdjust"
+        @cancel="onPlanCancel"
+        @collapse="collapsePlanDock"
       />
 
       <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留） -->
@@ -172,7 +182,8 @@
         active
         :state="state"
         :sending="state.sending"
-        :blocked="!!pendingAsk"
+        :blocked="!!pendingAsk || showPlanDock"
+        @draft-change="draftText = $event"
         @send="onSend"
         @stop="onStop"
         @queue-edit="onQueueEdit"
@@ -266,7 +277,7 @@ import {
   type AssistantConversation
 } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
-import { getAssistant, ACT, logSt, tryAcquireRemoteWatch, releaseRemoteWatch } from '@/components/DcsAssistant/useAssistant';
+import { getAssistant, ACT, logSt, tryAcquireRemoteWatch, releaseRemoteWatch, PLAN_CONFIRM_TEXT } from '@/components/DcsAssistant/useAssistant';
 import type { AssistantBindings } from '@/components/DcsAssistant/useAssistant';
 import { useHelpModal } from '@/components/DcsAssistant/helpModal';
 import { relTime, cnEpoch, cnDayDiff } from '@/components/DcsAssistant/time';
@@ -275,6 +286,9 @@ import { pushToast } from '@/components/DcsAssistant/toastStore';
 import { assistantName } from '@/components/DcsAssistant/nameState';
 import MsgFlow from '@/components/DcsAssistant/MsgFlow.vue';
 import HitlDock from '@/components/DcsAssistant/HitlDock.vue';
+import PlanDock from '@/components/DcsAssistant/PlanDock.vue';
+import PlanTip from '@/components/DcsAssistant/PlanTip.vue';
+import { latestPendingPlan, shouldShowPlanDock } from '@/components/DcsAssistant/planDock';
 import { startTour } from '@/components/DcsAssistant/useTour';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import Composer from '@/components/DcsAssistant/Composer.vue';
@@ -531,6 +545,40 @@ getAssistant(userStore.userId).bind(hostBinding);
 /** 停靠区数据源（与抽屉同口径）：最近一张 pending 卡 */
 const pendingTurn = computed(() => [...state.turns].reverse().find((t) => t.hitl?.cardState === 'pending') ?? null);
 const pendingAsk = computed(() => pendingTurn.value?.hitl ?? null);
+/** 最新一张待确认计划（Q5-A：旧卡只读，只有最新一张可操作） */
+const pendingPlan = computed(() => latestPendingPlan(state.turns));
+const activePlan = computed(() => pendingPlan.value?.plan ?? null);
+/** Composer 草稿（Q6-A：有字时只出细条，不抢输入框） */
+const draftText = ref('');
+const planDockForced = ref(false);
+const showPlanDock = computed(() =>
+  shouldShowPlanDock({
+    hasPlan: !!activePlan.value,
+    hasPendingAsk: !!pendingAsk.value,
+    sending: state.sending,
+    forced: planDockForced.value,
+    draft: draftText.value
+  })
+);
+const showPlanTip = computed(() => !!activePlan.value && !pendingAsk.value && !showPlanDock.value);
+watch(
+  () => activePlan.value?.planId,
+  () => {
+    planDockForced.value = false;
+  }
+);
+watch(showPlanDock, (v, old) => {
+  if (old && !v) {
+    nextTick(() => composerRef.value?.focus());
+  }
+});
+function openPlanDock() {
+  planDockForced.value = true;
+}
+function collapsePlanDock() {
+  planDockForced.value = false;
+  nextTick(() => composerRef.value?.focus());
+}
 /** 停靠区「改一下」：先取消本次确认（cancelled resume 清服务端悬挂），
  *  用户要求进排队，取消轮收尾后自动发出 */
 function onDockRevise(m: string) {
@@ -541,9 +589,9 @@ function onDockRevise(m: string) {
   resolveHitl(false);
   onSend(text, '');
 }
-// 停靠区收卡后焦点还给输入框（与抽屉同口径）
+// 停靠区收卡后焦点还给输入框（与抽屉同口径）；计划停靠区接手时由 PlanDock 自己聚焦
 watch(pendingAsk, (v, old) => {
-  if (old && !v) {
+  if (old && !v && !showPlanDock.value) {
     nextTick(() => composerRef.value?.focus());
   }
 });
@@ -644,27 +692,53 @@ function onDraftSet(text: string, append: boolean) {
   composerRef.value?.setDraft(curText ? curText + '\n' + text : text);
   composerRef.value?.focus();
 }
-/** 多实例批 4：确认/改计划都带这张卡的 planId，旧卡重复点击由后端 409 挡住 */
-function onPlanConfirm(p: { planId?: string; text: string }) {
-  getAssistant(userStore.userId).notePlanDecision('confirm', p.planId);
-  onSend(p.text, '');
-}
-/** 二审回修：「改计划」=回填输入框并记住这张卡的 planId（用户改完自己发），不立即发送 */
-function onPlanEdit(p: { planId?: string; text: string }) {
-  getAssistant(userStore.userId).notePlanEdit(p.planId);
-  onResend(p.text);
-}
-function onPlanCancel(planId?: string) {
-  // 二审回修（dspro-P2-2）：按 planId 定位被点的那张卡，多卡同屏不误清新卡
-  const t = planId ? state.turns.find((x) => x.plan?.planId === planId) : cur();
-  if (t) {
-    t.plan = null;
+/** 计划动作的前置闸：归档/禁用时 onSend 会整段早退，不能先把卡翻成“已确认/已修改” */
+function planBlockedMsg(): string {
+  if (state.curConvArchived || selected.value?.status === 'ARCHIVED') {
+    return '该会话已归档（只读回放），请先恢复再执行计划';
   }
+  if (state.banner === 'disabled') {
+    return '管理员已暂停你的 AI 助手使用，这张计划卡现在不能执行';
+  }
+  return '';
+}
+/** 计划停靠区：开始执行（带本卡 planId，旧卡重复点击由后端 409 挡住） */
+function onPlanConfirm(planId?: string) {
+  const blocked = planBlockedMsg();
+  if (blocked) {
+    pushToast(blocked, 'info');
+    return;
+  }
+  getAssistant(userStore.userId).notePlanDecision('confirm', planId);
+  onSend(PLAN_CONFIRM_TEXT, '');
+}
+/** 计划停靠区：改一下——只发一句反馈，不再把整份计划回填输入框 */
+function onPlanAdjust(planId: string | undefined, feedback: string) {
+  const text = feedback.trim();
+  if (!text) {
+    return;
+  }
+  const blocked = planBlockedMsg();
+  if (blocked) {
+    pushToast(blocked, 'info');
+    return;
+  }
+  getAssistant(userStore.userId).notePlanAdjust(planId);
+  onSend(text, '');
+}
+/** 计划停靠区：取消只作废这张卡；卡留在聊天记录里显示「已取消」 */
+function onPlanCancel(planId?: string) {
   // 题8（三席回修）：取消也是明确动作——下一次请求带 planDecision=cancel 解闸，
   // 否则后端硬闸要等 30 分钟 TTL 才放开写操作
   getAssistant(userStore.userId).notePlanDecision('cancel', planId);
-  // ②（2026-10-31）：当场打清闸端点立即解闸，不等下一条消息；失败静默（上面的兜底仍有效）
-  getAssistant(userStore.userId).cancelPlanOnServer(planId);
+  // ②（2026-10-31）：当场打清闸端点立即解闸，不等下一条消息；失败提示，下一条消息仍兜底
+  getAssistant(userStore.userId)
+    .cancelPlanOnServer(planId)
+    .then((ok) => {
+      if (!ok) {
+        pushToast('取消请求没送达，下一条消息会自动重试', 'info');
+      }
+    });
 }
 
 function onNewSession() {

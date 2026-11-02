@@ -18,7 +18,14 @@ import { ElMessageBox } from 'element-plus';
 import { readWebOn } from './webOnState';
 import { readSkillId } from './skillState';
 import { createAguiClient, type AguiClientOptions, type AguiTurnHandle } from '@/api/dcs/assistant/aguiClient';
-import { getPendingHitl, getConversationTodo, getFollowups, revokeAssistantAction, getAssistantPlanState, type PendingHitlItem } from '@/api/dcs/assistant';
+import {
+  getPendingHitl,
+  getConversationTodo,
+  getFollowups,
+  revokeAssistantAction,
+  getAssistantPlanState,
+  type PendingHitlItem
+} from '@/api/dcs/assistant';
 import type { AguiResume } from '@/api/dcs/assistant/types';
 import { humanizeAiError } from '@/utils/aiErrorText';
 import type { AguiHandlers, AguiMessage, AguiRunInput } from '@/api/dcs/assistant/types';
@@ -31,6 +38,9 @@ import { renderMd } from './md';
  *  30s 窗口在队列里还没轮到；90s 兜住两轮生成周期，且配合聚焦/回页补拉（见
  *  scheduleFollowupPull），离开页面期间到手的建议回来立刻可见 */
 const FOLLOWUP_PULL_DELAYS = [3500, 5500, 9000, 12000, 16000, 20000, 24000];
+
+/** 计划停靠区「开始执行」发的固定文案（后端只认 planDecision+planId，文案给人看） */
+export const PLAN_CONFIRM_TEXT = '按刚才的计划开始执行';
 
 /** 工具名 → 人话动词（前端展示层映射；未知工具退化为去下划线）。
  *  二站① AU-52 起导出共用——管理端「运行记录」动作列与回合步骤行同词典（批I 账本列同源） */
@@ -768,6 +778,19 @@ export function useAssistant(options: UseAssistantOptions = {}) {
             }));
           if (steps.length > 0) {
             const planId = typeof v.planId === 'string' && v.planId ? v.planId : undefined;
+            // 无编号的卡不能进入停靠区：后端缺 planId 时 confirm/cancel 会变成
+            // “消费本线程任意一张待确认计划”（旧守卫删掉后不能靠文本兜底）。
+            if (!planId) {
+              toast('计划卡缺少编号，请重新让助手出一次计划', 'info');
+              return;
+            }
+            // Q5-A：新计划到达后，同会话更早的待确认卡统一标失效——
+            // 历史仍可回看，但只有最新一张进输入框停靠区可操作。
+            for (const t of state.turns) {
+              if (t !== turn && t.plan && (!t.plan.status || t.plan.status === 'pending')) {
+                t.plan.status = 'expired';
+              }
+            }
             turn.plan = { planId, title: typeof v.title === 'string' ? v.title : undefined, steps, status: 'pending' };
             // 多实例批 4：另一标签页/另一实例确认或取消后，本页旧卡要跟着置灰
             if (planId) {
@@ -912,11 +935,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         // 稳流① Q1（拍板 A②）：600s 无帧（含 20s 心跳都没到=链路真断）不再自动重发
         // ——重发撞 409 防双计费；裁决交用户。继续等=再挂一个看门狗窗；停止=按手动停止收口
         try {
-          await ElMessageBox.confirm(
-            '等了很久还没有新内容，连接可能出了问题。继续等待，还是停止这一轮？',
-            '还在等待回复',
-            { confirmButtonText: '继续等待', cancelButtonText: '停止', type: 'warning' }
-          );
+          await ElMessageBox.confirm('等了很久还没有新内容，连接可能出了问题。继续等待，还是停止这一轮？', '还在等待回复', {
+            confirmButtonText: '继续等待',
+            cancelButtonText: '停止',
+            type: 'warning'
+          });
           toast('继续等待中——若仍无进展可随时点「停止」结束本轮', 'info');
           return 'keep-waiting';
         } catch {
@@ -1035,8 +1058,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     const ctl = new AbortController();
     attachCtl = ctl;
     // 续看流停滞（600s 无帧）不弹用户裁决框——断开交还轮询兜底，刷新后的恢复保持静默
-    client.attach(state.threadId, { ...handlers(turn), onStall: () => 'stop' }).done
-      .then((r) => {
+    client
+      .attach(state.threadId, { ...handlers(turn), onStall: () => 'stop' })
+      .done.then((r) => {
         if (attachCtl === ctl) {
           attachCtl = null;
         }
@@ -1126,40 +1150,45 @@ export function useAssistant(options: UseAssistantOptions = {}) {
 
   /**
    * 题8 案1（三席回修）：计划卡三键意图——后端硬闸只在用户明确动作后解除，
-   * 不再按回合边界自动放。确认/改计划由三键发出的固定文案识别，取消由宿主显式上报。
+   * 不再按回合边界自动放。确认/改计划/取消都由宿主点击时显式上报，不信自然语言文案。
    */
-  const PLAN_CONFIRM_TEXT = '按刚才的计划开始执行';
-  const PLAN_ADJUST_PREFIX = '按这个计划执行：';
   let planDecisionNext: { kind: 'confirm' | 'cancel' | 'adjust'; planId?: string } | null = null;
-  /**
-   * 二审回修（三席共识 P1）：「改计划」是回填输入框，不是立即发送——planId 在这里暂存，
-   * 等用户真的把（改过的）计划发出来时再凭 PLAN_ADJUST_PREFIX 认领，避免点一下就把
-   * 未修改的原文直接执行掉。只认最近一次点击；新会话/新确认会覆盖。
-   */
-  let editPlanId: string | undefined;
   /** 宿主计划卡动作时调用（带上这张卡的 planId，旧卡重复点击会被后端 409 挡住） */
-  function notePlanDecision(kind: 'confirm' | 'cancel' | 'adjust', planId?: string) {
+  function notePlanDecision(kind: 'confirm' | 'cancel', planId?: string) {
+    // 无编号不动作：建卡处已拒收无 planId 的计划，这里是第二道防线（回放重建等路径若放开）
+    if (!planId) {
+      toast('计划卡缺少编号，请重新让助手出一次计划', 'info');
+      return;
+    }
     planDecisionNext = { kind, planId };
     // 四审回修（dspro-P2-2）：点击当下先乐观置位。此前只有 3s 轮询会写 confirmed/cancelled，
     // 用户确认 A 后模型在首个 tick 前又出计划 B，轮询看到 planId 不匹配会把 A 误标“已过期”。
-    if (planId && kind !== 'adjust') {
-      applyPlanStatus(planId, kind === 'confirm' ? 'confirmed' : 'cancelled');
-    }
+    applyPlanStatus(planId, kind === 'confirm' ? 'confirmed' : 'cancelled');
   }
-  /** 「改计划」：只记住卡号，不发送 */
-  function notePlanEdit(planId?: string) {
-    editPlanId = planId;
+  /** 输入框停靠区「改一下」：带本卡 planId 发一句反馈，不把整份计划回填输入框 */
+  function notePlanAdjust(planId?: string) {
+    if (!planId) {
+      toast('计划卡缺少编号，请重新让助手出一次计划', 'info');
+      return;
+    }
+    planDecisionNext = { kind: 'adjust', planId };
+    applyPlanStatus(planId, 'adjusted');
   }
   /**
    * ②（2026-10-31）：点「取消」当场通知服务端清闸——不等下一条消息的 planDecision 兜底，
    * 取消后立刻让助手做写操作即放行。fire-and-forget：失败静默（stop 同款），
    * 收卡不被网络问题阻塞；兜底链路（notePlanDecision→下一条消息）原样保留。
    */
-  function cancelPlanOnServer(planId?: string) {
-    if (!state.threadId) {
-      return;
+  function cancelPlanOnServer(planId?: string): Promise<boolean> {
+    // 先把 threadId 取出来：动态 import 期间切会话时不能把取消打到新会话
+    const threadId = state.threadId;
+    if (!threadId) {
+      return Promise.resolve(false);
     }
-    import('@/api/dcs/assistant').then((m) => m.cancelAssistantPlan(state.threadId, planId)).catch(() => {});
+    return import('@/api/dcs/assistant')
+      .then((m) => m.cancelAssistantPlan(threadId, planId))
+      .then(() => true)
+      .catch(() => false);
   }
   function takePlanDecision(): { kind: 'confirm' | 'cancel' | 'adjust'; planId?: string } | null {
     const v = planDecisionNext;
@@ -1182,8 +1211,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     for (const t of state.turns) {
       if (t.plan?.planId === planId) {
         // 三审回修（dsflash-P2-5）：模型确认后重新 submit_plan 时，thread 里会出现新 planId，
-        // 旧卡轮询会拿到「不匹配→expired」；已经确认/取消的卡不能被降级覆写成“已过期”。
-        if (status === 'expired' && (t.plan.status === 'confirmed' || t.plan.status === 'cancelled')) {
+        // 旧卡轮询会拿到「不匹配→expired」；已经确认/取消/改过的卡不能被降级覆写成“已过期”。
+        if (status === 'expired' && (t.plan.status === 'confirmed' || t.plan.status === 'cancelled' || t.plan.status === 'adjusted')) {
           continue;
         }
         t.plan.status = status;
@@ -1283,27 +1312,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       return;
     }
     const turn = reactive<AssistantTurn>(emptyTurn(q));
-    // 题8 案1（三席回修）：计划卡三键意图随请求上行——确认/改计划的固定文案在此识别，
-    // 取消由宿主 notePlanDecision('cancel') 上报；不带=计划卡仍挂着，后端继续硬拒写操作
-    const qTrim = q.trim();
-    // 四审回修（dspro-P2-3）：固定确认文案只认按钮路径带来的 planId。此前任何来源的
-    // 同句文本都会注入 confirm，且无 planId 时后端 planMatches 对 null 放行——队列里
-    // 一条重复确认文本可能消费掉模型刚出的下一张计划（用户从未点过它）。
-    if (qTrim === PLAN_CONFIRM_TEXT && planDecisionNext?.planId) {
-      // 三审 P1：按钮路径已通过 notePlanDecision 写入 planId；这里只补 kind，
-      // 不能整个覆盖，否则旧卡精确拒绝的 planId 在真实点击路径上永远丢失
-      planDecisionNext = { kind: 'confirm', planId: planDecisionNext.planId };
-      editPlanId = undefined;
-    } else if (qTrim.startsWith(PLAN_ADJUST_PREFIX) && (editPlanId || planDecisionNext?.planId)) {
-      // 二审回修：「改计划」只暂存卡号，用户改完发出来才在这里认领
-      planDecisionNext = { kind: 'adjust', planId: editPlanId ?? planDecisionNext?.planId };
-      editPlanId = undefined;
-    }
+    // 计划决策由宿主点击时显式写入 planDecisionNext（不信自然语言文案）；
+    // 这里只取一次并随请求上行，不带=计划卡仍挂着，后端继续硬拒写操作。
     const planDecision = takePlanDecision();
-    // 四审回修（dspro-P2-2 同族）：改计划真正发出时立刻置“已调整”，防新计划先到时被误判过期
-    if (planDecision?.kind === 'adjust' && planDecision.planId) {
-      applyPlanStatus(planDecision.planId, 'adjusted');
-    }
     turn.stamp = stamp;
     // 二审 P1：尾部悬挂的压缩/熔断标记由新回合接管（否则横幅永远漂在最新回答下面）
     if (state.lastCompaction) {
@@ -1343,9 +1354,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         ...(currentModelPin() ? { modelConfigId: currentModelPin() } : {}),
         // 题10 案1：联网默认自动——永远显式带值，停用发 false 让后端撤掉搜索工具
         webSearchEnabled: currentWebOn(),
-        ...(planDecision
-          ? { planDecision: planDecision.kind, ...(planDecision.planId ? { planId: planDecision.planId } : {}) }
-          : {}),
+        ...(planDecision ? { planDecision: planDecision.kind, ...(planDecision.planId ? { planId: planDecision.planId } : {}) } : {}),
         ...(currentSkillId() ? { skillId: currentSkillId() } : {}),
         ...fwd
       }
@@ -1507,7 +1516,6 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       // 三审回修（dsflash-P2-3）：消息被拦下没发出去，计划卡意图不能留到下一次发送
       // （否则一条无关提问会带着 confirm+planId 把计划闸消费掉）
       planDecisionNext = null;
-      editPlanId = undefined;
       toast('请先确认或取消上面的操作，再继续提问', 'info');
       return;
     }
@@ -1552,14 +1560,16 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // G1 乙类#5：服务端真取消（fire-and-forget——本地断流照旧先行，后端秒级落终态
     // 而非等 60s 收割；失败静默：会话已不在/已停=幂等无事发生）
     if (state.threadId) {
-      import('@/api/dcs/assistant').then((m) => m.stopAssistantRun(state.threadId)).catch((e: any) => {
-        // 四审回修（dsflash-P2-5）：409=这轮在另一台实例上，本机没有它的现场。本地已断流，
-        // 但对端还在出字——必须让人知道要刷新回去再停，不能只弹一条通用错误。
-        const code = e?.code ?? e?.response?.data?.code;
-        if (code === 409) {
-          toast('这轮回答在另一台服务上，刷新页面后再点停止', 'err');
-        }
-      });
+      import('@/api/dcs/assistant')
+        .then((m) => m.stopAssistantRun(state.threadId))
+        .catch((e: any) => {
+          // 四审回修（dsflash-P2-5）：409=这轮在另一台实例上，本机没有它的现场。本地已断流，
+          // 但对端还在出字——必须让人知道要刷新回去再停，不能只弹一条通用错误。
+          const code = e?.code ?? e?.response?.data?.code;
+          if (code === 409) {
+            toast('这轮回答在另一台服务上，刷新页面后再点停止', 'err');
+          }
+        });
     }
   }
 
@@ -1759,14 +1769,15 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     if (approved && editedArgs) {
       turn.hitl.toolInput = { ...(turn.hitl.toolInput ?? {}), ...editedArgs };
     }
-    const resumePayload = (hitlIds.length > 0 ? hitlIds : [turn.hitl.interruptId]).map((id): AguiResume =>
-      id === turn.hitl!.interruptId
-        ? {
-            interruptId: id,
-            status: approved ? 'resolved' : 'cancelled',
-            ...(approved ? { payload: { approved: true, ...(editedArgs ? { editedArgs } : {}) } } : {})
-          }
-        : { interruptId: id, status: 'cancelled' }
+    const resumePayload = (hitlIds.length > 0 ? hitlIds : [turn.hitl.interruptId]).map(
+      (id): AguiResume =>
+        id === turn.hitl!.interruptId
+          ? {
+              interruptId: id,
+              status: approved ? 'resolved' : 'cancelled',
+              ...(approved ? { payload: { approved: true, ...(editedArgs ? { editedArgs } : {}) } } : {})
+            }
+          : { interruptId: id, status: 'cancelled' }
     );
     const myHandle = client.startTurn(
       {
@@ -1895,7 +1906,6 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     clearPlanPollers();
     // 三审 P2：未发出的计划决策不能跨会话残留（否则新会话第一条消息被 409）
     planDecisionNext = null;
-    editPlanId = undefined;
     // 题5：续看流随会话重置断开让位（旧回合占位即将被清/换，attach 不得再写任何 turn）
     attachCtl?.abort();
     attachCtl = null;
@@ -2097,8 +2107,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       const content = m.content ?? '';
       if (m.role === 'system') {
         try {
-          const parsed = JSON.parse(content) as
-            { type?: string; beforeTokens?: number | null; afterTokens?: number | null; reason?: string };
+          const parsed = JSON.parse(content) as { type?: string; beforeTokens?: number | null; afterTokens?: number | null; reason?: string };
           if (parsed?.type === 'compaction') {
             pendingCompaction = { beforeTokens: parsed.beforeTokens ?? null, afterTokens: parsed.afterTokens ?? null };
           } else if (parsed?.type === 'compaction_blocked' || parsed?.type === 'compaction_failed') {
@@ -2278,10 +2287,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     resumeSay,
     resolveHitl,
     setAutoLevel,
-    /** 题8（三席回修）：宿主取消计划卡时上报，下一次请求带 planDecision=cancel 解闸 */
+    /** 题8（三席回修）：宿主计划卡动作时上报，下一次请求带 planDecision 解闸 */
     notePlanDecision,
-    /** 二审回修：「改计划」只暂存卡号并回填输入框，不直接发送 */
-    notePlanEdit,
+    /** 2026-11-02 停靠区：「改一下」带本卡 planId 发一句反馈，不再回填整份计划 */
+    notePlanAdjust,
     /** ②（2026-10-31）：宿主取消计划卡时当场清服务端闸（失败静默，planDecision 仍兜底） */
     cancelPlanOnServer,
     queueEdit,

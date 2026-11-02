@@ -2,7 +2,7 @@
   <div class="pcard">
     <div class="phead">
       <div class="pt">{{ plan.title ?? `这个任务我打算分 ${plan.steps.length} 步做` }}</div>
-      <span v-if="badge" class="pbadge" :class="plan.status">{{ badge }}</span>
+      <span v-if="badge" class="pbadge" :class="statusKey">{{ badge }}</span>
     </div>
     <div class="pst">
       <template v-for="(s, i) in plan.steps" :key="i">
@@ -11,23 +11,18 @@
         <span class="pstep" :class="s.state" v-html="emoToSvgHtml(stepText(s, i))"></span>
       </template>
     </div>
-    <div class="pact">
-      <button class="pa-ghost" :disabled="locked" title="把计划填回输入框，改完再发" @click="emit('edit-plan', planText, plan.planId)"><IconSpan name="pencil" /> 改计划</button>
-      <button class="pa-go" :disabled="locked" title="让助手按这个计划开始执行" @click="emit('confirm-plan', plan.planId)"><IconSpan name="play-circle" /> 直接执行</button>
-      <button class="pa-ghost" :disabled="locked" title="收起计划卡（不影响对话）" @click="emit('cancel-plan', plan.planId)">取消</button>
+    <div class="pfoot" :class="statusKey">
+      <IconSpan v-if="statusKey === 'pending'" name="arrow-down" :size="12" />
+      <span>{{ footerText }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * 计划卡（批C-2，原型 pcard2 翻译；P1-3 拍板补做）：
- * CUSTOM plan 事件带步骤数组 → useAssistant turn.plan → 本卡渲染。
- * 后端接线（哪个工具发 plan 事件）随后端批次——无触发源期间组件就绪不出现。
- * 三键均为真实动作：改计划=计划文本回填输入框；直接执行=按计划下发指令；取消=收卡。
- *
- * 多实例批 4：卡片带 planId，三键回传该 id；status 非 pending 时按钮置灰并显示
- * 文字徽章（另一标签页已确认/取消时，本页旧卡不再可点）。
+ * 计划卡（只读收据，2026-11-02 拍板 Q4-A）：
+ * 决策入口已经搬到输入框位置的 PlanDock，这里不再放按钮，只保留标题、步骤和状态说明。
+ * 历史卡仍能看到「已确认 / 已取消 / 已调整 / 已失效」，但不再提供第二个操作入口。
  */
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
@@ -40,24 +35,34 @@ const props = defineProps<{
     status?: 'pending' | 'confirmed' | 'cancelled' | 'adjusted' | 'expired';
   };
 }>();
-const emit = defineEmits<{
-  'edit-plan': [text: string, planId?: string];
-  'confirm-plan': [planId?: string];
-  'cancel-plan': [planId?: string];
-}>();
 
 const QN = '①②③④⑤⑥⑦⑧';
 // 编辑态前缀 ✏️=U+270F（EMO2IC→pencil；此前 ✎ U+270E 无映射，Q2 口径统一原型）
 const stepText = (s: { label: string; state: string }, i: number) => (s.state === 'edit' ? `✏️ ${s.label}` : `${QN[i] ?? i + 1} ${s.label}`);
 
-const locked = computed(() => !!props.plan.status && props.plan.status !== 'pending');
+const statusKey = computed(() => props.plan.status ?? 'pending');
 const badge = computed(() => {
-  const s = props.plan.status;
-  if (!s || s === 'pending') return '';
-  return ({ confirmed: '已确认', cancelled: '已取消', adjusted: '已按修改后计划执行', expired: '已过期' } as Record<string, string>)[s] ?? '';
+  return (
+    {
+      pending: '待确认',
+      confirmed: '已确认',
+      cancelled: '已取消',
+      adjusted: '已修改',
+      expired: '已失效'
+    } as Record<string, string>
+  )[statusKey.value] ?? '';
 });
-
-const planText = computed(() => `按这个计划执行：\n${props.plan.steps.map((s, i) => `${i + 1}. ${s.label}`).join('\n')}\n开始吧。`);
+const footerText = computed(() => {
+  return (
+    {
+      pending: '在下方选择：开始执行 / 改一下 / 取消这张卡',
+      confirmed: '已按这个计划开始执行',
+      cancelled: '这张卡已取消，其他计划不受影响',
+      adjusted: '修改意见已发出去，助手会按新意见重做计划',
+      expired: '后面又出了新计划，这张卡已失效'
+    } as Record<string, string>
+  )[statusKey.value] ?? '';
+});
 </script>
 
 <style lang="scss" scoped>
@@ -87,6 +92,10 @@ const planText = computed(() => `按这个计划执行：\n${props.plan.steps.ma
   border: 1px solid var(--dcs-border-color-light);
   color: var(--dcs-text-secondary);
 
+  &.pending {
+    color: var(--el-color-primary);
+    border-color: var(--el-color-primary-light-5);
+  }
   &.confirmed {
     color: var(--dcs-color-success);
     border-color: var(--dcs-color-success-light-5, #b3e19d);
@@ -138,39 +147,26 @@ const planText = computed(() => `按这个计划执行：\n${props.plan.steps.ma
 .parw {
   color: var(--dcs-text-placeholder);
 }
-.pact {
+.pfoot {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--dcs-border-color-light);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--dcs-text-secondary);
 
-  button {
-    border-radius: 8px;
-    padding: 5px 12px;
-    font-size: 12.5px;
-    cursor: pointer;
-    border: 1px solid var(--dcs-border-color-light);
-    background: var(--el-bg-color);
-    color: var(--dcs-text-regular);
-
-    &:hover {
-      border-color: var(--el-color-primary-light-5);
-      color: var(--el-color-primary);
-    }
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
+  &.confirmed {
+    color: var(--dcs-color-success);
   }
-  .pa-go {
-    background: var(--el-color-primary);
-    border-color: var(--el-color-primary);
-    color: var(--app-primary-ink);
-
-    &:hover {
-      background: var(--el-color-primary-light-3);
-      color: var(--app-primary-ink);
-    }
+  &.cancelled,
+  &.expired {
+    color: var(--dcs-text-placeholder);
+  }
+  &.adjusted {
+    color: var(--el-color-primary);
   }
 }
 @keyframes dcs-ppp {

@@ -545,6 +545,8 @@ const emit = defineEmits<{
   /** 自动压缩被检测到（上下文占用大幅回落）——宿主重拉会话消息，
    *  「已压缩」分隔条随历史重建出现 */
   compacted: [];
+  /** 草稿变化（含恢复/清空）——宿主据此判断计划停靠区要不要让位给输入框 */
+  'draft-change': [text: string];
 }>();
 
 const QN = '①②③④⑤⑥⑦⑧⑨';
@@ -812,6 +814,8 @@ const roleChips = computed(() => CHIPS_BY_ROLE[roleKey.value] ?? CHIPS_BY_ROLE.t
 
 const draft = ref('');
 const focused = ref(false);
+/** 计划停靠区用：草稿为空才占输入框，有字时只出细条（Q6-A） */
+watch(draft, (v) => emit('draft-change', v), { immediate: true });
 const taRef = ref<HTMLTextAreaElement>();
 /** 待确认时输入框收起——先收焦点与弹层，防移动端键盘顶住停靠区、也防隐藏后仍能 Enter 发送 */
 watch(

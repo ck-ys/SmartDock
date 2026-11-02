@@ -89,9 +89,6 @@
         @fill="(t) => emit('fill', t)"
         @pgoto="(p) => emit('pgoto', p)"
         @mdnav="(u) => emit('mdnav', u)"
-        @plan-confirm="(p) => emit('plan-confirm', p)"
-        @plan-edit="(p) => emit('plan-edit', p)"
-        @plan-cancel="(id) => emit('plan-cancel', id)"
       />
     </template>
     <!-- Q2A：排队消息上屏灰气泡（半透明+排队中；发送时转正=shift 出队）。
@@ -176,11 +173,6 @@ const emit = defineEmits<{
   pgoto: [payload: { missionId: string; missionName: string }];
   /** 批3 Q6 站内链导航（TurnBlock 转发；抽屉宿主收抽屉再跳） */
   mdnav: [url: string];
-  /** 多实例批 4：计划卡三键必须原样上浮（planId 不能在这一层被剥掉） */
-  'plan-confirm': [payload: { planId?: string; text: string }];
-  /** 二审回修：改计划仍回填输入框，planId 只暂存不发送 */
-  'plan-edit': [payload: { planId?: string; text: string }];
-  'plan-cancel': [planId?: string];
   /** 选区条：填入输入框（append=true 追加；false 覆盖聚焦） */
   'draft-set': [text: string, append: boolean];
   /** BN-6：新手「帮我填一句」=回填输入框（不直接发，原型 stepsTry） */
@@ -565,14 +557,19 @@ watch(
     // 六审回修补丁（E2E 实锤）：帧序=cardState 先翻 pending、phase 后变 waiting——
     // 仅挂 cardState 时本 watch 在 phase 仍 writing 的瞬间贴底滚（把卡顶推出视口顶），
     // phase 翻转不再触发=卡顶定位从未执行；把 phase 也挂进键，翻转后重定位到卡顶
-    props.state.turns.at(-1)?.phase ?? ''
+    props.state.turns.at(-1)?.phase ?? '',
+    // 计划卡到达无文本增长（submit_plan 是工具帧）；不挂进键则计划卡停在视口半截，
+    // 下面的输入框停靠区会把卡顶出首屏——到达即贴底，让用户先看全计划再选。
+    props.state.turns.at(-1)?.plan?.planId ?? '',
+    props.state.turns.at(-1)?.plan?.status ?? ''
   ],
   () => {
     const last = props.state.turns.at(-1);
     // HITL 卡到达=回合以「等待用户动作」收尾，即使此前上滚阅读历史（follow=false）
     // 也拉回底部——否则确认按钮不在首屏，用户不知道要确认（k3 终审 P2-2）
     const cardArrived = last?.phase === 'waiting' && last.hitl?.cardState === 'pending';
-    if (!props.follow && !cardArrived) {
+    const planArrived = !!last?.plan && (!last.plan.status || last.plan.status === 'pending');
+    if (!props.follow && !cardArrived && !planArrived) {
       return;
     }
     nextTick(() => {

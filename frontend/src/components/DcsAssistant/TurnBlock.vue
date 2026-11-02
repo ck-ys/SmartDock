@@ -159,14 +159,8 @@
     <!-- 已用工具章（原型 stamp）：UI 专项批1 删除——折叠态胶囊「用了 N 个工具」、
          展开态工具行 verb 双侧都与其重复（视觉评审 ui3 两轮实锤），动词语义留这两处承载 -->
 
-    <!-- 计划卡（P1-3：CUSTOM plan 事件驱动，后端无源恒不渲染） -->
-    <plan-card
-      v-if="turn.plan"
-      :plan="turn.plan"
-      @confirm-plan="(planId) => emit('plan-confirm', { planId, text: '按刚才的计划开始执行' })"
-      @edit-plan="(t, planId) => emit('plan-edit', { planId, text: t })"
-      @cancel-plan="(planId) => emit('plan-cancel', planId)"
-    />
+    <!-- 计划卡（只读收据；决策入口在输入框位置的 PlanDock） -->
+    <plan-card v-if="turn.plan" :plan="turn.plan" />
 
     <!-- G3-A1：MCP 外部工具反问卡（server 在飞挂起，run 保持 RUNNING）——作答走独立端点，
          不进 HITL resume 体系；done 后本地移除（后端超时 CANCEL 兜底） -->
@@ -518,11 +512,6 @@ const emit = defineEmits<{
   'resend-run': [text: string];
   branch: [turn: AssistantTurn];
   ask: [text: string];
-  /** 多实例批 4：计划卡三键带 planId 上浮（确认/改计划走新回合一并带上计划标识） */
-  'plan-confirm': [payload: { planId?: string; text: string }];
-  /** 二审回修：改计划=回填输入框（不直接发送），planId 暂存给下一次发送 */
-  'plan-edit': [payload: { planId?: string; text: string }];
-  'plan-cancel': [planId?: string];
   /** 业务批(1015) Q10：追问 chip 点击=回填输入框不直接发（复用 HeroWelcome「帮我填一句」通道） */
   fill: [text: string];
   pgoto: [payload: { missionId: string; missionName: string }];

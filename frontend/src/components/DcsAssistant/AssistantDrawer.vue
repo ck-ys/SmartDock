@@ -209,9 +209,6 @@
             @pgoto="onPageGoto"
             @mdnav="onMdNav"
             @draft-set="onDraftSet"
-            @plan-confirm="onPlanConfirm"
-            @plan-edit="onPlanEdit"
-            @plan-cancel="onPlanCancel"
             @ask-user-done="removeAskUserCard"
             @elicit-done="removeElicitationCard"
             @tour="startTour"
@@ -242,6 +239,25 @@
             </span>
           </div>
 
+          <!-- 计划待确认：输入框有字时只出细条，不抢输入（Q6-A）；点开后才占输入框位置 -->
+          <plan-tip
+            v-if="modelValue && !isAssistantSessionRoute && showPlanTip && activePlan"
+            :plan="activePlan"
+            :full="full"
+            :busy="state.sending"
+            @open="openPlanDock"
+          />
+          <plan-dock
+            v-if="modelValue && !isAssistantSessionRoute && showPlanDock && activePlan"
+            :plan="activePlan"
+            :full="full"
+            :can-collapse="draftText.trim().length > 0"
+            @confirm="onPlanConfirm"
+            @adjust="onPlanAdjust"
+            @cancel="onPlanCancel"
+            @collapse="collapsePlanDock"
+          />
+
           <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留）。
                会话页有自己的停靠区：路由切过去时抽屉若还开着会出现两张卡，
                removedIds 各持一份会发出用户没同意的全量催办——路由互斥只留一份 -->
@@ -253,7 +269,8 @@
             :sending="state.sending"
             :active="modelValue || full"
             :full="full"
-            :blocked="!!pendingAsk"
+            :blocked="!!pendingAsk || showPlanDock"
+            @draft-change="draftText = $event"
             @send="onSend"
             @stop="onStop"
             @queue-edit="onQueueEdit"
@@ -377,7 +394,7 @@ import {
 } from '@/api/dcs/assistant';
 import { getTask, statsOverview } from '@/api/dcs/core/task';
 import { useUserStore } from '@/store/modules/user';
-import { getAssistant, tryAcquireRemoteWatch, releaseRemoteWatch } from './useAssistant';
+import { getAssistant, tryAcquireRemoteWatch, releaseRemoteWatch, PLAN_CONFIRM_TEXT } from './useAssistant';
 import { relTime, cnEpoch } from './time';
 import type { AssistantBindings, AssistantTurn } from './useAssistant';
 import { roleOf, roleLabelOf, pageNameOf, taskCtxOf, suggestionsFor } from './assistantCtx';
@@ -387,6 +404,9 @@ import { displayTitle, renameSeed, shouldRename } from '@/utils/assistantTitle';
 import { assistantName } from './nameState';
 import MsgFlow from './MsgFlow.vue';
 import HitlDock from './HitlDock.vue';
+import PlanDock from './PlanDock.vue';
+import PlanTip from './PlanTip.vue';
+import { latestPendingPlan, shouldShowPlanDock } from './planDock';
 import { startTour } from './useTour';
 import IconSpan from './IconSpan.vue';
 import Composer from './Composer.vue';
@@ -1010,7 +1030,43 @@ const pendingTurn = computed(() => [...state.turns].reverse().find((t) => t.hitl
 const pendingAsk = computed(() => pendingTurn.value?.hitl ?? null);
 /** 会话页有自己的停靠区（审查回修 P1：两份卡 removedIds 不同步会发出未同意的全量催办）——
  *  抽屉停靠区在会话页路由下不挂载，全站其它页面照常 */
-const isAssistantSessionRoute = computed(() => route.path.startsWith('/ai/assistant'));
+// 只让“独立会话页”让位；/ai/assistant-admin、/ai/assistant-audit 不是会话页，
+// 抽屉停靠区必须继续挂载，否则 Composer 被 blocked 收起、决策区却不渲染（输入框锁死）。
+const isAssistantSessionRoute = computed(() => route.path === '/ai/assistant' || route.path === '/ai/assistant/');
+/** 最新一张待确认计划（Q5-A：旧卡只读，只有最新一张可操作） */
+const pendingPlan = computed(() => latestPendingPlan(state.turns));
+const activePlan = computed(() => pendingPlan.value?.plan ?? null);
+/** Composer 草稿（Q6-A：有字时只出细条，不抢输入框） */
+const draftText = ref('');
+const planDockForced = ref(false);
+const showPlanDock = computed(() =>
+  shouldShowPlanDock({
+    hasPlan: !!activePlan.value,
+    hasPendingAsk: !!pendingAsk.value,
+    sending: state.sending,
+    forced: planDockForced.value,
+    draft: draftText.value
+  })
+);
+const showPlanTip = computed(() => !!activePlan.value && !pendingAsk.value && !showPlanDock.value);
+watch(
+  () => activePlan.value?.planId,
+  () => {
+    planDockForced.value = false;
+  }
+);
+watch(showPlanDock, (v, old) => {
+  if (old && !v) {
+    nextTick(() => composerRef.value?.focus());
+  }
+});
+function openPlanDock() {
+  planDockForced.value = true;
+}
+function collapsePlanDock() {
+  planDockForced.value = false;
+  nextTick(() => composerRef.value?.focus());
+}
 /** 停靠区「改一下」：先取消本次确认（cancelled resume 清服务端悬挂），
  *  用户要求进排队，取消轮收尾后自动发出——不丢字，也不会把待确认 interrupt 冲掉 */
 function onDockRevise(m: string) {
@@ -1021,9 +1077,10 @@ function onDockRevise(m: string) {
   resolveHitl(false);
   onSend(text, '');
 }
-// 停靠区收卡（确认/取消）后把焦点还给输入框（ZCode 同款：对话框关闭焦点回 composer）
+// 停靠区收卡（确认/取消）后把焦点还给输入框（ZCode 同款：对话框关闭焦点回 composer）；
+// 计划停靠区接手时由 PlanDock 自己聚焦，别把焦点塞进已被 blocked 的 Composer
 watch(pendingAsk, (v, old) => {
-  if (old && !v) {
+  if (old && !v && !showPlanDock.value) {
     nextTick(() => composerRef.value?.focus());
   }
 });
@@ -1280,29 +1337,53 @@ function onDraftSet(text: string, append: boolean) {
   composerRef.value?.focus();
 }
 
-/** 多实例批 4：确认/改计划都带这张卡的 planId，旧卡重复点击由后端 409 挡住 */
-function onPlanConfirm(p: { planId?: string; text: string }) {
-  getAssistant(userStore.userId).notePlanDecision('confirm', p.planId);
-  onSend(p.text, '');
-}
-/** 二审回修：「改计划」=回填输入框并记住这张卡的 planId（用户改完自己发），不立即发送 */
-function onPlanEdit(p: { planId?: string; text: string }) {
-  getAssistant(userStore.userId).notePlanEdit(p.planId);
-  onResend(p.text);
-}
-/** 计划卡取消：只收被点的那张卡（按 planId 定位，多卡同屏时不误清新卡） */
-function onPlanCancel(planId?: string) {
-  // 二审回修（dspro-P2-2）：原来固定收 cur()=最后一个回合，同一会话有两张卡时点旧卡
-  // 会把新卡从屏上删掉、而新卡的 pending 还在（写操作继续被拒且用户无卡可点）
-  const t = planId ? state.turns.find((x) => x.plan?.planId === planId) : cur();
-  if (t) {
-    t.plan = null;
+/** 计划动作的前置闸：这些状态下 onSend 会整段早退，不能先把卡翻成“已确认/已修改” */
+function planBlockedMsg(): string {
+  if (state.curConvArchived) {
+    return '该会话已归档（只读回放），请先恢复再执行计划';
   }
+  if (state.banner === 'disabled') {
+    return '管理员已暂停你的 AI 助手使用，这张计划卡现在不能执行';
+  }
+  return '';
+}
+/** 计划停靠区：开始执行（带本卡 planId，旧卡重复点击由后端 409 挡住） */
+function onPlanConfirm(planId?: string) {
+  const blocked = planBlockedMsg();
+  if (blocked) {
+    pushToast(blocked, 'info');
+    return;
+  }
+  getAssistant(userStore.userId).notePlanDecision('confirm', planId);
+  onSend(PLAN_CONFIRM_TEXT, '');
+}
+/** 计划停靠区：改一下——只发一句反馈，不再把整份计划回填输入框 */
+function onPlanAdjust(planId: string | undefined, feedback: string) {
+  const text = feedback.trim();
+  if (!text) {
+    return;
+  }
+  const blocked = planBlockedMsg();
+  if (blocked) {
+    pushToast(blocked, 'info');
+    return;
+  }
+  getAssistant(userStore.userId).notePlanAdjust(planId);
+  onSend(text, '');
+}
+/** 计划停靠区：取消只作废这张卡；卡留在聊天记录里显示「已取消」 */
+function onPlanCancel(planId?: string) {
   // 题8（三席回修）：取消也是明确动作——下一次请求带 planDecision=cancel 解闸，
   // 否则后端硬闸要等 30 分钟 TTL 才放开写操作
   getAssistant(userStore.userId).notePlanDecision('cancel', planId);
-  // ②（2026-10-31）：当场打清闸端点立即解闸，不等下一条消息；失败静默（上面的兜底仍有效）
-  getAssistant(userStore.userId).cancelPlanOnServer(planId);
+  // ②（2026-10-31）：当场打清闸端点立即解闸，不等下一条消息；失败提示，下一条消息仍兜底
+  getAssistant(userStore.userId)
+    .cancelPlanOnServer(planId)
+    .then((ok) => {
+      if (!ok) {
+        pushToast('取消请求没送达，下一条消息会自动重试', 'info');
+      }
+    });
 }
 
 /** Esc 分层（原型语义）：帮助弹层→须知门→流式中停止（不关面板）→停后收起；Alt+N=新建会话 */
