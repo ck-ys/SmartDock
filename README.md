@@ -104,6 +104,38 @@ SmartDock 是一套**开源通用智能体引擎**，附带一条可独立使用
   <img src="docs/images/ai-flow.svg" alt="智能体运行时：一次请求的完整链路" width="100%">
 </p>
 
+#### 技能：把业务 SOP 变成智能体的操作手册
+
+工具解决「能做什么」，技能解决「怎么做才对」。技能就是一个 Markdown 文件（官方 SKILL.md 格式，YAML frontmatter + 正文），业务和运维同学可以直接在管理台改，不用发版：
+
+```markdown
+---
+name: urge-wording
+description: 用户说「帮我写催办/怎么催比较好/写个催办」时，写不伤人的催办提醒（有依据、给出路、不施压过度）
+displayName: 催办话术
+minRole: publisher
+---
+你正在使用「催办话术」技能。目标：帮用户起草一条得体的催办留言。
+1. 说事不说人：「办公区安全检查还有 3 天截止」而不是「你怎么还没交」。
+2. 给依据给出路：附截止时间、入口（任务详情页）、卡住可联系谁。
+3. 语气分级：第一次催=提醒式；第二次=说明影响；逾期后=协助式。
+发送仍走催办确认卡，你只负责写话术。
+```
+
+- **渐进披露**：只有 `description` 常驻技能目录（模型靠它判断何时调用），正文默认不占上下文、用到才读——单技能正文上限 20000 字符
+- **三层装载**：内置 classpath → `config/skills/` 部署期覆写 → 管理台在线编辑（优先级最高，下一轮会话生效）
+- **权限双重闸**：`minRole` 控制谁能用，租户工具开关矩阵控制是否启用（停用后对所有角色整技能遮罩，超管也看不见）
+- **可度量**：每个技能的使用次数与最近使用时间都落在管理台
+
+内置 4 个示例技能（创建任务 / 创建模板 / 催办话术 / 数据解读），可直接改或新增：
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/screenshots/15-assistant-skill.png" alt="技能库"><br><sub>技能库：左侧目录只放一句话说明，右侧编辑正文；保存立即生效</sub></td>
+<td width="50%"><img src="docs/images/screenshots/14-assistant-toolgate.png" alt="工具与技能开关矩阵"><br><sub>工具开关矩阵：平台工具、MCP 外部工具、技能统一按角色与租户分档</sub></td>
+</tr>
+</table>
+
 ### 📊 用户画像引擎（配套）
 
 - **事件源评分**：业务动作 → 事件 → 规则 → 版本化快照，可回放、可对账
@@ -363,10 +395,6 @@ public class BizEventReporter {
 <tr>
 <td width="50%"><img src="docs/images/screenshots/11-assistant-hitl.png" alt="AI 助手：写操作确认卡"><br><sub>要写库之前先停下来问：卡片写明这一步会动真实数据，点「确认执行」才落库；待确认期间输入暂停、草稿保留</sub></td>
 <td width="50%"><img src="docs/images/screenshots/12-assistant-admin.png" alt="AI 助手管理端"><br><sub>管理端：开关、每日回合上限、联网次数与租户日预算，加上进程内运行健康，一页看清</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/images/screenshots/14-assistant-toolgate.png" alt="工具开关矩阵"><br><sub>工具开关：平台工具、MCP 外部工具、技能按角色与租户分档，关掉对下一轮会话即生效</sub></td>
-<td width="50%"><img src="docs/images/screenshots/15-assistant-skill.png" alt="技能库"><br><sub>技能库：技能是助手的「操作手册」，一句话说明决定何时调用，正文用时才读、平时不占上下文</sub></td>
 </tr>
 </table>
 
