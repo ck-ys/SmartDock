@@ -212,6 +212,11 @@ onMounted(load);
 </script>
 
 <style scoped>
+/* 2026-11-01 视觉评审 ⑥：手机卡片里时间和「标已读」之间空得比上面一段松，收 4px */
+.notice-card .dcs-card-foot {
+  margin-top: 6px;
+}
+
 /* 筛选条与表格同卡：卡体不留内边距，由 .ui-toolbar 自己管 */
 .notice-list-card :deep(.el-card__body) {
   min-width: 0;

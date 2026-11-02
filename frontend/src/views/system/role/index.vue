@@ -55,7 +55,9 @@
         </el-row>
       </template>
 
-      <div class="dcs-ops-table-wrap">
+      <!-- 2026-11-01 视觉评审 ③：手机档宽表能横滑但没有提示，用户以为右半边没内容 -->
+      <span v-if="scrollHint" class="role-scroll-hint">← 左右滑动看更多 →</span>
+      <div ref="tableWrapRef" class="dcs-ops-table-wrap" @scroll.passive="updateScrollHint">
         <el-table ref="roleTableRef" border v-loading="loading" :data="roleList" class="ui-table" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="55" align="center" />
           <el-table-column v-if="false" label="角色编号" prop="roleId" width="120" />
@@ -207,6 +209,17 @@ const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const { sys_normal_disable } = toRefs<any>(proxy?.useDict('sys_normal_disable'));
 
 const roleList = ref<RoleVO[]>();
+
+/* 2026-11-01 视觉评审 ③：手机档宽表能横滑但没有提示——滑到最右自动收掉，避免和小按钮热区抢位 */
+const tableWrapRef = ref<HTMLElement>();
+const scrollHint = ref(false);
+const updateScrollHint = () => {
+  const el = tableWrapRef.value;
+  if (!el) return;
+  scrollHint.value = el.scrollWidth - el.clientWidth - el.scrollLeft > 8;
+};
+const refreshScrollHint = () => nextTick(updateScrollHint);
+watch(roleList, refreshScrollHint);
 const loading = ref(true);
 const showSearch = ref(true);
 const ids = ref<Array<string | number>>([]);
@@ -504,11 +517,41 @@ const cancelDataScope = () => {
 
 onMounted(() => {
   getList();
+  refreshScrollHint();
+  window.addEventListener('resize', refreshScrollHint);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', refreshScrollHint);
 });
 </script>
 
 <style lang="scss" scoped>
 .dcs-ops-table-wrap :deep(.el-table) {
   min-width: 900px;
+}
+
+/* 2026-11-01 视觉评审 ③：手机档横滑提示（桌面档表格本来就是全宽，不需要） */
+.role-scroll-hint {
+  display: none;
+  margin: 0 0 8px;
+  font-size: var(--dcs-font-xs);
+  color: var(--el-text-color-secondary);
+}
+
+@media (max-width: 992px) {
+  .role-scroll-hint {
+    display: block;
+  }
+
+  /* 2026-11-01 视觉评审 ⑥：手机档右侧工具图标会浮到第二行右边、左边空一大片，
+     改成换行后左对齐，和上面的操作按钮同一列起头 */
+  :deep(.top-right-btn) {
+    float: none;
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    margin-top: 8px;
+  }
 }
 </style>

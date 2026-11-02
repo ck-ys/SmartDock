@@ -46,7 +46,10 @@
               <span class="ui-num">{{ assigneeCount(row) }} 人</span>
             </template>
           </el-table-column>
-          <el-table-column prop="deadline" label="截止" width="110" />
+          <!-- 2026-11-01 视觉评审 ⑤：空值补占位，与手机卡片「截止 —」同一口径 -->
+          <el-table-column prop="deadline" label="截止" width="110">
+            <template #default="{ row }">{{ row.deadline || '—' }}</template>
+          </el-table-column>
           <el-table-column prop="createTime" label="创建时间" width="170" />
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">

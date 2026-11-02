@@ -30,10 +30,11 @@
               <span>{{ (queryParams.pageNum - 1) * queryParams.pageSize + scope.$index + 1 }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="会话编号" align="center" prop="tokenId">
+          <!-- 2026-11-01 视觉评审 ②：列宽 103 装不下「…＋后 10 位」，编号被挤成两行、行高从 47 撑到 70 -->
+          <el-table-column label="会话编号" align="center" prop="tokenId" width="120">
             <template #default="scope">
               <el-tooltip :content="scope.row.tokenId" placement="top">
-                <span>…{{ scope.row.tokenId.slice(-10) }}</span>
+                <span class="session-token">…{{ scope.row.tokenId.slice(-10) }}</span>
               </el-tooltip>
             </template>
           </el-table-column>
@@ -143,6 +144,11 @@ onMounted(() => {
 <style lang="scss" scoped>
 .dcs-ops-table-wrap :deep(.el-table) {
   min-width: 1050px;
+}
+
+/* 会话编号「…＋后 10 位」共 11 个字符，必须单行——折行会把整行高度从 47 撑到 70 */
+.session-token {
+  white-space: nowrap;
 }
 
 /* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */

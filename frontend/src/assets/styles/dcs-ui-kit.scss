@@ -507,6 +507,11 @@ html.density-compact {
     grid-column: 1 / -1;
   }
 
+  /* 2026-11-01 视觉评审 ⑥：3 张卡在手机档排成等宽三列时，最后一张回到正常一格，不再通栏 */
+  .dcs-ops-metrics--trio > .dcs-ops-metric:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+
   .ui-kpi__label,
   .dcs-ops-metric__label {
     font-size: var(--dcs-font-sm);

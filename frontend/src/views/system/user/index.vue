@@ -140,10 +140,14 @@
                   <span v-else>—</span>
                 </template>
               </el-table-column>
-              <el-table-column v-if="columns[4].visible" key="phonenumber" label="手机号码" align="center" prop="phonenumber" width="120" />
+              <!-- 2026-11-01 视觉评审 ⑤：空值显示「—」，别让整列看着像坏了 -->
+              <el-table-column v-if="columns[4].visible" key="phonenumber" label="手机号码" align="center" prop="phonenumber" width="120">
+                <template #default="scope">{{ scope.row.phonenumber || '—' }}</template>
+              </el-table-column>
               <el-table-column v-if="columns[5].visible" key="userLevel" label="级别" align="center" prop="userLevel" width="80">
                 <template #default="scope">
-                  <dict-tag :options="sys_user_level" :value="scope.row.userLevel" />
+                  <dict-tag v-if="scope.row.userLevel" :options="sys_user_level" :value="scope.row.userLevel" />
+                  <span v-else>—</span>
                 </template>
               </el-table-column>
               <el-table-column v-if="columns[6].visible" key="status" label="状态" align="center">

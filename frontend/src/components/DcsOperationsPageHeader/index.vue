@@ -14,7 +14,15 @@
       </div>
     </div>
 
-    <div v-if="metrics.length" class="dcs-ops-metrics" aria-label="页面概览">
+    <!-- 2026-11-01 视觉评审 ⑥：3 张指标卡在手机档会被两列挤成「2+1」，最后一张只剩左半有内容。
+         用行内栅格钉成等宽三列（行内样式压得过组件自带的 scoped 规则），4 张的页面不受影响 -->
+    <div
+      v-if="metrics.length"
+      class="dcs-ops-metrics"
+      :class="{ 'dcs-ops-metrics--trio': metrics.length === 3 }"
+      :style="metrics.length === 3 ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : undefined"
+      aria-label="页面概览"
+    >
       <article v-for="metric in metrics" :key="metric.label" class="dcs-ops-metric" :class="`dcs-ops-metric--${metric.tone || 'primary'}`">
         <span class="dcs-ops-metric__label">{{ metric.label }}</span>
         <strong class="dcs-ops-metric__value">{{ metric.value }}</strong>
