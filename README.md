@@ -35,8 +35,8 @@ SmartDock 是一套**开源通用智能体引擎**，附带一条可独立使用
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/06-assistant.png" alt="AI 助手"><br><sub>AI 助手：工具调用链，查不到就说查不到</sub></td>
-<td width="50%"><img src="docs/images/screenshots/01-overview.png" alt="首页总览"><br><sub>首页总览：智能体与画像两条引擎的运行态</sub></td>
+<td width="50%"><img src="docs/images/screenshots/13-assistant-session.png" alt="AI 助手会话页"><br><sub>全屏会话页：多会话历史、按当前页面推荐问题、模型与思考档位随手切</sub></td>
+<td width="50%"><img src="docs/images/screenshots/06-assistant.png" alt="AI 助手抽屉"><br><sub>业务页面内的助手抽屉：工具调用链、耗时与来源数都摊开给你看</sub></td>
 </tr>
 </table>
 
@@ -343,7 +343,7 @@ public class BizEventReporter {
 
 ### AI 助手
 
-<p align="center"><img src="docs/images/screenshots/06a-assistant-demo.gif" width="384" alt="AI 助手：一次完整问答"></p>
+<p align="center"><img src="docs/images/screenshots/06a-assistant-demo.gif" width="384" alt="AI 助手：一次完整问答"><br><sub>一次完整问答：思考 → 调工具 → 引用来源 → 给结论；工具面之外就直说查不到</sub></p>
 
 1. 登录后进入「AI 模型配置」，配置模型供应商与 API Key；
 2. 为模型维护 **CNY 价格行**（价格目录维护或自动探测）——无人民币价格行的模型不会进入可选列表；
@@ -357,11 +357,16 @@ public class BizEventReporter {
 - 思考档位切换（快 / 平衡 / 深）
 - 工具调用可视化（含耗时与来源数）
 - HITL 写操作确认
+- 技能库（助手的操作手册）与 MCP 外部工具，按角色与租户分档开关
 
 <table>
 <tr>
 <td width="50%"><img src="docs/images/screenshots/11-assistant-hitl.png" alt="AI 助手：写操作确认卡"><br><sub>要写库之前先停下来问：卡片写明这一步会动真实数据，点「确认执行」才落库；待确认期间输入暂停、草稿保留</sub></td>
 <td width="50%"><img src="docs/images/screenshots/12-assistant-admin.png" alt="AI 助手管理端"><br><sub>管理端：开关、每日回合上限、联网次数与租户日预算，加上进程内运行健康，一页看清</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/images/screenshots/14-assistant-toolgate.png" alt="工具开关矩阵"><br><sub>工具开关：平台工具、MCP 外部工具、技能按角色与租户分档，关掉对下一轮会话即生效</sub></td>
+<td width="50%"><img src="docs/images/screenshots/15-assistant-skill.png" alt="技能库"><br><sub>技能库：技能是助手的「操作手册」，一句话说明决定何时调用，正文用时才读、平时不占上下文</sub></td>
 </tr>
 </table>
 
