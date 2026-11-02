@@ -457,7 +457,7 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 
 ## 使用边界与适合谁
 
-**适合**：想快速搭一套「AI 助手 + 用户画像」双引擎的团队；需要多租户、权限、计费、审计底座的业务后台；想研究 AgentScope 工具循环与事件源画像如何落地的开发者。
+**适合**：想给业务系统接一个能查数据、能执行操作的 AI 助手的团队；需要多智能体注册、工具接入、权限与计费底座的平台项目；顺带想要用户画像与行为分析的团队。
 
 **不适合**（先说清楚，省得白折腾）：
 
@@ -477,7 +477,7 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 
 ## 测试与质量
 
-后端 JUnit **437** 用例 + 前端 Vitest **241** 用例，覆盖权限矩阵、状态机、PII 脱敏、注入打标、HITL、AGUI 协议与计费。其中 8 个红队集成用例（`RedteamCore8Test`）需要连上完整的 PostgreSQL/Redis 才能启动 Spring 上下文，纯本地环境跑会跳过通过项、报上下文加载失败，属预期。
+后端 JUnit **437** 用例 + 前端 Vitest **241** 用例，覆盖权限矩阵、状态机、PII 脱敏、注入打标、HITL、AGUI 协议与计费。其中 8 个红队集成用例（`RedteamCore8Test`）需要完整的 PostgreSQL/Redis 才能启动 Spring 上下文；纯本地环境跑会报 8 个 context 加载错误，属预期（其余 429 个全部通过）。
 
 ```bash
 # 后端（根 pom 默认 skipTests=true，且默认 dev profile；跑 local 组需显式指定）
