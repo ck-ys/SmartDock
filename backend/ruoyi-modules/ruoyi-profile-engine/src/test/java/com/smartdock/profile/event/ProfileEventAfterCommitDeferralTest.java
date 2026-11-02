@@ -35,6 +35,11 @@ import static org.mockito.Mockito.verify;
  * 小修包件5（2026-11-02 拍板「全按推荐」）：孤儿事件防线——业务事务里发事件时,
  * 账本写入推迟到外层事务 afterCommit; 外层回滚则什么都不写。
  * 行为锁：活动事务下 publish 立即返回 true 但不落账; 提交后落账一次; 回滚后永不落账。
+ *
+ * <p>三席复审(dsflash P2-4): 这里用桩事务管理器 + 手工 initSynchronization 锁的是
+ * <b>分支逻辑</b>, 不能证明真实 Spring suspend/resume 语义——真实链路由 2026-11-02 活体
+ * 探针覆盖(建草稿→发布走 @Transactional, 断言 profile_event 与 profile_subject.
+ * last_event_time 同值落库, 见 .workshop/tmp/20261102-smallfix-aftercommit-probe.cjs)。</p>
  */
 @Tag("local")
 class ProfileEventAfterCommitDeferralTest {

@@ -102,7 +102,8 @@ class DcsAiConfigResolveHealthGateTest {
         com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<?> wrapper = captor.getValue();
         String segment = String.valueOf(wrapper.getSqlSegment());
         assertThat(segment).contains("status");
-        assertThat(segment).contains("fail_streak");
+        // 三席复审(dsflash P2-5): 连操作符一起钉死——把 ge 误写成 le/eq 也不能绿
+        assertThat(segment).contains("fail_streak >=");
         assertThat(segment).containsIgnoringCase("exists");
         assertThat(wrapper.getParamNameValuePairs().values()).contains("FAIL");
         assertThat(wrapper.getParamNameValuePairs().values()).contains(2);

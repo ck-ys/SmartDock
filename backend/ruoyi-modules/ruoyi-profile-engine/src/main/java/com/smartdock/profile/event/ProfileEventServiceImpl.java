@@ -179,6 +179,11 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
 
     /**
      * 管理端灌数: 区分「重复」与「校验失败」, 避免把坏数据误报成幂等命中。
+     *
+     * <p>三席复审(dsflash P2-1): 本方法<b>同步写入</b>, 不走 afterCommit 延发——返回的
+     * written/duplicated 必须是真实落库结果。因此只允许在无事务的调用方使用(现唯一入口=
+     * 管理端灌数接口); 若将来在业务事务里复用它, 又会回到"外层回滚、事件已落"的孤儿形态,
+     * 届时须改走 {@link #publishBatch}。</p>
      */
     @Override
     public Map<String, Object> publishBatchDetailed(List<ProfileEventBo> events) {
@@ -232,6 +237,8 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         }
 
         // 身份解析失败不阻断事件(链接表是索引, 事件是账本); 下一条事件会再补
+        // 三席复审(dsflash P2-3): resolveAndLink 自身是 REQUIRES_NEW, 这里在调用线程执行——
+        // 外层业务回滚时链接表可能已落账。身份图谱按"索引"语义允许先于账本提交(下条事件复用)。
         e.setSubjectId(resolveCanonicalSubject(e, bo));
         return new PreparedEvent(e, bo);
     }
@@ -248,6 +255,10 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
      * 且不会再有提交), cleanup 时连接按脏状态回滚——账本成功、主体索引与首见永久丢失。
      * {@link #runSideWrite} 在事务/afterCommit 上下文各自开独立短事务, 非事务上下文保持
      * 自动提交, 语义仍是"旁路失败只丢索引, 下一条事件会再补"。</p>
+     *
+     * <p>三席复审(dsflash P2-2): afterCommit 阶段外层连接被挂起但仍占池直到 cleanup,
+     * 本方法是 3 个串行短事务(账本+旁路×2), 单线程峰值 2 条连接——连接池须 ≥2
+     * (Hikari 默认 10, 本仓未缩小)。</p>
      */
     private ProfileEvent writePrepared(PreparedEvent prepared) {
         ProfileEvent e = prepared.event();
@@ -266,7 +277,9 @@ public class ProfileEventServiceImpl implements ProfileEventPublisher {
         return inserted;
     }
 
-    /** 旁路写: 事务/afterCommit 上下文必须独立短事务(原因见 writePrepared 注释), 非事务上下文直写。 */
+    /** 旁路写: 事务/afterCommit 上下文必须独立短事务(原因见 writePrepared 注释), 非事务上下文直写。
+     *  三席复审边界提醒: 判据是"同步是否活跃", 若未来有人在 afterCompletion(同步已清、外层连接
+     *  尚未 cleanup)里调用发布, 会走直写并被回滚——发布入口只应出现在业务代码或 afterCommit。 */
     private void runSideWrite(Runnable write) {
         try {
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
