@@ -508,6 +508,14 @@
                     <groups>${surefire.groups}</groups>
                     <!-- 排除标签 -->
                     <excludedGroups>exclude</excludedGroups>
+                    <!-- 2026-11-02 密钥整改：测试用固定假密钥（仅测试 JVM；生产必须走环境变量）。
+                         启动自检会拒绝缺失/长度错/旧版内置钥匙，故测试进程必须注入。 -->
+                    <systemPropertyVariables>
+                        <SMARTDOCK_AI_CONFIG_KEY>0123456789abcdef0123456789abcdef</SMARTDOCK_AI_CONFIG_KEY>
+                        <SMARTDOCK_MCP_HEADERS_KEY>fedcba9876543210fedcba9876543210</SMARTDOCK_MCP_HEADERS_KEY>
+                        <!-- 测试进程不跑历史密文迁移，避免误改任何数据库 -->
+                        <SMARTDOCK_ENCRYPT_MIGRATION_ENABLED>false</SMARTDOCK_ENCRYPT_MIGRATION_ENABLED>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
             <!-- 统一版本号管理 -->

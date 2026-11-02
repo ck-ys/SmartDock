@@ -11,6 +11,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -40,23 +41,34 @@ class G4EncryptScanTest {
             "DcsAiConfig.apiKey 应带 @EncryptField");
     }
 
-    /** G4-#1 事故复现锁：首版密钥 14 位 → 拦截器吞掉 IllegalArgument 后明文落库。
-     *  AES 硬性要求 16/24/32 位；注解与显式路径两个密钥必须同值（ENC_ 前缀幂等互认） */
+    /** 2026-11-02 密钥整改：注解不再写字面量，只写环境变量占位符；
+     *  服务层旧常量 HEADERS_ENC_KEY 必须已删除，防止字面量回潮。 */
     @Test
-    void headersAesKeyLengthValidAndDualTrackAligned() throws Exception {
+    void headersKeyComesFromEnvironmentNotLiteral() throws Exception {
         org.dromara.common.encrypt.annotation.EncryptField anno =
             DcsMcpServer.class.getDeclaredField("headers")
                 .getAnnotation(org.dromara.common.encrypt.annotation.EncryptField.class);
         assertNotNull(anno, "headers 缺 @EncryptField");
-        int len = anno.password().length();
-        assertTrue(len == 16 || len == 24 || len == 32,
-            "AES 密钥长度必须 16/24/32 位（当前 " + len + " 位——首版事故根因，严禁回退）");
+        assertEquals("${smartdock.encrypt.mcp-headers-key}", anno.password(),
+            "注解密钥必须是环境变量占位符（禁止字面量）");
 
-        java.lang.reflect.Field constField = org.dromara.assistant.service.McpPilotService.class
-            .getDeclaredField("HEADERS_ENC_KEY");
-        constField.setAccessible(true);
-        assertEquals(anno.password(), constField.get(null),
-            "实体注解与服务层显式加密必须同密钥（否则双轨互解不开）");
+        org.springframework.mock.env.MockEnvironment env =
+            new org.springframework.mock.env.MockEnvironment();
+        env.setProperty("smartdock.encrypt.mcp-headers-key", "0123456789abcdef0123456789abcdef");
+        String resolved = org.dromara.common.encrypt.core.EncryptKeyResolver
+            .resolve(env, anno.password(), "");
+        assertEquals(32, resolved.length(), "解析后应是 32 位真实密钥");
+
+        assertThrows(NoSuchFieldException.class,
+            () -> org.dromara.assistant.service.McpPilotService.class.getDeclaredField("HEADERS_ENC_KEY"),
+            "旧的字面量常量必须已删除");
+
+        org.dromara.common.encrypt.annotation.EncryptField ai =
+            com.smartdock.domain.DcsAiConfig.class.getDeclaredField("apiKey")
+                .getAnnotation(org.dromara.common.encrypt.annotation.EncryptField.class);
+        assertNotNull(ai, "DcsAiConfig.apiKey 缺 @EncryptField");
+        assertEquals("${smartdock.encrypt.ai-config-key}", ai.password(),
+            "AI 配置密钥也必须是占位符");
     }
 
     /** 事故盲区正面试锁（G4 三审回修 dsflash P2）：扫描过≠加解密真的跑得通——
@@ -67,9 +79,13 @@ class G4EncryptScanTest {
         org.dromara.common.encrypt.annotation.EncryptField anno =
             DcsMcpServer.class.getDeclaredField("headers")
                 .getAnnotation(org.dromara.common.encrypt.annotation.EncryptField.class);
+        org.springframework.mock.env.MockEnvironment env =
+            new org.springframework.mock.env.MockEnvironment();
+        env.setProperty("smartdock.encrypt.mcp-headers-key", "0123456789abcdef0123456789abcdef");
         org.dromara.common.encrypt.core.EncryptContext ctx = new org.dromara.common.encrypt.core.EncryptContext();
         ctx.setAlgorithm(anno.algorithm());
-        ctx.setPassword(anno.password());
+        ctx.setPassword(org.dromara.common.encrypt.core.EncryptKeyResolver
+            .resolve(env, anno.password(), ""));
         ctx.setEncode(anno.encode() == org.dromara.common.encrypt.enumd.EncodeType.DEFAULT
             ? org.dromara.common.encrypt.enumd.EncodeType.BASE64 : anno.encode());
         // 传不存在包跳过扫描（encrypt/decrypt 不依赖扫描缓存）

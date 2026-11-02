@@ -8,13 +8,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.executor.parameter.ParameterHandler;
 import org.apache.ibatis.executor.resultset.ResultSetHandler;
 import org.apache.ibatis.plugin.*;
-import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.encrypt.annotation.EncryptField;
 import org.dromara.common.encrypt.core.EncryptContext;
+import org.dromara.common.encrypt.core.EncryptKeyResolver;
 import org.dromara.common.encrypt.core.EncryptorManager;
 import org.dromara.common.encrypt.enumd.AlgorithmType;
 import org.dromara.common.encrypt.enumd.EncodeType;
 import org.dromara.common.encrypt.properties.EncryptorProperties;
+import org.springframework.core.env.Environment;
 
 import java.lang.reflect.Field;
 import java.sql.Statement;
@@ -37,6 +38,8 @@ public class MybatisDecryptInterceptor implements Interceptor {
 
     private final EncryptorManager encryptorManager;
     private final EncryptorProperties defaultProperties;
+    /** 2026-11-02 密钥整改：解析注解里的 ${...} 占位符（密钥只从环境变量来） */
+    private final Environment environment;
 
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
@@ -90,34 +93,33 @@ public class MybatisDecryptInterceptor implements Interceptor {
         if(ObjectUtil.isNull(fields)){
             return;
         }
-        try {
-            for (Field field : fields) {
-                field.set(sourceObject, this.decryptField(Convert.toStr(field.get(sourceObject)), field));
+        for (Field field : fields) {
+            // 2026-11-02 密钥整改：上下文（含 ${...} 解析）放在 try 外——密钥没配必须炸出来
+            EncryptContext encryptContext = this.buildContext(field);
+            try {
+                String value = Convert.toStr(field.get(sourceObject));
+                if (ObjectUtil.isNull(value)) {
+                    continue;
+                }
+                field.set(sourceObject, this.encryptorManager.decrypt(value, encryptContext));
+            } catch (Exception e) {
+                log.error("处理解密字段时出错", e);
             }
-        } catch (Exception e) {
-            log.error("处理解密字段时出错", e);
         }
     }
 
     /**
-     * 字段值进行加密。通过字段的批注注册新的加密算法
-     *
-     * @param value 待加密的值
-     * @param field 待加密字段
-     * @return 加密后结果
+     * 按字段注解构造解密上下文（2026-11-02：密钥支持 ${...} 占位符，运行时从环境变量取）
      */
-    private String decryptField(String value, Field field) {
-        if (ObjectUtil.isNull(value)) {
-            return null;
-        }
+    private EncryptContext buildContext(Field field) {
         EncryptField encryptField = field.getAnnotation(EncryptField.class);
         EncryptContext encryptContext = new EncryptContext();
         encryptContext.setAlgorithm(encryptField.algorithm() == AlgorithmType.DEFAULT ? defaultProperties.getAlgorithm() : encryptField.algorithm());
         encryptContext.setEncode(encryptField.encode() == EncodeType.DEFAULT ? defaultProperties.getEncode() : encryptField.encode());
-        encryptContext.setPassword(StringUtils.isBlank(encryptField.password()) ? defaultProperties.getPassword() : encryptField.password());
-        encryptContext.setPrivateKey(StringUtils.isBlank(encryptField.privateKey()) ? defaultProperties.getPrivateKey() : encryptField.privateKey());
-        encryptContext.setPublicKey(StringUtils.isBlank(encryptField.publicKey()) ? defaultProperties.getPublicKey() : encryptField.publicKey());
-        return this.encryptorManager.decrypt(value, encryptContext);
+        encryptContext.setPassword(EncryptKeyResolver.resolve(environment, encryptField.password(), defaultProperties.getPassword()));
+        encryptContext.setPrivateKey(EncryptKeyResolver.resolve(environment, encryptField.privateKey(), defaultProperties.getPrivateKey()));
+        encryptContext.setPublicKey(EncryptKeyResolver.resolve(environment, encryptField.publicKey(), defaultProperties.getPublicKey()));
+        return encryptContext;
     }
 
     @Override

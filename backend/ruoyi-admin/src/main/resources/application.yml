@@ -188,6 +188,19 @@ mybatis-encryptor:
   publicKey:
   privateKey:
 
+# SmartDock 安全密钥（2026-11-02 密钥整改铁律）
+# 只从环境变量注入，仓库与配置文件里禁止出现真实密钥；AES 要求 16/24/32 位 ASCII。
+# 未配置/长度不对/仍用旧版内置钥匙 → 服务拒绝启动（EncryptKeyStartupRunner），
+# 绝不静默回退明文（2026-10-22 首版 14 位密钥事故教训）。
+smartdock:
+  encrypt:
+    # 保护 dcs_ai_config.api_key / dcs_ai_provider_access.api_key
+    ai-config-key: ${SMARTDOCK_AI_CONFIG_KEY:}
+    # 保护 dcs_mcp_server.headers（第三方 MCP 请求头令牌）
+    mcp-headers-key: ${SMARTDOCK_MCP_HEADERS_KEY:}
+    # 历史密文自动换锁开关（测试/特殊部署可关；生产保持默认开启）
+    migration-enabled: ${SMARTDOCK_ENCRYPT_MIGRATION_ENABLED:true}
+
 # api接口加密
 api-decrypt:
   # 是否开启全局接口加密

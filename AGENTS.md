@@ -152,6 +152,13 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 6. **多租户**：业务表带 `tenant_id`；跨租户操作走 `TenantHelper`（注意 `TenantHelper.dynamic` 会删超管切换态，先存后还）；手写 SQL 被租户插件注入报"列不存在"时，加 `@InterceptorIgnore(tenantLine="true")` 且 SQL 内自带租户条件
 7. **表结构变更必须沉淀 DDL**（见上文「DDL 与部署口径」）
 8. **时区铁律**：后端固定 GMT+8（启动参数 `-Duser.timezone=GMT+8`）；种子/测试数据按 UTC+8 墙上时间生成
+9. **安全密钥铁律（2026-11-02 密钥整改）**：加密密钥一律只从环境变量注入，**禁止写进源码 / yml / SQL / 种子 / 文档示例**
+   - `SMARTDOCK_AI_CONFIG_KEY` → 保护 `dcs_ai_config.api_key`、`dcs_ai_provider_access.api_key`
+   - `SMARTDOCK_MCP_HEADERS_KEY` → 保护 `dcs_mcp_server.headers`（第三方 MCP 请求头令牌）
+   - 两把必须不同，16/24/32 位可见 ASCII；未配置 / 长度错 / 仍用旧版内置钥匙 → 服务**拒绝启动**（`EncryptKeyStartupRunner`）
+   - `@EncryptField` 的 password 只写占位符 `${smartdock.encrypt.*}`，由框架运行时解析；新增加密字段照此办理，禁止字面量
+   - 历史密文由 `EncryptKeyMigrationRunner` 启动时自动换锁（旧钥匙只解密、绝不加密）；迁移走原生 SQL，绕开 MyBatis 加解密拦截器
+   - 轮换流程：换环境变量 → 启动一次让迁移跑完 → 到厂商后台把对应 API Key / 令牌也换新（旧钥匙已公开则必须换，清 git 历史无效）
 
 ---
 

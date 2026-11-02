@@ -46,8 +46,9 @@ public class DcsAiConfig extends BaseEntity {
     /** Q5-A：接口格式（CHAT_COMPLETIONS/ANTHROPIC_MESSAGES/RESPONSES，空=兼容存量按 Chat Completions） */
     private String apiFormat;
 
-    /** API Key, 由 MyBatis 加密插件落库加密(显式 AES + 专用密钥, 不依赖全局默认算法) */
-    @EncryptField(algorithm = AlgorithmType.AES, password = "DcsAiCfgEncKey16")
+    /** API Key, 由 MyBatis 加密插件落库加密(显式 AES + 专用密钥, 不依赖全局默认算法)。
+     *  2026-11-02 密钥整改：密钥来自 SMARTDOCK_AI_CONFIG_KEY，源码内不再出现字面量 */
+    @EncryptField(algorithm = AlgorithmType.AES, password = "${smartdock.encrypt.ai-config-key}")
     private String apiKey;
 
     /** 模型名称 */

@@ -187,6 +187,18 @@ Windows CMD 用 `set PGCLIENTENCODING=UTF8`，PowerShell 用 `$env:PGCLIENTENCOD
 
 **2. 启动后端**
 
+启动前先设置两把加密密钥（16/24/32 位可见 ASCII，两把必须不同；未配置会拒绝启动）：
+
+```bash
+export SMARTDOCK_AI_CONFIG_KEY=$(openssl rand -base64 24)
+export SMARTDOCK_MCP_HEADERS_KEY=$(openssl rand -base64 24)
+```
+
+> 前者保护 AI 厂商 Key（`dcs_ai_config.api_key` / `dcs_ai_provider_access.api_key`），
+> 后者保护 MCP 服务器请求头令牌（`dcs_mcp_server.headers`）。禁止写进源码或提交进仓库。
+> 从旧版本升级时，首次启动会自动把历史密文换成新钥匙；之后请到厂商后台把对应 API Key/令牌
+> 也换新——旧版内置钥匙已随公开源码泄露，换锁救不回已经流出去的凭证。
+
 ```bash
 cd backend
 mvn clean package -DskipTests
@@ -255,6 +267,9 @@ POSTGRES_PASSWORD=换成强口令
 REDIS_PASSWORD=换成强口令
 MINIO_PASSWORD=换成强口令
 HTTP_PORT=80
+# 两把加密密钥：各执行一次 openssl rand -base64 24 生成，必须不同，勿提交
+SMARTDOCK_AI_CONFIG_KEY=换成32位随机串
+SMARTDOCK_MCP_HEADERS_KEY=换成另一个32位随机串
 ```
 
 ```bash
@@ -499,6 +514,7 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 ## 安全与上线前检查
 
 - 基线**不包含任何真实 AI Key**；`dcs.assistant.websearch.key` 默认留空（联网搜索未启用）。
+- **加密密钥只走环境变量**：`SMARTDOCK_AI_CONFIG_KEY`（保护 AI 厂商 Key）与 `SMARTDOCK_MCP_HEADERS_KEY`（保护 MCP 请求头令牌），两把必须不同、16/24/32 位；未配置/长度错/仍用旧版内置钥匙会**拒绝启动**。轮换后请同时到厂商后台更换对应 Key/令牌——旧钥匙一旦公开，换锁不能撤回已泄露的凭证。
 - `application.yml` 的 `jwt-secret-key`、RSA/AES 密钥以及数据库/Redis/MinIO 默认口令均为演示值，**上线前必须全部替换**。
 - 默认账号仅用于本地演示；生产环境请删除或改密，并按组织要求配置密码策略。
 - AI 只负责起草与建议：所有写操作都经过 HITL 确认，但模型输出不保证正确，关键结论请保留证据链。
@@ -506,7 +522,7 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 
 ## 测试与质量
 
-后端 JUnit **437** 用例 + 前端 Vitest **241** 用例，覆盖权限矩阵、状态机、PII 脱敏、注入打标、HITL、AGUI 协议与计费。其中 8 个红队集成用例（`RedteamCore8Test`）需要完整的 PostgreSQL/Redis 才能启动 Spring 上下文；纯本地环境跑会报 8 个 context 加载错误，属预期（其余 429 个全部通过）。
+后端 JUnit **451** 用例 + 前端 Vitest **241** 用例，覆盖权限矩阵、状态机、PII 脱敏、注入打标、HITL、AGUI 协议与计费。其中 8 个红队集成用例（`RedteamCore8Test`）需要完整的 PostgreSQL/Redis 才能启动 Spring 上下文；纯本地环境跑会报 8 个 context 加载错误，属预期（其余 443 个全部通过）。
 
 ```bash
 # 后端（根 pom 默认 skipTests=true，且默认 dev profile；跑 local 组需显式指定）

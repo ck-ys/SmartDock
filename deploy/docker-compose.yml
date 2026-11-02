@@ -81,6 +81,10 @@ services:
       SPRING_DATA_REDIS_DATABASE: 0
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-changeit}
       SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
+      # 2026-11-02 密钥整改：两把密钥只从环境变量注入，缺一个都拒绝启动。
+      # 生成：openssl rand -base64 24（各生成一次，两把必须不同）
+      SMARTDOCK_AI_CONFIG_KEY: ${SMARTDOCK_AI_CONFIG_KEY:?请设置 SMARTDOCK_AI_CONFIG_KEY（openssl rand -base64 24）}
+      SMARTDOCK_MCP_HEADERS_KEY: ${SMARTDOCK_MCP_HEADERS_KEY:?请设置 SMARTDOCK_MCP_HEADERS_KEY（openssl rand -base64 24）}
     volumes:
       - ./logs/backend:/app/logs
     depends_on:

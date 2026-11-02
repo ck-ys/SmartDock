@@ -46,8 +46,9 @@ public class DcsAiProviderAccess extends BaseEntity {
     /** Q5-A：接口格式（空=兼容存量按 Chat Completions） */
     private String apiFormat;
 
-    /** API Key，加密链与 dcs_ai_config.api_key 同源（显式 AES + 同一专用密钥，存量密文可直接迁移） */
-    @EncryptField(algorithm = AlgorithmType.AES, password = "DcsAiCfgEncKey16")
+    /** API Key，加密链与 dcs_ai_config.api_key 同源（显式 AES + 同一专用密钥，存量密文可直接迁移）。
+     *  2026-11-02 密钥整改：密钥来自 SMARTDOCK_AI_CONFIG_KEY，源码内不再出现字面量 */
+    @EncryptField(algorithm = AlgorithmType.AES, password = "${smartdock.encrypt.ai-config-key}")
     private String apiKey;
 
     /** 厂商控制台直达链接（可选，ZCode apiKeyManagementUrl 同款） */

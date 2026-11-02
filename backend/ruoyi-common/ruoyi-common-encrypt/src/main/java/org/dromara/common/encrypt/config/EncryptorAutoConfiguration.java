@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 
 /**
  * 加解密配置
@@ -34,13 +35,15 @@ public class EncryptorAutoConfiguration {
     }
 
     @Bean
-    public MybatisEncryptInterceptor mybatisEncryptInterceptor(EncryptorManager encryptorManager) {
-        return new MybatisEncryptInterceptor(encryptorManager, properties);
+    public MybatisEncryptInterceptor mybatisEncryptInterceptor(EncryptorManager encryptorManager,
+                                                               Environment environment) {
+        return new MybatisEncryptInterceptor(encryptorManager, properties, environment);
     }
 
     @Bean
-    public MybatisDecryptInterceptor mybatisDecryptInterceptor(EncryptorManager encryptorManager) {
-        return new MybatisDecryptInterceptor(encryptorManager, properties);
+    public MybatisDecryptInterceptor mybatisDecryptInterceptor(EncryptorManager encryptorManager,
+                                                               Environment environment) {
+        return new MybatisDecryptInterceptor(encryptorManager, properties, environment);
     }
 
 }

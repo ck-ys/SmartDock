@@ -38,8 +38,15 @@ docker compose up -d --build
 PostgreSQL/Redis 默认口令为 `changeit`，MinIO 为 `minioadmin`，请用环境变量覆盖：
 
 ```bash
-POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... docker compose up -d
+POSTGRES_PASSWORD=... REDIS_PASSWORD=... MINIO_PASSWORD=... \
+SMARTDOCK_AI_CONFIG_KEY=$(openssl rand -base64 24) \
+SMARTDOCK_MCP_HEADERS_KEY=$(openssl rand -base64 24) \
+docker compose up -d
 ```
+
+> `SMARTDOCK_AI_CONFIG_KEY` / `SMARTDOCK_MCP_HEADERS_KEY` 是 AI 厂商 Key 与 MCP 请求头令牌的落库加密密钥：
+> 两把必须不同、16/24/32 位；缺一个后端都会拒绝启动。从旧版本升级时首次启动会自动换锁，
+> 之后请到厂商后台把对应 Key/令牌也换新。
 
 ## 4. 首启后的一次性配置
 

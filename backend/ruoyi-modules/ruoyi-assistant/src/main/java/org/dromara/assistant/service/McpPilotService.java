@@ -16,6 +16,7 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -55,10 +56,10 @@ public class McpPilotService {
     private static final Set<String> ALLOWED_COMMANDS = Set.of("node", "node.exe");
     private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{2,29}$");
 
-    /** G4-#1 headers 显式加密密钥（16 位——AES 硬性要求 16/24/32；与实体注解同值，
-     *  ENC_ 前缀幂等互认不会双重加密）。首版 "DcsMcpEncKey16" 是 14 位：拦截器路径
-     *  抛 IllegalArgument 被其 catch 吞掉→明文落库（活库 g4htest 行实锤） */
-    static final String HEADERS_ENC_KEY = "DcsMcpHeadersK16";
+    /** G4-#1 headers 加密密钥（2026-11-02 密钥整改：不再写死，只从
+     *  smartdock.encrypt.mcp-headers-key / SMARTDOCK_MCP_HEADERS_KEY 读取；
+     *  与实体注解同值，ENC_ 前缀幂等互认不会双重加密。启动自检见
+     *  EncryptKeyStartupRunner——缺失/长度错/旧版内置钥匙一律拒绝启动） */
 
     /**
      * G4-#1 实测坑（2026-10-22 活库 g4htest 行实锤）：@EncryptField 注解在、启动扫描
@@ -75,6 +76,8 @@ public class McpPilotService {
     private final DcsMcpServerMapper serverMapper;
     private final DcsMcpCallLogMapper callLogMapper;
     private final io.agentscope.spring.boot.agui.common.ThreadSessionManager threadSessionManager;
+    /** 2026-11-02 密钥整改：请求头加密密钥从环境变量读（smartdock.encrypt.mcp-headers-key） */
+    private final Environment environment;
 
     /**
      * 三审回修（三席共识 P0/进程泄漏）：(rcUserId, threadId) → 本会话 attach 的 MCP 客户端。
@@ -327,13 +330,17 @@ public class McpPilotService {
         return m.encrypt(plainJson, headersEncryptContext());
     }
 
-    /** headers 显式解密：ENC_ 密文 → 明文 JSON；历史明文/空原样返回（幂等兼容） */
+    /** headers 显式解密：ENC_ 密文 → 明文 JSON；历史明文/空原样返回（幂等兼容）。
+     *  2026-11-02：加密组件缺失时不再原样返回密文——否则挂载会把 "ENC_..." 当请求头发出去 */
     String decryptHeaders(String storedJson) {
         if (storedJson == null || !storedJson.startsWith("ENC_")) {
             return storedJson;
         }
         org.dromara.common.encrypt.core.EncryptorManager m = encryptorManagerProvider.getIfAvailable();
-        return m == null ? storedJson : m.decrypt(storedJson, headersEncryptContext());
+        if (m == null) {
+            throw new ServiceException("加密组件未启用（mybatis-encryptor.enable），无法读取 MCP 请求头");
+        }
+        return m.decrypt(storedJson, headersEncryptContext());
     }
 
     /** G4-#1：回显键名（逗连）——解密后取；管理面列表唯一出口（值永不出库到前端）。
@@ -359,10 +366,15 @@ public class McpPilotService {
         }
     }
 
-    private static org.dromara.common.encrypt.core.EncryptContext headersEncryptContext() {
+    private org.dromara.common.encrypt.core.EncryptContext headersEncryptContext() {
+        String key = environment.getProperty("smartdock.encrypt.mcp-headers-key", "");
+        if (key == null || key.isBlank()) {
+            // 启动自检已挡；这里是防御性兜底（禁止空密钥加密）
+            throw new ServiceException("MCP 请求头加密密钥未配置（SMARTDOCK_MCP_HEADERS_KEY）");
+        }
         org.dromara.common.encrypt.core.EncryptContext c = new org.dromara.common.encrypt.core.EncryptContext();
         c.setAlgorithm(org.dromara.common.encrypt.enumd.AlgorithmType.AES);
-        c.setPassword(HEADERS_ENC_KEY);
+        c.setPassword(key);
         c.setEncode(org.dromara.common.encrypt.enumd.EncodeType.BASE64);
         return c;
     }
