@@ -40,6 +40,8 @@ SmartDock 是一套**开源通用智能体引擎**，附带一条可独立使用
 </tr>
 </table>
 
+<p align="center"><img src="docs/images/screenshots/06a-assistant-demo.gif" width="420" alt="AI 助手：一次完整问答"><br><sub>一次完整问答（录屏）：思考 → 调工具 → 引用来源 → 给结论；工具面之外就直说查不到</sub></p>
+
 <sub>截图来自真实运行的演示环境，数据由 `backend/script/demo/seed-internal-ops-demo.js` 生成（合成数据，不含真实个人信息）；部分截图拍摄于 v3.42.2，界面细节可能与当前版本略有差异。</sub>
 
 <p align="center">
@@ -148,10 +150,10 @@ minRole: publisher
 
 ## 快速开始
 
-> **只想最快看到界面？** 按「方式一」起好后端与前端（约 3 分钟），用内置演示账号登录即可浏览全部页面
-> （AI 助手需先在「AI 模型配置」录入一个供应商 Key 才能对话）。想看满数据，再跑一次造数脚本、点一次
-> **「画像与分析 → 重建汇总」**——使用概览、漏斗、留存、明细等报表全部有数
-> （约 292 事件 / 81 会话 / 4 位同事的内部协作演示口径；实时看板只统计最近 5 分钟，演示种子是历史数据、显示为空属正常）。Java 接入 10 分钟指南见
+> **只想最快看到效果？** 按「方式一」起好后端与前端（约 3 分钟），用内置演示账号登录，进「AI 助手」——
+> 先在「AI 模型配置」录入一个供应商 Key，就能在助手抽屉或全屏会话页里对话、看工具调用链。
+> 画像侧想看满数据，再跑一次造数脚本、点一次「重建汇总」（约 292 事件 / 81 会话 / 4 位同事的合成演示口径；
+> 实时看板只统计最近 5 分钟，演示种子是历史数据、显示为空属正常）。画像 Java 接入 10 分钟指南见
 > [docs/profile-integration.md](docs/profile-integration.md)，协议字段表见
 > [docs/profile-engine.md](docs/profile-engine.md#2-通用接入协议)。
 
@@ -375,8 +377,6 @@ public class BizEventReporter {
 
 ### AI 助手
 
-<p align="center"><img src="docs/images/screenshots/06a-assistant-demo.gif" width="384" alt="AI 助手：一次完整问答"><br><sub>一次完整问答：思考 → 调工具 → 引用来源 → 给结论；工具面之外就直说查不到</sub></p>
-
 1. 登录后进入「AI 模型配置」，配置模型供应商与 API Key；
 2. 为模型维护 **CNY 价格行**（价格目录维护或自动探测）——无人民币价格行的模型不会进入可选列表；
 3. 在「AI 助手管理」设置默认模型；
@@ -389,6 +389,7 @@ public class BizEventReporter {
 - 思考档位切换（快 / 平衡 / 深）
 - 工具调用可视化（含耗时与来源数）
 - HITL 写操作确认
+- 计划卡：多步任务先列计划，可以「开始执行 / 改一下 / 取消」，选择都在输入框位置完成
 - 技能库（助手的操作手册）与 MCP 外部工具，按角色与租户分档开关
 
 <table>
@@ -399,24 +400,15 @@ public class BizEventReporter {
 </table>
 
 > 基线不包含任何 AI Key；没有可用模型配置时，助手会明确提示未配置，不会静默降级到其他租户或平台配置。
-> 工具面之外的问题它会直说「查不到」，不编数字——这一点在上面动图里能看到。
+> 工具面之外的问题它会直说「查不到」，不编数字。
 
-### 用户画像
+### 用户画像（配套）
 
 1. 业务系统通过 `ProfileEventPublisher` 发送事件（见 [把自己的业务接进来](#把自己的业务接进来)）；
 2. 在「画像工作室」配置维度、权重与覆盖度；
 3. 触发重算，查看主体画像与历史快照。
 
-<p align="center"><img src="docs/images/screenshots/03-profile-detail.png" alt="画像详情：维度雷达、总分趋势与逐维证据" width="100%"></p>
-
-### 配置与运营
-
-<table>
-<tr>
-<td width="50%"><img src="docs/images/screenshots/05-model-config.png" alt="AI 模型与钥匙"><br><sub>AI 模型与钥匙：按厂商管模型、价格、钥匙与巡检</sub></td>
-<td width="50%"><img src="docs/images/screenshots/04-profile-studio.png" alt="画像工作室"><br><sub>画像工作室：7 套场景模板一键预填，维度/权重/分群/漏斗可完全自建</sub></td>
-</tr>
-</table>
+画像的界面与运营细节见 [画像引擎文档](docs/profile-engine.md)，这里不再展开。
 
 ### 内置 Demo
 
@@ -435,33 +427,20 @@ public class BizEventReporter {
 
 ## 更多界面
 
-画像与分析侧的四个界面——分析深度、画像运营与企业合规：
+智能体治理的四个面——租户级管控、能力门槛、MCP 外部服务、用量与额度：
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/07-analytics-funnel.png" alt="转化漏斗"><br><sub>转化漏斗：内置 demo 的真实任务链路——任务发布 → 数据提交 → 审核通过，每一步的流失去向都写在下方</sub></td>
-<td width="50%"><img src="docs/images/screenshots/08-profile-segments.png" alt="标签分群"><br><sub>标签分群：规则只写一次，成员按最新快照实时求值，运行记录可追溯</sub></td>
+<td width="50%"><img src="docs/images/screenshots/16-assistant-tenant.png" alt="租户设置"><br><sub>租户设置：助手开关、每日回合上限、联网次数、日预算、自动压缩阈值，一屏管住</sub></td>
+<td width="50%"><img src="docs/images/screenshots/17-assistant-panorama.png" alt="能力全景"><br><sub>能力全景：助手会用哪些工具、怎么执行、什么门槛、本租户是否生效，逐项列清</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/09-profile-review.png" alt="低分复核"><br><sub>低分复核：低于阈值自动入队；确认或驳回后，分数没有继续下降就不再重复打扰</sub></td>
-<td width="50%"><img src="docs/images/screenshots/10-compliance.png" alt="合规中心"><br><sub>合规中心：敏感字段打码规则、主体级删除、导出审计，一页管齐并全部留痕</sub></td>
+<td width="50%"><img src="docs/images/screenshots/18-assistant-mcp.png" alt="外部工具 MCP"><br><sub>外部工具：MCP 服务挂载与调用审计——每次挂载、每次调用都落账，按租户限频</sub></td>
+<td width="50%"><img src="docs/images/screenshots/19-assistant-quota.png" alt="用户额度"><br><sub>用户额度：每人每日回合与联网次数、本月费用、超额状态，按人可调</sub></td>
 </tr>
 </table>
 
 ## 扩展指南
-
-### 新增画像维度
-
-向 `profile_score_dimension` 插入配置（`prop` / `dedupKey` 键名需匹配 `^[A-Za-z][A-Za-z0-9_]{0,62}$`）：
-
-```json
-{
-  "metric": { "operator": "COUNT", "target": { "eventName": "task.published" } },
-  "window": { "type": "all" },
-  "score": { "type": "linear", "direction": "higher", "lo": 0, "hi": 100 },
-  "missing": "neutral"
-}
-```
 
 ### 新增业务工具
 
@@ -475,6 +454,23 @@ public class BizEventReporter {
 @Bean
 public AguiAgentRegistryCustomizer myAgentCustomizer() {
     return registry -> registry.registerFactory("my-agent", loginUser -> myAgentFactory.create(loginUser));
+}
+```
+
+### 新增技能
+
+在管理台「AI 助手管理 → 技能库」新建，或往 `config/skills/<技能名>/SKILL.md` 放一个文件：YAML frontmatter 写 `name/description/displayName/minRole`，正文写操作步骤。`description` 决定模型何时调用它，正文只在用到时进上下文。
+
+### 新增画像维度（配套）
+
+向 `profile_score_dimension` 插入配置（`prop` / `dedupKey` 键名需匹配 `^[A-Za-z][A-Za-z0-9_]{0,62}$`）：
+
+```json
+{
+  "metric": { "operator": "COUNT", "target": { "eventName": "task.published" } },
+  "window": { "type": "all" },
+  "score": { "type": "linear", "direction": "higher", "lo": 0, "hi": 100 },
+  "missing": "neutral"
 }
 ```
 
