@@ -43,7 +43,7 @@
                   <span class="ag-tile" aria-hidden="true">{{ s.name.slice(0, 1) }}</span>
                   <b class="ag-card-n">{{ s.name }}</b>
                 </div>
-                <p class="ag-card-d">{{ s.desc }}</p>
+                <p class="ag-card-d">{{ descOf(s.desc) }}</p>
                 <div class="ag-card-m">{{ s.source === 'recent' ? `你用过 ${s.count} 次` : '技能库' }}</div>
               </article>
             </div>
@@ -117,6 +117,15 @@ const cando = computed<CandoRow[]>(() => {
   }
   return out.slice(0, 3);
 });
+
+/** 技能描述是 SKILL.md 原文，十个里有十个长成「用户说「A/B/C」时，真正的能力描述」。
+ *  卡片正文只放后半句：前半句是触发词，放进卡片会把正文挤成半句就截断（「用户说「写周报/帮我
+ *  写本周周报/周报怎么…」），读着像没写完。不是这套句式的技能原样透传，不改作者文案。 */
+function descOf(d: string): string {
+  const s = (d || '').trim();
+  const hit = s.match(/^用户说[「『][^」』]*[」』]\s*时[，,]\s*([\s\S]+)$/);
+  return (hit && hit[1].trim()) || s;
+}
 
 /** 空态文案分三种：还在读 / 读失败 / 真的没有——三件事不能混成一句「技能库是空的」 */
 const stripEmptyText = computed(() => {
@@ -239,11 +248,12 @@ html.dark .agent-ws {
   height: calc(100dvh - 48px);
 }
 
-/* 进门内容：与消息列同宽同轴（900 居中）。实测输入框可见盒 .box 正是 900 @ x=426，
-   所以这里不再加左右内距——加 12 会让标题和卡片比输入框内缩 12px（原型 D3 也是 900 贴边） */
+/* 进门内容：与输入框同一条列几何。宽度必须读 --dcs-col-max（Composer 观测宿主宽写的
+   单一真源：宿主 ≥1380 时 900 → 1080），不能写死 900——写死的话全屏下输入框 1080、
+   标题和卡片还是 900，三张卡比上面的输入框窄一圈、左边缘也对不齐。 */
 .ag-dcol {
   width: 100%;
-  max-width: 900px;
+  max-width: var(--dcs-col-max, 900px);
   margin-inline: auto;
   /* 容器基线定 13：不写就继承 body 的 16px，档外字号会从这里漏进新加的元素 */
   font-size: 13px;
@@ -341,7 +351,6 @@ html.dark .ag-card:hover {
 }
 .ag-card-d {
   margin: 8px 0 0;
-  min-height: 40px;
   font-size: 13px;
   line-height: 20px;
   color: var(--mut);
@@ -350,9 +359,10 @@ html.dark .ag-card:hover {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* 原来 min-height:40 + margin-top:auto 把「技能库」顶到卡片底部：正文两行撑满、
+   底下一条孤零零的字，卡片看着又高又空。现在正文按实际行数走，出处紧跟其后 */
 .ag-card-m {
-  margin-top: auto;
-  padding-top: 12px;
+  margin-top: 8px;
   font-size: 12px;
   color: var(--faint);
 }
