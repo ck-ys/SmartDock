@@ -2457,6 +2457,20 @@ defineExpose({
     text-align: center;
   }
 }
+/* 深色档：联网钮的浅蓝底 #e8f3ff 是亮色专用——在深色输入框 #1a2430 上它渲染成
+   全页最亮的白块（对面板 15.6:1），把「输入框是唯一被点亮的物件」抢走了。
+   换成主色暗底（dark 档 light-9 = #16283f / 主色 #4a8cf7）。
+   注意：这条必须写在 .brow 外面并带 .brow 前缀——写进 .brow 里 scss 会编成
+   「.brow 的后代 html.dark」，永不命中（本轮实测踩过） */
+html.dark .brow .btool.bicon.wbtn.on {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary, #409eff);
+
+  &:hover {
+    background: var(--el-color-primary-light-8);
+    color: var(--el-color-primary, #409eff);
+  }
+}
 .box {
   position: relative;
   display: flex;
@@ -2480,6 +2494,11 @@ defineExpose({
   &.focus {
     border-color: #79bbff;
     background: #fafbfc;
+  }
+  /* 深色档不能用同一个 #fafbfc：字号色跟着 --el-text-color-primary 变成 #e4ecf4，
+     压在近白底上对比度只有 1.15:1——打了字看不见（三席实测）。底改成和容器同族的抬升层 */
+  html.dark &.focus {
+    background: var(--el-fill-color-light);
   }
   &.dragover {
     border: 1px dashed var(--el-color-primary);
@@ -2662,6 +2681,8 @@ defineExpose({
       color: var(--el-color-primary, #409eff);
     }
   }
+  /* 深色档：上面那块浅蓝是亮色专用（覆盖写在 .brow 外，见文件下方 —— 在 .brow 里写
+     html.dark 会被编译成「.brow 的后代 html」，永不命中） */
   /* 状态弹窗联网行：额度用完整行红（与回合行红色数字同语义，加行级提示） */
   .ctxrow.web-out,
   .ctxrow.web-out + .ctxsub {
