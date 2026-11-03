@@ -10,6 +10,13 @@
       <top-bar id="topbar-container" class="topbar-container" />
     </template>
     <div class="right-menu flex align-center">
+      <!-- 批3：智能体工作台入口（业务壳 → 全屏工作台）。放在搜索左侧做「换端」锚点，
+           与工作台侧栏「返回业务系统」配对；无权限不渲染。 -->
+      <button v-if="canAgent" type="button" class="nav-agent" aria-label="进入智能体工作台" @click="goAgent">
+        <IconSpan name="bot" :size="15" />
+        <span v-if="appStore.device !== 'mobile'" class="nav-agent__label">智能体工作台</span>
+        <IconSpan v-if="appStore.device !== 'mobile'" name="arrow-up-right" :size="12" class="nav-agent__arrow" />
+      </button>
       <!-- 方案一：顶栏只留 5 个——搜索 / 消息 / 外观 / 全屏 / 头像。
            租户搬左上品牌行，反馈回头像菜单，语言/字号/主题收进外观抽屉（见 DcsAppearanceDrawer） -->
       <button v-if="appStore.device !== 'mobile'" type="button" class="nav-search" aria-label="搜索页面" @click="openPalette">
@@ -73,6 +80,7 @@ import { useAnnouncementStore } from '@/store/modules/announcement';
 import notice from './notice/index.vue';
 import DcsAppearanceDrawer from '@/components/DcsAppearanceDrawer/index.vue';
 import DcsUserMenu from '@/components/DcsUserMenu/index.vue';
+import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import { ElMessage } from 'element-plus';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import Logo from '@/layout/components/Sidebar/Logo.vue';
@@ -91,6 +99,10 @@ const setLayout = () => {
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const route = useRoute();
+const router = useRouter();
+// 批3：换端入口与 /agent 页内自检同一条权限串；超管走通配
+const canAgent = computed(() => userStore.permissions.includes('*:*:*') || userStore.permissions.includes('agentws:workspace:use'));
+const goAgent = () => router.push('/agent');
 // 反馈弹窗由 layout 持有（左下用户行也要能开同一个框），这里只发事件
 const requestFeedback = () => emit('feedback', 'submit');
 
@@ -148,6 +160,44 @@ onMounted(() => {
   top: 4px;
   right: 2px;
   transform: translateY(-50%);
+}
+
+.nav-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 32px;
+  margin-right: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-control-radius);
+  background: transparent;
+  color: var(--app-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+.nav-agent:hover {
+  background: var(--app-raised);
+  border-color: var(--app-control);
+}
+.nav-agent:active {
+  background: var(--app-active);
+}
+.nav-agent__arrow {
+  color: var(--app-muted);
+}
+@media (max-width: 991px) {
+  .nav-agent {
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+  }
 }
 
 .nav-search {

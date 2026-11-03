@@ -68,6 +68,15 @@ export const constantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/agreement/PrivacyPolicy.vue'),
     hidden: true
   },
+  // 智能体工作台（批3 · V8 纸面进门）：独立分区——不套业务壳层（自带 264 左栏与品牌）。
+  // 权限串 agentws:workspace:use 由页面内自检（角色绑定走 sys_menu 12060 按钮行，不生成动态路由，
+  // 避免同一个组件在业务壳内再注册一份）；未授权跳 /403 说明页。
+  {
+    path: '/agent',
+    component: () => import('@/views/dcs/agent/index.vue'),
+    hidden: true,
+    meta: { title: '智能体工作台', noCache: true }
+  },
   {
     path: '/401',
     component: () => import('@/views/error/401.vue'),

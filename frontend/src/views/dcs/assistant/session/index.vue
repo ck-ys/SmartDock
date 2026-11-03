@@ -640,7 +640,11 @@ function onSend(q: string, stamp = '', fwd: Record<string, unknown> = {}) {
   send(q, stamp, fwd);
 }
 function onGateOk() {
+  // 交接提示词被须知门挂起时，输入框里还留着同一句；放行后 gateOk 会把 pending 发出去，
+  // 草稿必须同步清掉，否则用户再按回车就是第二条（三席审查 P1-2 的门控分支）
+  const pending = state.gatePendQ;
   gateOk();
+  if (pending && composerRef.value?.draftText === pending) composerRef.value?.clearDraft();
 }
 function onStop() {
   stop(true);
@@ -977,7 +981,58 @@ function watchPageRemote(c: AssistantConversation) {
   pageWatchers.set(c.threadId, timer);
 }
 
-onMounted(loadConversations);
+/** 智能体工作台（/agent）跨页交接：一次性指令放 sessionStorage（长提示词不走 query）。
+ *  - conv：打开指定会话（工作台「最近会话」点进来）
+ *  - prefill + new：提示词落到新会话并直接发送（工作台发送 / 场景卡）
+ *  - at：写入时刻。只认 2 分钟内的指令——跳转失败（403/登录过期/导航中止）留下的旧 key
+ *    不会在以后某次正常进入时突然自动发送（多席审查 P1-4）。
+ *  消费即清；仍走同一条 onSend 路径（须知门/归档拦截照常生效）。 */
+const HANDOFF_TTL_MS = 2 * 60_000;
+let handoffDisposed = false;
+
+async function consumeAgentHandoff() {
+  const at = Number(sessionStorage.getItem('dcs.agent.at') ?? 0);
+  const convId = sessionStorage.getItem('dcs.agent.conv');
+  const prefill = sessionStorage.getItem('dcs.agent.prefill');
+  const wantNew = sessionStorage.getItem('dcs.agent.new') === '1';
+  sessionStorage.removeItem('dcs.agent.conv');
+  sessionStorage.removeItem('dcs.agent.prefill');
+  sessionStorage.removeItem('dcs.agent.new');
+  sessionStorage.removeItem('dcs.agent.at');
+  if (handoffDisposed || !at || Date.now() - at > HANDOFF_TTL_MS) return;
+  if (convId) {
+    const hit = conversations.value.find((c) => String(c.id) === convId || c.threadId === convId);
+    if (hit) {
+      await openConversation(hit);
+      return;
+    }
+    ElMessage.warning('这条会话不在当前列表（可能已删除或列表未加载），已停在新会话');
+  }
+  if (prefill) {
+    // 工作台发起的任务一律新会话：不吃上次会话残留的 threadId/上下文
+    if (wantNew) onNewSession();
+    composerRef.value?.setDraft(prefill);
+    composerRef.value?.focus();
+    const archived = state.curConvArchived || selected.value?.status === 'ARCHIVED';
+    const turnsBefore = state.turns.length;
+    const queueBefore = state.queue.length;
+    onSend(prefill);
+    // 只有「真的落到回合或队列」才清草稿：被禁用/待确认/归档拦下时原文必须留着，
+    // 否则工作台已清空 + 会话页再清空 = 用户输入彻底丢失（复核 P1-1）。
+    const accepted = state.turns.length > turnsBefore || state.queue.length > queueBefore;
+    if (!archived && accepted) composerRef.value?.clearDraft();
+  }
+}
+
+onMounted(async () => {
+  await loadConversations();
+  if (handoffDisposed) return;
+  await consumeAgentHandoff();
+});
+
+onBeforeUnmount(() => {
+  handoffDisposed = true;
+});
 
 /** 业务批(1015) Q15：答完递进补刷列表（3.5/5.5/9s，与追问侧车同款时序）——标题侧车
  *  几秒后才改写短标题，单次刷新常读旧值；静默模式不闪 loading；卸载回收防登出后 401 幽灵 */

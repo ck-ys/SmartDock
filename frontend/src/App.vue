@@ -1,6 +1,11 @@
 <template>
   <el-config-provider :locale="appStore.locale" :size="appStore.size">
-    <router-view />
+    <!-- 批3：业务壳 ↔ 智能体工作台是顶层换端，给一次轻微淡入（内页切换走 AppMain 既有过渡，不受影响） -->
+    <router-view v-slot="{ Component }">
+      <transition name="shell-fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
   </el-config-provider>
 </template>
 
@@ -17,3 +22,20 @@ const appStore = useAppStore();
 const settingsStore = useSettingsStore();
 applyThemeMode(settingsStore.dark);
 </script>
+
+<style>
+.shell-fade-enter-active,
+.shell-fade-leave-active {
+  transition: opacity 0.14s ease;
+}
+.shell-fade-enter-from,
+.shell-fade-leave-to {
+  opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-fade-enter-active,
+  .shell-fade-leave-active {
+    transition: none;
+  }
+}
+</style>

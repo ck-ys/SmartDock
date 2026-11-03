@@ -63,6 +63,14 @@ router.beforeEach(async (to) => {
         // hack方法 确保addRoutes已完成：以 replace 重放当前导航
         return { path: to.path, replace: true, params: to.params, query: to.query, hash: to.hash, name: to.name as string };
       } else {
+        // 批3 · V8 进门：有工作台权限时 AI 助手菜单落 /agent（工作台内跳会话带 from=agent 放行）。
+        // 只授过 11920 的自定义/存量角色不劫持——照旧进会话页，避免菜单点出 /403。
+        const perms = useUserStore().permissions ?? [];
+        const hasAgentWs = perms.includes('*:*:*') || perms.includes('agentws:workspace:use');
+        if (hasAgentWs && (to.path === '/ai/assistant' || to.path === '/ai/assistant/') && to.query.from !== 'agent') {
+          NProgress.done();
+          return { path: '/agent', replace: true };
+        }
         // 批一 P0-3：有登录但导航只命中 404 兜底通配（NOT_FOUND_ROUTE_PATH，与 router/index.ts
         // 共享常量），说明动态路由表里没有这条路径。后端 getRouters 按权限过滤菜单，前端拿不到
         // 全量菜单清单，无法区分「系统有但本人无权」与「真不存在」——统一进 /403 说明页

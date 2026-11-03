@@ -17,6 +17,8 @@ export interface AssistantStatus {
   dailyBudgetAmount: string;
   turnsUsedToday: number;
   remainingTurnsToday: number;
+  /** 当前用户被管理员暂停助手（与租户级 enabled 独立的字段；工作台发送闸要看它） */
+  quotaDisabled?: boolean;
   /** 批B B2：带 threadId 时返回——该会话末次模型调用 tokens（上下文环分子；null=空态） */
   contextTokens?: number | null;
 }

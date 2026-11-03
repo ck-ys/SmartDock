@@ -279,3 +279,12 @@ SELECT 6, 11989 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
 INSERT INTO public.sys_role_menu (role_id, menu_id)
 SELECT 6, 12020 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
   AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 12020);
+
+-- 批3(2026-11-03): 智能体工作台入口 agentws:workspace:use(12060) 按「已绑 AI 助手会话 11920」派生
+-- （全新装=角色 5/6；与 migration/2026-11-03_agent_workspace_menu.sql 同构，升级库/全新装口径一致）
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12060
+FROM public.sys_role_menu rm
+JOIN public.sys_role r ON r.role_id = rm.role_id
+WHERE rm.menu_id = 11920
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12060);
