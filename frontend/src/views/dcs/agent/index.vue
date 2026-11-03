@@ -43,7 +43,7 @@
                   <span class="ag-tile" aria-hidden="true">{{ s.name.slice(0, 1) }}</span>
                   <b class="ag-card-n">{{ s.name }}</b>
                 </div>
-                <p class="ag-card-d">{{ descOf(s.desc) }}</p>
+                <p class="ag-card-d" :title="descOf(s.desc)">{{ descOf(s.desc) }}</p>
                 <div class="ag-card-m">{{ s.source === 'recent' ? `你用过 ${s.count} 次` : '技能库' }}</div>
               </article>
             </div>
@@ -170,6 +170,14 @@ onMounted(async () => {
   --tile: #f2f3f5;
   --acc: #0d0d0d;
   --acc-txt: #ffffff;
+  /* 批4：白卡原来和面板共用 --bd（0.10），全页 6 条同重线；卡边单独收淡一档，
+     读起来是「柔边」而不是「画了一根线」。环色 / 落影色都从这里取。
+     静止态故意不到 3:1（要到得用 #949494 中灰实线，和整站安静边框冲突），
+     「我是可以点的」由交互态补：指针移上/键盘聚焦时边框转主色（#2f6feb 对白 4.57:1） */
+  --card-ring: rgba(16, 24, 40, 0.07);
+  --card-ring-2: rgba(16, 24, 40, 0.04);
+  --card-ring-hover: var(--el-color-primary);
+  --card-ring-2-hover: rgba(16, 24, 40, 0.06);
   --app-chrome: 0px;
   min-height: 100vh;
   display: flex;
@@ -187,6 +195,12 @@ html.dark .agent-ws {
   --tile: rgba(255, 255, 255, 0.06);
   --acc: #e9ebee;
   --acc-txt: #17191c;
+  /* 深色档不能照搬亮色的黑影：卡片本来就比容器亮一点点（1.05:1），再压一层黑影
+     四周反而更暗，读起来像「挖了个坑」。深色下取消落影，靠底色抬升 + 一条更亮的边成形 */
+  --card-ring: rgba(255, 255, 255, 0.13);
+  --card-ring-2: transparent;
+  --card-ring-hover: var(--el-color-primary);
+  --card-ring-2-hover: transparent;
 }
 
 /* 顶栏：字号 12/14、间距 4/8/12、圆角 4/8，全部对齐 dcs-tokens 六档（原 13.5px/650/6px/30px 在档外） */
@@ -311,20 +325,31 @@ html.dark .agent-ws {
   display: flex;
   flex-direction: column;
   padding: 16px;
-  border: 1px solid var(--bd);
+  /* 批4：白卡原来靠 1px 边成形，和面板边同重、全页 6 条同色线；把同一条边的颜色调淡一档，
+     读起来比线软。**不用外扩的环阴影**：0 0 0 1px 画在 border-box 外面，卡会比输入框
+     左右各宽 1px、16px 的 gap 读成 14px——本页刚把「卡和输入框不同宽」当过问题修 */
+  border: 1px solid var(--card-ring);
   border-radius: 12px;
   background: var(--panel);
+  box-shadow: 0 1px 2px var(--card-ring-2);
   text-align: left;
   cursor: pointer;
   transition:
     border-color 0.16s,
-    background-color 0.16s;
+    box-shadow 0.16s;
 }
-.ag-card:hover {
-  border-color: rgba(13, 13, 13, 0.28);
+/* 键盘聚焦与指针悬停同一条反馈：边界转主色——静止态那条淡边不够 3:1（见上方令牌注释），
+   交互态这条 4.57:1 才过 WCAG 1.4.11 */
+.ag-card:hover,
+.ag-card:focus-visible {
+  border-color: var(--card-ring-hover);
+  box-shadow: 0 2px 6px var(--card-ring-2-hover);
 }
-html.dark .ag-card:hover {
-  border-color: rgba(255, 255, 255, 0.32);
+/* 颜色预算（批4 题6 甲）：平时中性灰块，指针移上去才转主色——色只放在"要动手"的地方 */
+.ag-card:hover .ag-tile,
+.ag-card:focus-visible .ag-tile {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
 }
 .ag-card-hd {
   display: flex;
@@ -343,6 +368,9 @@ html.dark .ag-card:hover {
   color: var(--text);
   font-size: 15px;
   font-weight: 500;
+  transition:
+    background-color 0.16s,
+    color 0.16s;
 }
 .ag-card-n {
   font-size: 14px;
@@ -358,6 +386,11 @@ html.dark .ag-card:hover {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* 批4：三卡并排时眼睛横扫的是同一条线，正文一行 / 两行不定会让出处行一高一低
+     （实测 720 / 720 / 740，差 20px）。给正文一个两行高，出处自然对齐。
+     断点口径跟全仓统一在 992（不另写 993，否则 992~993 之间那 1px 落空档）：
+     手机档在下方 ≤992 里归零——那是竖排，没有横向对齐这回事，加了两张卡白长 20px */
+  min-height: 40px;
 }
 /* 原来 min-height:40 + margin-top:auto 把「技能库」顶到卡片底部：正文两行撑满、
    底下一条孤零零的字，卡片看着又高又空。现在正文按实际行数走，出处紧跟其后 */
@@ -389,6 +422,10 @@ html.dark .ag-card:hover {
      否则卡片比输入框宽出一圈，读起来是两套边 */
   .ag-dcol {
     padding: 0 24px;
+  }
+  /* 竖排没有「横向对齐出处行」这回事，两行高只让每张卡白长 20px */
+  .ag-card-d {
+    min-height: 0;
   }
 }
 </style>

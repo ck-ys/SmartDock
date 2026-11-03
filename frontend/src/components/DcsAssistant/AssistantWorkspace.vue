@@ -1504,6 +1504,15 @@ defineExpose({
      ③ 标题条在空态收起（「新会话」与进门内容重复）④ 剩下的内容作为一组居中。
      会话页 variant=session，agEmpty 恒 false，以上一条都不会命中。 */
   .main.ag-empty {
+    /* 批4：整组下沉。实测原来是一像素不差的几何居中（上 295 / 下 294），但框内「上紧下松」——
+       标题到输入框只有输入框自己的 8px 内边距，卡片下面却空 294px，眼睛就把整块读高了。
+       center 对齐下 padding-top 只会把内容推下「一半」，所以乘 2：1080 屏 lift=28px、整组下沉约 56px。
+       手机档在下方的 ≤992 里归零——那档内容已经比一屏高，下沉会把输入框顶出首屏。 */
+    --ag-lift: clamp(0px, 2.6vh, 30px);
+    padding-top: calc(var(--ag-lift) * 2);
+    /* 批4：输入框投影走令牌，深色只换值。原来深色另写一条选择器，两条类计数相同，
+       是靠一个 html 类型选择器破平局——日后给亮色那条多挂一个类，深色就静默失效 */
+    --ag-box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 10px 28px -14px rgba(16, 24, 40, 0.16);
     justify-content: center;
     /* 视口一矮（1440×720、125% 缩放）整组就比可用高还高：flex 居中 + overflow:hidden
        会把上下两端同时裁掉且够不到。safe center 在溢出时自动退化成 flex-start，
@@ -1532,9 +1541,20 @@ defineExpose({
        所以深色下把 .box 抬一档底色，形体还在。 */
     :deep(.dcs-comp) {
       background: transparent;
+      /* 批4：标题下沿到输入框上沿原来只有 8px（输入框自己的内边距），标题等于贴在框上。
+         20 是 4/8/12/16/24/32 六档里的「一档半再多」，实测 1440/1920 都读得开 */
+      padding-top: 20px;
+    }
+    /* :not(.focus) 是必需的：这条规则的类计数高于 Composer 自己的 .box.focus，
+       不排除聚焦态就把蓝焦点边压掉了——全站只有本页「点了输入框没反应」 */
+    :deep(.dcs-comp .box:not(.focus)) {
+      border-color: var(--dcs-border-color);
     }
     :deep(.dcs-comp .box) {
-      border-color: var(--dcs-border-color);
+      /* 批4：本页唯一「你要动手」的东西。原来只有 0 1px 2px 4%，和卡片一个平面；
+         现在近处一条细边 + 远处一层柔光，让它成为页面上唯一浮起来的物件。
+         再重一档就成浮层卡片，和整站「安静边框」的基调冲突——这是上限 */
+      box-shadow: var(--ag-box-shadow);
     }
   }
   /* safe center 不支持时退回 flex-start（老 Chrome/Safari）：宁可贴着顶部，
@@ -1542,6 +1562,25 @@ defineExpose({
   @supports not (justify-content: safe center) {
     .main.ag-empty {
       justify-content: flex-start;
+    }
+  }
+
+  /* 批4：手机档不下沉。390×844 实测内容本来就比一屏高 22px（要滚动才看得完第三张卡），
+     再下沉只会把输入框往首屏外推；间隙也从 20 收到 12，省 8px 给技能卡 */
+  @media (max-width: 992px) {
+    .main.ag-empty {
+      --ag-lift: 0px;
+    }
+    .main.ag-empty :deep(.dcs-comp) {
+      padding-top: 12px;
+    }
+  }
+  /* 批4：宽而矮的窗口（1440×720、宽屏拉半高）内容放不下时 safe center 会退成 flex-start，
+     下沉就从「视觉补偿」变成「白占一块死区」把输入框再往下顶。内容高约 417、可用高约视口-74，
+     解 417 + lift×2 > 可用高 得视口 < 520，把闸放在 560 留余量 */
+  @media (min-width: 993px) and (max-height: 560px) {
+    .main.ag-empty {
+      --ag-lift: 0px;
     }
   }
 
@@ -1652,8 +1691,17 @@ defineExpose({
 
 /* 深色档空态：.box 与 .main 同为 --el-bg-color，容器背景透明后只剩 1px 描边会糊在面板里，
    这里给输入卡抬一档底色（html.dark 在组件根之外，只能写在顶层，靠 .main.ag-empty 限定作用域） */
+html.dark .main.ag-empty {
+  /* 深色下黑影看不见，只留落影；「亮环」不用 box-shadow 画——0 0 0 1px 画在 border-box
+     外面，输入框会比下方卡片行左右各宽 1px（实测亮色 x=1655 / 深色 x=1656），
+     改成同一条 border 上换色（见下一条） */
+  --ag-box-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.6);
+}
 html.dark .main.ag-empty :deep(.dcs-comp .box) {
   background: var(--el-fill-color-light);
+}
+html.dark .main.ag-empty :deep(.dcs-comp .box:not(.focus)) {
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 /* ≤992：左侧会话栏改历史抽屉，主对话区全宽 */
