@@ -100,6 +100,17 @@ export function getAssistantSkillCatalog() {
   });
 }
 
+/* 批3.5·题5：当前登录人最近用过的技能（真值来自使用统计表按人维度，倒序前8） */
+export interface AssistantRecentSkill {
+  skillId: string;
+  useCount: number;
+  lastUsedAt: string | null;
+}
+
+export function getAssistantRecentSkills() {
+  return request<AssistantRecentSkill[]>({ url: '/dcs/assistant/skills/recent', method: 'get' });
+}
+
 /* ============ 5b 批：技能在线层管理（能力段「技能库」数据源；读=config 权限，写=skill:edit） ============ */
 
 /** 管理列表行：生效内容（三层叠加后）∪ 停用行；source 标明这行从哪层来 */

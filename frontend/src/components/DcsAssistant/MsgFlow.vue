@@ -33,7 +33,7 @@
       <button v-if="!demoDone" @click="stopDemo(true)">停止演示</button>
     </div>
     <hero-welcome
-      v-if="state.turns.length === 0 && state.queue.length === 0"
+      v-if="!hideWelcome && state.turns.length === 0 && state.queue.length === 0"
       :newbie-use="state.newbieUse"
       :snap="snap"
       @pick="onPick"
@@ -145,6 +145,10 @@ const props = defineProps<{
   follow: boolean;
   full?: boolean;
   snap?: SnapItem[];
+  /** 批3.6：agent 工作台自带进门内容（intro 槽位），不再叠第二块欢迎卡——
+   *  此前 /agent 空态是「工作台欢迎区 + MsgFlow 欢迎卡」两块叠着，卡片被挤到只剩 42%。
+   *  会话页不传，行为一行不变。 */
+  hideWelcome?: boolean;
 }>();
 
 /** 原型 .avatar：用户气泡右端首字圆标（昵称>账号兜底） */
