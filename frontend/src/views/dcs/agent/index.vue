@@ -74,7 +74,7 @@ import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import AssistantWorkspace from '@/components/DcsAssistant/AssistantWorkspace.vue';
 import { useUserStore } from '@/store/modules/user';
 import { getAssistantSkillCatalog, getAssistantRecentSkills } from '@/api/dcs/assistant';
-import { buildSkillDraft, shouldClearOnLeave, shouldPrefillOnHover, skillDesc } from './prefill';
+import { buildSkillDraft, shouldGhostOnHover, skillDesc } from './prefill';
 
 interface CatalogRow {
   id: string;
@@ -130,14 +130,13 @@ const stripEmptyText = computed(() => {
 });
 
 /**
- * 悬停预填（拍板 2026-11-04 题一甲 / 题二甲 / 题四甲）：
+ * 悬停预填（拍板 2026-11-04 题一甲 / 题二甲 / 题四甲；同日用户反馈改灰色半透明幽灵字）：
  * - 句子 = 「用「技能名」帮我：」+ 技能自己的描述（题二甲：不吃第二份手写文案）
- * - 框是空的才填；框里有字（或点击过的句子）就一个字都不动
- * - 填进去之后没改过、鼠标移开 → 清空复原；改过 → 归用户，不清
- * - 点击 = 整段替换（学 ZCode），且这篇归用户，移开不清
+ * - 悬停只写进 placeholder（灰字幽灵层，学 WorkBuddy 观感）：真值仍为空、发不出去；
+ *   框里有字时占位层不显示，用户输入天然不受碰
+ * - 点击 = 整段替换成真文本（学 ZCode），深色可编辑
  * - 手机档（无 hover）不做悬停预填，点一下就是预填（题四·手机档口径）
  */
-const prefill = ref<string | null>(null);
 const hoverFrom = ref<string | null>(null);
 
 function sentenceOf(s: CandoRow): string {
@@ -152,28 +151,24 @@ function draftNow(): string {
 
 function onCardEnter(s: CandoRow) {
   if (!canHoverPrefill()) return;
-  // 用户打的字（或点出来的句子）→ 只高亮卡片，不碰输入框
-  if (!shouldPrefillOnHover(draftNow(), prefill.value)) return;
-  const next = sentenceOf(s);
+  // 框里有用户打的字 → 只高亮卡片，灰字层也不换（占位层反正不显示，判空只为干净）
+  if (!shouldGhostOnHover(draftNow())) return;
   hoverFrom.value = s.id;
-  prefill.value = next;
-  wsRef.value?.setDraft(next);
+  wsRef.value?.setGhostText(sentenceOf(s));
 }
 
 function onCardLeave(s: CandoRow) {
   if (!canHoverPrefill()) return;
-  // 从 A 卡滑到 B 卡时，A 的 leave 可能晚于 B 的 enter——只清自己那张卡的预填
+  // 从 A 卡滑到 B 卡时，A 的 leave 可能晚于 B 的 enter——只撤自己那张卡的灰字
   if (hoverFrom.value !== s.id) return;
-  if (shouldClearOnLeave(draftNow(), prefill.value)) wsRef.value?.clearDraft();
-  prefill.value = null;
+  wsRef.value?.setGhostText(null);
   hoverFrom.value = null;
 }
 
 function pick(s: CandoRow) {
-  wsRef.value?.setDraft(sentenceOf(s));
-  // 点击是明确要它：这篇归用户，鼠标移开不清
-  prefill.value = null;
+  wsRef.value?.setGhostText(null);
   hoverFrom.value = null;
+  wsRef.value?.setDraft(sentenceOf(s));
   wsRef.value?.focusComposer();
 }
 

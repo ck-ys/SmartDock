@@ -93,7 +93,7 @@
         ref="taRef"
         v-model="draft"
         rows="1"
-        :placeholder="disabled ? '管理员已暂停你的 AI 助手使用' : placeholder"
+        :placeholder="disabled ? '管理员已暂停你的 AI 助手使用' : (ghostText ?? placeholder)"
         maxlength="16000"
         :aria-label="`向 ${assistantName} 提问`"
         :readonly="disabled"
@@ -1452,6 +1452,15 @@ const placeholder = computed(() => {
   }
   return phPool.value[phIdx.value % phPool.value.length];
 });
+/**
+ * 悬停预填的「灰字幽灵」层（2026-11-04 用户反馈：学 WorkBuddy 的灰色半透明感觉）：
+ * 悬停技能卡时把整句写进 placeholder——天然半透明灰、真值仍为空（发不出去），
+ * 点卡片才 setDraft 变真文本。占位层不碰 value，也就不存在"冲掉用户输入"。
+ */
+const ghostText = ref<string | null>(null);
+function setGhostText(t: string | null) {
+  ghostText.value = t;
+}
 // 原型 syncThinkBtn：title=思考程度：{档名}（换 THINK 副句后保持按钮 title 口径不变）
 const thinkTitle = computed(() => `思考程度：${THINK[thinkLevel.value].label}`);
 const sendTitle = computed(() => (props.sending ? '排队——答完自动发出' : canSend.value ? '发送（Enter）' : '先输入内容'));
@@ -2174,6 +2183,7 @@ defineExpose({
   draftText: computed(() => draft.value),
   setDraft,
   clearDraft,
+  setGhostText,
   focus: () => taRef.value?.focus(),
   escClosePop
 });

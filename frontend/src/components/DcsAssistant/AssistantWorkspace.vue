@@ -1113,9 +1113,10 @@ defineExpose({
   openConversation,
   reloadConversations: () => void loadConversations(true),
   setDraft: (t: string) => composerRef.value?.setDraft(t),
-  /** 读草稿 / 清空：工作台悬停预填要判"框里有没有字、是不是我们填的那句"（批5 题四甲） */
+  /** 读草稿 / 清空 / 悬停灰字层：工作台悬停预填要判"框里有没有字、是不是我们填的那句"（批5 题四甲） */
   draftText: computed(() => composerRef.value?.draftText ?? ''),
   clearDraft: () => composerRef.value?.clearDraft(),
+  setGhostText: (t: string | null) => composerRef.value?.setGhostText(t),
   focusComposer: () => composerRef.value?.focus()
 });
 </script>

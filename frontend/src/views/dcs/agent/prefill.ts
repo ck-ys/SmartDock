@@ -1,11 +1,12 @@
 /**
- * 工作台技能卡的悬停预填口径（拍板 2026-11-04 题一甲 / 题二甲 / 题四甲）。
+ * 工作台技能卡的悬停预填口径（拍板 2026-11-04 题一甲 / 题二甲 / 题四甲；
+ * 同日用户反馈改成「灰色半透明幽灵字」——学 WorkBuddy 的占位层观感）。
  *
  * 纯函数放这里，页面只负责"什么时候调"——规则本身可单测（`prefill.test.ts`）：
  * 1. 句子 = 「用「技能名」帮我：」+ 技能自己的描述（不吃第二份手写文案，技能改了自动跟着变）；
- * 2. 框是空的才填；框里有字（或点击过的句子）就一个字都不动；
- * 3. 填进去没改过、鼠标移开 → 清空复原；改过一个字就归用户，移开不清；
- * 4. 点击 = 整段替换（学 ZCode：点了就是明确要用它）。
+ * 2. 悬停只写进 placeholder（灰字幽灵层）：真值仍为空、发不出去；
+ * 3. 框里有字就不动（占位层本来就不显示，判空只为干净）；
+ * 4. 点击 = 整段替换成真文本（学 ZCode：点了就是明确要用它）。
  */
 
 /** 技能描述是 SKILL.md 原文，十个里有十个长成「用户说「A/B/C」时，真正的能力描述」。
@@ -23,13 +24,8 @@ export function buildSkillDraft(name: string, desc: string): string {
   return d ? `用「${name}」帮我：${d}` : `用「${name}」帮我：`;
 }
 
-/** 悬停要不要填：框空着，或框里还是我们上次填的那句（换一张卡可以直接换） */
-export function shouldPrefillOnHover(currentDraft: string, ourPrefill: string | null): boolean {
-  const cur = currentDraft;
-  return !cur.trim() || cur === ourPrefill;
+/** 悬停要不要显示灰字幽灵：框空着才显示（有字时占位层不显示，这里判空只为干净） */
+export function shouldGhostOnHover(currentDraft: string): boolean {
+  return !currentDraft.trim();
 }
 
-/** 移开要不要撤回：只有"还是我们填的那句、一个字没改"才撤回 */
-export function shouldClearOnLeave(currentDraft: string, ourPrefill: string | null): boolean {
-  return ourPrefill !== null && currentDraft === ourPrefill;
-}
