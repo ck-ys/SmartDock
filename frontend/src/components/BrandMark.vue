@@ -2,10 +2,10 @@
   <svg class="brand-mark" :width="px" :height="px" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
     <mask :id="maskId">
       <rect width="24" height="24" fill="#fff" />
-      <rect x="7.2" y="2" width="9.6" height="13.6" fill="#000" />
+      <rect x="12.2" y="8.4" width="7.8" height="7.8" fill="#000" />
     </mask>
-    <rect x="2.4" y="2.4" width="19.2" height="19.2" rx="4.2" fill="var(--brand-ink, #12a594)" :mask="`url(#${maskId})`" />
-    <rect x="9.4" y="7.2" width="5.2" height="5.2" fill="var(--brand-signal, #ff5a3c)" />
+    <rect x="2.6" y="2.6" width="18.8" height="18.8" rx="4.6" fill="var(--brand-ink, #12a594)" :mask="`url(#${maskId})`" />
+    <rect x="13.6" y="9.8" width="5" height="5" fill="var(--brand-signal, #ff5a3c)" />
   </svg>
 </template>
 
@@ -16,11 +16,12 @@ let brandMarkSeq = 0;
 
 <script setup lang="ts">
 /**
- * 品牌标「停靠」：一块方料开一个朝上的托槽，珊瑚件坐在槽里，四周留缝。
- * 24 网格：方料 19.2 见方、圆角 4.2；槽 9.6 宽、开口到方料顶边以上（所以轮廓上有个缺口）；
- * 件 5.2 见方，左右缝 2.2、底缝 3.2。珊瑚只用在这颗件上——全站珊瑚只表示「正在发生」。
- * 为什么是开口槽不是封闭窗口：真机 22px 实测，封闭窗口糊成「青块+红点」（像录像键），
- * 开口之后 22px 仍认得出是个托着东西的槽（见 .workshop/logs 2026-11-04）。
+ * 品牌标「停靠」：一块方料右侧铣一个槽，珊瑚件坐在槽里，四周留等宽的缝。
+ * 24 网格：方料 18.8 见方、圆角 4.6；槽 7.8 见方、偏心 4.0（不在正中，这是刻意的）；
+ * 件 5.0 见方，四周缝恒等 1.4——等缝是铣出来的工艺感，不是摆出来的。
+ * 珊瑚只用在这颗件上：全站珊瑚只表示「正在发生」，标上这颗就是"零件在动"。
+ * 小尺寸实测：22px 顶栏下缝约 1.3px 仍可见，读作"方块里嵌着一件"；16px favicon 更紧一些，
+ * 但件与底仍分得开（见 .workshop/logs 2026-11-04）。
  */
 import { computed } from 'vue';
 
