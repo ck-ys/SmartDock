@@ -145,13 +145,13 @@ const skinOptions: { value: AppSkin; label: string; desc: string; preview: Recor
     value: 't1',
     label: 'T1 深蓝稳重',
     desc: '深色导航 + 亮色内容，政企数据平台骨架',
-    preview: { '--pv-shell': '#1e2a38', '--pv-bg': '#eef1f6', '--pv-acc': '#2f6feb' }
+    preview: { '--pv-shell': '#1e2a38', '--pv-bg': '#fafafa', '--pv-acc': '#2f6feb' }
   },
   {
     value: 't7',
     label: 'T7 通用蓝',
     desc: '白侧栏 + 亮蓝主色，通用中台范式',
-    preview: { '--pv-shell': '#ffffff', '--pv-bg': '#f3f5f8', '--pv-acc': '#0052d9' }
+    preview: { '--pv-shell': '#ffffff', '--pv-bg': '#fafafa', '--pv-acc': '#0052d9' }
   }
 ];
 

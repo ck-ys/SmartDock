@@ -15,18 +15,18 @@
 /* ============================ T1 · 浅色（默认） ============================ */
 :root {
   color-scheme: light;
-  /* 结构（2026-10-27 重构拍板 Q2=甲：画布 #f2f4f7 / 卡 #fff / 线 #e2e5ea / 不投阴影） */
-  --app-frame: #f2f4f7;
+  /* 结构（2026-11-04 题三+题六甲：底 #fafafa / 浮起 #f5f5f5 / 卡 #fff / 线 rgba(13,13,13,.1) / 不投阴影） */
+  --app-frame: #fafafa;
   --app-sheet-bg: #ffffff;
-  --app-ground: #f2f4f7;
+  --app-ground: #fafafa;
   --app-surface: #ffffff;
-  --app-raised: #f4f6fa;
+  --app-raised: #f5f5f5;
   --app-active: #e8f0fe; /* 内容面选中底 = accSoft；侧栏选中另有 side-active-* 令牌 */
-  --app-border: #e2e5ea;
-  --app-rule: #e2e5ea;
+  --app-border: rgba(13,13,13,.1);
+  --app-rule: rgba(13,13,13,.1);
   /* 2026-11-01 Q4=甲：表格行分隔线比卡片描边再淡一档 */
-  --app-table-rule: #f1f3f6;
-  --app-control: #e2e5ea;
+  --app-table-rule: rgba(13,13,13,.06);
+  --app-control: rgba(13,13,13,.12);
   --app-text: #14202d;
   /* 2026-11-01 Q1=乙 三档排位（灰画布口径）：正文 16.5 > 常规 10.2 > 次要 7.6 > 占位 4.8
      原 muted #5f7083 只有 5.1，比次要还浅一档，次序是反的 */
@@ -77,7 +77,7 @@
   --app-table-head-h: 44px;
 
   /* 品牌字母标（markBg/markFg，两主题同款、颜色随令牌） */
-  --app-mark-bg: #eef2f7;
+  --app-mark-bg: #f0f0f0;
   --app-mark-fg: #1e2a38;
   --app-ava: #8fa0b3;
 
@@ -140,9 +140,9 @@
   --el-border-color-light: var(--app-border);
   --el-border-color-lighter: var(--app-rule);
   --el-border-color-extra-light: var(--app-rule);
-  --el-fill-color: #edf1f6;
+  --el-fill-color: #f0f0f0;
   --el-fill-color-light: var(--app-raised);
-  --el-fill-color-lighter: #f4f6fa;
+  --el-fill-color-lighter: #fafafa;
   --el-fill-color-blank: var(--app-surface);
   --el-border-radius-base: var(--app-card-radius);
   --el-border-radius-small: var(--app-control-radius);
@@ -175,17 +175,17 @@
    深色主题残留时，全局规则会把它们的输入框/卡片刷成深面，所以仍要整套钉回浅色值） */
 :is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper, .tenant-picker) {
   color-scheme: light;
-  --app-frame: #f2f4f7;
+  --app-frame: #fafafa;
   --app-sheet-bg: #ffffff;
-  --app-ground: #f2f4f7;
+  --app-ground: #fafafa;
   --app-surface: #ffffff;
-  --app-raised: #f4f6fa;
+  --app-raised: #f5f5f5;
   --app-active: #e8f0fe;
-  --app-border: #e2e5ea;
-  --app-rule: #e2e5ea;
+  --app-border: rgba(13,13,13,.1);
+  --app-rule: rgba(13,13,13,.1);
   /* 2026-11-01 Q4=甲：表格行分隔线比卡片描边再淡一档 */
-  --app-table-rule: #f1f3f6;
-  --app-control: #e2e5ea;
+  --app-table-rule: rgba(13,13,13,.06);
+  --app-control: rgba(13,13,13,.12);
   --app-text: #14202d;
   --app-muted: #374151;
   --app-faint: #4b5563;
@@ -195,7 +195,7 @@
   --app-primary-ink: #ffffff;
   --app-primary-hover: #4983ed;
   --app-primary-active: #2a64d4;
-  --app-mark-bg: #eef2f7;
+  --app-mark-bg: #f0f0f0;
   --app-mark-fg: #1e2a38;
   --app-card-radius: 8px;
   --app-sheet-radius: 8px;
@@ -222,16 +222,16 @@
 
 /* T7 皮肤下，常亮页整体换成 T7 浅色口径（含主色阶梯） */
 html[data-skin='t7'] :is(.login-page, .register-page, .agreement-page, .dcs-dw, .forgot-pwd, .login-tenant-popper, .tenant-picker) {
-  --app-frame: #f3f5f8;
+  --app-frame: #fafafa;
   --app-sheet-bg: #ffffff;
-  --app-ground: #f3f5f8;
+  --app-ground: #fafafa;
   --app-surface: #ffffff;
-  --app-raised: #f5f7fa;
+  --app-raised: #f5f5f5;
   --app-active: #e8f3ff;
-  --app-border: #e3e6eb;
-  --app-rule: #e3e6eb;
-  --app-table-rule: #f1f3f6;
-  --app-control: #e3e6eb;
+  --app-border: rgba(13,13,13,.1);
+  --app-rule: rgba(13,13,13,.1);
+  --app-table-rule: rgba(13,13,13,.06);
+  --app-control: rgba(13,13,13,.12);
   --app-text: #181818;
   --app-muted: #374151;
   --app-faint: #4b5563;
@@ -273,28 +273,28 @@ html[data-skin='t7'] .login-page {
   --el-text-color-placeholder: #667085;
   --el-text-color-disabled: #c0c4cc;
   --el-bg-color: #ffffff;
-  --el-bg-color-page: #f7f8fa;
+  --el-bg-color-page: var(--app-ground);
   --el-bg-color-overlay: #ffffff;
-  --el-fill-color: #f4f6f8;
-  --el-fill-color-light: #f4f6f8;
-  --el-fill-color-lighter: #f7f8fa;
+  --el-fill-color: #f0f0f0;
+  --el-fill-color-light: #f5f5f5;
+  --el-fill-color-lighter: #fafafa;
   --el-fill-color-blank: #ffffff;
-  --el-border-color: #e8eaec;
-  --el-border-color-light: #e8eaec;
-  --el-border-color-lighter: #f0f1f2;
-  --el-border-color-extra-light: #f0f1f2;
+  --el-border-color: rgba(13,13,13,.1);
+  --el-border-color-light: rgba(13,13,13,.1);
+  --el-border-color-lighter: rgba(13,13,13,.08);
+  --el-border-color-extra-light: rgba(13,13,13,.08);
   --el-color-white: #ffffff;
   --dcs-text-primary: #131416;
   --dcs-text-regular: #5d5f60;
   --dcs-text-secondary: #6b6b6b;
   --dcs-text-placeholder: #667085;
-  --dcs-bg-page: #f7f8fa;
+  --dcs-bg-page: #fafafa;
   --dcs-bg-card: #ffffff;
-  --dcs-bg-fill-light: #f4f6f8;
-  --dcs-bg-fill-lighter: #f7f8fa;
-  --dcs-border-color: #e8eaec;
-  --dcs-border-color-light: #e8eaec;
-  --dcs-border-color-lighter: #f0f1f2;
+  --dcs-bg-fill-light: #f5f5f5;
+  --dcs-bg-fill-lighter: #fafafa;
+  --dcs-border-color: rgba(13,13,13,.1);
+  --dcs-border-color-light: rgba(13,13,13,.1);
+  --dcs-border-color-lighter: rgba(13,13,13,.08);
   --dcs-color-success-light-9: #f0f9eb;
   --dcs-color-warning-light-9: #fdf6ec;
   --dcs-color-danger-light-9: #fef0f0;
@@ -341,22 +341,22 @@ html.dark {
   /* ============================ T1 · 深色 ============================ */
   /* 让原生滚动条 / 日期选择 / 下拉框跟随深色，否则深底上挂一条浅灰滚动条 */
   color-scheme: dark;
-  /* 2026-10-27 重构拍板 Q3=甲：画布 #0a0c10 / 卡 #1b2027 / raised #242a32 / 线 #2f3641
-     （画布↔卡 1.20、卡↔raised 1.13、卡↔线 1.34；原配方只有 1.083，卡片几乎浮不起来） */
-  --app-frame: #0a0c10;
-  --app-sheet-bg: #1b2027;
-  --app-ground: #0a0c10;
-  --app-surface: #1b2027;
-  --app-raised: #242a32;
+  /* 2026-11-04 题六甲：画布 #0a0a0a / 卡 #1b1b1b / raised #242424 / 线 #2f2f2f（全部去蓝）
+     （画布↔卡 1.15、卡↔raised 1.11、卡↔线 1.29） */
+  --app-frame: #0a0a0a;
+  --app-sheet-bg: #1b1b1b;
+  --app-ground: #0a0a0a;
+  --app-surface: #1b1b1b;
+  --app-raised: #242424;
   --app-active: #1d2a3d; /* accSoft 做内容面选中底 */
-  --app-border: #2f3641;
-  --app-rule: #2f3641;
-  --app-table-rule: #1f2833;
-  /* 控件描边比 rule 提一档：#1b2027 卡面上 #2f3641 只有 1.34，输入框描边要扫到即知 */
-  --app-control: #414a57;
-  --app-text: #e4ecf4;
-  --app-muted: #a3b3c4;
-  --app-faint: #95a6b8;
+  --app-border: #2f2f2f;
+  --app-rule: #2f2f2f;
+  --app-table-rule: #202020;
+  /* 控件描边比 rule 提一档：卡 #1b1b1b 上 #2f2f2f 只有 1.29，输入框描边要扫到即知 */
+  --app-control: #414141;
+  --app-text: #e8e8e8;
+  --app-muted: #ababab;
+  --app-faint: #9c9c9c;
 
   /* acc #4a8cf7，主按钮墨色取 accFg #061426 */
   --app-accent: #4a8cf7;
@@ -369,20 +369,20 @@ html.dark {
   --app-chart-1: #4a8cf7;
   --app-chart-2: #7e8fa2;
   --app-chart-3: #55636f;
-  --app-fab: #eef2f7;
+  --app-fab: #f0f0f0;
   --app-fab-fg: #16202c;
   --app-fab-border: transparent;
 
-  --app-shell: #10151b;
-  --app-side-text: #aebdcb;
-  --app-side-faint: #8fa0b3;
-  --app-side-hover: #1a212a;
+  --app-shell: #121212;
+  --app-side-text: #b0b0b0;
+  --app-side-faint: #949494;
+  --app-side-hover: #1d1d1d;
   /* 选中与亮色同口径：浅一档底 + 白字 + 2px 蓝短条（深色下“浅一档”= 比 shell 亮） */
-  --app-side-active-bg: #243040;
+  --app-side-active-bg: #2c2c2c;
   --app-side-active-text: #ffffff;
   --app-side-active-bar: #4a8cf7;
 
-  --app-mark-bg: #eef2f7;
+  --app-mark-bg: #f0f0f0;
   --app-mark-fg: #16202c;
   --app-ava: #8fa0b3;
 
@@ -424,40 +424,40 @@ html.dark {
   --el-color-danger: #f08585;
   --el-color-danger-light-9: #2a1414;
   --el-color-info: #8fa0b3;
-  --el-bg-color-page: #0c1117;
-  --el-bg-color: #131a23;
-  --el-bg-color-overlay: #131a23;
-  --el-text-color-primary: #e4ecf4;
-  --el-text-color-regular: #8fa0b3;
+  --el-bg-color-page: var(--app-ground);
+  --el-bg-color: #131313;
+  --el-bg-color-overlay: #131313;
+  --el-text-color-primary: #e8e8e8;
+  --el-text-color-regular: var(--app-muted);
   --el-text-color-secondary: var(--app-faint);
-  --el-text-color-placeholder: #8496a9;
-  --el-border-color: #212b36;
-  --el-border-color-light: #212b36;
-  --el-border-color-lighter: #1c2530;
-  --el-border-color-extra-light: #1c2530;
-  --el-fill-color: #1a2430;
-  --el-fill-color-light: #1a2430;
-  --el-fill-color-lighter: #17202a;
-  --el-fill-color-blank: #131a23;
+  --el-text-color-placeholder: #8a8a8a;
+  --el-border-color: #212121;
+  --el-border-color-light: #212121;
+  --el-border-color-lighter: #1c1c1c;
+  --el-border-color-extra-light: #1c1c1c;
+  --el-fill-color: #1a1a1a;
+  --el-fill-color-light: #1e1e1e;
+  --el-fill-color-lighter: #171717;
+  --el-fill-color-blank: #131313;
   --el-mask-color: rgba(0, 0, 0, 0.72);
-  --el-table-row-hover-bg-color: #1a2430;
+  --el-table-row-hover-bg-color: #1a1a1a;
 }
 
 /* ============================ T7 · 浅色（白侧栏通用中台） ============================ */
 /* 与 html.dark 同特异性（0,1,1），靠本文件在后声明胜出；T7 的深色再由下方组合块覆盖 */
 html[data-skin='t7'] {
   color-scheme: light;
-  /* spec T7.light：bg #f3f5f8 / shell #ffffff / sheet #ffffff / rule #e3e6eb / raised #f5f7fa */
-  --app-frame: #f3f5f8;
+  /* 2026-11-04 题六甲：bg #fafafa / shell #ffffff / sheet #ffffff / rule rgba(13,13,13,.1) / raised #f5f5f5 */
+  --app-frame: #fafafa;
   --app-sheet-bg: #ffffff;
-  --app-ground: #f3f5f8;
+  --app-ground: #fafafa;
   --app-surface: #ffffff;
-  --app-raised: #f5f7fa;
+  --app-raised: #f5f5f5;
   --app-active: #e8f3ff;
-  --app-border: #e3e6eb;
-  --app-rule: #e3e6eb;
-  --app-table-rule: #f1f3f6;
-  --app-control: #e3e6eb;
+  --app-border: rgba(13,13,13,.1);
+  --app-rule: rgba(13,13,13,.1);
+  --app-table-rule: rgba(13,13,13,.06);
+  --app-control: rgba(13,13,13,.12);
   --app-text: #181818;
   --app-muted: #374151;
   --app-faint: #4b5563;
@@ -479,7 +479,7 @@ html[data-skin='t7'] {
   --app-shell: #ffffff;
   --app-side-text: #333d4b;
   --app-side-faint: #4b5563;
-  --app-side-hover: #f5f7fa;
+  --app-side-hover: #f5f5f5;
   --app-side-active-bg: var(--app-accent);
   --app-side-active-text: #ffffff;
 
@@ -513,23 +513,23 @@ html[data-skin='t7'] {
   --el-color-primary-light-9: #e5edfb;
   --el-color-primary-dark-2: #0041ad;
   --el-color-info: #5e6d82;
-  --el-bg-color-page: #f3f5f8;
+  --el-bg-color-page: var(--app-ground);
   --el-bg-color: #ffffff;
   --el-bg-color-overlay: #ffffff;
   --el-text-color-primary: #181818;
   --el-text-color-regular: #5e6d82;
   --el-text-color-secondary: var(--app-faint);
   --el-text-color-placeholder: #667085;
-  --el-border-color: #e3e6eb;
-  --el-border-color-light: #e3e6eb;
-  --el-border-color-lighter: #e9ecf0;
-  --el-border-color-extra-light: #e9ecf0;
-  --el-fill-color: #eef1f5;
-  --el-fill-color-light: #f5f7fa;
-  --el-fill-color-lighter: #f7f9fb;
+  --el-border-color: rgba(13,13,13,.1);
+  --el-border-color-light: rgba(13,13,13,.1);
+  --el-border-color-lighter: rgba(13,13,13,.08);
+  --el-border-color-extra-light: rgba(13,13,13,.08);
+  --el-fill-color: #f0f0f0;
+  --el-fill-color-light: #f5f5f5;
+  --el-fill-color-lighter: #fafafa;
   --el-fill-color-blank: #ffffff;
   --el-mask-color: rgba(0, 0, 0, 0.72);
-  --el-table-row-hover-bg-color: #f5f7fa;
+  --el-table-row-hover-bg-color: #f5f5f5;
 }
 
 /* ============================ T7 · 深色 ============================ */
@@ -544,7 +544,7 @@ html[data-skin='t7'].dark {
   --app-active: #1b2b45;
   --app-border: #333333;
   --app-rule: #333333;
-  --app-table-rule: #262626;
+  --app-table-rule: #2e2e2e;
   --app-control: #454545;
   --app-text: #e7e7e7;
   --app-muted: #b5b5b5;
@@ -952,7 +952,7 @@ html.dark .el-card {
 }
 
 html.dark .el-switch {
-  --el-switch-off-color: #3a3a3e;
+  --el-switch-off-color: #3a3a3a;
   --el-switch-on-color: var(--app-primary);
 }
 
