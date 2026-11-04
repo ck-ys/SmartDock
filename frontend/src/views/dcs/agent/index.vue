@@ -36,6 +36,8 @@
                 tabindex="0"
                 :aria-label="`用「${s.name}」开个头`"
                 @click="pick(s)"
+                @mouseenter="onCardEnter(s)"
+                @mouseleave="onCardLeave(s)"
                 @keydown.enter="pick(s)"
                 @keydown.space.prevent="pick(s)"
               >
@@ -43,7 +45,7 @@
                   <span class="ag-tile" aria-hidden="true">{{ s.name.slice(0, 1) }}</span>
                   <b class="ag-card-n">{{ s.name }}</b>
                 </div>
-                <p class="ag-card-d" :title="descOf(s.desc)">{{ descOf(s.desc) }}</p>
+                <p class="ag-card-d" :title="skillDesc(s.desc)">{{ skillDesc(s.desc) }}</p>
                 <div class="ag-card-m">{{ s.source === 'recent' ? `你用过 ${s.count} 次` : '技能库' }}</div>
               </article>
             </div>
@@ -72,6 +74,7 @@ import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import AssistantWorkspace from '@/components/DcsAssistant/AssistantWorkspace.vue';
 import { useUserStore } from '@/store/modules/user';
 import { getAssistantSkillCatalog, getAssistantRecentSkills } from '@/api/dcs/assistant';
+import { buildSkillDraft, shouldClearOnLeave, shouldPrefillOnHover, skillDesc } from './prefill';
 
 interface CatalogRow {
   id: string;
@@ -119,15 +122,6 @@ const cando = computed<CandoRow[]>(() => {
   return out.slice(0, 3);
 });
 
-/** 技能描述是 SKILL.md 原文，十个里有十个长成「用户说「A/B/C」时，真正的能力描述」。
- *  卡片正文只放后半句：前半句是触发词，放进卡片会把正文挤成半句就截断（「用户说「写周报/帮我
- *  写本周周报/周报怎么…」），读着像没写完。不是这套句式的技能原样透传，不改作者文案。 */
-function descOf(d: string): string {
-  const s = (d || '').trim();
-  const hit = s.match(/^用户说[「『][^」』]*[」』]\s*时[，,]\s*([\s\S]+)$/);
-  return (hit && hit[1].trim()) || s;
-}
-
 /** 空态文案分三种：还在读 / 读失败 / 真的没有——三件事不能混成一句「技能库是空的」 */
 const stripEmptyText = computed(() => {
   if (loading.value) return '正在读取能力…';
@@ -135,8 +129,51 @@ const stripEmptyText = computed(() => {
   return '技能库还是空的——管理员上架技能后，这里会自动出现。';
 });
 
+/**
+ * 悬停预填（拍板 2026-11-04 题一甲 / 题二甲 / 题四甲）：
+ * - 句子 = 「用「技能名」帮我：」+ 技能自己的描述（题二甲：不吃第二份手写文案）
+ * - 框是空的才填；框里有字（或点击过的句子）就一个字都不动
+ * - 填进去之后没改过、鼠标移开 → 清空复原；改过 → 归用户，不清
+ * - 点击 = 整段替换（学 ZCode），且这篇归用户，移开不清
+ * - 手机档（无 hover）不做悬停预填，点一下就是预填（题四·手机档口径）
+ */
+const prefill = ref<string | null>(null);
+const hoverFrom = ref<string | null>(null);
+
+function sentenceOf(s: CandoRow): string {
+  return buildSkillDraft(s.name, s.desc);
+}
+function canHoverPrefill(): boolean {
+  return typeof window.matchMedia === 'function' ? window.matchMedia('(hover: hover)').matches : false;
+}
+function draftNow(): string {
+  return wsRef.value?.draftText ?? '';
+}
+
+function onCardEnter(s: CandoRow) {
+  if (!canHoverPrefill()) return;
+  // 用户打的字（或点出来的句子）→ 只高亮卡片，不碰输入框
+  if (!shouldPrefillOnHover(draftNow(), prefill.value)) return;
+  const next = sentenceOf(s);
+  hoverFrom.value = s.id;
+  prefill.value = next;
+  wsRef.value?.setDraft(next);
+}
+
+function onCardLeave(s: CandoRow) {
+  if (!canHoverPrefill()) return;
+  // 从 A 卡滑到 B 卡时，A 的 leave 可能晚于 B 的 enter——只清自己那张卡的预填
+  if (hoverFrom.value !== s.id) return;
+  if (shouldClearOnLeave(draftNow(), prefill.value)) wsRef.value?.clearDraft();
+  prefill.value = null;
+  hoverFrom.value = null;
+}
+
 function pick(s: CandoRow) {
-  wsRef.value?.setDraft(`用「${s.name}」帮我：`);
+  wsRef.value?.setDraft(sentenceOf(s));
+  // 点击是明确要它：这篇归用户，鼠标移开不清
+  prefill.value = null;
+  hoverFrom.value = null;
   wsRef.value?.focusComposer();
 }
 

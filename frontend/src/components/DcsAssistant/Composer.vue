@@ -58,7 +58,15 @@
     >
       <!-- / 命令与 @ 引用任务菜单（cmdPop；批J-2：absolute 悬浮在输入盒上方，不再文档流下推）；
            批17 Q3：命令分「功能命令/快捷问句」双组（grp 变化处插组头），提示行加 Tab 补全 -->
-      <div v-if="cmd.open" class="cmdpop" role="listbox" :aria-label="cmd.mode === 'slash' ? '命令菜单' : '引用任务'">
+      <div
+        v-if="cmd.open"
+        ref="cmdPopRef"
+        class="cmdpop"
+        role="listbox"
+        :aria-label="cmd.mode === 'slash' ? '命令菜单' : '引用任务'"
+        :style="cmdFadeStyle"
+        @scroll="onCmdScroll"
+      >
         <div class="cmd-tip">
           {{ cmd.mode === 'slash' ? '命令 · ↑↓ 选择 · Tab 补全 · Enter 确认 · 支持拼音首字母（如 /db→待办）' : '引用任务 · ↑↓ 选择，Enter 回填' }}
         </div>
@@ -1834,6 +1842,64 @@ const cmd = reactive({
   items: [] as Array<{ icon: string; label: string; sub: string; text: string; grp?: 'fn' | 'ask' }>,
   active: 0
 });
+
+/**
+ * 面板滚动（拍板 2026-11-04 题五甲，学 ZCode）：
+ * ① 选中项自动滚进视野——否则按 ↓ 走到第 6 条以后，高亮就在可视区外，Enter 成了盲选；
+ * ② 上下 24px 渐隐提示"还能滚"——高度保持 240px（ZCode 224px，同一档，不靠拉高解决）。
+ */
+const cmdPopRef = ref<HTMLElement | null>(null);
+const cmdFade = reactive({ top: false, bottom: false });
+const CMD_FADE_PX = 24;
+/** 渐隐用 mask-image；只在该侧还有内容时才压边 */
+const cmdFadeStyle = computed(() => {
+  if (!cmdFade.top && !cmdFade.bottom) return {};
+  const topStop = cmdFade.top ? `transparent 0px, black ${CMD_FADE_PX}px` : `black 0px, black ${CMD_FADE_PX}px`;
+  const bottomStop = cmdFade.bottom ? `black calc(100% - ${CMD_FADE_PX}px), transparent 100%` : `black calc(100% - ${CMD_FADE_PX}px), black 100%`;
+  const mask = `linear-gradient(to bottom, ${topStop}, ${bottomStop})`;
+  return { maskImage: mask, WebkitMaskImage: mask };
+});
+function updateCmdFade() {
+  const el = cmdPopRef.value;
+  if (!el) {
+    cmdFade.top = false;
+    cmdFade.bottom = false;
+    return;
+  }
+  const maxScrollTop = el.scrollHeight - el.clientHeight;
+  cmdFade.top = maxScrollTop > 1 && el.scrollTop > 1;
+  cmdFade.bottom = maxScrollTop > 1 && el.scrollTop < maxScrollTop - 1;
+}
+function onCmdScroll() {
+  updateCmdFade();
+}
+/** 选中项滚进视野：block:'nearest' 只在出界时动，已经在视野内就不滚（不闪）。
+ *  最后一条要顶到底：nearest 会留出 6px 内边距，底部渐隐就永远不退，像"下面还有"。 */
+function scrollActiveCmdIntoView() {
+  void nextTick(() => {
+    const pop = cmdPopRef.value;
+    const el = pop?.querySelector<HTMLElement>('.cmd-it.on');
+    if (!pop || !el) return;
+    el.scrollIntoView({ block: 'nearest' });
+    const all = pop.querySelectorAll<HTMLElement>('.cmd-it');
+    if (all.length && all[all.length - 1] === el) pop.scrollTop = pop.scrollHeight;
+    updateCmdFade();
+  });
+}
+/** 键盘选中变化 → 跟随滚动（↑↓ 走到哪，高亮就在哪） */
+watch(
+  () => cmd.active,
+  () => {
+    if (cmd.open) scrollActiveCmdIntoView();
+  }
+);
+/** 面板开合 / 过滤结果变化 → 重算渐隐（列表长短变了，底部提示也要跟着变） */
+watch(
+  () => [cmd.open, cmd.items.length] as const,
+  () => {
+    if (cmd.open) scrollActiveCmdIntoView();
+  }
+);
 /** @ 引用任务数据（业务批4 Q1：切 mention-tasks 专用端点——七路可见+relation 标注，
  *  治「成员 @ 一辈子空」；60s TTL 缓存防回环（#24 教训），服务端已限 100 行（业务批4 Q2-A） */
 let taskPool: Array<{ icon: string; label: string; sub: string; text: string }> = [];
@@ -2372,8 +2438,9 @@ defineExpose({
 /* / 与 @ 命令菜单（批J-2：absolute 悬浮输入盒上方——原型 .slash，不再文档流下推） */
 .cmdpop {
   position: absolute;
-  left: 14px;
-  right: 14px;
+  /* 题五甲：与输入卡同宽（原来左右各缩 14px，量出来比卡片窄 30px，不像同一个东西） */
+  left: -1px;
+  right: -1px;
   bottom: calc(100% + 6px);
   z-index: 30;
   border: 1px solid var(--dcs-border-color-light);
