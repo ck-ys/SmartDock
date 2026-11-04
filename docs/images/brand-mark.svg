@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" role="img" aria-label="SmartDock">
+  <!-- 品牌标「停靠」：方料开一个朝上的托槽，珊瑚件坐在槽里。
+       24 网格：方料 19.2 见方 / 圆角 4.2；槽 9.6 宽、开口穿过顶边；件 5.2，左右缝 2.2、底缝 3.2。
+       改这里要同步 frontend/src/components/BrandMark.vue 与 frontend/public/favicon.ico。 -->
+  <mask id="sd-bay">
+    <rect width="24" height="24" fill="#fff" />
+    <rect x="7.2" y="2" width="9.6" height="13.6" fill="#000" />
+  </mask>
+  <rect x="2.4" y="2.4" width="19.2" height="19.2" rx="4.2" fill="#12A594" mask="url(#sd-bay)" />
+  <rect x="9.4" y="7.2" width="5.2" height="5.2" fill="#FF5A3C" />
+</svg>

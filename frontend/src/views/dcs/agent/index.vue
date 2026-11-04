@@ -2,7 +2,7 @@
   <div class="agent-ws">
     <!-- 批3.6：工作台壳只剩一条顶栏——会话区整体复用 AssistantWorkspace 积木（本页对话，不再跳转） -->
     <header class="ag-top">
-      <span class="brand"><span class="mk">S</span> 智能体工作台</span>
+      <span class="brand"><BrandMark :size="22" /> 智能体工作台</span>
       <span class="sp"></span>
       <button v-if="canAudit" class="tb-btn" type="button" @click="go('/ai/assistant-audit')"><IconSpan name="clipboard" :size="13" /> 审计</button>
       <button class="tb-btn" type="button" @click="go('/index')"><IconSpan name="arrow-up-right" :size="13" /> 返回业务系统</button>
@@ -67,6 +67,7 @@
  */
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import BrandMark from '@/components/BrandMark.vue';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import AssistantWorkspace from '@/components/DcsAssistant/AssistantWorkspace.vue';
 import { useUserStore } from '@/store/modules/user';
@@ -221,18 +222,6 @@ html.dark .agent-ws {
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-}
-.mk {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  background: var(--acc);
-  color: var(--acc-txt);
-  font-size: 12px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 .sp {
   flex: 1;
