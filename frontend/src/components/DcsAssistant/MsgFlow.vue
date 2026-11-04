@@ -75,6 +75,12 @@
         :now="ti === state.turns.length - 1 && state.sending ? now : 0"
         :thread-id="state.threadId"
         :show-think="state.showThink"
+        :active-plan-id="activePlanId"
+        :plan-busy="planBusy"
+        @plan-confirm="(id) => emit('plan-confirm', id)"
+        @plan-adjust="(id, text) => emit('plan-adjust', id, text)"
+        @plan-cancel="(id) => emit('plan-cancel', id)"
+        @plan-collapse="emit('plan-collapse')"
         @resume="emit('resume')"
         @stop="emit('stop')"
         @elicit-done="(id) => emit('elicit-done', id)"
@@ -112,8 +118,16 @@
     </div>
     <div class="flow-pad" />
 
-    <!-- 回到底部钮（原型 tobot：距底>48px 且内容超一屏才出；点击回底自动恢复 followTail） -->
-    <button v-show="showBack" class="tobot" aria-label="回到底部" title="回到底部（有新内容会自动跟随）" @click="backToBottom">
+    <!-- 回到底部钮（原型 tobot：距底>48px 且内容超一屏才出；点击回底自动恢复 followTail）。
+         与活卡矩形实测重叠时不出——圆钮会压在卡内自由输入行上（真机实拍） -->
+    <button
+      ref="tobotEl"
+      :class="{ 'is-hidden': !(showBack && !cardCovered) }"
+      class="tobot"
+      aria-label="回到底部"
+      title="回到底部（有新内容会自动跟随）"
+      @click="backToBottom"
+    >
       <IconSpan name="arrow-down" />
     </button>
   </div>
@@ -149,6 +163,10 @@ const props = defineProps<{
    *  此前 /agent 空态是「工作台欢迎区 + MsgFlow 欢迎卡」两块叠着，卡片被挤到只剩 42%。
    *  会话页不传，行为一行不变。 */
   hideWelcome?: boolean;
+  /** 题四甲：当前可操作的待确认计划卡 id（空串=没有） */
+  activePlanId?: string;
+  /** 计划决策请求在飞 */
+  planBusy?: boolean;
 }>();
 
 /** 原型 .avatar：用户气泡右端首字圆标（昵称>账号兜底） */
@@ -185,6 +203,11 @@ const emit = defineEmits<{
   'open-help': [];
   /** 批17 Q7：界面导览（HeroWelcome 新手行 → 宿主 driver.js 聚光灯带看） */
   tour: [];
+  /** 题四甲：消息流计划表单卡的决策（宿主持有真正的发送/解闸逻辑） */
+  'plan-confirm': [planId: string];
+  'plan-adjust': [planId: string, feedback: string];
+  'plan-cancel': [planId: string];
+  'plan-collapse': [];
 }>();
 
 const flowRef = ref<HTMLElement>();
@@ -193,6 +216,41 @@ const now = ref(Date.now());
 
 /** 回底钮显隐（48px 容差+内容超一屏；与 Drawer followTail 同口径但独立本地态） */
 const showBack = ref(false);
+const tobotEl = ref<HTMLButtonElement | null>(null);
+/** 回底钮是否会被一张活卡压住（按屏幕矩形实测，不按回合位置猜） */
+const cardCovered = ref(false);
+function syncCardCovered() {
+  const btn = tobotEl.value;
+  if (!btn) {
+    cardCovered.value = false;
+    return;
+  }
+  const br = btn.getBoundingClientRect();
+  const scope = flowRef.value;
+  cardCovered.value = [...(scope?.querySelectorAll('.dcs-pfc, .dcs-ask, .dcs-elicit') ?? [])].some((el) => {
+    const r = el.getBoundingClientRect();
+    return r.bottom > br.top && r.top < br.bottom && r.right > br.left && r.left < br.right;
+  });
+}
+/** 滚动高频入口：遮罩判定涉及多卡矩形，按帧合并，避免每个 scroll 都强制布局 */
+let coverRaf = 0;
+function scheduleSyncCovered() {
+  if (!coverRaf) {
+    coverRaf = requestAnimationFrame(() => {
+      coverRaf = 0;
+      syncCardCovered();
+    });
+  }
+}
+/** 活卡尺寸变化（第 4 行随打字长高、卡折叠/展开）也重算遮罩——不经过 scroll 事件 */
+let cardRO: ResizeObserver | null = null;
+function watchActiveCards() {
+  if (!cardRO) {
+    return;
+  }
+  cardRO.disconnect();
+  flowRef.value?.querySelectorAll('.dcs-pfc, .dcs-ask, .dcs-elicit').forEach((el) => cardRO!.observe(el));
+}
 /** Q3（20261011 拍板A）：滚动时若选区悬浮条在场，rAF 节流重定位跟随活选区——
  *  选区滚出可视区由 onSelChange 的视口守卫自动隐藏，不再滞留原位脱钩 */
 let selReposRaf = 0;
@@ -213,8 +271,33 @@ function onFlowScroll() {
   // 视觉席 U4-P0 回修：阈值 48→92——sticky 钮占底部 14~48px 带，旧阈值下末两行正被
   // 钮盖住时仍显示（"（"被压的实拍）；92 起 = 距底不足两行就隐钮，末行永不被盖
   showBack.value = el.scrollHeight - el.scrollTop - el.clientHeight > 92 && el.scrollHeight > el.clientHeight + 100;
+  scheduleSyncCovered();
   scheduleSelRepos();
 }
+// 卡挂载/收起后矩形会变（不经过滚动），补两次同步
+watch(
+  () => props.state.turns.map((t) => `${t.askUsers?.length ?? 0}:${t.plan?.status ?? ''}`).join('|'),
+  () =>
+    nextTick(() => {
+      watchActiveCards();
+      syncCardCovered();
+    })
+);
+onMounted(() => {
+  cardRO = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => syncCardCovered());
+  nextTick(() => {
+    watchActiveCards();
+    syncCardCovered();
+  });
+});
+onBeforeUnmount(() => {
+  cardRO?.disconnect();
+  cardRO = null;
+  if (coverRaf) {
+    cancelAnimationFrame(coverRaf);
+    coverRaf = 0;
+  }
+});
 function backToBottom() {
   const el = flowRef.value;
   if (el) {
@@ -372,6 +455,7 @@ function measureClamp() {
 function onWinResize() {
   scheduleSelRepos();
   nextTick(measureClamp);
+  nextTick(syncCardCovered);
 }
 watch(
   () => props.state.turns.length,
@@ -690,8 +774,10 @@ defineExpose({ jumpToStep, jumpToConfirm });
   scroll-behavior: smooth;
   /* 抽屉↔全屏形态切换时 padding 14↔24 平滑过渡（让位过渡已随廊位机制上移宿主父层） */
   transition: padding 0.3s ease;
-  /* UI 专项批1（5.3fh 审查「什么都白」）：消息区铺第一层浅灰底，衬托用户气泡与 AI 卡片 */
-  background: var(--el-fill-color-lighter, #fafafa);
+  /* UI 专项批1（5.3fh 审查「什么都白」）：消息区铺第一层浅灰底，衬托用户气泡与 AI 卡片；
+     2026-11-04 四档中性化后 --el-fill-color-lighter 已等于页面底 #fafafa，与白卡只差 1.04，
+     统一改用 light 档 #f5f5f5（与 full 一致），保住三层背景 */
+  background: var(--el-fill-color-light, #f5f5f5);
 
   /* 原型 #msgFlow 细滚动条（L298-300）：6px/thumb 透明 hover 显 */
   scrollbar-width: thin;
@@ -1012,6 +1098,12 @@ defineExpose({ jumpToStep, jumpToConfirm });
   line-height: 1;
   cursor: pointer;
   z-index: 5;
+
+  &.is-hidden {
+    /* 不用 display:none：遮罩判定要读它自己的矩形，display:none 会让矩形归零、判定自翻转 */
+    visibility: hidden;
+    pointer-events: none;
+  }
 
   &:hover {
     color: var(--el-color-primary);

@@ -212,6 +212,11 @@
             @ask-user-done="removeAskUserCard"
             @elicit-done="removeElicitationCard"
             @tour="startTour"
+            :active-plan-id="planCardActionable && drawerOwnsPlanUi ? (activePlan?.planId ?? '') : ''"
+            @plan-confirm="onPlanConfirm"
+            @plan-adjust="onPlanAdjust"
+            @plan-cancel="onPlanCancel"
+            @plan-collapse="collapsePlanCard"
           />
 
           <!-- 业务批4 Q2 拍板二：任务上下文条（原头部 chip 下移）——紧贴输入框上方，
@@ -239,23 +244,13 @@
             </span>
           </div>
 
-          <!-- 计划待确认：输入框有字时只出细条，不抢输入（Q6-A）；点开后才占输入框位置 -->
+          <!-- 计划待确认（题四甲）：主体是消息流里的表单卡；确认期间输入框收起。
+               用户「忽略」或输入框里有草稿时，才露出细条 + 输入框（草稿不能丢） -->
           <plan-tip
-            v-if="modelValue && !isAssistantSessionRoute && showPlanTip && activePlan"
+            v-if="drawerOwnsPlanUi && planTipShown && activePlan"
             :plan="activePlan"
             :full="full"
-            :busy="state.sending"
-            @open="openPlanDock"
-          />
-          <plan-dock
-            v-if="modelValue && !isAssistantSessionRoute && showPlanDock && activePlan"
-            :plan="activePlan"
-            :full="full"
-            :can-collapse="draftText.trim().length > 0"
-            @confirm="onPlanConfirm"
-            @adjust="onPlanAdjust"
-            @cancel="onPlanCancel"
-            @collapse="collapsePlanDock"
+            @open="expandPlanCard"
           />
 
           <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留）。
@@ -263,13 +258,15 @@
                removedIds 各持一份会发出用户没同意的全量催办——路由互斥只留一份 -->
           <hitl-dock v-if="modelValue && !isAssistantSessionRoute" :ask="pendingAsk" :full="full" @resolve="resolveHitl" @revise="onDockRevise" />
 
+          <!-- v-show 而不是 v-if：草稿/队列/附件/--dcs-col-max 都要保活 -->
           <composer
+            v-show="!hideComposerForPlan"
             ref="composerRef"
             :state="state"
             :sending="state.sending"
             :active="modelValue || full"
             :full="full"
-            :blocked="!!pendingAsk || showPlanDock"
+            :blocked="!!pendingAsk"
             @draft-change="draftText = $event"
             @send="onSend"
             @stop="onStop"
@@ -402,11 +399,11 @@ import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
 import { displayTitle, renameSeed, shouldRename } from '@/utils/assistantTitle';
 import { assistantName } from './nameState';
+import { convPins, toggleConvPin } from './conversationPins';
 import MsgFlow from './MsgFlow.vue';
 import HitlDock from './HitlDock.vue';
-import PlanDock from './PlanDock.vue';
 import PlanTip from './PlanTip.vue';
-import { latestPendingPlan, shouldShowPlanDock } from './planDock';
+import { latestPendingPlan } from './planDock';
 import { startTour } from './useTour';
 import IconSpan from './IconSpan.vue';
 import Composer from './Composer.vue';
@@ -526,8 +523,8 @@ function toggleWide() {
 const fpKw = ref('');
 type FpConv = { id: number | string; threadId: string; title: string; lastMessageTime?: string; status?: string; running?: boolean };
 const fpConvs = ref<FpConv[]>([]);
-const PIN_KEY = 'dcs:assistant:pins'; // 与会话页共用同一份置顶（跨宿主一致）
-const pins = ref<string[]>(JSON.parse(localStorage.getItem(PIN_KEY) ?? '[]'));
+// 与会话页共用同一份置顶（2026-11-04 批C：模块级单例，两个宿主不再各持一份内存副本）
+const pins = convPins;
 
 /** DP-1 原型 renderSessions 分组：📌 置顶 + 今天/昨天/更早（关键词只搜标题，与会话页口径一致） */
 const fpGroups = computed(() => {
@@ -541,7 +538,7 @@ const fpGroups = computed(() => {
   );
   const isPin = (c: FpConv) => pins.value.includes(String(c.id));
   const groups: Array<{ label: string; items: FpConv[] }> = [];
-  const pinned = live.filter(isPin);
+  const pinned = live.filter(isPin).sort((a, b) => pins.value.indexOf(String(a.id)) - pins.value.indexOf(String(b.id)));
   if (pinned.length) {
     groups.push({ label: '置顶', items: pinned });
   }
@@ -648,8 +645,7 @@ function togglePin(c: FpConv) {
   sessMenuId.value = null;
   const key = String(c.id);
   const has = pins.value.includes(key);
-  pins.value = has ? pins.value.filter((p) => p !== key) : [...pins.value, key];
-  localStorage.setItem(PIN_KEY, JSON.stringify(pins.value));
+  toggleConvPin(key);
   pushToast(has ? '已取消置顶' : '已置顶', 'ok');
 }
 async function archiveConv(c: FpConv) {
@@ -1036,35 +1032,44 @@ const isAssistantSessionRoute = computed(() => route.path === '/ai/assistant' ||
 /** 最新一张待确认计划（Q5-A：旧卡只读，只有最新一张可操作） */
 const pendingPlan = computed(() => latestPendingPlan(state.turns));
 const activePlan = computed(() => pendingPlan.value?.plan ?? null);
-/** Composer 草稿（Q6-A：有字时只出细条，不抢输入框） */
+/** Composer 草稿（题四甲：有草稿时不藏输入框，草稿不能丢） */
 const draftText = ref('');
-const planDockForced = ref(false);
-const showPlanDock = computed(() =>
-  shouldShowPlanDock({
-    hasPlan: !!activePlan.value,
-    hasPendingAsk: !!pendingAsk.value,
-    sending: state.sending,
-    forced: planDockForced.value,
-    draft: draftText.value
-  })
+/** 抽屉何时自己负责计划决策 UI：打开着、且不在会话页（会话页由页面自己渲染） */
+const drawerOwnsPlanUi = computed(() => !!modelValue.value && !isAssistantSessionRoute.value);
+/** 用户点过「忽略」：卡仍留在消息流里可再操作，但输入框先还回来 */
+const planCollapsed = ref(false);
+/** 卡是否可操作（无反问抢位、有卡号）——生成中也保留，否则第 4 行写一半会被卸载丢字 */
+const planCardActionable = computed(() => !!activePlan.value?.planId && !pendingAsk.value);
+/** 卡在场（含生成收尾窗口）：输入框立即收起，不留第二块输入区；卡在流未完时只锁「提交」 */
+const planCardShown = computed(() => planCardActionable.value);
+const planTipShown = computed(() => planCardShown.value && planCollapsed.value);
+/** 确认期间抽屉自己的输入框收起（ZCode 同款：卡下方没有第二块输入区） */
+const hideComposerForPlan = computed(
+  () => drawerOwnsPlanUi.value && planCardShown.value && !planCollapsed.value && draftText.value.trim() === ''
 );
-const showPlanTip = computed(() => !!activePlan.value && !pendingAsk.value && !showPlanDock.value);
 watch(
   () => activePlan.value?.planId,
   () => {
-    planDockForced.value = false;
+    planCollapsed.value = false;
   }
 );
-watch(showPlanDock, (v, old) => {
-  if (old && !v) {
+watch(planCardShown, (v, old) => {
+  // 抽屉关着时不要把焦点塞进屏幕外的输入框
+  if (old && !v && !pendingAsk.value && drawerOwnsPlanUi.value) {
     nextTick(() => composerRef.value?.focus());
   }
 });
-function openPlanDock() {
-  planDockForced.value = true;
+function expandPlanCard() {
+  planCollapsed.value = false;
+  nextTick(() => {
+    const id = activePlan.value?.planId;
+    const el = id ? (document.querySelector(`.dcs-pfc[data-plan-id="${id}"]`) as HTMLElement | null) : null;
+    el?.scrollIntoView({ block: 'nearest' });
+    el?.focus({ preventScroll: true });
+  });
 }
-function collapsePlanDock() {
-  planDockForced.value = false;
+function collapsePlanCard() {
+  planCollapsed.value = true;
   nextTick(() => composerRef.value?.focus());
 }
 /** 停靠区「改一下」：先取消本次确认（cancelled resume 清服务端悬挂），
@@ -1078,9 +1083,9 @@ function onDockRevise(m: string) {
   onSend(text, '');
 }
 // 停靠区收卡（确认/取消）后把焦点还给输入框（ZCode 同款：对话框关闭焦点回 composer）；
-// 计划停靠区接手时由 PlanDock 自己聚焦，别把焦点塞进已被 blocked 的 Composer
+// 计划表单卡在消息流里，由卡自己接管焦点
 watch(pendingAsk, (v, old) => {
-  if (old && !v && !showPlanDock.value) {
+  if (old && !v && !planCardShown.value) {
     nextTick(() => composerRef.value?.focus());
   }
 });
@@ -1272,14 +1277,25 @@ function onQueueDrop(i: number) {
 function onQueueResume() {
   queueResume();
 }
+/** 计划卡展示时抽屉输入框被收起——要回填草稿先展开输入框，等重挂后再写，避免静默丢字 */
+async function putDraft(text: string, append: boolean) {
+  if (hideComposerForPlan.value) {
+    planCollapsed.value = true;
+    await nextTick();
+    await nextTick();
+  }
+  const cur = append ? (composerRef.value?.draftText ?? '') : '';
+  composerRef.value?.setDraft(cur ? cur + '\n' + text : text);
+  composerRef.value?.focus();
+  return !!composerRef.value;
+}
 function onResend(text: string) {
-  composerRef.value?.setDraft(text);
+  void putDraft(text, false);
 }
 /** BN-6 原型 stepsTry：新手「帮我填一句」=回填+聚焦+toast（不直接发） */
-function onFillDraft(text: string) {
-  composerRef.value?.setDraft(text);
-  composerRef.value?.focus();
-  pushToast('已帮你填好——点发送或按回车', 'ok');
+async function onFillDraft(text: string) {
+  const filled = await putDraft(text, false);
+  pushToast(filled ? '已帮你填好——点发送或按回车' : '先处理上面的计划卡，再点这句', filled ? 'ok' : 'info');
 }
 /** BN-14 原型 helpDemo：关说明+按当前页面/身份发建议首问（跟我走一遍） */
 function onHelpDemo() {
@@ -1332,9 +1348,7 @@ function onMdNav(url: string) {
 
 /** 选区条落输入框：追加=接在现有草稿后；覆盖=填入选区聚焦待编辑 */
 function onDraftSet(text: string, append: boolean) {
-  const cur = append ? (composerRef.value?.draftText ?? '') : '';
-  composerRef.value?.setDraft(cur ? cur + '\n' + text : text);
-  composerRef.value?.focus();
+  void putDraft(text, append);
 }
 
 /** 计划动作的前置闸：这些状态下 onSend 会整段早退，不能先把卡翻成“已确认/已修改” */
@@ -1591,8 +1605,8 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
   /* Q24（2026-10-29）：同一条全局 aside 还带 margin-bottom:20px——fixed 且 top/bottom 都钉 0 时，
      下边距把盒子整体抬高 20px，抽屉底与视口底之间留一条 20px 的透底缝（会话页左卡同因，已一并复位） */
   margin: 0;
-  /* J-2 原型 bg2：灰画布，白头/白气泡/白输入盒在其上分层 */
-  background: #f7f8fa;
+  /* J-2 原型 bg2：灰画布，白头/白气泡/白输入盒在其上分层；2026-11-04 改跟全站底色令牌 */
+  background: var(--app-ground, #fafafa);
   /* 助手抽屉是自带浅色工作台（深色换肤不在本批范围）：内部主色钉回近黑，
      否则 html.dark 下 --el-color-primary=白，卡里「主色底 + 白字」的按钮会整个消失 */
   --el-color-primary: #1d1f20;

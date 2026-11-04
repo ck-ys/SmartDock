@@ -3,7 +3,7 @@ import type { AssistantTurn } from './useAssistant';
 export type AssistantPlan = NonNullable<AssistantTurn['plan']>;
 
 /**
- * 计划停靠区数据源：只认“最新一张仍在等待处理”的计划卡。
+ * 计划卡数据源：只认“最新一张仍在等待处理”的计划卡。
  *
  * 后端同一会话同时只保留一张待确认计划（新的 submit_plan 会覆盖旧的）；前端历史里
  * 可能还挂着更早的卡，旧卡由 {@link useAssistant} 在新计划到达时标成 expired。
@@ -19,13 +19,6 @@ export function latestPendingPlan(turns: AssistantTurn[]): { turn: AssistantTurn
     }
   }
   return null;
-}
-
-/** 输入框停靠区的显示判据（抽成纯函数，宿主与单测同源） */
-export function shouldShowPlanDock(opts: { hasPlan: boolean; hasPendingAsk: boolean; sending: boolean; forced: boolean; draft: string }): boolean {
-  // 生成中不抢输入框：Composer 里的“停止生成”必须始终可达；
-  // 计划已到但本轮还在收尾时，先显示细条，收尾完成后自动展开。
-  return opts.hasPlan && !opts.hasPendingAsk && !opts.sending && (opts.forced || opts.draft.trim() === '');
 }
 
 /** 卡号尾号：给人看的“只作废这一张”凭据；没有编号返回空串 */

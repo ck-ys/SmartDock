@@ -21,7 +21,7 @@
 <script setup lang="ts">
 /**
  * 计划卡（只读收据，2026-11-02 拍板 Q4-A）：
- * 决策入口已经搬到输入框位置的 PlanDock，这里不再放按钮，只保留标题、步骤和状态说明。
+ * 决策入口在消息流里的计划表单卡（PlanFormCard），这里不再放按钮，只保留标题、步骤和状态说明。
  * 历史卡仍能看到「已确认 / 已取消 / 已调整 / 已失效」，但不再提供第二个操作入口。
  */
 import IconSpan from './IconSpan.vue';
@@ -55,7 +55,7 @@ const badge = computed(() => {
 const footerText = computed(() => {
   return (
     {
-      pending: '在下方选择：开始执行 / 改一下 / 取消这张卡',
+      pending: '还没开始执行——本轮收尾后可直接在这张卡上选',
       confirmed: '已按这个计划开始执行',
       cancelled: '这张卡已取消，其他计划不受影响',
       adjusted: '修改意见已发出去，助手会按新意见重做计划',

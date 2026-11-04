@@ -10,6 +10,7 @@
     >
       <!-- 批3.6：agent 壳左栏 = 新任务 + 导航 + 搜索（四项待建，置灰不可点）；会话页走下面旧分支，一行不变 -->
       <template v-if="variant === 'agent'">
+        <div class="ag-ws" title="当前工作区"><IconSpan name="house" :size="13" /><span>SmartDock 工作区</span></div>
         <div class="ag-side-hd">
           <button class="ag-new" type="button" @click="onNewSession"><IconSpan name="plus" :size="14" /> 新任务</button>
           <button class="side-close" type="button" aria-label="关闭会话列表" @click="sideOpen = false"><IconSpan name="x" /></button>
@@ -43,14 +44,14 @@
       <div class="side-body">
         <el-empty
           v-if="!loading && grouped.length === 0 && archived.length === 0"
-          :description="variant === 'agent' ? '还没有会话——点上面「新任务」开始' : '还没有会话——点「新会话」开始'"
+          :description="kw.trim() ? `没有匹配「${kw.trim()}」的会话` : variant === 'agent' ? '还没有会话——点上面「新任务」开始' : '还没有会话——点「新会话」开始'"
           :image-size="64"
         />
         <!-- R4 二改(2026-10-10)：分组头带计数徽标（置顶组配 pin 图标）；「更早」收成折叠条
              （长列表不淹今天/昨天，计数可见），搜索/选中命中更早时自动展开 -->
         <template v-for="g in groupedTop" :key="g.key">
           <div class="grp">
-            <IconSpan v-if="g.key === '置顶'" name="map-pin" :size="11" />
+            <IconSpan v-if="g.key === '已置顶'" name="map-pin" :size="11" />
             <span>{{ g.key }}</span>
             <span class="g-badge">{{ g.items.length }}</span>
           </div>
@@ -58,13 +59,14 @@
             v-for="c in g.items"
             :key="c.id"
             class="conv-item"
-            :class="{ on: c.id === selectedId, pinned: pins.includes(String(c.id)) }"
+            :class="{ on: c.id === selectedId, 'has-ops': renamingId !== c.id && c.id !== 'tmp' }"
             :aria-current="c.id === selectedId ? 'true' : undefined"
             @click="openConversation(c)"
           >
             <span v-if="rowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
             <span v-else-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
             <span v-else-if="isActive(c)" class="sdot" title="最近活跃" />
+            <span v-else class="sslot" aria-hidden="true" />
             <div class="c-main">
               <div class="c-title">
                 <template v-if="renamingId === c.id">
@@ -74,14 +76,14 @@
                     class="c-rename"
                     maxlength="60"
                     @keydown.enter="saveRename(c)"
-                    @keydown.esc="renamingId = ''"
+                    @keydown.esc.stop="renamingId = ''"
                     @blur="saveRename(c)"
                   />
                 </template>
                 <template v-else>{{ displayTitle(c) }}</template>
               </div>
-              <div class="c-meta">{{ rowStatus(c) === 'answering' ? '正在回答…' : dayTime(c.lastMessageTime) }}</div>
             </div>
+            <span class="c-time">{{ rowStatus(c) === 'answering' ? '回答中' : dayTime(c.lastMessageTime) }}</span>
             <span v-if="renamingId !== c.id && c.id !== 'tmp'" class="c-ops">
               <button title="重命名" @click.stop="startRename(c)"><IconSpan name="pencil" /></button>
               <button :title="pins.includes(String(c.id)) ? '取消置顶' : '置顶'" @click.stop="togglePin(c)">
@@ -101,18 +103,33 @@
           <div
             v-for="c in olderGroup.items"
             :key="c.id"
-            class="conv-item"
-            :class="{ on: c.id === selectedId, pinned: pins.includes(String(c.id)) }"
+            class="conv-item has-ops"
+            :class="{ on: c.id === selectedId, 'has-ops': renamingId !== c.id && c.id !== 'tmp' }"
             :aria-current="c.id === selectedId ? 'true' : undefined"
             @click="openConversation(c)"
           >
             <span v-if="rowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
             <span v-else-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
+            <span v-else-if="isActive(c)" class="sdot" title="最近活跃" />
+            <span v-else class="sslot" aria-hidden="true" />
             <div class="c-main">
-              <div class="c-title">{{ displayTitle(c) }}</div>
-              <div class="c-meta">{{ rowStatus(c) === 'answering' ? '正在回答…' : dayTime(c.lastMessageTime) }}</div>
+              <div class="c-title">
+                <template v-if="renamingId === c.id">
+                  <input
+                    ref="renameRef"
+                    v-model="renameVal"
+                    class="c-rename"
+                    maxlength="60"
+                    @keydown.enter="saveRename(c)"
+                    @keydown.esc.stop="renamingId = ''"
+                    @blur="saveRename(c)"
+                  />
+                </template>
+                <template v-else>{{ displayTitle(c) }}</template>
+              </div>
             </div>
-            <span class="c-ops">
+            <span class="c-time">{{ rowStatus(c) === 'answering' ? '回答中' : dayTime(c.lastMessageTime) }}</span>
+            <span v-if="renamingId !== c.id && c.id !== 'tmp'" class="c-ops">
               <button title="重命名" @click.stop="startRename(c)"><IconSpan name="pencil" /></button>
               <button :title="pins.includes(String(c.id)) ? '取消置顶' : '置顶'" @click.stop="togglePin(c)">
                 <IconSpan name="map-pin" />
@@ -128,11 +145,18 @@
           <IconSpan :name="archOpen ? 'chevron-up' : 'chevron-down'" :size="12" />
         </div>
         <template v-if="archOpen">
-          <div v-for="c in archivedExpanded" :key="c.id" class="conv-item archived" @click="openConversation(c)">
+          <div
+            v-for="c in archivedExpanded"
+            :key="c.id"
+            class="conv-item archived has-ops"
+            :class="{ on: c.id === selectedId }"
+            :aria-current="c.id === selectedId ? 'true' : undefined"
+            @click="openConversation(c)"
+          >
             <div class="c-main">
               <div class="c-title">{{ displayTitle(c) }}</div>
-              <div class="c-meta">{{ dayTime(c.lastMessageTime) }}</div>
             </div>
+            <span class="c-time">{{ dayTime(c.lastMessageTime) }}</span>
             <span class="c-ops"><button title="恢复会话" @click.stop="restoreConv(c)">↩</button></span>
           </div>
         </template>
@@ -141,12 +165,13 @@
         <div
           v-if="realCount < convTotal"
           class="load-more"
+          :class="{ loading: loadingMore }"
           role="button"
-          tabindex="0"
+          :tabindex="loadingMore ? -1 : 0"
           @click="loadMoreConversations"
           @keydown.enter="loadMoreConversations"
         >
-          加载更多（已显示 {{ realCount }}/{{ convTotal }}）
+          {{ loadingMore ? '加载中…' : `加载更多（已显示 ${realCount}/${convTotal}）` }}
         </div>
       </div>
 
@@ -155,8 +180,10 @@
         <span class="ag-uav" aria-hidden="true">{{ userInitial }}</span>
         <div class="ag-umeta">
           <b>{{ userStore.nickname || userStore.name || '当前用户' }}</b>
-          <span>{{ userSub }}</span>
         </div>
+        <button class="ag-uset" type="button" title="设置" aria-label="设置" @click="openSettings">
+          <IconSpan name="settings" />
+        </button>
       </div>
     </aside>
 
@@ -200,31 +227,29 @@
         @draft-set="onDraftSet"
         @elicit-done="removeElicitationCard"
         @ask-user-done="removeAskUserCard"
+        :active-plan-id="planCardActionable ? (activePlan?.planId ?? '') : ''"
+        @plan-confirm="onPlanConfirm"
+        @plan-adjust="onPlanAdjust"
+        @plan-cancel="onPlanCancel"
+        @plan-collapse="collapsePlanCard"
       />
 
-      <!-- 计划待确认：输入框有字时只出细条，不抢输入（Q6-A）；点开后才占输入框位置 -->
-      <plan-tip v-if="showPlanTip && activePlan" :plan="activePlan" :busy="state.sending" full @open="openPlanDock" />
-      <plan-dock
-        v-if="showPlanDock && activePlan"
-        :plan="activePlan"
-        full
-        :can-collapse="draftText.trim().length > 0"
-        @confirm="onPlanConfirm"
-        @adjust="onPlanAdjust"
-        @cancel="onPlanCancel"
-        @collapse="collapsePlanDock"
-      />
+      <!-- 计划待确认（题四甲）：主体是消息流里的表单卡；确认期间输入框收起。
+           用户「忽略」或输入框里有草稿时，才露出细条 + 输入框（草稿不能丢） -->
+      <plan-tip v-if="planTipShown && activePlan" :plan="activePlan" full @open="expandPlanCard" />
 
       <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留） -->
       <hitl-dock :ask="pendingAsk" full @resolve="resolveHitl" @revise="onDockRevise" />
 
+      <!-- v-show 而不是 v-if：草稿/队列/附件/--dcs-col-max 都要保活（宽度不跳、状态不丢） -->
       <composer
+        v-show="!planCardShown || planCollapsed || draftText.trim() !== ''"
         ref="composerRef"
         full
         active
         :state="state"
         :sending="state.sending"
-        :blocked="!!pendingAsk || showPlanDock"
+        :blocked="!!pendingAsk"
         @draft-change="draftText = $event"
         @send="onSend"
         @stop="onStop"
@@ -315,6 +340,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search as SearchIcon } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
+import { ASSISTANT_ADMIN_PATH } from '@/router';
 import {
   archiveConversation,
   listActions,
@@ -335,9 +361,9 @@ import { pushToast } from '@/components/DcsAssistant/toastStore';
 import { assistantName } from '@/components/DcsAssistant/nameState';
 import MsgFlow from '@/components/DcsAssistant/MsgFlow.vue';
 import HitlDock from '@/components/DcsAssistant/HitlDock.vue';
-import PlanDock from '@/components/DcsAssistant/PlanDock.vue';
 import PlanTip from '@/components/DcsAssistant/PlanTip.vue';
-import { latestPendingPlan, shouldShowPlanDock } from '@/components/DcsAssistant/planDock';
+import { latestPendingPlan } from '@/components/DcsAssistant/planDock';
+import { convPins, toggleConvPin } from '@/components/DcsAssistant/conversationPins';
 import { startTour } from '@/components/DcsAssistant/useTour';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import Composer from '@/components/DcsAssistant/Composer.vue';
@@ -369,25 +395,17 @@ const syncMobile = (e: MediaQueryListEvent) => {
   isMobile.value = e.matches;
 };
 
-/** 置顶（localStorage 一期，跨设备同步登记二站） */
-const PIN_KEY = 'dcs:assistant:pins';
-const pins = ref<string[]>(
-  (() => {
-    try {
-      return JSON.parse(localStorage.getItem(PIN_KEY) ?? '[]');
-    } catch {
-      return [];
-    }
-  })()
-);
+/** 分钟级心跳：相对时间与「今天/昨天」分组要自己走，不能停在首次渲染 */
+const nowTick = ref(Date.now());
+let nowTimer: ReturnType<typeof setInterval> | null = null;
+/** 置顶（2026-11-04 批C：收进 conversationPins 单例，与抽屉共用同一份内存态） */
+const pins = convPins;
 function togglePin(c: AssistantConversation) {
   // 自查回修：临时行不可操作（假 ID 置顶=僵尸 pin，永远匹配不到真实会话）
   if (c.id === 'tmp') {
     return;
   }
-  const id = String(c.id);
-  pins.value = pins.value.includes(id) ? pins.value.filter((x) => x !== id) : [id, ...pins.value];
-  localStorage.setItem(PIN_KEY, JSON.stringify(pins.value));
+  toggleConvPin(String(c.id));
 }
 
 /** 重命名（PATCH title；行内编辑 Enter/失焦保存，Esc 取消） */
@@ -473,12 +491,15 @@ const filtered = computed(() =>
 const archived = computed(() => filtered.value.filter((c) => c.status === 'ARCHIVED'));
 const archivedExpanded = computed(() => (archOpen.value ? archived.value : []));
 const grouped = computed(() => {
+  void nowTick.value;
   const act = filtered.value.filter((c) => c.status !== 'ARCHIVED');
-  const pin = act.filter((c) => pins.value.includes(String(c.id)));
+  const pin = act
+    .filter((c) => pins.value.includes(String(c.id)))
+    .sort((a, b) => pins.value.indexOf(String(a.id)) - pins.value.indexOf(String(b.id)));
   const rest = act.filter((c) => !pins.value.includes(String(c.id)));
   const g: Array<{ key: string; items: AssistantConversation[] }> = [];
   if (pin.length > 0) {
-    g.push({ key: '置顶', items: pin });
+    g.push({ key: '已置顶', items: pin });
   }
   const byDay = new Map<string, AssistantConversation[]>();
   rest.forEach((c) => {
@@ -497,22 +518,28 @@ const groupedTop = computed(() => grouped.value.filter((g) => g.key !== '更早'
 const olderGroup = computed(() => grouped.value.find((g) => g.key === '更早') ?? null);
 const olderOpen = ref(false);
 watch(kw, (k) => {
-  if (k.trim()) {
-    olderOpen.value = true;
-  }
+  // 搜索时展开「更早」；清空关键字回到默认收起
+  olderOpen.value = k.trim() ? true : false;
 });
+// 只在「命中从无变有」时展开：旧写法盯 olderGroup 对象引用，每次列表重算都会重开，
+// 用户手动收起后一刷新又弹开
 watch(
-  () => [selectedId.value, olderGroup.value] as const,
-  ([sel, og]) => {
-    if (og && og.items.some((c) => c.id === sel)) {
-      olderOpen.value = true;
-    }
+  () => !!olderGroup.value && olderGroup.value.items.some((c) => c.id === selectedId.value),
+  (hit) => {
+    if (hit) olderOpen.value = true;
   }
 );
+// 搜到已归档的会话时自动展开归档组（否则正文空白，像搜漏了）
+watch(filtered, (list) => {
+  if (kw.value.trim() && list.some((c) => c.status === 'ARCHIVED')) {
+    archOpen.value = true;
+  }
+});
 /** 批A 审查回修 P1-2：分组日界改北京自然日（cnDayDiff=now−item 天数），与 relTime 的
  *  「今天/昨天」判定同一套口径——修前浏览器本地零点与北京零点在时差窗内错开，会出现
  *  「行内显示昨天 22:00 却挂在今天分组」的自相矛盾 */
 function dayBucket(t?: string): string {
+  void nowTick.value;
   const diff = cnDayDiff(t);
   if (diff === null) {
     return '更早';
@@ -522,6 +549,8 @@ function dayBucket(t?: string): string {
 /** 批A Q12（拍板 2026-10-11）：与抽屉 fpDayTime 一并收敛到共用 relTime（修无时区串
  *  本地解析负差恒「刚刚」+ 补「X 分钟前」档），两宿主口径单一真源 */
 function dayTime(t?: string): string {
+  // 读一下 tick 让模板在分钟级刷新时重渲染（否则「刚刚」能挂一整天）
+  void nowTick.value;
   return relTime(t);
 }
 function fmtTime(t?: string): string {
@@ -609,45 +638,49 @@ const agEmpty = computed(
  *  退回账号名。这里刻意不取租户名——/agent 是独立分区，不经业务壳，tenantName 不会加载，
  *  副行会随进入路径变化；账号名是确定值。 */
 const userInitial = computed(() => (userStore.nickname || userStore.name || '我').trim().charAt(0) || '我');
-const userSub = computed(() => {
-  const label = userStore.roles.includes('superadmin') ? '管理员' : '成员';
-  return label === (userStore.nickname || '').trim() ? userStore.name || '' : label;
-});
+/** 底栏设置：管理员进助手管理，普通成员进账号设置（助手管理他们没权限） */
+function openSettings() {
+  router.push(userStore.roles.includes('superadmin') ? ASSISTANT_ADMIN_PATH : '/user/profile');
+}
 /** 停靠区数据源（与抽屉同口径）：最近一张 pending 卡 */
 const pendingTurn = computed(() => [...state.turns].reverse().find((t) => t.hitl?.cardState === 'pending') ?? null);
 const pendingAsk = computed(() => pendingTurn.value?.hitl ?? null);
 /** 最新一张待确认计划（Q5-A：旧卡只读，只有最新一张可操作） */
 const pendingPlan = computed(() => latestPendingPlan(state.turns));
 const activePlan = computed(() => pendingPlan.value?.plan ?? null);
-/** Composer 草稿（Q6-A：有字时只出细条，不抢输入框） */
+/** Composer 草稿（题四甲：有草稿时不藏输入框，草稿不能丢） */
 const draftText = ref('');
-const planDockForced = ref(false);
-const showPlanDock = computed(() =>
-  shouldShowPlanDock({
-    hasPlan: !!activePlan.value,
-    hasPendingAsk: !!pendingAsk.value,
-    sending: state.sending,
-    forced: planDockForced.value,
-    draft: draftText.value
-  })
-);
-const showPlanTip = computed(() => !!activePlan.value && !pendingAsk.value && !showPlanDock.value);
+/** 用户点过「忽略」：卡仍留在消息流里可再操作，但输入框先还回来 */
+const planCollapsed = ref(false);
+/** 卡是否可操作（无反问抢位、有卡号）——生成中也保留，否则第 4 行写一半会被卸载丢字 */
+const planCardActionable = computed(() => !!activePlan.value?.planId && !pendingAsk.value);
+/** 卡在场（含生成收尾窗口）：输入框立即收起，不留第二块输入区；卡在流未完时只锁「提交」 */
+const planCardShown = computed(() => planCardActionable.value);
+const planTipShown = computed(() => planCardShown.value && planCollapsed.value);
 watch(
   () => activePlan.value?.planId,
   () => {
-    planDockForced.value = false;
+    planCollapsed.value = false;
   }
 );
-watch(showPlanDock, (v, old) => {
-  if (old && !v) {
+watch(planCardShown, (v, old) => {
+  // 计划决策完成/卡失效后，焦点还给输入框
+  if (old && !v && !pendingAsk.value) {
     nextTick(() => composerRef.value?.focus());
   }
 });
-function openPlanDock() {
-  planDockForced.value = true;
+function expandPlanCard() {
+  planCollapsed.value = false;
+  // 输入框会被收走：把卡本身滚进视野并接住焦点，别让用户对着没有输入框的页面发呆
+  nextTick(() => {
+    const id = activePlan.value?.planId;
+    const el = id ? (document.querySelector(`.dcs-pfc[data-plan-id="${id}"]`) as HTMLElement | null) : null;
+    el?.scrollIntoView({ block: 'nearest' });
+    el?.focus({ preventScroll: true });
+  });
 }
-function collapsePlanDock() {
-  planDockForced.value = false;
+function collapsePlanCard() {
+  planCollapsed.value = true;
   nextTick(() => composerRef.value?.focus());
 }
 /** 停靠区「改一下」：先取消本次确认（cancelled resume 清服务端悬挂），
@@ -660,9 +693,9 @@ function onDockRevise(m: string) {
   resolveHitl(false);
   onSend(text, '');
 }
-// 停靠区收卡后焦点还给输入框（与抽屉同口径）；计划停靠区接手时由 PlanDock 自己聚焦
+// 停靠区收卡后焦点还给输入框（与抽屉同口径）；计划表单卡在消息流里，由卡自己接管焦点
 watch(pendingAsk, (v, old) => {
-  if (old && !v && !showPlanDock.value) {
+  if (old && !v && !planCardShown.value) {
     nextTick(() => composerRef.value?.focus());
   }
 });
@@ -741,14 +774,25 @@ function onQueueDrop(i: number) {
 function onQueueResume() {
   queueResume();
 }
+/** 计划卡展示时输入框被收起——要回填草稿先展开输入框，等重挂后再写，避免静默丢字 */
+async function putDraft(text: string, append: boolean) {
+  if (planCardShown.value && !planCollapsed.value && draftText.value.trim() === '') {
+    planCollapsed.value = true;
+    await nextTick();
+    await nextTick();
+  }
+  const cur = append ? (composerRef.value?.draftText ?? '') : '';
+  composerRef.value?.setDraft(cur ? cur + '\n' + text : text);
+  composerRef.value?.focus();
+  return !!composerRef.value;
+}
 function onResend(text: string) {
-  composerRef.value?.setDraft(text);
+  void putDraft(text, false);
 }
 /** BN-6 原型 stepsTry：新手「帮我填一句」=回填+聚焦+toast（不直接发） */
-function onFillDraft(text: string) {
-  composerRef.value?.setDraft(text);
-  composerRef.value?.focus();
-  pushToast('已帮你填好——点发送或按回车', 'ok');
+async function onFillDraft(text: string) {
+  const filled = await putDraft(text, false);
+  pushToast(filled ? '已帮你填好——点发送或按回车' : '先处理上面的计划卡，再点这句', filled ? 'ok' : 'info');
 }
 function onBranch(turn: AssistantTurn) {
   if (state.sending) {
@@ -763,9 +807,7 @@ function onPageGoto(p: { missionId: string; missionName: string }) {
   router.push(`/dcs/mission/detail/${p.missionId}`);
 }
 function onDraftSet(text: string, append: boolean) {
-  const curText = append ? (composerRef.value?.draftText ?? '') : '';
-  composerRef.value?.setDraft(curText ? curText + '\n' + text : text);
-  composerRef.value?.focus();
+  void putDraft(text, append);
 }
 /** 计划动作的前置闸：归档/禁用时 onSend 会整段早退，不能先把卡翻成“已确认/已修改” */
 function planBlockedMsg(): string {
@@ -884,7 +926,13 @@ async function loadConversations(silent = false) {
     }
   }
 }
+const loadingMore = ref(false);
 async function loadMoreConversations() {
+  // 慢网连点会并发翻页：先回的写 page3、后回的覆盖成 page2，顺序错乱还可能漏页
+  if (loadingMore.value) {
+    return;
+  }
+  loadingMore.value = true;
   convPageNum.value += 1;
   try {
     const res = (await listConversations({ pageNum: convPageNum.value, pageSize: 50, status: 'ALL' })) as unknown as {
@@ -906,6 +954,8 @@ async function loadMoreConversations() {
     }
   } catch {
     convPageNum.value -= 1;
+  } finally {
+    loadingMore.value = false;
   }
 }
 
@@ -1070,11 +1120,22 @@ watch(
     }
   }
 );
-onBeforeUnmount(() => convRefreshTimers.forEach((t) => clearTimeout(t)));
+onBeforeUnmount(() => {
+  convRefreshTimers.forEach((t) => clearTimeout(t));
+  if (nowTimer) {
+    clearInterval(nowTimer);
+    nowTimer = null;
+  }
+});
 
 /** BN-10 原型 Esc 分层（会话页口径）：输入区弹层（AU-29）→ 生成中 Esc=停止（无面板可收；输入框内的 Esc 由组件自身处理） */
 function onPageEsc(e: KeyboardEvent) {
   if (e.key !== 'Escape') {
+    return;
+  }
+  // 输入控件里的 Esc 归控件自己（重命名撤销、输入框弹层），别在这里顺手停止生成
+  const t = e.target as HTMLElement | null;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
     return;
   }
   if (sideOpen.value) {
@@ -1089,6 +1150,9 @@ function onPageEsc(e: KeyboardEvent) {
   }
 }
 onMounted(() => {
+  nowTimer = setInterval(() => {
+    nowTick.value = Date.now();
+  }, 60_000);
   document.addEventListener('keydown', onPageEsc);
   mqMobile.addEventListener('change', syncMobile);
 });
@@ -1136,23 +1200,19 @@ defineExpose({
   padding: 12px;
 
   .side {
-    width: 300px;
+    width: 264px;
     flex: none;
     display: flex;
     flex-direction: column;
-    /* Q24（2026-10-29 用户截图红圈）：全局 element 选择器 `aside{...}`（assets/styles/index.scss:150，
-       若依模板的文档页样式）打穿了本组件的根 aside——①margin-bottom:20px 让卡片底比右栏主区
-       高 20px（红圈处那条 20px 白带）；②padding:8px 24px 把 298 的内容宽吃到 250，会话滚动条
-       因此悬在离卡右缘 24px 的空白里；③line-height:32px 把每行会话从 ~56 撑到 82（标题行 32、
-       时间行 32）；④font-size:16px 抬高所有没显式设字号的文字。抽屉根 aside 早前已按同因复位
-       line-height/font-size（AssistantDrawer.vue `.dcs-dw`），本页整树一起复位。 */
-    margin: 0;
+    /* 题七甲（2026-11-04）：ZCode 同款——左栏是贴着窗口的一块浅灰面板，不是白卡；
+       负 margin 吃掉根容器的 12px 呼吸位，右侧主对话区仍是白卡。 */
+    margin: -12px 0 -12px -12px;
     padding: 0;
     line-height: 1.5;
     font-size: 13px;
-    border: 1px solid var(--dcs-border-color-lighter);
-    border-radius: var(--app-card-radius);
-    background: var(--el-bg-color);
+    border: 0;
+    border-radius: 0;
+    background: var(--app-raised, #f5f5f5);
     overflow: hidden;
 
     .side-hd {
@@ -1176,6 +1236,23 @@ defineExpose({
     /* 批3.6：agent 壳左栏（新任务 / 五项导航 / 搜索）。
        只在本分支渲染，会话页走上面 .side-hd 旧样式，一行不受影响。
        字号只用 13（档内），间距只用 4/8/12，圆角 8——全部对齐 dcs-tokens。 */
+    .ag-ws {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      height: 32px;
+      padding: 0 12px;
+      margin-top: 8px;
+      font-size: 12.5px;
+      color: var(--dcs-text-secondary);
+      overflow: hidden;
+
+      span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
     .ag-side-hd {
       display: flex;
       align-items: center;
@@ -1284,8 +1361,8 @@ defineExpose({
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 12px 12px 8px;
-      border-top: 1px solid var(--dcs-border-color-lighter);
+      padding: 8px 10px;
+      border-top: 1px solid var(--app-border, rgba(13, 13, 13, 0.1));
 
       .ag-uav {
         width: 28px;
@@ -1300,6 +1377,7 @@ defineExpose({
         font-weight: 500;
       }
       .ag-umeta {
+        flex: 1;
         min-width: 0;
 
         b {
@@ -1313,9 +1391,29 @@ defineExpose({
           white-space: nowrap;
         }
         span {
-          display: block;
-          font-size: 12px;
-          color: var(--dcs-text-placeholder);
+          display: none;
+        }
+      }
+      .ag-uset {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--dcs-text-secondary);
+        cursor: pointer;
+
+        &:hover {
+          background: color-mix(in srgb, var(--app-text, #181818) 6%, transparent);
+          color: var(--dcs-text-primary);
+        }
+        &:focus-visible {
+          outline: 2px solid var(--el-color-primary);
+          outline-offset: 1px;
         }
       }
     }
@@ -1358,7 +1456,7 @@ defineExpose({
 
     &:hover {
       color: var(--el-color-primary);
-      background: var(--el-fill-color-light);
+      background: color-mix(in srgb, var(--app-text, #181818) 6%, transparent);
     }
     > .iswap:last-child {
       margin-left: auto;
@@ -1368,51 +1466,67 @@ defineExpose({
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 8px 8px 10px;
-    border-radius: var(--app-card-radius);
+    min-height: 32px;
+    padding: 0 8px;
+    border-radius: 6px;
     cursor: pointer;
     position: relative;
 
     &:hover {
-      background: var(--el-fill-color-light);
+      background: color-mix(in srgb, var(--app-text, #181818) 6%, transparent);
 
       .c-ops {
         visibility: visible;
       }
     }
-    &.on {
-      background: var(--el-color-primary-light-9);
+    /* 时间与操作同一个右槽：hover 只藏时间（保宽不横跳），操作绝对定位盖在同一位置 */
+    &:hover.has-ops .c-time,
+    &:focus-within.has-ops .c-time {
+      visibility: hidden;
     }
-    &.pinned::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 8px;
-      bottom: 8px;
-      width: 3px;
-      border-radius: var(--dcs-radius-xs);
-      background: var(--el-color-primary);
+    &:focus-within .c-ops {
+      visibility: visible;
+    }
+    &.on {
+      background: color-mix(in srgb, var(--app-text, #181818) 9%, transparent);
     }
     &.archived {
       opacity: 0.75;
     }
-    .sdot {
-      /* Q10 圆点统一：与抽屉 sdot/统计面板 spdot 同 7px（视觉三轮提过不一致） */
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--dcs-color-success);
+    .sslot {
+      width: 16px;
+      height: 16px;
       flex: none;
     }
+    .sdot {
+      /* 16px 状态槽：外槽定宽，圆点 7px 居中（与抽屉 sdot/统计面板 spdot 同 7px） */
+      width: 16px;
+      height: 16px;
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+
+      &::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--dcs-color-success);
+      }
+    }
     /* 批D Q11-A：出错红点（最近一轮 error） */
-    .sdot-err {
+    .sdot-err::before {
       background: var(--dcs-color-danger);
     }
     /* 批D Q11-A：回答中旋转标——EP loading 同款顺时针，主色弧线 */
     .sspin {
       flex: none;
+      width: 16px;
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       color: var(--el-color-primary);
       animation: dcs-sspin 0.9s linear infinite;
     }
@@ -1426,11 +1540,17 @@ defineExpose({
       min-width: 0;
     }
     .c-title {
-      font-size: 13.5px;
+      font-size: 14px;
       color: var(--dcs-text-primary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .c-time {
+      flex: none;
+      font-size: 12px;
+      color: var(--dcs-text-placeholder);
+      font-variant-numeric: tabular-nums;
     }
     .c-rename {
       width: 100%;
@@ -1442,16 +1562,14 @@ defineExpose({
       color: var(--dcs-text-primary);
       outline: none;
     }
-    .c-meta {
-      margin-top: 2px;
-      font-size: 12px;
-      color: var(--dcs-text-secondary);
-    }
     .c-ops {
       visibility: hidden;
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
       display: flex;
       gap: 2px;
-      flex: none;
 
       button {
         border: none;
@@ -1465,6 +1583,15 @@ defineExpose({
           background: var(--el-fill-color);
         }
       }
+    }
+  }
+  /* 触摸屏没有 hover：操作常显（否则重命名/置顶/归档在手机上永不可达） */
+  @media (hover: none) {
+    .conv-item .c-ops {
+      visibility: visible;
+    }
+    .conv-item.has-ops .c-time {
+      visibility: hidden;
     }
   }
   .arch-fold {
@@ -1731,6 +1858,7 @@ html.dark .main.ag-empty :deep(.dcs-comp .box:not(.focus)) {
       left: 0;
       z-index: 1201;
       width: min(320px, 86vw);
+      margin: 0;
       height: 100dvh;
       padding-top: var(--sp-top, 0px);
       padding-bottom: env(safe-area-inset-bottom, 0px);

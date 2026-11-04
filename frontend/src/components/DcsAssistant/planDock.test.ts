@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { latestPendingPlan, planTail, shouldShowPlanDock } from './planDock';
+import { latestPendingPlan, planTail } from './planDock';
 import type { AssistantTurn } from './useAssistant';
 
 const turn = (plan: AssistantTurn['plan']) => ({ plan }) as AssistantTurn;
@@ -27,32 +27,6 @@ describe('latestPendingPlan（输入框停靠区只认最新一张待确认卡�
   it('没有 pending 卡返回 null', () => {
     expect(latestPendingPlan([])).toBeNull();
     expect(latestPendingPlan([turn(null), turn({ planId: 'x', steps: [], status: 'expired' })])).toBeNull();
-  });
-});
-
-describe('shouldShowPlanDock（输入框让位判据）', () => {
-  const base = { hasPlan: true, hasPendingAsk: false, sending: false, forced: false, draft: '' };
-
-  it('空草稿：直接占输入框', () => {
-    expect(shouldShowPlanDock(base)).toBe(true);
-  });
-
-  it('有草稿：不抢输入，只出细条', () => {
-    expect(shouldShowPlanDock({ ...base, draft: '写了一半' })).toBe(false);
-    expect(shouldShowPlanDock({ ...base, draft: '   ' })).toBe(true);
-  });
-
-  it('用户主动点细条：有草稿也展开', () => {
-    expect(shouldShowPlanDock({ ...base, draft: '写了一半', forced: true })).toBe(true);
-  });
-
-  it('生成中不占输入框：保证停止按钮始终可达', () => {
-    expect(shouldShowPlanDock({ ...base, sending: true })).toBe(false);
-  });
-
-  it('有待处理 HITL 或没有计划：不显示', () => {
-    expect(shouldShowPlanDock({ ...base, hasPendingAsk: true })).toBe(false);
-    expect(shouldShowPlanDock({ ...base, hasPlan: false })).toBe(false);
   });
 });
 

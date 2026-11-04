@@ -159,8 +159,18 @@
     <!-- 已用工具章（原型 stamp）：UI 专项批1 删除——折叠态胶囊「用了 N 个工具」、
          展开态工具行 verb 双侧都与其重复（视觉评审 ui3 两轮实锤），动词语义留这两处承载 -->
 
-    <!-- 计划卡（只读收据；决策入口在输入框位置的 PlanDock） -->
-    <plan-card v-if="turn.plan" :plan="turn.plan" />
+    <!-- 计划卡（题四甲 2026-11-04）：最新一张待确认计划渲染成消息流表单卡
+         （编号行+自由输入+忽略/提交）；其余状态与旧卡一律只读收据 -->
+    <plan-form-card
+      v-if="turn.plan && isActivePlan"
+      :plan="turn.plan"
+      :busy="planBusy"
+      @confirm="(id) => emit('plan-confirm', id)"
+      @adjust="(id, text) => emit('plan-adjust', id, text)"
+      @cancel="(id) => emit('plan-cancel', id)"
+      @collapse="emit('plan-collapse')"
+    />
+    <plan-card v-else-if="turn.plan" :plan="turn.plan" />
 
     <!-- G3-A1：MCP 外部工具反问卡（server 在飞挂起，run 保持 RUNNING）——作答走独立端点，
          不进 HITL resume 体系；done 后本地移除（后端超时 CANCEL 兜底） -->
@@ -443,6 +453,7 @@ import DataCard from './DataCard.vue';
 import FormCard from './FormCard.vue';
 import TemplateCard from './TemplateCard.vue';
 import PlanCard from './PlanCard.vue';
+import PlanFormCard from './PlanFormCard.vue';
 import ElicitCard from './ElicitationCard.vue';
 import AskUserCard from './AskUserCard.vue';
 import IconSpan from './IconSpan.vue';
@@ -465,8 +476,16 @@ const props = defineProps<{
   now: number;
   threadId?: string;
   showThink?: boolean;
+  /** 题四甲：当前可操作的计划卡 id（宿主算好传进来；空串=没有可操作的卡） */
+  activePlanId?: string;
+  /** 计划决策请求在飞（锁卡防重复提交） */
+  planBusy?: boolean;
 }>();
 const rootEl = ref<HTMLElement | null>(null);
+/** 只有「最新一张 pending 卡」可操作；历史卡/已决策卡走只读收据 */
+const isActivePlan = computed(
+  () => !!props.turn.plan?.planId && props.turn.plan.planId === props.activePlanId && (!props.turn.plan.status || props.turn.plan.status === 'pending')
+);
 
 /** 流内回执——待确认只留一行指路（真卡在输入框位置的停靠区），
  *  完成/取消后折叠为一行（详情可展开原卡只读内容） */
@@ -518,6 +537,11 @@ const emit = defineEmits<{
   /** 批3 Q6 站内链/任务卡导航（回修 P1-2：上浮宿主——抽屉态要先收抽屉再跳转，
    *  直接 router.push 会把目标页压在抽屉遮罩后面；session 页直接 push） */
   mdnav: [url: string];
+  /** 题四甲：消息流计划卡上的决策（上浮宿主，与旧停靠区同一套 handler） */
+  'plan-confirm': [planId: string];
+  'plan-adjust': [planId: string, feedback: string];
+  'plan-cancel': [planId: string];
+  'plan-collapse': [];
 }>();
 
 /** 👎问卷三选一（原型 fbpop 固定文案） */
@@ -2239,7 +2263,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       font-size: 11.5px;
       padding: 1px 4px;
       border-radius: 4px;
-      background: var(--dcs-fill-light, #f2f4f7);
+      background: var(--el-fill-color-light, #f5f5f5);
     }
     :deep(.dcs-link) {
       color: var(--el-color-primary);

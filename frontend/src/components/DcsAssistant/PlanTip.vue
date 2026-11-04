@@ -17,7 +17,7 @@
 /**
  * 计划待确认细条（2026-11-02 拍板 Q6-A）：
  * 用户正在输入框里打字时，计划突然到达——不抢输入框，只在上面出一条细条；
- * 点一下才展开 PlanDock，草稿原样保留。
+ * 点一下才展开消息流里的计划表单卡，草稿原样保留。
  */
 import IconSpan from './IconSpan.vue';
 import { planTail, type AssistantPlan } from './planDock';

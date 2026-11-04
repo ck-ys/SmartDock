@@ -25,41 +25,48 @@
             class="aopt"
             :class="{ on: isPicked(qi, o.label) }"
             :aria-pressed="isPicked(qi, o.label)"
+            :disabled="busy"
             :title="o.description || o.label"
             @click="togglePick(qi, o.label)"
           >
+            <span class="aopt-no">{{ oi + 1 }}.</span>
             <span class="aopt-l">{{ o.label }}</span>
             <span v-if="o.description" class="aopt-d">{{ o.description }}</span>
           </button>
+          <!-- 同款解剖：自填项就是「第 N+1 个选项」 -->
+          <label class="aopt aopt-other" :class="{ on: !!(other[qi] ?? '').trim() }">
+            <span class="aopt-no">{{ q.options.length + 1 }}.</span>
+            <input
+              v-model="other[qi]"
+              type="text"
+              class="aother"
+              :disabled="busy"
+              maxlength="200"
+              placeholder="输入你的回答…（都不合适就写在这）"
+              :aria-label="`${q.header}：其它补充`"
+            />
+          </label>
         </div>
-        <label class="aother-wrap">
-          <span class="aother-k">其它</span>
-          <input
-            v-model="other[qi]"
-            type="text"
-            class="aother"
-            maxlength="200"
-            placeholder="都不合适？写在这（可选）"
-            :aria-label="`${q.header}：其它补充`"
-          />
-        </label>
       </div>
     </div>
 
-    <div class="af-btns">
-      <button class="af-cancel" type="button" title="关掉这张卡（助手拿不到答案，会按稳妥默认继续）" @click="submit('cancel')">
-        关闭
-      </button>
-      <button
-        class="af-go"
-        type="button"
-        :class="{ busy }"
-        :disabled="busy || !!missing"
-        :title="missing || '提交选择，助手继续执行'"
-        @click="submit('answer')"
-      >
-        提交选择
-      </button>
+    <div class="af">
+      <span class="af-hint">点一行选中（可多选的题可点多个），也可以在最后一行自己写</span>
+      <div class="af-btns">
+        <button class="af-cancel" type="button" title="关掉这张卡（助手拿不到答案，会按稳妥默认继续）" @click="submit('cancel')">
+          关闭
+        </button>
+        <button
+          class="af-go"
+          type="button"
+          :class="{ busy }"
+          :disabled="busy || !!missing"
+          :title="missing || '提交选择，助手继续执行'"
+          @click="submit('answer')"
+        >
+          提交
+        </button>
+      </div>
     </div>
     <p v-if="errText" class="aerr">{{ errText }}</p>
   </div>
@@ -265,63 +272,111 @@ async function submit(action: 'answer' | 'cancel') {
 .aq-opts {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 1px;
 }
+/* 同款解剖：编号行；选中不靠蓝底，靠序号反白 + 行底 5% 灰 */
 .aopt {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  width: 100%;
+  min-height: 32px;
   text-align: left;
-  border: 1px solid var(--dcs-border, #dcdfe6);
-  border-radius: 7px;
-  background: var(--el-fill-color-blank, #fff);
-  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  padding: 5px 8px;
   cursor: pointer;
   font: inherit;
   &:hover {
-    border-color: var(--el-color-primary-light-5);
+    background: color-mix(in srgb, var(--app-text, #181818) 6%, transparent);
   }
   &.on {
-    border-color: var(--el-color-primary);
-    background: var(--el-color-primary-light-9, #ecf5ff);
+    background: color-mix(in srgb, var(--app-text, #181818) 6%, transparent);
+  }
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
 }
+.aopt-no {
+  flex: none;
+  width: 15px;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: right;
+  color: var(--app-faint, #8a8a8a);
+  font-variant-numeric: tabular-nums;
+}
+.aopt.on .aopt-no {
+  color: var(--app-text, #181818);
+  font-weight: 600;
+}
 .aopt-l {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 13px;
-  color: var(--dcs-text-primary, #303133);
+  line-height: 20px;
+  color: var(--app-text, #181818);
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .aopt-d {
-  font-size: 11px;
-  color: var(--dcs-text-secondary, #909399);
-  line-height: 1.45;
+  flex: 1 1 120px;
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 20px;
+  color: var(--app-muted, #666);
+  overflow-wrap: anywhere;
 }
-.aother-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.aother-k {
-  flex: none;
-  font-size: 11px;
-  color: var(--dcs-text-secondary, #909399);
-  border: 1px dashed var(--dcs-border, #dcdfe6);
-  border-radius: 6px;
-  padding: 3px 6px;
+.aopt-other {
+  align-items: flex-start;
+  cursor: text;
+  border-color: var(--app-border, rgba(13, 13, 13, 0.1));
+  background: var(--app-surface, #fff);
+  &:hover,
+  &.on {
+    background: var(--app-surface, #fff);
+  }
+  .aopt-no {
+    line-height: 24px;
+  }
+  &:focus-within {
+    border-color: var(--app-control, rgba(13, 13, 13, 0.12));
+    background: color-mix(in srgb, var(--app-text, #181818) 6%, transparent);
+  }
 }
 .aother {
   flex: 1;
   min-width: 0;
-  border: 1px dashed var(--dcs-border, #dcdfe6);
-  border-radius: 6px;
-  padding: 5px 8px;
-  font-size: 12.5px;
-  background: var(--el-fill-color-blank, #fff);
-  color: var(--dcs-text-primary, #303133);
+  border: 0;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  background: transparent;
+  color: var(--app-text, #181818);
+  &::placeholder {
+    color: var(--app-faint, #8a8a8a);
+  }
   &:focus-visible {
     outline: none;
-    border-color: var(--el-color-primary);
   }
+}
+.af {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: none;
+}
+.af-hint {
+  flex: 1;
+  min-width: 160px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--app-faint, #8a8a8a);
 }
 .af-btns {
   display: flex;
@@ -329,31 +384,31 @@ async function submit(action: 'answer' | 'cancel') {
   justify-content: flex-end;
   flex-wrap: wrap;
   flex: none;
+  margin-left: auto;
   button {
-    border-radius: 7px;
-    border: 1px solid var(--dcs-border, #dcdfe6);
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--app-border, rgba(13, 13, 13, 0.1));
     font-size: 12.5px;
-    padding: 5px 12px;
+    padding: 0 12px;
     cursor: pointer;
-    background: var(--el-fill-color-blank, #fff);
+    background: var(--app-surface, #fff);
+    color: var(--app-muted, #666);
     &:disabled {
       opacity: 0.55;
       cursor: not-allowed;
     }
   }
   .af-go {
-    background: var(--el-color-primary);
-    border-color: var(--el-color-primary);
-    color: var(--app-primary-ink);
+    background: var(--app-text, #181818);
+    border-color: var(--app-text, #181818);
+    color: var(--app-surface, #fff);
     &:not(:disabled):hover {
-      background: var(--el-color-primary-light-3);
+      background: color-mix(in srgb, var(--app-text, #181818) 82%, #000);
     }
     &.busy {
       opacity: 0.6;
     }
-  }
-  .af-cancel {
-    color: var(--dcs-text-secondary, #909399);
   }
 }
 .aerr {
