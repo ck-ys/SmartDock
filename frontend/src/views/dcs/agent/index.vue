@@ -4,7 +4,7 @@
     <header class="ag-top">
       <span class="brand"><BrandMark :size="22" /> 智能体工作台</span>
       <span class="sp"></span>
-      <button v-if="canAudit" class="tb-btn" type="button" @click="go('/ai/assistant-audit')"><IconSpan name="clipboard" :size="13" /> 审计</button>
+      <button v-if="canAudit" class="tb-btn" type="button" @click="go('/agent/settings?s=audit')"><IconSpan name="clipboard" :size="13" /> 审计</button>
       <button class="tb-btn" type="button" @click="go('/index')"><IconSpan name="arrow-up-right" :size="13" /> 返回业务系统</button>
     </header>
 
@@ -68,13 +68,14 @@
  * - 权限自检沿用批3（agentws:workspace:use）。
  */
 import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import BrandMark from '@/components/BrandMark.vue';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import AssistantWorkspace from '@/components/DcsAssistant/AssistantWorkspace.vue';
 import { useUserStore } from '@/store/modules/user';
 import { getAssistantSkillCatalog, getAssistantRecentSkills } from '@/api/dcs/assistant';
 import { buildSkillDraft, shouldGhostOnHover, skillDesc } from './prefill';
+import { setWorkspaceSnapshot, takePendingSkill, takeWorkspaceSnapshot } from './bridge';
 
 interface CatalogRow {
   id: string;
@@ -176,18 +177,66 @@ function go(path: string) {
   router.push(path);
 }
 
+/** 去设置页时记下当前会话与草稿（2026-11-05 A3）：回来能接上，不用网址参数。
+ *  只记去 /agent/settings 这一跳；去业务系统不记（免得回来被旧快照拉回旧会话）。 */
+onBeforeRouteLeave((to) => {
+  if (to.path === '/agent/settings') {
+    setWorkspaceSnapshot({ threadId: wsRef.value?.currentThreadId ?? '', draft: wsRef.value?.draftText ?? '' });
+  }
+});
+
+/** 设置页「试一句」回来：先恢复会话与草稿，再填这句。
+ *  「框里有字」必须排除我们自己刚恢复的旧草稿——点「试一句」本身就是明确选择；
+ *  那字如果是出发前的自己，再问一遍「要不要换」就自相矛盾（三审 P1：选「保留原样」还会把这句静默丢掉）。
+ *  只有往返窗口里用户新打的字才问。 */
+async function applyHandoff() {
+  const pending = takePendingSkill();
+  const snap = takeWorkspaceSnapshot();
+  // 没有快照（直开设置页/停留过久）时用单例里还在的会话兜底：标题与左栏高亮不掉回「新会话」
+  const threadId = snap?.threadId || (wsRef.value?.hasSession ? wsRef.value.currentThreadId : '');
+  try {
+    if (threadId) {
+      await wsRef.value?.restoreSession(threadId, snap?.draft);
+    }
+  } catch {
+    // 会话没接上不影响下面填句子
+  }
+  if (!pending) {
+    return;
+  }
+  const sentence = buildSkillDraft(pending.name, pending.desc);
+  const current = draftNow().trim();
+  const restored = (snap?.draft ?? '').trim();
+  if (current && current !== restored && current !== sentence.trim()) {
+    try {
+      await ElMessageBox.confirm(`输入框里已经有字了，要换成「${pending.name}」这句吗？`, '换成这句？', {
+        confirmButtonText: '换成这句',
+        cancelButtonText: '保留原样',
+        type: 'warning'
+      });
+    } catch {
+      return;
+    }
+  }
+  wsRef.value?.setDraft(sentence);
+  wsRef.value?.focusComposer();
+}
+
 onMounted(async () => {
   // 独立分区不进动态路由，权限在这里自检；未授权统一进 /403 说明页（保留业务壳层）
   if (!allowed.value) {
     router.replace('/403');
     return;
   }
+  // 交接与技能目录并行（三审 J）：慢网恢复/等确认时，技能条照常出，不空转
+  const handoff = applyHandoff().catch(() => {});
   const [catRes, recRes] = await Promise.allSettled([getAssistantSkillCatalog(), getAssistantRecentSkills()]);
   catalog.value = catRes.status === 'fulfilled' ? ((catRes.value as unknown as { data?: CatalogRow[] })?.data ?? []) : [];
   recent.value =
     recRes.status === 'fulfilled' ? ((recRes.value as unknown as { data?: Array<{ skillId: string; useCount: number }> })?.data ?? []) : [];
   failed.value = catRes.status === 'rejected';
   loading.value = false;
+  await handoff;
 });
 </script>
 
@@ -195,12 +244,12 @@ onMounted(async () => {
 /* 壳层口径：--app-chrome 归零（无业务壳页头），积木高度扣顶栏 48px；双肤沿用批3 令牌 */
 .agent-ws {
   --bd: rgba(13, 13, 13, 0.1);
-  --bg: #f8f8f8;
+  --bg: #fafafa;
   --panel: #ffffff;
   --text: #0d0d0d;
   --mut: #52525b;
   --faint: #6b6b6b;
-  --tile: #f2f3f5;
+  --tile: #f0f0f0;
   --acc: #0d0d0d;
   --acc-txt: #ffffff;
   /* 批4：白卡原来和面板共用 --bd（0.10），全页 6 条同重线；卡边单独收淡一档，
@@ -218,10 +267,17 @@ onMounted(async () => {
   background: var(--bg);
   color: var(--text);
 }
+/* T7 深色：跟 T7 深皮肤的面板/画布/描边（2026-11-04 三审 P2） */
+html[data-skin='t7'].dark .agent-ws {
+  --bd: #333333;
+  --bg: #101010;
+  --panel: #242424;
+  --tile: rgba(255, 255, 255, 0.07);
+}
 html.dark .agent-ws {
   --bd: rgba(255, 255, 255, 0.12);
-  --bg: #101216;
-  --panel: #1b1e24;
+  --bg: #0a0a0a;
+  --panel: #1b1b1b;
   --text: #e9ebee;
   --mut: #a8adb5;
   --faint: #8d929a;

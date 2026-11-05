@@ -19,12 +19,10 @@
           <!-- 「会话」是当前位置标记，不是入口：它原来挂了 onNewSession，正在聊的时候点一下
                就会清空当前会话（且 selected 不复位，标题栏还挂着旧标题）。做成不可点的当前项。 -->
           <span class="on" aria-current="page"><IconSpan name="message" :size="15" /> 会话</span>
-          <!-- 四项待建：用 disabled 按钮而不是 aria-disabled 的 span——读屏浏览模式会念出
-               「技能, 按钮, 不可用」，span 上的 aria-disabled 则会被当普通文字略过 -->
-          <button type="button" class="off" disabled title="技能管理 · 待建设"><IconSpan name="sparkles" :size="15" /> 技能</button>
-          <button type="button" class="off" disabled title="工具管理 · 待建设"><IconSpan name="wrench" :size="15" /> 工具</button>
-          <button type="button" class="off" disabled title="自动化 · 待建设"><IconSpan name="timer" :size="15" /> 自动化</button>
-          <button type="button" class="off" disabled title="审计 · 待建设"><IconSpan name="clipboard" :size="15" /> 审计</button>
+          <!-- 2026-11-05 拍板 A：左栏只留去处——技能/工具/审计收进设置页；自动化还没自己的板，
+               继续置灰（用 disabled 按钮而不是 aria-disabled 的 span：读屏会念「不可用」） -->
+          <button type="button" class="off" disabled title="自动化 · 待建设（等它自己的板）"><IconSpan name="timer" :size="15" /> 自动化</button>
+          <button type="button" title="设置：技能、工具、审计（整页跳转）" @click="goWorkspaceSettings"><IconSpan name="settings" :size="15" /> 设置</button>
         </nav>
         <el-input v-model="kw" class="ag-side-search" placeholder="搜索会话标题" aria-label="搜索会话标题" clearable :prefix-icon="SearchIcon" />
       </template>
@@ -638,9 +636,18 @@ const agEmpty = computed(
  *  退回账号名。这里刻意不取租户名——/agent 是独立分区，不经业务壳，tenantName 不会加载，
  *  副行会随进入路径变化；账号名是确定值。 */
 const userInitial = computed(() => (userStore.nickname || userStore.name || '我').trim().charAt(0) || '我');
-/** 底栏设置：管理员进助手管理，普通成员进账号设置（助手管理他们没权限） */
+/** 底栏设置：工作台壳进工作台设置页（A 版：技能/工具/审计都在那里）；
+ *  会话页（/ai/assistant）沿用旧口径——超管进助手管理，成员进账号设置 */
 function openSettings() {
+  if (props.variant === 'agent') {
+    goWorkspaceSettings();
+    return;
+  }
   router.push(userStore.roles.includes('superadmin') ? ASSISTANT_ADMIN_PATH : '/user/profile');
+}
+/** 左栏「设置」= 整页跳转（地址变，浏览器返回可用）；不套业务壳、不新增业务菜单 */
+function goWorkspaceSettings() {
+  router.push('/agent/settings');
 }
 /** 停靠区数据源（与抽屉同口径）：最近一张 pending 卡 */
 const pendingTurn = computed(() => [...state.turns].reverse().find((t) => t.hitl?.cardState === 'pending') ?? null);
@@ -1172,9 +1179,38 @@ onUnmounted(() => {
 });
 
 /** 批3.5·题3：agent 壳的遥控口——新任务/灌草稿/聚焦/刷新列表（只暴露已有函数，不加新逻辑） */
+/** 设置页往返（2026-11-05 拍板 A3）：回到工作台时把离开前的会话接上 + 还原草稿。
+ *  只走内存交接（agent/bridge.ts），不写 localStorage——刷新即忘，跨标签页不串。
+ *  找不到行（会话被删/归档到别的页）就安静返回空态，不报错。
+ *  两条守卫（2026-11-05 三审 P2）：用户已经自己点开别的会话就不再抢；
+ *  框里已有用户新打的字就不覆盖（恢复只补空框）。 */
+async function restoreSession(threadId: string, draft?: string) {
+  if (!threadId) {
+    return;
+  }
+  await loadConversations(true);
+  // 用户已经自己点开了一条别的会话：尊重他的选择，恢复让路
+  if (selected.value && selected.value.threadId !== threadId) {
+    return;
+  }
+  // 含临时行（还没落库/在首屏 50 条之外）：选中它才能让标题与左栏高亮跟上
+  const row = conversations.value.find((c) => c.threadId === threadId);
+  if (row && row.threadId !== selected.value?.threadId) {
+    await openConversation(row);
+  }
+  if (draft && !(composerRef.value?.draftText ?? '').trim()) {
+    composerRef.value?.setDraft(draft);
+  }
+}
+
 defineExpose({
   newSession: onNewSession,
   openConversation,
+  restoreSession,
+  /** 当前会话 threadId（设置页往返时记快照用；空态=空串） */
+  currentThreadId: computed(() => state.threadId || ''),
+  /** 单例里已经装着一条有内容的会话：没快照时用它兜底接回原会话 */
+  hasSession: computed(() => state.turns.length > 0),
   reloadConversations: () => void loadConversations(true),
   setDraft: (t: string) => composerRef.value?.setDraft(t),
   /** 读草稿 / 清空 / 悬停灰字层：工作台悬停预填要判"框里有没有字、是不是我们填的那句"（批5 题四甲） */
@@ -1327,6 +1363,19 @@ defineExpose({
         user-select: none;
       }
       > a {
+        cursor: pointer;
+
+        &:hover {
+          background: var(--el-fill-color-light);
+          color: var(--dcs-text-primary);
+        }
+        &:focus-visible {
+          outline: 2px solid var(--el-color-primary);
+          outline-offset: 2px;
+        }
+      }
+      /* 可点去处（设置）：和链接同一套悬停/焦点反馈；置灰项走下面的 .off */
+      > button:not(.off) {
         cursor: pointer;
 
         &:hover {

@@ -77,6 +77,15 @@ export const constantRoutes: RouteRecordRaw[] = [
     hidden: true,
     meta: { title: '智能体工作台', noCache: true }
   },
+  // 工作台设置（2026-11-05 拍板 A3）：左栏点「设置」整页跳到这里（真路由：地址变、
+  // 浏览器返回可用），技能/工具/审计都收在这一页；不套业务壳、不新增业务菜单。
+  // 权限与工作台同源（agentws:workspace:use），页面内自检，未授权统一 /403。
+  {
+    path: '/agent/settings',
+    component: () => import('@/views/dcs/agent/settings.vue'),
+    hidden: true,
+    meta: { title: '工作台设置', noCache: true }
+  },
   {
     path: '/401',
     component: () => import('@/views/error/401.vue'),

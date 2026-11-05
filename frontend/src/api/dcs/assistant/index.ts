@@ -111,6 +111,24 @@ export function getAssistantRecentSkills() {
   return request<AssistantRecentSkill[]>({ url: '/dcs/assistant/skills/recent', method: 'get' });
 }
 
+/* 2026-11-05 工作台设置页（A3/题2 丙）：技能详情只读。
+   与 /skills 同权限（dcs:assistant:use）——目录里看得见才看得见详情，成员不用管理权限。 */
+export interface AssistantSkillDetailView {
+  id: string;
+  name: string;
+  desc: string;
+  minRole: 'member' | 'publisher' | 'admin';
+  /** 技能说明书原文（SKILL.md 正文）；页面只取第一条编号清单做「它会怎么带你做」 */
+  body: string;
+}
+
+export function getAssistantSkillDetailView(skillId: string) {
+  return request<AssistantSkillDetailView>({
+    url: `/dcs/assistant/skills/${encodeURIComponent(skillId)}`,
+    method: 'get'
+  });
+}
+
 /* ============ 5b 批：技能在线层管理（能力段「技能库」数据源；读=config 权限，写=skill:edit） ============ */
 
 /** 管理列表行：生效内容（三层叠加后）∪ 停用行；source 标明这行从哪层来 */

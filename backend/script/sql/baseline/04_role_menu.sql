@@ -288,3 +288,13 @@ FROM public.sys_role_menu rm
 JOIN public.sys_role r ON r.role_id = rm.role_id
 WHERE rm.menu_id = 11920
   AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12060);
+
+-- 工作台设置页审计分节（2026-11-05 拍板 A3/题5 乙）：F 型权限行 12061 显式授给管理员
+-- （租户管理员 + 自定义 admin 角色），成员角色 5 不授；业务审计菜单 11936 保持 0 绑定
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT r.role_id, 12061
+FROM public.sys_role r
+WHERE r.role_key IN ('admin', 'tenant_admin')
+  AND r.del_flag = '0'
+  AND r.status = '0'
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = r.role_id AND x.menu_id = 12061);
