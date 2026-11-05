@@ -2,11 +2,15 @@
   <!-- 畸形 spec/type 统一降级为提示行（不炸页面；md 层已兜住 JSON.parse 失败，这里兜 type/结构） -->
   <div v-if="err" class="cb-err">图表无法渲染：{{ err }}</div>
   <div v-else class="cb-wrap">
-    <div v-if="headTitle || headSub" class="cb-head">
-      <span v-if="headTitle" class="cb-title">{{ headTitle }}</span>
+    <div class="cb-head">
+      <span class="cb-title">{{ headTitle || '统计图' }}</span>
       <span v-if="headSub" class="cb-sub">{{ headSub }}</span>
+      <!-- 批3.5·题1：图默认收成一行摘要（标题+口径），点开才画图——对齐 ZCode「不全展开」 -->
+      <button class="cb-toggle" type="button" :aria-expanded="open" @click="open = !open">
+        {{ open ? '收起 ↑' : '点开看图 ↓' }}
+      </button>
     </div>
-    <div ref="el" class="cb-box" :style="boxStyle"></div>
+    <div v-show="open" ref="el" class="cb-box" :style="boxStyle"></div>
   </div>
 </template>
 
@@ -34,6 +38,8 @@ const props = defineProps<{ spec: string }>();
 
 const el = ref<HTMLDivElement | null>(null);
 const err = ref('');
+/** 批3.5·题1：默认收起（ZCode 式不全展开）——v-show 藏画布，展开时 ResizeObserver 自动按新尺寸重画 */
+const open = ref(false);
 let chart: echarts.ECharts | null = null;
 let ro: ResizeObserver | null = null;
 /** 助手内嵌图与整站同一套取色：A 墨青 / D 青柠，切主题后重画 */
@@ -552,6 +558,22 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   font-size: 11.5px;
   color: var(--dcs-text-secondary, #909399);
+}
+.cb-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid var(--app-border, #dcdfe6);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dcs-text-secondary, #606266);
+  font-size: 11.5px;
+  line-height: 1;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.cb-toggle:hover {
+  color: var(--dcs-text-primary, #1f2d3d);
+  border-color: var(--dcs-text-secondary, #909399);
 }
 .cb-box {
   width: 100%;

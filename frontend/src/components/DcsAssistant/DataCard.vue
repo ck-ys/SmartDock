@@ -7,6 +7,14 @@
       <button class="dex" title="导出当前视图为 CSV" @click="exportCsv"><IconSpan name="download" /> 导出</button>
     </div>
 
+    <!-- 批3.5·题1：长表默认收成一行摘要（真数来自工具返回，前端不编）；短表（≤8 行）无此条、行为照旧 -->
+    <button v-if="longTable" class="dsum" type="button" :aria-expanded="expanded" @click="expanded = !expanded">
+      <IconSpan name="table" :size="12" />
+      共 {{ card.total ?? card.rows.length }} 行 · {{ expanded ? '收起 ↑' : '点开看全部 ↓' }}
+    </button>
+
+    <template v-if="!longTable || expanded">
+
     <!-- 状态筛选 chips（带计数；todos/alerts 按 todoType，missions 按 status）；
          未交名单卡右端附「明细 ⇄ 按部门汇总」双模切换（原型 DP-4） -->
     <div v-if="buckets.length > 1 || isUnsubmitted" class="ftools">
@@ -135,6 +143,7 @@
     <div v-if="firstMission" class="pgolink" @click="onRow({ missionId: firstMission.missionId, missionName: firstMission.missionName })">
       <IconSpan name="arrow-up-right" /> 在页面上查看「{{ firstMission.missionName }}」 ›
     </div>
+    </template>
   </div>
 </template>
 
@@ -160,6 +169,11 @@ const props = defineProps<{ step: AssistantStep }>();
 const emit = defineEmits<{ pgoto: [payload: { missionId: string; missionName: string }] }>();
 
 const PAGE = 20;
+
+/** 批3.5·题1：长表折叠线——超过 8 行默认只给「共 N 行」摘要行，点开才见全量（ZCode 式不全展开） */
+const COLLAPSE_AFTER = 8;
+const expanded = ref(false);
+const longTable = computed(() => (card.value?.rows?.length ?? 0) > COLLAPSE_AFTER);
 
 /* 批I 口径统一：任务状态中文标签+配色不再自造表（旧表 3 态配色语义与权威相反、
  * 2 个标签漂移：IN_DRAFT 草稿中→草稿 / RETURNED 已退回→已退修）——
@@ -544,6 +558,25 @@ watch(
   overflow: hidden;
   font-size: 12.5px;
 }
+/* 批3.5·题1：长表摘要行（默认收起时的唯一可见内容，安静边框样式） */
+.dsum {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 999px;
+  background: none;
+  color: var(--dcs-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.dsum:hover {
+  color: var(--dcs-text-primary);
+  border-color: var(--dcs-text-secondary);
+}
+
 .dh {
   display: flex;
   align-items: center;
@@ -553,7 +586,6 @@ watch(
   font-size: 13px;
   font-weight: 600;
   color: var(--dcs-text-primary);
-
   .asof {
     margin-left: auto;
     font-weight: 400;
