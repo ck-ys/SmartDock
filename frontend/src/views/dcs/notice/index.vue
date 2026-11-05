@@ -135,7 +135,8 @@ const TYPE_LABEL: Record<string, string> = {
   WALLET_RECONCILE_MISMATCH: '[对账]',
   CREDIT_SUBSCRIPTION_EXPIRING: '[订阅]',
   CREDIT_WEEK_EXHAUSTED: '[额度]',
-  CREDIT_TANK_LOW: '[额度]'
+  CREDIT_TANK_LOW: '[额度]',
+  AUTOMATION: '[自动化]'
 };
 const typeBadge = (t: string) => TYPE_LABEL[t] || '[通知]';
 const readPill = (row: DcsNoticeRow) => (row.readFlag === '0' ? 'ui-pill--warn' : 'ui-pill--muted');

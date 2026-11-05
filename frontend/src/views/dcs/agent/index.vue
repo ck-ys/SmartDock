@@ -1,5 +1,5 @@
 <template>
-  <div class="agent-ws">
+  <div class="agent-ws" :class="{ 'has-alert': !!deepLinkError }">
     <!-- 批3.6：工作台壳只剩一条顶栏——会话区整体复用 AssistantWorkspace 积木（本页对话，不再跳转） -->
     <header class="ag-top">
       <span class="brand"><BrandMark :size="22" /> 智能体工作台</span>
@@ -7,6 +7,11 @@
       <button v-if="canAudit" class="tb-btn" type="button" @click="go('/agent/settings?s=audit')"><IconSpan name="clipboard" :size="13" /> 审计</button>
       <button class="tb-btn" type="button" @click="go('/index')"><IconSpan name="arrow-up-right" :size="13" /> 返回业务系统</button>
     </header>
+
+    <div v-if="deepLinkError" class="ag-alert" role="alert">
+      <span>{{ deepLinkError }}</span>
+      <button class="ag-alert-x" type="button" aria-label="关闭提示" @click="deepLinkError = ''">×</button>
+    </div>
 
     <AssistantWorkspace ref="wsRef" variant="agent">
       <!-- 进门内容分两段：标题在输入框上方、技能条在输入框下方（原型 D3 的顺序）。
@@ -68,12 +73,12 @@
  * - 权限自检沿用批3（agentws:workspace:use）。
  */
 import { computed, onMounted, ref } from 'vue';
-import { onBeforeRouteLeave, useRouter } from 'vue-router';
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import BrandMark from '@/components/BrandMark.vue';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import AssistantWorkspace from '@/components/DcsAssistant/AssistantWorkspace.vue';
 import { useUserStore } from '@/store/modules/user';
-import { getAssistantSkillCatalog, getAssistantRecentSkills } from '@/api/dcs/assistant';
+import { getAssistantSkillCatalog, getAssistantRecentSkills, getConversationByThread } from '@/api/dcs/assistant';
 import { buildSkillDraft, shouldGhostOnHover, skillDesc } from './prefill';
 import { setWorkspaceSnapshot, takePendingSkill, takeWorkspaceSnapshot } from './bridge';
 
@@ -89,6 +94,7 @@ interface CandoRow extends CatalogRow {
 }
 
 const router = useRouter();
+const route = useRoute();
 const userStore = useUserStore();
 const wsRef = ref<InstanceType<typeof AssistantWorkspace>>();
 
@@ -97,6 +103,8 @@ const recent = ref<Array<{ skillId: string; useCount: number }>>([]);
 const loading = ref(true);
 /** 目录没读出来时不能只说「技能库是空的」——那是两件事，说错了会让人去翻数据库 */
 const failed = ref(false);
+/** 通知深链落地失败（会话被归档/清理）：页内常驻提示，不靠一闪而过的 toast */
+const deepLinkError = ref('');
 
 const canAudit = computed(() => userStore.permissions.includes('*:*:*') || userStore.permissions.includes('dcs:assistant:audit:query'));
 const allowed = computed(() => userStore.permissions.includes('*:*:*') || userStore.permissions.includes('agentws:workspace:use'));
@@ -235,6 +243,8 @@ onMounted(async () => {
   }
   // 交接与技能目录并行（三审 J）：慢网恢复/等确认时，技能条照常出，不空转
   const handoff = applyHandoff().catch(() => {});
+  // 深链取会话也提前发出去（不等技能目录）：慢网时三件事并行，不串成一条长队
+  const deep = fetchDeepLink().catch(() => null);
   const [catRes, recRes] = await Promise.allSettled([getAssistantSkillCatalog(), getAssistantRecentSkills()]);
   catalog.value = catRes.status === 'fulfilled' ? ((catRes.value as unknown as { data?: CatalogRow[] })?.data ?? []) : [];
   recent.value =
@@ -242,7 +252,46 @@ onMounted(async () => {
   failed.value = catRes.status === 'rejected';
   loading.value = false;
   await handoff;
+  // 自动化通知深链 /agent?thread=…：最后应用，覆盖交接恢复的会话
+  await applyDeepLink(await deep);
 });
+
+interface DeepLinkRow {
+  id: number | string;
+  threadId: string;
+  title: string | null;
+  lastMessageTime: string;
+  status: string;
+}
+
+function deepLinkThread(): string {
+  return String(route.query.thread ?? '').trim();
+}
+
+async function fetchDeepLink(): Promise<DeepLinkRow | null> {
+  const thread = deepLinkThread();
+  if (!thread) return null;
+  const res = await getConversationByThread(thread);
+  return ((res as unknown as { data?: DeepLinkRow })?.data ?? null) as DeepLinkRow | null;
+}
+
+/**
+ * 通知深链（2026-11-05 自动化批·题5 甲）：按 threadId 取会话再打开。
+ * 不走 restoreSession（它要求会话已在首屏 50 条里，且会被"用户已选别的会话"守卫拦下）。
+ * - 成功后才抹掉 ?thread=：取不到时保留地址，刷新还能再试（先 replace 会让链接一刷就丢）
+ * - 打开失败只由 openConversation 自己提示一次，这里不再叠第二个 toast
+ */
+async function applyDeepLink(row: DeepLinkRow | null) {
+  if (!deepLinkThread()) return;
+  if (!row) {
+    // 深链落地失败：页内提示兜底（不靠 toast——它 3 秒就没了，用户可能还没反应过来）
+    // 文案压到 24 字内：手机档 390 也不折行，提示条高度才敢写死 34px
+    deepLinkError.value = '这条结果会话没打开（可能已被清理），刷新再试。';
+    return;
+  }
+  await wsRef.value?.openConversation(row as never);
+  router.replace({ path: '/agent' });
+}
 </script>
 
 <style lang="scss" scoped>
@@ -257,6 +306,8 @@ onMounted(async () => {
   --tile: #f0f0f0;
   --acc: #0d0d0d;
   --acc-txt: #ffffff;
+  /* 提示条用的警示色（深度链落地失败）：亮档用深琥珀，深档换亮一档才读得清 */
+  --warn: #9a6700;
   /* 批4：白卡原来和面板共用 --bd（0.10），全页 6 条同重线；卡边单独收淡一档，
      读起来是「柔边」而不是「画了一根线」。环色 / 落影色都从这里取。
      静止态故意不到 3:1（要到得用 #949494 中灰实线，和整站安静边框冲突），
@@ -289,6 +340,7 @@ html.dark .agent-ws {
   --tile: rgba(255, 255, 255, 0.06);
   --acc: #e9ebee;
   --acc-txt: #17191c;
+  --warn: #d4a72c;
   /* 深色档不能照搬亮色的黑影：卡片本来就比容器亮一点点（1.05:1），再压一层黑影
      四周反而更暗，读起来像「挖了个坑」。深色下取消落影，靠底色抬升 + 一条更亮的边成形 */
   --card-ring: rgba(255, 255, 255, 0.13);
@@ -338,10 +390,44 @@ html.dark .agent-ws {
   border-color: var(--text);
 }
 
+/* 深链落地失败的页内提示：一条安静的通栏，不抢会话区的注意力。
+   高度固定 34px（文案压在一行内），会话区按 48+34 扣，和顶栏口径一致 */
+.ag-alert {
+  flex: none;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--bd);
+  background: var(--panel);
+  color: var(--warn, #9a6700);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ag-alert-x {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--mut);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ag-alert-x:hover {
+  color: var(--text);
+}
+
 /* 积木占满余高（扣顶栏）；.ws-in-agent 钩子留给积木内后续微调 */
 .agent-ws :deep(.dcs-as-session) {
   height: calc(100vh - 48px);
   height: calc(100dvh - 48px);
+}
+/* 有提示条时再扣 34px，否则会话区会被顶出视口底 */
+.agent-ws.has-alert :deep(.dcs-as-session) {
+  height: calc(100vh - 48px - 34px);
+  height: calc(100dvh - 48px - 34px);
 }
 
 /* 进门内容：与输入框同一条列几何。宽度必须读 --dcs-col-max（Composer 观测宿主宽写的

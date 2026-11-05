@@ -86,6 +86,20 @@ export const constantRoutes: RouteRecordRaw[] = [
     hidden: true,
     meta: { title: '工作台设置', noCache: true }
   },
+  // 自动化（2026-11-05 拍板 题7 乙）：一级页 + 整页新建/编辑。与工作台同分区，
+  // 权限在页面内自检（agentws:workspace:use + dcs:assistant:automation），未授权跳 /403。
+  {
+    path: '/agent/automation',
+    component: () => import('@/views/dcs/agent/automation/index.vue'),
+    hidden: true,
+    meta: { title: '自动化', noCache: true }
+  },
+  {
+    path: '/agent/automation/:id',
+    component: () => import('@/views/dcs/agent/automation/edit.vue'),
+    hidden: true,
+    meta: { title: '自动化 · 编辑', noCache: true }
+  },
   {
     path: '/401',
     component: () => import('@/views/error/401.vue'),

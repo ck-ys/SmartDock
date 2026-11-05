@@ -305,6 +305,11 @@ export function listConversations(params: { pageNum?: number; pageSize?: number;
   return request({ url: '/dcs/assistant/conversation/list', method: 'get', params });
 }
 
+/** 按 threadId 取本人会话（2026-11-05 自动化通知深链：不在首屏 50 条里也能打开） */
+export function getConversationByThread(threadId: string) {
+  return request({ url: '/dcs/assistant/conversation/by-thread', method: 'get', params: { threadId } });
+}
+
 export function listMessages(conversationId: number | string, params?: { limit?: number; pageNum?: number; tail?: boolean }) {
   return request<AssistantMessage[]>({
     url: `/dcs/assistant/conversation/${conversationId}/messages`,

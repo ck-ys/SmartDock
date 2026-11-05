@@ -1,0 +1,724 @@
+/* 自动化页共享样式（2026-11-05 拍板 题7 乙：一级页 + 卡片列表 + 整页新建/编辑）
+ * 观感口径 = design-taste-frontend app-screens：安静边框 / 小标签 / 近黑主按钮 /
+ * 彩色只给数据状态；静止态无投影，1px 描边成形。 */
+.auto-ws {
+  --bd: #e6e8ec;
+  --bd-soft: #eef0f3;
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --text: #1f2328;
+  --text-2: #3f4248;
+  --mut: #6b7078;
+  --faint: #9aa0a8;
+  --fill: #e9ebef;
+  --hover: #f2f3f5;
+  --well: #fafbfc;
+  --acc: #1f2328;
+  --acc-txt: #ffffff;
+  --ok: #1a7f37;
+  --bad: #b42318;
+  --warn: #9a6700;
+  --app-chrome: 0px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+html.dark .auto-ws {
+  --bd: #2b2d31;
+  --bd-soft: #26282c;
+  --bg: #0f1113;
+  --panel: #191b1e;
+  --text: #e9ebee;
+  --text-2: #c7cbd1;
+  --mut: #9ba1a9;
+  --faint: #7c828a;
+  --fill: #2a2d31;
+  --hover: #22252a;
+  --well: #1e2125;
+  --acc: #e9ebee;
+  --acc-txt: #17191c;
+  --ok: #57ab5a;
+  --bad: #f97066;
+  --warn: #d4a72c;
+}
+
+/* 顶栏（48px，与工作台/设置页同高） */
+.auto-top {
+  flex: none;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--bd);
+}
+.auto-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 6px 0 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.auto-back:hover {
+  color: var(--text);
+}
+.auto-sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 12px;
+  background: var(--bd);
+}
+.auto-crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--mut);
+}
+.auto-crumb b {
+  font-weight: 600;
+  color: var(--text);
+}
+.auto-crumb .sl {
+  color: var(--faint);
+}
+.auto-scope {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.auto-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 26px 32px 48px;
+  box-sizing: border-box;
+}
+
+.auto-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.auto-head h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+.auto-head p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--mut);
+}
+.auto-head-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.btn-primary,
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-primary {
+  border: 1px solid var(--acc);
+  background: var(--acc);
+  color: var(--acc-txt);
+}
+.btn-primary:hover {
+  opacity: 0.9;
+}
+.btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-ghost {
+  border: 1px solid var(--bd);
+  background: var(--panel);
+  color: var(--text-2);
+}
+.btn-ghost:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+.btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-danger {
+  color: var(--bad);
+}
+
+/* 筛选条 */
+.auto-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 22px 0 14px;
+  flex-wrap: wrap;
+}
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--mut);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.chip.on {
+  border-color: var(--bd);
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+}
+.auto-quota {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* 卡片列表 */
+.auto-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.auto-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  background: var(--panel);
+  text-align: left;
+  transition: border-color 0.16s;
+}
+.auto-card.clickable {
+  cursor: pointer;
+}
+.auto-card.clickable:hover,
+.auto-card.clickable:focus-visible {
+  border-color: var(--text);
+}
+.auto-card.builtin {
+  background: var(--well);
+}
+.ac-hd {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ac-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 标题按钮：只当键盘入口，外观与纯文本一致 */
+.ac-title-btn {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  /* 只继承族，不碰字号：这里再写 font-size 会盖掉 .ac-title 的 14px（同权重、在后） */
+  font-family: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.ac-title-btn:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.ac-badge {
+  flex: none;
+  padding: 0 6px;
+  height: 18px;
+  line-height: 18px;
+  border: 1px solid var(--bd);
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--mut);
+}
+.ac-switch {
+  margin-left: auto;
+  flex: none;
+}
+.ac-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--mut);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 36px;
+}
+.ac-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ac-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--bd);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--panel);
+}
+.ac-last {
+  font-size: 12px;
+  /* 12px 的 --faint 在白底只有 ~2.5:1，时间/次数是真信息，抬到 --mut */
+  color: var(--mut);
+}
+.ac-last.ok {
+  color: var(--ok);
+}
+.ac-last.bad {
+  color: var(--bad);
+}
+.ac-last.warn {
+  color: var(--warn);
+}
+.ac-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--bd-soft);
+  font-size: 12px;
+  color: var(--mut);
+}
+.ac-link {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.ac-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.ac-ops {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ac-op {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--mut);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ac-op:hover {
+  border-color: var(--bd);
+  background: var(--panel);
+  color: var(--text);
+}
+.ac-op.warn {
+  color: var(--bad);
+}
+.ac-op:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+.ac-op:disabled:hover {
+  border-color: transparent;
+  background: none;
+  color: var(--mut);
+}
+/* 键盘可达：所有自绘按钮共用一圈描边焦点环（缺了就只有鼠标能用） */
+.ac-op:focus-visible,
+.run-link:focus-visible,
+.chip:focus-visible,
+.auto-back:focus-visible,
+.btn-primary:focus-visible,
+.btn-ghost:focus-visible,
+.seg button:focus-visible,
+.day-chip:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* 空态 */
+.auto-empty {
+  padding: 44px 20px;
+  border: 1px dashed var(--bd);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--mut);
+  background: var(--panel);
+}
+.auto-empty b {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+.auto-empty p {
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+/* 最近运行 */
+.auto-recent {
+  margin-top: 30px;
+}
+.auto-recent h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.run-list {
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.run-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.run-row + .run-row {
+  border-top: 1px solid var(--bd-soft);
+}
+.run-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-weight: 500;
+}
+.run-time {
+  color: var(--mut);
+}
+.run-status.ok {
+  color: var(--ok);
+}
+.run-status.bad {
+  color: var(--bad);
+}
+.run-status.warn {
+  color: var(--warn);
+}
+.run-status.live {
+  color: var(--mut);
+}
+.run-link {
+  margin-left: auto;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.run-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.run-empty {
+  padding: 18px 14px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* 表单（新建/编辑页） */
+.edit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+  margin-top: 20px;
+}
+.edit-card {
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 18px 18px 16px;
+}
+.field + .field {
+  margin-top: 16px;
+}
+.field > label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.field-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+.sched-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.seg button {
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--mut);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.seg button.on {
+  background: var(--fill);
+  color: var(--text);
+  font-weight: 600;
+}
+.day-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.day-chip {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--mut);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.day-chip.on {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: var(--acc-txt);
+}
+.preview-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--bd-soft);
+  border-radius: 8px;
+  background: var(--well);
+  font-size: 12px;
+  color: var(--mut);
+  line-height: 20px;
+}
+.preview-box b {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.pv-times {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+}
+.pv-time {
+  white-space: nowrap;
+}
+.edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--bd-soft);
+}
+.edit-actions .sp {
+  flex: 1;
+}
+.edit-hint {
+  font-size: 12px;
+  color: var(--faint);
+}
+.side-card {
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 14px 16px;
+}
+.side-card + .side-card {
+  margin-top: 12px;
+}
+.side-card h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.side-card p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--mut);
+}
+.side-card ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--mut);
+}
+.hist-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hist-row + .hist-row {
+  border-top: 1px solid var(--bd-soft);
+}
+.hist-main {
+  min-width: 0;
+  flex: 1;
+}
+.hist-meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  line-height: 20px;
+}
+.hist-meta > span {
+  white-space: nowrap;
+}
+.hist-sum {
+  margin: 2px 0 0;
+  color: var(--faint);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@media (max-width: 992px) {
+  .auto-main {
+    padding: 18px 16px 40px;
+  }
+  .auto-head {
+    flex-wrap: wrap;
+  }
+  .auto-head-actions {
+    margin-left: 0;
+    padding-top: 0;
+  }
+  .auto-head h1 {
+    font-size: 20px;
+    line-height: 28px;
+  }
+  .auto-grid,
+  .edit-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .auto-quota {
+    width: 100%;
+    margin-left: 0;
+  }
+  .run-row {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .run-link {
+    margin-left: 0;
+  }
+  .ac-desc {
+    min-height: 0;
+  }
+}
+
+/* 手机档（2026-11-06 视觉验收实拍 390）：顶栏只留「返回 + 当前页」，
+   面包屑/说明塞不下就藏；卡片操作与次数整块换行，不许把词拆成两行 */
+@media (max-width: 560px) {
+  .auto-top {
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .auto-crumb,
+  .auto-sep,
+  .auto-scope {
+    display: none;
+  }
+  .auto-back {
+    white-space: nowrap;
+  }
+  .ac-foot {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .ac-foot > span,
+  .ac-op,
+  .run-time,
+  .run-status {
+    white-space: nowrap;
+  }
+  .ac-ops {
+    margin-left: auto;
+  }
+}

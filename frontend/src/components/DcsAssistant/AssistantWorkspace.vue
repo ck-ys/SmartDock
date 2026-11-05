@@ -19,9 +19,9 @@
           <!-- 「会话」是当前位置标记，不是入口：它原来挂了 onNewSession，正在聊的时候点一下
                就会清空当前会话（且 selected 不复位，标题栏还挂着旧标题）。做成不可点的当前项。 -->
           <span class="on" aria-current="page"><IconSpan name="message" :size="15" /> 会话</span>
-          <!-- 2026-11-05 拍板 A：左栏只留去处——技能/工具/审计收进设置页；自动化还没自己的板，
-               继续置灰（用 disabled 按钮而不是 aria-disabled 的 span：读屏会念「不可用」） -->
-          <button type="button" class="off" disabled title="自动化 · 待建设（等它自己的板）"><IconSpan name="timer" :size="15" /> 自动化</button>
+          <!-- 2026-11-05 自动化批（拍板 题7 乙）：左栏「自动化」点亮成真入口——一级页
+               （卡片列表 + 整页新建/编辑），结果进通知和会话。 -->
+          <button type="button" title="自动化：到点跑一轮，结果进通知和会话" @click="goAutomation"><IconSpan name="timer" :size="15" /> 自动化</button>
           <button type="button" title="设置：技能、工具、审计（整页跳转）" @click="goWorkspaceSettings"><IconSpan name="settings" :size="15" /> 设置</button>
         </nav>
         <el-input v-model="kw" class="ag-side-search" placeholder="搜索会话标题" aria-label="搜索会话标题" clearable :prefix-icon="SearchIcon" />
@@ -648,6 +648,10 @@ function openSettings() {
 /** 左栏「设置」= 整页跳转（地址变，浏览器返回可用）；不套业务壳、不新增业务菜单 */
 function goWorkspaceSettings() {
   router.push('/agent/settings');
+}
+/** 左栏「自动化」= 一级页（2026-11-05 拍板 题7 乙） */
+function goAutomation() {
+  router.push('/agent/automation');
 }
 /** 停靠区数据源（与抽屉同口径）：最近一张 pending 卡 */
 const pendingTurn = computed(() => [...state.turns].reverse().find((t) => t.hitl?.cardState === 'pending') ?? null);
