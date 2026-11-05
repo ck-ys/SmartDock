@@ -52,19 +52,44 @@ public class DcsNoticeService {
     /** 带幂等键 + 跳转路由的通知（N3 2026-10-23） */
     public boolean notifyIdem(Long userId, String noticeType, String title, String content,
                               Long taskId, String dedupKey, String refUrl) {
+        return notifyIdem(currentTenant(), userId, noticeType, title, content, taskId, dedupKey, refUrl);
+    }
+
+    /**
+     * 显式指定租户的通知（2026-11-05 自动批）：调度/异步线程没有登录态，且租户开关关闭时
+     * {@code TenantHelper.getDynamic()} 恒为 null，取不到上下文就不能靠兜底——调用方把租户传进来。
+     */
+    public boolean notifyIdem(String tenantId, Long userId, String noticeType, String title, String content,
+                              Long taskId, String dedupKey) {
+        return notifyIdem(tenantId, userId, noticeType, title, content, taskId, dedupKey, null);
+    }
+
+    public boolean notifyIdem(String tenantId, Long userId, String noticeType, String title, String content,
+                              Long taskId, String dedupKey, String refUrl) {
         if (dedupKey == null || dedupKey.isBlank()) {
-            notify(userId, noticeType, title, content, taskId, refUrl);
+            notify(tenantId, userId, noticeType, title, content, taskId, refUrl);
             return true;
         }
-        DcsNotice n = build(userId, noticeType, title, content, taskId, refUrl);
+        DcsNotice n = build(tenantId, userId, noticeType, title, content, taskId, refUrl);
         n.setDedupKey(dedupKey.length() > 128 ? dedupKey.substring(0, 128) : dedupKey);
         return noticeMapper.insertIgnoreDedup(n) > 0;
     }
 
+    /** 显式指定租户的普通通知 */
+    public void notify(String tenantId, Long userId, String noticeType, String title, String content,
+                       Long taskId, String refUrl) {
+        noticeMapper.insert(build(tenantId, userId, noticeType, title, content, taskId, refUrl));
+    }
+
     private DcsNotice build(Long userId, String noticeType, String title, String content, Long taskId, String refUrl) {
+        return build(currentTenant(), userId, noticeType, title, content, taskId, refUrl);
+    }
+
+    private DcsNotice build(String tenantId, Long userId, String noticeType, String title, String content,
+                            Long taskId, String refUrl) {
         DcsNotice n = new DcsNotice();
         n.setId(IdWorker.getId());
-        n.setTenantId(currentTenant());
+        n.setTenantId(tenantId);
         n.setUserId(userId);
         n.setNoticeType(noticeType);
         n.setTitle(title != null && title.length() > 200 ? title.substring(0, 200) : title);
@@ -109,6 +134,12 @@ public class DcsNoticeService {
     private String currentTenant() {
         // 工具线程无 Sa-Token 上下文: TenantHelper(含 dynamic)优先
         try {
+            // 调度线程（自动化/导出/触达）只设了 dynamic，getTenantId() 读不到——先认 dynamic
+            //（2026-11-05 自动批实测：漏这一步会让所有定时通知抛「缺少租户上下文」被吞掉）
+            String dyn = org.dromara.common.tenant.helper.TenantHelper.getDynamic();
+            if (dyn != null && !dyn.isBlank()) {
+                return dyn;
+            }
             String t = org.dromara.common.tenant.helper.TenantHelper.getTenantId();
             if (t != null && !t.isBlank()) {
                 return t;

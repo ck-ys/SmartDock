@@ -184,6 +184,18 @@ public class AssistantConversationController extends BaseController {
         return data;
     }
 
+    /** 按 threadId 取本人会话（自动化通知深链：不在首屏 50 条里也能打开） */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/conversation/by-thread")
+    public R<DcsAssistantConversation> byThread(@RequestParam String threadId) {
+        DcsAssistantConversation row = conversationService.conversationByThread(
+            TenantHelper.getTenantId(), threadId);
+        if (row == null || !LoginHelper.getUserId().equals(row.getUserId())) {
+            return R.fail("会话不存在或已清理");
+        }
+        return R.ok(row);
+    }
+
     /** status 合法值收敛（批H P1-1）：ACTIVE/ARCHIVED/ALL 之外的输入一律按 ACTIVE */
     private static String clampStatus(String status) {
         if (status == null) {

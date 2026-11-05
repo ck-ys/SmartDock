@@ -117,11 +117,25 @@ public class AssistantAgentFactory {
     }
 
     /**
+     * 自动化无人值守入口（2026-11-05 拍板 题2 甲）：同一套装配，但只保留只读工具——
+     * 平台侧仅 view_skill / load_skill_through_path，业务侧只留 {@code BizToolSpec.readOnly=true}
+     * 的查询工具；MCP 外部工具一律不挂（可能带写操作）。执行时也不会有确认卡可点，
+     * 所以写类/交互类（ask_user / submit_plan / todo_write / save_memory）必须裁掉。
+     */
+    public ReActAgent createReadOnly(LoginUser user, String aguiThreadId) {
+        return create(user, aguiThreadId, true);
+    }
+
+    /**
      * 按显式登录用户+AGUI threadId 建 agent（createFromLogin 主入口）。
      * threadId 供附件工具按会话取附件（每 (user,thread) 各建 agent，
      * SessionKey 含 thread——同 thread 复用缓存 agent 时工具实例与 thread 绑定不变）。
      */
     public ReActAgent create(LoginUser user, String aguiThreadId) {
+        return create(user, aguiThreadId, false);
+    }
+
+    private ReActAgent create(LoginUser user, String aguiThreadId, boolean readOnly) {
         // 批7 Q5/Q12-④: 优先级链第一段=用户会话选择(自选开关开时), 失效/关闸回退默认链
         DcsAiConfig cfg = modelFactory.resolveConfigWithUserChoice(user.getTenantId(), aguiThreadId);
         // 批7: 回写「本次建 agent 的选择基准」(picked 原值含回退), resolver 据此判失效
@@ -226,8 +240,29 @@ public class AssistantAgentFactory {
             autoAllow, actionLedgerHook));
         // 批2 Q2=A：MCP 外部工具试点挂载（平台级启用行；单服务失败=审计+warn 跳过，绝不连坐会话）
         // G4-#4：租户工具闸随行传入（mcp:<server> 键，off/admin 生效于挂载面）+ 用户角色档
-        registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
-            aguiThreadId, pb, tenantCfg.toolGate(), identity.getRoleLevel()));
+        // 自动化只读模式：MCP 工具无法判定读写，整段跳过（题2 甲：写操作一律不执行）
+        if (!readOnly) {
+            registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
+                aguiThreadId, pb, tenantCfg.toolGate(), identity.getRoleLevel()));
+        }
+        if (readOnly) {
+            // 只读白名单：技能正文（load_skill_through_path 由下方中间件注册）+ view_skill
+            // + read_file（只在会话驱逐落盘目录内回读，纯读）+ 业务侧 readOnly 查询工具。
+            // 其余（web_search/read_attachment/save_memory/submit_plan/ask_user/todo_write
+            // 及各写类业务工具）一律摘除。
+            // read_file 必须留：大结果被驱逐后模型要靠它回读，摘掉就只能交半截答案
+            //（席1 P2-D5：结果驱逐中间件对只读模式同样生效）。
+            java.util.Set<String> keep = new java.util.HashSet<>(
+                java.util.Set.of("view_skill", "load_skill_through_path", "read_file"));
+            keep.addAll(providerToolRegistry.readOnlyToolNames(identity));
+            for (String name : new java.util.ArrayList<>(toolkit.getToolNames())) {
+                if (!keep.contains(name)) {
+                    toolkit.removeTool(name);
+                }
+            }
+            // 速查卡按真注册面裁剪（同下方 sysPrompt 注释的纪律）：被摘掉的工具名不能留在提示词里
+            registered.retainAll(keep);
+        }
         // B 批装载替换（2026-10-27 题2=甲/题3=甲）：技能面迁官方 DynamicSkillMiddleware——
         // sysPrompt 不再拼自研目录（SkillAssets.catalog 摘除），每次调用由官方中间件按可见
         // 视图重组官方 <skills> 段；我们的子类 AssistantSkillGateMiddleware 管「谁能用哪个技能」

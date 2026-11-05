@@ -11,6 +11,7 @@ import com.smartdock.dcs.service.DcsSubmissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.assistant.domain.DcsAssistantConfig;
+import org.dromara.assistant.automation.service.AssistantAutomationService;
 import org.dromara.assistant.service.AssistantConfigService;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -50,6 +51,7 @@ public class AssistantDailyDigestJob {
     static final int MAX_NAMES = 5;
 
     private final AssistantConfigService configService;
+    private final AssistantAutomationService automationService;
     private final DcsTaskMapper taskMapper;
     private final DcsSubmissionService submissionService;
     private final DcsNoticeService noticeService;
@@ -66,13 +68,27 @@ public class AssistantDailyDigestJob {
         for (DcsAssistantConfig cfg : tenants) {
             String tenantId = cfg.getTenantId();
             try {
-                sent += TenantHelper.dynamic(tenantId, () -> pushTenant(tenantId));
+                int tenantSent = TenantHelper.dynamic(tenantId, () -> pushTenant(tenantId));
+                sent += tenantSent;
+                // 2026-11-05 自动化批·题8 甲：收编成只读内置项后，运行历史要有据可查
+                recordBuiltinRun(tenantId, tenantSent);
             } catch (Exception e) {
                 log.warn("[DailyDigest] tenant={} failed: {}", tenantId, e.getMessage());
             }
         }
         if (sent > 0) {
             log.info("[DailyDigest] done, tenants={} notices={}", tenants.size(), sent);
+        }
+    }
+
+    /** 内置项运行记录（安静日也记：证明「到点跑了、只是没打扰」） */
+    private void recordBuiltinRun(String tenantId, int sent) {
+        try {
+            automationService.recordBuiltinRun(tenantId,
+                LocalDate.now(ZoneId.of("Asia/Shanghai")).atTime(8, 0),
+                sent > 0 ? "已向 " + sent + " 位发布人推送未交摘要" : "今天没有未交任务（安静日，未推送）");
+        } catch (Exception e) {
+            log.warn("[DailyDigest] tenant={} 运行记录写入失败: {}", tenantId, e.getMessage());
         }
     }
 
@@ -147,7 +163,8 @@ public class AssistantDailyDigestJob {
         }
         String title = "今日未交摘要（" + rows.size() + " 个任务）";
         String content = String.join("\n", lines);
-        return noticeService.notifyIdem(publisher, DcsNotice.TYPE_TASK_DIGEST, title, content, null,
+        // 显式传租户：调度线程没登录态，靠上下文兜底在单租户部署里会抛「缺少租户上下文」
+        return noticeService.notifyIdem(tenantId, publisher, DcsNotice.TYPE_TASK_DIGEST, title, content, null,
             dedupKey(tenantId, publisher, today));
     }
 

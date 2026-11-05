@@ -80,6 +80,20 @@ public class ProviderToolRegistry {
     }
 
     /**
+     * 只读业务工具名集合（2026-11-05 自动化批·题2 甲）：无人值守运行只允许只读面，
+     * 工厂建完 agent 后按此白名单裁掉写类/交互类工具。与注册链共用同一 eligibleSpecs。
+     */
+    public Set<String> readOnlyToolNames(ToolIdentity identity) {
+        Set<String> out = new LinkedHashSet<>();
+        for (Eligible e : eligibleSpecs(identity)) {
+            if (e.spec().isReadOnly()) {
+                out.add(e.spec().getName());
+            }
+        }
+        return out;
+    }
+
+    /**
      * 按会话身份注册全部达标工具(在 ToolRegistry.registerAll 之后调用, 内置优先)。
      *
      * @return 实际注册的工具名集合(守卫断言用)

@@ -298,3 +298,12 @@ WHERE r.role_key IN ('admin', 'tenant_admin')
   AND r.del_flag = '0'
   AND r.status = '0'
   AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = r.role_id AND x.menu_id = 12061);
+
+-- 自动化任务（2026-11-05 拍板 题3 甲：全员可建、只看自己的）：权限载体 12062 按
+-- 「已绑 AI 助手会话 11920」派生（成员/租户管理员都有；与 migration 同口径）
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12062
+FROM public.sys_role_menu rm
+JOIN public.sys_role r ON r.role_id = rm.role_id
+WHERE rm.menu_id = 11920
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12062);

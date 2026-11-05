@@ -25,6 +25,8 @@ public class DcsNotice implements Serializable {
     public static final String TYPE_AUDIT_RESULT = "AUDIT_RESULT";
     /** 「问数据」批·题6②: 每日摘要（08:00 给有进行中任务的发布人推未交摘要） */
     public static final String TYPE_TASK_DIGEST = "TASK_DIGEST";
+    /** 2026-11-05 自动化批·题5 甲：自动化跑完/失败的结果通知（ref_url 直达结果会话） */
+    public static final String TYPE_AUTOMATION = "AUTOMATION";
 
     @TableId
     private Long id;

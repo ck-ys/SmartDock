@@ -39,7 +39,8 @@ public class ProfileExportNotifyAdapter implements ProfileExportNotifier {
             + " 行(" + ("1".equals(logRow.getMasked()) ? "脱敏" : "明文") + "), 导出人 userId="
             + logRow.getExportBy() + ", 请在合规中心核查。";
         for (Long adminId : admins) {
-            noticeService.notifyIdem(adminId, NOTICE_TYPE, title, content, null,
+            // 显式传租户：导出通知可能落在异步线程，没有登录态
+            noticeService.notifyIdem(logRow.getTenantId(), adminId, NOTICE_TYPE, title, content, null,
                 "profile:export:" + logRow.getLogId() + ":" + adminId);
         }
     }

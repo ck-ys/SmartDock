@@ -688,6 +688,65 @@ CREATE TABLE public.dcs_audit (
 
 
 --
+-- Name: dcs_automation; Type: TABLE; Schema: public; Owner: -
+-- 2026-11-05 自动化批（拍板 题0 甲/题1 乙/题4 乙）：用户自建「到点替你跑一件事」。
+-- 一条行 = 一句话任务 + 日程 + 开关；执行身份 = 创建人 user_id（审计记本人）。
+-- builtin='1' 为系统内置项（每日摘要，租户级 user_id=0）：只能开关，不能改提示词/删除。
+--
+
+CREATE TABLE public.dcs_automation (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    user_id bigint NOT NULL,
+    title character varying(120) NOT NULL,
+    prompt text NOT NULL,
+    schedule_type character varying(16) NOT NULL,
+    schedule_time character varying(5),
+    weekdays character varying(20),
+    time_zone character varying(40) DEFAULT 'Asia/Shanghai'::character varying NOT NULL,
+    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    builtin character(1) DEFAULT '0'::bpchar NOT NULL,
+    last_run_at timestamp without time zone,
+    last_status character varying(16),
+    last_run_id bigint,
+    consecutive_failures integer DEFAULT 0 NOT NULL,
+    next_run_at timestamp without time zone,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    del_flag character(1) DEFAULT '0'::bpchar NOT NULL,
+    CONSTRAINT ck_dcs_automation_enabled CHECK (((enabled)::text = ANY ((ARRAY['0'::character varying, '1'::character varying])::text[]))),
+    CONSTRAINT ck_dcs_automation_schedule CHECK (((schedule_type)::text = ANY ((ARRAY['DAILY'::character varying, 'WEEKLY'::character varying, 'BUILTIN'::character varying])::text[])))
+);
+
+
+--
+-- Name: dcs_automation_run; Type: TABLE; Schema: public; Owner: -
+-- 运行记录：一次执行一行；scheduled_for=计划时刻（补跑窗口判 MISSED 的依据）。
+-- 同一条自动化的同一计划时刻只能落一行（部分唯一索引），多实例/重扫天然不重复。
+--
+
+CREATE TABLE public.dcs_automation_run (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    automation_id bigint NOT NULL,
+    user_id bigint NOT NULL,
+    trigger_type character varying(16) NOT NULL,
+    scheduled_for timestamp without time zone NOT NULL,
+    status character varying(16) NOT NULL,
+    thread_id character varying(128),
+    conversation_id bigint,
+    result_summary text,
+    error_message character varying(1000),
+    duration_ms integer,
+    started_at timestamp without time zone,
+    finished_at timestamp without time zone,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: dcs_captcha_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2566,6 +2625,22 @@ ALTER TABLE ONLY public.dcs_audit
 
 
 --
+-- Name: dcs_automation pk_dcs_automation; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dcs_automation
+    ADD CONSTRAINT pk_dcs_automation PRIMARY KEY (id);
+
+
+--
+-- Name: dcs_automation_run pk_dcs_automation_run; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dcs_automation_run
+    ADD CONSTRAINT pk_dcs_automation_run PRIMARY KEY (id);
+
+
+--
 -- Name: dcs_captcha_log pk_dcs_captcha_log; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3184,6 +3259,34 @@ CREATE INDEX idx_dcs_audit_task ON public.dcs_audit USING btree (task_id);
 
 
 --
+-- Name: idx_dcs_automation_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_automation_due ON public.dcs_automation USING btree (next_run_at) WHERE ((enabled = '1'::bpchar) AND (del_flag = '0'::bpchar) AND (next_run_at IS NOT NULL));
+
+
+--
+-- Name: idx_dcs_automation_run_auto; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_automation_run_auto ON public.dcs_automation_run USING btree (tenant_id, automation_id, scheduled_for DESC);
+
+
+--
+-- Name: idx_dcs_automation_run_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_automation_run_user ON public.dcs_automation_run USING btree (tenant_id, user_id, create_time DESC);
+
+
+--
+-- Name: idx_dcs_automation_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_automation_user ON public.dcs_automation USING btree (tenant_id, user_id, del_flag, create_time DESC);
+
+
+--
 -- Name: idx_dcs_file_guard_log_disposition; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3607,6 +3710,27 @@ CREATE UNIQUE INDEX uk_dcs_ai_model_price_model ON public.dcs_ai_model_price USI
 --
 
 CREATE UNIQUE INDEX uk_dcs_asst_conv_thread ON public.dcs_assistant_conversation USING btree (tenant_id, thread_id);
+
+
+--
+-- Name: uk_dcs_automation_run_running; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_dcs_automation_run_running ON public.dcs_automation_run USING btree (automation_id) WHERE ((status)::text = 'RUNNING'::text);
+
+
+--
+-- Name: uk_dcs_automation_builtin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_dcs_automation_builtin ON public.dcs_automation USING btree (tenant_id) WHERE ((builtin)::text = '1'::text);
+
+
+--
+-- Name: uk_dcs_automation_run_slot; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_dcs_automation_run_slot ON public.dcs_automation_run USING btree (automation_id, scheduled_for) WHERE ((trigger_type)::text = 'SCHEDULE'::text);
 
 
 --

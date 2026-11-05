@@ -27,8 +27,11 @@ public class BizToolSpec {
 
     /**
      * true=只读直接执行; false=写操作, 调用时出 HITL 确认卡(复用平台既有确认卡流程)。
+     *
+     * <p>默认 false（fail-closed）：无人值守场景按 readOnly 白名单放行，默认 true 会让忘记声明的
+     * 写工具静默进入只读面。只读工具请用 {@link #readOnly} 工厂显式声明。</p>
      */
-    private boolean readOnly = true;
+    private boolean readOnly = false;
 
     /** 角色门槛(0=所有人; 档位语义与助手 ToolIdentity 对齐, 由桥侧比较) */
     private int minRoleLevel = 0;

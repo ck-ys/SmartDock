@@ -101,6 +101,11 @@
             <artifactId>ruoyi-dcs</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 2026-11-05 自动化批：无人值守执行按创建人账号重建登录快照（状态/权限现查） -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-system</artifactId>
+        </dependency>
         <!-- 最小生产装配(T12)：DcsAiConfig 实体+Mapper（TenantHelper 经本件传递引入） -->
         <dependency>
             <groupId>org.dromara</groupId>
