@@ -46,3 +46,5 @@ frontend/data/
 # taste-skill 的巡检截图/报告默认写在项目根；.workbuddy 是另一条线的会话记忆
 .taste-skill/
 .workbuddy/
+# 代码审查工具（mimosa）会往项目根/子目录写 finding ledger 与 hook 状态，非源码
+.mimosa/
