@@ -10,13 +10,23 @@
       <top-bar id="topbar-container" class="topbar-container" />
     </template>
     <div class="right-menu flex align-center">
-      <!-- 批3：智能体工作台入口（业务壳 → 全屏工作台）。放在搜索左侧做「换端」锚点，
-           与工作台侧栏「返回业务系统」配对；无权限不渲染。 -->
-      <button v-if="canAgent" type="button" class="nav-agent" aria-label="进入智能体工作台" @click="goAgent">
-        <IconSpan name="bot" :size="15" />
-        <span v-if="appStore.device !== 'mobile'" class="nav-agent__label">智能体工作台</span>
-        <IconSpan v-if="appStore.device !== 'mobile'" name="arrow-up-right" :size="12" class="nav-agent__arrow" />
-      </button>
+      <!-- 批3.5·题4：右上换端入口改下拉选择（先看见去处再选择，不再一点就跳）。
+           当前端=业务系统打勾；点另一端才切换；点当前端/空白只收起。无权限不渲染。 -->
+      <el-dropdown v-if="canAgent" trigger="click" placement="bottom-end" @command="onSwitchEnd">
+        <button type="button" class="nav-agent" aria-label="切换到智能体工作台" aria-haspopup="menu">
+          <IconSpan name="bot" :size="15" />
+          <span v-if="appStore.device !== 'mobile'" class="nav-agent__label">工作台</span>
+          <IconSpan name="chevron-down" :size="12" class="nav-agent__arrow" />
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="biz">
+              业务系统<span class="nav-agent__cur">✓ 当前</span>
+            </el-dropdown-item>
+            <el-dropdown-item command="agent">智能体工作台</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <!-- 方案一：顶栏只留 5 个——搜索 / 消息 / 外观 / 全屏 / 头像。
            租户搬左上品牌行，反馈回头像菜单，语言/字号/主题收进外观抽屉（见 DcsAppearanceDrawer） -->
       <button v-if="appStore.device !== 'mobile'" type="button" class="nav-search" aria-label="搜索页面" @click="openPalette">
@@ -102,7 +112,10 @@ const route = useRoute();
 const router = useRouter();
 // 批3：换端入口与 /agent 页内自检同一条权限串；超管走通配
 const canAgent = computed(() => userStore.permissions.includes('*:*:*') || userStore.permissions.includes('agentws:workspace:use'));
-const goAgent = () => router.push('/agent');
+/** 批3.5·题4：下拉选择——当前端(biz)点击只收起不跳转；点另一端(agent)才换端 */
+const onSwitchEnd = (cmd: string | number | object) => {
+  if (cmd === 'agent') router.push('/agent');
+};
 // 反馈弹窗由 layout 持有（左下用户行也要能开同一个框），这里只发事件
 const requestFeedback = () => emit('feedback', 'submit');
 
@@ -160,6 +173,12 @@ onMounted(() => {
   top: 4px;
   right: 2px;
   transform: translateY(-50%);
+}
+
+.nav-agent__cur {
+  margin-left: 10px;
+  color: var(--el-color-success, #67c23a);
+  font-size: 11px;
 }
 
 .nav-agent {

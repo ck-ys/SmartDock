@@ -50,30 +50,17 @@ describe('global router guard (return-style navigation)', () => {
     expect(await guard({ path: '/login', fullPath: '/login', meta: {} }, {})).toEqual({ path: '/' });
   });
 
-  it('有工作台权限时，AI 助手菜单默认改道 /agent（含尾斜杠）', async () => {
+  it('批3.5：AI 助手菜单直达会话页，不再改道 /agent（有无权限都放行）', async () => {
     mocks.getToken.mockReturnValue('token');
     mocks.userStore.permissions = ['agentws:workspace:use'];
     const guard = registeredGuard();
-    expect(await guard({ path: '/ai/assistant', fullPath: '/ai/assistant', query: {}, meta: {} }, {})).toEqual({
-      path: '/agent',
-      replace: true
-    });
-    expect(await guard({ path: '/ai/assistant/', fullPath: '/ai/assistant/', query: {}, meta: {} }, {})).toEqual({
-      path: '/agent',
-      replace: true
-    });
+    expect(await guard({ path: '/ai/assistant', fullPath: '/ai/assistant', query: {}, meta: {}, matched: [] }, {})).toBe(true);
+    expect(await guard({ path: '/ai/assistant/', fullPath: '/ai/assistant/', query: {}, meta: {}, matched: [] }, {})).toBe(true);
+    // 交接参数（from=agent）是批3 遗留，路由不再消费它，同样直达
+    expect(await guard({ path: '/ai/assistant', fullPath: '/ai/assistant?from=agent', query: { from: 'agent' }, meta: {}, matched: [] }, {})).toBe(true);
   });
 
-  it('工作台交接（from=agent）放行会话页', async () => {
-    mocks.getToken.mockReturnValue('token');
-    mocks.userStore.permissions = ['agentws:workspace:use'];
-    const guard = registeredGuard();
-    expect(await guard({ path: '/ai/assistant', fullPath: '/ai/assistant?from=agent', query: { from: 'agent' }, meta: {}, matched: [] }, {})).toBe(
-      true
-    );
-  });
-
-  it('没有工作台权限的存量角色不劫持，仍进会话页', async () => {
+  it('没有工作台权限的存量角色同样直达会话页', async () => {
     mocks.getToken.mockReturnValue('token');
     mocks.userStore.permissions = ['dcs:assistant:use'];
     const guard = registeredGuard();

@@ -5,7 +5,7 @@
          R2(2026-10-10 拍板A)：会话页真实路由是 /ai/assistant（菜单 migration_20261008_01），旧守卫写 /assistant
          永假=独立会话页悬浮球重复出现（真机实证）——前缀匹配覆盖该页及子路由 -->
     <fab-ball
-      v-show="!drawerOpen && !route.path.startsWith('/ai/assistant')"
+      v-show="!drawerOpen && !route.path.startsWith('/ai/assistant') && route.path !== '/agent'"
       ref="ballRef"
       :has-dot="hasDot"
       :exec="astate.sending"
