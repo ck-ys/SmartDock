@@ -7,6 +7,7 @@ import org.dromara.assistant.mapper.AssistantSkillUsageMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -29,7 +30,7 @@ public class AssistantSkillUsageService {
      * 记一次成功取用。写库失败只 debug 日志——统计是旁路，绝不允许反过来打断对话。
      * 调用线程可能是助手运行时线程（无 Sa-Token），租户由调用方显式传入。
      */
-    public void record(String tenantId, String skillId) {
+    public void record(String tenantId, Long userId, String skillId) {
         if (tenantId == null || tenantId.isBlank() || skillId == null || skillId.isBlank()) {
             return;
         }
@@ -38,9 +39,26 @@ public class AssistantSkillUsageService {
             return;
         }
         try {
-            usageMapper.bump(IdWorker.getId(), tenantId, sid);
+            usageMapper.bump(IdWorker.getId(), tenantId, userId == null ? 0L : userId, sid);
         } catch (Exception e) {
             log.debug("[SkillUsage] 统计写入失败 tenant={} skill={}: {}", tenantId, sid, e.getMessage());
+        }
+    }
+
+    /**
+     * 批3.5·题5：某人最近用过的技能（倒序），供工作台「能做什么·你最近用过」一路取数。
+     * 读侧 fail-open（与 usageOf 同口径）：统计抖动不连坐能力卡。
+     */
+    public List<Map<String, Object>> recentOf(String tenantId, Long userId, int limit) {
+        if (tenantId == null || tenantId.isBlank() || userId == null) {
+            return List.of();
+        }
+        try {
+            return usageMapper.selectRecentByUser(tenantId, userId, limit);
+        } catch (Exception e) {
+            log.debug("[SkillUsage] 最近使用读取失败（能力卡走技能库精选兜底） tenant={} user={}: {}",
+                tenantId, userId, e.getMessage());
+            return List.of();
         }
     }
 

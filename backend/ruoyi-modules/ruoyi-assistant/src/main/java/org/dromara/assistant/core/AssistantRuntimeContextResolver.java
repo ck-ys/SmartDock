@@ -210,7 +210,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
             && AssistantSkillGateMiddleware.visibleTo(pickedSkill,
                 org.dromara.assistant.tools.ToolIdentity.from(user).getRoleLevel(),
                 cfg.toolGate(), tenantId)) {
-            skillUsageService.record(tenantId, pickedSkill);
+            skillUsageService.record(tenantId, user.getUserId(), pickedSkill);
         }
         // 批8-3 回修（dspro P1-1，javap 字节码实证）：agent 会话键=(复合用户"t:租户:用户", threadId)，
         // removeSession 单参版本按 ("__anon__",threadId) 查键恒 miss（原实现=死代码）——必须双参直指；

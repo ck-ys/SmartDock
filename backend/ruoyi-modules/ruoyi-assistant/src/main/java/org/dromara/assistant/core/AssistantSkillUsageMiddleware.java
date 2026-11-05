@@ -36,16 +36,19 @@ public class AssistantSkillUsageMiddleware implements HarnessRuntimeMiddleware {
 
     private final AssistantSkillUsageService usageService;
     private final String tenantId;
+    /** 批3.5·题5：使用人（雪花 userId）——「你最近用过」按人记账 */
+    private final Long userId;
     private final int roleLevel;
     private final Map<String, String> toolGate;
     /** 题2 案3 收口回修：本会话 id——手动胶囊那一轮已在 resolver 记过，模型再自取同一技能不重复计 */
     private final String aguiThreadId;
 
-    public AssistantSkillUsageMiddleware(AssistantSkillUsageService usageService, String tenantId,
+    public AssistantSkillUsageMiddleware(AssistantSkillUsageService usageService, String tenantId, Long userId,
                                          int roleLevel, Map<String, String> toolGate,
                                          String aguiThreadId) {
         this.usageService = usageService;
         this.tenantId = tenantId;
+        this.userId = userId;
         this.roleLevel = roleLevel;
         this.toolGate = toolGate;
         this.aguiThreadId = aguiThreadId;
@@ -73,7 +76,7 @@ public class AssistantSkillUsageMiddleware implements HarnessRuntimeMiddleware {
                 // 题2 案3 收口回修：手动胶囊已在 resolver 按请求记过一次；本轮模型再自取
                 // 同一个技能不重复计数（正文已注入，取用属多余动作），自取其它技能照记。
                 if (shouldRecordToolUse(AssistantSkillHolder.get(aguiThreadId), skillId)) {
-                    usageService.record(tenantId, skillId);
+                    usageService.record(tenantId, userId, skillId);
                 }
             }
         });

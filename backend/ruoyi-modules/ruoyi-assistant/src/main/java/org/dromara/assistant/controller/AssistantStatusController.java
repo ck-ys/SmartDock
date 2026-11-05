@@ -39,6 +39,8 @@ public class AssistantStatusController extends BaseController {
     private final AssistantDailyQuota dailyQuota;
     private final org.dromara.assistant.service.AssistantConversationService conversationService;
     private final org.dromara.assistant.service.AssistantUserQuotaService quotaService;
+    /** 批3.5·题5：技能使用统计（最近用过端点数据源） */
+    private final org.dromara.assistant.service.AssistantSkillUsageService skillUsageService;
     /** 业务批3-④：联网已用次数真值源（此前占位 0） */
     private final org.dromara.assistant.limiter.AssistantWebSearchQuota webSearchQuota;
     /** 业务批7 Q7：今日缓存命中率聚合 */
@@ -51,6 +53,34 @@ public class AssistantStatusController extends BaseController {
     private final org.dromara.assistant.service.AssistantFollowupService followupService;
     /** 批A-1：/config 下发压缩策略派生值（按当前默认模型窗口算，只读展示） */
     private final org.dromara.assistant.factory.AssistantModelFactory modelFactory;
+
+    /**
+     * 批3.5·题5（2026-11-03 拍板）：当前登录人最近用过的技能（真值来自 dcs_assistant_skill_usage
+     * 按人维度，倒序前 N）——工作台「能做什么」两路取数之一；无记录返回空数组，前端走技能库精选兜底。
+     * 与 /skills 同权限（dcs:assistant:use）、同租户口径；统计读侧 fail-open。
+     *
+     * <p>租户取「动态优先」：超管切到某租户时看的是那个租户的统计，而不是登录租户快照。</p>
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/skills/recent")
+    public R<java.util.List<Map<String, Object>>> recentSkills() {
+        org.dromara.assistant.tools.ToolIdentity identity = org.dromara.assistant.tools.ToolIdentity.from(
+            org.dromara.common.satoken.utils.LoginHelper.getLoginUser());
+        String dynamicTenantId = TenantHelper.getTenantId();
+        String tenantId = dynamicTenantId != null && !dynamicTenantId.isBlank()
+            ? dynamicTenantId : identity.getTenantId();
+        java.util.List<Map<String, Object>> rows = skillUsageService.recentOf(
+            tenantId, org.dromara.common.satoken.utils.LoginHelper.getUserId(), 8);
+        java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("skillId", r.get("skillid"));
+            row.put("useCount", r.get("usecount"));
+            row.put("lastUsedAt", r.get("lastusedat"));
+            out.add(row);
+        }
+        return R.ok(out);
+    }
 
     /**
      * 能力① Q4 轻量（2026-10-20）：用户视角技能目录（perm=use——panorama 是管理端点，

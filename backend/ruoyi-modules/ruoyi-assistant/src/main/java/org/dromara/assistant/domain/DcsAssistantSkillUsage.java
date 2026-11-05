@@ -10,7 +10,7 @@ import java.io.Serializable;
 /**
  * 技能使用统计（题2 案3，2026-10-31 拍板）：一技一行，只记次数与最近一次。
  *
- * <p>不存逐次调用明细（题2 案3 明确不做归档/扫描）；键是 (tenant_id, skill_id)，
+ * <p>不存逐次调用明细（题2 案3 明确不做归档/扫描）；键是 (tenant_id, user_id, skill_id)（批3.5·题5 加人维度），
  * 内置技能没有 {@code dcs_assistant_skill} 在线行也能统计。</p>
  *
  * @author smartdock
@@ -28,6 +28,9 @@ public class DcsAssistantSkillUsage implements Serializable {
 
     /** 租户编号 */
     private String tenantId;
+
+    /** 使用人（批3.5·题5：雪花 userId；历史单位级行=0，由迁移补列） */
+    private Long userId;
 
     /** 技能标识（与技能目录同 id） */
     private String skillId;
