@@ -1,5 +1,9 @@
 <template>
-  <div class="set-ws">
+  <div v-if="allowed" class="set-ws">
+    <!-- 题7① (2026-11-05)：没权限的人不渲染整页，只等 onMounted 跳 403——否则会先闪一帧设置页内容。
+         注意：根节点不能是「注释 + 元素」两兄弟——那会编译成 Fragment，App.vue 的淡出（mode="out-in"）
+         在 Fragment 上收不到 afterLeave，离开本页时整页白屏（2026-11-05 三席审查 P0）。
+         所以注释挪进 div，无权限时由下面的空 div 兜住根节点。 -->
     <!-- 顶栏（48px，与工作台同高）：返回工作台 / 面包屑 / 当前身份。真路由整页跳转，地址会变 -->
     <header class="set-top">
       <button class="set-back" type="button" @click="backToWorkbench">
@@ -38,15 +42,24 @@
             >
               <IconSpan :name="it.icon" :size="15" /><span>{{ it.label }}</span>
             </button>
-            <span v-else class="set-row soon" :title="`${it.label} · 待建设（下一批或它自己的板）`">
-              <IconSpan :name="it.icon" :size="15" /><span>{{ it.label }}</span><span class="soon-tag">待做</span>
+            <span
+              v-else
+              class="set-row soon"
+              :title="
+                it.key === 'schedule'
+                  ? '定时任务还没开放：后台现在只有系统任务（每日摘要 08:00、数据保留清理 03:40），没有用户自定义任务'
+                  : `${it.label} · 待建设（下一批或它自己的板）`
+              "
+            >
+              <IconSpan :name="it.icon" :size="15" /><span>{{ it.label }}</span>
+              <span class="soon-tag">{{ it.key === 'schedule' ? '未开放' : '待做' }}</span>
             </span>
           </template>
         </template>
 
         <div class="set-navfoot">
-          <template v-if="isManager">本批只读：技能内容在「AI 助手管理 → 能力」里改（仅超管）。</template>
-          <template v-else>技能由管理员统一维护；其它设置项也由管理员管理。</template>
+          <template v-if="isManager">本批只读：技能与工具的改动都在「AI 助手管理 → 能力」里（需要助手配置权限）。</template>
+          <template v-else>技能与工具由管理员统一维护；其它设置项也由管理员管理。</template>
         </div>
       </aside>
 
@@ -162,6 +175,75 @@
           </div>
         </section>
 
+        <!-- ============ 工具：只读清单（题1-4 全甲：全员可见 / 表格 / 后端一句话 / 档位只读） ============ -->
+        <section v-else-if="section === 'tools'" class="set-sheet tools" aria-label="工具">
+          <div class="audit-hd">
+            <div>
+              <h1>工具</h1>
+              <p>这个助手会做哪些事、每件风险多高、现在能不能用。{{ toolsSummary }}</p>
+            </div>
+          </div>
+
+          <div class="audit-scroll">
+            <el-table
+              v-loading="toolsLoading"
+              :data="toolsRows"
+              class="ui-table tools-table"
+              :style="isNarrow ? undefined : 'min-width: 760px'"
+            >
+              <el-table-column label="工具" min-width="300">
+                <template #default="{ row }">
+                  <div class="tool-nm">{{ row.displayName }}</div>
+                  <div class="tool-ds">
+                    {{ row.userDesc }}<template v-if="row.kind === 'mcp'"> · {{ callsText(row.calls) }}</template>
+                  </div>
+                  <!-- 窄屏只留工具一列，其余并到名字下面——避免横滑后只剩一排数字、对不上是哪个工具 -->
+                  <div v-if="isNarrow" class="tool-meta">
+                    {{ row.category }} · 风险
+                    <span class="risk" :class="'r-' + row.riskLevel">{{ riskText(row.riskLevel) }}</span>
+                    · {{ row.whoCanUse }}
+                    <span class="tool-st tool-st-inline">
+                      <i class="dot" :class="'d-' + row.status" aria-hidden="true"></i>{{ row.statusText }}
+                    </span>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!isNarrow" label="分类" width="96">
+                <template #default="{ row }"><span class="tool-mut">{{ row.category }}</span></template>
+              </el-table-column>
+              <el-table-column v-if="!isNarrow" label="风险" width="76">
+                <template #default="{ row }">
+                  <span class="risk" :class="'r-' + row.riskLevel">{{ riskText(row.riskLevel) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!isNarrow" label="状态" width="132">
+                <template #default="{ row }">
+                  <span class="tool-st"><i class="dot" :class="'d-' + row.status" aria-hidden="true"></i>{{ row.statusText }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="!isNarrow" label="谁能用" width="118">
+                <template #default="{ row }"><span class="tool-mut">{{ row.whoCanUse }}</span></template>
+              </el-table-column>
+              <template #empty>
+                <el-empty
+                  :description="
+                    toolsLoading
+                      ? '正在读工具清单…'
+                      : toolsFailed
+                        ? '工具清单没读出来——刷新页面再试；还是不行找管理员'
+                        : '这个助手还没有登记任何工具'
+                  "
+                />
+              </template>
+            </el-table>
+          </div>
+
+          <p class="tools-foot">
+            <template v-if="canConfigAssistant">只读；谁能用和停用只能在「AI 助手管理 → 能力」里改<button class="set-lfontlink" type="button" @click="goAdmin">打开管理台 →</button></template>
+            <template v-else>只读；谁能用由平台管理员在「AI 助手管理 → 能力」里配。</template>
+          </p>
+        </section>
+
         <!-- ============ 审计：只读，复用现有接口与列（业务审计页不动） ============ -->
         <section v-else-if="section === 'audit'" class="set-sheet audit" aria-label="审计">
           <div class="audit-hd">
@@ -254,6 +336,9 @@
       </main>
     </div>
   </div>
+  <div v-else class="set-blocked" aria-hidden="true">
+    <!-- 无权限时的占位根：v-if 为假只渲染注释节点，注释接不住过渡（见上方注释），这里留个真实元素 -->
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -264,7 +349,7 @@
  * - A3 版式：264 子导航 + 360 列表 + 右侧详情；列表与详情同一张白卡，不丢上下文；
  * - 内容只读：技能来自 /dcs/assistant/skills（按角色过滤），详情补 body 只为取
  *   第一条编号清单做「它会怎么带你做」；没有任何开关/删除/新建；
- * - 成员（A′）：只显示「技能」一个分节，7 条只读；审计与其它分节不出现；
+ * - 成员（A′）：显示「技能」「工具」两个分节；工具全员只读，审计与其它分节不出现；
  * - 审计（题5 乙）：admin/tenant_admin 靠 F 型权限 12061 进来，只读、复用现有接口与列；
  *   业务系统里的 11936 审计页原样不动。
  */
@@ -274,15 +359,18 @@ import { Search as SearchIcon } from '@element-plus/icons-vue';
 import BrandMark from '@/components/BrandMark.vue';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import { useUserStore } from '@/store/modules/user';
+import { ASSISTANT_ADMIN_PATH } from '@/router';
 import {
   getAssistantSkillCatalog,
   getAssistantSkillDetailView,
   getAssistantRecentSkills,
+  getAssistantToolCatalog,
   pageAssistantActionAudit,
   exportAssistantActionAudit,
   type AssistantActionAuditRow,
   type AssistantRecentSkill,
-  type AssistantSkillDetailView
+  type AssistantSkillDetailView,
+  type AssistantToolRow
 } from '@/api/dcs/assistant';
 import { ACT, logSt } from '@/components/DcsAssistant/useAssistant';
 import { fmtIsoTime } from '@/components/DcsAssistant/util';
@@ -305,6 +393,8 @@ const userStore = useUserStore();
 /* ---------- 权限与身份 ---------- */
 const perms = computed(() => userStore.permissions);
 const canEditSkills = computed(() => perms.value.includes('*:*:*') || perms.value.includes('dcs:assistant:skill:edit'));
+/** 能进「AI 助手管理 → 能力」改档位的人：只认真正的配置权（租户管理员只有审计权时不挂死链） */
+const canConfigAssistant = computed(() => perms.value.includes('*:*:*') || perms.value.includes('dcs:assistant:config'));
 const canAudit = computed(() => perms.value.includes('*:*:*') || perms.value.includes('dcs:assistant:audit:query'));
 /** 管理员视角=能审计 / 能改技能 / 有助手配置权；其余按成员/发布人视角（A′） */
 const isManager = computed(
@@ -325,7 +415,7 @@ const scopeText = computed(() => {
 });
 
 /* ---------- 分节导航 ---------- */
-type SectionKey = 'skills' | 'audit';
+type SectionKey = 'skills' | 'tools' | 'audit';
 interface NavItem {
   key: SectionKey | string;
   label: string;
@@ -334,11 +424,13 @@ interface NavItem {
 }
 const READY: NavItem[] = [
   { key: 'skills', label: '技能', icon: 'sparkles', ready: true },
+  // 题1 甲：全员可见全部工具行（含用不了的），状态列说清原因
+  { key: 'tools', label: '工具', icon: 'wrench', ready: true },
   ...(canAudit.value ? [{ key: 'audit', label: '审计', icon: 'clipboard', ready: true } as NavItem] : [])
 ];
 const navGroups = computed(() => {
   if (!isManager.value) {
-    return [{ label: 'Agent 能力', items: READY.filter((i) => i.key === 'skills') }];
+    return [{ label: 'Agent 能力', items: READY.filter((i) => i.key === 'skills' || i.key === 'tools') }];
   }
   return [
     {
@@ -353,7 +445,7 @@ const navGroups = computed(() => {
       label: 'Agent 能力',
       items: [
         { key: 'skills', label: '技能', icon: 'sparkles', ready: true },
-        { key: 'tools', label: '工具', icon: 'wrench' },
+        { key: 'tools', label: '工具', icon: 'wrench', ready: true },
         { key: 'mcp', label: 'MCP 服务', icon: 'globe' },
         { key: 'plugins', label: '插件', icon: 'package' },
         { key: 'schedule', label: '定时任务', icon: 'timer' },
@@ -369,14 +461,15 @@ const navGroups = computed(() => {
     }
   ];
 });
-const currentLabel = computed(() => (section.value === 'audit' ? '审计' : '技能'));
+const SECTION_LABEL: Record<SectionKey, string> = { skills: '技能', tools: '工具', audit: '审计' };
 
-/** 分节状态跟地址：?s=audit 可直达（审计分节给 admin 收藏/分享） */
+/** 分节状态跟地址：?s=audit / ?s=tools 可直达（审计只给有权限的人） */
 const section = ref<SectionKey>('skills');
+const currentLabel = computed(() => SECTION_LABEL[section.value]);
 watch(
   () => route.query.s,
   (v) => {
-    const next: SectionKey = v === 'audit' && canAudit.value ? 'audit' : 'skills';
+    const next: SectionKey = v === 'audit' && canAudit.value ? 'audit' : v === 'tools' ? 'tools' : 'skills';
     if (next !== section.value) {
       section.value = next;
     }
@@ -384,16 +477,21 @@ watch(
   { immediate: true }
 );
 function goSection(key: string) {
-  if (key !== 'skills' && key !== 'audit') return;
+  if (key !== 'skills' && key !== 'tools' && key !== 'audit') return;
   if (key === section.value) return;
   section.value = key;
   // replace：切分节不堆历史，浏览器返回=离开设置页回工作台
-  router.replace({ path: '/agent/settings', query: key === 'audit' ? { s: 'audit' } : {} });
+  router.replace({ path: '/agent/settings', query: key === 'skills' ? {} : { s: key } });
 }
 
 /** 返回工作台：从工作台来的走浏览器返回（工作台会接回刚才的会话与草稿）；
- *  直接打开/刷新进来的没有上一页，就 push 到 /agent。 */
+ *  直接打开/刷新进来的没有上一页，就 push 到 /agent。
+ *  600ms 内只认第一次点击：连点两下会触发两次 back，第二下会把工作台一起退掉。 */
+let lastBackAt = 0;
 function backToWorkbench() {
+  const now = Date.now();
+  if (now - lastBackAt < 600) return;
+  lastBackAt = now;
   const back = (window.history.state as { back?: unknown } | null)?.back;
   if (typeof back === 'string' && (back === '/agent' || back.startsWith('/agent?'))) {
     router.back();
@@ -402,7 +500,7 @@ function backToWorkbench() {
   router.push('/agent');
 }
 function goAdmin() {
-  router.push('/ai/assistant-admin');
+  router.push(ASSISTANT_ADMIN_PATH);
 }
 
 /* ---------- 技能列表 ---------- */
@@ -620,6 +718,57 @@ async function handleExport() {
   }
 }
 
+/* ---------- 工具清单（题1-4 全甲：全员只读；状态/一句话都由后端给，页面不自己翻译） ---------- */
+const toolsRows = ref<AssistantToolRow[]>([]);
+const toolsLoading = ref(false);
+const toolsFailed = ref(false);
+let toolsLoaded = false;
+
+const RISK_TEXT: Record<string, string> = { low: '低', mid: '中', high: '高' };
+const riskText = (r: string) => RISK_TEXT[r] ?? '—';
+
+/** 外部服务的调用次数：0 不写成「已调用 0 次」；负数=后端没读出来，别冒充 0；账本只留 90 天 */
+const callsText = (n: number | null | undefined) => {
+  const v = n ?? 0;
+  if (v < 0) return '调用次数没读出来';
+  if (v === 0) return '近 90 天还没调用过';
+  return v >= 10000 ? `近 90 天调用 ${(v / 10000).toFixed(1)} 万次` : `近 90 天调用 ${v} 次`;
+};
+
+/** 说明条：真实计数从行里数出来（不写死「9 个」——以后加工具/加外部服务会自动变） */
+const toolsSummary = computed(() => {
+  const list = toolsRows.value;
+  if (!list.length) return '';
+  const ready = list.filter((t) => t.status === 'ready').length;
+  const waiting = list.filter((t) => t.status === 'waiting').length;
+  const off = list.filter((t) => t.status === 'off').length;
+  const admin = list.filter((t) => t.status === 'admin').length;
+  // 管理员档对管理员本人是可用的：按当前视角算「你能用」，避免和表格里的「管理员限定」打架
+  const usable = isAdminLevel.value ? ready + admin : ready;
+  const parts = [`共 ${list.length} 个，你能用 ${usable} 个`];
+  if (admin) parts.push(`${admin} 个仅管理员可用`);
+  if (waiting) parts.push(`${waiting} 个等租户开启`);
+  if (off) parts.push(`${off} 个已停用`);
+  return parts.join('；') + '。';
+});
+
+async function loadTools() {
+  if (toolsLoading.value) return;
+  toolsLoading.value = true;
+  toolsFailed.value = false;
+  try {
+    const res = (await getAssistantToolCatalog()) as unknown as { data?: AssistantToolRow[] };
+    toolsRows.value = res?.data ?? [];
+    toolsLoaded = true;
+  } catch {
+    // 读失败是「读不出来」，不是「没有工具」——空态文案按这个状态分支
+    toolsFailed.value = true;
+    toolsRows.value = [];
+  } finally {
+    toolsLoading.value = false;
+  }
+}
+
 /* ---------- 挂载 ---------- */
 function ensureFirstSelected() {
   // 默认选中第一条：A3 的右侧详情不该一开始就是空的（手机单列不自动跳详情）
@@ -645,6 +794,9 @@ onMounted(async () => {
   if (section.value === 'skills') {
     ensureFirstSelected();
   }
+  if (section.value === 'tools') {
+    void loadTools();
+  }
   if (section.value === 'audit' && canAudit.value) {
     void loadAudit();
   }
@@ -652,6 +804,9 @@ onMounted(async () => {
 watch(section, (v) => {
   if (v === 'skills') {
     ensureFirstSelected();
+  }
+  if (v === 'tools' && !toolsLoaded) {
+    void loadTools();
   }
   if (v === 'audit' && canAudit.value && !auditRows.value.length && !auditLoading.value) {
     void loadAudit();
@@ -1305,6 +1460,119 @@ html.dark .set-meta code {
 .set-sheet.audit :deep(.el-pagination) {
   margin-top: 8px;
   justify-content: flex-end;
+}
+
+/* 工具分节（题2 甲：表格；390 在容器内横滚，和审计表同款） */
+.set-sheet.tools {
+  flex-direction: column;
+  padding: 18px 20px 10px;
+  overflow: hidden;
+
+  .audit-hd p {
+    max-width: 760px;
+  }
+}
+.tools-table :deep(.el-table__cell) {
+  padding: 9px 0;
+  vertical-align: top;
+}
+.tool-nm {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text);
+}
+.tool-ds {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--mut);
+}
+.tool-mut {
+  font-size: 12px;
+  color: var(--mut);
+}
+.risk {
+  font-size: 12px;
+  color: var(--mut);
+
+  &.r-high {
+    color: #831c1e;
+    font-weight: 500;
+  }
+  &.r-mid {
+    color: var(--text-2);
+  }
+}
+/* 窄屏工具行：分类/风险/权限/状态并成一行，跟在描述下面 */
+.tool-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-2);
+
+  .tool-st-inline {
+    display: inline-flex;
+
+    &::before {
+      content: '·';
+      margin-right: 6px;
+      color: var(--faint);
+    }
+  }
+}
+.tool-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--faint);
+    flex: none;
+
+    &.d-ready {
+      background: #247b50;
+    }
+    &.d-waiting {
+      background: #b45309;
+    }
+    &.d-admin {
+      background: #1f2328;
+    }
+    &.d-off {
+      background: #9aa0a8;
+    }
+  }
+}
+.tools-foot {
+  flex: none;
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--mut);
+
+  .set-lfontlink {
+    margin-left: 4px;
+  }
+}
+html.dark .risk.r-high {
+  color: #e5566f;
+}
+html.dark .tool-st .dot.d-ready {
+  background: #3fc07a;
+}
+html.dark .tool-st .dot.d-admin {
+  background: #e9ebee;
+}
+/* 暗色下「等开启」和「已停用」也要有可读的亮度差，否则两颗点都糊成深灰 */
+html.dark .tool-st .dot.d-waiting {
+  background: #e0a45c;
+}
+html.dark .tool-st .dot.d-off {
+  background: #6b727c;
 }
 
 /* 手机档（992 断点，全仓统一）：子导航变横条；列表/详情单列切换，无横向溢出 */

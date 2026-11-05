@@ -181,7 +181,12 @@ function go(path: string) {
  *  只记去 /agent/settings 这一跳；去业务系统不记（免得回来被旧快照拉回旧会话）。 */
 onBeforeRouteLeave((to) => {
   if (to.path === '/agent/settings') {
-    setWorkspaceSnapshot({ threadId: wsRef.value?.currentThreadId ?? '', draft: wsRef.value?.draftText ?? '' });
+    setWorkspaceSnapshot({
+      threadId: wsRef.value?.currentThreadId ?? '',
+      draft: wsRef.value?.draftText ?? '',
+      // 题7②：连标题一起带走——首屏 50 条外的旧会话回来时列表找不到行，不能叫「新会话」
+      title: wsRef.value?.currentTitle ?? ''
+    });
   }
 });
 
@@ -196,7 +201,7 @@ async function applyHandoff() {
   const threadId = snap?.threadId || (wsRef.value?.hasSession ? wsRef.value.currentThreadId : '');
   try {
     if (threadId) {
-      await wsRef.value?.restoreSession(threadId, snap?.draft);
+      await wsRef.value?.restoreSession(threadId, snap?.draft, snap?.title);
     }
   } catch {
     // 会话没接上不影响下面填句子

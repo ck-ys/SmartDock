@@ -22,6 +22,9 @@ class EncryptKeyGuardTest {
         IllegalStateException e = assertThrows(IllegalStateException.class,
             () -> validate(""));
         assertTrue(e.getMessage().contains("SMARTDOCK_AI_CONFIG_KEY"), "报错必须点名缺哪个变量");
+        assertTrue(e.getMessage().contains("smartdock.encrypt.ai-config-key"), "报错必须同时给出配置项名，便于对照");
+        assertTrue(e.getMessage().contains("不是配置项名"), "报错必须说清环境变量名≠配置项名（2026-11-05 用户 issue 踩过）");
+        assertTrue(e.getMessage().contains("完全重启"), "报错必须提醒 setx 后要重启 IDE/终端");
         assertTrue(e.getMessage().contains("openssl rand -base64 24"), "报错必须给出生成方法");
     }
 

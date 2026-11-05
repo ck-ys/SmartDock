@@ -895,12 +895,24 @@ function ensureCurRow(list: AssistantConversation[]): AssistantConversation[] {
     return list;
   }
   const nowWall = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 19).replace('T', ' ');
-  return [{ id: 'tmp', threadId: state.threadId, title: '新会话', lastMessageTime: nowWall, status: 'ACTIVE', running: state.sending }, ...list];
+  // 题7② (2026-11-05)：首屏 50 条外的旧会话从设置页返回时，列表里找不到行——
+  // 保底行不能一律叫「新会话」（用户会以为自己点错了）。当前选中的同一会话还留着标题，就沿用它。
+  const kept = selected.value?.threadId === state.threadId ? (selected.value.title ?? '').trim() : '';
+  return [{ id: 'tmp', threadId: state.threadId, title: kept || '新会话', lastMessageTime: nowWall, status: 'ACTIVE', running: state.sending }, ...list];
 }
 /** 真实会话数（不含临时行）：加载更多计数/可见性用它，防 +1 挤掉第 51 条 */
 const realCount = computed(() => conversations.value.filter((c) => c.id !== 'tmp').length);
-/** silent=true 供答后补刷（3.5/5.5/9s）用：不闪 loading 转圈，静默换数据 */
-async function loadConversations(silent = false) {
+/** 同一时刻只允许一条列表请求：首屏 onMounted 和从设置页返回的 restoreSession 会同时触发，
+ *  两条并发谁后回谁覆盖，偶发把刚恢复的临时行冲掉。后到的调用共享前一条的 Promise。 */
+let convLoadInFlight: Promise<void> | null = null;
+function loadConversations(silent = false): Promise<void> {
+  if (convLoadInFlight) return convLoadInFlight;
+  convLoadInFlight = doLoadConversations(silent).finally(() => {
+    convLoadInFlight = null;
+  });
+  return convLoadInFlight;
+}
+async function doLoadConversations(silent: boolean) {
   if (!silent) {
     loading.value = true;
   }
@@ -1184,7 +1196,7 @@ onUnmounted(() => {
  *  找不到行（会话被删/归档到别的页）就安静返回空态，不报错。
  *  两条守卫（2026-11-05 三审 P2）：用户已经自己点开别的会话就不再抢；
  *  框里已有用户新打的字就不覆盖（恢复只补空框）。 */
-async function restoreSession(threadId: string, draft?: string) {
+async function restoreSession(threadId: string, draft?: string, title?: string) {
   if (!threadId) {
     return;
   }
@@ -1195,6 +1207,10 @@ async function restoreSession(threadId: string, draft?: string) {
   }
   // 含临时行（还没落库/在首屏 50 条之外）：选中它才能让标题与左栏高亮跟上
   const row = conversations.value.find((c) => c.threadId === threadId);
+  // 题7②：首屏 50 条外=保底行没有真标题；带上来的标题只补「新会话」这一个占位，不覆盖真实标题
+  if (row && row.id === 'tmp' && title?.trim()) {
+    row.title = title.trim();
+  }
   if (row && row.threadId !== selected.value?.threadId) {
     await openConversation(row);
   }
@@ -1209,6 +1225,8 @@ defineExpose({
   restoreSession,
   /** 当前会话 threadId（设置页往返时记快照用；空态=空串） */
   currentThreadId: computed(() => state.threadId || ''),
+  /** 当前会话的显示标题（题7②：带过设置页再回来，列表找不到行时接上标题） */
+  currentTitle: computed(() => (selected.value ? displayTitle(selected.value) : '')),
   /** 单例里已经装着一条有内容的会话：没快照时用它兜底接回原会话 */
   hasSession: computed(() => state.turns.length > 0),
   reloadConversations: () => void loadConversations(true),

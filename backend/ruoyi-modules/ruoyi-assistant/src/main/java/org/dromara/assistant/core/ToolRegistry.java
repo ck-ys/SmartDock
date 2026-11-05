@@ -246,10 +246,15 @@ public final class ToolRegistry {
     /**
      * 工具展示元数据（能力全景/管理页，批A Q4）：与 SPECS 同文件=单点注册不破。
      *
+     * @param gateDesc  给管理员看的不可用原因（技术话，管理页/闸矩阵用）
      * @param riskLevel 能力风险档（low/mid/high）——管理页「一键推荐」按此 × 策略推档位；
      *                  口径：low=只读无副作用，mid=会落数据或改变会话状态，high=出网/接外部服务
+     * @param userDesc  给成员看的一句话（工作台设置页工具表第二行，2026-11-05 题3 甲）：
+     *                  只说「它是干什么的」，不写内部键名/注册条件；与 gateDesc 一样是
+     *                  展示层文案，不改模型行为
      */
-    public record ToolMeta(String displayName, String category, int station, String gateDesc, String riskLevel) {
+    public record ToolMeta(String displayName, String category, int station, String gateDesc,
+                           String riskLevel, String userDesc) {
     }
 
     /**
@@ -257,13 +262,13 @@ public final class ToolRegistry {
      * web_search 默认可用（题10 案1），用户在本会话显式停用或租户无可用 key 时不注册。
      */
     public static final java.util.Map<String, ToolMeta> TOOL_META = java.util.Map.ofEntries(
-        java.util.Map.entry("web_search", new ToolMeta("联网搜索", "查询", 1, "会话停用联网或租户未配 key 时不注册", "high")),
-        java.util.Map.entry("read_attachment", new ToolMeta("读会话附件", "查询", 1, "", "low")),
-        java.util.Map.entry("submit_plan", new ToolMeta("计划卡", "交互", 2, "", "low")),
-        java.util.Map.entry("ask_user", new ToolMeta("结构化反问", "交互", 2, "", "low")),
-        java.util.Map.entry("save_memory", new ToolMeta("保存长期记忆", "交互", 2, "租户开启长期记忆后", "mid")),
-        java.util.Map.entry("todo_write", new ToolMeta("任务清单", "交互", 3, "", "low")),
-        java.util.Map.entry("view_skill", new ToolMeta("查看技能指引", "交互", 3, "", "low")),
-        java.util.Map.entry("read_file", new ToolMeta("回读工作区文件", "查询", 1, "", "low"))
+        java.util.Map.entry("web_search", new ToolMeta("联网搜索", "查询", 1, "会话停用联网或租户未配 key 时不注册", "high", "查资料、核实时效信息（每天有次数上限）")),
+        java.util.Map.entry("read_attachment", new ToolMeta("读会话附件", "查询", 1, "", "low", "读你上传到本会话的文件")),
+        java.util.Map.entry("submit_plan", new ToolMeta("计划卡", "交互", 2, "", "low", "把要做的事摊成一张确认卡")),
+        java.util.Map.entry("ask_user", new ToolMeta("结构化反问", "交互", 2, "", "low", "缺信息时弹选项问你")),
+        java.util.Map.entry("save_memory", new ToolMeta("保存长期记忆", "交互", 2, "租户开启长期记忆后", "mid", "把偏好记到跨会话")),
+        java.util.Map.entry("todo_write", new ToolMeta("任务清单", "交互", 3, "", "low", "在会话里维护待办")),
+        java.util.Map.entry("view_skill", new ToolMeta("查看技能指引", "交互", 3, "", "low", "按需取技能说明（技能本身在技能页）")),
+        java.util.Map.entry("read_file", new ToolMeta("回读工作区文件", "查询", 1, "", "low", "把中间结果落盘后再读回来"))
     );
 }

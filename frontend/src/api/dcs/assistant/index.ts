@@ -792,6 +792,30 @@ export function saveAssistantToolGate(gate: Record<string, string>) {
   return request({ url: '/dcs/assistant/toolgate', method: 'post', data: gate });
 }
 
+/* ============ 工作台设置页·工具清单（成员可读；题1-3 全甲 2026-11-05） ============ */
+
+/** 只读工具行：状态由后端按「模型实际看不看得见」推导，前端只做配色不做翻译 */
+export interface AssistantToolRow {
+  /** 平台工具=工具方法名；外部服务=mcp:<serverName> */
+  key: string;
+  displayName: string;
+  /** 一句人话（TOOL_META.userDesc；外部服务=备注+只读/可写） */
+  userDesc: string;
+  category: string;
+  riskLevel: 'low' | 'mid' | 'high';
+  /** ready=可用 / waiting=等租户开启 / off=已停用 / admin=管理员限定 */
+  status: 'ready' | 'waiting' | 'off' | 'admin';
+  statusText: string;
+  whoCanUse: string;
+  kind: 'platform' | 'mcp';
+  /** 真实调用次数（近 90 天，排除挂载记录）：只有外部服务有账本，0=还没调用过；平台工具恒 null */
+  calls: number | null;
+}
+
+export function getAssistantToolCatalog() {
+  return request<AssistantToolRow[]>({ url: '/dcs/assistant/tools', method: 'get' });
+}
+
 /* ============ 批2 Q2=A：MCP 外部工具试点（管理台「外部工具」页签） ============ */
 
 /** 服务行（headers 只回键名——G4-#1 起值 AES 加密落库，键名是管理面唯一可见信息） */

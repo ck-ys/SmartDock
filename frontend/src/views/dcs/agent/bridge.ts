@@ -20,6 +20,8 @@ export interface SkillTry {
 export interface WorkspaceSnapshot {
   threadId: string;
   draft: string;
+  /** 离开时会话的显示标题（题7②：首屏 50 条外的旧会话回来时列表找不到行，靠它把标题接上） */
+  title: string;
   at: number;
 }
 

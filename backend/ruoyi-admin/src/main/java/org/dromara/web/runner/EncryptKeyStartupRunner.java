@@ -60,8 +60,10 @@ public class EncryptKeyStartupRunner {
     public static void validate(String envName, String propName, String key) {
         if (key == null || key.isBlank()) {
             throw new IllegalStateException(
-                "[密钥自检] 缺少环境变量 " + envName + "（配置项 " + propName + "）。"
-                    + "生成方法：openssl rand -base64 24（得到 32 位），设置为环境变量后重启。");
+                "[密钥自检] 缺少环境变量 " + envName + "（配置项 " + propName + " 为空）。"
+                    + "注意：要设的是环境变量名 " + envName + "（全大写、下划线），不是配置项名 " + propName + "；"
+                    + "用 setx / 系统属性设置后，必须完全重启 IDE 或终端再启动后端。"
+                    + "生成方法：openssl rand -base64 24（得到 32 位）。");
         }
         if (!key.equals(key.trim())) {
             throw new IllegalStateException(
