@@ -106,6 +106,11 @@ API 文件在 `src/api/**`（core/assistant/…，子目录含 `index.ts` 与类
 3. **样式/图表/布局改动必须视觉验收**：computed style 实际值 + 截图 + 肉眼确认 + 至少 2 个数据规模回归；attribute 值 ≠ 渲染值
 4. 同值曲线重合是数据问题不是样式问题——先查数据再改样式
 
+## 风格与组件参照（观感锚点，非依赖）
+
+- **Vercel Geist**：<https://vercel.com/geist/introduction> —— 「简洁科技风」的组件观感锚点：黑白灰 + 一个强调色、1px 细线分区、按钮/输入框/表格的克制范式。做壳层与基础组件的间距、字号、线色拿不出手时，量它定值。**只参照观感，不引入任何 Geist 依赖**（我们的组件库仍是 Element Plus）。
+- 完整的参照清单（shadcn-admin、vue-pure-admin、Soybean、TDesign、Grafana 等，按风格分类）与拍板结论见 `.workshop/plans/20261024-shell-redesign-board.html`；后台界面的排版规矩以本机 taste-skill（`design-taste-frontend`）`references/app-screens.md` 的实测中位数为准。
+
 ## 更新日志铁律（用户硬性要求）
 
 **任何修复类提交，必须在更新日志页补一条人话版记录（≤3 条），并验收它在日志页首位正常渲染（含「本次更新」徽标）。** 操作口径（数据库驱动，2026-10-23 起）：

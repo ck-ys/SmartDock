@@ -59,6 +59,15 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 - ❌ 拍板页只留在会话可视化目录、不归档仓内
 - ❌ 把内网 IP、密码、真实人名/公司/校名/邮箱写进任何 git 追踪文件（含本文件）
 
+### 对外可见性（2026-11-02 加）
+
+- **`.workshop/` 保持全量 gitignore，不开任何「只推一部分」的例外。** git 里删不掉：`git rm` 只删工作区，`git log -S` 照样翻得出来（本仓实例：`docs/decisions/20261027-style-direction-board.html` 里的内网 IP，内容已清、历史仍在）。真删需 `filter-repo` + force push，代价远大于收益。
+- **想让人知道「接下来做什么 / 明确不做什么」→ 只改 `docs/roadmap.md` 一页**，状态用文字徽章（已完成 / 正在做 / 等开工 / 在讨论 / 明确不做）。不推未完成计划原件。
+- **想让人知道「为什么这么设计」→ 只改 `docs/design-decisions.md`**（按主题组织，不按时间）。
+- **精选决策板归档**：只有结论具备长期参考价值时才脱敏后进 `docs/decisions/`，并在 `docs/decisions/README.md` 索引加一行。脱敏 = 去掉内网地址、本机路径、内部代号（含沿用旧系统的名字）、内部协作语境。
+- **允许出现的**：真实代码标识符（如 `dcs-assistant` 这个 agentId、`dcs_` 前缀表名）——它们是可运行的代码，不是内部代号；批 11B 改名后自然消失。
+- **每批收口必做**：回刷 `docs/roadmap.md`（状态变更 ≤5 行）。
+
 ---
 
 ## 开始任何工作前：必须先读
@@ -304,6 +313,30 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 物料图 | `imagegen` `banner-design` `brand` | README banner/图标类 |
 
 **纪律**：skill 是参考输入不是挡箭牌——结论仍要落到「计算样式断言 + 截图 + 原生读图」三件套；调用了什么 skill、采纳/拒绝了哪条要写进人话日志。
+
+---
+
+## 外部智能体源码参照库（本机只读）
+
+> 位置：`D:\Git\git-github\`。这是本机参照环境，不是构建依赖——目录不存在就跳过，不要写进 CI / 脚本 / pom。
+> 用途：改 AI 助手、智能体引擎、会话 UI 前，先到对应上游真源码看成熟做法，再动手。
+> 三条纪律：① **只读**——不改上游仓、不把上游代码复制进本仓；② **许可证分层**——Apache-2.0 / MIT 可读可借鉴，**AGPL-3.0（cherry-studio）、GPL-3.0（AIClient-2-API）、Open WebUI 自定义许可只读，严禁把代码转录进本仓**（本仓 Apache-2.0）；③ **版本只作对照**——API 以本仓实际依赖为准，尤其 AgentScope：本地源码 HEAD 是 `2.1.0-SNAPSHOT`，本仓 `backend/pom.xml` 钉的是 `agentscope-bom` **2.0.4**。
+
+| 目录 | 是什么 | 版本锚点 | 本仓对应位置（改这里先看那里） |
+|------|--------|---------|------------------------------|
+| `agentscope-java` | 本仓助手实际依赖的 Java 智能体框架 | HEAD `997c60ac`（revision `2.1.0-SNAPSHOT`，最近 tag `v2.0.2`） | 后端：`backend/ruoyi-modules/ruoyi-assistant` 的 `core`（Agent 工厂、中间件、工具、技能、压缩、HITL）与 `ruoyi-assistant-spi`（`BizToolProvider`）。改实现前先读 `agentscope-core` 的 `agent` / `tool` / `permission` / `skill` / `memory` / `session` / `interruption` / `middleware` 子包 |
+| `ZCode` | ZCode 客户端与 CLI 真源码（TS monorepo） | `v3.17.1` / `a60ba6a7` | 前端会话：`frontend/src/components/DcsAssistant`（Composer、TurnBlock、MsgFlow、PlanDock、HitlDock）；后端压缩与会话：`org.dromara.assistant.core` 的 `AssistantCompactionPolicy`、`DcsCompactionMiddleware`。读 `packages/services/src/{zcode-agent,zcode-session,subagents,skills}`、`packages/ui/src/lib/contextCompactionRuntime.ts`、`apps/zcode-cli/docs/design/v2/compact/` |
+| `LibreChat` | 多用户聊天平台，含 Agents SDK 4.2.1 / MCP / HITL / 权限 | `v0.8.9-rc1` / `f4154b649` | 后端 Agent 控制链与 HITL：`ruoyi-assistant` 的 `controller`、`core`（AGUI 流、run 状态、审批闸）。行为规格优先读 `api/server/controllers/agents/__tests__`（askUserQuestion、hitlCheckpoint、resumeMetadata、eventActorPause、memory），实现读 `api/server/controllers/agents`、`routes/agents`、`packages/chat` |
+| `assistant-ui` | 聊天 UI 基元库（React / Vue 绑定） | HEAD `e8ec559d8`，`@assistant-ui/vue` `0.0.7` | 前端 `frontend/src/components/DcsAssistant` 的流式消息、输入框、工具卡片结构。Vue 绑定看 `packages/vue`，状态机看 `packages/core/src/{runtime,store}`，交互范式看 `packages/react/src/primitives`；只参照结构，不引入依赖 |
+| `open-webui` | FastAPI + Svelte 的 AI 平台 | `v0.12.5` / `f7ac7ee10` | 后端会话、压缩、追问、权限中间件：`ruoyi-assistant` 的 `core` 与 `controller`。读 `backend/open_webui/utils/{context_compaction,ask_user,asgi_middleware}.py`、`routers/{groups,chats,folders}.py`、`utils/access_control`；前端 Svelte 会话只作结构参照（`src/lib/components/chat`） |
+| `cherry-studio` | Electron 桌面 AI 客户端（AGPL-3.0） | `2.1.10` / `8e13399fa2` | 工具审批、技能、MCP、提示注入防护：`src/main/ai/{toolApproval,skills,mcp,agentSession}`、`untrustedContent.ts`、`steerReminder.ts`；对应本仓 `AssistantSkillGateMiddleware`、`AssistantPlanGateMiddleware`、MCP 注册与工具开关。**只读，禁转录** |
+| `cline` | 编码智能体（VS Code / CLI / SDK，Apache-2.0） | HEAD `a6507a62a`（本地 git 索引为空，直接读工作区文件） | 工具循环、计划-执行模式、检查点与回滚：`sdk/packages/{core,agents,llms}`、`apps/vscode/src/core`；对应本仓 PlanGate、计划/待办信号、工具审批与运行恢复 |
+| `NextChat` | 轻量 Next.js 聊天前端（MIT） | `v2.16.1` / `1d3dc331` | 多模型提供商适配：`app/client/platforms/*`（deepseek、glm、siliconflow 等）、`app/mcp`、`app/store`；对应本仓模型配置页与 provider 选择逻辑 |
+| `AIClient-2-API` | 订阅账号转 OpenAI 兼容 API 的网关（GPL-3.0） | `v2.13.7` / `d511ba1` | 渠道池、OAuth 凭据、模型路由与降级：`src/providers/*`、`provider-pool-manager.js`；对应本仓模型密钥与渠道路由（选路逻辑）。**只读，禁转录** |
+
+**按任务速查**：改会话界面 → `assistant-ui` + `ZCode/packages/ui` + `open-webui` 聊天组件；改 Agent 主链 / 工具 / 技能 → `agentscope-java` + `LibreChat` 的 agents 控制器；改压缩 / 记忆 → `ZCode` 的 compact 设计文档 + `open-webui` 的 `context_compaction.py`；改审批 / HITL → `LibreChat` 的 hitlCheckpoint + `cherry-studio` 的 toolApproval；改模型 / 渠道 → `NextChat` 的 platforms + `AIClient-2-API` 的 providers。
+
+**不纳入本库**：`glm-coding-grabber` 是油猴抢购脚本，不是智能体源码；`shadcn-admin` / `vue-pure-admin` 是 UI 观感参照（已登记在 `frontend/AGENTS.md`）；其余目录（SpringBoot-Labs、mall-cloud-alibaba、yudao-cloud、newbee-mall-cloud、dddsample-core、pg_jieba、rocketmq-dashboard 等）与智能体无关。
 
 ---
 
