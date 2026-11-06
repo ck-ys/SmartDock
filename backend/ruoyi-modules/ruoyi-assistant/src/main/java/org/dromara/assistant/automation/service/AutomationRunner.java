@@ -156,10 +156,10 @@ public class AutomationRunner {
         // 此前自动化只查租户开关，用户被暂停/预算用完/准入不过都照常扣费（14 条缺陷里唯一的钱相关 P1）。
         // 被后置闸拒绝时退回合（与 AssistantRuntimeContextResolver 的补偿口径一致）；
         // 模型调用本身失败不退——那一次确实跑过了（同对话侧"跑完即算"）。
+        org.dromara.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits = null;
         try {
             AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
-            org.dromara.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits =
-                quotaService.billingAwareLimits(tenantId, automation.getUserId());
+            limits = quotaService.billingAwareLimits(tenantId, automation.getUserId());
             if (!limits.creditsMode() || limits.roundLimit() <= 0) {
                 dailyQuota.tryTurn(tenantId, automation.getUserId(), limits.roundLimit());
             }
@@ -175,7 +175,9 @@ public class AutomationRunner {
                 throw e;
             }
         } catch (RuntimeException e) {
-            fail(tenantId, runId, null, friendly(e), true);
+            // 三审 P2：被暂停/配额用完/准入不过都不是自动化本身坏了——不记连续失败，
+            // 否则每天排一次即累计一次，第 3 天整条自动化被自动停用，用户恢复配额后还得手动重开
+            fail(tenantId, runId, null, friendly(e), false);
             return;
         }
 
@@ -190,16 +192,22 @@ public class AutomationRunner {
             safeRegisterRun(tenantId, automation.getUserId(), threadId, aguiRun);
         } catch (Exception e) {
             log.warn("[Automation] 结果会话创建失败 run={}: {}", runId, e.toString());
+            // 三审 P2：回合已在上方扣了，但这次连模型都没跑到——按「被后置闸拒绝」同口径退回合
+            if (limits != null && !limits.creditsMode()) {
+                dailyQuota.refundTurn(tenantId, automation.getUserId());
+            }
             fail(tenantId, runId, null, "无法打开结果会话：" + friendly(e), true);
             return;
         }
 
         // 旧板题 3 乙：只读外部服务白名单（默认空=一个不挂；可写服务在挂载面被二次过滤）
         java.util.Set<String> mcpSel = parseMcp(automation.getMcpServers());
+        // 三审 P2：真正挂上的外部工具（空=这轮没有任何外部因素，失败照常计数）
+        java.util.Set<String> mountedMcp = new java.util.HashSet<>();
         ReActAgent agent = null;
         String answer;
         try {
-            agent = agentFactory.createReadOnly(user, threadId, mcpSel);
+            agent = agentFactory.createReadOnly(user, threadId, mcpSel, mountedMcp);
             // sessionId 必须显式给：AGUI 链路由框架按 threadId 注入，这里直调不会自动带；
             // 留空会让同一用户的每次运行共用同一个会话槽，历史互相污染。
             RuntimeContext ctx = RuntimeContext.builder()
@@ -221,10 +229,12 @@ public class AutomationRunner {
                 }
             }
             String reason = friendly(t);
-            // 三条硬规矩③：挂了外部工具的自动化，运行失败不计入「连续 3 次自动停用」——
+            // 三条硬规矩③：真挂上外部工具的自动化，运行失败不计入「连续 3 次自动停用」——
             // 外部服务抖动/离线不是用户的错，不能把整条自动化停掉（宁可多跑几次失败）。
-            // 反过来也成立：没勾外部工具的失败照常计数，与旧行为一致。
-            boolean countFailure = mcpSel.isEmpty();
+            // 三审 P2（2026-11-07）：判据从「勾选名单」改成「实际挂上没」——服务已删除/停用/
+            // 被闸关时一个工具都挂不上，这时的失败没有任何外部因素可归因，必须照常计数，
+            // 否则一条残留勾选就能让坏掉的自动化永远停不下来。
+            boolean countFailure = mountedMcp.isEmpty();
             try {
                 conversationService.appendAssistantMessage(tenantId, conversationId,
                     automation.getUserId(), "（这次自动化没有跑完）" + reason, null, "error");

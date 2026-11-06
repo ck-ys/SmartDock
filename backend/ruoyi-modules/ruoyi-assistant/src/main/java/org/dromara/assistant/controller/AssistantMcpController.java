@@ -73,6 +73,9 @@ public class AssistantMcpController extends BaseController {
                 new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<DcsMcpCallLog>()
                     .select("server_name", "tool_name")
                     .eq("tenant_id", tenantId)
+                    // 三审 P2：javadoc 写的「最近 90 天」此前没落进 SQL——账本 append-only，
+                    // 不设窗口会让已删服务的历史工具名永久回显，且每次打开页都全量 group by
+                    .ge("create_time", java.time.LocalDateTime.now().minusDays(90))
                     .notIn("action", java.util.List.of("MOUNT_OK", "MOUNT_ERROR"))
                     .isNotNull("tool_name")
                     .groupBy("server_name", "tool_name"));
@@ -130,7 +133,10 @@ public class AssistantMcpController extends BaseController {
     @SaCheckPermission("dcs:assistant:config")
     @GetMapping("/list")
     public R<List<McpServerRow>> list() {
-        List<McpServerRow> rows = mcpPilotService.listAll().stream().map(s -> new McpServerRow(
+        // 三审 P2：平台级配置的取数口径与 member-list 统一——save() 恒写 000000 租户，
+        // 超管切到别家租户后若不 ignore，管理清单会空而成员清单照旧有行，自相矛盾
+        List<McpServerRow> rows = org.dromara.common.tenant.helper.TenantHelper
+            .ignore(mcpPilotService::listAll).stream().map(s -> new McpServerRow(
             s.getId(), s.getServerName(), s.getDisplayName(), s.getTransportType(),
             s.getCommand(), s.getArgs(), s.getUrl(),
             // G4-#1：落库是 ENC_ 密文——先解密再取键名（service 内同款显式解密，与挂载链路一致）

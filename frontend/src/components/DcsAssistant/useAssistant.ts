@@ -222,6 +222,8 @@ export interface AssistantTurn {
   retryDepth?: number;
   /** 已自动重试过（防同一轮重复调度） */
   autoRetried?: boolean;
+  /** 本轮 runId（排错/续看用；自动重试会换新 runId，靠 resumeRound 防重复落用户消息） */
+  runId?: string;
   costYuan: number | null;
   tokens: number | null;
   stamp: string;
@@ -431,6 +433,24 @@ function emptyTurn(question: string): AssistantTurn {
     askUsers: [],
     askReceipts: []
   };
+}
+
+/**
+ * 三审 P1（2026-11-07）：自动重试前把**同一个回合**清回起点——保留 id/问题/重试标记，
+ * 其余流内容全清。此前重试直接 runTurn 新建回合，导致界面多一条同问题气泡、
+ * history 与后端各多一条 user 消息（本批 E-3 刚堵住的重复落库换了个入口回来）。
+ * 重试换**新 runId**（旧 run 已登记，复用必撞后端 409）；是否跳过 user 落库由调用方
+ * 按「上一发有没有真到服务端」决定，经 forwardedProps.resumeRound 上行（后端 E-3 同款口径）。
+ */
+function resetTurnForRetry(turn: AssistantTurn) {
+  const keepId = turn.id;
+  const keepPayload = turn.retryPayload;
+  Object.assign(turn, emptyTurn(turn.question), {
+    id: keepId,
+    retryPayload: keepPayload,
+    retryDepth: 1,
+    autoRetried: true
+  });
 }
 
 /**
@@ -1109,6 +1129,12 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           const payload = turn.retryPayload;
           turn.autoRetried = true;
           turn.errorMsg = `${turn.errorMsg || '连接断开'}（已自动重试一次）`;
+          // 三审 P1：非数字 code = 服务端真发过 RUN_ERROR 帧（这一轮已登记、user 消息已落库），
+          // 重试带 resumeRound 让后端跳过二次落库；数字 code = HTTP 前置拒绝（429 等，多发生在落库前），
+          // 仍按普通轮落一次消息。
+          const codeStr = String(turn.errorCode || '');
+          const serverAccepted = codeStr !== '' && !/^\d+$/.test(codeStr);
+          const retryFwd = serverAccepted ? { ...payload.fwd, resumeRound: true } : payload.fwd;
           let waits = 0;
           const go = () => {
             if (state.sending) {
@@ -1117,7 +1143,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
               }
               return;
             }
-            void runTurn(payload.q, payload.stamp, payload.fwd, 1);
+            // 复用原回合重试（同一气泡）——新建回合会让界面/history 各多一条同问题的 user 消息
+            void runTurn(payload.q, payload.stamp, retryFwd, 1, turn);
           };
           setTimeout(go, 800);
         }
@@ -1388,38 +1415,50 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   }
 
   /** 发起一轮（runTurn；history 镜像同步 user 消息）。fwd=请求级标记（思考档位等，AGUI forwardedProps 通道） */
-  async function runTurn(q: string, stamp = '', fwd: Record<string, unknown> = {}, retryDepth = 0) {
+  async function runTurn(q: string, stamp = '', fwd: Record<string, unknown> = {}, retryDepth = 0, reuse?: AssistantTurn) {
     // R1：禁用统一闸（队列续发/立即发送/继续说完/须知门均汇入此处，见 assertUsable）
     if (!assertUsable()) {
       return;
     }
-    const turn = reactive<AssistantTurn>(emptyTurn(q));
-    turn.retryPayload = { q, stamp, fwd };
-    turn.retryDepth = retryDepth;
+    // 三审 P1：自动重试复用原回合（不新增气泡/不重推 history/不换 runId）
+    const turn = reuse ?? reactive<AssistantTurn>(emptyTurn(q));
+    if (reuse) {
+      resetTurnForRetry(reuse);
+    } else {
+      turn.retryPayload = { q, stamp, fwd };
+      turn.retryDepth = retryDepth;
+    }
     // 计划决策由宿主点击时显式写入 planDecisionNext（不信自然语言文案）；
     // 这里只取一次并随请求上行，不带=计划卡仍挂着，后端继续硬拒写操作。
     const planDecision = takePlanDecision();
     turn.stamp = stamp;
-    // 二审 P1：尾部悬挂的压缩/熔断标记由新回合接管（否则横幅永远漂在最新回答下面）
-    if (state.lastCompaction) {
-      turn.compactedBefore = state.lastCompaction;
-      state.lastCompaction = null;
+    if (!reuse) {
+      // 二审 P1：尾部悬挂的压缩/熔断标记由新回合接管（否则横幅永远漂在最新回答下面）
+      // 重试轮已接管过，不再二次消费（否则横幅会跟着重试再挂一遍）
+      if (state.lastCompaction) {
+        turn.compactedBefore = state.lastCompaction;
+        state.lastCompaction = null;
+      }
+      if (state.lastCompactionBlocked) {
+        turn.compactionBlockedBefore = state.lastCompactionBlocked;
+        state.lastCompactionBlocked = null;
+      }
+      state.turns.push(turn);
     }
-    if (state.lastCompactionBlocked) {
-      turn.compactionBlockedBefore = state.lastCompactionBlocked;
-      state.lastCompactionBlocked = null;
-    }
-    state.turns.push(turn);
     // glm53 P2-4：新回合开始=此前回合的 pending 卡已不可能再被 resume（服务端只认最新轮
     // must-cover 全等）——入口即扫，防「弃卡改问后新回合又挂 interrupt」双待确认卡同屏
     sweepStaleHitlCards(turn);
     state.sending = true;
     // 第一条发出去即不再是草稿态：后端 ensureConversation 会落库，草稿作用域切到 threadId
-    state.draftMode = false;
+    if (!reuse) {
+      state.draftMode = false;
+    }
     // 题5：新回合发起即断开续看流（旧 run 仍在服务端跑，其结果下次重开可见——与轮询兜底同口径）
     attachCtl?.abort();
-    state.newbieUse += 1;
-    history.push({ id: 'u' + seq, role: 'user', content: q });
+    if (!reuse) {
+      state.newbieUse += 1;
+      history.push({ id: 'u' + seq, role: 'user', content: q });
+    }
     if (persistKey) {
       try {
         localStorage.setItem(persistKey, state.threadId);
@@ -1429,6 +1468,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
 
     const input: AguiRunInput = {
+      // 重试轮换新 runId（旧 run 已登记，复用必 409）；重复落库由 resumeRound 挡
       runId: uuid(),
       threadId: state.threadId,
       messages: [...history],
@@ -1447,6 +1487,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         ...fwd
       }
     };
+    turn.runId = input.runId;
     const myGen = convGen;
     const myHandle = client.startTurn(input, handlers(turn));
     handle = myHandle;

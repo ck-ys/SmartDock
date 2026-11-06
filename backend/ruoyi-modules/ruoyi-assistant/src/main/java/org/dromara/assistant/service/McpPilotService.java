@@ -468,6 +468,15 @@ public class McpPilotService {
     }
 
     /**
+     * 无人值守（自动化）挂载判据（三审 P1，纯函数直测）：只认显式 {@code readOnlyHint=TRUE}。
+     * 未声明 / 声明可写一律不挂——交互会话里写类还能弹确认卡，无人值守没人点确认。
+     * 注解是第三方服务自声明，没声明就按写类处理，宁可不给能力。
+     */
+    public static boolean mountInAutomation(Boolean readOnlyHint) {
+        return Boolean.TRUE.equals(readOnlyHint);
+    }
+
+    /**
      * 把平台级启用的 MCP 服务挂进助手工具面（AgentFactory 在平台/业务工具之后调用）。
      * 单服务失败=审计 MOUNT_ERROR + warn 后继续——服务下线绝不连坐助手会话。
      *
@@ -582,6 +591,11 @@ public class McpPilotService {
                 List<io.modelcontextprotocol.spec.McpSchema.Tool> tools =
                     raw.listTools().block(Duration.ofMillis(remainAfterInit));
                 java.util.Set<String> writeTools = new java.util.HashSet<>();
+                // 三审 P1：自动化（allowedServers != null）是无人值守，只挂**显式声明只读**的工具。
+                // 注解是第三方服务自声明，没声明就当写类——宁可不给能力，也不让半夜自己写数据。
+                // 交互会话保持旧口径（无注解且服务只读 → 放行），否则现网工具会大面积消失。
+                java.util.Set<String> explicitReadOnly = new java.util.HashSet<>();
+                boolean automationMode = allowedServers != null;
                 boolean serverReadOnly = !"0".equals(row.getReadOnly());
                 for (io.modelcontextprotocol.spec.McpSchema.Tool t : tools == null ? List.<io.modelcontextprotocol.spec.McpSchema.Tool>of() : tools) {
                     if (before.contains(t.name())) {
@@ -590,6 +604,8 @@ public class McpPilotService {
                     Boolean hint = t.annotations() == null ? null : t.annotations().readOnlyHint();
                     if (isWriteTool(hint, serverReadOnly)) {
                         writeTools.add(t.name());
+                    } else if (mountInAutomation(hint)) {
+                        explicitReadOnly.add(t.name());
                     }
                 }
                 GatedMcpClient gated = new GatedMcpClient(raw, tenantId, userId, row.getServerName(),
@@ -601,6 +617,11 @@ public class McpPilotService {
                 java.util.Set<String> mountedNames = new java.util.LinkedHashSet<>();
                 for (String name : toolkit.getToolNames()) {
                     if (!before.contains(name)) {
+                        // 无人值守模式：没显式 readOnlyHint 的工具不进白名单（不进 added），
+                        // AgentFactory 的只读裁剪会把它们从 toolkit 摘掉；连规则都不必加
+                        if (automationMode && !explicitReadOnly.contains(name)) {
+                            continue;
+                        }
                         // G4-#3：MCP 工具不再无条件 ALLOW——写类（注解 FALSE 或写类服务无注解）
                         // 进 ASK 确认卡，堵「放开 read_only 后写类 MCP 绕确认闸」的 G1 同款事故面
                         boolean write = writeTools.contains(name);

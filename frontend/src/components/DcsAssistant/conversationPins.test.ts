@@ -33,12 +33,11 @@ describe('conversationPins', () => {
   });
 
   // E-10（2026-11-06）：全局键会把甲的置顶带给乙（列表里挂着别人会话 id）
-  it('initConvPins 切到按用户键；旧全局键只迁一次且迁完即删', () => {
+  it('initConvPins 切到按用户键；旧全局键只删不迁（归属无法判定，不送给先登录者）', () => {
     store.set('dcs:assistant:pins', JSON.stringify(['legacy']));
     store.delete('dcs:assistant:pins:1');
     initConvPins(1);
-    expect(loadPins()).toEqual(['legacy']);
-    expect(store.get('dcs:assistant:pins:1')).toBe('["legacy"]');
+    expect(loadPins()).toEqual([]);
     expect(store.has('dcs:assistant:pins')).toBe(false);
   });
 

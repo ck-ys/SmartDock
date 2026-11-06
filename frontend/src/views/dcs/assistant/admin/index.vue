@@ -89,7 +89,7 @@
                   <b>{{ it.title }}</b>
                   <p>{{ it.desc }}</p>
                 </div>
-                <el-button link type="primary" size="small" @click="jumpTo(it.tab)">{{ it.action }} →</el-button>
+                <el-button link type="primary" size="small" @click="it.route ? router.push(it.route) : jumpTo(it.tab)">{{ it.action }} →</el-button>
               </li>
               <li v-if="!attentionItems.length" class="att-ok">
                 <span class="att-dot ok"></span>
@@ -2881,7 +2881,7 @@ function copyOneSegment() {
 
 /* ===== 总览：需要处理（只列会影响用户的事，点一下直达对应段） ===== */
 const attentionItems = computed(() => {
-  const out: Array<{ level: string; title: string; desc: string; action: string; tab: string }> = [];
+  const out: Array<{ level: string; title: string; desc: string; action: string; tab: string; route?: string }> = [];
   // F13（2026-10-31 复审回修）：建议全部指向能力/规则/审计段，这几段都只对配置权限开放——
   // 无权限者点了「去开通/去收紧/去看真实调用」只能白跑一趟，整组不显示
   if (canConfig.value) {
@@ -2912,7 +2912,15 @@ const attentionItems = computed(() => {
     }
     const offMcp = mcpRows.value.filter((s) => s.enabled !== '1');
     if (offMcp.length) {
-      out.push({ level: 'info', title: `${offMcp.length} 个外部服务已停用`, desc: '对应的能力当前不会出现在会话里。', action: '去看看', tab: 'caps' });
+      // 三审 P2：MCP 已搬去 /agent/settings?s=mcp——能力段只剩工具闸，跳 caps 等于给了个改不了的入口
+      out.push({
+        level: 'info',
+        title: `${offMcp.length} 个外部服务已停用`,
+        desc: '对应的能力当前不会出现在会话里。',
+        action: '去看看',
+        tab: 'caps',
+        route: '/agent/settings?s=mcp'
+      });
     }
   }
   return out;
@@ -3507,22 +3515,6 @@ async function loadMcpCallLog() {
 function reloadMcpLog() {
   mcpLogPage.value = 1;
   void loadMcpCallLog();
-}
-/** 外部服务行里的「审计」：带着服务名跳到运营段（离开编辑先过脏检查） */
-async function openMcpAudit(serverName: string) {
-  // 走 jumpTo 统一入口：脏检查 + 运营段懒加载。只设 tab 会绕过 onTabChange，
-  // 反馈统计/公告/运行记录永远停在「加载中」或假空态（三审 P1）
-  const prevFilter = mcpLogFilter.value;
-  const prevPage = mcpLogPage.value;
-  mcpLogFilter.value = serverName;
-  mcpLogPage.value = 1;
-  await jumpTo('ops');
-  // 跳转被脏检查拦下（用户选「继续编辑」留下）时恢复原值：别让残留的服务名在之后
-  // 手动进运营时悄悄过滤调用记录（缺失审计 L1，2026-11-01）
-  if (tab.value !== 'ops') {
-    mcpLogFilter.value = prevFilter;
-    mcpLogPage.value = prevPage;
-  }
 }
 /** 失败行标红：真实调用里最该看的就是失败 */
 function auditRowClass({ row }: { row: AssistantMcpCallLog }): string {
@@ -6865,10 +6857,6 @@ onMounted(() => {
   :global(.q-dialog .field-hint) {
     margin-left: 0;
     padding-left: 0;
-  }
-  :global(.mcp-form-drawer.el-drawer) {
-    width: 100vw !important;
-    max-width: 100vw;
   }
 }
 

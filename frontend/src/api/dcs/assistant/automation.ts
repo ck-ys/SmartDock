@@ -54,6 +54,8 @@ export interface AutomationPayload {
   scheduleType: 'DAILY' | 'WEEKLY';
   scheduleTime: string;
   weekdays?: string;
+  /** 只读外部服务白名单（逗号分隔，后端 AutomationBo.mcpServers 同名字段） */
+  mcpServers?: string;
 }
 
 const BASE = '/dcs/assistant/automations';

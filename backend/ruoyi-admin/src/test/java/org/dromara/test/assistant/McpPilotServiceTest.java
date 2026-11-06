@@ -149,4 +149,16 @@ class McpPilotServiceTest {
         assertEquals("boom", overflow.getErrorMsg());
         assertNull(overflow.getDurationMs(), "超 int 的耗时不该炸行，也不该截断成错值");
     }
+
+    /**
+     * 三审 P1（2026-11-07）：自动化是无人值守，只挂显式声明只读的工具。
+     * 没注解≠只读——注解是第三方服务自声明，不声明就按写类处理。
+     */
+    @Test
+    void automationMountsOnlyExplicitlyReadOnlyTools() {
+        assertTrue(org.dromara.assistant.service.McpPilotService.mountInAutomation(Boolean.TRUE));
+        assertFalse(org.dromara.assistant.service.McpPilotService.mountInAutomation(null),
+            "无 readOnlyHint 注解的工具不得进自动化白名单");
+        assertFalse(org.dromara.assistant.service.McpPilotService.mountInAutomation(Boolean.FALSE));
+    }
 }

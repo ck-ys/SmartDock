@@ -1,7 +1,6 @@
 package org.dromara.assistant.core;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 反问卡「自动继续」会话级开关暂存（C 七行·设置页「常规」，2026-11-06）。
@@ -15,9 +14,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class AssistantAskPrefHolder {
 
-    /** 显式关闭的线程集合（默认开，只有用户主动关才进集合）。 */
-    private static final Map<String, Boolean> AUTO = new ConcurrentHashMap<>();
+    /** 显式关闭的线程集合（默认开，只有用户主动关才进集合）。
+     *  三审 P2：原实现超 CAP 就 clear()——一次清空把所有人「关闭自动继续」的显式设置
+     *  静默恢复成默认开。改 LRU 淘汰：只挤掉最久没写过的行，不动近期活跃会话。 */
     private static final int CAP = 50_000;
+    private static final Map<String, Boolean> AUTO = java.util.Collections.synchronizedMap(
+        new java.util.LinkedHashMap<>(1024, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                return size() > CAP;
+            }
+        });
 
     private AssistantAskPrefHolder() {
     }
@@ -26,9 +33,6 @@ public final class AssistantAskPrefHolder {
     public static void set(String threadId, Object raw) {
         if (threadId == null || threadId.isBlank() || raw == null) {
             return;
-        }
-        if (AUTO.size() > CAP) {
-            AUTO.clear();
         }
         AUTO.put(threadId, !isExplicitOff(raw));
     }

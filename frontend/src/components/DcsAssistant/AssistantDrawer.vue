@@ -262,7 +262,8 @@
                会话页有自己的停靠区：路由切过去时抽屉若还开着会出现两张卡，
                removedIds 各持一份会发出用户没同意的全量催办——路由互斥只留一份 -->
           <!-- 题10 乙：反问卡贴输入框上方（同工作台） -->
-          <ask-user-card v-if="askCard" :card="askCard" :thread-id="state.threadId" @done="onAskUserDone" />
+          <!-- 三审 P2：key 绑卡 id——连出两张卡时不复用实例（倒计时/选项串台） -->
+          <ask-user-card v-if="askCard" :key="askCard.id" :card="askCard" :thread-id="state.threadId" @done="onAskUserDone" />
 
           <hitl-dock v-if="modelValue && !isAssistantSessionRoute" :ask="pendingAsk" :full="full" @resolve="resolveHitl" @revise="onDockRevise" />
 

@@ -25,7 +25,12 @@ export function loadPins(): string[] {
 
 export const convPins = ref<string[]>(loadPins());
 
-/** 按当前登录用户切键并重读；旧全局键只迁给第一个调用者，迁完即删（否则下个账号还能读到）。 */
+/**
+ * 按当前登录用户切键并重读。
+ * 旧全局键**只删不迁**：它没有归属信息，升级后先登录的人不一定是当初置顶的人——
+ * 迁给先登录者等于把甲的会话 id 挂到乙名下，与本批「换账号不串」正好相反。
+ * 代价是升级后旧置顶失联一次（低频动作，重按一下即可）。
+ */
 export function initConvPins(userId: string | number) {
   const next = `dcs:assistant:pins:${userId || 'anon'}`;
   if (next === PIN_KEY) {
@@ -33,11 +38,7 @@ export function initConvPins(userId: string | number) {
   }
   PIN_KEY = next;
   try {
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (legacy && localStorage.getItem(PIN_KEY) == null) {
-      localStorage.setItem(PIN_KEY, legacy);
-    }
-    if (legacy) {
+    if (localStorage.getItem(LEGACY_KEY) != null) {
       localStorage.removeItem(LEGACY_KEY);
     }
   } catch {

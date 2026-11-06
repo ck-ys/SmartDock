@@ -71,6 +71,9 @@
                 <span class="mcp-pick-d">{{ m.tools.length ? m.tools.join('、') : '还没调用过，工具名用过才出现' }}</span>
               </label>
             </div>
+            <p v-else-if="mcpFailed" class="field-hint">
+              外部服务清单没加载出来（网络或权限问题），<button class="mcp-retry" type="button" @click="loadMcpOptions">重试</button>
+            </p>
             <p v-else class="field-hint">平台还没有开放只读外部服务。</p>
           </div>
 
@@ -245,6 +248,8 @@ const form = reactive({
   mcpServers: [] as string[]
 });
 const mcpOptions = ref<AssistantMcpMemberRow[]>([]);
+/** 三审 P2：清单加载失败不能伪装成「平台没有服务」——分开记，文案各说各的 */
+const mcpFailed = ref(false);
 function toggleMcp(name: string) {
   const i = form.mcpServers.indexOf(name);
   if (i >= 0) form.mcpServers.splice(i, 1);
@@ -260,6 +265,17 @@ const saving = ref(false);
 const running = ref(false);
 
 const perms = computed(() => userStore.permissions);
+/** 三审 P2：运行侧对「管理员限定」服务会直接跳过（McpPilotService 按角色闸），
+ *  成员勾了也永远挂不上——列表里直接不给他看，别让用户存一条永远不生效的勾选。
+ *  判定与设置页 isAdminLevel 同口径（权限串优先，角色名兜底），避免只认 superadmin 误伤租户管理员 */
+const isAdminUser = computed(
+  () =>
+    perms.value.includes('*:*:*') ||
+    perms.value.includes('dcs:assistant:config') ||
+    perms.value.includes('dcs:assistant:audit:query') ||
+    userStore.roles.includes('superadmin') ||
+    userStore.roles.includes('admin')
+);
 const allowed = computed(
   () => perms.value.includes('*:*:*') || (perms.value.includes('agentws:workspace:use') && perms.value.includes('dcs:assistant:automation'))
 );
@@ -337,13 +353,18 @@ function durationText(ms: number): string {
   return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
 }
 
-/** 只读外部服务选项：只留只读、未停用的行——可写服务永不进自动化 */
+/** 只读外部服务选项：只留只读、未停用的行——可写服务永不进自动化；
+ *  管理员限定行对非管理员不展示（运行侧会跳过，勾了也是空勾） */
 async function loadMcpOptions() {
   try {
     const res = (await listAssistantMcpMembers()) as unknown as { data?: AssistantMcpMemberRow[] };
-    mcpOptions.value = (res?.data ?? []).filter((m) => m.readOnly === '1' && m.status !== 'off');
+    mcpOptions.value = (res?.data ?? []).filter(
+      (m) => m.readOnly === '1' && m.status !== 'off' && (isAdminUser.value || m.whoCanUse !== '管理员')
+    );
+    mcpFailed.value = false;
   } catch {
     mcpOptions.value = [];
+    mcpFailed.value = true;
   }
 }
 

@@ -240,7 +240,8 @@
       <plan-tip v-if="planTipShown && activePlan" :plan="activePlan" full @open="expandPlanCard" />
 
       <!-- 题10 乙：反问卡贴输入框上方（不随消息流滚走；一次一题、可空答） -->
-      <ask-user-card v-if="askCard" :card="askCard" :thread-id="state.threadId" @done="onAskUserDone" />
+      <!-- 三审 P2：key 绑卡 id——同一会话可能连出两张卡，复用实例会带上一张的倒计时/选项 -->
+      <ask-user-card v-if="askCard" :key="askCard.id" :card="askCard" :thread-id="state.threadId" @done="onAskUserDone" />
 
       <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留） -->
       <hitl-dock :ask="pendingAsk" full @resolve="resolveHitl" @revise="onDockRevise" />

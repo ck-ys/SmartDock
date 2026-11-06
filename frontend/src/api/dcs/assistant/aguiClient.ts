@@ -182,16 +182,20 @@ export function createAguiClient(options: AguiClientOptions = {}) {
   /** 停滞哨兵：看门狗超窗以 resolve（非 reject）出循环——停滞≠断线，裁决权在 onStall */
   const STALLED = { stalled: true } as const;
 
-  // E-7（2026-11-06）：EOF 无终态帧 = 半截流，返回 'retry' 交上层退避重连（旧写法一律 'error'，永不重试）
+  // E-7（2026-11-06）：EOF 无终态帧——按「有没有收到过帧」分两种：
+  //   一帧没收到 = 大概率没登记上，'retry' 重发是安全的；
+  //   收到过帧后断流 = 服务端已受理（run 行已落），重发同 runId 必撞后端 409 幂等门，
+  //   重试通道结构性无效 → 'broken'，由上层按断线收口，不再空转 5 次退避。
   async function readStream(
     response: Response,
     h: AguiHandlers,
     signal: AbortSignal
-  ): Promise<'finished' | 'error' | 'stopped' | 'retry'> {
+  ): Promise<'finished' | 'error' | 'stopped' | 'retry' | 'broken'> {
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let terminal: 'finished' | 'error' | null = null;
+    let sawFrame = false;
     // 包一层捕获终态：dispatch 到 RUN_FINISHED/ERROR 时置位
     const gate: AguiHandlers = {
       ...h,
@@ -296,6 +300,7 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       for (const f of frames) {
         const ev = parseEventFrame(f);
         if (ev) {
+          sawFrame = true;
           dispatch(ev, gate);
           if (terminal) {
             try {
@@ -329,15 +334,15 @@ export function createAguiClient(options: AguiClientOptions = {}) {
         /* 非完整 JSON 忽略 */
       }
     }
-    // E-7：EOF 但没收到 RUN_FINISHED/RUN_ERROR——「真·半截流」按断线语义交上层退避重试
-    //（旧写法 return 'error' 既不重试也不回调，长回答中途断线时用户只看到字停住）
+    // EOF 但没收到 RUN_FINISHED/RUN_ERROR：收到过帧=服务端已受理，重发必 409（'broken'）；
+    // 一帧都没有=可能压根没接上，'retry' 重发是安全的
     if (!terminal) {
-      return 'retry';
+      return sawFrame ? 'broken' : 'retry';
     }
     return terminal;
   }
 
-  async function requestOnce(input: AguiRunInput, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error' | 'stopped' | 'retry' | 'retry-stall'> {
+  async function requestOnce(input: AguiRunInput, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error' | 'stopped' | 'retry' | 'retry-stall' | 'broken'> {
     let response: Response;
     try {
       response = await fetch(url, {
@@ -386,7 +391,8 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       }
       // goal 加固 G1：看门狗超时且无 onStall 裁决（非用户停止）带 stall 标记重试——
       // onRetry 话术区分「连接停滞」；有 onStall 的生产路径停滞已在 readStream 内收口，不到这
-      return e instanceof DOMException && e.message === 'stalled' ? 'retry-stall' : 'retry';
+      // 其余读流异常同理：HTTP 响应已到 = 服务端可能已登记，重发同 runId 必 409 → 按 'broken' 收口
+      return e instanceof DOMException && e.message === 'stalled' ? 'retry-stall' : 'broken';
     }
   }
 
@@ -410,6 +416,12 @@ export function createAguiClient(options: AguiClientOptions = {}) {
           return;
         }
         const r = await requestOnce(input, handlers, controller.signal);
+        if (r === 'broken') {
+          // 半截流：run 已登记，重发同 runId 只会拿 409——直接按断线收口，交上层提示/轮询兜底
+          options.onDisconnected?.(attempt);
+          settle!('disconnected');
+          return;
+        }
         if (r !== 'retry' && r !== 'retry-stall') {
           settle!(r === 'finished' && stopped ? 'stopped' : r);
           return;
@@ -500,8 +512,8 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       // 「本轮已结束」人话错标成本回合失败（污染在途占位），attach 侧剥掉该回调
       try {
         const r = await readStream(response, { ...handlers, onRunError: undefined }, controller.signal);
-        // attach 不做重连（调用方轮询兜底）：EOF 无终态一律按 'error' 收口，退回既有语义
-        settle!(r === 'retry' ? 'error' : r);
+        // attach 不做重连（调用方轮询兜底）：EOF 无终态（含半截流 'broken'）一律按 'error' 收口
+        settle!(r === 'retry' || r === 'broken' ? 'error' : r);
       } catch {
         settle!(controller.signal.aborted ? 'stopped' : 'error');
       }

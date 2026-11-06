@@ -123,6 +123,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { checkPermi } from '@/utils/permission';
+import { useUserStore } from '@/store/modules/user';
 import {
   deleteAssistantMcpServer,
   getAssistantToolCatalog,
@@ -135,7 +136,12 @@ import {
   type AssistantToolRow
 } from '@/api/dcs/assistant';
 
-const canManage = computed(() => checkPermi(['dcs:assistant:config']));
+const userStore = useUserStore();
+/** 三审 P2：后端 save/toggle/delete 都过 requireSuperAdmin——只有 config 权限的自定义管理员
+ *  能看到按钮但点了必报「仅超管可管理」。前端与后端同口径：必须真超管才给管理面。 */
+const canManage = computed(
+  () => checkPermi(['dcs:assistant:config']) && userStore.roles.includes('superadmin')
+);
 
 const rows = ref<AssistantMcpServerRow[]>([]);
 const members = ref<AssistantMcpMemberRow[]>([]);

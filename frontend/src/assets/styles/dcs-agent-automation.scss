@@ -512,6 +512,16 @@ html.dark .auto-ws {
   font-size: 12px;
   color: var(--faint);
 }
+/* 三审 P2：清单加载失败时的就地重试（与正文同字号，不做成按钮块） */
+.mcp-retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--brand);
+  cursor: pointer;
+  text-decoration: underline;
+}
 /* 只读外部服务勾选（题3 乙）：一行一项，勾中与未勾只差描边/底色，不用彩色 */
 .mcp-picks {
   display: flex;

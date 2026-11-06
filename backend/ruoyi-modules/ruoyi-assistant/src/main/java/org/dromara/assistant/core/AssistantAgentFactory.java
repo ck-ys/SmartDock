@@ -126,11 +126,20 @@ public class AssistantAgentFactory {
      * 名单里的服务由 McpPilotService 二次过滤（只读才挂），挂进来的工具并入只读白名单。</p>
      */
     public ReActAgent createReadOnly(LoginUser user, String aguiThreadId) {
-        return create(user, aguiThreadId, true, null);
+        return create(user, aguiThreadId, true, null, null);
     }
 
     public ReActAgent createReadOnly(LoginUser user, String aguiThreadId, java.util.Set<String> mcpServers) {
-        return create(user, aguiThreadId, true, mcpServers);
+        return create(user, aguiThreadId, true, mcpServers, null);
+    }
+
+    /**
+     * 自动化专用：额外回传**实际挂上**的只读外部工具名（三审 P2，2026-11-07）——
+     * 失败计数要按「真的挂上了没」判，而不是按用户勾选名单猜（勾了但服务下线/闸关＝零外部因素）。
+     */
+    public ReActAgent createReadOnly(LoginUser user, String aguiThreadId, java.util.Set<String> mcpServers,
+                                     java.util.Set<String> mountedOut) {
+        return create(user, aguiThreadId, true, mcpServers, mountedOut);
     }
 
     /**
@@ -139,11 +148,11 @@ public class AssistantAgentFactory {
      * SessionKey 含 thread——同 thread 复用缓存 agent 时工具实例与 thread 绑定不变）。
      */
     public ReActAgent create(LoginUser user, String aguiThreadId) {
-        return create(user, aguiThreadId, false, null);
+        return create(user, aguiThreadId, false, null, null);
     }
 
     private ReActAgent create(LoginUser user, String aguiThreadId, boolean readOnly,
-                              java.util.Set<String> readOnlyMcpServers) {
+                              java.util.Set<String> readOnlyMcpServers, java.util.Set<String> mountedOut) {
         // 批7 Q5/Q12-④: 优先级链第一段=用户会话选择(自选开关开时), 失效/关闸回退默认链
         DcsAiConfig cfg = modelFactory.resolveConfigWithUserChoice(user.getTenantId(), aguiThreadId);
         // 批7: 回写「本次建 agent 的选择基准」(picked 原值含回退), resolver 据此判失效
@@ -257,6 +266,10 @@ public class AssistantAgentFactory {
             readOnlyMcpTools = mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
                 aguiThreadId, pb, tenantCfg.toolGate(), identity.getRoleLevel(), readOnlyMcpServers);
             registered.addAll(readOnlyMcpTools);
+        }
+        // 三审 P2：回传实际挂载结果（0 个工具＝这轮没有任何外部因素可归因）
+        if (mountedOut != null) {
+            mountedOut.addAll(readOnlyMcpTools);
         }
         if (readOnly) {
             // 只读白名单：技能正文（load_skill_through_path 由下方中间件注册）+ view_skill

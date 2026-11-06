@@ -54,7 +54,8 @@
         </template>
 
         <div class="set-navfoot">
-          <template v-if="isManager">技能与工具只读，改动在「AI 助手管理 → 能力」；MCP 服务在本页可直接注册、启停（平台级）。</template>
+          <template v-if="canManageMcp">技能与工具只读，改动在「AI 助手管理 → 能力」；MCP 服务在本页可直接注册、启停（平台级）。</template>
+          <template v-else-if="isManager">技能与工具只读，改动在「AI 助手管理 → 能力」；MCP 服务由平台超管注册，本页可看清单与谁能用。</template>
           <template v-else>技能与工具由管理员统一维护；MCP 服务由平台管理员配置。</template>
         </div>
       </aside>
@@ -551,6 +552,11 @@ const perms = computed(() => userStore.permissions);
 const canEditSkills = computed(() => perms.value.includes('*:*:*') || perms.value.includes('dcs:assistant:skill:edit'));
 /** 能进「AI 助手管理 → 能力」改档位的人：只认真正的配置权（租户管理员只有审计权时不挂死链） */
 const canConfigAssistant = computed(() => perms.value.includes('*:*:*') || perms.value.includes('dcs:assistant:config'));
+/** MCP 是平台级配置：后端 save/toggle/delete 三处都要求超管（AssistantMcpController.requireSuperAdmin）。
+ *  只有 config 权限的自定义管理员能看到按钮但点了必失败，所以这里跟后端同口径——必须带超管标记。 */
+const canManageMcp = computed(
+  () => (perms.value.includes('*:*:*') || perms.value.includes('dcs:assistant:config')) && userStore.roles.includes('superadmin')
+);
 const canAudit = computed(() => perms.value.includes('*:*:*') || perms.value.includes('dcs:assistant:audit:query'));
 /** 管理员视角=能审计 / 能改技能 / 有助手配置权；其余按成员/发布人视角（A′） */
 const isManager = computed(
@@ -650,7 +656,8 @@ watch(
   { immediate: true }
 );
 function goSection(key: string) {
-  if (key !== 'general' && key !== 'skills' && key !== 'tools' && key !== 'audit') return;
+  // 三审 P0：mcp 是本批新加的分节，漏在白名单里＝点「MCP 服务」静默无反应（只有 ?s=mcp 直达能进）
+  if (key !== 'general' && key !== 'skills' && key !== 'tools' && key !== 'mcp' && key !== 'audit') return;
   if (key === section.value) return;
   section.value = key;
   // replace：切分节不堆历史，浏览器返回=离开设置页回工作台
