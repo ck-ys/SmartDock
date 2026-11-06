@@ -6,8 +6,12 @@ import { ref } from 'vue';
  * 2026-11-04 批C 三席交叉实证：会话页与抽屉各自 `ref` 初始化、各自把整数组写回，
  * 同一标签页不触发 storage 事件 → A 处置顶、B 处再置顶会把 A 覆盖掉（静默丢用户数据）。
  * 收成一个模块级单例：两宿主读同一个 ref，写盘也只剩一处。
+ *
+ * E-10（2026-11-06）：键按用户分开——全局键会把甲的置顶带给乙（列表里挂着别人会话 id）。
+ * 宿主 setup 里调 initConvPins(userId) 切键；未调用（单测/极早读）仍用旧全局键。
  */
-const PIN_KEY = 'dcs:assistant:pins';
+let PIN_KEY = 'dcs:assistant:pins';
+const LEGACY_KEY = 'dcs:assistant:pins';
 
 export function loadPins(): string[] {
   try {
@@ -20,6 +24,27 @@ export function loadPins(): string[] {
 }
 
 export const convPins = ref<string[]>(loadPins());
+
+/** 按当前登录用户切键并重读；旧全局键只迁给第一个调用者，迁完即删（否则下个账号还能读到）。 */
+export function initConvPins(userId: string | number) {
+  const next = `dcs:assistant:pins:${userId || 'anon'}`;
+  if (next === PIN_KEY) {
+    return;
+  }
+  PIN_KEY = next;
+  try {
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy && localStorage.getItem(PIN_KEY) == null) {
+      localStorage.setItem(PIN_KEY, legacy);
+    }
+    if (legacy) {
+      localStorage.removeItem(LEGACY_KEY);
+    }
+  } catch {
+    // 存储不可用：内存态照常
+  }
+  convPins.value = loadPins();
+}
 
 export function toggleConvPin(id: string) {
   const key = String(id);

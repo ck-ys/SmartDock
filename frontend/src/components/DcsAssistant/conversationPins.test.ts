@@ -7,7 +7,7 @@ vi.stubGlobal('localStorage', {
   removeItem: (k: string) => store.delete(k)
 });
 
-const { convPins, loadPins, toggleConvPin } = await import('./conversationPins');
+const { convPins, initConvPins, loadPins, toggleConvPin } = await import('./conversationPins');
 
 describe('conversationPins', () => {
   it('新置顶排最前，再点取消', () => {
@@ -30,5 +30,20 @@ describe('conversationPins', () => {
     expect(loadPins()).toEqual([]);
     store.set('dcs:assistant:pins', '["x",1,null,{"y":2}]');
     expect(loadPins()).toEqual(['x']);
+  });
+
+  // E-10（2026-11-06）：全局键会把甲的置顶带给乙（列表里挂着别人会话 id）
+  it('initConvPins 切到按用户键；旧全局键只迁一次且迁完即删', () => {
+    store.set('dcs:assistant:pins', JSON.stringify(['legacy']));
+    store.delete('dcs:assistant:pins:1');
+    initConvPins(1);
+    expect(loadPins()).toEqual(['legacy']);
+    expect(store.get('dcs:assistant:pins:1')).toBe('["legacy"]');
+    expect(store.has('dcs:assistant:pins')).toBe(false);
+  });
+
+  it('换账号看不到上一个人的置顶', () => {
+    initConvPins(2);
+    expect(convPins.value).toEqual([]);
   });
 });

@@ -24,4 +24,7 @@ public class AutomationBo {
 
     /** 每周几：ISO 1=周一 … 7=周日，逗号分隔 */
     private String weekdays;
+
+    /** 只读外部服务：逗号分隔的 serverName；不传/空=不挂任何外部工具（默认关） */
+    private String mcpServers;
 }

@@ -111,6 +111,7 @@ public class AssistantAutomationService {
         a.setScheduleTime(bo.getScheduleTime());
         a.setWeekdays(AutomationSchedule.WEEKLY.equals(bo.getScheduleType())
             ? joinDays(bo.getWeekdays()) : null);
+        a.setMcpServers(sanitizeMcpServers(bo.getMcpServers()));
         a.setTimeZone("Asia/Shanghai");
         a.setEnabled("1");
         a.setBuiltin("0");
@@ -130,6 +131,7 @@ public class AssistantAutomationService {
         a.setScheduleTime(bo.getScheduleTime());
         a.setWeekdays(AutomationSchedule.WEEKLY.equals(bo.getScheduleType())
             ? joinDays(bo.getWeekdays()) : null);
+        a.setMcpServers(sanitizeMcpServers(bo.getMcpServers()));
         a.setNextRunAt("1".equals(a.getEnabled())
             ? AutomationSchedule.next(now(), a.getScheduleType(), a.getScheduleTime(), a.getWeekdays())
             : null);
@@ -345,6 +347,28 @@ public class AssistantAutomationService {
         bo.setPrompt(prompt);
     }
 
+    /**
+     * 只读外部服务白名单清洗（纯函数）：只留小写字母/数字/下划线、逗号连接、去重、上限 10 个。
+     * 未知名字/可写服务不在这里拒绝——挂载面（McpPilotService.attachEnabled）二次过滤，
+     * 保证「只读」是执行期硬约束，不依赖保存时的库状态。
+     */
+    static String sanitizeMcpServers(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (String part : raw.split(",")) {
+            String name = part.trim().toLowerCase(java.util.Locale.ROOT);
+            if (name.matches("[a-z0-9_]{1,30}")) {
+                out.add(name);
+            }
+            if (out.size() >= 10) {
+                break;
+            }
+        }
+        return out.isEmpty() ? null : String.join(",", out);
+    }
+
     private String joinDays(String weekdays) {
         List<Integer> days = new ArrayList<>(AutomationSchedule.parseWeekdays(weekdays));
         if (days.isEmpty()) {
@@ -385,6 +409,7 @@ public class AssistantAutomationService {
         vo.setScheduleType(a.getScheduleType());
         vo.setScheduleTime(a.getScheduleTime());
         vo.setWeekdays(a.getWeekdays());
+        vo.setMcpServers(a.getMcpServers());
         vo.setScheduleText(AutomationSchedule.describe(a.getScheduleType(), a.getScheduleTime(), a.getWeekdays()));
         boolean builtin = "1".equals(a.getBuiltin());
         // 内置项状态以租户配置为准（管理员在管理页改过也同步）

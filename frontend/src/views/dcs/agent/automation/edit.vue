@@ -50,6 +50,31 @@
           </div>
 
           <div class="field">
+            <label>能用的外部工具</label>
+            <p class="field-hint">
+              默认一个都不挂；勾上才挂，而且只挂只读服务。挂了外部工具的自动化，运行失败不会被连续失败自动停用（外部服务抖动不算你的错）。
+            </p>
+            <div v-if="mcpOptions.length" class="mcp-picks">
+              <label
+                v-for="m in mcpOptions"
+                :key="m.serverName"
+                class="mcp-pick"
+                :class="{ on: form.mcpServers.includes(m.serverName) }"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.mcpServers.includes(m.serverName)"
+                  @change="toggleMcp(m.serverName)"
+                />
+                <span class="mcp-pick-n">{{ m.displayName }}</span>
+                <span class="mcp-pick-st">{{ m.statusText }}</span>
+                <span class="mcp-pick-d">{{ m.tools.length ? m.tools.join('、') : '还没调用过，工具名用过才出现' }}</span>
+              </label>
+            </div>
+            <p v-else class="field-hint">平台还没有开放只读外部服务。</p>
+          </div>
+
+          <div class="field">
             <label for="auto-time">什么时候跑</label>
             <div class="sched-row">
               <div class="seg" role="group" aria-label="频率">
@@ -161,6 +186,10 @@
       </div>
     </main>
   </div>
+  <div v-else class="auto-blocked" aria-hidden="true">
+    <!-- 未授权时只留这个真实元素兜底：注释不能和元素做根节点的兄弟——那会编译成 Fragment，
+         路由过渡收不到 afterLeave，离开本页整页白屏（2026-11-05 设置页同款 P0；题6 of 14） -->
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -185,6 +214,7 @@ import {
   type AutomationRow,
   type AutomationRunRow
 } from '@/api/dcs/assistant/automation';
+import { listAssistantMcpMembers, type AssistantMcpMemberRow } from '@/api/dcs/assistant';
 
 const route = useRoute();
 const router = useRouter();
@@ -210,8 +240,16 @@ const form = reactive({
   prompt: '',
   scheduleType: 'DAILY' as 'DAILY' | 'WEEKLY',
   scheduleTime: '09:00',
-  weekdays: [1] as number[]
+  weekdays: [1] as number[],
+  /** 只读外部服务白名单（默认空=一个不挂；题3 乙 三条硬规矩①） */
+  mcpServers: [] as string[]
 });
+const mcpOptions = ref<AssistantMcpMemberRow[]>([]);
+function toggleMcp(name: string) {
+  const i = form.mcpServers.indexOf(name);
+  if (i >= 0) form.mcpServers.splice(i, 1);
+  else form.mcpServers.push(name);
+}
 
 const row = ref<AutomationRow | null>(null);
 const runs = ref<AutomationRunRow[]>([]);
@@ -299,6 +337,16 @@ function durationText(ms: number): string {
   return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
 }
 
+/** 只读外部服务选项：只留只读、未停用的行——可写服务永不进自动化 */
+async function loadMcpOptions() {
+  try {
+    const res = (await listAssistantMcpMembers()) as unknown as { data?: AssistantMcpMemberRow[] };
+    mcpOptions.value = (res?.data ?? []).filter((m) => m.readOnly === '1' && m.status !== 'off');
+  } catch {
+    mcpOptions.value = [];
+  }
+}
+
 function goList() {
   router.push('/agent/automation');
 }
@@ -336,6 +384,10 @@ async function load() {
       .split(',')
       .map((v) => Number(v))
       .filter((v) => v >= 1 && v <= 7);
+    form.mcpServers = (data.mcpServers || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
     if (form.weekdays.length === 0) form.weekdays = [1];
     await loadRuns();
   } catch {
@@ -376,7 +428,9 @@ async function save() {
     prompt: form.prompt.trim(),
     scheduleType: form.scheduleType,
     scheduleTime: form.scheduleTime,
-    weekdays: form.scheduleType === 'WEEKLY' ? weekdayParam() : undefined
+    weekdays: form.scheduleType === 'WEEKLY' ? weekdayParam() : undefined,
+    // 只读外部服务：没勾就传空串（后端清洗成 null，与默认不挂一致）
+    mcpServers: form.mcpServers.length ? form.mcpServers.join(',') : ''
   };
   try {
     const res = isNew.value ? await createAutomation(payload) : await updateAutomation(id.value, payload);
@@ -460,6 +514,7 @@ async function remove() {
 }
 
 onMounted(async () => {
+  void loadMcpOptions();
   if (!allowed.value) {
     router.replace('/403');
     return;

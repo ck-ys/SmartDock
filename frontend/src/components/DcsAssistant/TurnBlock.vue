@@ -54,7 +54,10 @@
          R3(2026-10-10 拍板A)：思考分段与工具行按事件到达序交错成统一时间线（ZCode 同构）——
          思考段就位在它发生的时刻（think①→工具①→think②），不再全文拼成一坨置顶；
          旧数据（thinkSegs 空/thinkText 有值、回放 steps 无 seq）兜底=合成单段置顶=旧行为 -->
-    <div v-show="!folded" class="proc" :class="{ 'proc-empty': !timeline.length }">
+    <!-- 题7 甲（2026-11-06）：折叠/展开 300ms 高度过渡（grid 0fr↔1fr，内容保持挂载——
+         v-show 的 display:none 没法做高度动画，且卸载会丢内部滚动位置） -->
+    <div class="proc-wrap" :class="{ open: !folded, animating: foldAnimating }">
+    <div class="proc" :class="{ 'proc-empty': !timeline.length }">
       <!-- Q17 空窗占位：过程区还没有任何可显示的行时，先给一行「正在准备…」，
            让「已发送 → 首个事件」这段不再是一片空白（胶囊秒数仍在标题行，这里只补过程区） -->
       <div v-if="waitHint" class="twait">
@@ -71,7 +74,7 @@
           ⋯ 另外 {{ hiddenMid }} 步
         </button>
         <!-- 思考段（Q9-A 胶囊折叠，逐段独立）：进行中=呼吸胶囊+流式摘要小窗；完成=自动收
-             「已思考 · N 秒」（多段=思考① · N 秒）；点开=限高 300px 滚动区+markdown；
+             「思考 · N 秒」（多段=多行同款文案，不编号）；点开=限高 300px 滚动区+markdown；
              开合=会话内记忆（用户点过的段优先于偏好）；停止时灰态「思考中断」 -->
         <div v-if="it.kind === 'think'" class="think">
           <div
@@ -83,7 +86,7 @@
             @keydown.space.prevent="onSegToggle(it.seg)"
           >
             <span class="tk-i"><IconSpan name="brain" :size="14" /></span>
-            <span class="tk-t" :class="{ run: !it.seg.done, cut: segCut(it.seg) }">{{ segLabel(it.seg, it.idx) }}</span>
+            <span class="tk-t" :class="{ run: !it.seg.done, cut: segCut(it.seg) }">{{ segLabel(it.seg) }}</span>
             <!-- Q16：右侧一组（剩余量提示 + 开合箭头）整体靠右，箭头不再被提示挤走 -->
             <span class="tk-r">
               <!-- Q16：展开态且没滚到底时给个明确余量，光靠底部渐隐看不清还剩多少 -->
@@ -133,11 +136,20 @@
             <IconSpan v-if="it.step.status === 'run'" name="loader-circle" cls="spin mini" />
             <IconSpan v-else-if="it.step.status === 'ok'" name="check-circle" cls="ok-ic" />
             <IconSpan v-else name="circle-x" cls="fail-ic" />
-            <span class="s-verb">{{ it.step.verb }}</span>
+            <span class="s-verb">{{ it.step.name === 'ask_user' ? '已询问' : it.step.verb }}</span>
+            <span v-if="it.step.name === 'ask_user' && askedCount(it.step)" class="s-dur">· {{ askedCount(it.step) }} 个问题</span>
             <span v-if="stepDur(it.step)" class="s-dur">· {{ stepDur(it.step) }}</span>
             <!-- TW-1 原型口径：失败词下划虚线=点击复制错误信息 -->
             <span
-              v-if="it.step.status === 'err'"
+              v-if="it.step.status === 'err' && it.step.name === 'ask_user'"
+              class="failword"
+              :title="askFailReason(it.step) || '执行失败'"
+              @click.stop="copyAskFail(it.step)"
+              @keydown.enter.stop="copyAskFail(it.step)"
+              >执行失败</span
+            >
+            <span
+              v-if="it.step.status === 'err' && it.step.name !== 'ask_user'"
               class="failword"
               title="点击复制错误信息"
               role="button"
@@ -150,10 +162,12 @@
               ><IconSpan :name="openSteps.has(it.step.id) ? 'chevron-up' : 'chevron-down'" :size="12"
             /></span>
           </span>
-          <span v-if="it.step.argsText" class="args">{{ shortArgs(it.step.argsText) }}</span>
+          <!-- 题8：反问的原始参数不摆给用户看（ZCode 那行 <pre> 也是注释掉的）；要排错点详情/看返回 -->
+          <span v-if="it.step.argsText && it.step.name !== 'ask_user'" class="args">{{ shortArgs(it.step.argsText) }}</span>
           <div v-if="openSteps.has(it.step.id) && it.step.resultFull" class="s-json">{{ it.step.resultFull }}</div>
         </div>
       </template>
+    </div>
     </div>
 
     <!-- 已用工具章（原型 stamp）：UI 专项批1 删除——折叠态胶囊「用了 N 个工具」、
@@ -182,15 +196,22 @@
       @done="(id) => emit('elicit-done', id)"
     />
 
-    <!-- 题12 案1：内置结构化反问卡（ask_user 在飞挂起，run 保持 RUNNING）——用户在卡上点选，
-         结果作为工具结果回到模型继续跑；done 后本地移除（后端超时按未作答收尾） -->
-    <ask-user-card
-      v-for="ac in turn.askUsers"
-      :key="ac.id"
-      :card="ac"
-      :thread-id="sessionThreadId ?? ''"
-      @done="(id) => emit('ask-user-done', id)"
-    />
+    <!-- 题8 甲（2026-11-06）：反问回执——问过就留一行，四种结局都写清楚；点「详情」看逐题问答。
+         活卡不在这里：题10 乙把它钉到输入框上方了（见宿主 dock），滚走也不会丢。 -->
+    <div v-for="rc in turn.askReceipts" :key="'rc-' + rc.id" class="askrc">
+      <button class="askrc-hd" type="button" :aria-expanded="askReceiptOpen.has(rc.id)" @click="toggleAskReceipt(rc.id)">
+        <IconSpan name="help" :size="13" />
+        <span class="askrc-lb">{{ receiptLead(rc) }}</span>
+        <span v-if="rc.failed" class="askrc-fail" :title="rc.failReason || '执行失败'" @click.stop>执行失败</span>
+        <span class="askrc-x">{{ askReceiptOpen.has(rc.id) ? '收起' : '详情' }}</span>
+      </button>
+      <div v-if="askReceiptOpen.has(rc.id)" class="askrc-body">
+        <div v-for="(q, qi) in rc.questions" :key="qi" class="askrc-q">
+          <b>{{ q.question }}</b>
+          <span>{{ receiptAnswer(rc, qi) }}</span>
+        </div>
+      </div>
+    </div>
 
     <!-- 正文气泡：流式=纯文本+光标（S-23 仅末段增量）；完成=全量 md；
          UI 专项批1：卡内「已完成」章删除——与顶部状态胶囊重复报状态（视觉评审 7.4 轮实锤），成功语义只留胶囊+浅绿描边 -->
@@ -201,7 +222,7 @@
         <!-- Q16 流式期也过行内渲染（粗体 / 行内码 / 站内链）——原先整段当纯文本，
              答案里 8 处 ** 原样露面，完成瞬间整块重排。块级结构仍留到完成态 -->
         <!-- eslint-disable-next-line vue/no-v-html —— renderStream 先转义后白名单替换，与 .md 同链路 -->
-        <span v-if="turn.bufText" class="sh" v-html="streamHtml"></span
+        <span v-if="turn.shownLen > 0" class="sh" v-html="streamHtml"></span
         ><span v-else class="dots"><i /><i /><i /></span><span class="cursor" />
       </div>
       <!-- 批6-#2：中断回答徽标（历史回放 end_reason=partial/truncated）——刷新/断网保全的
@@ -445,7 +466,7 @@ const favHostDead = reactive(new Set<string>());
  * 批C 补件：工具章/已完成章/来源折叠条/追问 chips/hover 六图标操作行（fua）
  * + 👎问卷（submitFeedback 落库）+ ⭐收藏（favBar）+ 代码卡复制（事件委托）。
  */
-import type { AssistantStep, AssistantTurn, HitlEdits, ThinkSeg } from './useAssistant';
+import type { AssistantAskReceipt, AssistantStep, AssistantTurn, HitlEdits, ThinkSeg } from './useAssistant';
 import { ACT, getAssistant } from './useAssistant';
 import { createVNode, defineAsyncComponent, render, watch } from 'vue';
 import ConfirmCard from './ConfirmCard.vue';
@@ -455,7 +476,6 @@ import TemplateCard from './TemplateCard.vue';
 import PlanCard from './PlanCard.vue';
 import PlanFormCard from './PlanFormCard.vue';
 import ElicitCard from './ElicitationCard.vue';
-import AskUserCard from './AskUserCard.vue';
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
 import { turnStateWord } from './assistantCtx';
@@ -463,6 +483,7 @@ import { renderMd, renderStream } from './md';
 import { parseToolJson, summarizeArgs } from './toolJson';
 import { submitFeedback, listConversations, listMessages, exportAssistantReport } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
+import { getAgentPrefs } from './prefsStore';
 import { pushToast } from './toastStore';
 import { useFavs } from './favStore';
 import { findVisibleHitlDock } from './util';
@@ -481,6 +502,8 @@ const props = defineProps<{
   /** 计划决策请求在飞（锁卡防重复提交） */
   planBusy?: boolean;
 }>();
+const userStore = useUserStore();
+const prefs = getAgentPrefs(userStore.userId);
 const rootEl = ref<HTMLElement | null>(null);
 /** 只有「最新一张 pending 卡」可操作；历史卡/已决策卡走只读收据 */
 const isActivePlan = computed(
@@ -521,7 +544,6 @@ const emit = defineEmits<{
    *  vue/no-mutating-props，三审回修） */
   'elicit-done': [id: string];
   /** 题12 案1：结构化反问卡收卡（提交/关闭/超时） */
-  'ask-user-done': [id: string];
   'resolve-hitl': [approved: boolean, remember?: boolean, edits?: HitlEdits];
   'new-session': [];
   /** AU-35：错误卡「恢复挂起的确认」——上浮到状态机 recoverInterrupt（peek 悬挂缓存重建卡） */
@@ -684,22 +706,90 @@ const fbOpen = ref(false);
  *  刷新/重开会话时满屏过程明细铺开（三框架共识：cline/assistant-ui/open-webui 历史默认折叠）；
  *  live 回合 phase 从 thinking 起、初始非终态不受影响 */
 const isTerminal = computed(() => ['done', 'stopped', 'error', 'waiting'].includes(props.turn.phase));
-const folded = ref(isTerminal.value);
+const folded = ref(isTerminal.value && !prefs.toolsOpen);
 let userFolded = false;
 let foldTimer: ReturnType<typeof setTimeout> | null = null;
+/** 折叠动画进行中：这 300ms 内强制裁掉溢出，否则 0fr→1fr 的中间态里明细会压到下面的答案上 */
+const foldAnimating = ref(false);
+let foldAnimTimer: ReturnType<typeof setTimeout> | null = null;
+
+function animateFold() {
+  foldAnimating.value = true;
+  if (foldAnimTimer) {
+    clearTimeout(foldAnimTimer);
+  }
+  foldAnimTimer = setTimeout(() => {
+    foldAnimating.value = false;
+    foldAnimTimer = null;
+  }, 320);
+}
 
 function toggleFold() {
   folded.value = !folded.value;
   userFolded = true;
+  animateFold();
 }
 
 /** DP-3：统计面板跳步骤命中本回合但过程区已折叠（MsgFlow 派发）——展开并钉住（不再自动收） */
 function onExpandFold() {
   folded.value = false;
   userFolded = true;
+  animateFold();
 }
 
 /** TW-1：失败词点击复制错误信息（原型 .failword 虚线下划 cursor:copy） */
+/* ---- 题8 甲（2026-11-06）：反问回执行 ---- */
+/** 展开状态按卡 id 记忆（同 ZCode 的 toolId 记忆口径） */
+const askReceiptOpen = reactive(new Set<string>());
+function toggleAskReceipt(id: string) {
+  if (askReceiptOpen.has(id)) {
+    askReceiptOpen.delete(id);
+  } else {
+    askReceiptOpen.add(id);
+  }
+}
+function receiptLead(rc: AssistantAskReceipt): string {
+  const n = rc.questions.length;
+  if (rc.failed || rc.outcome === 'answered') {
+    return `已询问 · ${n} 个问题`;
+  }
+  return rc.outcome === 'cancelled' ? '已询问 · 未提供回答' : '已询问 · 未回答，已自动继续';
+}
+function receiptAnswer(rc: AssistantAskReceipt, qi: number): string {
+  const byQuestion = rc.answers.find((a) => a.question === rc.questions[qi]?.question);
+  const a = byQuestion ?? rc.answers[qi];
+  const picked = a?.picked ?? [];
+  const other = (a?.other ?? '').trim();
+  if (!picked.length && !other) {
+    return '未提供回答';
+  }
+  return picked.map((p) => `「${p}」`).join('、') + (other ? `；补充：${other}` : '');
+}
+/** ask_user 参数里的题数（失败行也要说「已询问 · N 个问题」） */
+function askedCount(step: AssistantStep): number {
+  try {
+    const v = JSON.parse(step.argsText || '{}')?.questions;
+    return Array.isArray(v) ? v.length : 0;
+  } catch {
+    return 0;
+  }
+}
+function askFailReason(step: AssistantStep): string {
+  const raw = (step.resultFull || step.brief || '').replace(/\s+/g, ' ').trim();
+  return raw ? `反问没有发出去：${raw.slice(0, 160)}` : '反问没有发出去（模型给的参数不合法）';
+}
+function copyAskFail(step: AssistantStep) {
+  const text = askFailReason(step);
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => pushToast('失败原因已复制', 'ok'),
+      () => pushToast('复制失败，可点详情查看', 'info')
+    );
+  } else {
+    pushToast('复制失败，可点详情查看', 'info');
+  }
+}
+
 function copyFail(s: { resultFull?: string; brief?: string; argsText?: string }) {
   const text = s.resultFull || s.brief || s.argsText || '';
   const done = () => pushToast(text ? '错误信息已复制' : '该步骤没有可复制的错误详情', text ? 'ok' : 'info');
@@ -748,7 +838,7 @@ const streamHtml = computed(() => renderStream(props.turn.bufText.slice(0, props
 watch(
   () => props.turn.phase,
   (ph) => {
-    if (ph === 'done' && !userFolded) {
+    if (ph === 'done' && !userFolded && !prefs.toolsOpen) {
       if (foldTimer) clearTimeout(foldTimer);
       foldTimer = setTimeout(() => {
         folded.value = true;
@@ -759,6 +849,7 @@ watch(
 );
 onBeforeUnmount(() => {
   if (foldTimer) clearTimeout(foldTimer);
+  if (foldAnimTimer) clearTimeout(foldAnimTimer);
   tblRo?.disconnect();
   tblRo = null;
   document.removeEventListener('mousedown', onFbDocDown);
@@ -964,11 +1055,21 @@ function stepDur(s: { durMs?: number }): string {
 
 /** Q12-③ 中段折叠：步骤>5 首尾保留（首 1+尾 2），中段收「⋯ 另外 N 步」点击展开 */
 const PROC_KEEP = 5;
-const stepsAll = ref(false);
+const stepsAll = ref(prefs.toolsOpen);
 watch(
   () => props.turn.id,
   () => {
-    stepsAll.value = false;
+    stepsAll.value = prefs.toolsOpen;
+  }
+);
+watch(
+  () => prefs.toolsOpen,
+  (v) => {
+    stepsAll.value = v;
+    if (isTerminal.value) {
+      folded.value = !v;
+      userFolded = false;
+    }
   }
 );
 const hiddenMid = computed(() => (props.turn.steps.length > PROC_KEEP ? props.turn.steps.length - 3 : 0));
@@ -1073,24 +1174,22 @@ const timeline = computed<TlItem[]>(() => {
  *  刻意不建思考段：伪造段到达真段时会换 key 重挂，整块闪一次。 */
 const waitHint = computed(() => ['thinking', 'acting'].includes(props.turn.phase) && !timeline.value.length);
 
-/** 多段序号（思考①②…）：仅分段>1 时标号，单段保持「已思考 · N 秒」原口径 */
-const SEG_NUM = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧'];
-function segLabel(seg: ThinkSeg, idx: number): string {
+/* 题6 甲（2026-11-06）：思考段不再编号——序号只表示「第几段」，对用户无信息量，
+   三个参照仓（ZCode/cline/assistant-ui）也都不编号。多段就是多行，按时间顺序排。 */
+function segLabel(seg: ThinkSeg): string {
   const t = props.turn;
   // Q9 停止灰态：思考中被中断（该段未置 done 而回合已停）→「思考中断」
   if (t.phase === 'stopped' && !seg.done) {
     return '思考中断';
   }
-  const multi = thinkSegsView.value.length > 1;
-  const tag = multi && idx < SEG_NUM.length ? '思考' + SEG_NUM[idx] : '';
   if (seg.done) {
     // 批8-3 回修口径：优先纯思考段耗时；段无真值时退整轮口径
     const ms =
       seg.durMs > 0 ? seg.durMs : seg.startedAt > 0 ? Date.now() - seg.startedAt : t.durMs > 0 ? Math.min(t.durMs, Date.now() - t.startedAt) : 0;
     const sec = Math.max(1, Math.round(ms / 1000));
-    return multi ? `${tag} · ${sec} 秒` : `已思考 · ${sec} 秒`;
+    return `思考 · ${sec} 秒`;
   }
-  return multi ? `${tag} 正在思考…` : '正在思考…';
+  return '正在思考…';
 }
 
 /** Q9 思考中断灰态（逐段判定：cut 类=去呼吸动画、灰字） */
@@ -1704,12 +1803,13 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
 
   /* 运行态扫字呼吸（原型 L312：灰→蓝→灰 200% 渐变 1.6s） */
   &.live .ts-t.run {
+    /* 题7 甲：工作态摘要行照 ZCode 的 animated-gradient-text 放慢到 4s；状态词另走 1.4s（题9） */
     background: linear-gradient(90deg, var(--dcs-text-secondary) 25%, var(--el-color-primary) 50%, var(--dcs-text-secondary) 75%);
     background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: dcs-sweep 1.6s linear infinite;
+    animation: dcs-sweep 4s linear infinite;
   }
   /* 完成态强化（原型 L324：t1 色+500） */
   &:not(.live) .ts-t {
@@ -1806,6 +1906,83 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   opacity: 0;
   transform: translateY(-6px);
 }
+/* 题8 甲：反问回执行——安静一行，点「详情」展开逐题问答（题目加粗、回答偏灰） */
+.askrc {
+  margin: 6px 0 2px;
+  border: 1px solid var(--dcs-border-color-lighter);
+  border-radius: 10px;
+  background: var(--el-bg-color);
+  overflow: hidden;
+}
+.askrc-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dcs-text-secondary);
+  text-align: left;
+
+  &:hover {
+    background: var(--el-fill-color-lighter);
+  }
+}
+.askrc-lb {
+  color: var(--dcs-text-primary);
+}
+.askrc-fail {
+  color: var(--dcs-color-danger);
+  border-bottom: 1px dashed currentColor;
+  cursor: copy;
+}
+.askrc-x {
+  margin-left: auto;
+  color: var(--dcs-text-placeholder);
+  font-size: 11px;
+}
+.askrc-body {
+  border-top: 1px solid var(--dcs-border-color-lighter);
+  padding: 8px 10px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.askrc-q {
+  display: grid;
+  gap: 2px;
+  border-left: 1px solid var(--dcs-border-color-light);
+  padding-left: 10px;
+
+  b {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dcs-text-primary);
+  }
+  span {
+    font-size: 12px;
+    color: var(--dcs-text-secondary);
+  }
+}
+@keyframes dcs-tool-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dcs-turn .tool {
+    animation: none;
+  }
+}
 @keyframes dcs-istk {
   50% {
     opacity: 0.35;
@@ -1814,7 +1991,9 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
 /* 图标态修复（批J-2 P1）：cls 经 ic() 落在 v-html 注入的 svg 上，scoped 编译后
    `.spin[data-v]` 永不命中（svg 无 data-v 属性）——必须 :deep 才能生效 */
 .dcs-turn :deep(.spin) {
-  animation: dcs-rot 0.8s linear infinite;
+  /* 题7 甲（对齐 ZCode reasoning.tsx / ToolLayout.tsx：时间线里不许有旋转 loader）：
+     运行态只留静态图标 + 文字扫光，别让一排小圈同时转 */
+  animation: none;
   color: var(--el-color-primary);
   font-size: 15px;
 }
@@ -1899,6 +2078,32 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   }
 }
 /* 过程区（原型 .proc L356-359）：左挂时间线圆点 + 末尾收尾线 */
+.proc-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease-in-out;
+
+  &.open {
+    grid-template-rows: 1fr;
+  }
+  /* 收起时裁掉溢出才能让 0fr 真正变 0；展开态还原可见，别把内部滚动/吸附一起废掉 */
+  > .proc {
+    min-height: 0;
+    overflow: hidden;
+  }
+  &.open > .proc {
+    overflow: visible;
+  }
+  /* 动画这 300ms 内一律裁掉：展开/收起的中间态不能让明细压到答案上（动画结束还原 visible） */
+  &.animating > .proc {
+    overflow: hidden;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .proc-wrap {
+    transition: none;
+  }
+}
 .proc {
   position: relative;
   padding-left: 14px;
@@ -1979,8 +2184,9 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     width: 100%;
 
     .tk-t.run {
+      /* 题9 甲：四个状态词统一 1.4s（ZCode .zcode-loading-label 同参数） */
       color: var(--el-color-primary);
-      animation: dcs-sweep 1.5s linear infinite;
+      animation: dcs-sweep 1.4s linear infinite;
       background: linear-gradient(90deg, #6b7280 25%, var(--el-color-primary) 50%, #6b7280 75%);
       background-size: 200% 100%;
       -webkit-background-clip: text;
@@ -2188,6 +2394,8 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     font-family: ui-monospace, Menlo, Consolas, monospace;
     word-break: break-all;
   }
+  /* 题7 甲：工具行是突然插进来的——补 200ms 淡入 + 2px 上移，不抢注意力 */
+  animation: dcs-tool-in 0.2s ease-out;
   /* 运行/失败整行着色（原型 L369-371：st-run 主色+动词扫光 / st-err 红） */
   &.st-run .th {
     color: var(--el-color-primary);
@@ -2198,7 +2406,8 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      animation: dcs-sweep 1.6s linear infinite;
+      /* 题9 甲：状态词统一 1.4s */
+      animation: dcs-sweep 1.4s linear infinite;
     }
   }
   &.st-err .th {
@@ -2221,7 +2430,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
      历史：UI 专项批1 的白卡源于当时 5.3fh 批「裸文本无归属 3.5/10」，但灰底（第 1 层）
      +用户蓝气泡（第 3 层）的对比仍在，裸排不会回到「什么都白」；真实使用反馈优先于
      视觉席意见。表格/代码卡自带白壳（局部卡片感保留，cherry-studio 同款取向） */
-  font-size: 14px;
+  font-size: var(--dcs-answer-size, 14px);
   line-height: 1.75;
   color: var(--dcs-text-primary);
   min-height: 1.75em;

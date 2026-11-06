@@ -15,6 +15,9 @@ public class AutomationVo {
     private String scheduleType;
     private String scheduleTime;
     private String weekdays;
+
+    /** 只读外部服务白名单（逗号分隔；空=没挂） */
+    private String mcpServers;
     /** 人话日程：每天 09:00 / 每周一、三 09:00 */
     private String scheduleText;
 

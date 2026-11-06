@@ -1,0 +1,19 @@
+/**
+ * 动效强度 = 减弱（AI 助手·常规设置）
+ *
+ * 只挂在 AI 助手两块宿主根节点上（.dcs-as-session / .dcs-dw），不影响全站。
+ * 与 dcs-operations.scss 的 prefers-reduced-motion 同口径（0.01ms 而非 0）：
+ * 0 会让 transitionend/animationend 在某些浏览器里不触发，1ms 级更稳。
+ *
+ * 纪律：只作用于「跟随系统 / 减弱」这一档；默认档不加任何类，视觉零变化。
+ */
+.motion-reduced {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

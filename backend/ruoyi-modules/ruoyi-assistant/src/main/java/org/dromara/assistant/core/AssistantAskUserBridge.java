@@ -28,8 +28,12 @@ import java.util.concurrent.TimeoutException;
  *
  * <p>边界（三席审查回修 2026-10-31）：单会话最多同时挂 2 张、单实例全局最多 32 张
  * （防一个用户开多会话把全平台反问关停；上限按 boundedElastic 工具线程池量级取，
- * 超限直接回绝，不让模型把 run 挂死）；等待 240 秒（必须小于纯心跳 10 分钟收割线）；
+ * 超限直接回绝，不让模型把 run 挂死）；等待上限必须小于纯心跳 10 分钟收割线；
  * 超时/中断/关页面按「未作答」收尾，模型被明确告知没拿到答案。</p>
+ *
+ * <p>C 七行·提问自动继续（2026-11-06，对齐 ZCode askUserQuestionAutoResolutionEnabled 默认开）：
+ * 开 = 5 分钟没答按「空答案」收尾，模型拿到的原话是「按最稳妥的默认继续」——不替用户乱选，
+ * 也不是硬中断；关 = 不自动继续，等到上限按 timeout 收尾让模型改用正文追问。</p>
  */
 @Slf4j
 @Component
@@ -41,8 +45,10 @@ public class AssistantAskUserBridge {
     private static final int MAX_PENDING_GLOBAL = 32;
     /** 卡信号仓上限（run 中断未取走的卡防泄漏） */
     private static final int MAX_SIGNALS = 128;
-    /** 等待上限（秒） */
-    public static final int TIMEOUT_SECONDS = 240;
+    /** 自动继续的等待上限（秒）：5 分钟，与 ZCode 同值（ASK_USER_QUESTION_AUTO_RESOLUTION_MS=300000） */
+    public static final int AUTO_CONTINUE_SECONDS = 300;
+    /** 关掉自动继续后的等待上限（秒）：必须 < 600s 纯心跳收割线，留 2 分钟余量 */
+    public static final int TIMEOUT_SECONDS = 480;
     /** 单次反问的题数与选项上限（前端卡片按此渲染；作答载荷同口径收紧） */
     public static final int MAX_QUESTIONS = 4;
     public static final int MAX_OPTIONS = 4;
@@ -54,18 +60,34 @@ public class AssistantAskUserBridge {
         final String tenantId;
         final Long userId;
         final String threadId;
+        /** 到期后是「空答案继续」还是「超时收尾」；建卡时定死，运行中改设置不影响已挂起的卡 */
+        final boolean autoContinue;
         final CompletableFuture<Map<String, Object>> future = new CompletableFuture<>();
         volatile long expiresAtMs;
 
-        Pending(String id, String tenantId, Long userId, String threadId) {
+        Pending(String id, String tenantId, Long userId, String threadId, boolean autoContinue) {
             this.id = id;
             this.tenantId = tenantId;
             this.userId = userId;
             this.threadId = threadId;
+            this.autoContinue = autoContinue;
         }
     }
 
     private final Map<String, Pending> pending = new ConcurrentHashMap<>();
+
+    /** 两档等待上限（秒）。生产走默认构造；带参构造给单测接缝（不必真等 5 分钟）。 */
+    private final int autoContinueSeconds;
+    private final int timeoutSeconds;
+
+    public AssistantAskUserBridge() {
+        this(AUTO_CONTINUE_SECONDS, TIMEOUT_SECONDS);
+    }
+
+    public AssistantAskUserBridge(int autoContinueSeconds, int timeoutSeconds) {
+        this.autoContinueSeconds = Math.max(1, autoContinueSeconds);
+        this.timeoutSeconds = Math.max(1, timeoutSeconds);
+    }
 
     private final Map<String, List<Map<String, Object>>> signals =
         Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, false) {
@@ -86,6 +108,12 @@ public class AssistantAskUserBridge {
      */
     public Map<String, Object> ask(String tenantId, Long userId, String threadId,
                                    List<Map<String, Object>> questions) {
+        // 缺省开：旧前端/自动化跑批不带开关时按 ZCode 默认值走（无人值守时更该继续而非挂死）
+        return ask(tenantId, userId, threadId, questions, true);
+    }
+
+    public Map<String, Object> ask(String tenantId, Long userId, String threadId,
+                                   List<Map<String, Object>> questions, boolean autoContinue) {
         if (threadId == null || threadId.isBlank() || questions == null || questions.isEmpty()) {
             return Map.of("action", "cancelled", "answers", List.of());
         }
@@ -97,16 +125,17 @@ public class AssistantAskUserBridge {
             return Map.of("action", "busy", "answers", List.of());
         }
         String id = UUID.randomUUID().toString();
-        Pending p = new Pending(id, tenantId, userId, threadId);
+        Pending p = new Pending(id, tenantId, userId, threadId, autoContinue);
         pending.put(id, p);
-        long remainMs = TIMEOUT_SECONDS * 1000L;
+        int limitSec = autoContinue ? autoContinueSeconds : timeoutSeconds;
+        long remainMs = limitSec * 1000L;
         p.expiresAtMs = System.currentTimeMillis() + remainMs;
         submitSignal(threadId, cardPayload(id, questions, remainMs));
         Map<String, Object> result;
         try {
-            result = p.future.get(TIMEOUT_SECONDS + 5L, TimeUnit.SECONDS);
+            result = p.future.get(limitSec + 5L, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            completeAs(p, "timeout");
+            completeOnExpiry(p);
             result = p.future.join();
         } catch (InterruptedException e) {
             // 停止生成/实例关停：中断不是用户超时，按取消收尾并恢复中断标志
@@ -286,12 +315,23 @@ public class AssistantAskUserBridge {
         }
     }
 
-    /** 懒清扫：过期未答 → 按 timeout 完成并移除 */
+    /**
+     * 到期收尾：自动继续=空答案（模型按稳妥默认往下走）；否则=timeout（模型改用正文追问）。
+     * 两条都写明 answers 为空，前端与模型的口径一致。
+     */
+    private boolean completeOnExpiry(Pending p) {
+        Map<String, Object> value = p.autoContinue
+            ? Map.of("action", "answered", "answers", List.of(), "auto", true)
+            : Map.of("action", "timeout", "answers", List.of());
+        return p.future.complete(value);
+    }
+
+    /** 懒清扫：过期未答 → 按建卡时的口径收尾并移除 */
     private void sweepExpired() {
         long now = System.currentTimeMillis();
         for (Pending p : pending.values()) {
             if (p.expiresAtMs > 0 && p.expiresAtMs <= now && !p.future.isDone()) {
-                if (completeAs(p, "timeout")) {
+                if (completeOnExpiry(p)) {
                     pending.remove(p.id, p);
                     removeSignal(p.threadId, p.id);
                 }

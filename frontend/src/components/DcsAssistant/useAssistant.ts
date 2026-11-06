@@ -17,6 +17,7 @@ import { reactive } from 'vue';
 import { ElMessageBox } from 'element-plus';
 import { readWebOn } from './webOnState';
 import { readSkillId } from './skillState';
+import { getAgentPrefs, lastUseKey } from './prefsStore';
 import { createAguiClient, type AguiClientOptions, type AguiTurnHandle } from '@/api/dcs/assistant/aguiClient';
 import {
   getPendingHitl,
@@ -174,6 +175,19 @@ export interface HitlEdits {
   };
 }
 
+/** 题8 甲：一行反问回执（结局 + 逐题问答）。outcome 四态对齐 ZCode：
+ *  answered=答了 / cancelled=忽略或弃卡 / timeout=超时未答（后端按自动继续收尾） */
+export interface AssistantAskReceipt {
+  id: string;
+  questions: import('@/api/dcs/assistant').AssistantAskUserCard['questions'];
+  outcome: 'answered' | 'cancelled' | 'timeout' | 'skipped';
+  answers: import('@/api/dcs/assistant').AssistantAskUserAnswer[];
+  /** 工具执行失败（模型调 ask_user 本身报错）——行首仍是「已询问」，旁边挂「执行失败」 */
+  failed?: boolean;
+  /** 失败原因（悬停「执行失败」看，可复制） */
+  failReason?: string;
+}
+
 export interface AssistantTurn {
   id: string;
   question: string;
@@ -202,6 +216,12 @@ export interface AssistantTurn {
   errorCode: string;
   /** 业务批(1015) Q9：人话化错误背后的原始报错（超时/内部类映射后原文收进折叠详情，排错可查现场） */
   errorDetail?: string;
+  /** 常规 · 失败自动重试：本轮原始请求（由 runTurn 写入，最多重试一次） */
+  retryPayload?: { q: string; stamp: string; fwd: Record<string, unknown> };
+  /** 重试深度（0=首轮，1=自动重试轮；≥1 不再重试） */
+  retryDepth?: number;
+  /** 已自动重试过（防同一轮重复调度） */
+  autoRetried?: boolean;
   costYuan: number | null;
   tokens: number | null;
   stamp: string;
@@ -224,6 +244,9 @@ export interface AssistantTurn {
   /** 题12 案1：内置结构化反问卡（CUSTOM 'ask_user' 帧，run 内挂起随本回合走）；
    *  作答走独立端点，答完工具结果回到模型继续跑，过期本地收卡 */
   askUsers: import('@/api/dcs/assistant').AssistantAskUserCard[];
+  /** 题8 甲（2026-11-06）：反问回执——卡消失后留一行「已询问」，展开看逐题问答。
+   *  与 askUsers 的区别：askUsers 是「还在等你答」，回执是「已经问过、结局是什么」 */
+  askReceipts: AssistantAskReceipt[];
   /** 三批④（2026-11-01）：全自动档完成通知卡（CUSTOM 'auto_done' 帧——仅 auto 档且
    *  RUN_FINISHED 非 interrupt 收尾时后端按 run 查可撤行下发；save_memory/dcs_create_task
    *  才有行）。id=动作账本行 id（撤回端点锚点）；卡片随回合内存态走——刷新后历史回放
@@ -261,6 +284,9 @@ export interface AssistantState {
   gatePendQ: string;
   newbieUse: number;
   threadId: string;
+  /** 草稿态：新建后还没发出第一条消息。true 时左栏不插临时行、草稿走固定 draft 作用域；
+   *  发出第一条（runTurn）或打开真实会话（rebuildFromHistory）即落 false。 */
+  draftMode: boolean;
   /** 当前会话是否归档（AU-36）：三宿主共享的发送闸——宿主打开会话时写入，resetForNewSession 复位 */
   curConvArchived: boolean;
   /** 同类免确认积累（档1「同类只问一次」）：存确认过的工具名（如 act_remind）；切档/新会话即清 */
@@ -402,7 +428,8 @@ function emptyTurn(question: string): AssistantTurn {
     hitl: null,
     plan: null,
     elicitations: [],
-    askUsers: []
+    askUsers: [],
+    askReceipts: []
   };
 }
 
@@ -428,7 +455,17 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   const history: AguiMessage[] = options.history ?? [];
   // E5 会话重建：threadId 按 persistKey 持久化（刷新/重进续同一会话——后端按 threadId 记忆）
   const persistKey = options.persistKey;
-  const savedThread = persistKey ? localStorage.getItem(persistKey) : null;
+  // E-10（2026-11-06）：存储读取统一走 try——隐私模式/配额满时 getItem 会抛，
+  // 裸读会让整个 useAssistant setup 炸掉（界面整块空白）；setItem 早就都包了 try，读写要对称
+  const safeGet = (k: string): string | null => {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  };
+  const savedThread = persistKey ? safeGet(persistKey) : null;
+  const prefs = getAgentPrefs(persistKey ? persistKey.split(':').pop() || 'anon' : 'anon');
   // 组件层可变绑定（工厂模式=直接取 options；单例模式=bind 栈顶）：
   // 批H P1-5 栈化——会话页 bind 抢占后路由离开，抽屉（layout 常驻不重挂）拿不回
   // getDraft。改为 push/pop：卸载方 unbind() 弹栈自动归还上一任；空栈=无宿主接管
@@ -447,18 +484,19 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     queue: [],
     queuePaused: false,
     banner: '',
-    gateDone: (() => (persistKey ? localStorage.getItem(persistKey.replace(':thread:', ':gateOk:')) === '1' : false))(),
+    gateDone: (() => (persistKey ? safeGet(persistKey.replace(':thread:', ':gateOk:')) === '1' : false))(),
     gatePendQ: '',
     newbieUse: 0,
     threadId: savedThread && savedThread.length > 8 ? savedThread : uuid(),
+    draftMode: true,
     autoApproved: [],
     // 自主权档位持久化（Q9 拍板）：按用户分键（与 persistKey 同源派生），刷新不回 always
     autoLevel: (() => {
-      const saved = persistKey ? localStorage.getItem(persistKey.replace(':thread:', ':autoLevel:')) : null;
+      const saved = persistKey ? safeGet(persistKey.replace(':thread:', ':autoLevel:')) : null;
       return saved === 'once' || saved === 'auto' ? saved : 'always';
     })(),
     // T-2(1008)：思考过程总显示——同源派生键持久化，默认收起（思考是配菜答案是主菜）
-    showThink: (() => (persistKey ? localStorage.getItem(persistKey.replace(':thread:', ':thinkShow:')) === '1' : false))(),
+    showThink: (() => (persistKey ? safeGet(persistKey.replace(':thread:', ':thinkShow:')) === '1' : false))(),
     // ZCode 对齐 Q2（批B）：会话 TODO 清单（todo CUSTOM 帧/打开会话恢复写）
     todoItems: [],
     curConvArchived: false
@@ -474,6 +512,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   // 题5 续看：attach 流控制器（单槽——新 attach 顶旧 attach；runTurn 发起时主动断开）
   let attachCtl: AbortController | null = null;
   let wasStopped = false;
+  /** 队列「立即」抢占中：停掉当前轮后要发的那条（由 consumeQueue 在收尾时消费，
+   *  不能 stop 后立刻 runTurn——sending 还没落，硬发会把状态机搅乱） */
+  let preemptText: string | null = null;
   let qDrained = 0;
   let pendingIdSeq = 1;
   let stopTicker: (() => void) | null = null;
@@ -562,8 +603,13 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       return;
     }
     if (t.shownLen < t.bufText.length) {
-      const remain = t.bufText.length - t.shownLen;
-      t.shownLen = Math.min(t.bufText.length, t.shownLen + Math.max(2, Math.ceil(remain * 0.35)));
+      // 常规 · 流式输出关：先攒着，等这一轮收尾时一次性全量出（减少滚动抖动）
+      if (prefs.streamOutput) {
+        const remain = t.bufText.length - t.shownLen;
+        t.shownLen = Math.min(t.bufText.length, t.shownLen + Math.max(2, Math.ceil(remain * 0.35)));
+      } else if (t.streamDone) {
+        t.shownLen = t.bufText.length;
+      }
     }
     if (t.streamDone && t.shownLen >= t.bufText.length && !t.answerHtml) {
       t.answerHtml = renderMd(t.bufText);
@@ -598,6 +644,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       // G3 三审回修（dsflash P2-13）：反问卡是 run 内挂起（tools/call 在飞）——run
       // 终态/契约失效即死卡（作答必得「已失效」），与 HITL 不同没有 resume 续命，全清
       t.elicitations = [];
+      // 题8 甲：run 已结束，还挂着的反问卡不可能再作答——转成回执行（别无声消失）
+      for (const c of t.askUsers) {
+        t.askReceipts.push({ id: c.id, questions: c.questions, outcome: 'cancelled', answers: [] });
+      }
       t.askUsers = [];
     }
   }
@@ -611,12 +661,23 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
   }
 
-  /** 题12 案1：结构化反问卡收卡（用户提交/关闭/超时；与 elicitation 同机制） */
-  function removeAskUserCard(id: string) {
+  /**
+   * 题12 案1 + 题8 甲（2026-11-06）：结构化反问卡收卡——不再静默移除，落一行回执
+   * （已询问 · N 个问题 / 未回答，已自动继续 / 未提供回答），展开可回看逐题问答。
+   */
+  function finishAskUserCard(
+    id: string,
+    outcome: AssistantAskReceipt['outcome'] = 'cancelled',
+    answers: AssistantAskReceipt['answers'] = []
+  ) {
     for (const t of state.turns) {
-      if (t.askUsers.length > 0) {
-        t.askUsers = t.askUsers.filter((c) => c.id !== id);
+      const card = t.askUsers.find((c) => c.id === id);
+      if (!card) {
+        continue;
       }
+      t.askReceipts.push({ id, questions: card.questions, outcome, answers });
+      t.askUsers = t.askUsers.filter((c) => c.id !== id);
+      return;
     }
   }
 
@@ -1039,6 +1100,27 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         // AU-23: 错误轮同样收尾——否则打字机光标永久闪烁、部分文本永不渲染 md、ticker 不停
         turn.streamDone = true;
         ensureTypingLoop();
+        // 常规 · 失败自动重试（最多 1 次）：契约/暂停/鉴权类不重试，避免把不可恢复错误再打一遍
+        const retryable =
+          code !== 'AGUI_INTERRUPT_CONTRACT_ERROR' &&
+          !(msg && msg.startsWith('Agent is paused for human-in-the-loop')) &&
+          !['401', '403', '409'].includes(String(code || ''));
+        if (prefs.autoRetry && retryable && (turn.retryDepth ?? 0) < 1 && turn.retryPayload && !turn.autoRetried) {
+          const payload = turn.retryPayload;
+          turn.autoRetried = true;
+          turn.errorMsg = `${turn.errorMsg || '连接断开'}（已自动重试一次）`;
+          let waits = 0;
+          const go = () => {
+            if (state.sending) {
+              if (++waits < 20) {
+                setTimeout(go, 300);
+              }
+              return;
+            }
+            void runTurn(payload.q, payload.stamp, payload.fwd, 1);
+          };
+          setTimeout(go, 800);
+        }
       }
     };
   }
@@ -1306,12 +1388,14 @@ export function useAssistant(options: UseAssistantOptions = {}) {
   }
 
   /** 发起一轮（runTurn；history 镜像同步 user 消息）。fwd=请求级标记（思考档位等，AGUI forwardedProps 通道） */
-  async function runTurn(q: string, stamp = '', fwd: Record<string, unknown> = {}) {
+  async function runTurn(q: string, stamp = '', fwd: Record<string, unknown> = {}, retryDepth = 0) {
     // R1：禁用统一闸（队列续发/立即发送/继续说完/须知门均汇入此处，见 assertUsable）
     if (!assertUsable()) {
       return;
     }
     const turn = reactive<AssistantTurn>(emptyTurn(q));
+    turn.retryPayload = { q, stamp, fwd };
+    turn.retryDepth = retryDepth;
     // 计划决策由宿主点击时显式写入 planDecisionNext（不信自然语言文案）；
     // 这里只取一次并随请求上行，不带=计划卡仍挂着，后端继续硬拒写操作。
     const planDecision = takePlanDecision();
@@ -1330,6 +1414,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // must-cover 全等）——入口即扫，防「弃卡改问后新回合又挂 interrupt」双待确认卡同屏
     sweepStaleHitlCards(turn);
     state.sending = true;
+    // 第一条发出去即不再是草稿态：后端 ensureConversation 会落库，草稿作用域切到 threadId
+    state.draftMode = false;
     // 题5：新回合发起即断开续看流（旧 run 仍在服务端跑，其结果下次重开可见——与轮询兜底同口径）
     attachCtl?.abort();
     state.newbieUse += 1;
@@ -1354,6 +1440,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         ...(currentModelPin() ? { modelConfigId: currentModelPin() } : {}),
         // 题10 案1：联网默认自动——永远显式带值，停用发 false 让后端撤掉搜索工具
         webSearchEnabled: currentWebOn(),
+        // C 七行·提问自动继续：永远显式带值——后端按它决定反问卡等 5 分钟自动继续，还是等到超时
+        askAutoContinue: prefs.askAutoContinue,
         ...(planDecision ? { planDecision: planDecision.kind, ...(planDecision.planId ? { planId: planDecision.planId } : {}) } : {}),
         ...(currentSkillId() ? { skillId: currentSkillId() } : {}),
         ...fwd
@@ -1374,6 +1462,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     turn.durMs = Date.now() - turn.startedAt;
     // 题12 案1（三席 P1）：run 已到终态，未作答的反问卡已不可能被模型用上——
     // 后端停止时已按取消收尾，前端再留着只会让用户点出一笔「成功但模型收不到」的假提交
+    // 题8 甲：收尾时仍未回答的卡 → 回执（正常路径早已作答并转回执，这里兜超时/断线）
+    for (const c of turn.askUsers) {
+      turn.askReceipts.push({ id: c.id, questions: c.questions, outcome: 'cancelled', answers: [] });
+    }
     turn.askUsers = [];
     // assistant 回复入 history 镜像（AGUI 每轮全量重传——多轮上下文；E2E 实证缺此步二轮即失忆）
     if (turn.bufText && !turn.hitl) {
@@ -1467,6 +1559,13 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     if (hasPendingHitl()) {
       return;
     }
+    // 抢占补发优先：用户点了「立即」，这条必须抢在所有排队项前面
+    if (preemptText) {
+      const text = preemptText;
+      preemptText = null;
+      runTurn(text);
+      return;
+    }
     // 暂停态不自动续发（批H P2-13）：「队列已暂停待手动恢复」的 UI 承诺与自动补发矛盾
     if (state.queuePaused) {
       return;
@@ -1521,7 +1620,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
     // 全屏「今日概况」行的 🕒 上次使用时间（抽屉/全屏/会话页统一走本入口）
     try {
-      localStorage.setItem('dcs:assistant:lastUse', new Date().toISOString());
+      localStorage.setItem(lastUseKey(persistKey ? persistKey.split(':').pop() || 'anon' : 'anon'), new Date().toISOString());
     } catch {
       /* 存储不可用忽略 */
     }
@@ -1595,18 +1694,27 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     toast('已撤回到输入框——改完再发', 'ok');
     return item.text;
   }
+  /**
+   * 队列「立即」：不排了，马上发这条——正在生成就先停掉当前轮再发。
+   * 与 ZCode sendQueuedNow 同义（源码注释原话：preempts active turn）。
+   */
   function queueGo(i: number) {
-    if (state.queue.length === 0) {
+    if (i < 0 || i >= state.queue.length) {
       return;
     }
+    // 注意：这里不拦 pending 确认卡——「弃卡改问」是既有防御路径（旧卡由 runTurn 入口
+    // sweepStaleHitlCards 收掉，E2E 2026-10-10 实证），拦了会让队列消息永远发不出去
     const [item] = state.queue.splice(i, 1);
-    if (state.sending) {
-      state.queue.unshift(item);
-      toast('已挪到队首，答完就发', 'ok');
-    } else {
+    state.queuePaused = false;
+    if (!state.sending) {
+      collapsePausedIfEmpty();
       runTurn(item.text);
+      return;
     }
-    collapsePausedIfEmpty();
+    // 先停当前轮（本机断流 + 服务端真取消），收尾时 consumeQueue 把这条发出去
+    preemptText = item.text;
+    stop(false);
+    toast('已停当前回答，马上发这条', 'ok');
   }
   function queueDrop(i: number) {
     state.queue.splice(i, 1);
@@ -1715,6 +1823,10 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         ...(currentModelPin() ? { modelConfigId: currentModelPin() } : {}),
         // 题10 案1：联网默认自动——永远显式带值，停用发 false 让后端撤掉搜索工具
         webSearchEnabled: currentWebOn(),
+        // E-3（2026-11-06）：确认/取消补跑＝resume 轮，不是用户新写的一句话——
+        // 后端只认这个标记，据此跳过 user 消息落库（否则库里重复一条原问题）
+        resumeRound: true,
+        askAutoContinue: prefs.askAutoContinue,
         ...(currentSkillId() ? { skillId: currentSkillId() } : {})
       }
     };
@@ -1912,13 +2024,19 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // k3 P1-1 回修：切会话/新会话即清任务清单——旧会话清单不得残留到新面板
     // （loadTodo 晚归响应被上面的代数守卫拦下，不会回填旧值）
     state.todoItems = [];
+    // E-11（2026-11-06）：队列随会话清空是必要语义，但不能静默——用户以为那几条已发出去
+    if (state.queue.length > 0) {
+      toast(`已切到别的会话，${state.queue.length} 条排队消息不会发出（可在原会话里重发）`, 'info');
+    }
     state.queue = [];
     state.queuePaused = false;
+    preemptText = null;
     qDrained = 0;
     stop(false);
     // 旧回合收尾已被代数守卫拦下（不再复位 sending）——重置即复位，UI 不停留发送态
     state.sending = false;
     state.curConvArchived = false;
+    state.draftMode = true;
   }
 
   /** 三档自主权切换（批I-2 原型 autoPop）：切档即重置同类积累（原型 autoDid=false 同义） */
@@ -2081,6 +2199,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     // 先按新会话收敛（批H P1-3）：清队列+代数递增（在途回合收尾作废）+sending 复位
     // （stop 的 abort settle 可能滞后数秒——重建的是只读视图，UI 不应停留在旧回合的发送态）
     resetForNewSession();
+    // 打开的是真实会话（含空会话）：草稿态结束，草稿作用域切到 threadId
+    state.draftMode = false;
     if (threadId && threadId.length > 8) {
       state.threadId = threadId;
       if (persistKey) {
@@ -2281,7 +2401,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     attachRunning,
     resumeStreamingPlaceholder,
     removeElicitationCard,
-    removeAskUserCard,
+    finishAskUserCard,
     /** 三批④：全自动完成卡撤回（TurnBlock 撤回按钮经 getAssistant 单例自治直达） */
     revokeAutoDone,
     resumeSay,

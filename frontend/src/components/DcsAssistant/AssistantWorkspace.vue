@@ -1,5 +1,9 @@
 <template>
-  <div class="dcs-as-session" :class="{ 'ws-in-agent': variant === 'agent' }">
+  <div
+    class="dcs-as-session"
+    :class="{ 'ws-in-agent': variant === 'agent', 'motion-reduced': motionReduced(prefs) }"
+    :style="{ '--dcs-answer-size': prefs.answerSize === 'large' ? '15.5px' : '14px' }"
+  >
     <!-- 左：会话列表（搜索/新会话/置顶/时间分组/归档折叠）；≤992 变历史会话抽屉 -->
     <div v-if="sideOpen" class="side-mask" @click="sideOpen = false"></div>
     <aside
@@ -224,7 +228,6 @@
         @mdnav="(u) => router.push(u)"
         @draft-set="onDraftSet"
         @elicit-done="removeElicitationCard"
-        @ask-user-done="removeAskUserCard"
         :active-plan-id="planCardActionable ? (activePlan?.planId ?? '') : ''"
         @plan-confirm="onPlanConfirm"
         @plan-adjust="onPlanAdjust"
@@ -235,6 +238,9 @@
       <!-- 计划待确认（题四甲）：主体是消息流里的表单卡；确认期间输入框收起。
            用户「忽略」或输入框里有草稿时，才露出细条 + 输入框（草稿不能丢） -->
       <plan-tip v-if="planTipShown && activePlan" :plan="activePlan" full @open="expandPlanCard" />
+
+      <!-- 题10 乙：反问卡贴输入框上方（不随消息流滚走；一次一题、可空答） -->
+      <ask-user-card v-if="askCard" :card="askCard" :thread-id="state.threadId" @done="onAskUserDone" />
 
       <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留） -->
       <hitl-dock :ask="pendingAsk" full @resolve="resolveHitl" @revise="onDockRevise" />
@@ -248,6 +254,7 @@
         :state="state"
         :sending="state.sending"
         :blocked="!!pendingAsk"
+        :draft-scope="draftScope"
         @draft-change="draftText = $event"
         @send="onSend"
         @stop="onStop"
@@ -350,6 +357,7 @@ import {
   type AssistantConversation
 } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
+import { getAgentPrefs, motionReduced } from '@/components/DcsAssistant/prefsStore';
 import { getAssistant, ACT, logSt, tryAcquireRemoteWatch, releaseRemoteWatch, PLAN_CONFIRM_TEXT } from '@/components/DcsAssistant/useAssistant';
 import type { AssistantBindings } from '@/components/DcsAssistant/useAssistant';
 import { useHelpModal } from '@/components/DcsAssistant/helpModal';
@@ -361,9 +369,10 @@ import MsgFlow from '@/components/DcsAssistant/MsgFlow.vue';
 import HitlDock from '@/components/DcsAssistant/HitlDock.vue';
 import PlanTip from '@/components/DcsAssistant/PlanTip.vue';
 import { latestPendingPlan } from '@/components/DcsAssistant/planDock';
-import { convPins, toggleConvPin } from '@/components/DcsAssistant/conversationPins';
+import { convPins, initConvPins, toggleConvPin } from '@/components/DcsAssistant/conversationPins';
 import { startTour } from '@/components/DcsAssistant/useTour';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
+import AskUserCard from '@/components/DcsAssistant/AskUserCard.vue';
 import Composer from '@/components/DcsAssistant/Composer.vue';
 import GateCard from '@/components/DcsAssistant/GateCard.vue';
 import StatPanel from '@/components/DcsAssistant/StatPanel.vue';
@@ -375,7 +384,17 @@ const props = withDefaults(defineProps<{ variant?: 'session' | 'agent' }>(), { v
 
 const router = useRouter();
 const userStore = useUserStore();
+// E-10（2026-11-06）：置顶键按登录用户分开（换账号不串别人会话）
+initConvPins(userStore.userId);
+const prefs = getAgentPrefs(userStore.userId);
 const help = useHelpModal();
+
+/** 题10 乙：当前活着的反问卡（一次只显示一张；ZCode 同形——问完一张换下一张） */
+const askCard = computed(() => cur()?.askUsers?.[0] ?? null);
+/** 题8 甲：答完/超时/忽略 → 落一行「已询问」回执，卡从停靠区撤下 */
+function onAskUserDone(p: { id: string; outcome: 'answered' | 'cancelled' | 'timeout' | 'skipped'; answers: never[] }) {
+  finishAskUserCard(p.id, p.outcome, p.answers);
+}
 
 const loading = ref(false);
 const conversations = ref<AssistantConversation[]>([]);
@@ -596,7 +615,7 @@ const {
   stop,
   resumeStreamingPlaceholder,
   removeElicitationCard,
-  removeAskUserCard,
+  finishAskUserCard,
   resumeSay,
   resolveHitl,
   setAutoLevel,
@@ -661,6 +680,8 @@ const pendingPlan = computed(() => latestPendingPlan(state.turns));
 const activePlan = computed(() => pendingPlan.value?.plan ?? null);
 /** Composer 草稿（题四甲：有草稿时不藏输入框，草稿不能丢） */
 const draftText = ref('');
+/** 草稿作用域：新建态固定 draft（不跟临时 uuid 走），真实会话用 threadId */
+const draftScope = computed(() => (state.draftMode ? 'draft' : selected.value?.threadId || state.threadId));
 /** 用户点过「忽略」：卡仍留在消息流里可再操作，但输入框先还回来 */
 const planCollapsed = ref(false);
 /** 卡是否可操作（无反问抢位、有卡号）——生成中也保留，否则第 4 行写一半会被卸载丢字 */
@@ -881,8 +902,6 @@ function onNewSession() {
   actions.value = [];
   // 搜索词一起清：不清的话新会话列表会被上一次的关键字过滤，用户以为会话没了
   kw.value = '';
-  // 业务批(1015) Q15：新会话即时置顶（答后补刷会换成真实行+真实标题）
-  conversations.value = ensureCurRow(conversations.value);
 }
 
 /** 列表分页（AU-19）：后端 clamp pageSize=100，此前只拉 50 条弃 total——
@@ -895,6 +914,11 @@ const convTotal = ref(0);
  *  收起的「更早」组，即时置顶落空；②行内操作(打开/重命名/置顶/归档)对临时行全拦
  *  （假 ID 打真 API 只会弹"操作失败"假错误 + 僵尸置顶）；③计数不计临时行 */
 function ensureCurRow(list: AssistantConversation[]): AssistantConversation[] {
+  // 草稿态不插行（A 案）：列表里只放真实会话；新建后第一句发出、服务端落库再由列表刷新接管。
+  // 真实会话被选中但不在首屏 50 条内时，仍保留一行保底，避免当前会话从列表里消失。
+  if (state.draftMode || !selected.value || selected.value.threadId !== state.threadId) {
+    return list;
+  }
   if (!state.threadId || list.some((c) => c.threadId === state.threadId)) {
     return list;
   }
@@ -928,6 +952,16 @@ async function doLoadConversations(silent: boolean) {
       total?: number;
     };
     const head = ensureCurRow(res?.rows ?? []);
+    // 草稿态第一句发出后：服务端已落库的真实行一出现就接管当前会话（标题/高亮跟上），
+    // 不再靠临时行；只认 threadId 相同的行，避免把别人的会话选中。
+    if (!selected.value) {
+      const cur = head.find((c) => c.id !== 'tmp' && c.threadId === state.threadId);
+      if (cur) {
+        selected.value = cur;
+        selectedId.value = cur.id;
+        state.draftMode = false;
+      }
+    }
     if (silent) {
       // 自查回修(dspro P2)：静默补刷只换首页，已「加载更多」的尾段保留——此前整表替换把
       // 列表压回 50 条，刚翻到第 2 页的用户被无声打断；同 id 以新数据为准，临时行一律丢弃
@@ -1006,6 +1040,10 @@ async function openConversation(c: AssistantConversation) {
   }
   // 连点序号守卫（批H P2-1）：两个并发 Promise.all 后完成者不得覆盖先选中者
   const mySeq = ++openSeq;
+  // E-4（2026-11-06）：加载失败要回滚选中——否则左栏高亮在 C、state.threadId 还停在原会话，
+  // 用户接着发的消息就写进了另一个会话（最坏情况：以为在私聊 A，实际发到 B）
+  const prevSelected = selected.value;
+  const prevSelectedId = selectedId.value;
   selected.value = c;
   selectedId.value = c.id;
   // 单例归档闸（AU-36）：rebuildFromHistory 开头 reset 会清位，rebuild 之后再置
@@ -1038,6 +1076,9 @@ async function openConversation(c: AssistantConversation) {
     }
   } catch {
     if (openSeq === mySeq) {
+      // E-4：回滚到打开前的选中态（threadId 从未切过，回滚后左栏/消息区重新对齐）
+      selected.value = prevSelected;
+      selectedId.value = prevSelectedId;
       ElMessage.error('会话加载失败，请稍后再试');
     }
   }
@@ -1137,6 +1178,11 @@ let convRefreshTimers: ReturnType<typeof setTimeout>[] = [];
 watch(
   () => state.sending,
   (v, old) => {
+    // 第一条发出后服务端才落库：800ms 后静默补刷一次，让真实行尽快出现在左栏
+    // （否则要等答完的 3.5s 补刷，用户会以为新会话没建）
+    if (!old && v) {
+      convRefreshTimers.push(setTimeout(() => void loadConversations(true), 800));
+    }
     if (old && !v) {
       convRefreshTimers.forEach((t) => clearTimeout(t));
       convRefreshTimers = [3500, 5500, 9000].map((ms) => setTimeout(() => void loadConversations(true), ms));

@@ -34,11 +34,97 @@ public class AssistantMcpController extends BaseController {
 
     private final McpPilotService mcpPilotService;
     private final DcsMcpCallLogMapper callLogMapper;
+    private final org.dromara.assistant.service.AssistantConfigService assistantConfigService;
 
     /** 服务行 VO：headers 只回键名不回值（免密钥试点仍防误回显） */
     public record McpServerRow(Long id, String serverName, String displayName, String transportType,
                                String command, String args, String url, String headerKeys,
-                               String enabled, String remark, String updateTime) {
+                               String enabled, String readOnly, String remark, String updateTime) {
+    }
+
+    /**
+     * 成员可见行（旧板题 2 乙 2026-11-06）：清单 + 带来的工具 + 现在能不能用（外部服务恒标高危）。
+     * tools 来自真实调用账本的去重工具名（最近 90 天），不是注册时猜的。
+     */
+    public record McpMemberRow(String serverName, String displayName, String transportType, String readOnly,
+                               String status, String statusText, String whoCanUse,
+                               java.util.List<String> tools) {
+    }
+
+    /**
+     * 成员只读清单：只回**已启用**的服务（停用的对成员等于不存在）。
+     * 状态口径与工具清单（AssistantToolViewerController）一致：租户闸 off → 已停用；
+     * 闸 admin → 管理员限定；tool_gate 污染 → fail-closed。
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/member-list")
+    public R<java.util.List<McpMemberRow>> memberList() {
+        String dynamic = org.dromara.common.tenant.helper.TenantHelper.getTenantId();
+        String tenantId = org.dromara.common.core.utils.StringUtils.isNotBlank(dynamic)
+            ? dynamic : LoginHelper.getTenantId();
+        var cfg = assistantConfigService.effective(tenantId);
+        java.util.Map<String, String> gate = cfg.toolGate();
+        boolean poisoned = gate != null
+            && gate.containsKey(org.dromara.assistant.service.AssistantConfigService.POISONED_GATE_SENTINEL);
+        // 工具名按本租户真实调用去重（排除每次建会话都写的挂载行）——没有账本的服务 tools 为空
+        java.util.Map<String, java.util.List<String>> toolsByServer = new java.util.HashMap<>();
+        try {
+            java.util.List<java.util.Map<String, Object>> maps = callLogMapper.selectMaps(
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<DcsMcpCallLog>()
+                    .select("server_name", "tool_name")
+                    .eq("tenant_id", tenantId)
+                    .notIn("action", java.util.List.of("MOUNT_OK", "MOUNT_ERROR"))
+                    .isNotNull("tool_name")
+                    .groupBy("server_name", "tool_name"));
+            for (java.util.Map<String, Object> m : maps) {
+                Object server = m.get("server_name") != null ? m.get("server_name") : m.get("SERVER_NAME");
+                Object tool = m.get("tool_name") != null ? m.get("tool_name") : m.get("TOOL_NAME");
+                if (server == null || tool == null) {
+                    continue;
+                }
+                java.util.List<String> list = toolsByServer.computeIfAbsent(
+                    String.valueOf(server), k -> new java.util.ArrayList<>());
+                if (list.size() < 20) {
+                    list.add(String.valueOf(tool));
+                }
+            }
+        } catch (Exception e) {
+            // 账本读失败：清单照常返回，工具名留空（不冒充「没有工具」）
+            org.slf4j.LoggerFactory.getLogger(AssistantMcpController.class)
+                .warn("[MCP] 成员工具名读取失败，本次只回服务清单", e);
+        }
+        java.util.List<McpMemberRow> rows = new java.util.ArrayList<>();
+        for (DcsMcpServer s : org.dromara.common.tenant.helper.TenantHelper.ignore(mcpPilotService::listAll)) {
+            if (!"1".equals(s.getEnabled())) {
+                continue;
+            }
+            String override = gate == null ? null : gate.get("mcp:" + s.getServerName());
+            int effective = "off".equals(override) ? -1
+                : "admin".equals(override) ? org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN
+                : org.dromara.assistant.tools.ToolIdentity.LEVEL_MEMBER;
+            if (poisoned) {
+                effective = -1;
+            }
+            String status;
+            String statusText;
+            if (effective < 0) {
+                status = "off";
+                statusText = "已停用";
+            } else if (effective >= org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN) {
+                status = "admin";
+                statusText = "管理员限定";
+            } else {
+                status = "ready";
+                statusText = "可用";
+            }
+            String who = effective < 0 ? "—"
+                : effective >= org.dromara.assistant.tools.ToolIdentity.LEVEL_ADMIN ? "管理员" : "成员";
+            rows.add(new McpMemberRow(s.getServerName(),
+                s.getDisplayName() == null || s.getDisplayName().isBlank() ? s.getServerName() : s.getDisplayName(),
+                s.getTransportType(), s.getReadOnly(), status, statusText, who,
+                toolsByServer.getOrDefault(s.getServerName(), java.util.List.of())));
+        }
+        return R.ok(rows);
     }
 
     @SaCheckPermission("dcs:assistant:config")
@@ -48,7 +134,7 @@ public class AssistantMcpController extends BaseController {
             s.getId(), s.getServerName(), s.getDisplayName(), s.getTransportType(),
             s.getCommand(), s.getArgs(), s.getUrl(),
             // G4-#1：落库是 ENC_ 密文——先解密再取键名（service 内同款显式解密，与挂载链路一致）
-            mcpPilotService.headerKeysOf(s), s.getEnabled(), s.getRemark(),
+            mcpPilotService.headerKeysOf(s), s.getEnabled(), s.getReadOnly(), s.getRemark(),
             s.getUpdateTime() == null ? null : String.valueOf(s.getUpdateTime().getTime()))).toList();
         return R.ok(rows);
     }

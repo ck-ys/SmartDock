@@ -4,9 +4,9 @@
          活的"立即发送/继续发送"按钮与禁用横幅自相矛盾（dspro P1-3 配套） -->
     <div v-if="(state.queue.length > 0 || state.queuePaused) && !disabled" class="queue-bar" aria-live="polite">
       <div class="qb-hd">
-        <!-- BN-18 原型口径：头部带操作图例（改 · 提前 · 移除） -->
+        <!-- BN-18 原型口径：头部带操作图例；「立即」= 不排队，停当前轮马上发（对齐 ZCode） -->
         <span>排队 {{ state.queue.length }} 条 · 答完自动逐条发送</span>
-        <span class="qb-tip">✎ 改 · ↗ 提前 · ✕ 移除</span>
+        <span class="qb-tip">✎ 改 · 立即 插队 · ✕ 移除</span>
         <button v-if="state.queuePaused" class="qb-go" @click="emit('queue-resume')">继续发送</button>
       </div>
       <div v-if="state.queuePaused" class="qb-p">你中断了本轮回答，队列已暂停</div>
@@ -16,7 +16,13 @@
         <span class="q-t" :title="q.text">{{ q.text.length > 18 ? q.text.slice(0, 18) + '…' : q.text }}</span>
         <span class="q-ops">
           <button title="撤回修改" @click="emit('queue-edit', i)">✎</button>
-          <button :title="sending ? '排到队首，答完就发' : '立即发送'" @click="emit('queue-go', i)"><IconSpan name="arrow-up-right" /></button>
+          <button
+            class="q-now"
+            :title="sending ? '立即：停掉当前回答，马上发这条' : '立即发送'"
+            @click="emit('queue-go', i)"
+          >
+            立即
+          </button>
           <button title="移除" @click="emit('queue-drop', i)"><IconSpan name="x" /></button>
         </span>
       </div>
@@ -72,7 +78,7 @@
         </div>
         <template v-for="(it, i) in cmd.items" :key="it.label">
           <div v-if="cmd.mode === 'slash' && (i === 0 || cmd.items[i - 1].grp !== it.grp)" class="cmd-grp">
-            {{ it.grp === 'fn' ? '功能命令' : '快捷问句' }}
+            {{ it.grp === 'fn' ? '功能命令' : it.grp === 'skill' ? '技能（选中即挂本会话）' : '快捷问句' }}
           </div>
           <button
             class="cmd-it"
@@ -200,10 +206,12 @@
                长解释/恢复时间全部进 title hover；订阅租户积分区=三行微条 5小时窗→周池→加油包（有余额才显示） -->
           <span class="ctxpop">
             <b>会话状态</b>
+            <!-- 题5 甲（2026-11-06）：空态/读数≤0 一律不渲染读数（同 ZCode 两道守卫），只留一句「待测」 -->
             <span
+              v-if="ctxKnown"
               class="ctxrow"
               :title="
-                (ctxKnown ? `本会话上下文占用 ${fmtK(ctxTokens)} / ${fmtK(ctxWindowDisplay)} tokens` : ctxEmptyHint) +
+                `本会话上下文占用 ${fmtK(ctxTokens)} / ${fmtK(ctxWindowDisplay)} tokens` +
                 (ctxTrigger ? ` · 到 ${fmtK(ctxTrigger)} 自动压缩` : '') +
                 ' · 环变橙=接近自动压缩线 · 变红=即将压缩'
               "
@@ -216,10 +224,12 @@
               <!-- 批A-1 回修：数字与环色同分母=离自动压缩线进度（条上竖线即触发线位置） -->
               <span>{{ ctxKnown ? Math.round(ctxNearPct * 100) + '%' : '待测' }}</span>
             </span>
-            <!-- 批A-1：全自动压缩——用户只读水位三值（已用 / 窗口 / 自动触发线），没有任何手动入口 -->
-            <span class="ctxsub">
+            <!-- 批A-1：全自动压缩——用户只读水位三值（已用 / 窗口 / 自动触发线），没有任何手动入口。
+                 题5 甲：没读数就不摆「已用 — / 窗口 …」这种噪音，直接一句为什么 -->
+            <span v-if="ctxKnown" class="ctxsub">
               已用 {{ fmtK(ctxTokens) }} / 窗口 {{ fmtK(ctxWindowDisplay) }}{{ ctxWindowUnknown ? '（未配置，按 20 万算）' : '' }} · 自动触发线 {{ fmtK(ctxTrigger) }}
             </span>
+            <span v-else class="ctxsub">{{ ctxEmptyHint }}</span>
             <span class="ctxdiv" />
             <template v-if="billingMode === 'credits'">
               <!-- 业务批(1015) Q8：常显消费方式徽标——演示/实测"池子不动"的困惑根因=不知这轮扣哪本账 -->
@@ -527,6 +537,8 @@ import { useFavs } from './favStore';
 import IconSpan from './IconSpan.vue';
 import type { AssistantState } from './useAssistant';
 import { unwrap } from './util';
+import { readDraft, writeDraft, removeDraft, migrateDraft } from './draftStore';
+import { getAgentPrefs } from './prefsStore';
 import { globalHeaders } from '@/utils/request';
 import { listAssistantAttachments, registerAssistantAttachment, removeAssistantAttachment, type AssistantAttachmentItem } from '@/api/dcs/assistant';
 
@@ -537,6 +549,8 @@ const props = defineProps<{
   full?: boolean;
   /** 有待确认操作时收起输入框（保持挂载，草稿不丢）——对齐母仓 Q21-A / ZCode 口径 */
   blocked?: boolean;
+  /** 草稿作用域：草稿态传 'draft'，真实会话传 threadId；缺省用 state.threadId */
+  draftScope?: string;
 }>();
 const emit = defineEmits<{
   send: [text: string, stamp: string, fwd: Record<string, unknown>];
@@ -596,11 +610,22 @@ function amActive(): boolean {
   return props.active !== false;
 }
 
+/** E-9（2026-11-06）：附件拉取代次——晚归的旧会话响应不得写进新会话的附件条 */
+let attSeq = 0;
 async function refreshAttachments() {
   const tid = props.state.threadId;
-  if (!tid || !amActive()) return;
+  if (!tid || !amActive()) {
+    // 没有会话/不可见时清空——否则切到新任务后还挂着上一会话的附件 chips
+    attachments.value = [];
+    stopAttachPolling();
+    return;
+  }
+  const mySeq = ++attSeq;
   try {
     const res: any = await listAssistantAttachments(tid);
+    if (mySeq !== attSeq || props.state.threadId !== tid) {
+      return;
+    }
     attachments.value = unwrap<AssistantAttachmentItem[]>(res);
   } catch {
     /* 挂载时失败不打扰（发消息不受影响） */
@@ -725,7 +750,12 @@ async function uploadOne(file: File) {
 /* 回放/重进：挂载即拉本会话附件（threadId 变化=换会话也要刷新） */
 watch(
   () => props.state.threadId,
-  () => refreshAttachments(),
+  () => {
+    // E-9：换会话先清旧 chips（拉取失败也不能让上一会话的附件留在输入框上方）
+    attachments.value = [];
+    stopAttachPolling();
+    void refreshAttachments();
+  },
   { immediate: true }
 );
 
@@ -812,11 +842,24 @@ const SLASH_CMDS = computed(() => {
   if (roleKey.value !== 'member') {
     ask.splice(3, 0, { icon: 'megaphone', label: '/催办', sub: '给未交的人提个醒', text: '怎么给还没提交的成员发催办？' });
   }
-  // fn 组在前 ask 组在后——syncCmd 过滤保序，模板按 grp 变化插组头
-  return [...fn.map((c) => ({ ...c, grp: 'fn' as const })), ...ask.map((c) => ({ ...c, grp: 'ask' as const }))];
+  // 题11 甲（2026-11-06）：/ 里补「技能」组——复用 ➕ 面板那份目录与 toggleSkill()，
+  // 语义仍是「本会话每轮生效」（不是 ZCode 的消息级 token），三处入口同一份真源
+  const skill = skillCatalogForRole.value.map((sk) => ({
+    icon: 'sparkles',
+    label: '/' + sk.name,
+    sub: skillId.value === sk.id ? '已启用 · 再点停用' : '技能 · 本会话生效',
+    text: '__SKILL__:' + sk.id
+  }));
+  // fn 组在前、技能居中、快捷问句在后——syncCmd 过滤保序，模板按 grp 变化插组头
+  return [
+    ...fn.map((c) => ({ ...c, grp: 'fn' as const })),
+    ...skill.map((c) => ({ ...c, grp: 'skill' as const })),
+    ...ask.map((c) => ({ ...c, grp: 'ask' as const }))
+  ];
 });
 
 const userStore = useUserStore();
+const prefs = getAgentPrefs(userStore.userId);
 const roleKey = computed(() => roleOf(userStore.roles, userStore.permissions));
 const roleChips = computed(() => CHIPS_BY_ROLE[roleKey.value] ?? CHIPS_BY_ROLE.teacher);
 
@@ -824,6 +867,34 @@ const draft = ref('');
 const focused = ref(false);
 /** 计划停靠区用：草稿为空才占输入框，有字时只出细条（Q6-A） */
 watch(draft, (v) => emit('draft-change', v), { immediate: true });
+
+/* 草稿按用户 + 会话作用域各存一份：切会话不丢、刷新还在；草稿态固定 draft，
+   拿到真实 threadId 后迁移并删旧键（施工令 A×B 边界）。 */
+const draftScopeOf = () => props.draftScope || props.state.threadId || 'draft';
+let draftScope = draftScopeOf();
+{
+  const saved = readDraft(userStore.userId, draftScope);
+  if (saved) {
+    draft.value = saved;
+  }
+}
+watch(draft, (v) => writeDraft(userStore.userId, draftScope, v));
+watch(
+  () => [props.draftScope, props.state.threadId] as const,
+  () => {
+    const next = draftScopeOf();
+    if (next === draftScope) {
+      return;
+    }
+    writeDraft(userStore.userId, draftScope, draft.value);
+    const prev = draftScope;
+    draftScope = next;
+    if (prev === 'draft' && next !== 'draft') {
+      migrateDraft(userStore.userId, prev, next);
+    }
+    draft.value = readDraft(userStore.userId, next);
+  }
+);
 const taRef = ref<HTMLTextAreaElement>();
 /** 待确认时输入框收起——先收焦点与弹层，防移动端键盘顶住停靠区、也防隐藏后仍能 Enter 发送 */
 watch(
@@ -1099,7 +1170,18 @@ const skillId = ref<string | null>(null);
  *  与实际权限不一致的账号，按 key 裁会与后端目录分叉（前端勾选、后端不注入=勾了白勾） */
 const skillPublisherLevel = computed(() => {
   const p = userStore.permissions ?? [];
-  return roleKey.value === 'admin' || p.includes('*:*:*') || p.includes('dcs:task:edit') || p.includes('dcs:audit:audit');
+  return (
+    roleKey.value === 'admin' ||
+    p.includes('*:*:*') ||
+    // E-12（2026-11-06）：与后端 ToolIdentity.from 的发布人串**逐条对齐**——
+    // 原来只认 task:edit/audit:audit，只持 dcs:mission:edit 的发布人目录里看得见技能、
+    // 却在 ➕ 面板被裁掉（看得见选不了）；任何一侧加串必须同时改 ToolIdentity
+    p.includes('dcs:mission:edit') ||
+    p.includes('dcs:mission:audit') ||
+    p.includes('dcs:task:add') ||
+    p.includes('dcs:task:edit') ||
+    p.includes('dcs:audit:audit')
+  );
 });
 /** 目录裁剪：无发布人级权限只留全员技能（与后端 SkillAssets 目录同口径）；
  *  能力① Q4：SKILL_CATALOG 静态兜底 → skillCatalog 动态目录（onMounted 拉后端刷新） */
@@ -1463,7 +1545,7 @@ function setGhostText(t: string | null) {
 }
 // 原型 syncThinkBtn：title=思考程度：{档名}（换 THINK 副句后保持按钮 title 口径不变）
 const thinkTitle = computed(() => `思考程度：${THINK[thinkLevel.value].label}`);
-const sendTitle = computed(() => (props.sending ? '排队——答完自动发出' : canSend.value ? '发送（Enter）' : '先输入内容'));
+const sendTitle = computed(() => (props.sending ? '排队——答完自动发出' : canSend.value ? `发送（${prefs.sendKey === 'ctrl-enter' ? 'Ctrl+Enter' : 'Enter'}）` : '先输入内容'));
 
 function pickChip(p: string) {
   draft.value = p;
@@ -1848,7 +1930,7 @@ function onSend() {
 const cmd = reactive({
   open: false,
   mode: 'slash' as 'slash' | 'at',
-  items: [] as Array<{ icon: string; label: string; sub: string; text: string; grp?: 'fn' | 'ask' }>,
+  items: [] as Array<{ icon: string; label: string; sub: string; text: string; grp?: 'fn' | 'skill' | 'ask' }>,
   active: 0
 });
 
@@ -2085,6 +2167,14 @@ function cmdPick(i?: number) {
     ringCardOpen.value = true;
     return;
   }
+  // 题11 甲：/ 里选中技能＝调用 ➕ 面板同一个开关（胶囊随之上屏）
+  if (it.text.startsWith('__SKILL__:')) {
+    draft.value = '';
+    closeCmd();
+    toggleSkill(it.text.slice('__SKILL__:'.length));
+    nextTick(() => taRef.value?.focus());
+    return;
+  }
   draft.value = it.text;
   closeCmd();
   nextTick(() => {
@@ -2125,9 +2215,13 @@ function onKey(e: KeyboardEvent) {
     return;
   }
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-    e.preventDefault();
-    if (canSend.value || props.sending) {
-      onSend();
+    // 常规 · 发送键：Enter 发送 / Ctrl+Enter（Mac ⌘+Enter）发送；另一种组合始终换行
+    const combo = prefs.sendKey === 'ctrl-enter' ? e.ctrlKey || e.metaKey : !e.ctrlKey && !e.metaKey;
+    if (combo) {
+      e.preventDefault();
+      if (canSend.value || props.sending) {
+        onSend();
+      }
     }
   } else if (e.key === 'ArrowUp' && draft.value === '' && !e.isComposing) {
     // 召回最近一问（原型口径）
@@ -2153,6 +2247,7 @@ function setDraft(text: string) {
 }
 function clearDraft() {
   draft.value = '';
+  removeDraft(userStore.userId, draftScope);
   nextTick(autoGrow);
 }
 /** AU-29 Esc 链：宿主（抽屉/会话页）全局 Esc 先问这里——五个弹层任一开着就收它并吞掉事件
@@ -2440,6 +2535,20 @@ defineExpose({
         &:hover {
           color: var(--el-color-primary);
           background: var(--el-color-primary-light-9);
+        }
+
+        /* 「立即」是这条的主操作：给它一圈细边，别和 ✎/✕ 混成一个图标组 */
+        &.q-now {
+          padding: 1px 7px;
+          border: 1px solid var(--dcs-border-color-light);
+          border-radius: 999px;
+          font-size: 11px;
+          line-height: 16px;
+          color: var(--dcs-text-primary);
+
+          &:hover {
+            border-color: var(--el-color-primary);
+          }
         }
       }
     }

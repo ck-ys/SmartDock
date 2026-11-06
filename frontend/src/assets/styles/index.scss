@@ -16,6 +16,7 @@
 /* 框架纸 / 纯黑夜：最后加载，压过上面各文件的默认外观 */
 @use './theme-framed.scss';
 @use './dcs-ui-kit.scss';
+@use './dcs-motion.scss';
 
 body {
   height: 100%;

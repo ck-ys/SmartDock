@@ -45,6 +45,10 @@ public class DcsAutomation implements Serializable {
     /** 每周几（ISO 1=周一 … 7=周日，逗号分隔） */
     private String weekdays;
 
+    /** 只读外部服务白名单（旧板题 3 乙 2026-11-06）：逗号分隔的 MCP serverName，空/null=一个都不挂。
+     *  只允许 read_only='1' 的服务——可写服务无论怎么勾都不会挂（挂载面二次过滤）。 */
+    private String mcpServers;
+
     private String timeZone;
 
     /** 1=开 0=停 */

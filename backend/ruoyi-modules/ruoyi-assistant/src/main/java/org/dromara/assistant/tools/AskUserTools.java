@@ -60,7 +60,9 @@ public class AskUserTools {
         if (threadId == null || threadId.isBlank()) {
             return "当前会话不可用，无法发起结构化反问；请直接在正文里提问。";
         }
-        Map<String, Object> result = bridge.ask(tenantId, userId, threadId, questions);
+        // C 七行·提问自动继续：设置页开关随请求上行，这里按线程取值（缺省=开，ZCode 同款默认）
+        boolean autoContinue = org.dromara.assistant.core.AssistantAskPrefHolder.isAutoContinue(threadId);
+        Map<String, Object> result = bridge.ask(tenantId, userId, threadId, questions, autoContinue);
         return formatResult(result);
     }
 
@@ -142,6 +144,11 @@ public class AskUserTools {
         if ("timeout".equals(action)) {
             return "用户超时未作答（" + AssistantAskUserBridge.TIMEOUT_SECONDS
                 + " 秒）。请用一句话说明你卡在哪、需要用户补充什么，等用户回复后再继续，不要重复发问。";
+        }
+        if (Boolean.TRUE.equals(result.get("auto"))) {
+            return "用户 " + (AssistantAskUserBridge.AUTO_CONTINUE_SECONDS / 60)
+                + " 分钟没有作答，已按「自动继续」往下走。请按最稳妥的默认继续；"
+                + "涉及写操作或不可逆动作时停下来告诉用户缺哪项信息，不要重复发问。";
         }
         if ("cancelled".equals(action) || !"answered".equals(action)) {
             return "用户关掉了反问，没有作答。请按最稳妥的默认继续；涉及写操作或不可逆动作时停下来告诉用户缺哪项信息。";

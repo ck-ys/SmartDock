@@ -129,6 +129,10 @@
       </section>
     </main>
   </div>
+  <div v-else class="auto-blocked" aria-hidden="true">
+    <!-- 未授权时只留这个真实元素兜底：注释不能和元素做根节点的兄弟——那会编译成 Fragment，
+         路由过渡收不到 afterLeave，离开本页整页白屏（2026-11-05 设置页同款 P0；题6 of 14） -->
+  </div>
 </template>
 
 <script setup lang="ts">

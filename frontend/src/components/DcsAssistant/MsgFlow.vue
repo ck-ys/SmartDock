@@ -84,7 +84,6 @@
         @resume="emit('resume')"
         @stop="emit('stop')"
         @elicit-done="(id) => emit('elicit-done', id)"
-        @ask-user-done="(id) => emit('ask-user-done', id)"
         @resolve-hitl="(a, r, e) => emit('resolve-hitl', a, r, e)"
         @new-session="emit('new-session')"
         @recover-interrupt="emit('recover-interrupt')"
@@ -182,7 +181,6 @@ const emit = defineEmits<{
   /** G3 反问卡收卡（TurnBlock 转发宿主 store 移除） */
   'elicit-done': [id: string];
   /** 题12 案1：结构化反问卡收卡（TurnBlock 转发宿主 store 移除） */
-  'ask-user-done': [id: string];
   resend: [text: string];
   /** BN-7：重试直发（TurnBlock 转发） */
   'resend-run': [text: string];

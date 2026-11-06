@@ -476,6 +476,18 @@ public class McpPilotService {
     public Set<String> attachEnabled(Toolkit toolkit, String tenantId, Long userId, String aguiThreadId,
                                      io.agentscope.core.permission.PermissionContextState.Builder pb,
                                      java.util.Map<String, String> toolGate, int roleLevel) {
+        return attachEnabled(toolkit, tenantId, userId, aguiThreadId, pb, toolGate, roleLevel, null);
+    }
+
+    /**
+     * @param allowedServers null=平台启用的全挂（对话侧原行为）；非 null=只挂名单内的服务，
+     *                       且**只挂 read_only='1' 的行**——自动化无人值守，可写服务永不挂
+     *                       （旧板题 3 乙 三条硬规矩：默认关 / 没勾不挂 / 可写不挂）。
+     */
+    public Set<String> attachEnabled(Toolkit toolkit, String tenantId, Long userId, String aguiThreadId,
+                                     io.agentscope.core.permission.PermissionContextState.Builder pb,
+                                     java.util.Map<String, String> toolGate, int roleLevel,
+                                     java.util.Set<String> allowedServers) {
         Set<String> added = new LinkedHashSet<>();
         List<DcsMcpServer> rows;
         try {
@@ -489,6 +501,15 @@ public class McpPilotService {
         long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
         AttachKey sessionKey = new AttachKey("t:" + tenantId + ":" + userId, aguiThreadId);
         for (DcsMcpServer row : rows) {
+            if (allowedServers != null) {
+                if (!"1".equals(row.getReadOnly())) {
+                    log.info("[McpPilot] {} 不是只读服务，自动化不挂载", row.getServerName());
+                    continue;
+                }
+                if (!allowedServers.contains(row.getServerName())) {
+                    continue;
+                }
+            }
             // G4-#4：MCP 纳入工具闸（server 粒度键 mcp:<server>，与平台工具同份 tool_gate JSON，
             // 生效时机同款=下一轮建会话）。off=整租户关闭（跳过挂载）；admin=仅管理员角色；
             // member/未配=全员（MCP 内置档=member）。工具级粒度需挂载后才知工具名，本期不做。

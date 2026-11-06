@@ -151,6 +151,9 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         // 题10 案1（2026-10-31 反转）：联网开关逐请求上行——默认自动（模型判断），
         // 只有显式 false/0/no/off 才是「本会话停用」；缺省不改现状（旧前端不带键不会误恢复联网）
         AssistantWebSearchHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("webSearchEnabled"));
+        // C 七行·提问自动继续（2026-11-06）：默认开=反问卡 5 分钟没答就按空答案收尾（模型走稳妥默认）；
+        // 只有显式 false/0/no/off 才关。缺省不改现状，旧前端/自动化跑批仍是默认开。
+        AssistantAskPrefHolder.set(aguiThreadId, input == null ? null : input.getForwardedProp("askAutoContinue"));
         // 题8 案1（三席回修）：计划待确认态靠用户动作解除——前端点「直接执行/改计划/取消」
         // 时随请求带 planDecision，这里清闸；不带=计划卡还挂着，写操作继续被硬拒（TTL 30 分钟兜底）
         // ②（2026-10-31）：清闸 owner 必须用 user.getTenantId() 登录快照（与 PlanTools submit
@@ -289,11 +292,16 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
             // 每轮重复入库污染会话表；与 AssistantInputGuard 同一口径。
             // 三步下沉 persistUserRound 单事务（dspro P2-8：防 PG 闪断留空壳会话）
             AguiMessage current = AssistantInputGuard.lastUserMessage(input);
+            // E-3（2026-11-06）：确认/取消的 resume 轮 AGUI 会重传全量历史，尾条仍是原问题——
+            // 再落一次就是库里两条一模一样的 user 行（重开会话多出一个「没等到回答」的空回合）。
+            // 只认前端显式 resumeRound 标记：不能只看 hasResume()——丢卡后过滤器会注入
+            // resume=cancelled，那一路不是用户写的字，同样不该新增 user 行。
+            boolean resumeRound = truthy(input.getForwardedProp("resumeRound"));
             // glm53 P2-3 回修：按码点截断（substring 会劈开边界代理对，与 shouldGenerate 的码点口径对齐）
             String initialTitle = title == null ? "新会话"
                 : title.substring(0, title.offsetByCodePoints(0, Math.min(30, title.codePointCount(0, title.length()))));
             conversationService.persistUserRound(tenantId, userId, threadId, input.getRunId(),
-                initialTitle, current == null ? null : current.getTextContent());
+                initialTitle, resumeRound || current == null ? null : current.getTextContent());
             // 首条且够长：异步侧车把截断标题总结成短标题（CAS 防覆盖用户重命名）
             if (firstRound && title != null) {
                 titleService.tryStart(tenantId, userId, threadId, title, initialTitle);
@@ -303,6 +311,15 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         } catch (DataAccessException e) {
             log.warn("[AssistantPersist] PG 闪断, user 侧降级跳过(对话继续) tenant={}: {}", tenantId, e.getMessage());
         }
+    }
+
+    /** forwardedProps 真值口径（resumeRound 等布尔标记）：缺省/垃圾值一律当假，只认显式真值。 */
+    private static boolean truthy(Object raw) {
+        if (raw == null) {
+            return false;
+        }
+        String s = String.valueOf(raw).trim().toLowerCase(java.util.Locale.ROOT);
+        return "true".equals(s) || "1".equals(s) || "yes".equals(s) || "on".equals(s);
     }
 
     private String firstUserText(RunAgentInput input) {

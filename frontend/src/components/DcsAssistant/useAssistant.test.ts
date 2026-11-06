@@ -142,7 +142,8 @@ describe('AGUI 事件桥', () => {
     finishTurn();
     await vi.waitFor(() => expect(a.state.sending).toBe(false));
     expect(turn.phase).toBe('error');
-    expect(turn.errorMsg).toBe('查询超时了');
+    // 常规「失败自动重试」默认开：首轮失败会标注，再以新回合重跑一次（最多 1 次）
+    expect(turn.errorMsg).toBe('查询超时了（已自动重试一次）');
   });
 
   it('二站 T4：契约错误按 code 精确识别 → 人话 toast 指路重发（禁止文本匹配）', async () => {
@@ -673,7 +674,7 @@ describe('队列六条（v3.18）', () => {
     expect(toasts.some((t) => t.includes('队列已清空'))).toBe(true);
   });
 
-  it('④✎ 撤回取回文本；↗ 回答中提前=挪队首', async () => {
+  it('④✎ 撤回取回文本；「立即」= 抢占：从队列摘掉、停当前轮后马上发', async () => {
     const { a, toasts } = setup();
     a.state.gateDone = true;
     a.send('第一问');
@@ -682,9 +683,9 @@ describe('队列六条（v3.18）', () => {
     a.send('q2');
     expect(a.queueEdit(0)).toBe('q1');
     a.send('q1b');
-    a.queueGo(1); // sending 中：q1b 挪到队首
-    expect(toasts.some((t) => t.includes('已挪到队首'))).toBe(true);
-    expect(a.state.queue.map((q) => q.text)).toEqual(['q1b', 'q2']);
+    a.queueGo(1); // sending 中：q1b 不排队，停当前轮后抢在前面发
+    expect(toasts.some((t) => t.includes('已停当前回答'))).toBe(true);
+    expect(a.state.queue.map((q) => q.text)).toEqual(['q2']);
   });
 });
 

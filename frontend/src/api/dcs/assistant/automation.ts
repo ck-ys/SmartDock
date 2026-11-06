@@ -11,6 +11,8 @@ export interface AutomationRow {
   scheduleType: 'DAILY' | 'WEEKLY' | 'BUILTIN';
   scheduleTime: string | null;
   weekdays: string | null;
+  /** 只读外部服务白名单（逗号分隔 serverName）；空=不挂 */
+  mcpServers?: string | null;
   /** 人话日程：每天 09:00 / 每周一、三 09:00 */
   scheduleText: string;
   /** '1'=开 '0'=停 */

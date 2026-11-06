@@ -45,27 +45,174 @@
             <span
               v-else
               class="set-row soon"
-              :title="
-                it.key === 'schedule'
-                  ? '定时任务还没开放：后台现在只有系统任务（每日摘要 08:00、数据保留清理 03:40），没有用户自定义任务'
-                  : `${it.label} · 待建设（下一批或它自己的板）`
-              "
+              :title="`${it.label} · 待建设（下一批或它自己的板）`"
             >
               <IconSpan :name="it.icon" :size="15" /><span>{{ it.label }}</span>
-              <span class="soon-tag">{{ it.key === 'schedule' ? '未开放' : '待做' }}</span>
+              <span class="soon-tag">待做</span>
             </span>
           </template>
         </template>
 
         <div class="set-navfoot">
-          <template v-if="isManager">本批只读：技能与工具的改动都在「AI 助手管理 → 能力」里（需要助手配置权限）。</template>
-          <template v-else>技能与工具由管理员统一维护；其它设置项也由管理员管理。</template>
+          <template v-if="isManager">技能与工具只读，改动在「AI 助手管理 → 能力」；MCP 服务在本页可直接注册、启停（平台级）。</template>
+          <template v-else>技能与工具由管理员统一维护；MCP 服务由平台管理员配置。</template>
         </div>
       </aside>
 
       <main class="set-main">
+        <!-- ============ 常规（C 七行）：只影响本人这台设备的聊天手感 ============ -->
+        <section v-if="section === 'general'" class="set-sheet general" aria-label="常规">
+          <div class="gen-head">
+            <h1>常规</h1>
+            <p>聊天手感设置——只存你这台设备，改完立即生效，不用保存。换电脑/换账号不会跟着走。</p>
+          </div>
+
+          <div class="gen-scroll">
+            <div class="gen-grp">输入</div>
+            <div class="gen-row">
+              <div class="gen-main">
+                <b>发送键</b>
+                <small>按哪个键把消息发出去；另一种组合始终是换行（Shift+Enter 永远换行）。</small>
+              </div>
+              <div class="gen-seg" role="radiogroup" aria-label="发送键">
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="prefs.sendKey === 'enter'"
+                  :class="{ on: prefs.sendKey === 'enter' }"
+                  @click="prefs.sendKey = 'enter'"
+                >
+                  Enter 发送
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="prefs.sendKey === 'ctrl-enter'"
+                  :class="{ on: prefs.sendKey === 'ctrl-enter' }"
+                  @click="prefs.sendKey = 'ctrl-enter'"
+                >
+                  Ctrl+Enter 发送
+                </button>
+              </div>
+            </div>
+
+            <div class="gen-grp">输出</div>
+            <div class="gen-row">
+              <div class="gen-main">
+                <b>流式输出</b>
+                <small>开着是边生成边出字；关掉先等这一轮跑完，再一次性显示（内容不变，只是不滚屏）。</small>
+              </div>
+              <div class="gen-ctl">
+                <el-switch v-model="prefs.streamOutput" aria-label="流式输出" />
+                <span class="gen-state">{{ prefs.streamOutput ? '边生成边显示' : '跑完再显示' }}</span>
+              </div>
+            </div>
+            <div class="gen-row">
+              <div class="gen-main">
+                <b>工具调用默认展开</b>
+                <small>助手查数据、调工具的过程明细：开着默认摊开；关掉默认收起，点一下再看。</small>
+              </div>
+              <div class="gen-ctl">
+                <el-switch v-model="prefs.toolsOpen" aria-label="工具调用默认展开" />
+                <span class="gen-state">{{ prefs.toolsOpen ? '默认展开' : '默认收起' }}</span>
+              </div>
+            </div>
+            <div class="gen-row">
+              <div class="gen-main">
+                <b>失败时自动重试</b>
+                <small>网络抖一下、服务临时 5xx：自动再试 1 次，不打断你。鉴权失败/额度用完这类不会硬试。</small>
+              </div>
+              <div class="gen-ctl">
+                <el-switch v-model="prefs.autoRetry" aria-label="失败时自动重试" />
+                <span class="gen-state">{{ prefs.autoRetry ? '最多重试 1 次' : '失败就停' }}</span>
+              </div>
+            </div>
+
+            <div class="gen-grp">显示</div>
+            <div class="gen-row">
+              <div class="gen-main">
+                <b>动效强度</b>
+                <small>折叠、滑入、扫光这些动画的强弱。跟随系统=听操作系统的「减少动态效果」开关。</small>
+              </div>
+              <div class="gen-seg" role="radiogroup" aria-label="动效强度">
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="prefs.motion === 'system'"
+                  :class="{ on: prefs.motion === 'system' }"
+                  @click="prefs.motion = 'system'"
+                >
+                  跟随系统
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="prefs.motion === 'full'"
+                  :class="{ on: prefs.motion === 'full' }"
+                  @click="prefs.motion = 'full'"
+                >
+                  标准
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="prefs.motion === 'reduced'"
+                  :class="{ on: prefs.motion === 'reduced' }"
+                  @click="prefs.motion = 'reduced'"
+                >
+                  减弱
+                </button>
+              </div>
+            </div>
+            <div class="gen-row">
+              <div class="gen-main">
+                <b>回答字号</b>
+                <small>只放大助手的回答正文；你的消息、按钮和表格不跟着变。</small>
+              </div>
+              <div class="gen-seg" role="radiogroup" aria-label="回答字号">
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="prefs.answerSize === 'standard'"
+                  :class="{ on: prefs.answerSize === 'standard' }"
+                  @click="prefs.answerSize = 'standard'"
+                >
+                  标准
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  :aria-checked="prefs.answerSize === 'large'"
+                  :class="{ on: prefs.answerSize === 'large' }"
+                  @click="prefs.answerSize = 'large'"
+                >
+                  大号
+                </button>
+              </div>
+            </div>
+
+            <div class="gen-grp">提问</div>
+            <div class="gen-row">
+              <div class="gen-main">
+                <b>提问自动继续</b>
+                <small>
+                  助手反问、你又没空答时：开着 5 分钟后按最稳妥的默认往下走（写操作仍会停下等你）；关掉不自动继续，最多等你 8 分钟，到点助手改用文字问你。
+                </small>
+              </div>
+              <div class="gen-ctl">
+                <el-switch v-model="prefs.askAutoContinue" aria-label="提问自动继续" />
+                <span class="gen-state">{{ prefs.askAutoContinue ? '5 分钟没答就继续' : '不自动继续' }}</span>
+              </div>
+            </div>
+
+            <p class="gen-foot">
+              这些是聊天手感，不是平台策略——技能、工具谁能用、每日额度仍由管理员在「AI 助手管理」里配。
+            </p>
+          </div>
+        </section>
+
         <!-- ============ 技能：列表 + 右侧详情（题 2 丙：只读三件套 + 试一句） ============ -->
-        <section v-if="section === 'skills'" class="set-sheet" aria-label="技能">
+        <section v-else-if="section === 'skills'" class="set-sheet" aria-label="技能">
           <div class="set-list" :class="{ 'is-hidden': isNarrow && mobileDetail }">
             <div class="set-lhead">
               <h1>技能</h1>
@@ -244,6 +391,11 @@
           </p>
         </section>
 
+        <!-- ============ MCP 服务（旧板题 0/1/2，2026-11-06）：管理/成员两视角 ============ -->
+        <section v-else-if="section === 'mcp'" class="set-sheet" aria-label="MCP 服务">
+          <McpPanel />
+        </section>
+
         <!-- ============ 审计：只读，复用现有接口与列（业务审计页不动） ============ -->
         <section v-else-if="section === 'audit'" class="set-sheet audit" aria-label="审计">
           <div class="audit-hd">
@@ -374,8 +526,10 @@ import {
 } from '@/api/dcs/assistant';
 import { ACT, logSt } from '@/components/DcsAssistant/useAssistant';
 import { fmtIsoTime } from '@/components/DcsAssistant/util';
+import { getAgentPrefs } from '@/components/DcsAssistant/prefsStore';
 import { buildSkillDraft, guideSteps, skillDesc, triggerPhrases } from './prefill';
 import { setPendingSkill } from './bridge';
+import McpPanel from './mcp/McpPanel.vue';
 
 defineOptions({ name: 'AgentWorkspaceSettings' });
 
@@ -389,6 +543,8 @@ interface CatalogRow {
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
+/** C 七行：按用户存的聊天偏好（localStorage），本页直接改，宿主页读同一份 reactive。 */
+const prefs = getAgentPrefs(userStore.userId);
 
 /* ---------- 权限与身份 ---------- */
 const perms = computed(() => userStore.permissions);
@@ -415,7 +571,7 @@ const scopeText = computed(() => {
 });
 
 /* ---------- 分节导航 ---------- */
-type SectionKey = 'skills' | 'tools' | 'audit';
+type SectionKey = 'general' | 'skills' | 'tools' | 'mcp' | 'audit';
 interface NavItem {
   key: SectionKey | string;
   label: string;
@@ -426,17 +582,24 @@ const READY: NavItem[] = [
   { key: 'skills', label: '技能', icon: 'sparkles', ready: true },
   // 题1 甲：全员可见全部工具行（含用不了的），状态列说清原因
   { key: 'tools', label: '工具', icon: 'wrench', ready: true },
+  // 旧板题 0/2（2026-11-06）：MCP 迁进设置页；成员看清单+带来的工具+能不能用
+  { key: 'mcp', label: 'MCP 服务', icon: 'globe', ready: true },
   ...(canAudit.value ? [{ key: 'audit', label: '审计', icon: 'clipboard', ready: true } as NavItem] : [])
 ];
 const navGroups = computed(() => {
+  // 常规是纯本机手感，所有人都有；其余灰项仍按身份显示
+  const generalRow = { key: 'general', label: '常规', icon: 'settings', ready: true } as NavItem;
   if (!isManager.value) {
-    return [{ label: 'Agent 能力', items: READY.filter((i) => i.key === 'skills' || i.key === 'tools') }];
+    return [
+      { label: '工作台', items: [generalRow] },
+      { label: 'Agent 能力', items: READY.filter((i) => i.key === 'skills' || i.key === 'tools' || i.key === 'mcp') }
+    ];
   }
   return [
     {
       label: '工作台',
       items: [
-        { key: 'general', label: '常规', icon: 'settings' },
+        generalRow,
         { key: 'appearance', label: '外观', icon: 'lightbulb' },
         { key: 'model', label: '模型', icon: 'brain' }
       ] as NavItem[]
@@ -446,9 +609,8 @@ const navGroups = computed(() => {
       items: [
         { key: 'skills', label: '技能', icon: 'sparkles', ready: true },
         { key: 'tools', label: '工具', icon: 'wrench', ready: true },
-        { key: 'mcp', label: 'MCP 服务', icon: 'globe' },
+        { key: 'mcp', label: 'MCP 服务', icon: 'globe', ready: true },
         { key: 'plugins', label: '插件', icon: 'package' },
-        { key: 'schedule', label: '定时任务', icon: 'timer' },
         { key: 'subagents', label: '子智能体', icon: 'bot' }
       ] as NavItem[]
     },
@@ -461,15 +623,26 @@ const navGroups = computed(() => {
     }
   ];
 });
-const SECTION_LABEL: Record<SectionKey, string> = { skills: '技能', tools: '工具', audit: '审计' };
+const SECTION_LABEL: Record<SectionKey, string> = { general: '常规', skills: '技能', tools: '工具', mcp: 'MCP 服务', audit: '审计' };
 
 /** 分节状态跟地址：?s=audit / ?s=tools 可直达（审计只给有权限的人） */
-const section = ref<SectionKey>('skills');
+const section = ref<SectionKey>('general');
 const currentLabel = computed(() => SECTION_LABEL[section.value]);
 watch(
   () => route.query.s,
   (v) => {
-    const next: SectionKey = v === 'audit' && canAudit.value ? 'audit' : v === 'tools' ? 'tools' : 'skills';
+    const next: SectionKey =
+      v === 'general'
+        ? 'general'
+        : v === 'audit' && canAudit.value
+          ? 'audit'
+          : v === 'tools'
+            ? 'tools'
+            : v === 'mcp'
+              ? 'mcp'
+              : v === 'skills'
+                ? 'skills'
+                : 'general';
     if (next !== section.value) {
       section.value = next;
     }
@@ -477,11 +650,11 @@ watch(
   { immediate: true }
 );
 function goSection(key: string) {
-  if (key !== 'skills' && key !== 'tools' && key !== 'audit') return;
+  if (key !== 'general' && key !== 'skills' && key !== 'tools' && key !== 'audit') return;
   if (key === section.value) return;
   section.value = key;
   // replace：切分节不堆历史，浏览器返回=离开设置页回工作台
-  router.replace({ path: '/agent/settings', query: key === 'skills' ? {} : { s: key } });
+  router.replace({ path: '/agent/settings', query: key === 'general' ? {} : { s: key } });
 }
 
 /** 返回工作台：从工作台来的走浏览器返回（工作台会接回刚才的会话与草稿）；
@@ -1045,6 +1218,139 @@ html.dark .set-ws {
   border-radius: 10px;
   overflow: hidden;
 }
+.set-sheet.general {
+  flex-direction: column;
+  overflow: hidden;
+}
+.gen-head {
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--bd-soft);
+
+  h1 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  p {
+    margin: 4px 0 0;
+    font-size: 11px;
+    line-height: 1.55;
+    color: var(--mut);
+  }
+}
+.gen-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+}
+.gen-grp {
+  margin: 18px 0 2px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--mut);
+}
+.gen-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bd-soft);
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
+}
+.gen-main {
+  min-width: 0;
+
+  b {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--text);
+  }
+  small {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--mut);
+  }
+}
+.gen-ctl {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gen-state {
+  font-size: 11px;
+  color: var(--mut);
+  white-space: nowrap;
+}
+.gen-seg {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  background: var(--well);
+
+  button {
+    height: 26px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-2);
+    font: inherit;
+    font-size: 11px;
+    line-height: 26px;
+    white-space: nowrap;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+    }
+    &.on {
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--text);
+      outline-offset: 1px;
+    }
+  }
+}
+.gen-foot {
+  margin: 18px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--bd-soft);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--mut);
+}
+@media (max-width: 720px) {
+  .gen-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .gen-seg,
+  .gen-ctl {
+    margin-left: 0;
+    align-self: flex-start;
+  }
+}
+
 .set-list {
   width: 360px;
   flex: none;

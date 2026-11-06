@@ -58,6 +58,43 @@ class AssistantAskUserBridgeTest {
         }
     }
 
+    /** C 七行（2026-11-06）：开了自动继续，到点按「空答案」收尾——不是 timeout，也不替用户乱选。 */
+    @Test
+    void autoContinueFinishesWithEmptyAnswers() throws Exception {
+        // 1 秒到期，autoContinue 档；timeout 档给 30 秒，确保走的是 auto 分支
+        AssistantAskUserBridge bridge = new AssistantAskUserBridge(1, 30);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            CompletableFuture<Map<String, Object>> future =
+                CompletableFuture.supplyAsync(() -> bridge.ask("t1", 1L, "th-auto", QUESTIONS, true), pool);
+            awaitCards(bridge, "th-auto");
+            Map<String, Object> result = future.get(4, TimeUnit.SECONDS);
+            assertEquals("answered", result.get("action"), "自动继续必须按已作答收尾");
+            assertEquals(List.of(), result.get("answers"), "自动继续不带任何选项");
+            assertEquals(Boolean.TRUE, result.get("auto"), "必须带 auto 标记，模型据此知道是超时自动走的");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** 关掉自动继续：到点按 timeout 收尾（模型改用正文追问），不会替用户继续。 */
+    @Test
+    void autoContinueOffFinishesWithTimeout() throws Exception {
+        AssistantAskUserBridge bridge = new AssistantAskUserBridge(30, 1);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            CompletableFuture<Map<String, Object>> future =
+                CompletableFuture.supplyAsync(() -> bridge.ask("t1", 1L, "th-off", QUESTIONS, false), pool);
+            awaitCards(bridge, "th-off");
+            Map<String, Object> result = future.get(4, TimeUnit.SECONDS);
+            assertEquals("timeout", result.get("action"));
+            assertEquals(List.of(), result.get("answers"));
+            assertFalse(result.containsKey("auto"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     @Test
     void rejectsCrossTenantUserAndThread() throws Exception {
         AssistantAskUserBridge bridge = new AssistantAskUserBridge();

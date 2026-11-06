@@ -19,7 +19,7 @@
       <template #intro>
         <div class="ag-dcol">
           <h1 class="ag-h1">今天帮你做点什么</h1>
-          <p class="ag-sub">问数据、写周报、盯定时任务；@ 带上文件，/ 调技能与指令</p>
+          <p class="ag-sub">问数据、写周报、盯自动化；@ 带上文件，＋ 选技能，/ 调快捷指令</p>
         </div>
       </template>
 

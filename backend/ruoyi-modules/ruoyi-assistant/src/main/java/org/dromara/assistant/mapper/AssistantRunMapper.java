@@ -49,6 +49,13 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
         + " WHERE run_id=#{runId} AND status='RUNNING'")
     int touch(@Param("runId") String runId);
 
+    /** E-14（2026-11-06）：同 (租户,用户,thread) 除本 run 外是否还有 RUNNING。
+     *  存在性查询，不受「僵尸 RUNNING 之后又跑过两轮终态」影响（原 LIMIT 2 取样会漏检） */
+    @Select("SELECT COUNT(1) FROM dcs_assistant_run WHERE tenant_id=#{tenantId} AND thread_id=#{threadId}"
+        + " AND user_id=#{userId} AND status='RUNNING' AND run_id<>#{runId}")
+    int countOtherRunning(@Param("tenantId") String tenantId, @Param("threadId") String threadId,
+        @Param("userId") Long userId, @Param("runId") String runId);
+
     /** 按 thread 查 run（断线恢复列表，最新在前） */
     @Select("SELECT * FROM dcs_assistant_run WHERE tenant_id=#{tenantId} AND thread_id=#{threadId} AND user_id=#{userId}"
         + " ORDER BY id DESC LIMIT #{limit}")

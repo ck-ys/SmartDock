@@ -588,11 +588,10 @@ public class AssistantConversationService {
         // thread 再发新消息=双流并发写同一 AgentSession（框架明确不支持态；recorder 步骤/
         // 思考缓冲也依赖同 thread 单活跃 run）。DB 真源兜底：同 (租户,用户,thread) 存在
         // 其它 RUNNING run 即 409 人话拒绝（新 run 行由 registerRun 刚插入，按 runId 排除）。
-        List<DcsAssistantRun> inflight = runMapper.selectByThread(tenantId, threadId, userId, 2);
-        for (DcsAssistantRun r : inflight) {
-            if ("RUNNING".equals(r.getStatus()) && !r.getRunId().equals(runId)) {
-                throw new ServiceException("上一轮回答还在生成中，稍候再发；刷新页面即可接着看这一轮回答", 409);
-            }
+        // E-14（2026-11-06）：改成存在性查询——原「取最新 2 行再筛 RUNNING」在僵尸 RUNNING
+        // 之后又跑过两轮终态时会漏检（僵尸被挤出取样窗），并发双流仍可能发生
+        if (runMapper.countOtherRunning(tenantId, threadId, userId, runId) > 0) {
+            throw new ServiceException("上一轮回答还在生成中，稍候再发；刷新页面即可接着看这一轮回答", 409);
         }
         if (content != null && !content.isBlank()) {
             appendUserMessage(tenantId, conversationId, userId, content);

@@ -182,7 +182,12 @@ export function createAguiClient(options: AguiClientOptions = {}) {
   /** 停滞哨兵：看门狗超窗以 resolve（非 reject）出循环——停滞≠断线，裁决权在 onStall */
   const STALLED = { stalled: true } as const;
 
-  async function readStream(response: Response, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error' | 'stopped'> {
+  // E-7（2026-11-06）：EOF 无终态帧 = 半截流，返回 'retry' 交上层退避重连（旧写法一律 'error'，永不重试）
+  async function readStream(
+    response: Response,
+    h: AguiHandlers,
+    signal: AbortSignal
+  ): Promise<'finished' | 'error' | 'stopped' | 'retry'> {
     const reader = (response.body as ReadableStream<Uint8Array>).getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
@@ -206,15 +211,20 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       if (!pendingRead) {
         pendingRead = reader.read();
       }
-      // abort 竞速：真实 fetch 会联动取消 body 流，但 mock/降级环境不保证——统一竞速兜底
+      // abort 竞速：真实 fetch 会联动取消 body 流，但 mock/降级环境不保证——统一竞速兜底。
+      // E-8（2026-11-06）：监听器每轮结束必须摘——长回答几百帧会在同一个 signal 上越挂越多
+      let onAbort: (() => void) | null = null;
       const aborted = new Promise<never>((_, reject) => {
         // 信号可能早于注册已 abort（stop 在 fetch resolve 前调用）——事件不会补发，必须预检
         if (signal.aborted) {
           reject(new DOMException('aborted', 'AbortError'));
           return;
         }
-        signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true });
+        onAbort = () => reject(new DOMException('aborted', 'AbortError'));
+        signal.addEventListener('abort', onAbort, { once: true });
       });
+      // 循环正常收尾后才 abort 的：本轮已没人 race 这个 promise，补一个空 catch 防 unhandled rejection
+      aborted.catch(() => {});
       // goal 加固 G1（稳流① Q1 调整）：无帧看门狗——停滞（连接活着但 0 字节）时
       // reader.read() 会无限悬挂；每次读循环武装计时器，收到任意字节（含后端 20s
       // dcs-heartbeat 心跳帧）由下一轮重建即「重置」。超窗不自动重发：服务端可能仍在
@@ -272,11 +282,15 @@ export function createAguiClient(options: AguiClientOptions = {}) {
           /* 对端已关流 */
         }
         throw e instanceof DOMException ? e : new DOMException('aborted', 'AbortError');
+      } finally {
+        // E-8：无论正常读到帧还是出错/继续等，本轮监听器都摘掉（signal 上不再累积闭包）
+        if (onAbort) {
+          signal.removeEventListener('abort', onAbort);
+        }
       }
-      if (done) {
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
+      // E-7（2026-11-06）：先解码再判断 EOF——最后一个 chunk 同时带数据+done 时，
+      // 旧写法 `if (done) break` 在 decode 之前，尾帧（常常正是 RUN_FINISHED）被整条丢掉
+      buffer += decoder.decode(value, { stream: !done });
       const { frames, rest } = parseSseFrames(buffer);
       buffer = rest;
       for (const f of frames) {
@@ -292,6 +306,9 @@ export function createAguiClient(options: AguiClientOptions = {}) {
             return terminal;
           }
         }
+      }
+      if (done) {
+        break;
       }
     }
     // 流自然结束但无终态帧：RuoYi 全局异常=HTTP 200 + 单体 JSON（无 data: 前缀，批G 登记）——
@@ -312,8 +329,12 @@ export function createAguiClient(options: AguiClientOptions = {}) {
         /* 非完整 JSON 忽略 */
       }
     }
-    // 真·半截流，按断线语义交给上层重试
-    return terminal ?? 'error';
+    // E-7：EOF 但没收到 RUN_FINISHED/RUN_ERROR——「真·半截流」按断线语义交上层退避重试
+    //（旧写法 return 'error' 既不重试也不回调，长回答中途断线时用户只看到字停住）
+    if (!terminal) {
+      return 'retry';
+    }
+    return terminal;
   }
 
   async function requestOnce(input: AguiRunInput, h: AguiHandlers, signal: AbortSignal): Promise<'finished' | 'error' | 'stopped' | 'retry' | 'retry-stall'> {
@@ -479,7 +500,8 @@ export function createAguiClient(options: AguiClientOptions = {}) {
       // 「本轮已结束」人话错标成本回合失败（污染在途占位），attach 侧剥掉该回调
       try {
         const r = await readStream(response, { ...handlers, onRunError: undefined }, controller.signal);
-        settle!(r);
+        // attach 不做重连（调用方轮询兜底）：EOF 无终态一律按 'error' 收口，退回既有语义
+        settle!(r === 'retry' ? 'error' : r);
       } catch {
         settle!(controller.signal.aborted ? 'stopped' : 'error');
       }

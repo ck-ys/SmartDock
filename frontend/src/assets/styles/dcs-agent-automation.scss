@@ -512,6 +512,54 @@ html.dark .auto-ws {
   font-size: 12px;
   color: var(--faint);
 }
+/* 只读外部服务勾选（题3 乙）：一行一项，勾中与未勾只差描边/底色，不用彩色 */
+.mcp-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.mcp-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+}
+.mcp-pick.on {
+  border-color: var(--text);
+  background: var(--well);
+}
+.mcp-pick input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--text);
+  cursor: pointer;
+}
+.mcp-pick-n {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.mcp-pick-st {
+  font-size: 10.5px;
+  line-height: 16px;
+  padding: 0 6px;
+  border: 1px solid var(--bd);
+  border-radius: 999px;
+  color: var(--mut);
+}
+.mcp-pick-d {
+  flex: 1 1 220px;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--faint);
+  overflow-wrap: anywhere;
+}
 .sched-row {
   display: flex;
   align-items: center;

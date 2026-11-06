@@ -834,6 +834,8 @@ export interface AssistantMcpServerRow {
   url: string | null;
   headerKeys: string;
   enabled: string;
+  /** '1'=只读（试点约束），'0'=可写 */
+  readOnly?: string;
   remark: string | null;
   updateTime: string | null;
 }
@@ -850,6 +852,23 @@ export interface AssistantMcpCallLog {
   durationMs: number | null;
   errorMsg: string | null;
   createTime: string;
+}
+
+/** 成员可见的外部服务行（旧板题 2 乙）：清单 + 真实调用过的工具名 + 现在能不能用 */
+export interface AssistantMcpMemberRow {
+  serverName: string;
+  displayName: string;
+  transportType: string;
+  readOnly: string;
+  status: string;
+  statusText: string;
+  whoCanUse: string;
+  tools: string[];
+}
+
+/** 成员只读清单（perm=dcs:assistant:use）：只回已启用的服务 */
+export function listAssistantMcpMembers() {
+  return request<AssistantMcpMemberRow[]>({ url: '/dcs/assistant/mcp/member-list', method: 'get' });
 }
 
 export function listAssistantMcpServers() {

@@ -9,6 +9,8 @@ import org.dromara.assistant.automation.domain.DcsAutomationRun;
 import org.dromara.assistant.automation.mapper.DcsAutomationMapper;
 import org.dromara.assistant.automation.mapper.DcsAutomationRunMapper;
 import org.dromara.assistant.core.AssistantAgentFactory;
+import org.dromara.assistant.limiter.AssistantAdmissionGate;
+import org.dromara.assistant.limiter.AssistantDailyQuota;
 import org.dromara.assistant.service.AssistantConfigService;
 import org.dromara.assistant.service.AssistantConversationService;
 import org.dromara.common.core.domain.model.LoginUser;
@@ -55,6 +57,10 @@ public class AutomationRunner {
     private final AssistantConversationService conversationService;
     private final AssistantAgentFactory agentFactory;
     private final AssistantConfigService configService;
+    /** E-13（2026-11-06）：对话侧四道闸对无人值守同样生效——暂停用户 / 日预算 / 准入 / 回合上限 */
+    private final org.dromara.assistant.service.AssistantUserQuotaService quotaService;
+    private final AssistantDailyQuota dailyQuota;
+    private final AssistantAdmissionGate admissionGate;
     private final AutomationNotifier notifier;
     private final AutomationFailurePolicy failurePolicy;
     private final ISysUserService userService;
@@ -66,6 +72,9 @@ public class AutomationRunner {
                             AssistantConversationService conversationService,
                             AssistantAgentFactory agentFactory,
                             AssistantConfigService configService,
+                            org.dromara.assistant.service.AssistantUserQuotaService quotaService,
+                            AssistantDailyQuota dailyQuota,
+                            AssistantAdmissionGate admissionGate,
                             AutomationNotifier notifier,
                             AutomationFailurePolicy failurePolicy,
                             ISysUserService userService,
@@ -76,6 +85,9 @@ public class AutomationRunner {
         this.conversationService = conversationService;
         this.agentFactory = agentFactory;
         this.configService = configService;
+        this.quotaService = quotaService;
+        this.dailyQuota = dailyQuota;
+        this.admissionGate = admissionGate;
         this.notifier = notifier;
         this.failurePolicy = failurePolicy;
         this.userService = userService;
@@ -133,8 +145,37 @@ public class AutomationRunner {
         try {
             user = buildUser(automation.getUserId(), tenantId);
             configService.assertOpen(tenantId);
+            // E-13（2026-11-06）：被管理员暂停的账号不再烧模型
+            quotaService.assertEnabled(tenantId, automation.getUserId());
         } catch (ServiceException e) {
             fail(tenantId, runId, null, e.getMessage(), true);
+            return;
+        }
+
+        // E-13（2026-11-06）：与对话侧同口径的四道闸——回合计数 → 日预算 → 准入。
+        // 此前自动化只查租户开关，用户被暂停/预算用完/准入不过都照常扣费（14 条缺陷里唯一的钱相关 P1）。
+        // 被后置闸拒绝时退回合（与 AssistantRuntimeContextResolver 的补偿口径一致）；
+        // 模型调用本身失败不退——那一次确实跑过了（同对话侧"跑完即算"）。
+        try {
+            AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
+            org.dromara.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits =
+                quotaService.billingAwareLimits(tenantId, automation.getUserId());
+            if (!limits.creditsMode() || limits.roundLimit() <= 0) {
+                dailyQuota.tryTurn(tenantId, automation.getUserId(), limits.roundLimit());
+            }
+            try {
+                if (!limits.creditsMode()) {
+                    dailyQuota.checkBudget(tenantId, cfg.dailyBudgetAmount());
+                }
+                admissionGate.admit(tenantId, automation.getUserId());
+            } catch (RuntimeException e) {
+                if (!limits.creditsMode()) {
+                    dailyQuota.refundTurn(tenantId, automation.getUserId());
+                }
+                throw e;
+            }
+        } catch (RuntimeException e) {
+            fail(tenantId, runId, null, friendly(e), true);
             return;
         }
 
@@ -153,10 +194,12 @@ public class AutomationRunner {
             return;
         }
 
+        // 旧板题 3 乙：只读外部服务白名单（默认空=一个不挂；可写服务在挂载面被二次过滤）
+        java.util.Set<String> mcpSel = parseMcp(automation.getMcpServers());
         ReActAgent agent = null;
         String answer;
         try {
-            agent = agentFactory.createReadOnly(user, threadId);
+            agent = agentFactory.createReadOnly(user, threadId, mcpSel);
             // sessionId 必须显式给：AGUI 链路由框架按 threadId 注入，这里直调不会自动带；
             // 留空会让同一用户的每次运行共用同一个会话槽，历史互相污染。
             RuntimeContext ctx = RuntimeContext.builder()
@@ -178,6 +221,10 @@ public class AutomationRunner {
                 }
             }
             String reason = friendly(t);
+            // 三条硬规矩③：挂了外部工具的自动化，运行失败不计入「连续 3 次自动停用」——
+            // 外部服务抖动/离线不是用户的错，不能把整条自动化停掉（宁可多跑几次失败）。
+            // 反过来也成立：没勾外部工具的失败照常计数，与旧行为一致。
+            boolean countFailure = mcpSel.isEmpty();
             try {
                 conversationService.appendAssistantMessage(tenantId, conversationId,
                     automation.getUserId(), "（这次自动化没有跑完）" + reason, null, "error");
@@ -185,7 +232,7 @@ public class AutomationRunner {
             } catch (Exception ignore) {
                 // 会话写失败不阻断运行记录收口
             }
-            fail(tenantId, runId, conversationId, reason, true);
+            fail(tenantId, runId, conversationId, reason, countFailure);
             return;
         }
 
@@ -242,6 +289,21 @@ public class AutomationRunner {
      * 按创建人账号重建登录快照。触发时重查（题3 甲）：账号删除/停用/换租户、助手权限被收回，
      * 都不再执行。
      */
+    /** 白名单解析（纯函数）：null/空=空集合；忽略非法片段（保存面已清洗，这里兜底历史脏值）。 */
+    private static java.util.Set<String> parseMcp(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return java.util.Set.of();
+        }
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (String part : raw.split(",")) {
+            String name = part.trim().toLowerCase(java.util.Locale.ROOT);
+            if (name.matches("[a-z0-9_]{1,30}")) {
+                out.add(name);
+            }
+        }
+        return out;
+    }
+
     private LoginUser buildUser(Long userId, String tenantId) {
         SysUserVo u = userService.selectUserById(userId);
         if (u == null) {

@@ -119,11 +119,18 @@ public class AssistantAgentFactory {
     /**
      * 自动化无人值守入口（2026-11-05 拍板 题2 甲）：同一套装配，但只保留只读工具——
      * 平台侧仅 view_skill / load_skill_through_path，业务侧只留 {@code BizToolSpec.readOnly=true}
-     * 的查询工具；MCP 外部工具一律不挂（可能带写操作）。执行时也不会有确认卡可点，
+     * 的查询工具；MCP 外部工具默认不挂（可能带写操作）。执行时也不会有确认卡可点，
      * 所以写类/交互类（ask_user / submit_plan / todo_write / save_memory）必须裁掉。
+     *
+     * <p>旧板题 3 乙（2026-11-06）：自动化可以显式勾选只读外部服务——默认空=一个不挂；
+     * 名单里的服务由 McpPilotService 二次过滤（只读才挂），挂进来的工具并入只读白名单。</p>
      */
     public ReActAgent createReadOnly(LoginUser user, String aguiThreadId) {
-        return create(user, aguiThreadId, true);
+        return create(user, aguiThreadId, true, null);
+    }
+
+    public ReActAgent createReadOnly(LoginUser user, String aguiThreadId, java.util.Set<String> mcpServers) {
+        return create(user, aguiThreadId, true, mcpServers);
     }
 
     /**
@@ -132,10 +139,11 @@ public class AssistantAgentFactory {
      * SessionKey 含 thread——同 thread 复用缓存 agent 时工具实例与 thread 绑定不变）。
      */
     public ReActAgent create(LoginUser user, String aguiThreadId) {
-        return create(user, aguiThreadId, false);
+        return create(user, aguiThreadId, false, null);
     }
 
-    private ReActAgent create(LoginUser user, String aguiThreadId, boolean readOnly) {
+    private ReActAgent create(LoginUser user, String aguiThreadId, boolean readOnly,
+                              java.util.Set<String> readOnlyMcpServers) {
         // 批7 Q5/Q12-④: 优先级链第一段=用户会话选择(自选开关开时), 失效/关闸回退默认链
         DcsAiConfig cfg = modelFactory.resolveConfigWithUserChoice(user.getTenantId(), aguiThreadId);
         // 批7: 回写「本次建 agent 的选择基准」(picked 原值含回退), resolver 据此判失效
@@ -240,10 +248,15 @@ public class AssistantAgentFactory {
             autoAllow, actionLedgerHook));
         // 批2 Q2=A：MCP 外部工具试点挂载（平台级启用行；单服务失败=审计+warn 跳过，绝不连坐会话）
         // G4-#4：租户工具闸随行传入（mcp:<server> 键，off/admin 生效于挂载面）+ 用户角色档
-        // 自动化只读模式：MCP 工具无法判定读写，整段跳过（题2 甲：写操作一律不执行）
+        // 自动化只读模式：默认整段跳过；只有显式勾选的**只读**服务才挂（题3 乙三条硬规矩）
+        java.util.Set<String> readOnlyMcpTools = java.util.Set.of();
         if (!readOnly) {
             registered.addAll(mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
                 aguiThreadId, pb, tenantCfg.toolGate(), identity.getRoleLevel()));
+        } else if (readOnlyMcpServers != null && !readOnlyMcpServers.isEmpty()) {
+            readOnlyMcpTools = mcpPilotService.attachEnabled(toolkit, user.getTenantId(), user.getUserId(),
+                aguiThreadId, pb, tenantCfg.toolGate(), identity.getRoleLevel(), readOnlyMcpServers);
+            registered.addAll(readOnlyMcpTools);
         }
         if (readOnly) {
             // 只读白名单：技能正文（load_skill_through_path 由下方中间件注册）+ view_skill
@@ -255,6 +268,8 @@ public class AssistantAgentFactory {
             java.util.Set<String> keep = new java.util.HashSet<>(
                 java.util.Set.of("view_skill", "load_skill_through_path", "read_file"));
             keep.addAll(providerToolRegistry.readOnlyToolNames(identity));
+            // 勾选的只读外部工具：挂载成功才在 keep 里（挂失败自然不在，不留空名）
+            keep.addAll(readOnlyMcpTools);
             for (String name : new java.util.ArrayList<>(toolkit.getToolNames())) {
                 if (!keep.contains(name)) {
                     toolkit.removeTool(name);

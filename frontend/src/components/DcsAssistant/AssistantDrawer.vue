@@ -1,7 +1,13 @@
 <template>
   <teleport to="body">
     <div v-if="mounted" class="dcs-dw-mask" :class="{ open: modelValue }" @click="close" />
-    <aside class="dcs-dw" :class="{ open: modelValue, full: full }" role="dialog" :aria-label="assistantName">
+    <aside
+      class="dcs-dw"
+      :class="{ open: modelValue, full: full, 'motion-reduced': motionReduced(prefs) }"
+      :style="{ '--dcs-answer-size': prefs.answerSize === 'large' ? '15.5px' : '14px' }"
+      role="dialog"
+      :aria-label="assistantName"
+    >
       <header v-show="!full" class="dw-head">
         <span class="orb"><IconSpan name="bot" :size="18" /></span>
         <div class="hd-txt">
@@ -209,7 +215,6 @@
             @pgoto="onPageGoto"
             @mdnav="onMdNav"
             @draft-set="onDraftSet"
-            @ask-user-done="removeAskUserCard"
             @elicit-done="removeElicitationCard"
             @tour="startTour"
             :active-plan-id="planCardActionable && drawerOwnsPlanUi ? (activePlan?.planId ?? '') : ''"
@@ -256,6 +261,9 @@
           <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留）。
                会话页有自己的停靠区：路由切过去时抽屉若还开着会出现两张卡，
                removedIds 各持一份会发出用户没同意的全量催办——路由互斥只留一份 -->
+          <!-- 题10 乙：反问卡贴输入框上方（同工作台） -->
+          <ask-user-card v-if="askCard" :card="askCard" :thread-id="state.threadId" @done="onAskUserDone" />
+
           <hitl-dock v-if="modelValue && !isAssistantSessionRoute" :ask="pendingAsk" :full="full" @resolve="resolveHitl" @revise="onDockRevise" />
 
           <!-- v-show 而不是 v-if：草稿/队列/附件/--dcs-col-max 都要保活 -->
@@ -267,6 +275,7 @@
             :active="modelValue || full"
             :full="full"
             :blocked="!!pendingAsk"
+            :draft-scope="draftScope"
             @draft-change="draftText = $event"
             @send="onSend"
             @stop="onStop"
@@ -391,6 +400,7 @@ import {
 } from '@/api/dcs/assistant';
 import { getTask, statsOverview } from '@/api/dcs/core/task';
 import { useUserStore } from '@/store/modules/user';
+import { getAgentPrefs, lastUseKey, motionReduced } from './prefsStore';
 import { getAssistant, tryAcquireRemoteWatch, releaseRemoteWatch, PLAN_CONFIRM_TEXT } from './useAssistant';
 import { relTime, cnEpoch } from './time';
 import type { AssistantBindings, AssistantTurn } from './useAssistant';
@@ -399,13 +409,14 @@ import { useHelpModal } from './helpModal';
 import { pushToast } from './toastStore';
 import { displayTitle, renameSeed, shouldRename } from '@/utils/assistantTitle';
 import { assistantName } from './nameState';
-import { convPins, toggleConvPin } from './conversationPins';
+import { convPins, initConvPins, toggleConvPin } from './conversationPins';
 import MsgFlow from './MsgFlow.vue';
 import HitlDock from './HitlDock.vue';
 import PlanTip from './PlanTip.vue';
 import { latestPendingPlan } from './planDock';
 import { startTour } from './useTour';
 import IconSpan from './IconSpan.vue';
+import AskUserCard from './AskUserCard.vue';
 import Composer from './Composer.vue';
 import GateCard from './GateCard.vue';
 import AssistantToasts from './AssistantToasts.vue';
@@ -422,11 +433,21 @@ const composerRef = ref<InstanceType<typeof Composer>>();
 /** DP-3：统计面板跳转通道（step-jump/jump-confirm → MsgFlow expose） */
 const msgFlowRef = ref<InstanceType<typeof MsgFlow>>();
 const help = useHelpModal();
+
+/** 题10 乙：当前活着的反问卡；题8 甲：答完落回执行 */
+const askCard = computed(() => cur()?.askUsers?.[0] ?? null);
+function onAskUserDone(p: { id: string; outcome: 'answered' | 'cancelled' | 'timeout' | 'skipped'; answers: never[] }) {
+  finishAskUserCard(p.id, p.outcome, p.answers);
+}
+
 /** 全屏形态（批A 过渡：同一抽屉展宽；批D 升级为会话栏+限宽 hero 的完整屏D） */
 const full = ref(false);
 const taskMenuOpen = ref(false);
 
 const userStore = useUserStore();
+// E-10（2026-11-06）：置顶键按登录用户分开（换账号不串别人会话）
+initConvPins(userStore.userId);
+const prefs = getAgentPrefs(userStore.userId);
 const route = useRoute();
 const router = useRouter();
 
@@ -733,6 +754,10 @@ const fpTotal = ref(0);
  *  自查回修(dspro P2)：补 lastMessageTime（北京墙钟）——分组/时间显示都吃它；行内操作
  *  (打开/重命名/置顶/归档)对临时行全拦（假 ID 打真 API 只会弹假错误 + 僵尸置顶） */
 function ensureCurRow(list: FpConv[]): FpConv[] {
+  // 草稿态不插行（A 案）：新建后列表保持原样，第一句发出、服务端落库后再由列表刷新接管
+  if (state.draftMode) {
+    return list;
+  }
   if (!state.threadId || list.some((c) => c.threadId === state.threadId)) {
     return list;
   }
@@ -749,6 +774,10 @@ async function loadFpConvs(silent = false) {
       total?: number;
     };
     const head = ensureCurRow(convs?.rows ?? []);
+    // F5/重进：持久化的 threadId 已是真实会话时，草稿态随真实行到达结束
+    if (state.draftMode && (convs?.rows ?? []).some((c) => c.threadId === state.threadId)) {
+      state.draftMode = false;
+    }
     if (silent) {
       // 自查回修(dspro P2)：答后静默补刷只换首页，已「加载更多」的尾段保留；
       // 同 id 以新数据为准，临时行一律丢弃
@@ -794,10 +823,6 @@ function onFpNewSession() {
     stop(true);
   }
   newSession();
-  // 业务批(1015) Q15：新会话即时置顶（列表已加载过才插——普通抽屉形态无侧栏，开全屏时 loadFpConvs 兜底）
-  if (fpConvs.value.length || full.value) {
-    fpConvs.value = ensureCurRow(fpConvs.value);
-  }
 }
 /** 连点序号守卫（k3 P2-2 回修，会话页批H openSeq 同款）：连点两个会话时
  * 双 listMessages 并发在途，晚 resolve 的旧会话不得覆盖先选中的新会话 */
@@ -961,9 +986,14 @@ function watchRemoteRun(c: { id: number | string; threadId: string; status?: str
 
 /** 今日概况 snaprow（仅全屏；admin=待审核口径，其余=待办口径；「已催办/自己逾期」无现成字段→以「待修改」替换并计划留痕） */
 const snapItems = ref<SnapItem[]>([]);
-const LAST_KEY = 'dcs:assistant:lastUse';
+// E-10（2026-11-06）：「上次使用时间」按用户分键，且读取包 try（隐私模式 getItem 会抛）
 async function loadSnap() {
-  const lastRaw = localStorage.getItem(LAST_KEY);
+  let lastRaw: string | null = null;
+  try {
+    lastRaw = localStorage.getItem(lastUseKey(userStore.userId));
+  } catch {
+    lastRaw = null;
+  }
   const last = lastRaw ? new Date(lastRaw) : null;
   const lastTxt = last && !Number.isNaN(last.getTime()) ? last.toTimeString().slice(0, 5) : '—';
   try {
@@ -1003,7 +1033,7 @@ const {
   resumeStreamingPlaceholder,
   resumeSay,
   resolveHitl,
-  removeAskUserCard,
+  finishAskUserCard,
   removeElicitationCard,
   setAutoLevel,
   queueEdit,
@@ -1034,6 +1064,8 @@ const pendingPlan = computed(() => latestPendingPlan(state.turns));
 const activePlan = computed(() => pendingPlan.value?.plan ?? null);
 /** Composer 草稿（题四甲：有草稿时不藏输入框，草稿不能丢） */
 const draftText = ref('');
+/** 草稿作用域：新建态固定 draft，真实会话用 threadId */
+const draftScope = computed(() => (state.draftMode ? 'draft' : state.threadId));
 /** 抽屉何时自己负责计划决策 UI：打开着、且不在会话页（会话页由页面自己渲染） */
 const drawerOwnsPlanUi = computed(() => !!modelValue.value && !isAssistantSessionRoute.value);
 /** 用户点过「忽略」：卡仍留在消息流里可再操作，但输入框先还回来 */
@@ -1543,6 +1575,16 @@ function scheduleConvRefresh() {
 watch(
   () => state.sending,
   (v, old) => {
+    // 第一句发出后 800ms 补刷一次，真实行尽快出现在全屏侧栏
+    if (!old && v && full.value) {
+      convRefreshTimers.push(
+        setTimeout(() => {
+          if (mounted.value && full.value) {
+            void loadFpConvs(true);
+          }
+        }, 800)
+      );
+    }
     if (old && !v && full.value) {
       scheduleConvRefresh();
     }

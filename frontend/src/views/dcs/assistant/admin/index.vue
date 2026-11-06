@@ -265,7 +265,6 @@
             <span class="sp" />
             <!-- 低频编辑区不再各占一段：出口与页脚同一行，点开在下方展开 -->
             <span class="cap-more-links">
-              <button type="button" @click="openCapMore('svc')">外部服务 <b>{{ mcpRows.length }}</b></button>
               <button type="button" @click="openCapMore('skill')">技能库 <b>{{ skillRows.length }}</b></button>
               <button type="button" @click="openCapMore('pano')">行为总纲 <b>{{ panoSegments.length }} 段</b></button>
             </span>
@@ -306,41 +305,6 @@
           </div>
         </section>
 
-        <section class="adm-sec cap-fold cap-more cap-more-svc" :class="{ open: mcpOpen }">
-          <div class="sec-head cap-fold-head" @click="mcpOpen = !mcpOpen">
-            <span class="fold-arr">▶</span>
-            <div class="sec-ttl">
-              <b>外部服务</b>
-              <span class="sec-cnt">{{ mcpRows.length }} 个</span>
-              <span class="sec-note">只读的 MCP 服务；挂上之后它带来的能力才会出现在上面的清单里</span>
-            </div>
-            <div class="sec-acts" @click.stop>
-              <el-button size="small" type="primary" @click="openMcpForm()">注册服务</el-button>
-            </div>
-          </div>
-          <div v-show="mcpOpen" class="cap-fold-body">
-          <div class="cap-note">
-            服务停用或离线时，那一组能力整体消失。改动对下一轮新会话生效。
-          </div>
-          <div v-loading="mcpLoading" class="svc-list">
-            <div v-for="row in mcpRows" :key="row.id" class="svc-line" :class="{ off: row.enabled !== '1' }">
-              <b>{{ row.displayName || row.serverName }}</b>
-              <code>{{ row.serverName }}</code>
-              <span class="st"><i class="d" />{{ row.enabled === '1' ? '已启用' : '已停用' }}</span>
-              <span class="muted">{{ row.transportType === 'STDIO' ? '本地脚本' : '网络服务' }}</span>
-              <span class="muted svc-cmd" :title="mcpCmdFull(row)">{{ mcpCmdSummary(row) }}</span>
-              <span v-if="row.headerKeys" class="muted svc-hd">鉴权头：{{ row.headerKeys }}</span>
-              <span class="acts">
-                <el-switch :model-value="row.enabled === '1'" size="small" @change="(v: any) => onToggleMcp(row, v)" />
-                <el-button link size="small" type="primary" @click="openMcpForm(row)">编辑</el-button>
-                <el-button link size="small" type="primary" @click="openMcpAudit(row.serverName)">审计</el-button>
-                <el-button link size="small" type="danger" @click="onDeleteMcp(row)">删除</el-button>
-              </span>
-            </div>
-            <div v-if="!mcpRows.length && !mcpLoading" class="cap-empty">还没有注册外部服务</div>
-          </div>
-          </div>
-        </section>
 
         <!-- ============ 5b 批：技能库（低频编辑区，默认收起，标题即出口） ============ -->
         <section class="adm-sec cap-fold cap-more cap-more-skill" :class="{ open: skillOpen }">
@@ -1744,50 +1708,6 @@
         >
       </template>
     </el-dialog>
-        <!-- 注册/编辑抽屉 -->
-        <el-drawer v-model="mcpFormVisible" :title="mcpForm.id ? '编辑外部服务' : '注册外部服务'" size="480px" class="mcp-form-drawer">
-          <el-form label-width="92px">
-            <el-form-item label="服务名" required>
-              <el-input v-model="mcpForm.serverName" placeholder="小写字母/数字/下划线，3-30 位，如 weather_demo" :disabled="!!mcpForm.id" />
-            </el-form-item>
-            <el-form-item label="说明">
-              <el-input v-model="mcpForm.displayName" placeholder="如：天气查询（试点）" maxlength="100" />
-            </el-form-item>
-            <el-form-item label="传输类型" required>
-              <el-select v-model="mcpForm.transportType" style="width:100%" :disabled="!!mcpForm.id">
-                <el-option label="STDIO（node 脚本，试点推荐）" value="STDIO" />
-                <el-option label="STREAMABLE_HTTP" value="STREAMABLE_HTTP" />
-                <el-option label="SSE" value="SSE" />
-              </el-select>
-            </el-form-item>
-            <template v-if="mcpForm.transportType === 'STDIO'">
-              <el-form-item label="命令">
-                <el-input model-value="node" disabled />
-              </el-form-item>
-              <el-form-item label="脚本路径" required>
-                <el-input v-model="mcpForm.argsJson" placeholder='JSON 数组，如 ["D:/.../backend/mcp-demo/weather-server.mjs"]' />
-              </el-form-item>
-            </template>
-            <template v-else>
-              <el-form-item label="服务地址" required>
-                <el-input v-model="mcpForm.url" placeholder="http://127.0.0.1:3000/mcp（host 须在白名单）" />
-              </el-form-item>
-            </template>
-            <el-form-item v-if="mcpForm.transportType !== 'STDIO'" label="请求头">
-              <el-input v-model="mcpForm.headers" :placeholder="mcpHeadersPlaceholder" />
-            </el-form-item>
-            <el-form-item label="备注">
-              <el-input v-model="mcpForm.remark" type="textarea" :rows="2" maxlength="255" />
-            </el-form-item>
-            <el-form-item label="立即启用">
-              <el-switch v-model="mcpForm.enabledBool" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="mcpFormVisible = false">取消</el-button>
-            <el-button type="primary" :loading="mcpSaving" @click="onSaveMcp">保存</el-button>
-          </template>
-        </el-drawer>
   </div>
 </template>
 
@@ -1812,9 +1732,6 @@ import {
   getAssistantToolGate,
   saveAssistantToolGate,
   listAssistantMcpServers,
-  saveAssistantMcpServer,
-  toggleAssistantMcpServer,
-  deleteAssistantMcpServer,
   pageAssistantMcpCallLog,
   type AssistantMcpServerRow,
   type AssistantMcpCallLog,
@@ -3034,8 +2951,6 @@ const capQuery = ref('');
 const capSel = ref<Set<string>>(new Set());
 /** 行内改档：当前展开的那一行（同一时刻只开一条，不遮别的行） */
 const capOpenGate = ref<string | null>(null);
-/** 底部出口（外部服务）与技能库/总纲同一个折叠口径，默认收起 */
-const mcpOpen = ref(false);
 /** 按角色看：全部 / 成员 / 发布人 / 管理员。只换「谁能用」那一列的读法，不另起一套版式 */
 const capLens = ref<'all' | '0' | '1' | '2'>('all');
 const CAP_LENS = [
@@ -3234,9 +3149,8 @@ function onCapRowKey(e: KeyboardEvent, row: TgRowUi) {
   rows[i + (e.key === 'ArrowDown' ? 1 : -1)]?.focus();
 }
 /** 底部出口：打开对应折叠区并滚过去（都是同一个页面里的低频编辑区） */
-function openCapMore(kind: 'svc' | 'skill' | 'pano') {
-  if (kind === 'svc') mcpOpen.value = true;
-  else if (kind === 'skill') skillOpen.value = true;
+function openCapMore(kind: 'skill' | 'pano') {
+  if (kind === 'skill') skillOpen.value = true;
   else panoOpen.value = true;
   void nextTick(() => {
     document.querySelector(`.cap-more-${kind}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3522,28 +3436,7 @@ async function onSaveToolGate(): Promise<boolean> {
 
 /* ===== 外部工具页签（批2 Q2=A）：MCP 试点服务注册 + 调用审计 ===== */
 const mcpLoading = ref(false);
-const mcpSaving = ref(false);
 const mcpRows = ref<AssistantMcpServerRow[]>([]);
-const mcpFormVisible = ref(false);
-const mcpForm = reactive({
-  id: '',
-  serverName: '',
-  displayName: '',
-  transportType: 'STDIO' as 'STDIO' | 'STREAMABLE_HTTP' | 'SSE',
-  argsJson: '[""]',
-  url: '',
-  headers: '',
-  /** 编辑时已有的请求头键名（提示用——值永不回显；改 headers 须整份重填） */
-  headerKeysHint: '',
-  remark: '',
-  enabledBool: true
-});
-/** G4 三审回修：请求头占位提示——编辑时展示已有键名（值永不回显），改须整份重填。
- *  放 computed（含双引号示例 JSON，进模板属性会截断——用户实测 vite 报错教训） */
-const mcpHeadersPlaceholder = computed(() =>
-  mcpForm.id && mcpForm.headerKeysHint
-    ? `已有键：${mcpForm.headerKeysHint}。留空保持不变；要改须整份重填（含未变的键）`
-    : '可选 JSON 对象，如 {"Authorization":"Bearer ..."}；值加密存储、列表只显示键名');
 const mcpLogRows = ref<AssistantMcpCallLog[]>([]);
 const mcpLogTotal = ref(0);
 const mcpLogPage = ref(1);
@@ -3578,22 +3471,6 @@ async function loadMcpServers() {
   } finally {
     mcpLoading.value = false;
   }
-}
-/** 启动方式一行放不下：列表只给脚本名/地址，完整命令进 title（长命令会把这一行撑爆） */
-function mcpCmdFull(row: AssistantMcpServerRow): string {
-  return row.transportType === 'STDIO' ? `${row.command || ''} ${row.args || ''}`.trim() : row.url || '';
-}
-function mcpCmdSummary(row: AssistantMcpServerRow): string {
-  const full = mcpCmdFull(row);
-  if (!full) return '—';
-  if (row.transportType !== 'STDIO') return full.replace(/^https?:\/\//, '').slice(0, 46);
-  // args 是 JSON 数组串（["x.mjs"]），先把引号/方括号剥掉再取脚本名
-  const parts = full
-    .replace(/["'[\]]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
-  const script = parts.find((p) => /\.(mjs|cjs|js|py|sh)$/.test(p)) || parts[parts.length - 1];
-  return script.split(/[\\/]/).pop() || full;
 }
 /** 题5：翻页/筛选连点时只认最后一次请求，先发后到的旧响应直接丢弃（否则显示错页内容） */
 let mcpLogSeq = 0;
@@ -3650,79 +3527,6 @@ async function openMcpAudit(serverName: string) {
 /** 失败行标红：真实调用里最该看的就是失败 */
 function auditRowClass({ row }: { row: AssistantMcpCallLog }): string {
   return row.status === '1' ? '' : 'audit-fail';
-}
-function openMcpForm(row?: AssistantMcpServerRow) {
-  if (row) {
-    mcpForm.id = row.id;
-    mcpForm.serverName = row.serverName;
-    mcpForm.displayName = row.displayName ?? '';
-    mcpForm.transportType = row.transportType;
-    mcpForm.argsJson = row.args ?? '[""]';
-    mcpForm.url = row.url ?? '';
-    mcpForm.headers = '';
-    mcpForm.headerKeysHint = row.headerKeys ?? '';
-    mcpForm.remark = row.remark ?? '';
-    mcpForm.enabledBool = row.enabled === '1';
-  } else {
-    Object.assign(mcpForm, { id: '', serverName: '', displayName: '', transportType: 'STDIO', argsJson: '[""]', url: '', headers: '', headerKeysHint: '', remark: '', enabledBool: true });
-  }
-  mcpFormVisible.value = true;
-}
-async function onSaveMcp() {
-  mcpSaving.value = true;
-  try {
-    await saveAssistantMcpServer({
-      id: mcpForm.id || undefined,
-      serverName: mcpForm.serverName.trim(),
-      displayName: mcpForm.displayName.trim() || null,
-      transportType: mcpForm.transportType,
-      command: mcpForm.transportType === 'STDIO' ? 'node' : null,
-      args: mcpForm.transportType === 'STDIO' ? mcpForm.argsJson.trim() : null,
-      url: mcpForm.transportType === 'STDIO' ? null : mcpForm.url.trim(),
-      headers: mcpForm.headers.trim() || null,
-      remark: mcpForm.remark.trim() || null,
-      enabled: mcpForm.enabledBool ? '1' : '0'
-    });
-    mcpFormVisible.value = false;
-    await loadMcpServers();
-    await loadMcpCallLog();
-    ElMessage.success('已保存——下一轮新会话起挂载');
-  } catch {
-    // 白名单人话报错 request 层已弹，抽屉保留输入可改
-  } finally {
-    mcpSaving.value = false;
-  }
-}
-async function onToggleMcp(row: AssistantMcpServerRow, on: boolean) {
-  // 乐观更新防连点弹跳：先本地置态，失败回滚
-  const prev = row.enabled;
-  row.enabled = on ? '1' : '0';
-  try {
-    await toggleAssistantMcpServer(row.id, on ? '1' : '0');
-    await loadMcpCallLog();
-    ElMessage.success(on ? '已启用——下一轮新会话挂载' : '已停用——新会话不再挂载');
-  } catch {
-    row.enabled = prev;
-  }
-}
-async function onDeleteMcp(row: AssistantMcpServerRow) {
-  try {
-    await ElMessageBox.confirm(
-      `删除服务「${row.serverName}」？已挂载会话不受影响，新会话不再挂载。审计记录保留。`,
-      '删除外部服务',
-      { type: 'warning' }
-    );
-  } catch {
-    return;
-  }
-  try {
-    await deleteAssistantMcpServer(row.id);
-    await loadMcpServers();
-    await loadMcpCallLog();
-    ElMessage.success('已删除');
-  } catch {
-    // request 层已弹
-  }
 }
 function formatMcpTime(t: string): string {
   if (!t) return '—';

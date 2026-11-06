@@ -703,6 +703,7 @@ CREATE TABLE public.dcs_automation (
     schedule_type character varying(16) NOT NULL,
     schedule_time character varying(5),
     weekdays character varying(20),
+    mcp_servers character varying(500),
     time_zone character varying(40) DEFAULT 'Asia/Shanghai'::character varying NOT NULL,
     enabled character(1) DEFAULT '1'::bpchar NOT NULL,
     builtin character(1) DEFAULT '0'::bpchar NOT NULL,
