@@ -4,7 +4,7 @@
       <span class="ah-ic"><IconSpan name="help" /></span>
       <b>{{ card.questions[idx]?.header || '请选择' }}</b>
       <span class="ah-hint">{{ idx + 1 }} / {{ card.questions.length }}</span>
-      <span class="ah-ttl" :class="{ urgent: remainMs < 60_000 }" title="超时未答会按设置里的「提问自动继续」处理，不会替你乱选">{{
+      <span class="ah-ttl" :class="{ urgent: remainMs < 60_000 }" :title="autoContinue === false ? '超时未答会改用文字问你，不会替你乱选' : '超时未答会按设置里的「提问自动继续」处理，不会替你乱选'">{{
         remainText
       }}</span>
     </div>
@@ -76,7 +76,7 @@ interface AskUserDone {
   answers: AssistantAskUserAnswer[];
 }
 
-const props = defineProps<{ card: AssistantAskUserCard; threadId: string }>();
+const props = defineProps<{ card: AssistantAskUserCard; threadId: string; autoContinue?: boolean }>();
 const emit = defineEmits<{ done: [payload: AskUserDone] }>();
 
 const rootEl = ref<HTMLElement | null>(null);
@@ -94,7 +94,12 @@ const deadlineAt = Date.now() + (props.card.remainingMs ?? 240_000);
 const remainMs = computed(() => Math.max(0, deadlineAt - nowMs.value));
 const remainText = computed(() => {
   const s = Math.ceil(remainMs.value / 1000);
-  return remainMs.value <= 0 ? '已超时' : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} 后自动继续`;
+  if (remainMs.value <= 0) {
+    return '已超时';
+  }
+  const left = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  // 设置页「提问自动继续」关着时，到点不是继续，是改用文字问——倒计时文案不能再说「自动继续」
+  return props.autoContinue === false ? `${left} 后改用文字问你` : `${left} 后自动继续`;
 });
 
 let timer: ReturnType<typeof setInterval> | null = null;

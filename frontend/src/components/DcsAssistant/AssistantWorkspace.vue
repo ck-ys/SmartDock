@@ -241,7 +241,7 @@
 
       <!-- 题10 乙：反问卡贴输入框上方（不随消息流滚走；一次一题、可空答） -->
       <!-- 三审 P2：key 绑卡 id——同一会话可能连出两张卡，复用实例会带上一张的倒计时/选项 -->
-      <ask-user-card v-if="askCard" :key="askCard.id" :card="askCard" :thread-id="state.threadId" @done="onAskUserDone" />
+      <ask-user-card v-if="askCard" :key="askCard.id" :card="askCard" :thread-id="state.threadId" :auto-continue="prefs.askAutoContinue" @done="onAskUserDone" />
 
       <!-- HITL 待确认停靠区——占输入框位置，输入框由 blocked 收起（草稿保留） -->
       <hitl-dock :ask="pendingAsk" full @resolve="resolveHitl" @revise="onDockRevise" />
@@ -969,6 +969,11 @@ async function doLoadConversations(silent: boolean) {
         selected.value = cur;
         selectedId.value = cur.id;
         state.draftMode = false;
+        // 题5 甲根因（2026-11-07）：刷新后左栏/顶栏已指向这个会话，正文却还是欢迎页（0 条消息）。
+        // 标题、正文、读数必须同源——没有在飞回合时把历史拉回来；发送后的静默补刷 turns 非空，不会再拉。
+        if (state.turns.length === 0 && !state.sending) {
+          await openConversation(cur);
+        }
       }
     }
     if (silent) {
