@@ -1,7 +1,7 @@
 # <img src="docs/images/brand-mark.svg" width="30" height="30" alt="SmartDock 标"> SmartDock
 
 <p align="center">
-  <img src="docs/images/banner.svg" alt="SmartDock：通用智能体引擎（附带用户画像引擎）" width="100%">
+  <img src="docs/images/banner.svg" alt="SmartDock：开源通用智能体引擎（附带用户画像引擎）" width="100%">
 </p>
 
 <p align="center">
@@ -14,75 +14,117 @@
 </p>
 
 <p align="center">
-  <b>让 AI 真的能查数据、走流程；让每一次业务动作都沉淀成可追溯的用户画像。</b><br>
+  <b>一个能查真实数据、能走真实流程的智能体工作台。</b><br>
   <sub>Java 21 · Spring Boot 3.5 · Vue 3.5 · PostgreSQL · 多租户 · Apache-2.0</sub>
 </p>
 
-SmartDock 是一套**开源通用智能体引擎**，附带一条可独立使用的**用户画像引擎**。智能体侧按 `agentId` 注册路由，走 ReAct 工具循环，能查真实业务数据、写操作前先确认，全程流式输出；画像侧把业务动作沉淀成事件，自动算出维度分、分群与行为分析。两条引擎在同一个 Spring Boot 进程里各管一摊，靠「工具 SPI」与「业务事件」两条缝对接；多租户、权限、计费、审计、文件安全由成熟底座提供——**整套能跑，也能只拆走智能体引擎**。
+SmartDock 是一个**开源的智能体工作台**：左侧是会话，右侧是工作区，技能点一下就能开工，工具调用全程可见，写操作先确认再执行。它就是你在截图里看到的那个界面——不是 SDK 加一个聊天框的示例。
+
+引擎侧按 `agentId` 注册多智能体，走 ReAct 工具循环；业务能力通过「工具 SPI」接进来，不用改引擎核心。同一套底座上还带一条**用户画像引擎**（事件 → 指标 → 快照），让助手能查「这个人最近怎么样」，而不只是查任务列表。
+
+<p align="center">
+  <a href="#智能体工作台"><b>智能体工作台</b></a> ｜
+  <a href="#30-秒了解">30 秒了解</a> ｜
+  <a href="#一次请求怎么跑">一次请求怎么跑</a> ｜
+  <a href="#快速开始">10 分钟跑起来</a> ｜
+  <a href="#把自己的业务接进来">业务接入</a> ｜
+  <a href="#扩展指南">扩展</a> ｜
+  <a href="docs/architecture.md">分层与判定序</a>
+</p>
 
 ## 30 秒了解
 
 <table>
 <tr><th align="left">你想要</th><th align="left">SmartDock 给你</th></tr>
-<tr><td><b>让 AI 真正干活</b></td><td>ReAct 工具循环、工具 SPI 扩业务、HITL 写操作确认、AGUI/SSE 流式输出（28 类事件）</td></tr>
+<tr><td><b>一个能用的智能体工作台</b></td><td>会话 / 技能 / 工具 / 自动化 / 审计，一套界面全在里面；不是要你自己攒的组件库</td></tr>
+<tr><td><b>让 AI 真的干活</b></td><td>ReAct 工具循环、工具 SPI 扩业务、HITL 写操作确认、AGUI/SSE 流式输出（28 类事件）</td></tr>
+<tr><td><b>把业务 SOP 交给 AI</b></td><td>技能就是 Markdown 文件：写清「怎么做」，模型按步骤执行；管理台改完立即生效，不用发版</td></tr>
+<tr><td><b>让 AI 到点自己跑</b></td><td>自动化：一句话 + 一个时间，到点用只读工具跑一轮，结果进通知和会话</td></tr>
 <tr><td><b>看懂用户</b></td><td>事件源画像：维度配置 → 评分 → 分群 → 低分复核；快照可回放、可对账</td></tr>
 <tr><td><b>不用从零搭后台</b></td><td>RuoYi-Vue-Plus 5.6.1 底座：多租户、权限、字典、OSS、风控、调度、监控</td></tr>
 </table>
 
-## 界面速览
+## 智能体工作台
 
-界面全部来自真实运行的演示环境（合成数据，非设计稿）：
+<p align="center">
+  <img src="docs/images/screenshots/20-workspace-entry.png" alt="智能体工作台：进门页" width="100%">
+</p>
+
+进门就是这一步：一句「今天帮你做点什么」，下面是这个租户里你能用的技能卡——点一张，输入框自动填好完整问法，不用想怎么开口。
+
+<p align="center">
+  <img src="docs/images/screenshots/27-workspace-ask.gif" width="760" alt="工作台：一次完整问答（录屏）">
+  <br><sub>一次完整问答（真实录屏，加速播放）：提问 → 思考 → 调 <code>dcs_query_my_todos</code> → 流式回答 → 标注来源与用量</sub>
+</p>
+
+会话页长这样：左边是会话历史，中间是消息流。工具调用不是黑盒——「已完成 · 用了 1 个工具 · 37 秒」点开就是每一步的耗时和参数。
+
+### 技能：点一张，直接开工
+
+<p align="center">
+  <img src="docs/images/screenshots/28-workspace-skill.gif" width="760" alt="技能卡：点一下自动填好问法">
+  <br><sub>点技能卡 → 输入框自动填好完整问法（不是替你发送，你可以先改）</sub>
+</p>
+
+技能是一个 Markdown 文件（官方 SKILL.md 格式，YAML frontmatter + 正文），业务和运维同学可以直接在管理台改，不用发版。本仓内置 10 个，成员默认能用 7 个：
+
+```markdown
+---
+name: weekly-report
+description: 用户说「帮我写周报/周报怎么写/本周总结」时，按三步问法帮用户成稿（进展/问题/下周计划）
+displayName: 写周报
+minRole: member
+---
+你正在使用「写周报」技能。目标：帮用户把这一周的事整理成一份能直接发出去的周报。
+1. 先问：本周主要做了哪些事？（用户可能随手列几条，帮他归类，不要追问细节）
+2. 再问：过程中遇到什么问题或卡点？怎么处理的？
+3. 最后问：下周打算做什么？
+成稿要求：三段式，进展写结果不写过程，问题写「卡在哪 + 谁来解决」，计划写具体动作。
+```
+
+- **渐进披露**：只有 `description` 常驻技能目录（模型靠它判断何时调用），正文默认不占上下文、用到才读——单技能正文上限 20000 字符
+- **三层装载**：内置 classpath → `config/skills/` 部署期覆写 → 管理台在线编辑（优先级最高，下一轮会话生效）
+- **权限双重闸**：`minRole` 控制谁能用，租户工具开关矩阵控制是否启用（停用后对所有角色整技能遮罩，超管也看不见）
+- **可度量**：每个技能的使用次数与最近使用时间都落在管理台
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/13-assistant-session.png" alt="AI 助手会话页"><br><sub>全屏会话页：多会话历史、按当前页面推荐问题、模型与思考档位随手切</sub></td>
-<td width="50%"><img src="docs/images/screenshots/06-assistant.png" alt="AI 助手抽屉"><br><sub>业务页面内的助手抽屉：工具调用链、耗时与来源数都摊开给你看</sub></td>
+<td width="50%"><img src="docs/images/screenshots/22-workspace-skills.png" alt="技能库"><br><sub>技能库：左边目录只放一句话说明，右边是完整步骤、谁能用、怎么用，还能「试一句」直接填进输入框</sub></td>
+<td width="50%"><img src="docs/images/screenshots/23-workspace-tools.png" alt="工具清单"><br><sub>工具面：9 个工具，按查询/交互/外部服务分类，标注风险与「谁能用」，不用的直接停用</sub></td>
 </tr>
 </table>
 
-<p align="center"><img src="docs/images/screenshots/06a-assistant-demo.gif" width="420" alt="AI 助手：一次完整问答"><br><sub>一次完整问答（录屏）：思考 → 调工具 → 引用来源 → 给结论；工具面之外就直说查不到</sub></p>
-
-<sub>截图来自真实运行的演示环境，数据由 `backend/script/demo/seed-internal-ops-demo.js` 生成（合成数据，不含真实个人信息）；部分截图拍摄于 v3.42.2，界面细节可能与当前版本略有差异。</sub>
+### 自动化：到点自己跑一轮
 
 <p align="center">
-  <a href="#快速开始"><b>10 分钟跑起来</b></a> ｜
-  <a href="#核心能力"><b>核心能力</b></a> ｜
-  <a href="docs/architecture.md"><b>分层与判定序</b></a> ｜
-  <a href="docs/agent-engine.md">智能体引擎</a> ｜
-  <a href="docs/profile-engine.md">画像引擎</a> ｜
-  <a href="docs/profile-integration.md"><b>业务接入指南</b></a>
+  <img src="docs/images/screenshots/26-workspace-automation-new.png" alt="新建自动化" width="100%">
 </p>
 
-## 为什么值得一看
+写一句要它做什么，选个时间；到点用**只读工具**跑一轮，结果放通知和会话里。写操作一律不执行——这是自动化与「定时脚本」的区别，也是它敢在生产环境跑的原因。失败不会静默：页面上能看原因，连续 3 次失败自动停用。
 
-1. **智能体是真能干活的那种**——ReAct 工具循环自主决策、工具 SPI 接业务、AGUI/SSE 28 类事件全程流式；不是只会聊天的套壳。
-2. **AI 不直接动生产数据**——写操作先出确认卡写明将改什么，点确认才落库；待确认期间输入暂停、草稿保留。
-3. **多智能体、多租户开箱可用**——按 `agentId` 注册与路由，工具/权限/记忆/技能/计费共用一套底座。
-4. **画像给智能体补上「懂用户」**——业务动作自动变成画像事件，助手用同一套权限查画像与任务数据；这是内置联动，不是两个拼在一起的 demo。
-5. **安全是默认项**——PII 出网脱敏、工具结果注入打标、16K 输入闸、导出审计、敏感字段打码。
-6. **有测试兜底**——后端 JUnit **437** 用例（其中 8 个红队集成用例需完整 PostgreSQL/Redis 环境）+ 前端 Vitest **241** 用例，覆盖权限矩阵、状态机、PII 脱敏、HITL、AGUI 协议与计费。
+<table>
+<tr>
+<td width="50%"><img src="docs/images/screenshots/25-workspace-automation.png" alt="自动化列表"><br><sub>自动化列表：进行中 / 已暂停 / 失败三档，内置一条「每日未交摘要」可直接开关</sub></td>
+<td width="50%"><img src="docs/images/screenshots/24-workspace-mcp.png" alt="MCP 外部服务"><br><sub>MCP 服务：平台级注册、启停、header 令牌加密存储；外部工具调用单独限频</sub></td>
+</tr>
+</table>
 
-## 目录
+### 设置与能力开关
 
-- [30 秒了解](#30-秒了解)
-- [界面速览](#界面速览)
-- [为什么值得一看](#为什么值得一看)
-- [技术架构](#技术架构)
-- [核心能力](#核心能力)
-- [快速开始](#快速开始)
-- [把自己的业务接进来](#把自己的业务接进来)
-- [核心模块](#核心模块)
-- [使用说明](#使用说明)
-- [更多界面](#更多界面)
-- [扩展指南](#扩展指南)
-- [技术栈](#技术栈)
-- [使用边界与适合谁](#使用边界与适合谁)
-- [安全与上线前检查](#安全与上线前检查)
-- [测试与质量](#测试与质量)
-- [内置账号](#内置账号)
-- [文档导航](#文档导航)
-- [许可](#许可)
-- [🙏 特别鸣谢](#-特别鸣谢)
+<p align="center">
+  <img src="docs/images/screenshots/29-workspace-caps.gif" width="760" alt="设置页：常规 / 技能 / 工具 / MCP">
+  <br><sub>设置页：常规手感（发送键、流式、动效、字号）自己调；技能与工具只读看清单；MCP 服务平台级注册</sub>
+</p>
+
+技能与工具是只读的——能力和权限在「AI 助手管理」里配，工作台只负责让你看清「我现在能用什么」。这条边界是有意为之：使用者不该在会话页里改权限。
+
+## 一次请求怎么跑
+
+<p align="center">
+  <img src="docs/images/ai-flow.svg" alt="智能体运行时：一次请求的完整链路" width="100%">
+</p>
+
+接入 → ReAct 推理循环 → 工具行动 → AGUI 流式输出；模型装饰器链与权限闸贯穿同一次请求。分层细节、模块边界与判定顺序见 [docs/architecture.md](docs/architecture.md)。
 
 ## 技术架构
 
@@ -90,7 +132,7 @@ SmartDock 是一套**开源通用智能体引擎**，附带一条可独立使用
   <img src="docs/images/architecture-overview.svg" alt="SmartDock 技术架构" width="100%">
 </p>
 
-客户端只调 REST/SSE；智能体引擎与画像引擎同进程、互不依赖——智能体通过「工具 SPI」接业务能力，画像通过「业务事件」收业务动作；平台能力（多租户、权限、计费、文件安全、风控、调度、监控、对象存储）全部来自底座。分层细节、模块边界与判定顺序见 [docs/architecture.md](docs/architecture.md)。
+客户端只调 REST/SSE；智能体引擎与画像引擎同进程、互不依赖——智能体通过「工具 SPI」接业务能力，画像通过「业务事件」收业务动作；平台能力（多租户、权限、计费、文件安全、风控、调度、监控、对象存储）全部来自底座。
 
 ## 核心能力
 
@@ -99,44 +141,10 @@ SmartDock 是一套**开源通用智能体引擎**，附带一条可独立使用
 - **多智能体注册**：按 `agentId` 注册与路由，共用工具注册、权限、记忆、技能与计费
 - **ReAct 工具循环**：模型自主决策调用工具，全程流式输出（AGUI/SSE，28 类事件）
 - **工具 SPI 机制**：业务能力通过 `BizToolProvider` 扩展，无需修改引擎核心
-- **安全防护**：PII 出网脱敏、工具结果注入打标、16K 输入闸、HITL 写操作确认
+- **写操作先确认**：`readOnly=false` 的工具在落库前停下来出确认卡，写明将改什么；待确认期间输入暂停、草稿保留
+- **会话能力**：多会话历史、`@` 引用文件与业务对象、`/` 调技能与命令、计划卡（多步任务先列计划）、结构化反问（缺信息时给选项而不是瞎猜）
+- **安全防护**：PII 出网脱敏、工具结果注入打标、16K 输入闸、权限三态与工具开关矩阵
 - **计费系统**：钱包/积分双轨、19 家预置供应商 + 自定义、多 Key 池
-
-<p align="center">
-  <img src="docs/images/ai-flow.svg" alt="智能体运行时：一次请求的完整链路" width="100%">
-</p>
-
-#### 技能：把业务 SOP 变成智能体的操作手册
-
-工具解决「能做什么」，技能解决「怎么做才对」。技能就是一个 Markdown 文件（官方 SKILL.md 格式，YAML frontmatter + 正文），业务和运维同学可以直接在管理台改，不用发版：
-
-```markdown
----
-name: urge-wording
-description: 用户说「帮我写催办/怎么催比较好/写个催办」时，写不伤人的催办提醒（有依据、给出路、不施压过度）
-displayName: 催办话术
-minRole: publisher
----
-你正在使用「催办话术」技能。目标：帮用户起草一条得体的催办留言。
-1. 说事不说人：「办公区安全检查还有 3 天截止」而不是「你怎么还没交」。
-2. 给依据给出路：附截止时间、入口（任务详情页）、卡住可联系谁。
-3. 语气分级：第一次催=提醒式；第二次=说明影响；逾期后=协助式。
-发送仍走催办确认卡，你只负责写话术。
-```
-
-- **渐进披露**：只有 `description` 常驻技能目录（模型靠它判断何时调用），正文默认不占上下文、用到才读——单技能正文上限 20000 字符
-- **三层装载**：内置 classpath → `config/skills/` 部署期覆写 → 管理台在线编辑（优先级最高，下一轮会话生效）
-- **权限双重闸**：`minRole` 控制谁能用，租户工具开关矩阵控制是否启用（停用后对所有角色整技能遮罩，超管也看不见）
-- **可度量**：每个技能的使用次数与最近使用时间都落在管理台
-
-内置 4 个示例技能（创建任务 / 创建模板 / 催办话术 / 数据解读），可直接改或新增：
-
-<table>
-<tr>
-<td width="50%"><img src="docs/images/screenshots/15-assistant-skill.png" alt="技能库"><br><sub>技能库：左侧目录只放一句话说明，右侧编辑正文；保存立即生效</sub></td>
-<td width="50%"><img src="docs/images/screenshots/14-assistant-toolgate.png" alt="工具与技能开关矩阵"><br><sub>工具开关矩阵：平台工具、MCP 外部工具、技能统一按角色与租户分档</sub></td>
-</tr>
-</table>
 
 ### 📊 用户画像引擎（配套）
 
@@ -144,14 +152,16 @@ minRole: publisher
 - **配置化维度**：六种算子 + 时间窗 + 打分映射 + 缺失策略，80% 维度零代码
 - **通用接入**：任意业务源通过同构事件接入，配置维度即可产出画像
 
+画像的完整界面与运营细节见 [画像引擎文档](docs/profile-engine.md)。
+
 ### 🏢 平台基线
 
 继承 RuoYi-Vue-Plus 5.6.1，多租户、权限、字典、OSS、文件安全、风控、调度、监控一应俱全。
 
 ## 快速开始
 
-> **只想最快看到效果？** 按「方式一」起好后端与前端（约 3 分钟），用内置演示账号登录，进「AI 助手」——
-> 先在「AI 模型配置」录入一个供应商 Key，就能在助手抽屉或全屏会话页里对话、看工具调用链。
+> **只想最快看到效果？** 按「方式一」起好后端与前端（约 3 分钟），用内置演示账号登录，进「智能体工作台」——
+> 先在「AI 模型配置」录入一个供应商 Key，就能在工作台里对话、点技能卡、看工具调用链。
 > 画像侧想看满数据，再跑一次造数脚本、点一次「重建汇总」（约 292 事件 / 81 会话 / 4 位同事的合成演示口径；
 > 实时看板只统计最近 5 分钟，演示种子是历史数据、显示为空属正常）。画像 Java 接入 10 分钟指南见
 > [docs/profile-integration.md](docs/profile-integration.md)，协议字段表见
@@ -390,40 +400,33 @@ public class BizEventReporter {
 
 ## 使用说明
 
-### AI 助手
+### 工作台入口
 
-1. 登录后进入「AI 模型配置」，配置模型供应商与 API Key；
-2. 为模型维护 **CNY 价格行**（价格目录维护或自动探测）——无人民币价格行的模型不会进入可选列表；
-3. 在「AI 助手管理」设置默认模型；
-4. 打开助手抽屉，开始对话。
+登录后从左侧「AI 助手」进入，或用 `/agent` 直达。工作台有三个一级入口：
 
-助手支持：
+- **会话**：多会话历史、上下文用量、工具调用明细；`@` 带文件、`/` 调技能与命令
+- **自动化**：写一句要它做什么、选个时间，到点只读跑一轮
+- **设置**：常规手感、技能与工具清单、MCP 服务、审计与用量
 
-- 页面感知：随当前页面推荐问题
-- `@` 引用业务对象
-- 思考档位切换（快 / 平衡 / 深）
-- 工具调用可视化（含耗时与来源数）
-- HITL 写操作确认
-- 计划卡：多步任务先列计划，可以「开始执行 / 改一下 / 取消」，选择都在输入框位置完成
-- 技能库（助手的操作手册）与 MCP 外部工具，按角色与租户分档开关
+### 抽屉模式
 
-<table>
-<tr>
-<td width="50%"><img src="docs/images/screenshots/11-assistant-hitl.png" alt="AI 助手：写操作确认卡"><br><sub>要写库之前先停下来问：卡片写明这一步会动真实数据，点「确认执行」才落库；待确认期间输入暂停、草稿保留</sub></td>
-<td width="50%"><img src="docs/images/screenshots/12-assistant-admin.png" alt="AI 助手管理端"><br><sub>管理端：开关、每日回合上限、联网次数与租户日预算，加上进程内运行健康，一页看清</sub></td>
-</tr>
-</table>
+不想离开当前页面？业务页右侧的悬浮球打开助手抽屉，能力与工作台一致，只是收在一侧。
 
-> 基线不包含任何 AI Key；没有可用模型配置时，助手会明确提示未配置，不会静默降级到其他租户或平台配置。
-> 工具面之外的问题它会直说「查不到」，不编数字。
+<p align="center"><img src="docs/images/screenshots/06a-assistant-demo.gif" width="360" alt="助手抽屉：一次完整问答"><br><sub>抽屉模式（录屏）：思考 → 调工具 → 引用来源 → 给结论；工具面之外就直说查不到</sub></p>
+
+### 写操作确认
+
+<p align="center">
+  <img src="docs/images/screenshots/11-assistant-hitl.png" alt="AI 助手：写操作确认卡" width="100%">
+</p>
+
+要写库之前先停下来问：卡片写明这一步会动真实数据，点「确认执行」才落库；待确认期间输入暂停、草稿保留。
 
 ### 用户画像（配套）
 
 1. 业务系统通过 `ProfileEventPublisher` 发送事件（见 [把自己的业务接进来](#把自己的业务接进来)）；
 2. 在「画像工作室」配置维度、权重与覆盖度；
 3. 触发重算，查看主体画像与历史快照。
-
-画像的界面与运营细节见 [画像引擎文档](docs/profile-engine.md)，这里不再展开。
 
 ### 内置 Demo
 
@@ -438,20 +441,23 @@ public class BizEventReporter {
 </p>
 
 执行基线 `05_demo_data.optional.sql` 后可直接看到一条演示任务；跳过时 Demo 页为空，可自行创建任务体验。
-任务与提交的状态机见 [docs/architecture.md](docs/architecture.md)。
 
 ## 更多界面
 
-智能体治理的四个面——租户级管控、能力门槛、MCP 外部服务、用量与额度：
+管理端负责「配能力、定门槛、看账」，和工作台是分开的两件事：
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/16-assistant-tenant.png" alt="租户设置"><br><sub>租户设置：助手开关、每日回合上限、联网次数、日预算、自动压缩阈值，一屏管住</sub></td>
-<td width="50%"><img src="docs/images/screenshots/17-assistant-panorama.png" alt="能力全景"><br><sub>能力全景：助手会用哪些工具、怎么执行、什么门槛、本租户是否生效，逐项列清</sub></td>
+<td width="50%"><img src="docs/images/screenshots/15-assistant-skill.png" alt="AI 助手管理：技能库"><br><sub>管理端技能库：编辑 SKILL.md 正文、指定最低角色、看使用统计</sub></td>
+<td width="50%"><img src="docs/images/screenshots/14-assistant-toolgate.png" alt="工具与技能开关矩阵"><br><sub>工具开关矩阵：平台工具、MCP 外部工具、技能统一按角色与租户分档</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/18-assistant-mcp.png" alt="外部工具 MCP"><br><sub>外部工具：MCP 服务挂载与调用审计——每次挂载、每次调用都落账，按租户限频</sub></td>
+<td width="50%"><img src="docs/images/screenshots/12-assistant-admin.png" alt="AI 助手管理端"><br><sub>管理端总览：开关、每日回合上限、联网次数与租户日预算，加上进程内运行健康</sub></td>
 <td width="50%"><img src="docs/images/screenshots/19-assistant-quota.png" alt="用户额度"><br><sub>用户额度：每人每日回合与联网次数、本月费用、超额状态，按人可调</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/images/screenshots/17-assistant-panorama.png" alt="能力全景"><br><sub>能力全景：助手会用哪些工具、怎么执行、什么门槛、本租户是否生效</sub></td>
+<td width="50%"><img src="docs/images/screenshots/18-assistant-mcp.png" alt="外部工具 MCP"><br><sub>外部工具：MCP 服务挂载与调用审计——每次挂载、每次调用都落账</sub></td>
 </tr>
 </table>
 
@@ -501,7 +507,7 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 
 ## 使用边界与适合谁
 
-**适合**：想给业务系统接一个能查数据、能执行操作的 AI 助手的团队；需要多智能体注册、工具接入、权限与计费底座的平台项目；顺带想要用户画像与行为分析的团队。
+**适合**：想直接拿到一个能用、能改的智能体工作台的团队；需要多智能体注册、工具接入、权限与计费底座的项目；顺带想要用户画像与行为分析的团队。
 
 **不适合**（先说清楚，省得白折腾）：
 
