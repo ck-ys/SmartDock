@@ -247,8 +247,10 @@
       <hitl-dock :ask="pendingAsk" full @resolve="resolveHitl" @revise="onDockRevise" />
 
       <!-- v-show 而不是 v-if：草稿/队列/附件/--dcs-col-max 都要保活（宽度不跳、状态不丢） -->
+      <!-- 题8 甲（2026-11-06 对齐线）：反问/确认卡出现时输入框 display:none 但保留挂载
+           （ZCode ConversationComposer.tsx:2708-2723 同款）；草稿与编辑器状态不丢，作答完原地回来 -->
       <composer
-        v-show="!planCardShown || planCollapsed || draftText.trim() !== ''"
+        v-show="!askCard && !pendingAsk && (!planCardShown || planCollapsed || draftText.trim() !== '')"
         ref="composerRef"
         full
         active
@@ -733,6 +735,12 @@ watch(pendingAsk, (v, old) => {
   }
 });
 const composerRef = ref<InstanceType<typeof Composer>>();
+// 反问卡答完/超时后把焦点还给输入框（与确认卡同口径；卡与 composer 共用同一块 dock）
+watch(askCard, (v, old) => {
+  if (old && !v && !pendingAsk.value && !planCardShown.value) {
+    nextTick(() => composerRef.value?.focus());
+  }
+});
 /** DP-3：统计面板跳转通道（step-jump/jump-confirm → MsgFlow expose） */
 const msgFlowRef = ref<InstanceType<typeof MsgFlow>>();
 /** Q2（20261011 拍板A）：todo 清单行跳转目标——清单是会话级而步骤分属各回合，

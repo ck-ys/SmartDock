@@ -268,8 +268,10 @@
           <hitl-dock v-if="modelValue && !isAssistantSessionRoute" :ask="pendingAsk" :full="full" @resolve="resolveHitl" @revise="onDockRevise" />
 
           <!-- v-show 而不是 v-if：草稿/队列/附件/--dcs-col-max 都要保活 -->
+          <!-- 题8 甲（2026-11-06 对齐线）：反问/确认卡出现时输入框 display:none 但保留挂载
+               （ZCode ConversationComposer.tsx:2708-2723 同款）；草稿不丢，作答完原地回来 -->
           <composer
-            v-show="!hideComposerForPlan"
+            v-show="!askCard && !(pendingAsk && modelValue && !isAssistantSessionRoute) && !hideComposerForPlan"
             ref="composerRef"
             :state="state"
             :sending="state.sending"
@@ -1119,6 +1121,12 @@ function onDockRevise(m: string) {
 // 计划表单卡在消息流里，由卡自己接管焦点
 watch(pendingAsk, (v, old) => {
   if (old && !v && !planCardShown.value) {
+    nextTick(() => composerRef.value?.focus());
+  }
+});
+// 反问卡答完/超时后同样把焦点还给输入框（卡与 composer 共用同一块 dock）
+watch(askCard, (v, old) => {
+  if (old && !v && !pendingAsk.value && !planCardShown.value) {
     nextTick(() => composerRef.value?.focus());
   }
 });
