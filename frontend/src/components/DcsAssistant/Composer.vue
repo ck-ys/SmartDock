@@ -1001,8 +1001,12 @@ const ctxWindow = computed(() => {
   const defWin = modelChoice.value?.defaultContextWindow;
   return defWin && defWin > 0 ? defWin : null;
 });
-/** 空态守卫（Review Focus ②）：分子分母任一缺失/非正 → 环不画弧、卡内解释待测 */
-const ctxKnown = computed(() => (ctxTokens.value ?? 0) > 0 && (ctxWindow.value ?? 0) > 0);
+/** 空态守卫（Review Focus ②）：分子分母任一缺失/非正 → 环不画弧、卡内解释待测；
+ *  题5 甲（旧板 20261106）：空态（本会话还没有任何一轮）一律不显示读数——
+ *  恢复上次会话 id 但正文还是欢迎页时，不能把那个会话的 10K 挂出来。 */
+const ctxKnown = computed(
+  () => props.state.turns.length > 0 && (ctxTokens.value ?? 0) > 0 && (ctxWindow.value ?? 0) > 0
+);
 const ctxPct = computed(() => (ctxKnown.value ? Math.min(1, (ctxTokens.value as number) / (ctxWindow.value as number)) : 0));
 /** 自动压缩触发线（批A-1 水位三值）：与后端 AssistantCompactionPolicy 同公式——
  *  窗口 − min(模型输出额度, 21000) − 13000，下限 4000。后端按会话生效模型实算并随
