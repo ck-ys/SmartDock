@@ -126,6 +126,38 @@ class AssistantRunRecorderReapFlushUnitTest {
         assertThat(recorder.terminalOutcomeSnapshot("999999")).isEmpty();
     }
 
+    /** Q1 甲（2026-11-07）：反问卡在等用户作答——停表后 run 业务事件必然静默，
+     *  不能被 60s 停滞时钟当挂死收割；豁免到期前原样保留。 */
+    @Test
+    void 反问等待中_停表不收割() {
+        seedRun("run-i1", "th-i1", "已生成部分", 9011L);
+        recorder.lastEventAt.put("run-i1", NOW - STALL - 1);
+        recorder.markInteractionWait("run-i1", NOW + 60 * 60_000L);
+
+        recorder.flushAndReap(NOW);
+
+        verify(conversationService, never()).finalizeStalledRun(anyString(), anyString());
+        verify(dailyQuota, never()).refundTurn(anyString(), any());
+        assertThat(recorder.interactionWaitUntil).containsKey("run-i1");
+        assertThat(recorder.lastEventAt).containsKey("run-i1");
+    }
+
+    /** Q1 甲安全阀：桥进程异常没清豁免时，到点必须恢复收割，防永久豁免。 */
+    @Test
+    void 反问豁免安全阀到点_恢复收割并清豁免() {
+        seedRun("run-i2", "th-i2", "已生成部分", 9012L);
+        recorder.lastEventAt.put("run-i2", NOW - STALL - 1);
+        recorder.markInteractionWait("run-i2", NOW - 1);
+        when(costLedger.isInFlight("th-i2")).thenReturn(false);
+        when(conversationService.runByRunId("run-i2")).thenReturn(run("000000", 42L));
+        when(conversationService.finalizeStalledRun("000000", "run-i2")).thenReturn(List.of(run("000000", 42L)));
+
+        recorder.flushAndReap(NOW);
+
+        verify(conversationService).finalizeStalledRun("000000", "run-i2");
+        assertThat(recorder.interactionWaitUntil).doesNotContainKey("run-i2");
+    }
+
     @Test
     void 模型调用在飞_停滞也不收割() {
         seedRun("run-2", "th-2", "生成中", null);

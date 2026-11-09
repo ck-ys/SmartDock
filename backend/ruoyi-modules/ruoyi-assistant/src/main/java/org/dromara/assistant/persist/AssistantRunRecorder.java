@@ -213,6 +213,9 @@ public class AssistantRunRecorder {
     /** 每 run 末次业务事件时刻（glm53 审查 P2-1：心跳帧不计——「纯心跳零业务」持续超限
      *  = 服务端真挂起（工具/模型死锁但 interval 独立跳），须按停滞收割，不能被心跳无限喂养） */
     final Map<String, Long> lastBusinessEventAt = new ConcurrentHashMap<>();
+    /** 等待用户作答的豁免截止时刻（Q1 甲：反问停表后 run 不能每 10 分钟被当挂死收割；
+     *  桥在建卡/停表时写入，收尾/安全阀到点清除。值为绝对毫秒时刻，过期即恢复收割）。 */
+    final Map<String, Long> interactionWaitUntil = new ConcurrentHashMap<>();
     /** 纯心跳收割阈值：10 分钟零业务事件（合法静默=搜索 10-25s/压缩摘要分钟级，10min 只剩挂死） */
     private static final long PURE_HEARTBEAT_MS = 600_000L;
     /** 终态计数（租户 → status|reason → 次数；进程内累计，稳流②管理报表数据源。
@@ -786,6 +789,7 @@ public class AssistantRunRecorder {
         java.util.concurrent.atomic.AtomicLong gap = runMaxGapMs.remove(runId);
         java.util.concurrent.atomic.AtomicInteger hb = runHeartbeats.remove(runId);
         lastBusinessEventAt.remove(runId);
+        interactionWaitUntil.remove(runId);
         if (first == null) {
             // 零事件 run（建侧失败路径）——建侧失败/兜底收割已有专门 WARN，无诊断行
             return;
@@ -846,12 +850,34 @@ public class AssistantRunRecorder {
         flushAndReap(clock.millis());
     }
 
+    /** Q1 甲：等待反问的 run 申请收割豁免（untilMs=绝对时刻；桥停表/收尾时会更新/清除）。 */
+    public void markInteractionWait(String runId, long untilMs) {
+        if (runId != null && !runId.isBlank() && untilMs > 0) {
+            interactionWaitUntil.put(runId, untilMs);
+        }
+    }
+
+    public void clearInteractionWait(String runId) {
+        if (runId != null) {
+            interactionWaitUntil.remove(runId);
+        }
+    }
+
     /** 005 测试接缝：包内可见+时刻外参——单测拨针驱动收割/节流判定，不睡墙钟 */
     void flushAndReap(long now) {
         for (Map.Entry<String, Long> entry : lastEventAt.entrySet()) {
             String runId = entry.getKey();
             try {
                 maybeTouchRun(runId, now);
+                // Q1 甲：反问等待中（停表后可到 60 分钟）不按「零业务事件」收割；
+                // 安全阀到点自动恢复收割，防桥进程异常留下永久豁免
+                Long waitUntil = interactionWaitUntil.get(runId);
+                if (waitUntil != null) {
+                    if (now < waitUntil) {
+                        continue;
+                    }
+                    interactionWaitUntil.remove(runId, waitUntil);
+                }
                 boolean stalled = now - entry.getValue() >= STALL_MS;
                 // glm53 审查 P2-1（纯心跳收割）：lastEventAt 被心跳无限喂养永不 stalled，
                 // 服务端真挂起（工具/模型死锁）会被拖到 15min RetentionJob 兜底——
