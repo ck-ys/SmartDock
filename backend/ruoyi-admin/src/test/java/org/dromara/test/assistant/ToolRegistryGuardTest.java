@@ -64,6 +64,10 @@ class ToolRegistryGuardTest {
     }
 
     private static ToolRegistry.ToolDeps readyDeps(Boolean memoryEnabled, String threadId) {
+        return readyDeps(memoryEnabled, threadId, true);
+    }
+
+    private static ToolRegistry.ToolDeps readyDeps(Boolean memoryEnabled, String threadId, boolean interactive) {
         return new ToolRegistry.ToolDeps(
             KEY_CONFIG, null, null,
             null, null, memoryEnabled, threadId, "000000", null, null, null, null, null,
@@ -72,7 +76,9 @@ class ToolRegistryGuardTest {
             // 题12：ask_user 只存桥引用
             null,
             // 三批③：账本 hook 测试不注入（save_memory 构造只存引用，null 不触发调用）
-            null);
+            null,
+            // Q5：交互式会话=true；自动化/后台=false
+            interactive);
     }
 
     /** ①清单完整：全局名字无重复，与预期全集全等；每条 spec 字段齐。 */
@@ -126,6 +132,15 @@ class ToolRegistryGuardTest {
             readyDeps(true, "thread-never-touched"), PermissionContextState.builder(), null);
         assertTrue(onNames.contains("web_search"), "没停用过的线程默认可用（模型自主判断）");
         assertEquals(EXPECTED_ALL, onNames, "默认开=平台全量");
+    }
+
+    /** ②f Q5 甲：自动化/后台装配没有真人可答，ask_user 必须整枚消失，不让 run 白等。 */
+    @Test
+    void askUserGateCutsWhenNotInteractive() {
+        Set<String> names = ToolRegistry.registerAll(new Toolkit(), identity(ToolIdentity.LEVEL_ADMIN),
+            readyDeps(true, "thread-auto", false), PermissionContextState.builder(), null);
+        assertFalse(names.contains("ask_user"), "非交互装配不注册 ask_user");
+        assertEquals(EXPECTED_ALL.size() - 1, names.size(), "仅少 ask_user 一枚");
     }
 
     /** ②e 权限通配三态口径（批2 glm53 P2-8 单点化）：ProviderToolRegistry 的 provider

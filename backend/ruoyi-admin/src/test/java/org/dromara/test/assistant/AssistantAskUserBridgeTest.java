@@ -155,7 +155,7 @@ class AssistantAskUserBridgeTest {
     }
 
     @Test
-    void sanitizesAnswersAndRejectsEmptyAnswer() throws Exception {
+    void emptyAnswerIsAllowed() throws Exception {
         AssistantAskUserBridge bridge = new AssistantAskUserBridge();
         ExecutorService pool = Executors.newSingleThreadExecutor();
         try {
@@ -163,9 +163,25 @@ class AssistantAskUserBridgeTest {
                 CompletableFuture.supplyAsync(() -> bridge.ask("t1", 1L, "th1", QUESTIONS), pool);
             String id = String.valueOf(awaitCards(bridge, "th1").get(0).get("id"));
 
-            // action=answer 但没有任何选择：明确拒绝，不让模型收到「用户已回答：」空串
-            assertTrue(bridge.answer("t1", 1L, "th1", id, "answer", List.of()).contains("没有收到选择"));
-            assertTrue(bridge.answer("t1", 1L, "th1", id, "answer", null).contains("没有收到选择"));
+            // Q3 甲：用户点「继续」但没选也算作答，模型拿到空答案走稳妥默认
+            assertNull(bridge.answer("t1", 1L, "th1", id, "answer", List.of()));
+            Map<String, Object> result = future.get(3, TimeUnit.SECONDS);
+            assertEquals("answered", result.get("action"));
+            assertEquals(List.of(), result.get("answers"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void sanitizesAnswersToBoundedShape() throws Exception {
+        AssistantAskUserBridge bridge = new AssistantAskUserBridge();
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            CompletableFuture<Map<String, Object>> future =
+                CompletableFuture.supplyAsync(() -> bridge.ask("t1", 1L, "th1", QUESTIONS), pool);
+            String id = String.valueOf(awaitCards(bridge, "th1").get(0).get("id"));
+
             // 线程段必填（三段校验不因省略而跳过）
             assertTrue(bridge.answer("t1", 1L, null, id, "answer", List.of()).contains("不属于当前会话"));
 
@@ -197,26 +213,62 @@ class AssistantAskUserBridgeTest {
         }
     }
 
+    /** Q1/Q2：同会话卡排队，只有队首下发；前一张收尾后下一张才激活并重新计时。 */
     @Test
-    void capsConcurrentCardsPerThread() throws Exception {
+    void queuesCardsAndPromotesNextHead() throws Exception {
         AssistantAskUserBridge bridge = new AssistantAskUserBridge();
         ExecutorService pool = Executors.newFixedThreadPool(3);
         try {
             CompletableFuture<Map<String, Object>> f1 =
                 CompletableFuture.supplyAsync(() -> bridge.ask("t1", 1L, "th1", QUESTIONS), pool);
+            String firstId = String.valueOf(awaitCards(bridge, "th1").get(0).get("id"));
+
             CompletableFuture<Map<String, Object>> f2 =
                 CompletableFuture.supplyAsync(() -> bridge.ask("t1", 1L, "th1", QUESTIONS), pool);
-            List<String> ids = awaitCardIds(bridge, "th1", 2);
-            assertEquals(2, ids.size());
+            awaitPendingCount(bridge, "th1", 2);
+            // 第二张在排队：不下发，也不允许抢答
+            assertNull(bridge.take("th1"), "排队卡不下发");
             // 同会话第 3 张：直接回绝，不挂死第三个工具线程
             Map<String, Object> third = bridge.ask("t1", 1L, "th1", QUESTIONS);
             assertEquals("busy", third.get("action"));
-            // 释放两张，挂起线程收尾
-            for (String id : ids) {
-                assertNull(bridge.answer("t1", 1L, "th1", id, "cancel", null));
-            }
+
+            assertNull(bridge.answer("t1", 1L, "th1", firstId, "cancel", null));
             assertEquals("cancelled", f1.get(3, TimeUnit.SECONDS).get("action"));
+
+            // 队首被提升：拿到新卡且剩余时长重新从 300 秒起算
+            Map<String, Object> second = awaitCards(bridge, "th1").get(0);
+            assertTrue(((Number) second.get("remainingMs")).longValue() > 200_000L, "提升后重新计时");
+            String secondId = String.valueOf(second.get("id"));
+            assertNull(bridge.answer("t1", 1L, "th1", secondId, "cancel", null));
             assertEquals("cancelled", f2.get(3, TimeUnit.SECONDS).get("action"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /** Q1：首次交互永久停表；pending 端点带 snoozed 状态，刷新后不再显示倒计时。 */
+    @Test
+    void snoozeStopsAutoResolution() throws Exception {
+        AssistantAskUserBridge bridge = new AssistantAskUserBridge(1, 30);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        try {
+            CompletableFuture<Map<String, Object>> future =
+                CompletableFuture.supplyAsync(() -> bridge.ask("t1", 1L, "th1", QUESTIONS, true), pool);
+            String id = String.valueOf(awaitCards(bridge, "th1").get(0).get("id"));
+
+            assertNull(bridge.snooze("t1", 1L, "th1", id));
+            Thread.sleep(1500);
+            assertFalse(future.isDone(), "已停表就不该按 300 秒自动继续");
+
+            Map<String, Object> pending = bridge.pendingFor("t1", 1L, "th1");
+            assertEquals(id, pending.get("id"));
+            assertEquals(Boolean.TRUE, pending.get("snoozed"));
+            assertEquals(0L, pending.get("deadlineAt"));
+            assertNull(bridge.pendingFor("t2", 1L, "th1"), "跨租户查不到");
+            assertNull(bridge.pendingFor("t1", 2L, "th1"), "跨用户查不到");
+
+            assertNull(bridge.answer("t1", 1L, "th1", id, "cancel", null));
+            assertEquals("cancelled", future.get(3, TimeUnit.SECONDS).get("action"));
         } finally {
             pool.shutdownNow();
         }
@@ -241,6 +293,16 @@ class AssistantAskUserBridgeTest {
         }
     }
 
+    private static void awaitPendingCount(AssistantAskUserBridge bridge, String threadId, int n) throws Exception {
+        for (int i = 0; i < 100; i++) {
+            if (bridge.pendingCount(threadId) >= n) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("等不到挂起卡入队");
+    }
+
     /** 轮询取卡：ask 在工具线程挂起后信号才入仓，避免固定 sleep */
     private static List<Map<String, Object>> awaitCards(AssistantAskUserBridge bridge, String threadId) throws Exception {
         for (int i = 0; i < 100; i++) {
@@ -253,18 +315,4 @@ class AssistantAskUserBridgeTest {
         throw new AssertionError("等不到反问卡信号");
     }
 
-    /** 收齐 N 张卡的 id（多次 take 累加） */
-    private static List<String> awaitCardIds(AssistantAskUserBridge bridge, String threadId, int n) throws Exception {
-        List<String> ids = new java.util.ArrayList<>();
-        for (int i = 0; i < 200 && ids.size() < n; i++) {
-            List<Map<String, Object>> cards = bridge.take(threadId);
-            if (cards != null) {
-                cards.forEach(c -> ids.add(String.valueOf(c.get("id"))));
-            }
-            if (ids.size() < n) {
-                Thread.sleep(20);
-            }
-        }
-        return ids;
-    }
 }

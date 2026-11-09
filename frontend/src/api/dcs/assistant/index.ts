@@ -395,6 +395,14 @@ export interface AssistantAskUserCard {
   questions: AssistantAskUserQuestion[];
   /** 服务端下发的剩余可答时长（毫秒）——相对时长免疫两端时钟偏差 */
   remainingMs: number;
+  /** Q4 甲：绝对到期时刻（epoch ms）；刷新后续走，不再回放旧帧的相对时长 */
+  deadlineAt?: number;
+  /** Q1 甲：首次有效交互后永久停表 */
+  snoozed?: boolean;
+  /** 建卡时的自动继续开关；false=不显示倒计时、到上限按 timeout 收尾 */
+  autoContinue?: boolean;
+  /** 倒计时只在这一窗口内出现（秒），ZCode 最后 60 秒才显示 */
+  countdownWindowSeconds?: number;
 }
 
 /** 单题作答：picked=点选的预设项 label；other=「其它」补充文字（两者可同时有） */
@@ -403,6 +411,23 @@ export interface AssistantAskUserAnswer {
   question: string;
   picked: string[];
   other?: string;
+}
+
+/** Q4 甲：刷新续走——查当前会话队首反问卡（无卡返回 null）；带绝对到期时刻/停表状态 */
+export function getPendingAskUser(threadId: string) {
+  return request<AssistantAskUserCard | null>({
+    url: '/dcs/assistant/ask/pending',
+    method: 'get',
+    params: { threadId },
+    headers: threadHeaders(threadId)
+  });
+}
+
+/** Q1 甲：首次有效交互停表（幂等；卡已失效返回 409，前端静默忽略） */
+export function snoozeAskUser(threadId: string, id: string) {
+  return request({ url: '/dcs/assistant/ask/snooze', method: 'post',
+    headers: threadHeaders(threadId),
+    data: { threadId, id } });
 }
 
 /** 题12 案1：结构化反问作答——内置工具在飞挂起，答完作为工具结果回到模型继续跑 */

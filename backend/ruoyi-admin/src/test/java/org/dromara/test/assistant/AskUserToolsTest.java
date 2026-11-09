@@ -26,35 +26,24 @@ class AskUserToolsTest {
     @Test
     void parsesValidQuestionsAndDefaultsHeader() {
         List<Map<String, Object>> qs = AskUserTools.parseQuestions("""
-            [{"question":"要催哪个任务？","options":[{"label":"期末录入","description":"还有 12 人未交"},{"label":"选课审核"}],"multiSelect":true},
-             {"question":"什么时候发？","header":"时间","options":["今天","明天"]}]
+            [{"question":"要催哪个任务？","options":[{"label":"期末录入","description":"还有 12 人未交"},{"label":"选课审核","description":"本周截止"}],"multiSelect":true},
+             {"question":"什么时候发","header":"时间","options":[{"label":"今天","description":"立刻发"},{"label":"明天","description":"明早发"}]}]
             """);
         assertEquals(2, qs.size());
         assertEquals("请选择", qs.get(0).get("header"));
         assertEquals(Boolean.TRUE, qs.get(0).get("multiSelect"));
         assertEquals("时间", qs.get(1).get("header"));
         assertEquals(Boolean.FALSE, qs.get(1).get("multiSelect"));
+        // 题面缺问号自动补齐（ZCode 契约）
+        assertEquals("什么时候发？", qs.get(1).get("question"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> opts = (List<Map<String, Object>>) qs.get(0).get("options");
         assertEquals(2, opts.size());
         assertEquals("期末录入", opts.get(0).get("label"));
         assertEquals("还有 12 人未交", opts.get(0).get("description"));
-        // 纯字符串选项也归一成 {label}
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> opts2 = (List<Map<String, Object>>) qs.get(1).get("options");
-        assertEquals(Map.of("label", "今天"), opts2.get(0));
-    }
-
-    @Test
-    void capsOptionsAndDropsBlankLabels() {
-        List<Map<String, Object>> qs = AskUserTools.parseQuestions("""
-            [{"question":"选一个","options":[{"label":"A"},{"label":" "},{"label":"B"},{"label":"C"},{"label":"D"},{"label":"E"}]}]
-            """);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> opts = (List<Map<String, Object>>) qs.get(0).get("options");
-        // 空 label 剔除后再封顶 4 个
-        assertEquals(4, opts.size());
-        assertEquals(List.of("A", "B", "C", "D"), opts.stream().map(o -> o.get("label")).toList());
+        assertEquals(Map.of("label", "今天", "description", "立刻发"), opts2.get(0));
     }
 
     @Test
@@ -66,23 +55,41 @@ class AskUserToolsTest {
         assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("[]"))
             .getMessage().contains("非空数组"));
         assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("""
-            [{"question":"q1","options":["a","b"]},{"question":"q2","options":["a","b"]},
-             {"question":"q3","options":["a","b"]},{"question":"q4","options":["a","b"]},
-             {"question":"q5","options":["a","b"]}]
+            [{"question":"q1","options":[{"label":"a","description":"d"},{"label":"b","description":"d"}]},
+             {"question":"q2","options":[{"label":"a","description":"d"},{"label":"b","description":"d"}]},
+             {"question":"q3","options":[{"label":"a","description":"d"},{"label":"b","description":"d"}]},
+             {"question":"q4","options":[{"label":"a","description":"d"},{"label":"b","description":"d"}]},
+             {"question":"q5","options":[{"label":"a","description":"d"},{"label":"b","description":"d"}]}]
             """)).getMessage().contains("最多问 4"));
         assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("""
-            [{"question":"选一个","options":["只有一个"]}]
+            [{"question":"选一个","options":[{"label":"只有一个","description":"就一个"}]}]
             """)).getMessage().contains("至少给 2 个选项"));
         assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("""
-            [{"question":"  ","options":["a","b"]}]
+            [{"question":"  ","options":[{"label":"a","description":"d"},{"label":"b","description":"d"}]}]
             """)).getMessage().contains("question 不能为空"));
+        // ZCode 严格契约：选项必须是对象，description 必填，header ≤12，不许自带 Other
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("""
+            [{"question":"选一个？","options":["a","b"]}]
+            """)).getMessage().contains("{label, description}"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("""
+            [{"question":"选一个？","options":[{"label":"a"},{"label":"b","description":"说明"}]}]
+            """)).getMessage().contains("缺少 description"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("""
+            [{"question":"选一个？","header":"一二三四五六七八九十十一十二十三","options":[{"label":"a","description":"d"},{"label":"b","description":"d"}]}]
+            """)).getMessage().contains("header 最多 12"));
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> AskUserTools.parseQuestions("""
+            [{"question":"选一个？","options":[{"label":"a","description":"d"},{"label":"Other","description":"d"}]}]
+            """)).getMessage().contains("其它/Other"));
     }
 
     @Test
     void dedupesSameNamedOptions() {
         // 两条任务同名是常态：同名选项会让前端点一个亮两个、模型拿到无法消歧的答案
         List<Map<String, Object>> qs = AskUserTools.parseQuestions("""
-            [{"question":"要催哪个任务？","options":["期末成绩录入","期末成绩录入","期末成绩录入"]}]
+            [{"question":"要催哪个任务？","options":[
+              {"label":"期末成绩录入","description":"第一种"},
+              {"label":"期末成绩录入","description":"第二种"},
+              {"label":"期末成绩录入","description":"第三种"}]}]
             """);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> opts = (List<Map<String, Object>>) qs.get(0).get("options");

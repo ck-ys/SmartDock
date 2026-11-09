@@ -33,6 +33,8 @@ import reactor.core.publisher.Flux;
 public class AssistantRefreshGuardAdapterFactory implements AguiAgentAdapterFactory {
 
     private final AssistantRunStreamHub runStreamHub;
+    /** Q4 甲：反问卡即时推帧需要 thread→runId；Q1 甲：等待反问的 run 收割豁免也靠它 */
+    private final AssistantAskUserBridge askUserBridge;
 
     /** 启动即见：桥接工厂是否真的接管（starter 自动配置让位给本 bean），未接管时
      *  断连拆链静默回归——日志是唯一现场证据（深审回修补） */
@@ -51,6 +53,10 @@ public class AssistantRefreshGuardAdapterFactory implements AguiAgentAdapterFact
                 if (runId == null || runId.isBlank()) {
                     return original;
                 }
+                String threadId = input == null ? null : input.getThreadId();
+                askUserBridge.bindRun(threadId, runId);
+                // 注意：不能在这里 doFinally 解绑——断连只掉订阅者，run 仍在跑；
+                // thread→runId 留到下一轮覆盖即可（键按 thread 收敛，不会按 run 增长）
                 return runStreamHub.bridge(runId, original);
             }
         };

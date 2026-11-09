@@ -58,7 +58,9 @@ public final class ToolRegistry {
         org.dromara.assistant.core.AssistantAskUserBridge askUserBridge,
         /** 三批③：写操作审计挂钩（只传 hook 本身，不传任何集合——AuditScope 内含在 hook 里；
          *  null=不挂账本，测试路径。record 无重载，构造点必须回填末位实参） */
-        org.dromara.assistant.core.AssistantActionLedgerHook actionLedger
+        org.dromara.assistant.core.AssistantActionLedgerHook actionLedger,
+        /** Q5 甲：当前装配面有没有真人可答（false=自动化/后台，ask_user 不注册） */
+        boolean interactive
     ) {
     }
 
@@ -108,7 +110,7 @@ public final class ToolRegistry {
         new ToolSpec(Set.of("ask_user"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
             (id, d) -> new org.dromara.assistant.tools.AskUserTools(d.askUserBridge(), d.tenantId(),
-                id.getUserId(), d.aguiThreadId()), null),
+                id.getUserId(), d.aguiThreadId()), d -> d.interactive()),
         // TODO 清单（ZCode 对齐 Q2，批A）：全角色可用——整表替换式工作计划，
         // 落会话行 todo_items 列 + enricher 转 todo CUSTOM 帧，前端 StatPanel 分区
         new ToolSpec(Set.of("todo_write"),

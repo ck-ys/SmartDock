@@ -245,7 +245,9 @@ public class AssistantAgentFactory {
                 // 题12 案1：结构化反问桥（ask_user）
                 askUserBridge,
                 // 三批③：写操作审计挂钩（save_memory 平台放行也落账本）
-                actionLedgerHook), pb,
+                actionLedgerHook,
+                // Q5 甲：自动化只读装配没有真人可答，ask_user 连 schema 都不注册
+                !readOnly), pb,
             // 批1 Q1=B：租户级工具开关矩阵（tool_gate JSON）随会话生效——同租户同闸，
             // 管理员改完下一轮建会话即生效（注册面即时消失）
             tenantCfg.toolGate());
