@@ -1,9 +1,21 @@
 <template>
+  <!-- Q4 乙（2026-11-09 拍板）：抽屉打开时铺一层浅遮罩——不是挡内容，是告诉眼睛「你刚打开了
+       一个东西」；点遮罩=收起。放 transition 外：抽屉的滑入靠 transform，塞在里面的 fixed
+       会被它当包含块，动画那一帧遮罩会跟着错位。 -->
+  <div v-if="sheetMode" class="sp-sheet-mask" @click="collapseMini()" />
   <transition name="dcs-sp">
     <!-- Q7（ZCode 对齐，2026-10-10）：胶囊与展开是同一元素的两个形态——capsule 常驻做
          透明度淡切（ZCode mini 行常驻子元素），full-body 常驻做 max-height+opacity 过渡；
          原 v-if 双分支卸载重建=宽度/高度/内容三重跳变，是「动画怪」的根因 -->
-    <div v-if="turn" ref="panelRoot" class="stat-panel" :class="panelCls" role="status">
+    <div
+      v-if="turn"
+      ref="panelRoot"
+      class="stat-panel"
+      :class="panelCls"
+      role="status"
+      @mouseenter="onPanelEnter"
+      @mouseleave="onPanelLeave"
+    >
       <button
         class="capsule"
         :class="{ ghost: !mini }"
@@ -13,10 +25,17 @@
         @click="expandMini()"
       >
         <span class="spdot" :class="dotCls" />
-        <span class="cnt">{{ doneSteps }}/{{ turn.steps.length || 1 }}</span>
-        <span class="c-last">{{ capsuleText }}</span>
+        <!-- Q1 乙 + Q2 甲（2026-11-09 拍板）：手机档收起态写状态词（「工作中/已收尾」）——
+             手机没悬停，摘要进 title 和展开后的抽屉，眼前这几个字只回答「它是什么」 -->
+        <span v-if="narrowMini" class="c-state">{{ stateWord }}</span>
+        <!-- Q1 乙（2026-11-09 拍板）：收起态=摘要本身（ZCode 原样），步骤数进 title -->
+        <span v-else class="c-last capx">{{ capsuleSummary }}</span>
       </button>
       <div class="full-body" :class="{ fold: mini }">
+        <!-- Q5 乙：抽屉把手——按住下滑超过 56px 收起（「有把手能拖」，只对手机档生效） -->
+        <span v-if="sheetMode" class="sheet-grip" aria-hidden="true" @pointerdown="onGripDown" />
+        <!-- Q4 乙（2026-11-09 拍板）：标题行回答「这是什么」——遮罩负责「你打开了东西」 -->
+        <div v-if="sheetMode" class="sheet-ttl">这一轮做了什么</div>
         <!-- DP-3 原型 sph：waiting 态点头=跳到确认卡；展开态只留收起钮（原型 L398/L403：btn-max 仅 mini 显示） -->
         <div
           class="sph"
@@ -36,6 +55,133 @@
             </button>
           </span>
         </div>
+        <!-- Q7 甲（2026-11-07 拍板，照 ZCode 的摘要链）：一句话说「现在最要紧的是什么」——
+             优先级：在跑的步骤 → 计划进度 → 未完成待办 → 来源 → 文件 → 收尾。
+             点这行不做事，只读；要细节去下面的分区。 -->
+        <div class="sp-sum" :title="summaryText">{{ summaryText }}</div>
+
+        <!-- Q7 甲：分区清单（计划 / 来源 / 文件 / 动作）——行可点，详情长在这行下面（Q3 乙）；
+             同一项再点收起，换一项则替换（不叠 tab 条，ZCode 的多 tab 属于功能变多之后的丙案） -->
+        <!-- Q2 乙（2026-11-09 拍板）：分区头可折叠；步骤并进「计划」——它们本来就在说同一件事
+             （这轮干了什么），分成两块反而要来回对照。没有计划时这一区就叫步骤。 -->
+        <div v-if="planRows.length || turn.steps.length" class="spsec">
+          <button class="spsec-hd" type="button" :aria-expanded="!folded.plan" @click="toggleFold('plan')">
+            <IconSpan name="flag" :size="12" /> 计划
+            <span class="spsec-n">{{ planRows.length || turn.steps.length }}</span>
+            <IconSpan class="spsec-chev" name="chevron-down" :size="12" />
+          </button>
+          <div v-show="!folded.plan" class="spsec-bd">
+            <template v-for="r in planRows" :key="r.key">
+              <button
+                type="button"
+                class="spsec-row"
+                :class="{ on: detailKey === r.key }"
+                :data-detail-key="r.key"
+                @click="openDetail(r.key)"
+              >
+                <span class="kring" :class="'k-' + r.status"><IconSpan v-if="r.status === 'err'" name="x" :size="10" /><IconSpan v-else-if="r.status !== 'run'" name="check" :size="11" /></span>
+                <span class="k-name">{{ r.title }}</span>
+              </button>
+              <div v-if="detailKey === r.key" class="spdetail" :data-detail-key="r.key">
+                <div class="sd-hd">
+                  <b>{{ dTitle(r.key) }}</b>
+                  <button type="button" class="sd-x" title="收起详情" aria-label="收起详情" @click="closeDetail()">×</button>
+                </div>
+                <div class="sd-body">{{ dBody(r.key) }}</div>
+              </div>
+            </template>
+            <!-- DP-3 原型 foldrow 双向：折叠 ⇄ 展开全部步骤 -->
+            <button v-if="turn.steps.length > SPFOCUS" class="spr foldrow" @click="foldOpen = !foldOpen">
+              {{ foldOpen ? `⋯ 收起早期步骤，只看最近 ${SPFOCUS} 步` : `⋯ 已折叠前 ${turn.steps.length - SPFOCUS} 步 · 点击展开` }}
+            </button>
+            <template v-for="s in shownSteps" :key="s.id">
+              <div
+                class="spr link"
+                :class="{ on: detailKey === 'step:' + s.id }"
+                :data-detail-key="'step:' + s.id"
+                role="button"
+                tabindex="0"
+                title="展开这一步的参数与结果"
+                @click="openStepDetail(s)"
+                @keydown.enter="openStepDetail(s)"
+              >
+                <span class="kring" :class="'k-' + s.status">
+                  <IconSpan v-if="s.status === 'err'" name="x" :size="10" />
+                  <IconSpan v-else-if="s.status !== 'run'" name="check" :size="11" />
+                </span>
+                <span class="k-name">{{ s.verb }}{{ s.status === 'err' ? ' · 失败' : '' }}</span>
+              </div>
+              <div v-if="detailKey === 'step:' + s.id" class="spdetail" :data-detail-key="'step:' + s.id">
+                <div class="sd-hd">
+                  <b>{{ dTitle('step:' + s.id) }}</b>
+                  <button type="button" class="sd-x" title="收起详情" aria-label="收起详情" @click="closeDetail()">×</button>
+                </div>
+                <div class="sd-body">{{ dBody('step:' + s.id) }}</div>
+                <button type="button" class="sd-jump" @click="jumpFromDetail()">↗ 在对话中定位</button>
+              </div>
+            </template>
+            <div v-if="shownSteps.length === 0 && !planRows.length" class="spr empty">暂无进行中的步骤</div>
+          </div>
+        </div>
+        <!-- Q2 乙（2026-11-09 拍板）：每个分区头可折叠；Q3 乙：详情就长在被点的那行下面 -->
+        <div v-if="sourceRows.length" class="spsec">
+          <button class="spsec-hd" type="button" :aria-expanded="!folded.src" @click="toggleFold('src')">
+            <IconSpan name="globe" :size="12" /> 来源 <span class="spsec-n">{{ sourceRows.length }}</span>
+            <IconSpan class="spsec-chev" name="chevron-down" :size="12" />
+          </button>
+          <div v-show="!folded.src" class="spsec-bd">
+            <template v-for="r in sourceRows" :key="r.key">
+              <button
+                type="button"
+                class="spsec-row"
+                :class="{ on: detailKey === r.key }"
+                :data-detail-key="r.key"
+                @click="openDetail(r.key)"
+              >
+                <span class="kring k-ok"><IconSpan name="link" :size="10" /></span>
+                <span class="k-name">{{ r.title }}</span>
+              </button>
+              <div v-if="detailKey === r.key" class="spdetail" :data-detail-key="r.key">
+                <div class="sd-hd">
+                  <b>{{ dTitle(r.key) }}</b>
+                  <button type="button" class="sd-x" title="收起详情" aria-label="收起详情" @click="closeDetail()">×</button>
+                </div>
+                <div class="sd-body">{{ dBody(r.key) }}</div>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div v-if="fileRows.length" class="spsec">
+          <button class="spsec-hd" type="button" :aria-expanded="!folded.file" @click="toggleFold('file')">
+            <IconSpan name="file" :size="12" /> 文件 <span class="spsec-n">{{ fileRows.length }}</span>
+            <IconSpan class="spsec-chev" name="chevron-down" :size="12" />
+          </button>
+          <div v-show="!folded.file" class="spsec-bd">
+            <template v-for="r in fileRows" :key="r.key">
+              <button
+                type="button"
+                class="spsec-row"
+                :class="{ on: detailKey === r.key }"
+                :data-detail-key="r.key"
+                @click="openDetail(r.key)"
+              >
+                <span class="kring" :class="'k-' + r.status"><IconSpan v-if="r.status === 'err'" name="x" :size="10" /><IconSpan v-else-if="r.status !== 'run'" name="check" :size="11" /></span>
+                <span class="k-name">{{ r.title }}</span>
+              </button>
+              <div v-if="detailKey === r.key" class="spdetail" :data-detail-key="r.key">
+                <div class="sd-hd">
+                  <b>{{ dTitle(r.key) }}</b>
+                  <button type="button" class="sd-x" title="收起详情" aria-label="收起详情" @click="closeDetail()">×</button>
+                </div>
+                <div class="sd-body">{{ dBody(r.key) }}</div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Q7 甲：原「底部固定单详情栏」已被 Q3 乙 取代（2026-11-09 拍板）——详情现在长在被点
+             的那一行下面，见上面各分区；这里不再保留一条底部栏，避免同一内容出现两处。 -->
+
         <!-- 任务清单（ZCode 对齐 Q2）：todo_write 整表替换维护；划线+计数+>6 条收 3 条焦点窗 -->
         <div v-if="todoView.items.length" class="todo">
           <div class="todo-hd">
@@ -44,7 +190,7 @@
           </div>
           <!-- Q2（20261011 拍板A）：面板与聊天的联动此前"有而不显"——常驻提示让可点性可发现；
                批1审查 P2：无可跳目标（回放旧会话无 todo_write 步骤）时行本就不可点，提示随之隐藏 -->
-          <div v-if="todoStepId" class="todo-hint">↗ 点击清单行 / 步骤行，可在对话中定位到对应消息</div>
+          <div v-if="todoStepId" class="todo-hint">↗ 点清单行在对话中定位；点步骤行看参数与结果</div>
           <button v-if="todoView.pre > 0 && !todoOpen" class="todo-fold" @click="todoOpen = true">⋯ 前面 {{ todoView.pre }} 步，点开看全部</button>
           <div
             v-for="(it, i) in todoView.focus"
@@ -64,32 +210,13 @@
           </div>
           <button v-if="todoView.post > 0 && !todoOpen" class="todo-fold" @click="todoOpen = true">⋯ 还有 {{ todoView.post }} 步待办</button>
         </div>
-        <div class="spb">
-          <!-- DP-3 原型 foldrow 双向：折叠 ⇄ 展开全部步骤 -->
-          <button v-if="turn.steps.length > SPFOCUS" class="spr foldrow" @click="foldOpen = !foldOpen">
-            {{ foldOpen ? `⋯ 收起早期步骤，只看最近 ${SPFOCUS} 步` : `⋯ 已折叠前 ${turn.steps.length - SPFOCUS} 步 · 点击展开` }}
-          </button>
-          <div
-            v-for="s in shownSteps"
-            :key="s.id"
-            class="spr link"
-            role="button"
-            tabindex="0"
-            title="在对话中定位这一步"
-            @click="emit('step-jump', s.id)"
-            @keydown.enter="emit('step-jump', s.id)"
-          >
-            <span class="kring" :class="'k-' + s.status">
-              <IconSpan v-if="s.status === 'err'" name="x" :size="10" />
-              <IconSpan v-else-if="s.status !== 'run'" name="check" :size="11" />
-            </span>
-            <span class="k-name">{{ s.verb }}{{ s.status === 'err' ? ' · 失败' : '' }}</span>
-          </div>
-          <div v-if="shownSteps.length === 0" class="spr empty">暂无进行中的步骤</div>
-        </div>
+        <!-- Q2 乙：原来的独立「步骤」区已并进上面的「计划」分区（2026-11-09 拍板） -->
         <!-- eslint-disable-next-line vue/no-v-html —— stamp 源串保持 emoji（⚡/🧠/✓），渲染层按 EMO2IC 换 Lucide -->
         <div class="spf" :class="{ sumok }" v-html="emoToSvgHtml(spfText)"></div>
       </div>
+      <!-- Q3 乙（2026-11-09 拍板）：窄屏第一次收尾时教一次「这里能点」——3.5s 或点开即消，
+           之后不再出现（显示即记本机，点没点都算教过，否则每轮都弹=打扰） -->
+      <span v-if="showTeach" class="sp-teach">点这里看这一轮干了什么</span>
     </div>
   </transition>
 </template>
@@ -100,7 +227,7 @@
  * 全屏形态专属（原型 statdock 只挂 #full）；mini 胶囊手动收/完成后 1.6s 自动收（waiting 不收）。
  * 四交互：sph 双钮 / 步骤行点击跳流内工具行 / waiting 点头跳确认卡 / foldrow 双向展开。
  */
-import type { AssistantTurn } from './useAssistant';
+import type { AssistantTurn, AssistantStep } from './useAssistant';
 import type { AssistantTodoItem } from '@/api/dcs/assistant';
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
@@ -139,7 +266,9 @@ const MIN_COL = 480;
    · DOT 20：状态点，与胶囊同一个右锚，不再有「贴字」和「贴边」两套落点 */
 const GAP = 24;
 const PANEL_W = 220;
-const CAP_MAX = 168;
+/** Q1 乙（2026-11-09 拍板）：胶囊从「状态词」改成「摘要」，宽度上限 168 → 240——
+ *  摘要一行话（计划：本周清理 · 2/3 步）在 168 里只剩省略号；可负担量不够时仍按栏宽缩 */
+const CAP_MAX = 240;
 const CAP_MIN = 112;
 const DOT = 20;
 /* Q26（2026-10-29 用户拍板「只轻微优化间距」）→ Q30 重写：呼吸只剩一个下限。
@@ -198,6 +327,8 @@ const compact = ref(false);
  *  1.6s 自动收、容器宽跨阈三类自动行为均不得覆盖手动选择；新回合重置 */
 const userMini = ref(false);
 function expandMini() {
+  /* Q3 乙：用户已经知道能点了——气泡立刻收掉并记「教过」 */
+  if (showTeach.value) markTaught();
   mini.value = false;
   userMini.value = true;
 }
@@ -206,6 +337,83 @@ function collapseMini() {
   userMini.value = true;
 }
 const foldOpen = ref(false);
+/* ---- Q2 乙（2026-11-09 拍板）：分区头可折叠 + 步骤并进计划 ----
+ * 折叠状态按分区 key 记（plan/src/file）；换回合清空——ZCode 每个分区头都能折，
+ * 我们原来三区常显，来源一多就把「文件」挤出屏幕。 */
+const folded = ref<Record<string, boolean>>({});
+function toggleFold(key: string) {
+  folded.value[key] = !folded.value[key];
+}
+/** Q5 乙：手机档（<560）收起态=状态点，点开=底部抽屉（不再整块藏掉） */
+const sheetMode = ref(false);
+/** Q1 乙 + Q2 甲（2026-11-09 拍板）：手机档（<560）——收起态改成带字胶囊，右缘仍在右上角
+ *  （Q2 选甲=不换位置）。桌面那套「按栏宽缩胶囊」在手机上恒退化成 20px 点（MIN_COL=480），
+ *  所以窄屏单独一条几何：不挤正文、宽度交给 CSS 按内容定。 */
+const narrow = ref(false);
+const narrowMini = computed(() => narrow.value && mini.value);
+
+/* ---- Q3 乙（2026-11-09 拍板）：窄屏第一次「干活中→收尾」时教一次 ----
+ * 只教一次：显示即写本机标记（点没点都算教过，否则每轮都弹=打扰）；3.5s 自动消失。 */
+const TEACH_KEY = 'dcs:assistant:statusTeach.v1';
+const showTeach = ref(false);
+let teachTimer: number | null = null;
+function taught() {
+  try {
+    return localStorage.getItem(TEACH_KEY) === '1';
+  } catch {
+    return true; // 隐私模式读不到就当作教过：宁可不弹，也不要在每次渲染里抛异常
+  }
+}
+function markTaught() {
+  showTeach.value = false;
+  if (teachTimer !== null) {
+    window.clearTimeout(teachTimer);
+    teachTimer = null;
+  }
+  try {
+    localStorage.setItem(TEACH_KEY, '1');
+  } catch {
+    /* 写不进去只是下次再教一遍，不影响功能 */
+  }
+}
+/* Q5 乙：把手下拉——跟手位移，松手超过 56px 就收起，否则弹回（不引第三方手势库） */
+let gripDy = 0;
+function onGripDown(e: PointerEvent) {
+  const root = panelRoot.value;
+  if (!root) return;
+  /* 不 preventDefault 的话，拖动会把抽屉里的文字当作文本选中（实测截图里满屏蓝底） */
+  e.preventDefault();
+  const y0 = e.clientY;
+  gripDy = 0;
+  root.style.transition = 'none';
+  const move = (ev: PointerEvent) => {
+    gripDy = Math.max(0, ev.clientY - y0);
+    root.style.transform = `translateY(${gripDy}px)`;
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    root.style.removeProperty('transition');
+    root.style.removeProperty('transform');
+    if (gripDy > 56) collapseMini();
+    gripDy = 0;
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+/** Q4 乙：鼠标停在面板上时不收，离开再收 */
+const panelHover = ref(false);
+let pendingCollapse = false;
+function onPanelEnter() {
+  panelHover.value = true;
+}
+function onPanelLeave() {
+  panelHover.value = false;
+  if (pendingCollapse && !userMini.value) {
+    pendingCollapse = false;
+    mini.value = true;
+  }
+}
 let collapseTimer: ReturnType<typeof setTimeout> | null = null;
 // Q6-B：观测主列宽度驱动 auto 展开/收胶囊（ResizeObserver 而非 window resize——全屏模态/独立页容器宽 ≠ 窗口宽）
 let widthObserver: ResizeObserver | null = null;
@@ -309,6 +517,36 @@ watchEffect(() => {
     root.style.removeProperty('--sp-cap-w');
     return;
   }
+  /* Q5 乙（2026-11-09 拍板）：手机档（<560）展开态=底部抽屉——不参与右侧让位解算，
+     宽高全交给 CSS（.sheet）。 */
+  narrow.value = w > 0 && w < 560;
+  sheetMode.value = !mini.value && narrow.value;
+  if (sheetMode.value) {
+    /* 抽屉态既不是「浮层」也不是「状态点」——这两个标记必须清掉：`.compact:hover`
+       有一条「悬停向左展开成 168×26 胶囊」的老规则（状态点自查用），留着会把
+       展开的抽屉在鼠标移上去时瞬间压成 26px 高（2026-11-09 实测抓到的真 bug）。 */
+    floating.value = false;
+    compact.value = false;
+    host.style.setProperty('--sp-strip', '0px');
+    host.style.removeProperty('--sp-strip-l');
+    root.style.removeProperty('right');
+    root.style.removeProperty('--sp-panel-w');
+    root.style.removeProperty('--sp-cap-w');
+    return;
+  }
+  /* Q1 乙 + Q2 甲（2026-11-09 拍板）：窄屏收起态=带字胶囊。桌面几何（MIN_COL=480）在手机上
+     恒不成立，按老式子只会一路缩成 20px 点（390 实测就是这个根因）；窄屏不挤压正文
+     （strip=0，胶囊浮在右上角），宽度由 CSS 按内容定。 */
+  if (mini.value && narrow.value) {
+    floating.value = false;
+    compact.value = false;
+    host.style.setProperty('--sp-strip', '0px');
+    host.style.removeProperty('--sp-strip-l');
+    root.style.removeProperty('--sp-panel-w');
+    root.style.removeProperty('--sp-cap-w');
+    root.style.right = `${PANEL_EDGE}px`;
+    return;
+  }
   const colMax = readColMax(host);
   /* Q29：判定与让位量全部改用「列帽 + 列内距」的常数几何，不再读 .box 的实测左缘——
      列居中之后 boxLeft 会随 strip 漂（1920 未展开 214、展开 56），拿它当阈值会让
@@ -408,6 +646,19 @@ watch(
   },
   { immediate: true }
 );
+/* Q3 乙（2026-11-09 拍板）：窄屏「已收成胶囊 + 这一轮已结束」且从没教过 → 弹一次。
+   不挂 live 下降沿：刷新/回放历史时直接落在终态，也要教得到（全局只教一次，不会反复打扰）。 */
+watch(
+  () => narrowMini.value && !live.value && ['done', 'stopped'].includes(props.turn?.phase ?? ''),
+  (ready) => {
+    if (!ready || showTeach.value || taught()) {
+      return;
+    }
+    showTeach.value = true;
+    teachTimer = window.setTimeout(() => markTaught(), 3500);
+  },
+  { immediate: true }
+);
 const doneSteps = computed(() => props.turn?.steps.filter((s) => s.status !== 'run').length ?? 0);
 const shownSteps = computed(() => {
   if (!props.turn) {
@@ -462,8 +713,8 @@ const todoView = computed(() => {
   };
 });
 
-/** Q10 统一词表（turnStateWord 合一）：等确认/思考中/执行中/撰写中/已完成/已停止/失败——
- *  与 TurnBlock 状态条同源，杀掉「正在做/做完了/进程/出了点问题」旧词（执行中动词在尾注 c-last） */
+/** Q1 甲（2026-11-07 拍板）：状态词与 TurnBlock 同源——进行中一律「工作中」，
+ *  阶段动词只放尾注 c-last，不再让胶囊里出现「思考中/撰写中/执行中」三套词 */
 const stateWord = computed(() => (props.turn ? turnStateWord(props.turn.phase) : ''));
 const dotCls = computed(() => (live.value ? 'run' : props.turn?.phase === 'error' ? 'err' : props.turn?.phase === 'waiting' ? 'wait' : 'ok'));
 /** 面板三态类（批J-2 原型 L405-409）：running/waiting/finish 驱动边框与文案色 */
@@ -473,6 +724,10 @@ const panelCls = computed(() => ({
   float: floating.value,
   /** Q20：gutter 只够一个点——20px 状态点（与 float 解耦，不压字也要点态） */
   compact: compact.value,
+  /** Q5 乙（2026-11-09 拍板）：手机档展开=底部抽屉 */
+  sheet: sheetMode.value,
+  /** Q1 乙 + Q2 甲（2026-11-09 拍板）：手机档——收起态是带字胶囊（不是 20px 点） */
+  narrow: narrow.value,
   running: live.value,
   waiting: props.turn?.phase === 'waiting',
   finish: !live.value && ['done', 'stopped'].includes(props.turn?.phase ?? '')
@@ -488,20 +743,6 @@ const sphLast = computed(() => {
   }
   return t.stamp || '';
 });
-const capsuleText = computed(() => {
-  const t = props.turn;
-  if (!t) {
-    return '';
-  }
-  if (t.phase === 'waiting') {
-    return turnStateWord('waiting');
-  }
-  const last = t.steps[t.steps.length - 1];
-  if (live.value) {
-    return t.phase === 'thinking' ? '思考中' : t.phase === 'writing' ? '撰写中' : (last?.verb ?? '执行中');
-  }
-  return turnStateWord(t.phase);
-});
 /** Q19-b：浮动胶囊缩成 22px 状态点后，文字信息只能进 title/aria——完整说法放这里 */
 const capsuleTitle = computed(() => {
   const t = props.turn;
@@ -509,8 +750,155 @@ const capsuleTitle = computed(() => {
     return '';
   }
   const step = `${doneSteps.value}/${t.steps.length || 1}`;
-  return `${capsuleText.value} · 步骤 ${step}${t.phase === 'waiting' ? ' · 点这里展开' : ''}`;
+  // Q1 乙：胶囊正文已是摘要，title 里补齐状态词与步数（点态 20px 时只剩 title）
+  return `${stateWord.value} · 步骤 ${step} · ${capsuleSummary.value}${t.phase === 'waiting' ? ' · 点这里展开' : ''}`;
 });
+/* ---- Q7 甲（2026-11-07 拍板，照 ZCode 的摘要链 + 单详情栏）----
+ * 摘要链优先级：在跑的步骤 → 计划进度 → 未完成待办 → 来源 → 文件 → 收尾一句话。
+ * ZCode 的原链是 live workflow → currentPlanItem → active Goal → Git → done Goal →
+ * completedPlanItem → Todo 数 → latestSessionPlan → runningCount → endedWorkflowRunCount；
+ * 本仓没有 workflow/goal/git，能对上的是「在跑步骤 / 计划 / 待办 / 来源」，其余按本仓数据补。 */
+const summaryText = computed(() => {
+  const t = props.turn;
+  if (!t) {
+    return '';
+  }
+  const running = t.steps.find((s) => s.status === 'run');
+  if (running) {
+    return `正在 ${running.verb}${t.steps.length > 1 ? `（第 ${t.steps.indexOf(running) + 1}/${t.steps.length} 步）` : ''}`;
+  }
+  if (t.plan) {
+    const done = t.plan.steps.filter((x) => x.state === 'done').length;
+    return `计划：${t.plan.title || '本轮计划'} · ${done}/${t.plan.steps.length} 步`;
+  }
+  const tv = todoView.value;
+  if (tv.items.length && tv.done < tv.items.length) {
+    return `待办 ${tv.done}/${tv.items.length} · 还差 ${tv.items.length - tv.done} 项`;
+  }
+  const cites = t.citations?.length ?? 0;
+  if (cites) {
+    return `本轮引用了 ${cites} 条网页来源`;
+  }
+  const files = fileRows.value.length;
+  if (files) {
+    return `本轮读了 ${files} 个文件`;
+  }
+  if (t.phase === 'done') {
+    return `这一轮已收尾${t.steps.length ? ` · 共 ${t.steps.length} 步` : ''}`;
+  }
+  return `${stateWord.value}${t.steps.length ? ` · ${doneSteps.value}/${t.steps.length} 步` : ''}`;
+});
+
+/** Q1 乙（2026-11-09 拍板，照 ZCode）：收起态胶囊本身就是摘要——不是只写「已收尾」，
+ *  而是「计划：本周清理 · 2/3 步」这种一眼能判断要不要打断的信息；超长省略靠 CSS。 */
+const capsuleSummary = computed(() => summaryText.value || stateWord.value);
+
+interface SecRow {
+  key: string;
+  title: string;
+  body: string;
+  status: 'run' | 'ok' | 'err';
+}
+/** 计划分区：整份计划一行（点开看逐步状态），不逐条塞行——面板窄，逐条会挤掉待办 */
+const planRows = computed<SecRow[]>(() => {
+  const p = props.turn?.plan;
+  if (!p) {
+    return [];
+  }
+  const done = p.steps.filter((x) => x.state === 'done').length;
+  const body = p.steps
+    .map((x, i) => `${i + 1}. [${x.state === 'done' ? '已做' : x.state === 'run' ? '进行中' : '未开始'}] ${x.label}`)
+    .join('\n');
+  return [
+    {
+      key: `plan:${p.planId ?? 'draft'}`,
+      title: `${p.title || '本轮计划'}（${done}/${p.steps.length}）`,
+      body,
+      status: done >= p.steps.length ? 'ok' : 'run'
+    }
+  ];
+});
+/** 来源分区：联网搜索结果（网页外链在消息流里可点；这里只列标题与域名，点开看完整地址） */
+const sourceRows = computed<SecRow[]>(() =>
+  (props.turn?.citations ?? []).map((c, i) => ({
+    key: `source:${c.url || i}`,
+    title: c.title || c.url,
+    body: `${c.title || ''}
+${c.siteName ? c.siteName + ' · ' : ''}${c.url}`,
+    status: 'ok' as const
+  }))
+);
+/** 文件分区：读写类工具步骤 */
+const FILE_TOOLS = new Set(['read_file', 'write_file', 'list_dir', 'read_dir', 'open_file']);
+const fileRows = computed<SecRow[]>(() =>
+  (props.turn?.steps ?? [])
+    .filter((s) => FILE_TOOLS.has(s.name) || s.name.includes('file'))
+    .map((s) => ({
+      key: `file:${s.id}`,
+      title: `${s.verb}${s.status === 'err' ? ' · 失败' : ''}`,
+      body: `工具：${s.name}
+参数：${s.argsText || '—'}
+结果：${(s.resultFull || s.brief || '—').slice(0, 800)}`,
+      status: s.status
+    }))
+);
+
+/* 详情（行内）：唯一入口 openDetail / closeDetail——同一时刻只开一条，换行即替换。
+ * 代码席 P1（2026-11-09）：正文必须是**现算**的——早先存字符串快照，点开运行中的步骤
+ * 会永远停在「结果：—」，计划推进后详情还写着旧进度，同一面板自相矛盾。 */
+const detailKey = ref('');
+function openDetail(key: string) {
+  detailKey.value = detailKey.value === key ? '' : key;
+}
+function closeDetail() {
+  detailKey.value = '';
+}
+function stepDetailBody(s: AssistantStep): string {
+  return [
+    `工具：${s.name}`,
+    `参数：${s.argsText || '—'}`,
+    `结果：${(s.resultFull || s.brief || '—').slice(0, 800)}`
+  ].join('\n');
+}
+/* Q3 乙（2026-11-09 拍板）：详情就长在这行下面——原来固定挂面板最底部，点上面第 1 行
+ * 眼睛要往下跑 300~500px。模板里每类行后各跟一块，统一走这三个取值函数（不做非空断言）。 */
+function dTitle(key: string): string {
+  return detailOf(key)?.title ?? '';
+}
+function dBody(key: string): string {
+  return detailOf(key)?.body ?? '';
+}
+function detailOf(key: string): { title: string; body: string } | null {
+  if (!key) {
+    return null;
+  }
+  if (key.startsWith('step:')) {
+    const s = (props.turn?.steps ?? []).find((x) => x.id === key.slice(5));
+    return s ? { title: `${s.verb}${s.status === 'err' ? ' · 失败' : ''}`, body: stepDetailBody(s) } : null;
+  }
+  const r = [...planRows.value, ...sourceRows.value, ...fileRows.value].find((x) => x.key === key);
+  return r ? { title: r.title, body: r.body } : null;
+}
+/** 步骤行也走同一个详情栏（Q7 甲：分区行与步骤行同一套交互，不搞两套）；
+ *  跳转退成详情里的一枚「在对话中定位」——原先步骤行点击直跳，和分区行开详情互相打架 */
+const detailStepId = computed(() => (detailKey.value.startsWith('step:') ? detailKey.value.slice(5) : ''));
+function openStepDetail(s: AssistantStep) {
+  openDetail(`step:${s.id}`);
+}
+function jumpFromDetail() {
+  const id = detailStepId.value;
+  if (!id) {
+    return;
+  }
+  emit('step-jump', id);
+  closeDetail();
+}
+/** 换回合/收面板时详情不跨回合残留（纯前端态，刷新即失，符合甲案） */
+watch(
+  () => props.turn?.id,
+  () => closeDetail()
+);
+
 const durText = computed(() => {
   const t = props.turn;
   if (!t) {
@@ -553,6 +941,8 @@ watch(
   () => {
     foldOpen.value = false;
     userMini.value = false;
+    folded.value = {};
+    pendingCollapse = false;
   }
 );
 watch(
@@ -572,14 +962,20 @@ watch(
         mini.value = !containerWide.value;
       }
     } else if (wasLive && phase !== 'waiting') {
-      // 离开 live 1.6s 自动收胶囊；窗口内用户手动展开过则尊重选择（三席审查 m3 P1-1）；
-      // 回合已换（极端竞态）也不收
+      // Q4 乙（2026-11-09 拍板）：离开 live 3 秒收成胶囊（原 1.6 秒）——先给人看结果，
+      // 再把地方还回去；鼠标停在面板上时暂停计时，移开再收。
+      // 窗口内用户手动展开过则尊重选择（三席审查 m3 P1-1）；回合已换（极端竞态）也不收
       const turnAtSchedule = props.turn?.id;
       collapseTimer = setTimeout(() => {
-        if (props.turn?.id === turnAtSchedule && !userMini.value) {
-          mini.value = true;
+        if (props.turn?.id !== turnAtSchedule || userMini.value) {
+          return;
         }
-      }, 1600);
+        if (panelHover.value) {
+          pendingCollapse = true; // 正在看，等鼠标离开再收
+          return;
+        }
+        mini.value = true;
+      }, 3000);
     }
   }
 );
@@ -595,6 +991,11 @@ onBeforeUnmount(() => {
   }
   if (nowTimer !== null) {
     window.clearInterval(nowTimer);
+  }
+  /* Q3 乙：教学气泡的 3.5s 计时器（卸载后回调再跑会碰已卸载的 ref） */
+  if (teachTimer !== null) {
+    window.clearTimeout(teachTimer);
+    teachTimer = null;
   }
 });
 </script>
@@ -738,6 +1139,145 @@ onBeforeUnmount(() => {
     }
   }
 }
+/* Q5 乙（2026-11-09 拍板）：手机档（<560）展开态=底部抽屉——拇指够得着，不再用
+   「浮动面板盖半屏」（甲）也不是整块藏掉（丙）。放在 .stat-panel 块之后：与 .compact
+   同特异性，必须后写才能盖掉它的 20px 尺寸（抽屉展开时 compact 仍为真）。 */
+.stat-panel.sheet {
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  top: auto;
+  width: auto;
+  height: auto;
+  max-height: 52%;
+  border-radius: 16px 16px 12px 12px;
+  z-index: 30;
+  background: var(--el-bg-color);
+  backdrop-filter: none;
+  box-shadow: 0 -10px 28px rgb(16 24 40 / 18%);
+  transition: none;
+  /* Q5 乙：抽屉「升起来」而不是凭空出现（0.22s，动作可见即够） */
+  animation: dcs-sheet-up 0.22s ease-out;
+
+  .capsule {
+    display: none;
+  }
+  .full-body {
+    max-height: 100%;
+  }
+}
+@keyframes dcs-sheet-up {
+  from {
+    transform: translateY(18px);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+/* Q5 乙：抽屉把手（只有手机档渲染）——一道 40×4 的横杠，tab 焦点不占位 */
+.sheet-grip {
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 6px auto 0;
+  border-radius: 2px;
+  background: var(--el-border-color-darker, #c9ced6);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+/* Q4 乙（2026-11-09 拍板）：抽屉标题行——回答「这是什么」（遮罩负责「你打开了东西」） */
+.sheet-ttl {
+  padding: 8px 12px 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dcs-text-regular);
+}
+/* Q4 乙：浅遮罩——点一下收起，和拖把手下滑等价。z-index 低于抽屉（30）高于正文。 */
+.sp-sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  background: rgb(16 24 40 / 22%);
+  animation: dcs-mask-in 0.22s ease-out;
+}
+@keyframes dcs-mask-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+/* Q1 乙 + Q2 甲（2026-11-09 拍板）：手机档收起态=带字胶囊，右缘仍钉 16（位置不变）。
+   宽度交给内容：手机上正文是全宽，胶囊是浮层，不参与桌面「按栏宽缩胶囊」的让位几何
+   （那条式子的 MIN_COL=480 在 390 上恒不成立，一路算下去只剩 20px 点——实测根因）。 */
+.stat-panel.narrow.mini {
+  width: auto;
+  max-width: calc(100vw - 32px);
+  /* 教学气泡挂在胶囊下方，不能被壳的 overflow:hidden 裁掉（fold 态的 full-body 自己裁） */
+  overflow: visible;
+  transition: none;
+
+  .capsule {
+    width: auto;
+    min-width: 0;
+    height: 28px;
+    padding: 0 12px 0 10px;
+    gap: 6px;
+  }
+  /* 收起态把展开体彻底移出布局：fold 只是 max-height:0，宽度仍会被里面的摘要撑到 235px
+     （透明面板照样拦截点击，压在正文上的是一块看不见的挡板）——2026-11-09 实测抓到的 */
+  .full-body {
+    display: none;
+  }
+  .c-state {
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--dcs-text-regular);
+  }
+}
+/* Q3 乙：一次性教学气泡——出现 3.5s 或点开即消失，之后不再出现 */
+.sp-teach {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 6;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #111827;
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgb(16 24 40 / 18%);
+  animation: dcs-teach-in 0.18s ease-out;
+  pointer-events: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    right: 22px;
+    width: 8px;
+    height: 8px;
+    border-radius: 1px;
+    background: #111827;
+    transform: rotate(45deg);
+  }
+}
+@keyframes dcs-teach-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 /* Q7：胶囊常驻淡切（ZCode mini 行 150ms opacity）——非 mini 态绝对定位退出流+隐交互 */
 .capsule {
   /* 三反馈③（拍板 2026-10-10）：定最小宽+内容居中——live 期文本随阶段切换（思考中→查任务→…）
@@ -746,7 +1286,8 @@ onBeforeUnmount(() => {
      会撑破壳（overflow:hidden 直接裁字）；border-box 让 padding 计入这 168/137 */
   box-sizing: border-box;
   min-width: min(136px, 100%);
-  justify-content: center;
+  /* Q1 乙（2026-11-09 拍板）：胶囊正文改成摘要，左对齐 + 单行省略（原来居中是因为只有状态词） */
+  justify-content: flex-start;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -770,11 +1311,16 @@ onBeforeUnmount(() => {
     pointer-events: none;
   }
 
-  .c-last {
-    max-width: 110px;
+  /* Q1 乙：摘要一行话，超长省略——宽度上限由解算给出（240 → 可负担量） */
+  .c-last,
+  .capx {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
   }
 }
 /* Q7：展开体常驻，max-height+opacity 过渡（同元素可插值的另一半） */
@@ -783,6 +1329,10 @@ onBeforeUnmount(() => {
   flex-direction: column;
   min-height: 0;
   max-height: min(64vh, 32rem);
+  /* 代码席 P1（2026-11-09）：分区多了以后总高会超 max-height，而 .stat-panel 是
+     overflow:hidden——没有这行，超出的分区/尾行被直接裁掉且没有滚动条，永远够不到 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   opacity: 1;
   visibility: visible;
   transition:
@@ -792,6 +1342,7 @@ onBeforeUnmount(() => {
 
   &.fold {
     max-height: 0;
+    overflow: hidden;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -820,6 +1371,149 @@ onBeforeUnmount(() => {
 @keyframes dcs-dot {
   50% {
     opacity: 0.35;
+  }
+}
+/* Q7 甲（2026-11-07 拍板）：摘要链一行 + 分区清单；详情按 Q3 乙 改为行内展开（2026-11-09） */
+.sp-sum {
+  padding: 8px 12px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--dcs-text-secondary);
+  border-bottom: 1px solid var(--dcs-border-color-lighter);
+  /* 长句最多两行，超了省略——面板是速览，不是正文 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.spsec {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--dcs-border-color-lighter);
+
+  &:last-of-type {
+    border-bottom: 0;
+  }
+}
+/* Q2 乙（2026-11-09 拍板）：分区头变成可点的折叠开关（原来是死的 div） */
+.spsec-hd {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--dcs-text-placeholder);
+  letter-spacing: 0.02em;
+  padding: 2px 4px 3px;
+  border-radius: 5px;
+
+  &:hover {
+    background: rgba(127, 127, 127, 0.08);
+    color: var(--dcs-text-regular);
+  }
+  .spsec-chev {
+    margin-left: 2px;
+    transition: transform 0.15s ease;
+  }
+  &[aria-expanded='false'] .spsec-chev {
+    transform: rotate(-90deg);
+  }
+}
+.spsec-n {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.spsec-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  text-align: left;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--dcs-text-regular);
+
+  &:hover {
+    background: rgba(127, 127, 127, 0.08);
+  }
+  &.on {
+    background: var(--el-color-primary-light-9);
+    border-color: var(--el-color-primary-light-7);
+  }
+  .k-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+/* Q3 乙（2026-11-09 拍板）：详情就长在被点的那一行下面（原来是面板最底部的固定栏，
+   点上面第 1 行要往下跑 300~500px）；内部滚动上限保留 */
+.spdetail {
+  margin: 2px 0 6px;
+  border: 1px solid var(--dcs-border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(127, 127, 127, 0.04);
+  max-height: 240px;
+  display: flex;
+  flex-direction: column;
+
+  .sd-hd {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px 4px;
+    font-size: 12px;
+
+    b {
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+  .sd-x {
+    margin-left: auto;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    color: var(--dcs-text-placeholder);
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 2px;
+
+    &:hover {
+      color: var(--dcs-text-primary);
+    }
+  }
+  .sd-body {
+    padding: 0 12px 9px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--dcs-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow: auto;
+  }
+  .sd-jump {
+    align-self: flex-start;
+    margin: 0 12px 8px;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-size: 11px;
+    color: var(--dcs-brand, #1f6feb);
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 .sph {
@@ -1002,93 +1696,96 @@ onBeforeUnmount(() => {
     }
   }
 }
-.spb {
-  /* 原型 L389：滚动承载+flex 1（展开全部步骤不撑破面板） */
-  padding: 4px 6px;
+/* Q2 乙（2026-11-09）：分区体纵向排布——原容器 .spb（底部详情栏）已删，
+   间距改由这里给，步骤行与计划行的节奏保持一致 */
+.spsec-bd {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  overflow-y: auto;
-  flex: 1;
+}
+/* 步骤/计划行（原挂在 .spb 下；步骤并进「计划」分区后 .spb 容器没了，
+   规则必须提层——否则圆环、间距、悬停全丢） */
+.spr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  color: var(--dcs-text-regular);
+  min-width: 0;
 
-  .spr {
+  &.link {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--el-fill-color-light);
+    }
+    &:hover .k-name {
+      color: var(--el-color-primary);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--el-color-primary-light-5);
+      outline-offset: 1px;
+      border-radius: 4px;
+    }
+  }
+  &.on {
+    background: var(--el-fill-color-light);
+  }
+  &.foldrow {
+    border: none;
+    background: none;
+    padding: 5px 6px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--dcs-text-secondary);
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+      color: var(--el-color-primary);
+    }
+  }
+  &.empty {
+    color: var(--dcs-text-placeholder);
+  }
+
+  .k-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .kring {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--dcs-border-color);
+    font-size: 9px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 7px 6px;
-    border-radius: 8px;
-    color: var(--dcs-text-regular);
-    min-width: 0;
+    justify-content: center;
+    color: var(--dcs-text-placeholder);
+    flex: none;
 
-    &.link {
-      cursor: pointer;
-
-      &:hover {
-        background: var(--el-fill-color-light);
-      }
-      &:hover .k-name {
-        color: var(--el-color-primary);
-      }
-      &:focus-visible {
-        outline: 2px solid var(--el-color-primary-light-5);
-        outline-offset: 1px;
-        border-radius: 4px;
-      }
+    &.k-ok {
+      border-color: var(--dcs-color-success);
+      color: var(--dcs-color-success);
     }
-    &.foldrow {
-      border: none;
-      background: none;
-      padding: 5px 6px;
-      font: inherit;
-      font-size: 12px;
-      color: var(--dcs-text-secondary);
-      cursor: pointer;
-      text-align: left;
-
-      &:hover {
-        color: var(--el-color-primary);
-      }
+    &.k-err {
+      border-color: var(--dcs-color-danger);
+      color: var(--dcs-color-danger);
     }
-    &.empty {
-      color: var(--dcs-text-placeholder);
-    }
-
-    .k-name {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .kring {
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      border: 1.5px solid var(--dcs-border-color);
-      font-size: 9px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--dcs-text-placeholder);
-      flex: none;
-
-      &.k-ok {
-        border-color: var(--dcs-color-success);
-        color: var(--dcs-color-success);
-      }
-      &.k-err {
-        border-color: var(--dcs-color-danger);
-        color: var(--dcs-color-danger);
-      }
-      /* 原型 L392：运行步骤环琥珀脉冲 */
-      &.k-run {
-        border-color: var(--dcs-color-warning, #e6a23c);
-        color: var(--dcs-color-warning, #e6a23c);
-        animation: dcs-ppring 1s ease infinite;
-      }
+    /* 原型 L392：运行步骤环琥珀脉冲 */
+    &.k-run {
+      border-color: var(--dcs-color-warning, #e6a23c);
+      color: var(--dcs-color-warning, #e6a23c);
+      animation: dcs-ppring 1s ease infinite;
     }
   }
 }
+
 @keyframes dcs-ppring {
   50% {
     box-shadow: 0 0 0 6px rgba(230, 162, 60, 0.1);

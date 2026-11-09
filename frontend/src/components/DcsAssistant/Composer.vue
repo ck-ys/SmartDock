@@ -204,32 +204,25 @@
           </span>
           <!-- 业务批7 Q15（2026-10-14 拍板方案A）：回原尺寸+纯进度条——每行=标签+条+值，
                长解释/恢复时间全部进 title hover；订阅租户积分区=三行微条 5小时窗→周池→加油包（有余额才显示） -->
-          <span class="ctxpop">
+          <span ref="ctxPopEl" class="ctxpop">
             <b>会话状态</b>
-            <!-- 题5 甲（2026-11-06）：空态/读数≤0 一律不渲染读数（同 ZCode 两道守卫），只留一句「待测」 -->
-            <span
-              v-if="ctxKnown"
-              class="ctxrow"
-              :title="
-                `本会话上下文占用 ${fmtK(ctxTokens)} / ${fmtK(ctxWindowDisplay)} tokens` +
-                (ctxTrigger ? ` · 到 ${fmtK(ctxTrigger)} 自动压缩` : '') +
-                ' · 环变橙=接近自动压缩线 · 变红=即将压缩'
-              "
-            >
-              <span class="cl">上下文</span>
+            <!-- Q1 甲（2026-11-09 拍板，三段分层）：① 上下文=大百分比+条+数字；
+                 ② 额度=微条；③ 底部小字=联网/缓存。信息一个没少，眼睛有了落点。
+                 Q2 甲：首轮没真值先给估算（标「约/估算」）；Q4 甲：自动触发线只留条上那道刻度 -->
+            <span class="ctxhero" :title="ctxHeroTitle">
+              <span class="ctxpct">
+                {{ ctxShown ? Math.round(ctxPct * 100) + '%' : '待测' }}
+                <i v-if="ctxIsEstimate" class="ctxest">估算</i>
+              </span>
               <span class="cbar ctxbar-tick">
                 <i :style="ctxBarStyle" />
                 <b v-if="ctxTriggerPct !== null" :style="{ left: ctxTriggerPct * 100 + '%' }" />
               </span>
-              <!-- 批A-1 回修：数字与环色同分母=离自动压缩线进度（条上竖线即触发线位置） -->
-              <span>{{ ctxKnown ? Math.round(ctxNearPct * 100) + '%' : '待测' }}</span>
+              <span v-if="ctxShown" class="ctxnums">
+                {{ ctxIsEstimate ? '约 ' : '' }}{{ fmtNum(ctxShownTokens) }} / {{ fmtNum(ctxWindowDisplay) }}{{ ctxWindowUnknown ? '（未配置，按 20 万算）' : '' }}
+              </span>
+              <span v-else class="ctxnums">{{ ctxEmptyHint }}</span>
             </span>
-            <!-- 批A-1：全自动压缩——用户只读水位三值（已用 / 窗口 / 自动触发线），没有任何手动入口。
-                 题5 甲：没读数就不摆「已用 — / 窗口 …」这种噪音，直接一句为什么 -->
-            <span v-if="ctxKnown" class="ctxsub">
-              已用 {{ fmtK(ctxTokens) }} / 窗口 {{ fmtK(ctxWindowDisplay) }}{{ ctxWindowUnknown ? '（未配置，按 20 万算）' : '' }} · 自动触发线 {{ fmtK(ctxTrigger) }}
-            </span>
-            <span v-else class="ctxsub">{{ ctxEmptyHint }}</span>
             <span class="ctxdiv" />
             <template v-if="billingMode === 'credits'">
               <!-- 业务批(1015) Q8：常显消费方式徽标——演示/实测"池子不动"的困惑根因=不知这轮扣哪本账 -->
@@ -285,24 +278,20 @@
               </span>
             </template>
             <span class="ctxdiv" />
-            <span
-              class="ctxrow"
-              :class="{ 'web-out': webOn && !webDisabled && webLeft <= 0 }"
-              :title="webDisabled ? '管理员未开放联网（额度为 0）' : `每天 ${webLimit} 次 · 明早 0 点恢复`"
-            >
-              <span class="cl">联网次数</span>
-              <span class="cbar"><i :style="{ width: webPct * 100 + '%' }" /></span>
-              <span>{{ webUsed }} / {{ webLimit }}</span>
-            </span>
-            <!-- m3 二轮 P1：「未开放(额度0)」≠「当日用完」，是状态不是解释——仅此一种保留副行 -->
-            <span v-if="webDisabled" class="ctxsub">未开放（额度为 0）</span>
-            <span class="ctxdiv" />
-            <!-- 业务反馈批1015b Q11：改回「缓存命中」+ 恢复平均值口径（用户原话"为什么没有
-                 缓存平均值了"）——今日平均（LiteLLU 口径样本<3 显 —），单行不动用副行（拍板=尽量简洁）
-                 快刀批 Q5：tooltip 人话化（拍板页 v4 口径——何时掉、为什么聊天场景天然低于编码） -->
-            <span class="ctxrow" title="缓存命中：模型不用重读前文的重复部分，直接用缓存结果——更快更省（缓存价约为原价一折）。这里显示今日平均（今天聊得还少时显示 —）。什么时候会掉：新会话第一轮必不命中；会话中途开联网、换模型会让缓存重新预热。聊天场景普遍在 5~8 成，属健康区间，编码工具的 9 成以上学不来（场景不同）。">
-              <span class="cl">缓存命中</span>
-              <span>{{ cacheHitText }}</span>
+            <!-- Q1 甲第三层（2026-11-09 拍板）：联网/缓存缩成一行小字——偶尔才看的数
+                 不该跟上下文抢同样的份量；精确说明全进 title hover。 -->
+            <span class="ctxfoot">
+              <span
+                :class="{ 'web-out': webOn && !webDisabled && webLeft <= 0 }"
+                :title="webDisabled ? '管理员未开放联网（额度为 0）' : `每天 ${webLimit} 次 · 明早 0 点恢复`"
+              >
+                联网 {{ webUsed }}/{{ webLimit }}{{ webDisabled ? '（未开放）' : '' }}
+              </span>
+              <span class="fs">·</span>
+              <span
+                title="缓存命中：模型不用重读前文的重复部分，直接用缓存结果——更快更省（缓存价约为原价一折）。这里显示今日平均（今天聊得还少时显示 —）。什么时候会掉：新会话第一轮必不命中；会话中途开联网、换模型会让缓存重新预热。聊天场景普遍在 5~8 成，属健康区间，编码工具的 9 成以上学不来（场景不同）。"
+                >缓存 {{ cacheHitText }}</span
+              >
             </span>
           </span>
         </button>
@@ -1007,7 +996,53 @@ const ctxWindow = computed(() => {
 const ctxKnown = computed(
   () => props.state.turns.length > 0 && (ctxTokens.value ?? 0) > 0 && (ctxWindow.value ?? 0) > 0
 );
-const ctxPct = computed(() => (ctxKnown.value ? Math.min(1, (ctxTokens.value as number) / (ctxWindow.value as number)) : 0));
+/* ---- Q2 甲（2026-11-09 拍板）：首轮那几秒先给估算 ----
+ * 真值来自「本会话最新一条带 tokens 的回答」，本轮没落库就没有；运行中前端也不问后端
+ * （refreshStatus 只在 sending 变 false 时跑）。所以先按已渲染文本推个量级：
+ * 中文 ≈ 1 字 1 token、英文数字 ≈ 4 字符 1 token，再加一个固定底座
+ * （系统提示词 + 工具 schema；实测本仓 8 轮闲聊读数 20K ≈ 底座 1 万 + 内容）。
+ * 展示时强制带「约 / 估算」，答完由真值替换——估算不装真值。 */
+const CTX_EST_BASE = 8000;
+function roughTokens(s: string): number {
+  if (!s) {
+    return 0;
+  }
+  let cjk = 0;
+  let other = 0;
+  for (const ch of s) {
+    if ((ch.codePointAt(0) ?? 0) >= 0x2e80) {
+      cjk += 1;
+    } else {
+      other += 1;
+    }
+  }
+  return cjk + Math.round(other / 4);
+}
+const ctxEstimate = computed<number | null>(() => {
+  if (ctxKnown.value || !((ctxWindow.value ?? 0) > 0)) {
+    return null;
+  }
+  const turns = props.state.turns;
+  if (!turns.length) {
+    return null; // 还没发出去=不估（空会话只该显示「待测」）
+  }
+  let n = 0;
+  for (const t of turns) {
+    n += roughTokens(t.question) + roughTokens(t.thinkText) + roughTokens(t.bufText);
+    for (const s of t.steps) {
+      n += roughTokens(s.argsText || '');
+      n += roughTokens((s.resultFull || s.brief || '').slice(0, 4000));
+    }
+  }
+  return CTX_EST_BASE + n;
+});
+/** 展示用：真值优先，没真值用估算（估算在场时模板上加「约 / 估算」标记） */
+const ctxShownTokens = computed<number | null>(() => ctxTokens.value ?? ctxEstimate.value);
+const ctxIsEstimate = computed(() => !ctxKnown.value && ctxEstimate.value !== null);
+const ctxShown = computed(() => ctxKnown.value || ctxIsEstimate.value);
+const ctxPct = computed(() =>
+  ctxShown.value ? Math.min(1, (ctxShownTokens.value as number) / (ctxWindow.value as number)) : 0
+);
 /** 自动压缩触发线（批A-1 水位三值）：与后端 AssistantCompactionPolicy 同公式——
  *  窗口 − min(模型输出额度, 21000) − 13000，下限 4000。后端按会话生效模型实算并随
  *  /status 下发（compactionTriggerTokens），前端优先采信后端实算值；拿不到时才按
@@ -1030,13 +1065,13 @@ const ctxTriggerPct = computed(() => {
   const w = ctxWindowDisplay.value;
   return w > 0 ? Math.min(1, ctxTrigger.value / w) : null;
 });
-/** 离自动压缩还有多远（环色只用它：>75% 橙 / >90% 红） */
+/** 离自动压缩还有多远（环色只用它：>75% 橙 / >90% 红）——估算值也参与，首轮环就该有颜色 */
 const ctxNearPct = computed(() => {
-  if (!ctxKnown.value) {
+  if (!ctxShown.value) {
     return 0;
   }
   const t = ctxTrigger.value;
-  const used = ctxTokens.value as number;
+  const used = ctxShownTokens.value as number;
   return t && t > 0 ? Math.min(1, used / t) : ctxPct.value;
 });
 /** 阈值变色（LibreChat 严格同档 >75 黄/>90 红；step5 P2-2：等号边界对齐不含） */
@@ -1047,7 +1082,7 @@ const ringColor = computed(() =>
 const ringFgStyle = computed(() => ({
   strokeDasharray: '56.5 56.5',
   strokeDashoffset: String(56.5 * (1 - ctxPct.value)),
-  stroke: ctxKnown.value ? ringColor.value : 'transparent'
+  stroke: ctxShown.value ? ringColor.value : 'transparent'
 }));
 const ctxBarStyle = computed(() => ({ width: ctxPct.value * 100 + '%', background: ringColor.value }));
 /** 额度哨兵点（不抢环色）：剩 <20% 橙 / 用完红（横幅照旧由抽屉弹）；
@@ -1088,20 +1123,52 @@ const ringAria = computed(() => {
 });
 /** 点击=悬停同款卡（细则④：触屏无 hover 也能看） */
 const ringCardOpen = ref(false);
+const ctxPopEl = ref<HTMLElement | null>(null);
 function toggleRingCard() {
   ringCardOpen.value = !ringCardOpen.value;
+  if (ringCardOpen.value) {
+    // 手机档（2026-11-09 实拍）：250px 的卡右锚在圆环上，390 宽会把左半截顶出屏。
+    // 打开后量一次，只往右推「超出量 + 8px 边距」，不猜容器宽度。
+    nextTick(() => {
+      const el = ctxPopEl.value;
+      if (!el) return;
+      el.style.transform = '';
+      const r = el.getBoundingClientRect();
+      const over = 8 - r.left;
+      if (over > 0) el.style.transform = `translateX(${Math.round(over)}px)`;
+    });
+  }
 }
-function fmtK(n?: number | null): string {
+/** Q3 甲（2026-11-09 拍板）：数字一律走中文习惯的「万/亿」——只认千的 fmtK 会把
+ *  一百万写成 1000K。一万以下给原数（千分位），全站读数只此一处口径。 */
+function fmtNum(n?: number | null): string {
   if (!n || n <= 0) {
     return '—';
   }
-  return n >= 1000 ? Math.round(n / 1000) + 'K' : String(n);
+  if (n >= 1e8) {
+    return (n / 1e8).toFixed(1).replace(/\.0$/, '') + '亿';
+  }
+  if (n >= 1e4) {
+    const v = n / 1e4;
+    return (v >= 100 ? v.toFixed(0) : v.toFixed(1)).replace(/\.0$/, '') + '万';
+  }
+  return n.toLocaleString('zh-CN');
 }
 /** 空态文案双分支（step5 P2-1）：缺分母（模型窗口未知）≠ 缺分子（会话无记录），
  *  老会话（改造前历史行无 tokens）与未配置窗口各自归因，不再一律「没有 token 记录」误导 */
 const ctxEmptyHint = computed(() =>
-  (ctxWindow.value ?? 0) <= 0 ? '模型上下文窗口未知（待管理员在模型配置补全后可测量）' : '本会话还没有可测量记录（回答完成后即显示）'
+  (ctxWindow.value ?? 0) <= 0 ? '模型上下文窗口未知（待管理员在模型配置补全后可测量）' : '这一轮还没开始（发一句话就有数：先估算，答完换成真值）'
 );
+/** 上下文块标题（Q4 甲 2026-11-09）：触发线不再当数字摆出来，只在 hover 里说明「条上竖线是什么」 */
+const ctxHeroTitle = computed(() => {
+  if (!ctxShown.value) {
+    return ctxEmptyHint.value;
+  }
+  const head = ctxIsEstimate.value
+    ? `本会话上下文估算 ${fmtNum(ctxShownTokens.value)} / ${fmtNum(ctxWindowDisplay.value)} tokens（首轮还没落库，答完换真值）`
+    : `本会话上下文占用 ${fmtNum(ctxShownTokens.value)} / ${fmtNum(ctxWindowDisplay.value)} tokens`;
+  return `${head} · 条上竖线=自动压缩位置 · 环变橙=接近压缩线 · 变红=即将压缩`;
+});
 
 /* ---- 题10 案1（2026-10-31）：联网搜索默认自动（模型判断搜不搜）+ 可停用 + 配额展示 ---- */
 const webOn = ref(true);
@@ -1126,7 +1193,6 @@ const cacheHitText = computed(() => {
   return v == null ? '—' : `${v}%`;
 });
 const webLeft = computed(() => Math.max(0, webLimit.value - webUsed.value));
-const webPct = computed(() => (webLimit.value > 0 ? Math.min(1, webUsed.value / webLimit.value) : 0));
 /** 租户把联网额度关到 0（m3 二轮 P1）：「未开放」≠「当日用完」——文案/红色状态条都不得承诺明早恢复 */
 const webDisabled = computed(() => webLimit.value <= 0);
 /** R1：用户级禁用闸（抽屉 banner='disabled' 传导）——输入只读+置灰，发送在 onSend 拦截 */
@@ -1348,7 +1414,8 @@ async function refreshStatus() {
 
 /* ===== 批A-1（2026-10-22 拍板 Q2-A）：手动压缩通道整体删除 =====
  * 原「打包前文」按钮与 /压缩 命令已下线——压缩只由后端中间件按模型窗口派生阈值自动触发。
- * 前端只读展示水位三值（已用 / 窗口 / 自动触发线），压缩后由上下文回落自动感知。 */
+ * 前端只读展示「已用 / 窗口」两个数（2026-11-09 Q4 甲：自动压缩位置只在条上给一道刻度），
+ * 压缩后由上下文回落自动感知。 */
 onMounted(() => {
   readWebOnSync();
   readSkillSync();
@@ -2680,15 +2747,10 @@ html.dark .brow .btool.bicon.wbtn.on {
   &:hover {
     border-color: var(--dcs-border-color);
   }
-  /* 原型 :focus-within：浅蓝边 #79bbff + 底 #fafbfc（无外圈 ring） */
+  /* Q5 甲（2026-11-07 拍板，照 ZCode）：聚焦不再额外变色——与悬停同一档，不加深、不加外圈、
+     不换底色；点进去只有光标在动，框本身不变（ZCode 悬停/聚焦共用同一档灰）。 */
   &.focus {
-    border-color: #79bbff;
-    background: #fafbfc;
-  }
-  /* 深色档不能用同一个 #fafbfc：字号色跟着 --el-text-color-primary 变成 #e4ecf4，
-     压在近白底上对比度只有 1.15:1——打了字看不见（三席实测）。底改成和容器同族的抬升层 */
-  html.dark &.focus {
-    background: var(--el-fill-color-light);
+    border-color: var(--dcs-border-color);
   }
   &.dragover {
     border: 1px dashed var(--el-color-primary);
@@ -2964,6 +3026,85 @@ html.dark .brow .btool.bicon.wbtn.on {
         font-weight: 600;
         color: var(--dcs-text-primary);
         margin-bottom: 7px;
+      }
+      /* Q1 甲 三段卡（2026-11-09 拍板）：① 上下文——大百分比 + 条 + 数字，一眼有落点。
+         百分比=已用/窗口（ZCode 同口径）；条上竖线=自动压缩位置（Q4 甲：不再念触发线数字） */
+      .ctxhero {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-areas:
+          'pct bar'
+          'nums nums';
+        align-items: center;
+        column-gap: 9px;
+        row-gap: 5px;
+
+        .ctxpct {
+          grid-area: pct;
+          font-size: 20px;
+          font-weight: 600;
+          line-height: 1.1;
+          color: var(--dcs-text-primary);
+          font-variant-numeric: tabular-nums;
+          white-space: nowrap;
+
+          /* Q2 甲的「约」标记：估算不是真值，必须自己说出来 */
+          .ctxest {
+            margin-left: 4px;
+            padding: 0 5px;
+            font-size: 9.5px;
+            font-style: normal;
+            font-weight: 500;
+            color: var(--el-color-warning);
+            border: 1px solid var(--el-color-warning-light-5, #f3d19e);
+            border-radius: 999px;
+            vertical-align: 3px;
+          }
+        }
+        .cbar {
+          grid-area: bar;
+          position: relative;
+          height: 6px;
+          border-radius: 3px;
+          background: var(--el-fill-color-light);
+          overflow: hidden;
+
+          i {
+            display: block;
+            height: 100%;
+            background: var(--el-color-primary);
+          }
+          &.ctxbar-tick b {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            margin-left: -1px;
+            background: var(--dcs-text-secondary, #909399);
+            opacity: 0.85;
+          }
+        }
+        .ctxnums {
+          grid-area: nums;
+          font-size: 10.5px;
+          line-height: 1.4;
+          color: var(--dcs-text-placeholder);
+        }
+      }
+      /* Q1 甲 第三层：联网/缓存合成一行小字（偶尔才看的数，不跟上下文抢份量） */
+      .ctxfoot {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 10.5px;
+        color: var(--dcs-text-placeholder);
+
+        .fs {
+          opacity: 0.6;
+        }
+        .web-out {
+          color: var(--el-color-danger);
+        }
       }
       .ctxrow {
         display: flex;
