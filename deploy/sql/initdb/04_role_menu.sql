@@ -1,0 +1,309 @@
+-- 角色菜单绑定：
+-- 5 成员=验证过的收窄集；6 租户管理员=成员集+任务管理/画像/审核队列；7 文件审核员=风控审核族
+-- role 5 成员
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (5, 1),
+  (5, 100),
+  (5, 101),
+  (5, 102),
+  (5, 103),
+  (5, 104),
+  (5, 105),
+  (5, 106),
+  (5, 107),
+  (5, 108),
+  (5, 118),
+  (5, 123),
+  (5, 130),
+  (5, 131),
+  (5, 133),
+  (5, 500),
+  (5, 501),
+  (5, 1001),
+  (5, 1002),
+  (5, 1003),
+  (5, 1004),
+  (5, 1005),
+  (5, 1006),
+  (5, 1007),
+  (5, 1008),
+  (5, 1009),
+  (5, 1010),
+  (5, 1011),
+  (5, 1012),
+  (5, 1013),
+  (5, 1014),
+  (5, 1015),
+  (5, 1016),
+  (5, 1017),
+  (5, 1018),
+  (5, 1019),
+  (5, 1020),
+  (5, 1021),
+  (5, 1022),
+  (5, 1023),
+  (5, 1024),
+  (5, 1025),
+  (5, 1026),
+  (5, 1027),
+  (5, 1028),
+  (5, 1029),
+  (5, 1030),
+  (5, 1031),
+  (5, 1032),
+  (5, 1033),
+  (5, 1034),
+  (5, 1035),
+  (5, 1036),
+  (5, 1037),
+  (5, 1038),
+  (5, 1039),
+  (5, 1040),
+  (5, 1041),
+  (5, 1042),
+  (5, 1043),
+  (5, 1044),
+  (5, 1045),
+  (5, 1050),
+  (5, 1061),
+  (5, 1062),
+  (5, 1063),
+  (5, 1064),
+  (5, 1065),
+  (5, 1600),
+  (5, 1601),
+  (5, 1602),
+  (5, 1603),
+  (5, 1620),
+  (5, 1621),
+  (5, 1622),
+  (5, 1623),
+  (5, 9000),
+  (5, 9005),
+  (5, 9020),
+  (5, 9150),
+  (5, 9160),
+  (5, 9161),
+  (5, 9040),
+  (5, 11920),
+  (5, 11921),
+  (5, 11922),
+  (5, 11923),
+  (5, 11928),
+  (5, 11930),
+  (5, 11960),
+  (5, 11961);
+
+-- role 6 租户管理员(全审 glm53 P1: 补 dcs:task:add/edit/publish 三按钮 11963/11964/11965,
+-- 否则租户管理员的发布人主流程整体 403)
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (6, 1),
+  (6, 100),
+  (6, 101),
+  (6, 102),
+  (6, 103),
+  (6, 104),
+  (6, 105),
+  (6, 106),
+  (6, 107),
+  (6, 108),
+  (6, 118),
+  (6, 123),
+  (6, 130),
+  (6, 131),
+  (6, 133),
+  (6, 500),
+  (6, 501),
+  (6, 1001),
+  (6, 1002),
+  (6, 1003),
+  (6, 1004),
+  (6, 1005),
+  (6, 1006),
+  (6, 1007),
+  (6, 1008),
+  (6, 1009),
+  (6, 1010),
+  (6, 1011),
+  (6, 1012),
+  (6, 1013),
+  (6, 1014),
+  (6, 1015),
+  (6, 1016),
+  (6, 1017),
+  (6, 1018),
+  (6, 1019),
+  (6, 1020),
+  (6, 1021),
+  (6, 1022),
+  (6, 1023),
+  (6, 1024),
+  (6, 1025),
+  (6, 1026),
+  (6, 1027),
+  (6, 1028),
+  (6, 1029),
+  (6, 1030),
+  (6, 1031),
+  (6, 1032),
+  (6, 1033),
+  (6, 1034),
+  (6, 1035),
+  (6, 1036),
+  (6, 1037),
+  (6, 1038),
+  (6, 1039),
+  (6, 1040),
+  (6, 1041),
+  (6, 1042),
+  (6, 1043),
+  (6, 1044),
+  (6, 1045),
+  (6, 1050),
+  (6, 1061),
+  (6, 1062),
+  (6, 1063),
+  (6, 1064),
+  (6, 1065),
+  (6, 1600),
+  (6, 1601),
+  (6, 1602),
+  (6, 1603),
+  (6, 1620),
+  (6, 1621),
+  (6, 1622),
+  (6, 1623),
+  (6, 9000),
+  (6, 9001), (6, 11963), (6, 11964), (6, 11965),
+  (6, 9005),
+  (6, 9020),
+  (6, 9150),
+  (6, 9160),
+  (6, 9161),
+  (6, 9170),
+  (6, 9171),
+  (6, 9172),
+  (6, 9040),
+  (6, 9070),
+  (6, 11920),
+  (6, 11921),
+  (6, 11922),
+  (6, 11923),
+  (6, 11928),
+  (6, 11930),
+  (6, 11960),
+  (6, 11961),
+  (6, 11970);
+
+-- role 7 文件审核员（N3：公告 + 更新日志只读，与 migration 的“所有有效角色”口径一致）
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (7, 1602),
+  (7, 9007),
+  (7, 9101),
+  (7, 9102),
+  (7, 9103),
+  (7, 9150),
+  (7, 9160),
+  (7, 9161);
+
+-- 2026-10-19 画像管理按钮权限(超级管理员 / 租户管理员)
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 11971), (1, 11972),
+  (6, 11971), (6, 11972);
+
+-- 2026-10-19 画像协议 / 事件 Schema 权限(超级管理员 / 租户管理员)
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 11973), (1, 11974), (1, 11975), (1, 11976),
+  (6, 11973), (6, 11974), (6, 11975), (6, 11976);
+
+-- 2026-10-19 画像工作室(维度/规则治理)
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 11977), (1, 11978), (1, 11979),
+  (6, 11977), (6, 11978), (6, 11979);
+
+-- 2026-10-19 画像 RFM / 分群 / 低分复核
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 11980), (1, 11981), (1, 11982), (1, 11983), (1, 11984), (1, 11985),
+  (6, 11980), (6, 11981), (6, 11982), (6, 11983), (6, 11984), (6, 11985);
+
+
+
+-- 2026-10-20 菜单 IA：画像与分析独立顶级组（双引擎定位；迁移自任务中心）
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 12000),
+  (6, 12000);
+
+-- 2026-10-20 批11 安全合规：合规中心 + 列级权限按钮（只授超管；列级三权限不授普通角色=默认打码视图）
+INSERT INTO sys_role_menu (role_id, menu_id) VALUES
+  (1, 12010), (1, 12011), (1, 12012), (1, 12013), (1, 12014),
+  (1, 12015), (1, 12016), (1, 12017);
+
+-- 画像方向重构第一批: 折叠组目录 12018 授权(超管+member, 与其子菜单一致)
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 1, 12018 WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 1 AND menu_id = 12018);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 12018 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 12018);
+
+-- 画像方向重构第一批(三审 glm53/dspro 回修): 折叠组/宿主补绑与死角色清理,
+-- 与 migration/2026-10-27_direction_b1_menu_collapse.sql 第 7-8 步同构(适配既有绑定)
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12018 FROM public.sys_role_menu rm
+WHERE rm.menu_id IN (11979, 11980, 11981, 12001, 12010, 12002, 11989)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12018);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12001 FROM public.sys_role_menu rm
+WHERE rm.menu_id IN (12002, 11989)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12001);
+-- 低分复核(11982)→用户画像(9070) 宿主保证: 只授过复核没授过画像页的角色补画像页入口
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 9070 FROM public.sys_role_menu rm
+WHERE rm.menu_id = 11982
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 9070);
+-- 12019(来源改名停用)「跟随 11989 授权」块已随单源重构批末移除: 该按钮位与后端写端点一并退役,
+-- 升级库由 migration/2026-10-28_singlesource_m1_closeout.sql 负责 DELETE 清理
+DELETE FROM public.sys_role_menu rm
+WHERE rm.menu_id = 12018
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role r WHERE r.role_id = rm.role_id);
+
+-- 单源重构第一批(题4): 引擎管理页签对租户管理员开放
+-- 修复权限错位: 发布按钮 profile:event:publish(11971)授了角色1+6, 页签入口 profile:engine:query(11989)只授角色1,
+-- 租户管理员有发布权却进不去测试发送页(死按钮)。只开页面与页签, 重算/Schema/来源改写按钮不随此开放。
+-- 与 migration/2026-10-28_singlesource_m1_engine_tab.sql 同构(升级库/全新装口径一致)
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 12001 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 12001);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 11989 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 11989);
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, 12020 WHERE EXISTS (SELECT 1 FROM public.sys_role WHERE role_id = 6)
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_id = 6 AND menu_id = 12020);
+
+-- 批3(2026-11-03): 智能体工作台入口 agentws:workspace:use(12060) 按「已绑 AI 助手会话 11920」派生
+-- （全新装=角色 5/6；与 migration/2026-11-03_agent_workspace_menu.sql 同构，升级库/全新装口径一致）
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12060
+FROM public.sys_role_menu rm
+JOIN public.sys_role r ON r.role_id = rm.role_id
+WHERE rm.menu_id = 11920
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12060);
+
+-- 工作台设置页审计分节（2026-11-05 拍板 A3/题5 乙）：F 型权限行 12061 显式授给管理员
+-- （租户管理员 + 自定义 admin 角色），成员角色 5 不授；业务审计菜单 11936 保持 0 绑定
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT r.role_id, 12061
+FROM public.sys_role r
+WHERE r.role_key IN ('admin', 'tenant_admin')
+  AND r.del_flag = '0'
+  AND r.status = '0'
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = r.role_id AND x.menu_id = 12061);
+
+-- 自动化任务（2026-11-05 拍板 题3 甲：全员可建、只看自己的）：权限载体 12062 按
+-- 「已绑 AI 助手会话 11920」派生（成员/租户管理员都有；与 migration 同口径）
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT DISTINCT rm.role_id, 12062
+FROM public.sys_role_menu rm
+JOIN public.sys_role r ON r.role_id = rm.role_id
+WHERE rm.menu_id = 11920
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12062);

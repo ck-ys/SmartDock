@@ -1,0 +1,6 @@
+# 部署目录里只提交「配方」，运行时产物一律不入库
+.env
+data/
+logs/
+backups/
+release/

@@ -18,11 +18,19 @@ psql -d smartdock -f 06_profile_protocol.sql     # 画像接入协议与内置�
 psql -d smartdock -f 07_analytics.sql            # 分析中心：会话/日汇总/漏斗（可重复执行）
 ```
 
+> ⚠ **07 跑完还没完：必须再按文件名序跑一遍 `../migration/`**（2026-11-08 修正）。
+> 基线是某次从线上库导出的快照，**不含 batch10 之后新增的 4 张表**——
+> `analytics_rebuild_log` / `analytics_replay_task` / `analytics_visitor_first_seen` /
+> `profile_event_archive`（代码里有 Mapper，缺表会报「relation does not exist」）。
+> 这 4 张只存在 `../migration/2026-10-20_batch10_lifecycle.sql` 里。
+> 合并版见 `deploy/sql/initdb/08_migrations.sql`（本目录 01..07 + 全部迁移拼成一份，可直接 `psql -f`）；
+> 装完跑 `deploy/sql/verify-schema.sql` 自检：输出 0 行 = 117 张表齐全。
+
 ## 已有库升级
 
-基线只用于空库安装（本基线即完整安装来源，不依赖任何增量迁移）。已经在跑的库
-请在备份后，按**文件名日期顺序**执行 `../migration/` 目录下的增量脚本——只跑
-上次升级之后新增的那些即可（脚本幂等，全量重放也安全）：
+基线用于空库安装；**空库装完同样要补跑迁移**（原因见上面的 ⚠），否则会缺
+batch10 之后新增的表。已经在跑的库请在备份后，按**文件名日期顺序**执行
+`../migration/` 目录下的增量脚本——只跑上次升级之后新增的那些即可（脚本幂等，全量重放也安全）：
 
 ```bash
 # 示例：从未执行过任何增量的老库，按文件名顺序执行 migration/ 下全部脚本
@@ -62,4 +70,5 @@ done
 - AI 供应商接入（`dcs_ai_provider_access` / `dcs_ai_config`）**不含种子**——装好后在
   「AI 配置」页录入自己的 API Key；联网搜索 Key 走 `sys_config` 同样装后配置。
 - 应用启动对库的额外要求：`agentscope` schema（01 内已建）。
-- 本基线即完整安装来源，不依赖任何增量迁移。
+- 本基线是**结构快照**，不是最终形态：装完必须再跑 `../migration/`（见开头 ⚠），
+  合并好的版本在 `deploy/sql/initdb/`（00 扩展 + 01..07 + 08 迁移）。

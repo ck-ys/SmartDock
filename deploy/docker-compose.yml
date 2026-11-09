@@ -2,7 +2,9 @@ name: smartdock
 
 # SmartDock 一键部署（教科书口径）：postgres + redis + minio + backend + frontend
 # 首次启动前：先构建产物（backend: mvn package；frontend: npm run build:prod），
-# PostgreSQL 首次初始化会自动按序执行 ../backend/script/sql/baseline/ 的 7 个 SQL（含 05 演示数据；不需要时首次启动前移出该文件）。
+# PostgreSQL 首次初始化会自动按文件名序执行 sql/initdb/：00 扩展 + 01..07 基线 + 08 迁移
+# （08 是把 backend/script/sql/migration/ 全部脚本拼成的一份；基线快照缺 batch10 之后的 4 张表，
+#   不跑 08 会报表不存在。含 05 演示数据，不要演示数据时首次启动前移出该文件）。
 
 services:
   postgres:
@@ -16,7 +18,7 @@ services:
       PGTZ: Asia/Shanghai
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
-      - ../backend/script/sql/baseline:/docker-entrypoint-initdb.d:ro
+      - ./sql/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d smartdock"]
       interval: 10s
