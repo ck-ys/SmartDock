@@ -333,3 +333,30 @@ export function renderMd(text: string): string {
   closeQuote();
   return out.join('\n');
 }
+
+/**
+ * Q6 丙（2026-11-07 拍板）：把正文里的 [n] 包成可点的引用标记（.refn），与来源列表互相跳转。
+ * 只处理「非代码区」：先按 <pre>/<code> 切片，奇数位是代码区，原样跳过——
+ * 否则数组下标 a[0]、日志 [12] 会被误标成引用。n 超出实际来源数同样原样保留。
+ * 2026-11-09 代码席 P2 回修：标签本身也要单独切出来原样保留——否则
+ * 表格 cell 的 title="…[1]…"、dcs-link 的 title、data-chart 里的 [3] 会被塞进
+ * <span class="refn" …> 把属性串截断（引号提前闭合），属性值被写坏、图表解析失败。
+ */
+export function linkRefs(html: string, max: number): string {
+  if (!max || !html) {
+    return html;
+  }
+  return html
+    .split(/(<pre[\s\S]*?<\/pre>|<code[\s\S]*?<\/code>|<[^>]*>)/i)
+    .map((seg) => {
+      // 代码块整段（含内部标签）、以及任何单个标签（<p> / <td title="…">）都原样放回
+      if (/^<(?:pre|code)[\s>]/i.test(seg) || /^<[^>]*>$/.test(seg)) {
+        return seg;
+      }
+      return seg.replace(/\[(\d{1,2})\]/g, (m, d: string) => {
+        const n = Number(d);
+        return n >= 1 && n <= max ? `<span class="refn" data-ref="${n}" title="第 ${n} 条来源">[${n}]</span>` : m;
+      });
+    })
+    .join('');
+}

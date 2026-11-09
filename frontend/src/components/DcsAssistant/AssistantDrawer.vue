@@ -71,8 +71,8 @@
           <div class="fp-list" aria-label="会话列表">
             <!-- DP-1 原型 renderSessions：📌 置顶组 + 今天/昨天分组；R4 二改：分组头带计数、
                  「更早」收折叠条（默认收起，搜索/当前会话命中时自动展开），时间改分组感知口径 -->
-            <template v-for="g in fpGroupsTop" :key="g.label">
-              <div class="fp-grp">
+            <template v-for="g in fpGroupsTop" :key="g.label || 'running'">
+              <div v-if="g.label" class="fp-grp">
                 <IconSpan v-if="g.label === '置顶'" name="map-pin" :size="11" />
                 <span>{{ g.label }}</span>
                 <span class="g-badge">{{ g.items.length }}</span>
@@ -84,8 +84,7 @@
                 :class="{ on: c.threadId === state.threadId, pin: pins.includes(String(c.id)) }"
                 @click="onFpOpen(c)"
               >
-                <span v-if="fpRowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
-                <span v-else-if="fpRowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
+                <span v-if="fpRowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
                 <span v-else-if="fpActive(c)" class="sdot" title="最近活跃" />
                 <div class="fp-mid">
                   <div class="fp-t">
@@ -102,7 +101,10 @@
                     />
                     <template v-else>{{ displayTitle(c) }}</template>
                   </div>
-                  <div class="fp-time">{{ fpRowStatus(c) === 'answering' ? '正在回答…' : fpDayTime(c.lastMessageTime) }}</div>
+                  <div class="fp-time">
+                    <span v-if="fpRowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="14" /></span>
+                    {{ fpDayTime(c.lastMessageTime) }}
+                  </div>
                 </div>
                 <button v-if="renamingId !== c.id" class="fp-more" title="会话操作" aria-label="会话操作" @click.stop="openSessMenu(c)">⋯</button>
                 <!-- DP-1 原型 sessMenu：重命名/置顶/归档（Q8=B 拍板不补删除） -->
@@ -130,10 +132,12 @@
                 :class="{ on: c.threadId === state.threadId, pin: pins.includes(String(c.id)) }"
                 @click="onFpOpen(c)"
               >
-                <span v-if="fpRowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
                 <div class="fp-mid">
                   <div class="fp-t">{{ displayTitle(c) }}</div>
-                  <div class="fp-time">{{ fpRowStatus(c) === 'answering' ? '正在回答…' : fpDayTime(c.lastMessageTime) }}</div>
+                  <div class="fp-time">
+                    <span v-if="fpRowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="14" /></span>
+                    {{ fpDayTime(c.lastMessageTime) }}
+                  </div>
                 </div>
                 <button class="fp-more" title="会话操作" aria-label="会话操作" @click.stop="openSessMenu(c)">⋯</button>
               </div>
@@ -562,13 +566,26 @@ const fpGroups = computed(() => {
   );
   const isPin = (c: FpConv) => pins.value.includes(String(c.id));
   const groups: Array<{ label: string; items: FpConv[] }> = [];
-  const pinned = live.filter(isPin).sort((a, b) => pins.value.indexOf(String(a.id)) - pins.value.indexOf(String(b.id)));
+  // Q4 甲（照 ZCode）：运行中的行浮到最上（含置顶组之上），不新建分组标题；
+  // 运行层用创建序（id 单调）稳定排序，跳过流式事件刷新导致的换位
+  const running = live.filter((c) => fpRowStatus(c) === 'answering').sort((a, b) => {
+    const na = Number(a.id);
+    const nb = Number(b.id);
+    return Number.isFinite(na) && Number.isFinite(nb) ? na - nb : String(a.id).localeCompare(String(b.id));
+  });
+  const runIds = new Set(running.map((c) => String(c.id)));
+  if (running.length) {
+    groups.push({ label: '', items: running });
+  }
+  const pinned = live
+    .filter((c) => !runIds.has(String(c.id)) && isPin(c))
+    .sort((a, b) => pins.value.indexOf(String(a.id)) - pins.value.indexOf(String(b.id)));
   if (pinned.length) {
     groups.push({ label: '置顶', items: pinned });
   }
   const td = new Date().toDateString();
   const yd = new Date(Date.now() - 86400_000).toDateString();
-  const norms = live.filter((c) => !isPin(c));
+  const norms = live.filter((c) => !runIds.has(String(c.id)) && !isPin(c));
   for (const [label, gi] of [
     ['今天', 0],
     ['昨天', 1],
@@ -724,18 +741,21 @@ function fpActive(c: { lastMessageTime?: string }): boolean {
  *  answering 只认生产相位（thinking/acting/writing）——done/error/waiting 时 sending
  *  可能尚未翻 false（收尾落账窗口），照转就是 lobehub masked-tail「内容停了圈还转」 */
 function fpRowStatus(c: { threadId?: string; running?: boolean }): 'answering' | 'error' | 'ok' {
+  const last = c.threadId === state.threadId ? state.turns[state.turns.length - 1] : null;
   if (state.sending && c.threadId === state.threadId) {
-    const last = state.turns[state.turns.length - 1];
     if (last && (last.phase === 'thinking' || last.phase === 'acting' || last.phase === 'writing')) {
       return 'answering';
     }
   }
-  if (c.threadId === state.threadId && state.turns[state.turns.length - 1]?.phase === 'error') {
+  if (c.threadId === state.threadId && last?.phase === 'error') {
     return 'error';
   }
   // 业务批4 Q4：远端在途（run 表 RUNNING 回填）——刷新/重开后本窗无 sending 内存态，
   // 侧栏转圈改吃接口标志；本地 error 优先级更高（真错压过远端迟到的 running）
-  if (c.running) {
+  // Q4 甲（2026-11-07）：本地已终态（done/stopped/waiting）时，旧列表里的 running 不顶回转圈——
+  // 服务端 run 行收尾落库有延迟，照吃就是「内容停了圈还在转」
+  const localTerminal = !!last && ['done', 'stopped', 'waiting'].includes(last.phase);
+  if (c.running && !localTerminal) {
     return 'answering';
   }
   return 'ok';
@@ -2317,6 +2337,10 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
       flex: none;
       font-size: 10.5px;
       color: var(--dcs-text-secondary);
+      /* Q4 甲：转圈与相对时间同一行、居中对齐 */
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     .fp-more {
       border: none;

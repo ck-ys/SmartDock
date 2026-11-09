@@ -21,6 +21,7 @@ import { getAgentPrefs, lastUseKey } from './prefsStore';
 import { createAguiClient, type AguiClientOptions, type AguiTurnHandle } from '@/api/dcs/assistant/aguiClient';
 import {
   getPendingHitl,
+  getPendingAskUser,
   getConversationTodo,
   getFollowups,
   revokeAssistantAction,
@@ -31,6 +32,7 @@ import type { AguiResume } from '@/api/dcs/assistant/types';
 import { humanizeAiError } from '@/utils/aiErrorText';
 import type { AguiHandlers, AguiMessage, AguiRunInput } from '@/api/dcs/assistant/types';
 import { renderMd } from './md';
+import { parseToolJson } from './toolJson';
 
 /** 批5 Q7-3：追问拉取递进间隔（侧车写库实测比 done 慢 2~8s）。
  *  业务反馈批1015b Q2：累计窗口 18s→30s——侧车生成允许跑到 45s，前端 18s 就放弃
@@ -721,12 +723,58 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
   }
 
+  /**
+   * Q2 甲（2026-11-07 拍板）：思考增量 16ms 合帧。
+   * 直连 SSE 时每个 delta 都写响应式字段 → 思考区每帧重排（展开态一跳一跳）。
+   * 这里按「段 id → 待落账文本」缓冲，16ms 一次写回；结构事件（开新段/结束/工具/正文/收尾）
+   * 先冲刷，保证时间线与文本顺序不错位。单测同步调用时靠结构事件与收尾兜底，不用等定时器。
+   */
+  type ThinkBuffer = { pending: Map<string, string>; timer: ReturnType<typeof setTimeout> | null };
+  const thinkBuffers = new Map<string, ThinkBuffer>();
+  function bufferOf(turn: AssistantTurn): ThinkBuffer {
+    let b = thinkBuffers.get(turn.id);
+    if (!b) {
+      b = { pending: new Map(), timer: null };
+      thinkBuffers.set(turn.id, b);
+    }
+    return b;
+  }
+  function flushThink(turn: AssistantTurn) {
+    const b = thinkBuffers.get(turn.id);
+    if (!b) {
+      return;
+    }
+    if (b.timer) {
+      clearTimeout(b.timer);
+      b.timer = null;
+    }
+    if (b.pending.size === 0) {
+      return;
+    }
+    for (const [segId, text] of b.pending) {
+      const seg = turn.thinkSegs.find((s) => s.id === segId);
+      if (seg) {
+        seg.text += text;
+      }
+      turn.thinkText += text;
+    }
+    b.pending.clear();
+  }
+  function queueThink(turn: AssistantTurn, segId: string, delta: string) {
+    const b = bufferOf(turn);
+    b.pending.set(segId, (b.pending.get(segId) ?? '') + delta);
+    if (!b.timer) {
+      b.timer = setTimeout(() => flushThink(turn), 16);
+    }
+  }
+
   function handlers(turn: AssistantTurn): AguiHandlers {
     return {
       // R3(2026-10-10 拍板A)：思考分段——START 到达即开新段（上一段已 done 才开，防重复 START 双段）；
       // 段的 seq 取模块级 evSeq（与 onToolStart 同一计数器，跨 resume 轮单调不回卷），
       // 渲染层据此把每段思考插在它发生的时刻（think①→工具①→think②），不再拼成一坨置顶
       onReasoningStart: () => {
+        flushThink(turn); // 上一段的尾巴先落账，避免「新段已开、旧段还在缓冲」
         const last = turn.thinkSegs[turn.thinkSegs.length - 1];
         if (!last || last.done) {
           /* Q16 首段起点取回合起点：START 事件常比 phase=thinking 晚 2–6 秒到达（模型先想再吐字），
@@ -745,11 +793,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           last = { id: 'th' + ++seq, text: '', done: false, startedAt: startAt, durMs: 0, seq: evSeq++ };
           turn.thinkSegs.push(last);
         }
-        last.text += delta;
-        turn.thinkText += delta; // 旧拼接口径保留（tpeek 折叠偷看等消费方零改动）
+        queueThink(turn, last.id, delta);
         turn.thinkActive = true;
       },
       onReasoningEnd: () => {
+        flushThink(turn);
         const last = turn.thinkSegs[turn.thinkSegs.length - 1];
         if (last && !last.done) {
           last.done = true;
@@ -761,6 +809,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         turn.thinkDurMs = turn.thinkSegs.reduce((sum, s) => sum + (s.durMs || 0), 0) || turn.thinkDurMs;
       },
       onToolStart: (id, name) => {
+        flushThink(turn);
         turn.phase = turn.phase === 'writing' ? 'writing' : 'acting';
         turn.steps.push({
           id,
@@ -783,6 +832,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         }
       },
       onToolResult: (id, content) => {
+        flushThink(turn);
         let s = turn.steps.find((x) => x.id === id);
         if (!s) {
           // HITL resume 轮：结果事件的 toolCallId 属于被打断的原回合步骤——回填原步骤，
@@ -801,8 +851,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           // （http/https）+8 条上限+解析失败静默；正文外链维持纯文本，受控来源卡是唯一外链出口
           if (s.name === 'web_search') {
             try {
-              const j = JSON.parse(content) as { rows?: Array<{ name?: string; url?: string; siteName?: string }> };
-              const picked = (j.rows ?? [])
+              // 2026-11-09 实测修正：后端这里的 content 是**双层编码** JSON（parse 一次得到
+              // 字符串，真机看到 `"{\"asOf\":...}"`）——原来只 JSON.parse 一次，rows 永远取不到，
+              // 来源区在真环境下从未出现过。统一走 parseToolJson（双层兼容 + 雪花 ID 保真）。
+              const j = parseToolJson(content) as { rows?: Array<{ name?: string; url?: string; siteName?: string }> } | null;
+              const picked = (j?.rows ?? [])
                 .filter((r) => typeof r?.url === 'string' && /^https?:\/\//i.test(r.url))
                 .map((r) => ({
                   title: String(r.name ?? r.url ?? ''),
@@ -825,6 +878,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         }
       },
       onTextStart: () => {
+        flushThink(turn);
         if (turn.phase !== 'writing') {
           turn.phase = 'writing';
         }
@@ -929,39 +983,56 @@ export function useAssistant(options: UseAssistantOptions = {}) {
             });
           }
         } else if (name === 'ask_user' && value && typeof value === 'object') {
-          // 题12 案1：内置结构化反问（ask_user 工具在飞挂起，run 保持 RUNNING）——
-          // 卡片随本回合渲染，作答走独立端点；坏载荷/已收过的 id 直接忽略
-          const v = value as { id?: unknown; questions?: unknown; remainingMs?: unknown };
-          if (typeof v.id === 'string' && v.id && !turn.askUsers.some((c) => c.id === v.id)) {
-            const qs = (Array.isArray(v.questions) ? v.questions : [])
-              .filter((q) => q && typeof q === 'object')
-              .slice(0, 4)
-              .map((q) => {
-                const one = q as { question?: unknown; header?: unknown; options?: unknown; multiSelect?: unknown };
-                return {
-                  question: typeof one.question === 'string' ? one.question : '',
-                  header: typeof one.header === 'string' && one.header ? one.header : '请选择',
-                  options: (Array.isArray(one.options) ? one.options : [])
-                    .filter((o) => o && typeof o === 'object')
-                    .slice(0, 4)
-                    .map((o) => {
-                      const op = o as { label?: unknown; description?: unknown };
-                      return {
-                        label: typeof op.label === 'string' ? op.label : '',
-                        ...(typeof op.description === 'string' && op.description ? { description: op.description } : {})
-                      };
-                    })
-                    .filter((o) => o.label),
-                  multiSelect: one.multiSelect === true
-                };
-              })
-              .filter((q) => q.question && q.options.length >= 2);
-            if (qs.length > 0) {
-              turn.askUsers.push({
-                id: v.id,
-                questions: qs,
-                remainingMs: typeof v.remainingMs === 'number' ? v.remainingMs : 240_000
-              });
+          // 题12 案1 + Q4 甲：内置结构化反问（ask_user 工具在飞挂起，run 保持 RUNNING）——
+          // 卡片随本回合渲染，作答走独立端点；同一 id 的重复帧（即时推帧 + 事件批兜底）
+          // 只更新时长/停表状态，不再重复插卡。
+          const v = value as {
+            id?: unknown; questions?: unknown; remainingMs?: unknown; deadlineAt?: unknown;
+            snoozed?: unknown; autoContinue?: unknown; countdownWindowSeconds?: unknown;
+          };
+          if (typeof v.id === 'string' && v.id) {
+            const existing = turn.askUsers.find((c) => c.id === v.id);
+            if (existing) {
+              if (typeof v.remainingMs === 'number') existing.remainingMs = v.remainingMs;
+              if (typeof v.deadlineAt === 'number') existing.deadlineAt = v.deadlineAt;
+              if (typeof v.snoozed === 'boolean') existing.snoozed = v.snoozed;
+              if (typeof v.autoContinue === 'boolean') existing.autoContinue = v.autoContinue;
+              if (typeof v.countdownWindowSeconds === 'number') existing.countdownWindowSeconds = v.countdownWindowSeconds;
+            } else {
+              const qs = (Array.isArray(v.questions) ? v.questions : [])
+                .filter((q) => q && typeof q === 'object')
+                .slice(0, 4)
+                .map((q) => {
+                  const one = q as { question?: unknown; header?: unknown; options?: unknown; multiSelect?: unknown };
+                  return {
+                    question: typeof one.question === 'string' ? one.question : '',
+                    header: typeof one.header === 'string' && one.header ? one.header : '请选择',
+                    options: (Array.isArray(one.options) ? one.options : [])
+                      .filter((o) => o && typeof o === 'object')
+                      .slice(0, 4)
+                      .map((o) => {
+                        const op = o as { label?: unknown; description?: unknown };
+                        return {
+                          label: typeof op.label === 'string' ? op.label : '',
+                          ...(typeof op.description === 'string' && op.description ? { description: op.description } : {})
+                        };
+                      })
+                      .filter((o) => o.label),
+                    multiSelect: one.multiSelect === true
+                  };
+                })
+                .filter((q) => q.question && q.options.length >= 2);
+              if (qs.length > 0) {
+                turn.askUsers.push({
+                  id: v.id,
+                  questions: qs,
+                  remainingMs: typeof v.remainingMs === 'number' ? v.remainingMs : 300_000,
+                  ...(typeof v.deadlineAt === 'number' ? { deadlineAt: v.deadlineAt } : {}),
+                  ...(typeof v.snoozed === 'boolean' ? { snoozed: v.snoozed } : {}),
+                  ...(typeof v.autoContinue === 'boolean' ? { autoContinue: v.autoContinue } : {}),
+                  ...(typeof v.countdownWindowSeconds === 'number' ? { countdownWindowSeconds: v.countdownWindowSeconds } : {})
+                });
+              }
             }
           }
         } else if (name === 'todo' && value && typeof value === 'object') {
@@ -1031,6 +1102,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         }
       },
       onFinished: (outcome) => {
+        flushThink(turn);
+        thinkBuffers.delete(turn.id);
         // PD-5(2026-10-07 试点走查): SDK 错误=RAW 帧转 onRunError 后仍会紧跟 RUN_FINISHED
         // 收尾(如准入闸限流 429), error 态在此直接收尾——不得被 FINISHED 盖回 done「已回答」
         if (turn.phase === 'error') {
@@ -2344,6 +2417,44 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     const restoreTid = threadId && threadId.length > 8 ? threadId : state.threadId;
     if (restoreTid && restoreTid.length > 8) {
       void restorePendingHitl(restoreTid);
+      // Q4 甲：反问卡刷新续走——查 pending 补卡/续时，不再依赖重放旧帧
+      void restorePendingAskUser(restoreTid);
+    }
+  }
+
+  /**
+   * Q4 甲：刷新后补反问卡——查后端当前队首卡（带绝对到期时刻/停表状态），
+   * 补到尾部回合；已有同 id 卡则只更新时长，避免重复插卡。
+   */
+  async function restorePendingAskUser(threadId: string) {
+    const myGen = convGen;
+    try {
+      const raw = (await getPendingAskUser(threadId)) as unknown as
+        | { data?: import('@/api/dcs/assistant').AssistantAskUserCard | null }
+        | import('@/api/dcs/assistant').AssistantAskUserCard
+        | null;
+      const card = raw && typeof raw === 'object' && 'data' in raw
+        ? (raw as { data?: import('@/api/dcs/assistant').AssistantAskUserCard | null }).data
+        : (raw as import('@/api/dcs/assistant').AssistantAskUserCard | null);
+      if (!card || !card.id || myGen !== convGen) {
+        return;
+      }
+      const last = state.turns[state.turns.length - 1];
+      if (!last) {
+        return;
+      }
+      const existing = last.askUsers.find((c) => c.id === card.id);
+      if (existing) {
+        Object.assign(existing, card);
+        return;
+      }
+      last.askUsers.push(card);
+    } catch (e) {
+      // 无卡/409/网络异常都按「没有待答反问」处理，不阻塞历史回放
+      const code = (e as { code?: number })?.code;
+      if (code) {
+        console.warn(`[assistant] 待答反问探测被拒(code=${code})，按无卡继续回放`);
+      }
     }
   }
 

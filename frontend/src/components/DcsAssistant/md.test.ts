@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMd, renderStream } from './md';
+import { renderMd, renderStream, linkRefs } from './md';
 
 /** 批E 视觉审查 FAIL 回归锁：md 表格必须渲染为 <table>（管道符原样输出=乱码不可读） */
 describe('renderMd 表格白名单', () => {
@@ -255,5 +255,54 @@ describe('renderStream 流式行内渲染', () => {
   it('PII 掩码不被残星管线吃成假明文', () => {
     const html = renderStream('电话 138****0000');
     expect(html).toContain('138****0000');
+  });
+});
+
+/** Q6-丙（2026-11-07 拍板）：正文 [n] 与来源列表互跳——只在 1..max 范围内包 span，
+ *  代码块里的 [1] 不动（常见于 JSON 片段），超范围保持纯文本（防止把普通方括号误当引用） */
+describe('linkRefs 引用角标', () => {
+  it('范围内的 [n] 变带 data-ref 的 span', () => {
+    const html = linkRefs('结论来自 [1] 与 [3]', 3);
+    expect(html).toContain('<span class="refn" data-ref="1"');
+    expect(html).toContain('<span class="refn" data-ref="3"');
+    expect(html).toContain('>[1]</span>');
+  });
+
+  it('超出 max 的编号原样保留', () => {
+    const html = linkRefs('见 [4]', 3);
+    expect(html).toBe('见 [4]');
+  });
+
+  it('pre/code 内不做替换（JSON 数组常含 [1]）', () => {
+    const html = linkRefs('<pre>[1]</pre><code>[2]</code>正文 [1]', 3);
+    expect(html.startsWith('<pre>[1]</pre><code>[2]</code>')).toBe(true);
+    expect(html).toContain('<span class="refn" data-ref="1"');
+  });
+
+  it('max 为 0 或空串时原样返回', () => {
+    expect(linkRefs('见 [1]', 0)).toBe('见 [1]');
+    expect(linkRefs('', 3)).toBe('');
+  });
+});
+
+/** 2026-11-09 代码席 P2 回修：标签属性里也有方括号（<td title="…[1]…">、data-chart），
+ *  必须只改文本段，否则会把 span 塞进属性串、把引号提前闭合 */
+describe('linkRefs 只改文本段', () => {
+  it('属性值里的 [1] 不动', () => {
+    const html = linkRefs('<td title="使用率 42% [1]">单元格 [1]</td>', 3);
+    expect(html).toContain('title="使用率 42% [1]"');
+    expect(html).toContain('<span class="refn" data-ref="1"');
+  });
+
+  it('data-chart 里的数组不被改写', () => {
+    const html = linkRefs('<div data-chart="[3]">看图</div>', 3);
+    expect(html).toContain('data-chart="[3]"');
+    expect(html).not.toContain('data-chart="[<span');
+  });
+
+  it('pre 块整体保留（内部标签不影响判断）', () => {
+    const html = linkRefs('<pre><b>x</b>[1]</pre>正文 [2]', 3);
+    expect(html.startsWith('<pre><b>x</b>[1]</pre>')).toBe(true);
+    expect(html).toContain('data-ref="2"');
   });
 });

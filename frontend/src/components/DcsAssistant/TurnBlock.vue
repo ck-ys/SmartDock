@@ -5,13 +5,14 @@
     :data-phase="turn.phase"
     :data-folded="folded ? '1' : '0'"
     @dcs-expand-fold="onExpandFold"
-    @dcs-expand-steps="stepsAll = true"
+    @dcs-expand-steps="expandAllSteps"
   >
     <!-- Q2 批1审查 P1：MsgFlow.jumpToStep 目标落在中段折叠区时派发本事件先展开全部步骤 -->
     <!-- 回合状态条（tstat）：动词/终态/等你确认/耗时；可点折叠过程区（BN-2 原型 foldt，答完 1s 自动收）
          批J-2 补原型件：ts-ics 图标堆 / ts-f 失败计数 pill / ts-w8 等待 pill / tkl 换行滑动 / 终态去 ×N 双重计数 -->
     <button class="tstat" :class="statCls" :aria-expanded="!folded" :title="folded ? '展开过程明细' : '收起过程明细'" @click="toggleFold">
-      <IconSpan v-if="live" name="loader-circle" cls="spin" />
+      <!-- Q1 甲（照 ZCode）：3×3 像素轨道替代转圈——9 格 13px、环形依次亮，950ms 一圈 -->
+      <span v-if="live" class="px" aria-hidden="true"><i v-for="n in 9" :key="n" /></span>
       <IconSpan v-else-if="turn.phase === 'error'" name="circle-x" cls="fail-ic" />
       <IconSpan v-else-if="emptyFail" name="circle-x" cls="fail-ic" />
       <IconSpan v-else-if="turn.phase === 'stopped'" name="square" />
@@ -40,12 +41,6 @@
     <!-- 折叠态偷看行（原型 tpeek/fpeekrow L338-346）：思考摘要渐隐小窗 + 失败行点击展开定位；
          UI 专项批1：仅运行中保留（思考进行中瞄一眼），终态收起——英文 CoT 原文不再怼脸，想看完整思考点胶囊展开 -->
     <div v-if="folded && turn.thinkText && live" ref="peekEl" class="tpeek" :class="{ 'fade-t': peekOver }" title="展开过程明细" @click="toggleFold">{{ tpeekText }}</div>
-    <!-- Q17 空窗占位：首个思考事件到达前（实测 2–6s）先给一行「正在准备…」。
-         只做静态提示，不建思考段（伪造段会换 key 重挂，整块闪一次），也不改协议 -->
-    <div v-if="folded && waitHint" class="tpeek twait" title="展开过程明细" @click="toggleFold">
-      <IconSpan name="loader-circle" cls="spin mini" :size="14" />
-      <span>正在准备…</span>
-    </div>
     <div v-if="folded && failCount > 0" class="fpeekrow" @click="expandFail">
       <IconSpan name="ban" :size="12" /> {{ firstFailVerb }} · 失败 <IconSpan name="chevron-right" :size="12" />
     </div>
@@ -58,12 +53,6 @@
          v-show 的 display:none 没法做高度动画，且卸载会丢内部滚动位置） -->
     <div class="proc-wrap" :class="{ open: !folded, animating: foldAnimating }">
     <div class="proc" :class="{ 'proc-empty': !timeline.length }">
-      <!-- Q17 空窗占位：过程区还没有任何可显示的行时，先给一行「正在准备…」，
-           让「已发送 → 首个事件」这段不再是一片空白（胶囊秒数仍在标题行，这里只补过程区） -->
-      <div v-if="waitHint" class="twait">
-        <IconSpan name="loader-circle" cls="spin mini" :size="14" />
-        <span>正在准备…</span>
-      </div>
       <template v-for="it in timeline" :key="it.kind === 'think' ? 'th-' + it.seg.id : it.step.id">
         <button
           v-if="it.kind === 'tool' && !stepsAll && it.sIdx === 1 && hiddenMid > 0"
@@ -109,22 +98,45 @@
           >
             {{ it.seg.text.slice(-400) }}
           </div>
-          <!-- eslint-disable-next-line vue/no-v-html —— md.ts 先转义后白名单替换（与正文气泡同链路；
-               批3回修：思考块同样挂点击/回车委托，块内链/复制钮不再是死按钮） -->
+          <!-- Q2 甲（2026-11-07 拍板，照 ZCode）：思考正文按纯文本渲染。
+               思考的加粗/列表符号一律按原文显示——不跑 markdown，是「展开不卡」的另一半；
+               正文气泡仍走 md.ts，不受影响。 -->
           <div
             v-if="segIsOpen(it.seg)"
             :ref="setTkB"
             class="tk-b"
             :class="{ 'fade-t': !tkbAtTop, 'fade-b': !tkbAtBottom }"
-            v-html="segHtml(it.seg)"
             @scroll.passive="onTkBScroll"
-            @click="onMdClick"
-            @keydown.enter="onMdClick"
-          ></div>
+          >{{ it.seg.text }}</div>
         </div>
 
-        <!-- 工具行（Q10：单步耗时；Q12-③ 中段折叠>5 步首尾保留；终态可点开看真实返回 JSON） -->
-        <div v-else class="tool" :class="'st-' + it.step.status" :data-step-id="it.step.id">
+        <!-- 工具行（Q10：单步耗时；Q12-③ 中段折叠>5 步首尾保留；Q6 甲：终态点开=三段式详情）
+             Q6 甲（2026-11-07 拍板，照 ZCode）：连续同类工具收成一组，组头给次数/合计耗时/失败数；
+             命中即建组（gsize≥2），单次调用仍是原来那一行。组内跑着时强制展开，别把进度藏起来。 -->
+        <template v-else>
+          <button
+            v-if="it.gid && it.gpos === 0"
+            type="button"
+            class="tgh"
+            :class="{ open: groupIsOpen(it.gid) }"
+            :aria-expanded="groupIsOpen(it.gid)"
+            @click="toggleGroup(it.gid)"
+          >
+            <IconSpan :name="groupIcon(it.step.name)" :size="13" />
+            <span class="tgh-n">{{ groupTitle(it.step) }} · {{ it.gsize }} 次</span>
+            <span class="tgh-m">
+              合计 {{ groupDurText(it.gid) }}<template v-if="groupFailCount(it.gid)"> · {{ groupFailCount(it.gid) }} 失败</template>
+            </span>
+            <span class="tgh-c"
+              ><IconSpan :name="groupIsOpen(it.gid) ? 'chevron-up' : 'chevron-down'" :size="12"
+            /></span>
+          </button>
+          <div
+            v-if="!it.gid || it.gpos === 0 || groupIsOpen(it.gid)"
+            class="tool"
+            :class="['st-' + it.step.status, { 'in-grp': !!it.gid && it.gpos > 0 }]"
+            :data-step-id="it.step.id"
+          >
           <span
             class="th"
             :class="{ clickable: isTerminal && !!it.step.resultFull }"
@@ -164,8 +176,34 @@
           </span>
           <!-- 题8：反问的原始参数不摆给用户看（ZCode 那行 <pre> 也是注释掉的）；要排错点详情/看返回 -->
           <span v-if="it.step.argsText && it.step.name !== 'ask_user'" class="args">{{ shortArgs(it.step.argsText) }}</span>
-          <div v-if="openSteps.has(it.step.id) && it.step.resultFull" class="s-json">{{ it.step.resultFull }}</div>
+          <!-- Q6 甲（2026-11-07 拍板，照 ZCode 的 tool 展开）：点开只有三段摘要——
+               参数 / 结果 / 错误；原始 JSON 收进第二层折叠，不再一上来铺一屏（限高 240px 内滚）。 -->
+          <div v-if="openSteps.has(it.step.id)" class="s-det" :class="{ 'has-dc': isRowsStep(it.step) }">
+            <div v-if="it.step.name !== 'ask_user' && toolParams(it.step).length" class="sd">
+              <div class="sd-h">参数</div>
+              <div class="sd-kv">
+                <span v-for="p in toolParams(it.step)" :key="p.raw" class="sd-p"><i>{{ p.k }}</i>{{ p.v }}</span>
+              </div>
+            </div>
+            <div v-if="it.step.status === 'err'" class="sd sd-err">
+              <div class="sd-h">错误</div>
+              <div class="sd-t">{{ toolErrorText(it.step) }}</div>
+              <button type="button" class="sd-copy" @click.stop="copyFail(it.step)">复制错误</button>
+            </div>
+            <div v-if="it.step.resultFull && it.step.status !== 'err'" class="sd">
+              <div class="sd-h">{{ isRowsStep(it.step) ? '数据结果' : '结果' }}</div>
+              <!-- 2026-11-09：rows 型工具的数据原件卡从「来源区」搬回工具行展开区——
+                   数据是工具的结果，不是来源（ZCode 同口径：工具输出长在工具行里） -->
+              <data-card v-if="isRowsStep(it.step)" :step="it.step" @pgoto="(p) => emit('pgoto', p)" />
+              <div v-else class="sd-t">{{ toolResultBrief(it.step) }}</div>
+            </div>
+            <details v-if="it.step.argsText || it.step.resultFull" class="sd-raw">
+              <summary>展开原始 JSON</summary>
+              <pre>{{ toolRaw(it.step) }}</pre>
+            </details>
+          </div>
         </div>
+        </template>
       </template>
     </div>
     </div>
@@ -217,7 +255,7 @@
          UI 专项批1：卡内「已完成」章删除——与顶部状态胶囊重复报状态（视觉评审 7.4 轮实锤），成功语义只留胶囊+浅绿描边 -->
     <div v-if="turn.bufText || turn.answerHtml" class="bub" :class="{ 'g-ok': turn.phase === 'done' && turn.toolCalls > 0 }">
       <!-- eslint-disable-next-line vue/no-v-html —— md.ts 先转义后白名单替换，无注入面；点击委托处理链导航/代码卡/表格复制 -->
-      <div v-if="turn.answerHtml" class="md" v-html="turn.answerHtml" @click="onMdClick" @keydown.enter="onMdClick" />
+      <div v-if="turn.answerHtml" ref="mdEl" class="md" v-html="answerHtmlRefs" @click="onMdClick" @keydown.enter="onMdClick" />
       <div v-else class="stream" @click="onMdClick" @keydown.enter="onMdClick">
         <!-- Q16 流式期也过行内渲染（粗体 / 行内码 / 站内链）——原先整段当纯文本，
              答案里 8 处 ** 原样露面，完成瞬间整块重排。块级结构仍留到完成态 -->
@@ -322,48 +360,41 @@
       </template>
     </div>
 
-    <!-- 来源折叠条（批C：🗂 N 个来源 ▾；rows 型工具=DataCard 数据原件，其余=文本摘要） -->
-    <div v-if="hasFoot && turn.toolCalls > 0" class="srcwrap">
+    <!-- 来源（2026-11-09 改回 ZCode 口径）：只列联网搜索带回来的真实网页，编号 [n] 与正文互相跳转；
+         工具调用不再冒充来源（它们长在各自工具行的展开区里）。没有真来源时整块不出现。 -->
+    <div v-if="hasFoot && sourceItems.length" class="srcwrap">
       <button class="srcbar" :aria-expanded="srcOpen" @click="srcOpen = !srcOpen">
-        <IconSpan name="history" /> {{ turn.steps.length }} 个来源 <IconSpan name="chevron-down" />
+        <IconSpan name="history" /> {{ sourceItems.length }} 个来源 <IconSpan name="chevron-down" />
       </button>
       <div v-if="srcOpen" class="srclist">
-        <template v-for="(s, i) in turn.steps" :key="s.id">
-          <data-card v-if="isRowsStep(s)" :step="s" @pgoto="(p) => emit('pgoto', p)" />
-          <div v-else class="srcitem">
-            <b>[{{ i + 1 }}]</b> {{ s.verb }}
-            <span v-if="s.argsText" class="srcmeta">{{ shortArgs(s.argsText) }}</span>
-            <div v-if="s.brief" class="srcexcerpt">{{ s.brief }}</div>
-          </div>
-        </template>
-      </div>
-    </div>
-
-    <!-- 业务批(1015) Q6：联网搜索来源卡——受控可点外链的唯一出口（点击前再过协议白名单+
-         noopener 新开）。业务反馈批1015c Q6(拍板A)：favicon 改后端代理（/dcs/ai/favicon，
-         DuckDuckGo ip3 源+Redis 缓存）——前端直连外网图标域名在国内网络不可达（google s2
-         曾回退成纯字母），后端代理在内网部署也稳；代理 miss（404/断网）onerror 回退首字母块。
-         正文里模型手写的外链维持纯文本（md.ts 白名单），钓鱼面收窄到这份真实搜索结果 -->
-    <div v-if="turn.citations?.length" class="cite">
-      <button class="cite-bar" :aria-expanded="citeOpen" title="这轮联网搜索引用的网页，点击可打开（新标签）" @click="citeOpen = !citeOpen">
-        <IconSpan name="globe" /> {{ turn.citations.length }} 个来源 <IconSpan name="chevron-down" />
-      </button>
-      <div v-if="citeOpen" class="cite-list">
-        <button v-for="(c, i) in turn.citations" :key="c.url + i" class="cite-card" :title="`${c.title}\n${c.url}`" @click="openCitation(c.url)">
-          <span class="cite-fav">
+        <button
+          v-for="it in sourceItems"
+          :key="it.key"
+          type="button"
+          class="src-row"
+          :data-ref="it.n"
+          :class="{ hot: hotRef === it.n }"
+          :title="`${it.title}
+${it.url}`"
+          @mouseenter="hotRef = it.n"
+          @mouseleave="hotRef = 0"
+          @click="onSrcClick(it)"
+        >
+          <b>[{{ it.n }}]</b>
+          <span v-if="it.url" class="src-fav">
             <img
-              v-if="!favHostDead.has(hostOf(c.url))"
-              class="cite-favimg"
-              :src="`${favBase}/dcs/ai/favicon?host=${encodeURIComponent(hostOf(c.url))}`"
+              v-if="!favHostDead.has(hostOf(it.url))"
+              class="src-favimg"
+              :src="`${favBase}/dcs/ai/favicon?host=${encodeURIComponent(hostOf(it.url))}`"
               alt=""
               loading="lazy"
-              @error="favHostDead.add(hostOf(c.url))"
+              @error="favHostDead.add(hostOf(it.url))"
             />
-            <template v-else>{{ (hostOf(c.url) || '?').slice(0, 1).toUpperCase() }}</template>
+            <template v-else>{{ (hostOf(it.url) || '?').slice(0, 1).toUpperCase() }}</template>
           </span>
-          <span class="cite-main">
-            <b>{{ c.title }}</b>
-            <span class="cite-dom">{{ c.siteName || hostOf(c.url) }} ↗</span>
+          <span class="src-main">
+            <span class="src-t">{{ it.title }}</span>
+            <span v-if="it.meta" class="src-m">{{ it.meta }}{{ it.url ? ' ↗' : '' }}</span>
           </span>
         </button>
         <div class="cite-note">链接来自第三方网站，请注意辨别真伪；标题与摘要由搜索引擎返回</div>
@@ -479,8 +510,8 @@ import ElicitCard from './ElicitationCard.vue';
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
 import { turnStateWord } from './assistantCtx';
-import { renderMd, renderStream } from './md';
-import { parseToolJson, summarizeArgs } from './toolJson';
+import { linkRefs, renderStream } from './md';
+import { argPairs, parseToolJson, summarizeArgs } from './toolJson';
 import { submitFeedback, listConversations, listMessages, exportAssistantReport } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
 import { getAgentPrefs } from './prefsStore';
@@ -753,7 +784,9 @@ function receiptLead(rc: AssistantAskReceipt): string {
   if (rc.failed || rc.outcome === 'answered') {
     return `已询问 · ${n} 个问题`;
   }
-  return rc.outcome === 'cancelled' ? '已询问 · 未提供回答' : '已询问 · 未回答，已自动继续';
+  if (rc.outcome === 'cancelled') return '已询问 · 未提供回答';
+  if (rc.outcome === 'timeout') return '已询问 · 未回答，已超时';
+  return '已询问 · 未回答，已自动继续';
 }
 function receiptAnswer(rc: AssistantAskReceipt, qi: number): string {
   const byQuestion = rc.answers.find((a) => a.question === rc.questions[qi]?.question);
@@ -943,9 +976,61 @@ const hasFoot = computed(() => ['done', 'stopped', 'error'].includes(props.turn.
  *  判定与 statText/推荐题/错误卡三处联动：不显示"已完成"、不荐题、给人话+重问出路 */
 const emptyFail = computed(() => props.turn.phase === 'done' && !props.turn.bufText && !props.turn.answerHtml && props.turn.toolCalls === 0);
 
+/* ---- 来源（2026-11-09 按 ZCode 真源码改口径）：只列"真来源" ----
+ * ZCode 全仓没有"每轮来源清单"这种东西（ai-elements 的 Sources / SourcesTrigger 零调用）；
+ * 它的来源只有两种：正文里的 [n] 行内角标、以及模型自己声明的文件引用卡。**工具调用从不进来源**
+ * （工具结果长在工具行自己的展开区里）。我们上一版把每个工具步骤都塞进清单并分了五组，
+ * 用户原话「你怎么全部来源都上了」——这里改回真来源口径：
+ *   来源 = turn.citations（web_search 结构化出来的真实网页，带地址可点）；
+ *   一条都没有 → 整块不出现（宁缺毋滥，不拿工具充数）。 */
+interface SrcItem {
+  key: string;
+  n: number;
+  title: string;
+  meta?: string;
+  url?: string;
+}
+/** 扁平来源清单：citations 顺序即编号，与正文 [n] 对齐 */
+const sourceItems = computed<SrcItem[]>(() =>
+  (props.turn.citations ?? []).map((c, i) => ({
+    key: `web-${i}-${c.url}`,
+    n: i + 1,
+    title: c.title || hostOf(c.url),
+    meta: c.siteName || hostOf(c.url),
+    url: c.url
+  }))
+);
+const hotRef = ref(0);
+/** 正文 [n] 变成可点的 .refn（只处理正文，代码块里原样保留） */
+const answerHtmlRefs = computed(() => linkRefs(props.turn.answerHtml, sourceItems.value.length));
+const mdEl = ref<HTMLElement | null>(null);
+/** 悬停来源 → 反过来高亮正文里所有同号 [n]（v-html 里的节点只能直接操作类名） */
+watch(hotRef, (n) => {
+  const root = mdEl.value;
+  if (!root) {
+    return;
+  }
+  root.querySelectorAll('.refn.hot').forEach((el) => el.classList.remove('hot'));
+  if (n) {
+    root.querySelectorAll(`.refn[data-ref="${n}"]`).forEach((el) => el.classList.add('hot'));
+  }
+});
+/** 点来源：有网页就开网页（受控外链），否则把正文里第一个同号 [n] 滚到眼前闪一下 */
+function onSrcClick(it: SrcItem) {
+  if (it.url) {
+    openCitation(it.url);
+    return;
+  }
+  const el = mdEl.value?.querySelector(`.refn[data-ref="${it.n}"]`) as HTMLElement | null;
+  if (el) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.add('hot');
+    setTimeout(() => el.classList.remove('hot'), 1600);
+  }
+}
+
 /* ---- 业务批(1015) Q6：联网搜索来源卡（citations 由 useAssistant.onToolResult 从 web_search
  *      结果结构化提取；此处只管展示与受控跳转） ---- */
-const citeOpen = ref(false);
 /** 业务反馈批1015c Q6：favicon 失败黑名单已上移 module 级 favHostDead（按 host 键，
  *  跨回合/跨会话共享——同一坏图标只探测一次，防翻多卡时烧满 IP 限流；m3 P1-3） */
 const favBase = import.meta.env.VITE_APP_BASE_API as string;
@@ -1083,29 +1168,22 @@ const shownSteps = computed(() => {
 
 const statText = computed(() => {
   const t = props.turn;
-  const lastRun = [...t.steps].reverse().find((s) => s.status === 'run');
   switch (t.phase) {
     case 'thinking':
-      return turnStateWord('thinking');
     case 'acting':
-      return turnStateWord('acting', { actingVerb: `正在${lastRun?.verb ?? '查询'}` });
     case 'writing':
-      return turnStateWord('writing');
+      // Q1 甲（照 ZCode）：进行中只有一个词；在思考还是在调工具，由下面各行自己说
+      return turnStateWord(t.phase);
     case 'waiting': {
-      // 确认卡生命周期联动（k3 视觉复审 P2-1）：卡 run/done 后状态行不再挂「等确认」
+      // 确认卡生命周期联动（k3 视觉复审 P2-1）：卡 run/done 后状态行不再挂「等你确认」
       const cs = t.hitl?.cardState;
       if (cs === 'run') return '🛡 正在执行确认的操作…';
       if (cs === 'done') return t.hitl?.cancelled ? '已取消（未执行）' : '已确认执行';
       return '🛡 ' + turnStateWord('waiting'); // 🛡 经 toast/文本通道按 EMO2IC→power 渲染（Q2=A 照搬原型）
     }
-    case 'stopped': {
-      // 六审回修（glm53 P2）：中途停止且已有失败步骤时点出失败数——error 态胶囊红色告警，
-      // stopped 带失败却仍中性灰，折叠后用户无从知道过程里有步骤没跑成
-      if (failCount.value > 0) {
-        return `${turnStateWord('stopped')} · ${failCount.value} 项失败`;
-      }
-      return turnStateWord('stopped') + (t.toolCalls > 0 ? `（查了 ${t.toolCalls} 步）` : '');
-    }
+    case 'stopped':
+      // 失败数已由 ts-f 独立 pill 展示，主词回一个词，不重复计数
+      return turnStateWord('stopped');
     case 'error':
       return turnStateWord('error');
     default:
@@ -1113,8 +1191,8 @@ const statText = computed(() => {
       if (emptyFail.value) {
         return '没等到回答';
       }
-      // Q10 完成折叠口径：一行读出「已完成 · 用了 N 个工具 · N 秒」（秒数由 durText 追加）
-      return t.toolCalls > 0 ? `${turnStateWord('done')} · 用了 ${t.toolCalls} 个工具` : turnStateWord('done');
+      // Q1 甲：有耗时才说「已工作 · N 秒」；太快的轮次照 ZCode 说「已处理」
+      return (t.durMs || 0) >= 2100 ? turnStateWord('done') : '已处理';
   }
 });
 
@@ -1130,13 +1208,39 @@ function expandFail() {
   });
 }
 
+/** Q1 甲（照 ZCode）：计时 0.1 秒跳一次。心跳只挂在本回合自己身上（ZCode 也是独立小组件），
+ *  不让整条消息流跟着 10Hz 重渲染；live 才起，终态即停。 */
+const liveTick = ref(Date.now());
+let liveTimer: ReturnType<typeof setInterval> | null = null;
+function stopLiveTimer() {
+  if (liveTimer) {
+    clearInterval(liveTimer);
+    liveTimer = null;
+  }
+}
+watch(
+  live,
+  (v) => {
+    stopLiveTimer();
+    if (v) {
+      liveTick.value = Date.now();
+      liveTimer = setInterval(() => (liveTick.value = Date.now()), 100);
+    }
+  },
+  { immediate: true }
+);
+onBeforeUnmount(stopLiveTimer);
+
 const durText = computed(() => {
   const t = props.turn;
-  const ms = t.durMs > 0 ? t.durMs : live.value ? props.now - t.startedAt : 0;
-  if (ms < 2100) {
-    return ''; // 原型口径：≥2.1s 才显示
+  const ms = t.durMs > 0 ? t.durMs : live.value ? Math.max(0, liveTick.value - t.startedAt) : 0;
+  if (!live.value && ms < 2100) {
+    return ''; // 终态口径：≥2.1s 才显示；live 从 0.0 秒起跳
   }
-  return ms < 60_000 ? `${(ms / 1000).toFixed(0)} 秒` : `${Math.floor(ms / 60_000)} 分 ${Math.floor((ms % 60_000) / 1000)} 秒`;
+  if (ms < 60_000) {
+    return live.value ? `${(ms / 1000).toFixed(1)} 秒` : `${(ms / 1000).toFixed(0)} 秒`;
+  }
+  return `${Math.floor(ms / 60_000)} 分 ${Math.floor((ms % 60_000) / 1000)} 秒`;
 });
 
 /* ---- R3(2026-10-10 拍板A)：思考分段视图 + 统一时间线 ---- */
@@ -1151,28 +1255,60 @@ const thinkSegsView = computed<ThinkSeg[]>(() => {
 });
 
 /** 时间线项：think 段与 tool 步按事件序交错；sIdx=该步在 shownSteps（Q12-③ 折叠后）中的序号，
- *  供中段折叠按钮插位（i===1 前） */
-type TlItem = { kind: 'think'; seg: ThinkSeg; idx: number; sIdx: -1 } | { kind: 'tool'; step: AssistantStep; idx: number; sIdx: number };
+ *  供中段折叠按钮插位（i===1 前）。
+ *  Q6 甲（2026-11-07）：连续同类工具合并——gid=组 id（组内至少 2 步）、gpos=组内序号、gsize=组大小；
+ *  不同工具名之间即便紧邻也不进同一组（ZCode 也按类目分组，不跨类型）。 */
+type TlItem =
+  | { kind: 'think'; seg: ThinkSeg; idx: number; sIdx: -1; gid: null; gpos: 0; gsize: 0 }
+  | { kind: 'tool'; step: AssistantStep; idx: 0; sIdx: number; gid: string | null; gpos: number; gsize: number };
 const timeline = computed<TlItem[]>(() => {
   const shown = shownSteps.value;
   const shownIdx = new Map(shown.map((s, i) => [s.id, i]));
   const items: TlItem[] = [];
-  thinkSegsView.value.forEach((seg, idx) => items.push({ kind: 'think', seg, idx, sIdx: -1 }));
+  thinkSegsView.value.forEach((seg, idx) => items.push({ kind: 'think', seg, idx, sIdx: -1, gid: null, gpos: 0, gsize: 0 }));
+  // 代码席 P1（2026-11-09）：分组必须在**全量步骤**上算——按 shownSteps 子集算会把
+  // 「首步 + 末两步」当成相邻，组头写「N 次」却少算中间被折叠的同类调用
   props.turn.steps.forEach((step) => {
-    const sIdx = shownIdx.get(step.id);
-    if (sIdx !== undefined) {
-      items.push({ kind: 'tool', step, idx: 0, sIdx });
-    }
+    items.push({ kind: 'tool', step, idx: 0, sIdx: shownIdx.get(step.id) ?? -1, gid: null, gpos: 0, gsize: 0 });
   });
   // 排序键：事件序（回放行无 seq=排最后按插入序稳定兜底；legacy 合成段 seq=-1 置顶）
   const key = (it: TlItem) => (it.kind === 'think' ? it.seg.seq : (it.step.seq ?? Number.MAX_SAFE_INTEGER));
-  return items.sort((a, b) => key(a) - key(b));
+  const sorted = items.sort((a, b) => key(a) - key(b));
+  // 合并：排序后相邻、都是工具、工具名相同 → 建组（单次调用不建组，仍是一行）
+  // 中段折叠（>PROC_KEEP 且未展开）时不建组：折叠把中间同类步骤藏起来后，组的首行
+  // 可能不在可见集里，会出现「有组身没组头、点了也打不开」的死行；此时按单步渲染，数字不会错
+  const grouping = stepsAll.value || props.turn.steps.length <= PROC_KEEP;
+  const out: TlItem[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    const cur = sorted[i];
+    if (cur.kind !== 'tool') {
+      out.push(cur);
+      i++;
+      continue;
+    }
+    let j = i + 1;
+    while (j < sorted.length) {
+      const nx = sorted[j];
+      if (nx.kind !== 'tool' || nx.step.name !== cur.step.name) {
+        break;
+      }
+      j++;
+    }
+    const size = j - i;
+    const gid = grouping && size >= 2 ? `g:${cur.step.name}:${cur.step.id}` : null;
+    for (let k = i; k < j; k++) {
+      const t = sorted[k];
+      if (t.kind !== 'tool') {
+        continue;
+      }
+      out.push({ ...t, gid, gpos: k - i, gsize: size });
+    }
+    i = j;
+  }
+  // 渲染仍只给可见步骤（sIdx=-1 的属于中段折叠区），思考段始终在
+  return out.filter((it) => it.kind === 'think' || it.sIdx >= 0);
 });
 
-/** Q17 空窗占位：回合已开跑但过程区还没有任何一行（首个 REASONING_START 实测晚到 2–6s）。
- *  只在 thinking / acting 阶段成立——writing 时答案已经在长，再提示「准备」自相矛盾。
- *  刻意不建思考段：伪造段到达真段时会换 key 重挂，整块闪一次。 */
-const waitHint = computed(() => ['thinking', 'acting'].includes(props.turn.phase) && !timeline.value.length);
 
 /* 题6 甲（2026-11-06）：思考段不再编号——序号只表示「第几段」，对用户无信息量，
    三个参照仓（ZCode/cline/assistant-ui）也都不编号。多段就是多行，按时间顺序排。 */
@@ -1197,11 +1333,6 @@ function segCut(seg: ThinkSeg): boolean {
   return props.turn.phase === 'stopped' && !seg.done;
 }
 
-/** Q9：思考正文 markdown 渲染（逐段；md.ts 先转义后白名单，与正文气泡同链路） */
-function segHtml(seg: ThinkSeg): string {
-  return renderMd(seg.text);
-}
-
 function shortArgs(a: string): string {
   // 批I 零技术词：JSON 英文键名→中文摘要（mission_id→任务 等）；非 JSON 原样截断
   const s = summarizeArgs(a);
@@ -1219,6 +1350,128 @@ function toggleStep(id: string) {
     s.add(id);
   }
   openSteps.value = s;
+}
+
+/* ---- Q6 甲（2026-11-07 拍板，照 ZCode）：工具分组 + 三段式详情 ---- */
+
+/** 组默认收起；组里还有步骤在跑时强制展开——进度不能藏起来 */
+const openGroups = ref(new Set<string>());
+const groupSteps = computed(() => {
+  const m = new Map<string, AssistantStep[]>();
+  for (const it of timeline.value) {
+    if (it.kind === 'tool' && it.gid) {
+      const arr = m.get(it.gid);
+      if (arr) {
+        arr.push(it.step);
+      } else {
+        m.set(it.gid, [it.step]);
+      }
+    }
+  }
+  return m;
+});
+function groupIsOpen(gid: string): boolean {
+  if (openGroups.value.has(gid)) {
+    return true;
+  }
+  return (groupSteps.value.get(gid) ?? []).some((s) => s.status === 'run');
+}
+function toggleGroup(gid: string) {
+  // 代码席 P1（2026-11-09）：组内有在跑的步骤时恒展开，点击不写状态——
+  // 否则用户点「收起」会被记成 add(展开)，视觉没变但意图记反，跑完后组仍开着
+  if ((groupSteps.value.get(gid) ?? []).some((s) => s.status === 'run')) {
+    return;
+  }
+  const s = new Set(openGroups.value);
+  if (s.has(gid)) {
+    s.delete(gid);
+  } else {
+    s.add(gid);
+  }
+  openGroups.value = s;
+}
+function groupFailCount(gid: string): number {
+  return (groupSteps.value.get(gid) ?? []).filter((s) => s.status === 'err').length;
+}
+/** 代码席 P1（2026-11-09）：状态面板「在对话中定位」落到组内非首步时，该行不在 DOM 里，
+ *  MsgFlow 只能展开中段折叠、查不到元素就静默返回。这里在展开步骤的同时把组也全打开，
+ *  组身回到 DOM 后 MsgFlow 的 nextTick 重查才能命中。 */
+function expandAllSteps() {
+  stepsAll.value = true;
+  nextTick(() => {
+    openGroups.value = new Set(groupSteps.value.keys());
+  });
+}
+function groupDurText(gid: string): string {
+  const ms = (groupSteps.value.get(gid) ?? []).reduce((n, s) => n + (s.durMs || 0), 0);
+  if (!ms) {
+    return '—';
+  }
+  return ms >= 1000 ? (ms / 1000).toFixed(1) + ' 秒' : Math.round(ms) + ' 毫秒';
+}
+/** 组头的人话标题与图标：同类工具的叫法按类目收（ZCode 的 Explore / Execute / Changes 同款），
+ *  词典里没有的工具退回它自己的动词，不硬编造类目名 */
+const GROUP_META: Record<string, { title: string; icon: string }> = {
+  web_search: { title: '联网搜索', icon: 'globe' },
+  read_file: { title: '读文件', icon: 'file' },
+  write_file: { title: '写文件', icon: 'file' },
+  list_dir: { title: '列目录', icon: 'file' },
+  search_knowledge: { title: '知识库', icon: 'book' },
+  todo_write: { title: '任务清单', icon: 'check-circle' },
+  submit_plan: { title: '计划', icon: 'flag' }
+};
+function groupTitle(s: AssistantStep): string {
+  if (GROUP_META[s.name]) {
+    return GROUP_META[s.name].title;
+  }
+  if (s.name.startsWith('analytics_')) {
+    return '分析工具';
+  }
+  if (s.name.startsWith('query_')) {
+    return '业务数据';
+  }
+  return s.verb;
+}
+function groupIcon(name: string): string {
+  if (GROUP_META[name]) {
+    return GROUP_META[name].icon;
+  }
+  if (name.startsWith('analytics_')) {
+    return 'chart';
+  }
+  if (name.startsWith('query_')) {
+    return 'database';
+  }
+  return 'wrench';
+}
+
+/** 三段式详情：参数段（键值对，最多 8 对） */
+function toolParams(step: AssistantStep) {
+  return argPairs(step.argsText);
+}
+/** 失败行的错误正文：ask_user 有专门的人话口径，其它工具原样截 300 字 */
+function toolErrorText(step: AssistantStep): string {
+  if (step.name === 'ask_user') {
+    return askFailReason(step);
+  }
+  const raw = (step.resultFull || step.brief || '').replace(/\s+/g, ' ').trim();
+  return raw ? raw.slice(0, 300) : '这一步没有返回错误详情';
+}
+/** 结果段摘要：优先用后端给的 brief（rows 型走数据卡，不经过这里） */
+function toolResultBrief(step: AssistantStep): string {
+  const b = (step.brief || '').replace(/\s+/g, ' ').trim();
+  return b || '已执行完成（展开原始 JSON 看返回）';
+}
+/** 原始 JSON：参数与结果拼在一起，收进第二层折叠 */
+function toolRaw(step: AssistantStep): string {
+  const parts: string[] = [];
+  if (step.argsText) {
+    parts.push('参数：\n' + step.argsText);
+  }
+  if (step.resultFull) {
+    parts.push('结果：\n' + step.resultFull);
+  }
+  return parts.join('\n\n');
 }
 
 /** rows 型工具判定（来源区升级为 DataCard 数据原件；解析失败回退文本摘要）。
@@ -1404,6 +1657,22 @@ function writeClipboard(text: string): Promise<void> {
   });
 }
 function onMdClick(e: MouseEvent | KeyboardEvent) {
+  // Q6 丙：正文里的 [n] → 展开来源区并高亮对应那条（来源→正文的反向路径见 onSrcClick）
+  const ref = (e.target as HTMLElement).closest('.refn');
+  if (ref) {
+    e.preventDefault();
+    const n = Number(ref.getAttribute('data-ref') || 0);
+    if (n > 0) {
+      srcOpen.value = true;
+      hotRef.value = n;
+      nextTick(() => {
+        const row = rootEl.value?.querySelector(`.src-row[data-ref="${n}"]`) as HTMLElement | null;
+        row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+      setTimeout(() => (hotRef.value = 0), 2000);
+    }
+    return;
+  }
   const link = (e.target as HTMLElement).closest('[data-dcs-link]');
   if (link) {
     e.preventDefault();
@@ -1801,15 +2070,47 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     }
   }
 
-  /* 运行态扫字呼吸（原型 L312：灰→蓝→灰 200% 渐变 1.6s） */
+  /* Q1 甲（参数照 ZCode chat-loading.tsx / styles.css）：3×3 共 9 格，总 13px，
+     格间距 1.3px，圆角 1px；中心格固定 0.07，其余按环形顺序依次亮起（950ms，相邻 110ms）。 */
+  .px {
+    display: grid;
+    grid-template-columns: repeat(3, 3.4px);
+    grid-template-rows: repeat(3, 3.4px);
+    gap: 1.3px;
+    width: 13px;
+    height: 13px;
+    flex: none;
+    color: currentColor;
+
+    i {
+      display: block;
+      background: currentColor;
+      border-radius: 1px;
+      opacity: 0.15;
+      animation: dcs-pxon 950ms ease-in-out infinite;
+      &:nth-child(5) {
+        opacity: 0.07;
+        animation: none;
+      }
+      &:nth-child(1) { animation-delay: 0ms; }
+      &:nth-child(2) { animation-delay: 110ms; }
+      &:nth-child(3) { animation-delay: 220ms; }
+      &:nth-child(6) { animation-delay: 330ms; }
+      &:nth-child(9) { animation-delay: 440ms; }
+      &:nth-child(8) { animation-delay: 550ms; }
+      &:nth-child(7) { animation-delay: 660ms; }
+      &:nth-child(4) { animation-delay: 770ms; }
+    }
+  }
+
+  /* 运行态扫字呼吸（ZCode zcode-loading-label：1.4s，中性灰→主字色→中性灰） */
   &.live .ts-t.run {
-    /* 题7 甲：工作态摘要行照 ZCode 的 animated-gradient-text 放慢到 4s；状态词另走 1.4s（题9） */
-    background: linear-gradient(90deg, var(--dcs-text-secondary) 25%, var(--el-color-primary) 50%, var(--dcs-text-secondary) 75%);
+    background: linear-gradient(90deg, var(--dcs-text-secondary) 35%, var(--dcs-text-primary) 50%, var(--dcs-text-secondary) 65%);
     background-size: 200% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    animation: dcs-sweep 4s linear infinite;
+    animation: dcs-sweep 1.4s linear infinite;
   }
   /* 完成态强化（原型 L324：t1 色+500） */
   &:not(.live) .ts-t {
@@ -2295,6 +2596,8 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     font-size: 12px;
     line-height: 1.7;
     color: var(--dcs-text-placeholder);
+    /* Q2 甲：纯文本保留换行/缩进（原来是 markdown 段落渲染） */
+    white-space: pre-wrap;
 
     :deep(p) {
       margin: 0 0 6px;
@@ -2316,6 +2619,17 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     }
   }
 }
+@keyframes dcs-pxon {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
 @keyframes dcs-sweep {
   to {
     background-position: -200% 0;
@@ -2331,6 +2645,46 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     opacity: 1;
   }
 }
+/* Q6 甲（2026-11-07 拍板，照 ZCode）：连续同类工具组头——次数 / 合计耗时 / 失败数；
+   点组头展开组内明细，单次调用不建组。组内行缩进一级，一眼看出从属关系。 */
+.tgh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px 0;
+  padding: 2px 6px 2px 2px;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--dcs-text-secondary);
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(127, 127, 127, 0.09);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--el-color-primary-light-5);
+  }
+  .tgh-n {
+    font-weight: 500;
+  }
+  .tgh-m {
+    color: var(--dcs-text-placeholder);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tgh-c {
+    margin-left: 2px;
+    color: var(--dcs-text-placeholder);
+  }
+}
+.tool.in-grp {
+  margin-left: 18px;
+}
+
 .tool {
   display: flex;
   flex-direction: column;
@@ -2366,19 +2720,85 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     font-size: 11px;
     color: var(--dcs-text-placeholder);
   }
-  .s-json {
-    margin: 2px 0 0 25px;
-    max-height: 220px;
+  /* Q6 甲（2026-11-07 拍板，照 ZCode）：三段式详情——参数 / 结果 / 错误；
+     限高 240px 内滚，原始 JSON 收进第二层折叠（不再一上来铺一屏深色 JSON） */
+  .s-det {
+    margin: 4px 0 2px 25px;
+    max-height: 240px;
     overflow: auto;
-    background: #2b3648;
-    color: #e8ecf3;
-    border-radius: 8px;
+    border: 1px solid var(--dcs-border-color-light);
+    border-radius: var(--dcs-radius-sm, 8px);
+    background: rgba(127, 127, 127, 0.05);
     padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     font-size: 11.5px;
     line-height: 1.6;
-    font-family: ui-monospace, Menlo, Consolas, monospace;
-    white-space: pre-wrap;
+
+    /* 2026-11-09：数据卡（rows 型结果）搬进这里后，240px 限高会把它裁成一条缝、
+       还要在大表里再滚一层——带数据卡时放开限高，滚动交给卡自己的长表折叠 */
+    &.has-dc {
+      max-height: none;
+      overflow: visible;
+    }
+  }
+  .sd-h {
+    font-size: 10.5px;
+    color: var(--dcs-text-placeholder);
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+  .sd-kv {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+  .sd-p {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
     word-break: break-all;
+
+    i {
+      font-style: normal;
+      color: var(--dcs-text-placeholder);
+    }
+  }
+  .sd-t {
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--dcs-text-secondary);
+  }
+  .sd-err .sd-t {
+    color: var(--dcs-color-danger);
+  }
+  .sd-copy {
+    margin-top: 4px;
+    padding: 1px 8px;
+    border: 1px solid var(--dcs-border-color-light);
+    border-radius: 6px;
+    background: none;
+    color: var(--dcs-text-secondary);
+    font-size: 11px;
+    cursor: copy;
+  }
+  .sd-raw {
+    summary {
+      cursor: pointer;
+      color: var(--dcs-text-placeholder);
+      font-size: 11px;
+    }
+    pre {
+      margin: 6px 0 0;
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 11px;
+      color: var(--dcs-text-secondary);
+    }
   }
   .failword {
     /* 原型 L537：红字+点状下划线（非胶囊） */
@@ -2998,104 +3418,97 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     }
   }
 }
-/* 业务批(1015) Q6：联网搜索来源卡（cherry-studio/LobeChat 同款"底部折叠来源条"形态） */
-.cite {
-  margin-top: 10px;
+/* 业务批(1015) Q6：联网搜索来源卡（cherry-studio/LobeChat 同款"底部折叠来源条"形态）
+   2026-11-09 改回 ZCode 口径后只剩"真网页来源"一种，分组/只看被引用的样式一并删除 */
+.src-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--dcs-text-regular);
 
-  .cite-bar {
+  &:hover,
+  &.hot {
+    background: var(--el-color-primary-light-9);
+    border-color: var(--el-color-primary-light-7);
+  }
+  b {
+    flex: none;
+    color: var(--el-color-primary);
+    font-weight: 600;
+  }
+  .src-fav {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: var(--el-color-primary-light-9);
+    color: var(--el-color-primary);
+    font-size: 10px;
+    font-weight: 700;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 26px;
-    padding: 0 12px;
-    font-size: 12.5px;
-    border-radius: 999px;
-    border: 1px solid var(--dcs-border-color-light);
-    background: var(--el-bg-color);
-    color: var(--dcs-text-regular);
-    cursor: pointer;
+    justify-content: center;
+    overflow: hidden;
 
-    &:hover {
-      color: var(--el-color-primary);
-      border-color: var(--el-color-primary-light-5);
+    .src-favimg {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
     }
   }
-  .cite-list {
-    margin-top: 8px;
+  .src-main {
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
   }
-  .cite-card {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    text-align: left;
-    padding: 7px 10px;
-    border: 1px solid var(--dcs-border-color-light);
-    border-radius: 8px;
-    background: var(--el-bg-color);
-    cursor: pointer;
+  .src-t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .src-m {
+    font-size: 10.5px;
+    color: var(--dcs-text-placeholder);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+.cite-note {
+  font-size: 11px;
+  color: var(--dcs-text-secondary);
+  padding-top: 6px;
+  line-height: 1.4;
+}
+/* Q6 丙：正文里的 [n] —— 与来源列表互相跳转的锚点 */
+:deep(.refn) {
+  color: var(--el-color-primary);
+  cursor: pointer;
+  padding: 0 1px;
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
 
-    &:hover {
-      border-color: var(--el-color-primary-light-5);
-    }
-    img {
-      flex: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 4px;
-    }
-    .cite-fav {
-      flex: none;
-      width: 18px;
-      height: 18px;
-      border-radius: 4px;
-      background: var(--el-color-primary-light-9);
-      color: var(--el-color-primary);
-      font-size: 11px;
-      font-weight: 700;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      .cite-favimg {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-        display: block;
-      }
-    }
-    /* 业务反馈批1015c Q6：来源列表第三方免责行 */
-    .cite-note {
-      font-size: 11px;
-      color: var(--dcs-text-secondary);
-      padding-top: 6px;
-      line-height: 1.4;
-    }
-    .cite-main {
-      min-width: 0;
-
-      b {
-        display: block;
-        font-size: 12.5px;
-        font-weight: 500;
-        color: var(--dcs-text-regular);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .cite-dom {
-        font-size: 11.5px;
-        color: var(--dcs-text-secondary);
-      }
-    }
+  &:hover,
+  &.hot {
+    background: var(--el-color-primary-light-8);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .spin,
   .cursor,
-  .tk-t.run {
+  .tk-t.run,
+  /* 2026-11-09 代码席 P2：Q1 新加的像素轨道也是无限动画，系统开了「减少动态效果」
+     就该停——被它替换掉的 .spin 原本在这张名单里，不补等于无障碍退让能力回退 */
+  .px i {
     animation: none;
   }
 }

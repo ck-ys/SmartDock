@@ -52,7 +52,7 @@
         <!-- R4 二改(2026-10-10)：分组头带计数徽标（置顶组配 pin 图标）；「更早」收成折叠条
              （长列表不淹今天/昨天，计数可见），搜索/选中命中更早时自动展开 -->
         <template v-for="g in groupedTop" :key="g.key">
-          <div class="grp">
+          <div v-if="g.key" class="grp">
             <IconSpan v-if="g.key === '已置顶'" name="map-pin" :size="11" />
             <span>{{ g.key }}</span>
             <span class="g-badge">{{ g.items.length }}</span>
@@ -65,8 +65,7 @@
             :aria-current="c.id === selectedId ? 'true' : undefined"
             @click="openConversation(c)"
           >
-            <span v-if="rowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
-            <span v-else-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
+            <span v-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
             <span v-else-if="isActive(c)" class="sdot" title="最近活跃" />
             <span v-else class="sslot" aria-hidden="true" />
             <div class="c-main">
@@ -85,7 +84,9 @@
                 <template v-else>{{ displayTitle(c) }}</template>
               </div>
             </div>
-            <span class="c-time">{{ rowStatus(c) === 'answering' ? '回答中' : dayTime(c.lastMessageTime) }}</span>
+            <!-- Q4 甲（照 ZCode）：转圈在行右元信息槽、14px；时间保留相对时间 -->
+            <span v-if="rowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="14" /></span>
+            <span class="c-time">{{ dayTime(c.lastMessageTime) }}</span>
             <span v-if="renamingId !== c.id && c.id !== 'tmp'" class="c-ops">
               <button title="重命名" @click.stop="startRename(c)"><IconSpan name="pencil" /></button>
               <button :title="pins.includes(String(c.id)) ? '取消置顶' : '置顶'" @click.stop="togglePin(c)">
@@ -110,8 +111,7 @@
             :aria-current="c.id === selectedId ? 'true' : undefined"
             @click="openConversation(c)"
           >
-            <span v-if="rowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="11" /></span>
-            <span v-else-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
+            <span v-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
             <span v-else-if="isActive(c)" class="sdot" title="最近活跃" />
             <span v-else class="sslot" aria-hidden="true" />
             <div class="c-main">
@@ -130,7 +130,9 @@
                 <template v-else>{{ displayTitle(c) }}</template>
               </div>
             </div>
-            <span class="c-time">{{ rowStatus(c) === 'answering' ? '回答中' : dayTime(c.lastMessageTime) }}</span>
+            <!-- Q4 甲（照 ZCode）：转圈在行右元信息槽、14px；时间保留相对时间 -->
+            <span v-if="rowStatus(c) === 'answering'" class="sspin" title="正在回答…"><IconSpan name="loader-circle" :size="14" /></span>
+            <span class="c-time">{{ dayTime(c.lastMessageTime) }}</span>
             <span v-if="renamingId !== c.id && c.id !== 'tmp'" class="c-ops">
               <button title="重命名" @click.stop="startRename(c)"><IconSpan name="pencil" /></button>
               <button :title="pins.includes(String(c.id)) ? '取消置顶' : '置顶'" @click.stop="togglePin(c)">
@@ -513,11 +515,22 @@ const archivedExpanded = computed(() => (archOpen.value ? archived.value : []));
 const grouped = computed(() => {
   void nowTick.value;
   const act = filtered.value.filter((c) => c.status !== 'ARCHIVED');
-  const pin = act
-    .filter((c) => pins.value.includes(String(c.id)))
-    .sort((a, b) => pins.value.indexOf(String(a.id)) - pins.value.indexOf(String(b.id)));
-  const rest = act.filter((c) => !pins.value.includes(String(c.id)));
   const g: Array<{ key: string; items: AssistantConversation[] }> = [];
+  // Q4 甲（照 ZCode）：运行中的行浮到最上（含已置顶组之上），不新建分组标题；
+  // 运行层用创建序（id 单调）稳定排序，不被流式事件刷得换位
+  const running = act.filter((c) => rowStatus(c) === 'answering').sort((a, b) => {
+    const na = Number(a.id);
+    const nb = Number(b.id);
+    return Number.isFinite(na) && Number.isFinite(nb) ? na - nb : String(a.id).localeCompare(String(b.id));
+  });
+  const runIds = new Set(running.map((c) => String(c.id)));
+  if (running.length > 0) {
+    g.push({ key: '', items: running });
+  }
+  const pin = act
+    .filter((c) => !runIds.has(String(c.id)) && pins.value.includes(String(c.id)))
+    .sort((a, b) => pins.value.indexOf(String(a.id)) - pins.value.indexOf(String(b.id)));
+  const rest = act.filter((c) => !runIds.has(String(c.id)) && !pins.value.includes(String(c.id)));
   if (pin.length > 0) {
     g.push({ key: '已置顶', items: pin });
   }
@@ -595,17 +608,19 @@ function isActive(c: AssistantConversation): boolean {
  *  Q4（业务批4，dsflash P2 回修）：刷新后本地 sending/turns 已丢，吃后端瞬态 running
  *  （RUNNING 中的 run 存在即标"正在回答…"，与抽屉 watchRemoteRun 同源） */
 function rowStatus(c: AssistantConversation): 'answering' | 'error' | 'ok' {
+  const last = c.threadId === state.threadId ? state.turns[state.turns.length - 1] : null;
   if (state.sending && c.threadId === state.threadId) {
-    const last = state.turns[state.turns.length - 1];
     if (last && (last.phase === 'thinking' || last.phase === 'acting' || last.phase === 'writing')) {
       return 'answering';
     }
   }
-  if (c.running) {
-    return 'answering';
-  }
-  if (c.threadId === state.threadId && state.turns[state.turns.length - 1]?.phase === 'error') {
+  if (c.threadId === state.threadId && last?.phase === 'error') {
     return 'error';
+  }
+  // Q4 甲（2026-11-07）：本地已终态时，旧列表里的 running 不顶回转圈（服务端收尾有延迟）
+  const localTerminal = !!last && ['done', 'stopped', 'waiting'].includes(last.phase);
+  if (c.running && !localTerminal) {
+    return 'answering';
   }
   return 'ok';
 }
@@ -1682,6 +1697,10 @@ defineExpose({
       font-size: 12px;
       color: var(--dcs-text-placeholder);
       font-variant-numeric: tabular-nums;
+      /* Q4 甲：转圈与相对时间同一行、居中对齐 */
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
     .c-rename {
       width: 100%;
@@ -2076,9 +2095,16 @@ html.dark .main.ag-empty :deep(.dcs-comp .box:not(.focus)) {
         }
       }
 
-      /* 手机端不占对话宽度；进度信息在消息流里仍可见 */
+      /* 手机端不占对话宽度；进度信息在消息流里仍可见。
+         Q5 乙（2026-11-09 拍板）：≤560 改成「状态点 + 底部抽屉」——不再整块藏掉，
+         手机用户不该少一只眼睛；窄平板档（560~992）仍不占宽度。 */
       :deep(.stat-panel) {
         display: none;
+      }
+      @media (max-width: 560px) {
+        :deep(.stat-panel) {
+          display: block;
+        }
       }
 
       /* Q36：面板隐藏时让位本该是 0，但 StatPanel 仍会按宿主宽写 --sp-strip；

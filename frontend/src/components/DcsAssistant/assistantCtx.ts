@@ -128,25 +128,23 @@ export function suggestionsFor(pageName: string, role: RoleKey): SugItem[] {
 export type TurnPhase = 'thinking' | 'acting' | 'writing' | 'waiting' | 'done' | 'stopped' | 'error';
 
 /**
- * Q10 统一状态词表（2026-10-09 拍板，全站唯一口径）：
- * 思考中 → 执行中(正在查询任务库…) → 撰写中 → 等确认 → 已完成/已停止/失败。
- * TurnBlock 状态条与 StatPanel 面板头共用本函数，杀掉「正在想/正在做/做完了/进程/出了点问题」
- * 两套历史各说各的词（同批两次实现各写各的历史产物）。
+ * Q1 甲（2026-11-07 拍板，照 ZCode）：工作态收成一个词。
+ * 思考中/执行中/撰写中 → 统一「工作中」；阶段信息交给下面的思考行/工具行自己说，
+ * 不再让三个词在同一行里抢戏。终态：已工作 / 已停止 / 失败；等待：等你确认。
+ * TurnBlock 状态条与 StatPanel 面板头共用本函数（全站唯一口径）。
  *
- * @param extra.actingVerb acting 态的动宾补语（如「正在查询任务库」），无则只显示主词
+ * @param _extra 兼容旧调用（actingVerb 不再拼进主词；阶段由行自己表达）
  */
-export function turnStateWord(phase: TurnPhase | string, extra?: { actingVerb?: string }): string {
+export function turnStateWord(phase: TurnPhase | string, _extra?: { actingVerb?: string }): string {
   switch (phase) {
     case 'thinking':
-      return '思考中';
     case 'acting':
-      return extra?.actingVerb ? `执行中（${extra.actingVerb}…）` : '执行中';
     case 'writing':
-      return '撰写中';
+      return '工作中';
     case 'waiting':
-      return '等确认';
+      return '等你确认';
     case 'done':
-      return '已完成';
+      return '已工作';
     case 'stopped':
       return '已停止';
     case 'error':

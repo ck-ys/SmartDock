@@ -34,7 +34,7 @@ export function startTour() {
       element: '.brow .ring-btn',
       popover: {
         title: '会话状态环',
-        description: '环色显示这段对话占用离自动压缩线还有多远：橙=快了，红=马上自动打包前文。点开可看「已用 / 窗口 / 自动触发线」三个数。'
+        description: '环色显示这段对话占用离自动压缩线还有多远：橙=快了，红=马上自动打包前文。点开可看「已用 / 总共」两个数，条上那道竖线就是自动压缩的位置。'
       }
     },
     {

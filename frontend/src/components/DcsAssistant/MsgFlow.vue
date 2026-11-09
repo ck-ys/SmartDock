@@ -117,6 +117,43 @@
     </div>
     <div class="flow-pad" />
 
+    <!-- 左侧回合刻度（2026-11-07 拍板 Q6 丙；2026-11-09 按 ZCode 真源码 ConversationTurnNavigator.tsx 重做）：
+         ① 形状=2px 高 × 12px 宽圆头短横杠（不是圆点），origin-left 伸缩；
+         ② 悬停按距离做"山峰"：scaleX 2.6/1.7/1.25/1，透明度 1/.86/.72/.58（常态 .58）；
+         ③ 不悬停时，滚动位置对应的那一条变实色（真源码 showScrollActiveColor）；
+         ④ 悬停 120ms 后右侧出 320px 预览卡（问题 2 行 + 回答 3 行）；
+         ⑤ 回合 <2 条、或左侧留白塞不下 40px 轨时整条收起。刻度随滚动平移钉在视口。 -->
+    <nav
+      v-if="railOn"
+      ref="railEl"
+      class="rail"
+      :style="{ transform: `translateY(${railTop}px)`, height: railH + 'px' }"
+      aria-label="回合导航"
+    >
+      <div class="rail-in">
+        <button
+          v-for="(t, i) in state.turns"
+          :key="t.id"
+          type="button"
+          class="rail-b"
+          :aria-current="i === railActive ? 'location' : undefined"
+          :aria-label="`跳到第 ${i + 1} 回合`"
+          @mouseenter="railEnter(i, $event)"
+          @mouseleave="railLeave()"
+          @focus="railEnter(i, $event)"
+          @blur="railLeave()"
+          @click="railGoto(t)"
+        >
+          <span class="rail-bar" :class="`t-${railTone(i)}`" :style="railBarStyle(i)" />
+        </button>
+      </div>
+      <!-- 预览卡跟着刻度一起随滚动平移，所以必须留在 .rail 内部 -->
+      <div v-if="railCardAt >= 0 && state.turns[railCardAt]" class="rail-card" :style="{ top: `${railCardTop}px` }">
+        <p class="rc-q">{{ state.turns[railCardAt].question }}</p>
+        <p class="rc-a" :class="{ ph: !railPreview(railCardAt) }">{{ railPreview(railCardAt) || '还没有回答' }}</p>
+      </div>
+    </nav>
+
     <!-- 回到底部钮（原型 tobot：距底>48px 且内容超一屏才出；点击回底自动恢复 followTail）。
          与活卡矩形实测重叠时不出——圆钮会压在卡内自由输入行上（真机实拍） -->
     <button
@@ -151,6 +188,7 @@ import TurnBlock from './TurnBlock.vue';
 import IconSpan from './IconSpan.vue';
 import { useUserStore } from '@/store/modules/user';
 import { findVisibleHitlDock } from './util';
+import { turnStateWord } from './assistantCtx';
 
 const props = defineProps<{
   state: AssistantState;
@@ -249,6 +287,38 @@ function watchActiveCards() {
   cardRO.disconnect();
   flowRef.value?.querySelectorAll('.dcs-pfc, .dcs-ask, .dcs-elicit').forEach((el) => cardRO!.observe(el));
 }
+/** Q3 甲（2026-11-07 拍板，照 ZCode）：盯内容高度，不再枚举「回合数/字数/卡片状态」的 watch 键——
+ *  以后新增任何卡片/图表都自动覆盖。只在「你本来就在底部」时跟（props.follow），上翻阅读不打扰。
+ *  RO 回调只置脏 + rAF 贴底，避免在布局阶段同步写 scrollTop 把自身再触发一轮。 */
+let contentRO: ResizeObserver | null = null;
+let stickRaf = 0;
+function stickToBottom() {
+  if (stickRaf) {
+    return;
+  }
+  stickRaf = requestAnimationFrame(() => {
+    stickRaf = 0;
+    if (!props.follow) {
+      return;
+    }
+    const el = flowRef.value;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  });
+}
+function watchContentHeight() {
+  if (!contentRO) {
+    return;
+  }
+  const el = flowRef.value;
+  if (!el) {
+    return;
+  }
+  contentRO.disconnect();
+  // 直接子节点覆盖：回合、压缩条、演示条、flow-pad……哪个长高都算
+  Array.from(el.children).forEach((c) => contentRO!.observe(c));
+}
 /** Q3（20261011 拍板A）：滚动时若选区悬浮条在场，rAF 节流重定位跟随活选区——
  *  选区滚出可视区由 onSelChange 的视口守卫自动隐藏，不再滞留原位脱钩 */
 let selReposRaf = 0;
@@ -269,9 +339,139 @@ function onFlowScroll() {
   // 视觉席 U4-P0 回修：阈值 48→92——sticky 钮占底部 14~48px 带，旧阈值下末两行正被
   // 钮盖住时仍显示（"（"被压的实拍）；92 起 = 距底不足两行就隐钮，末行永不被盖
   showBack.value = el.scrollHeight - el.scrollTop - el.clientHeight > 92 && el.scrollHeight > el.clientHeight + 100;
+  syncRail();
   scheduleSyncCovered();
   scheduleSelRepos();
 }
+
+/* ---- 左侧回合刻度（rail）——2026-11-09 按 ZCode 真源码重做 ----
+ * 形状/动画/交互全部对齐 `ZCode/packages/ui/src/v4/ConversationTurnNavigator.tsx`
+ * 与 `conversationTurnNavigatorHelpers.ts:488-507`：
+ *   常态 opacity .58；悬停距离 0/1/2 分别 1/.86/.72，比例见 railBarStyle；
+ *   不悬停时"当前滚动位置那一条"给实色 + .9；预览卡延迟 120ms 打开。
+ * 本仓差异：ZCode 的轨是视口固定层，我们的在滚动容器内——靠 translateY(scrollTop)
+ * 反向平移钉在视口；轨的横向位置落在消息列左侧留白里（railGutter 实测，塞不下就收起）。 */
+const railTop = ref(0);
+const railH = ref(0);
+/** 消息列左缘的可用留白（px）——刻度 22px 轨要完整放进去，否则会压到正文 */
+const railGutter = ref(0);
+/** 容器宽度：ZCode 的硬门槛是 864px（CONVERSATION_TURN_NAVIGATOR_MIN_WIDTH_PX），窄于它整条不渲染 */
+const railW = ref(0);
+const railHover = ref(-1);
+const railCardAt = ref(-1);
+const railCardTop = ref(0);
+/** 滚动位置对应的当前回合（ZCode 的 activeItemIndex）：顶端越过 96px 探针线的最后一轮 */
+const railActive = ref(-1);
+const railEl = ref<HTMLElement>();
+let railCardTimer: ReturnType<typeof setTimeout> | undefined;
+/** 合帧：滚动事件每帧可能来好几次，逐条 getBoundingClientRect 会强制同步布局 */
+let railRaf = 0;
+/** ZCode：items.length < 2 直接不渲染；容器窄于 864px 整条隐藏。这里再加"留白放得下 22px 轨" */
+const railOn = computed(() => props.state.turns.length >= 2 && railW.value >= 864 && railGutter.value >= 24);
+function syncRail() {
+  if (railRaf) {
+    return;
+  }
+  railRaf = requestAnimationFrame(() => {
+    railRaf = 0;
+    measureRail();
+  });
+}
+function measureRail() {
+  const el = flowRef.value;
+  if (!el) {
+    return;
+  }
+  railTop.value = el.scrollTop;
+  railH.value = Math.max(0, el.clientHeight - 28);
+  railW.value = el.clientWidth;
+  // 留白实测：取第一条消息列元素左缘到容器左缘的距离（列是居中定宽的，逐条都一样）
+  const first = el.querySelector<HTMLElement>(':scope > .mrow-me');
+  railGutter.value = first ? Math.max(0, Math.round(first.getBoundingClientRect().left - el.getBoundingClientRect().left)) : 0;
+  // 当前回合：用户气泡顶端越过视口上方 96px 探针线的最后一轮
+  const bubs = el.querySelectorAll<HTMLElement>(':scope > .mrow-me .bub[data-tid]');
+  let active = -1;
+  const probe = el.getBoundingClientRect().top + 96;
+  bubs.forEach((b) => {
+    if (b.getBoundingClientRect().top <= probe) {
+      active += 1;
+    }
+  });
+  railActive.value = active;
+}
+/* ZCode resolveConversationTurnNavigatorBarVisualState：山峰按距离衰减。
+   本仓留白只有 24px（ZCode 那边是完整 48px 侧栏），峰值比例 2.6→2.2、
+   近邻 1.7→1.6，让最宽那条（22px）刚好填满留白、不越界不被裁。 */
+function railBarStyle(i: number): Record<string, string> {
+  const h = railHover.value;
+  if (h >= 0) {
+    const d = Math.abs(i - h);
+    if (d === 0) return { transform: 'scaleX(2.2)', opacity: '1' };
+    if (d === 1) return { transform: 'scaleX(1.6)', opacity: '0.86' };
+    if (d === 2) return { transform: 'scaleX(1.25)', opacity: '0.72' };
+    return { transform: 'scaleX(1)', opacity: '0.58' };
+  }
+  // 不悬停：全部常态；滚到的那一条压实色（透明度 .9）
+  return { transform: 'scaleX(1)', opacity: i === railActive.value ? '0.9' : '0.58' };
+}
+/** 色调：悬停的峰用正文色，其余用 40% 淡色（ZCode focus/muted 两档） */
+function railTone(i: number): 'peak' | 'muted' {
+  const h = railHover.value;
+  if (h >= 0) {
+    return i === h ? 'peak' : 'muted';
+  }
+  return i === railActive.value ? 'peak' : 'muted';
+}
+/** 悬停立刻生效（山峰要跟手），预览卡延迟 120ms（ZCode openDelay）。
+ *  注意 ev.currentTarget 只在派发期间有效（规范：派发结束即置 null），必须在进入时同步抓住元素，
+ *  否则延迟回调里拿到 null，卡永远不出来（2026-11-09 实测踩到）。 */
+function railEnter(i: number, ev: Event) {
+  railHover.value = i;
+  const btn = ev.currentTarget as HTMLElement | null;
+  if (railCardTimer) {
+    clearTimeout(railCardTimer);
+  }
+  railCardTimer = setTimeout(() => {
+    const rail = railEl.value;
+    if (!btn || !rail) {
+      return;
+    }
+    const b = btn.getBoundingClientRect();
+    const r = rail.getBoundingClientRect();
+    // 卡按 CSS translateY(-50%) 垂直居中在刻度上（ZCode HoverCard align=center），
+    // 这里只把中线夹在轨内，防末几条把卡甩出可视区
+    const center = Math.round(b.top - r.top + b.height / 2);
+    railCardTop.value = Math.max(58, Math.min(center, railH.value - 58));
+    railCardAt.value = i;
+  }, 120);
+}
+function railLeave() {
+  railHover.value = -1;
+  railCardAt.value = -1;
+  if (railCardTimer) {
+    clearTimeout(railCardTimer);
+    railCardTimer = undefined;
+  }
+}
+/** 预览卡回答段：优先正文纯文本，其次流式缓冲；压成单段便于 3 行截断 */
+function railPreview(i: number): string {
+  const t = props.state.turns[i];
+  if (!t) {
+    return '';
+  }
+  const raw = t.answerHtml ? t.answerHtml.replace(/<[^>]+>/g, ' ') : t.bufText || '';
+  return raw.replace(/\s+/g, ' ').trim();
+}
+function railGoto(t: AssistantTurn) {
+  const el = flowRef.value?.querySelector(`[data-tid="${t.id}"]`);
+  el?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  railLeave();
+}
+watch(
+  () => props.state.turns.length,
+  () => nextTick(syncRail)
+);
+
 // 卡挂载/收起后矩形会变（不经过滚动），补两次同步
 watch(
   () => props.state.turns.map((t) => `${t.askUsers?.length ?? 0}:${t.plan?.status ?? ''}`).join('|'),
@@ -283,14 +483,32 @@ watch(
 );
 onMounted(() => {
   cardRO = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => syncCardCovered());
+  contentRO = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => stickToBottom());
   nextTick(() => {
     watchActiveCards();
     syncCardCovered();
+    watchContentHeight();
+    syncRail();
   });
 });
+/** 回合增删/换会话后子节点变了，重新挂观察（RO 本身不感知「新增节点」） */
+watch(
+  () => [props.state.turns.length, props.state.threadId],
+  () => nextTick(watchContentHeight)
+);
 onBeforeUnmount(() => {
   cardRO?.disconnect();
   cardRO = null;
+  contentRO?.disconnect();
+  contentRO = null;
+  if (stickRaf) {
+    cancelAnimationFrame(stickRaf);
+    stickRaf = 0;
+  }
+  if (railRaf) {
+    cancelAnimationFrame(railRaf);
+    railRaf = 0;
+  }
   if (coverRaf) {
     cancelAnimationFrame(coverRaf);
     coverRaf = 0;
@@ -454,6 +672,9 @@ function onWinResize() {
   scheduleSelRepos();
   nextTick(measureClamp);
   nextTick(syncCardCovered);
+  // 2026-11-09 代码席 P2：抽屉↔全屏/窗口缩放会改容器高度，刻度间距必须跟着重算，
+  // 否则刻度还按旧高度均分，末几个点跑出可视区
+  nextTick(syncRail);
 }
 watch(
   () => props.state.turns.length,
@@ -763,6 +984,8 @@ defineExpose({ jumpToStep, jumpToConfirm });
 
 <style lang="scss" scoped>
 .dcs-flow {
+  /* Q6 丙：回合刻度（.rail）是本滚动容器的 absolute 子节点，需要定位上下文 */
+  position: relative;
   flex: 1;
   overflow-y: auto;
   padding: 14px;
@@ -817,7 +1040,10 @@ defineExpose({ jumpToStep, jumpToConfirm });
        贴左的代价在宽屏最明显：1920 实测列 900 挤在左缘（左 25 / 右 403），
        和「展开时左缝 = 到面板的缝」自相矛盾——因为列根本不在可用区中间。
        居中后：胶囊态左右对称；展开态列在「左缘 ~ 面板左缘」之间居中，两缝自然相等。 */
-    > *:not(.tobot) {
+    /* Q6-丙 回修（2026-11-08）：.rail 也是 flow 的直接子节点，被这条限宽
+       一起套成 900px——刻度被 align-items:center 推到消息列正中（活体实测 x≈893）。
+       它自带绝对定位与尺寸，必须排除在限宽之外（预览卡是它的子节点，跟着一起不受影响）。 */
+    > *:not(.tobot):not(.rail) {
       width: 100%;
       max-width: var(--dcs-col-max, 900px);
       align-self: center;
@@ -1067,6 +1293,127 @@ defineExpose({ jumpToStep, jumpToConfirm });
     &:hover {
       color: var(--el-color-danger);
       background: var(--el-color-danger-light-9);
+    }
+  }
+}
+
+/* 左侧回合刻度（2026-11-09 按 ZCode 真源码重做）——
+   短横杠 2×12px、origin-left、按悬停距离做山峰；轨落在消息列左侧留白里，
+   留白不足 44px 时由脚本整条收起（railOn），CSS 不再用视口断点猜。 */
+.rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* 只占消息列左侧留白（实测 24px），刻度右对齐贴列、向左生长——留白不够时脚本收起 */
+  width: 22px;
+  z-index: 4;
+  /* 平移量由脚本按 scrollTop 绑定（syncRail），这里只管形 */
+  will-change: transform;
+}
+/* 轨内滚动：回合多到装不下时自己滚（ZCode 同款，滚动条藏掉） */
+.rail-in {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 22px;
+  max-height: 100%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  /* 内容不满时垂直居中；回合多到溢出时用 safe center——纯 center + overflow 在
+     Chromium 里会把最上面几条顶到不可滚的负区间（ZCode 用虚拟列表规避，我们条目少，
+     交给 safe 关键字） */
+  justify-content: center;
+  justify-content: safe center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+/* 行高 10px、整条留白宽（点区比视觉杠宽得多，好点中）——ZCode w-9 h-2.5 */
+.rail-b {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 22px;
+  height: 10px;
+  padding: 0;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  border-radius: 2px;
+  &:focus-visible {
+    outline: 2px solid var(--el-color-primary-light-5);
+    outline-offset: 1px;
+  }
+}
+/* 视觉本体：2px 高、10px 宽的圆头短杠，从右端起伸缩（向左长，不压正文） */
+.rail-bar {
+  display: block;
+  width: 10px;
+  height: 2px;
+  border-radius: 999px;
+  transform-origin: right center;
+  transition: opacity 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
+  /* ZCode muted = foreground-subtlest：正文色 40% */
+  background: color-mix(in oklab, var(--dcs-text-primary) 40%, transparent);
+  &.t-peak {
+    background: var(--dcs-text-primary);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-bar {
+    transition: none;
+  }
+}
+/* 预览卡：320px（ZCode w-80）、轨右侧 6px、白底描边投影，问题 2 行 + 回答 3 行；
+   top 由脚本给刻度中线，translateY(-50%) 实现垂直居中对齐（ZCode HoverCard align=center） */
+.rail-card {
+  position: absolute;
+  left: 28px;
+  transform: translateY(-50%);
+  z-index: 6;
+  width: 320px;
+  max-width: calc(100vw - 2rem);
+  padding: 12px;
+  border: 1px solid var(--dcs-border-light, #e4e7ec);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .rc-q {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--dcs-text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .rc-a {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--dcs-text-secondary);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    &.ph {
+      color: var(--dcs-text-placeholder);
     }
   }
 }

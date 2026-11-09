@@ -77,6 +77,32 @@ const ARG_KEY_CN: Record<string, string> = {
   college: '部门'
 };
 
+/** Q6 甲（2026-11-07 拍板）：工具详情「参数」段——拆成键值对（中文键名 + 完整值），
+ *  最多 8 对防长参数刷屏；非 JSON 入参原样回一行。与 summarizeArgs 的区别：
+ *  摘要给一句话预览（3 个键、值截 24 字），这里给「点开之后看全」的明细。
+ *  2026-11-09 代码席 P2：①先 parse 再折叠空白——原实现先折叠整串，会把字符串值里的
+ *  换行/多空格一起压平，而这段的功能定位就是「看原文」；②key 带回原始键名 raw，
+ *  否则 dept/college 都映射成「部门」时 v-for :key 撞车（Vue 警告+复用错位）。 */
+export function argPairs(raw: string): Array<{ k: string; raw: string; v: string }> {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) {
+    return [];
+  }
+  const parsed = trimmed.startsWith('{') ? tryParse(shieldBigIds(trimmed)) : null;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    // 非 JSON / 解析失败：原样回一行（仅把超长空白折叠成单空格，避免一行几千像素）
+    const s = trimmed.replace(/\s+/g, ' ');
+    return [{ k: '参数', raw: '参数', v: s }];
+  }
+  return Object.entries(parsed as Record<string, unknown>)
+    .slice(0, 8)
+    .map(([k, v]) => ({
+      k: ARG_KEY_CN[k] ?? k,
+      raw: k,
+      v: v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v)
+    }));
+}
+
 export function summarizeArgs(raw: string): string {
   const s = raw.replace(/\s+/g, ' ').trim();
   if (!s.startsWith('{')) {

@@ -60,22 +60,22 @@ describe('assistantCtx 页面感知建议池', () => {
   });
 });
 
-describe('assistantCtx Q10 统一状态词表 turnStateWord（2026-10-09 拍板）', () => {
-  it('七相位主词全表（思考中/执行中/撰写中/等确认/已完成/已停止/失败）', () => {
-    expect(turnStateWord('thinking')).toBe('思考中');
-    expect(turnStateWord('acting')).toBe('执行中');
-    expect(turnStateWord('writing')).toBe('撰写中');
-    expect(turnStateWord('waiting')).toBe('等确认');
-    expect(turnStateWord('done')).toBe('已完成');
+describe('assistantCtx Q1 工作态词表 turnStateWord（2026-11-07 拍板，照 ZCode）', () => {
+  it('进行中三相位收成一个词「工作中」；终态/等待各一词', () => {
+    expect(turnStateWord('thinking')).toBe('工作中');
+    expect(turnStateWord('acting')).toBe('工作中');
+    expect(turnStateWord('writing')).toBe('工作中');
+    expect(turnStateWord('waiting')).toBe('等你确认');
+    expect(turnStateWord('done')).toBe('已工作');
     expect(turnStateWord('stopped')).toBe('已停止');
     expect(turnStateWord('error')).toBe('失败');
   });
-  it('acting 带动宾补语成「执行中（正在查询任务库…）」形态', () => {
-    expect(turnStateWord('acting', { actingVerb: '正在查询任务库' })).toBe('执行中（正在查询任务库…）');
+  it('acting 的动宾补语不再拼进主词（阶段由思考行/工具行自己表达）', () => {
+    expect(turnStateWord('acting', { actingVerb: '正在查询任务库' })).toBe('工作中');
   });
-  it('旧词表全部消灭（正在想/正在做/做完了/进程/出了点问题/等你确认/已回答不得再出现）', () => {
+  it('旧词表全部消灭（思考中/执行中/撰写中/等确认/已完成/正在想/做完了 不得再出现）', () => {
     const all = ['thinking', 'acting', 'writing', 'waiting', 'done', 'stopped', 'error'].map((p) => turnStateWord(p)).join('|');
-    for (const banned of ['正在想', '正在做', '做完了', '进程', '出了点问题', '等你确认', '已回答']) {
+    for (const banned of ['思考中', '执行中', '撰写中', '等确认', '已完成', '正在想', '正在做', '做完了']) {
       expect(all.includes(banned)).toBe(false);
     }
   });
