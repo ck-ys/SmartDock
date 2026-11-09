@@ -37,18 +37,23 @@ public class AskUserTools {
     }
 
     @Tool(name = "ask_user",
-        description = "向用户发起结构化反问（卡片选择），用户点完再继续。"
-            + "什么时候用：需要用户在几个候选里选一个（哪条任务/哪个分群/哪段时间）、"
-            + "或两个以上方案需要用户拍板、或关键参数缺失且猜不准。"
-            + "什么时候别用：能查到的先查（别拿反问代替查询）；能用一句话问清的直接在正文里问。"
-            + "questions 传 JSON 数组字符串，最多 4 题，每题 {question, header, options:[{label,description}], multiSelect}"
-            + "（options 2-4 个，header 是短标签，multiSelect=true 表示可多选）。",
+        description = "向用户发起结构化反问（选项卡片），只在真正需要用户拍板、且答案会改变下一步时用。"
+            + "什么时候用：用户必须在几个候选里选一个（哪条任务/哪个分群/哪段时间），"
+            + "或两个以上方案需要用户拍板，或关键参数缺失且猜不准。"
+            + "什么时候别用：能查到的先查（别拿反问代替查询）；有惯例默认值的别问；"
+            + "能用一句话问清的直接在正文里问。计划能不能执行走计划审批，不许用这张卡。"
+            + "questions 传 JSON 数组字符串，1-4 题；每题 {question, header, options, multiSelect}："
+            + "question 以问号结尾；header 是最多 12 字的短标签；options 2-4 个，每个必须是 "
+            + "{label, description} 对象（description 必填，用一句人话说明选它会发生什么）；"
+            + "multiSelect=true 表示可多选。不要自己加『其它/Other』选项，卡片会自动提供；"
+            + "如果推荐某个选项，把它放第一个并在 label 末尾加 (Recommended)。",
         readOnly = true)
     public String ask(
         @ToolParam(name = "questions",
             description = "JSON 数组字符串，例如 "
                 + "[{\"question\":\"要催哪个任务？\",\"header\":\"选任务\",\"options\":"
-                + "[{\"label\":\"期末成绩录入\",\"description\":\"还有 12 人未交\"},{\"label\":\"选课审核\"}],\"multiSelect\":false}]")
+                + "[{\"label\":\"期末成绩录入 (Recommended)\",\"description\":\"还有 12 人未交，优先催这个\"},"
+                + "{\"label\":\"选课审核\",\"description\":\"本周截止，影响下学期选课\"}],\"multiSelect\":false}]")
         String questionsJson) {
 
         List<Map<String, Object>> questions;
@@ -66,7 +71,7 @@ public class AskUserTools {
         return formatResult(result);
     }
 
-    /** 解析并收紧参数（纯函数，单测直测）：非法即抛 IllegalArgumentException（人话原因） */
+    /** 解析并收紧参数（纯函数，单测直测）：按 ZCode AskUserQuestion 契约校验，非法即抛人话原因。 */
     public static List<Map<String, Object>> parseQuestions(String json) {
         if (json == null || json.isBlank()) {
             throw new IllegalArgumentException("questions 不能为空");
@@ -92,42 +97,52 @@ public class AskUserTools {
             if (question.isEmpty()) {
                 throw new IllegalArgumentException("question 不能为空");
             }
-            String header = str(q.get("header"), 20);
+            if (!question.endsWith("?") && !question.endsWith("？")) {
+                question = question + "？";
+            }
+            String header = str(q.get("header"), 12);
+            if (header.isEmpty()) {
+                header = "请选择";
+            } else if (String.valueOf(q.get("header")).trim().length() > 12) {
+                throw new IllegalArgumentException("header 最多 12 个字，请缩短后重试");
+            }
             boolean multi = Boolean.TRUE.equals(q.get("multiSelect"));
             List<Map<String, Object>> options = new ArrayList<>();
             java.util.Set<String> usedLabels = new java.util.HashSet<>();
             Object opts = q.get("options");
-            if (opts instanceof List<?> list) {
-                for (Object o : list) {
-                    if (o instanceof Map<?, ?> om) {
-                        String label = dedupeLabel(str(om.get("label"), 40), usedLabels);
-                        if (label.isEmpty()) {
-                            continue;
-                        }
-                        Map<String, Object> one = new LinkedHashMap<>();
-                        one.put("label", label);
-                        String desc = str(om.get("description"), 80);
-                        if (!desc.isEmpty()) {
-                            one.put("description", desc);
-                        }
-                        options.add(one);
-                    } else if (o != null) {
-                        String label = dedupeLabel(str(o, 40), usedLabels);
-                        if (!label.isEmpty()) {
-                            options.add(Map.of("label", label));
-                        }
-                    }
-                    if (options.size() >= AssistantAskUserBridge.MAX_OPTIONS) {
-                        break;
-                    }
+            if (!(opts instanceof List<?> list)) {
+                throw new IllegalArgumentException("options 要一个数组（2-4 个 {label, description}）");
+            }
+            if (list.size() > AssistantAskUserBridge.MAX_OPTIONS) {
+                throw new IllegalArgumentException("每题最多 " + AssistantAskUserBridge.MAX_OPTIONS + " 个选项");
+            }
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> om)) {
+                    throw new IllegalArgumentException("每个选项必须是 {label, description} 对象");
                 }
+                String label = dedupeLabel(str(om.get("label"), 40), usedLabels);
+                if (label.isEmpty()) {
+                    throw new IllegalArgumentException("选项 label 不能为空");
+                }
+                String desc = str(om.get("description"), 80);
+                if (desc.isEmpty()) {
+                    throw new IllegalArgumentException("选项「" + label + "」缺少 description，请补一句人话说明");
+                }
+                String lowered = label.trim().toLowerCase(java.util.Locale.ROOT);
+                if ("other".equals(lowered) || "其它".equals(lowered) || "其他".equals(lowered)) {
+                    throw new IllegalArgumentException("不要自己加『其它/Other』选项，卡片会自动提供");
+                }
+                Map<String, Object> one = new LinkedHashMap<>();
+                one.put("label", label);
+                one.put("description", desc);
+                options.add(one);
             }
             if (options.size() < 2) {
                 throw new IllegalArgumentException("每题至少给 2 个选项（「其它」由卡片自带）");
             }
             Map<String, Object> one = new LinkedHashMap<>();
             one.put("question", question);
-            one.put("header", header.isEmpty() ? "请选择" : header);
+            one.put("header", header);
             one.put("options", options);
             one.put("multiSelect", multi);
             out.add(one);
@@ -142,10 +157,9 @@ public class AskUserTools {
             return "系统当前待作答的反问太多，这次没问出来；请改用正文直接提问。";
         }
         if ("timeout".equals(action)) {
-            return "用户超时未作答（" + AssistantAskUserBridge.TIMEOUT_SECONDS
-                + " 秒）。请用一句话说明你卡在哪、需要用户补充什么，等用户回复后再继续，不要重复发问。";
+            return "用户超时未作答。请用一句话说明你卡在哪、需要用户补充什么，等用户回复后再继续，不要重复发问。";
         }
-        if (Boolean.TRUE.equals(result.get("auto"))) {
+        if (result != null && Boolean.TRUE.equals(result.get("auto"))) {
             return "用户 " + (AssistantAskUserBridge.AUTO_CONTINUE_SECONDS / 60)
                 + " 分钟没有作答，已按「自动继续」往下走。请按最稳妥的默认继续；"
                 + "涉及写操作或不可逆动作时停下来告诉用户缺哪项信息，不要重复发问。";
