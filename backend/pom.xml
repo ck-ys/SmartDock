@@ -122,11 +122,12 @@
             </dependency>
 
             <!-- AgentScope 全家 BOM 钉版本（P0-Task0，2026-10-03）：2.0.x 迭代快，升级只改这一个号；
-                 若 Central 无此 BOM 则删除本段改逐坐标钉版本，结论记 document/evidence/assistant-p0/（Task 5 对账） -->
+                 若 Central 无此 BOM 则删除本段改逐坐标钉版本，结论记 document/evidence/assistant-p0/（Task 5 对账）。
+                 2026-11-10 升 2.1.0-BETA1（中央仓已发布，阿里/华为镜像均 200） -->
             <dependency>
                 <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-bom</artifactId>
-                <version>2.0.4</version>
+                <version>2.1.0-BETA1</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
