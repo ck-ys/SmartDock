@@ -69,7 +69,7 @@ class P10JdbcStoreTest {
     private static BaseStore buildBaseStore() {
         DataSource ds = controlledDataSource();
         AbstractJdbcDialect dialect = AbstractJdbcDialect.from(ds).autoCreateTable(false).build();
-        return JdbcStore.builder(ds).dialect(dialect).initializeSchema(false).build();
+        return JdbcStore.builder(ds).dialect(dialect).build();
     }
 
     @BeforeAll

@@ -62,7 +62,8 @@ class AssistantCompactionPolicyTest {
         assertThat(cfg.getKeepMessages()).isEqualTo(AssistantCompactionPolicy.KEEP_MESSAGES);
         assertThat(cfg.getSummaryPrompt()).isEqualTo(AssistantCompactionAssets.SUMMARY_PROMPT);
         assertThat(cfg.isFlushBeforeCompact()).isFalse();
-        assertThat(cfg.isOffloadBeforeCompact()).isFalse();
+        // AgentScope 2.1 删除了 offloadBeforeCompact（builder 与 getter 都已移除）：
+        // offload 关闭语义随上游消失，没有可断言的对象；此处只钉住仍在的 flush 关闭。
     }
 
     @Test

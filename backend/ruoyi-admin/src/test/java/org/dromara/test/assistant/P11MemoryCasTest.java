@@ -60,11 +60,11 @@ class P11MemoryCasTest {
         return ds;
     }
 
-    /** T10 沉淀装配配方：预建表 + 双开关关闭（三参构造的 boolean=false 即 initializeSchema(false)） */
+    /** T10 沉淀装配配方：预建表（AgentScope 2.1 起构造不再带建表开关） */
     private static JdbcAgentStateStore buildStateStore() {
         DataSource ds = controlledDataSource();
         AbstractJdbcDialect dialect = AbstractJdbcDialect.from(ds).autoCreateTable(false).build();
-        return new JdbcAgentStateStore(ds, dialect, false);
+        return new JdbcAgentStateStore(ds, dialect);
     }
 
     @BeforeAll
@@ -158,7 +158,7 @@ class P11MemoryCasTest {
     void concurrentPutIfVersionMemoryMd() throws Exception {
         DataSource ds = controlledDataSource();
         AbstractJdbcDialect dialect = AbstractJdbcDialect.from(ds).autoCreateTable(false).build();
-        BaseStore baseStore = JdbcStore.builder(ds).dialect(dialect).initializeSchema(false).build();
+        BaseStore baseStore = JdbcStore.builder(ds).dialect(dialect).build();
         List<String> ns = List.of(NS);
         String key = "MEMORY.md";
 

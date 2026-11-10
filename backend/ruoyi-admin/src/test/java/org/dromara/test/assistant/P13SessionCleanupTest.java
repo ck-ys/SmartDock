@@ -140,7 +140,7 @@ class P13SessionCleanupTest {
     void jdbcSessionDeleteRemovesRow() throws Exception {
         DataSource ds = controlledDataSource();
         AbstractJdbcDialect dialect = AbstractJdbcDialect.from(ds).autoCreateTable(false).build();
-        JdbcAgentStateStore jdbcStore = new JdbcAgentStateStore(ds, dialect, false);
+        JdbcAgentStateStore jdbcStore = new JdbcAgentStateStore(ds, dialect);
         try {
             jdbcStore.save(USER, "jdbc-1", "k", new ProbeState("v1"));
             String composite = USER + ":jdbc-1";

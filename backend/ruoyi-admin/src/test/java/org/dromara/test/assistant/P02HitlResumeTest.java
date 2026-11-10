@@ -327,6 +327,6 @@ class P02HitlResumeTest {
         javax.sql.DataSource ds = probeDataSource();
         io.agentscope.extensions.jdbc.dialect.AbstractJdbcDialect dialect =
             io.agentscope.extensions.jdbc.dialect.AbstractJdbcDialect.from(ds).autoCreateTable(false).build();
-        return new io.agentscope.extensions.jdbc.state.JdbcAgentStateStore(ds, dialect, false);
+        return new io.agentscope.extensions.jdbc.state.JdbcAgentStateStore(ds, dialect);
     }
 }

@@ -194,7 +194,7 @@ class P14CompactionTest {
     private static BaseStore buildBaseStore() {
         DataSource ds = controlledDataSource();
         AbstractJdbcDialect dialect = AbstractJdbcDialect.from(ds).autoCreateTable(false).build();
-        return JdbcStore.builder(ds).dialect(dialect).initializeSchema(false).build();
+        return JdbcStore.builder(ds).dialect(dialect).build();
     }
 
     // ================= Step1/2：压缩触发 + 摘要质量（ConversationCompactor 直测，1 次摘要调用） =================
