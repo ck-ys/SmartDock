@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 5b 批数据库在线层护栏（题2 甲·三层叠加 / 多单位隔离）：
@@ -64,15 +65,18 @@ class DatabaseSkillLayerUnitTest {
     @Tag("dev")
     void tenantIsolationHolds() {
         AssistantSkillSource.invalidateAll();
+        // 2026-11-10 修过时断言：这里原本用 "weekly-report"，但它已是 classpath 内置技能，
+        // 「B 不该看到 A 的行」被内置层自己顶成了红。换成任何内置层都没有的自造 id，
+        // 才真正只考验「A 的数据库行不漏给 B」。
         DatabaseSkillRepository.primeForTest(T_A, List.of(
-            dbSkill("weekly-report", "A 单位在线新增的周报技能", ToolIdentity.LEVEL_MEMBER)));
+            dbSkill("a-only-skill", "A 单位在线新增的周报技能", ToolIdentity.LEVEL_MEMBER)));
         AssistantSkillSource.clearMergedOnly();
 
-        // B 单位看不到 A 的行；B 视图只有内置四技能
+        // B 单位看不到 A 的行；B 视图仍有内置技能
         List<AssistantSkillSource.SkillView> viewB = AssistantSkillSource.all(T_B);
         assertThat(viewB).extracting(AssistantSkillSource.SkillView::id)
-            .doesNotContain("weekly-report")
-            .containsExactlyElementsOf(SkillAssets.SKILLS.stream().map(SkillAssets.Skill::id).toList());
+            .doesNotContain("a-only-skill")
+            .contains("data-reading");
     }
 
     @Test
@@ -97,11 +101,15 @@ class DatabaseSkillLayerUnitTest {
     @Test
     @Tag("dev")
     void dbLayerAbsentMeansBuiltinOnly() {
-        // 无 DB 行（层缺席）：视图退回内置四技能，不抛不缺
+        // 无 DB 行（层缺席）：视图退回内置层，不抛不缺。
+        // 2026-11-10 修过时断言：原本拿 SkillAssets.SKILLS（退役常量表，只剩 4 条）当期望值，
+        // 而 classpath 现在有 10 个技能目录——两边本来就不该相等。这里改成钉住语义本身：
+        // 内置技能在、数据库行一条都没有。
         AssistantSkillSource.invalidateAll();
         List<AssistantSkillSource.SkillView> view = AssistantSkillSource.all(T_B);
         assertThat(view).extracting(AssistantSkillSource.SkillView::id)
-            .containsExactlyElementsOf(SkillAssets.SKILLS.stream().map(SkillAssets.Skill::id).toList());
+            .contains("data-reading", "urge-wording")
+            .doesNotContain("a-only-skill", "global-skill");
     }
 
     @Test
@@ -122,5 +130,50 @@ class DatabaseSkillLayerUnitTest {
         AssistantSkillSource.clearMergedOnly();
         assertThat(AssistantSkillSource.all(T_B)).extracting(AssistantSkillSource.SkillView::id)
             .contains("urge-wording");
+    }
+
+    /* ===== 2026-11-10 Q3=乙：单条坏数据不得带走整层（可测缝 = DatabaseSkillRepository.toSkill） ===== */
+
+    private static org.dromara.assistant.domain.DcsAssistantSkill row(String id, String desc) {
+        org.dromara.assistant.domain.DcsAssistantSkill r = new org.dromara.assistant.domain.DcsAssistantSkill();
+        r.setSkillId(id);
+        r.setDescription(desc);
+        r.setBody("# 正文");
+        r.setMinRole("member");
+        return r;
+    }
+
+    @Test
+    @Tag("dev")
+    @Tag("local")
+    void toSkillRejectsEmptyNameAndEmptyDescription() {
+        // 官方 Builder 的硬校验（must have name/description）就是「一条坏数据能让整层技能
+        // 消失」的触发点：老代码只在外层 catch 兜，一抛就整层退场。这条把三个现实触发面钉死
+        // ——空名称、描述为 null、描述为空串。
+        assertThatThrownBy(() -> DatabaseSkillRepository.toSkill(row("", "一句说明")))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DatabaseSkillRepository.toSkill(row("ok-skill", null)))
+            .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> DatabaseSkillRepository.toSkill(row("ok-skill", "")))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @Tag("dev")
+    @Tag("local")
+    void toSkillKeepsValidRow() {
+        AgentSkill s = DatabaseSkillRepository.toSkill(row("db-ok", "一句说明"));
+        assertThat(s.getName()).isEqualTo("db-ok");
+        assertThat(s.getDescription()).isEqualTo("一句说明");
+        assertThat(s.getSkillContent()).isEqualTo("# 正文");
+    }
+
+    @Test
+    @Tag("dev")
+    @Tag("local")
+    void failedCountIsZeroWhenLayerIsClean() {
+        // 0 = 全部正常，界面此时一个字都不显示（不留「0 个失败」这种读数）
+        DatabaseSkillRepository.primeForTest(T_A, List.of(dbSkill("x1", "说明", 0)), java.util.Set.of());
+        assertThat(DatabaseSkillRepository.failedCount(T_A)).isZero();
     }
 }

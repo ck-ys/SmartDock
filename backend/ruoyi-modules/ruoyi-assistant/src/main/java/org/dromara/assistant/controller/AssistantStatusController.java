@@ -118,6 +118,27 @@ public class AssistantStatusController extends BaseController {
     }
 
     /**
+     * 技能加载失败条数（2026-11-10 Q3=乙）：技能库读到了，但其中有 N 条数据坏掉被跳过。
+     *
+     * <p>为什么不塞进 {@code /skills} 的返回体：那个端点的契约是「技能数组」，改成对象会让
+     * 所有消费方跟着改。这里单开一个端点，前端并行拉，列表结构零改动。</p>
+     *
+     * <p>权限与目录同（{@code dcs:assistant:use}）：目录看不见的人也不需要知道有几条坏数据。</p>
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/skills/failures")
+    public R<Map<String, Object>> skillFailures() {
+        org.dromara.assistant.tools.ToolIdentity identity = org.dromara.assistant.tools.ToolIdentity.from(
+            org.dromara.common.satoken.utils.LoginHelper.getLoginUser());
+        String dynamicTenantId = TenantHelper.getTenantId();
+        String tenantId = dynamicTenantId != null && !dynamicTenantId.isBlank()
+            ? dynamicTenantId : identity.getTenantId();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("failed", org.dromara.assistant.core.DatabaseSkillRepository.failedCount(tenantId));
+        return R.ok(out);
+    }
+
+    /**
      * 稳流② Q8②（2026-10-20）：助手运行健康（管理页「运行健康」卡数据源）。
      * 两张分布表=进程内累计（重启归零，since=本次启动时刻）——追问哑火/看门狗误判
      * 高危样本（心跳=0 且静默大的 run）从这先看出趋势，需要持久化再落表（观察期后决定）。

@@ -100,6 +100,12 @@ export function getAssistantSkillCatalog() {
   });
 }
 
+/* 2026-11-10 Q3=乙：技能库读到了、但其中有几条数据坏掉被跳过（失败条数，0=全部正常）。
+   与目录同权限；单独一个端点是为了不动 /skills 的返回结构（前端列表契约零改动）。 */
+export function getAssistantSkillFailures() {
+  return request<{ failed: number }>({ url: '/dcs/assistant/skills/failures', method: 'get' });
+}
+
 /* 批3.5·题5：当前登录人最近用过的技能（真值来自使用统计表按人维度，倒序前8） */
 export interface AssistantRecentSkill {
   skillId: string;

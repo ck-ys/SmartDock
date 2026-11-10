@@ -42,7 +42,7 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
     static final java.util.concurrent.atomic.AtomicLong GEN =
         new java.util.concurrent.atomic.AtomicLong();
 
-    private record Cached(List<AgentSkill> skills, java.util.Set<String> disabled, long at) {
+    private record Cached(List<AgentSkill> skills, java.util.Set<String> disabled, int failed, long at) {
     }
 
     private final String tenantId;
@@ -61,7 +61,7 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
         Load loaded = load();
         // 装载成功且装载期间未发生失效（保存/广播）才落缓存；失败沿用旧快照不入缓存
         if (loaded.ok() && GEN.get() == gen) {
-            CACHE.put(tenantId, new Cached(loaded.skills(), loaded.disabled(),
+            CACHE.put(tenantId, new Cached(loaded.skills(), loaded.disabled(), loaded.failed(),
                 System.currentTimeMillis()));
         }
         return loaded.skills();
@@ -81,6 +81,23 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
             snap = CACHE.get(key);
         }
         return snap == null ? java.util.Set.of() : snap.disabled();
+    }
+
+    /**
+     * 本租户上次装载时因单条数据损坏被跳过的技能条数（2026-11-10 Q3=乙）。
+     *
+     * <p>0 = 全部正常。整层读取失败（库挂了/超时）不在这里表达——那种情况沿用上次快照，
+     * 由前端「读失败」那一态说话；这条只回答「读到了，但有几条用不了」。</p>
+     */
+    public static int failedCount(String tenantId) {
+        String key = tenantId == null || tenantId.isBlank() ? GLOBAL_TENANT : tenantId;
+        Cached snap = CACHE.get(key);
+        if (snap == null || System.currentTimeMillis() - snap.at() >= TTL_MS) {
+            // 与 disabledIds 同口径：没有新鲜快照就先触发一次正规装载
+            new DatabaseSkillRepository(key).getAllSkills();
+            snap = CACHE.get(key);
+        }
+        return snap == null ? 0 : snap.failed();
     }
 
     @Override
@@ -157,14 +174,14 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
 
     /** 纯函数单测通道：直灌缓存（生效技能＋停用遮罩集） */
     static void primeForTest(String tenantId, List<AgentSkill> skills, java.util.Set<String> disabled) {
-        CACHE.put(tenantId, new Cached(List.copyOf(skills), java.util.Set.copyOf(disabled),
+        CACHE.put(tenantId, new Cached(List.copyOf(skills), java.util.Set.copyOf(disabled), 0,
             System.currentTimeMillis()));
     }
 
-    /** 装载结果：生效技能＋停用遮罩集；ok=装载成功（失败沿用旧快照，不落缓存） */
-    private record Load(List<AgentSkill> skills, java.util.Set<String> disabled, boolean ok) {
+    /** 装载结果：生效技能＋停用遮罩集＋坏数据条数；ok=装载成功（失败沿用旧快照，不落缓存） */
+    private record Load(List<AgentSkill> skills, java.util.Set<String> disabled, int failed, boolean ok) {
         static Load empty() {
-            return new Load(List.of(), java.util.Set.of(), false);
+            return new Load(List.of(), java.util.Set.of(), 0, false);
         }
     }
 
@@ -190,6 +207,7 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
                 byId.put(row.getSkillId(), row);
             }
             List<AgentSkill> out = new ArrayList<>(byId.size());
+            int failed = 0;
             for (DcsAssistantSkill row : byId.values()) {
                 if (row.getDisabled() != null && row.getDisabled() == 1) {
                     disabled.add(row.getSkillId());
@@ -198,27 +216,24 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
                 if (row.getBody() == null || row.getBody().isBlank()) {
                     continue;
                 }
-                Map<String, Object> meta = new LinkedHashMap<>();
-                meta.put("displayName",
-                    row.getDisplayName() == null || row.getDisplayName().isBlank()
-                        ? row.getSkillId() : row.getDisplayName());
-                meta.put("minRole", String.valueOf(minRoleOf(row.getMinRole())));
-                meta.put("origin", "database");
-                out.add(AgentSkill.builder()
-                    .name(row.getSkillId())
-                    .description(row.getDescription() == null ? "" : row.getDescription())
-                    .skillContent(row.getBody())
-                    // 注意：不能 .metadata(map) 整体替换——会把 name/description 从 metadata 里抹掉
-                    //（官方 Builder 校验读 metadata，IllegalArgument: must have name/description）
-                    .putMetadata("displayName", meta.get("displayName"))
-                    .putMetadata("minRole", meta.get("minRole"))
-                    .putMetadata("origin", "database")
-                    .source("database")
-                    .build());
+                // 2026-11-10 Q3=乙（逐条兜底）：官方 Builder 对空 name/description 直接抛
+                // IllegalArgumentException——一条坏数据不该让整层技能消失。只丢这一条并计数，
+                // 其余照常生效；条数经 /skills/failures 透给界面（黄条说「N 个加载失败」）。
+                try {
+                    out.add(toSkill(row));
+                } catch (RuntimeException bad) {
+                    failed++;
+                    log.warn("[skill-db] 租户 {} 的技能 {} 构造失败，已跳过该条（其余照常生效）: {}",
+                        tenantId, row.getSkillId(), bad.getMessage());
+                }
+            }
+            if (failed > 0) {
+                log.warn("[skill-db] 租户 {} 本次共 {}/{} 条技能加载失败（其余 {} 条已生效）",
+                    tenantId, failed, byId.size(), out.size());
             }
             log.debug("[skill-db] 租户 {} 生效 {} 条在线技能行，停用遮罩 {} 条",
                 tenantId, out.size(), disabled.size());
-            return new Load(List.copyOf(out), java.util.Set.copyOf(disabled), true);
+            return new Load(List.copyOf(out), java.util.Set.copyOf(disabled), failed, true);
         } catch (Exception e) {
             // DB 故障三审回修（dspro P1-2/dsflash P1-4）：不得把「空技能+空遮罩」当正常结果缓存——
             // 那等于停用 fail-open 30 秒（被藏技能全员复活）。沿用上一次成功快照（含旧遮罩）；
@@ -227,8 +242,32 @@ public final class DatabaseSkillRepository implements AgentSkillRepository {
                 tenantId, e.getMessage());
             Cached prev = CACHE.get(tenantId);
             return prev == null ? Load.empty()
-                : new Load(prev.skills(), prev.disabled(), false);
+                : new Load(prev.skills(), prev.disabled(), 0, false);
         }
+    }
+
+    /**
+     * 单行 → 官方 {@link AgentSkill}（Q3=乙 的可测缝，2026-11-10）。
+     *
+     * <p><b>调用方必须逐条 try/catch</b>：官方 Builder 对空 name / 空 description 直接抛
+     * {@link IllegalArgumentException}（"must have `name` and `description` fields."），
+     * 一条坏数据不该把整层技能带走。这里不替坏数据编默认值——名称说明是喂给模型判断
+     * 「什么时候用这个技能」的唯一依据，凭空补一句等于伪造语义；跳过并计数才是诚实的。</p>
+     */
+    static AgentSkill toSkill(DcsAssistantSkill row) {
+        return AgentSkill.builder()
+            .name(row.getSkillId())
+            .description(row.getDescription() == null ? "" : row.getDescription())
+            .skillContent(row.getBody())
+            // 注意：不能 .metadata(map) 整体替换——会把 name/description 从 metadata 里抹掉
+            //（官方 Builder 校验读 metadata，IllegalArgument: must have name/description）
+            .putMetadata("displayName",
+                row.getDisplayName() == null || row.getDisplayName().isBlank()
+                    ? row.getSkillId() : row.getDisplayName())
+            .putMetadata("minRole", String.valueOf(minRoleOf(row.getMinRole())))
+            .putMetadata("origin", "database")
+            .source("database")
+            .build();
     }
 
     /** minRole 串→档位（缺失/非法=member 全员，与 frontmatter minRoleOf 同口径） */

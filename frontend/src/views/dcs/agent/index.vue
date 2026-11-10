@@ -31,6 +31,10 @@
               <em>点一张，直接开工</em>
               <span class="ag-strip-n">这里 {{ cando.length }} 个 · 共 {{ catalog.length }} 个</span>
             </div>
+            <!-- 2026-11-10 Q3=乙：坏数据只在真有坏的时候说一句；没有就一个字都不占 -->
+            <p v-if="skillFailed > 0" class="ui-error ag-strip-warn">
+              技能库里有 {{ skillFailed }} 个加载失败，已按其余技能继续——多半是那条数据的「名称」或「说明」为空。
+            </p>
             <!-- 三张：最近用过的排前，技能库补足；数据全来自 /skills/recent ∪ /skills，没有一张是写死的 -->
             <div v-if="cando.length" class="ag-cards">
               <article
@@ -78,7 +82,7 @@ import BrandMark from '@/components/BrandMark.vue';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import AssistantWorkspace from '@/components/DcsAssistant/AssistantWorkspace.vue';
 import { useUserStore } from '@/store/modules/user';
-import { getAssistantSkillCatalog, getAssistantRecentSkills, getConversationByThread } from '@/api/dcs/assistant';
+import { getAssistantSkillCatalog, getAssistantSkillFailures, getAssistantRecentSkills, getConversationByThread } from '@/api/dcs/assistant';
 import { buildSkillDraft, shouldGhostOnHover, skillDesc } from './prefill';
 import { setWorkspaceSnapshot, takePendingSkill, takeWorkspaceSnapshot } from './bridge';
 
@@ -105,6 +109,8 @@ const loading = ref(true);
 const failed = ref(false);
 /** 通知深链落地失败（会话被归档/清理）：页内常驻提示，不靠一闪而过的 toast */
 const deepLinkError = ref('');
+/** 2026-11-10 Q3=乙：技能库里坏掉被跳过的条数（0=全部正常，不显示任何提示） */
+const skillFailed = ref(0);
 
 const canAudit = computed(() => userStore.permissions.includes('*:*:*') || userStore.permissions.includes('dcs:assistant:audit:query'));
 const allowed = computed(() => userStore.permissions.includes('*:*:*') || userStore.permissions.includes('agentws:workspace:use'));
@@ -245,11 +251,19 @@ onMounted(async () => {
   const handoff = applyHandoff().catch(() => {});
   // 深链取会话也提前发出去（不等技能目录）：慢网时三件事并行，不串成一条长队
   const deep = fetchDeepLink().catch(() => null);
-  const [catRes, recRes] = await Promise.allSettled([getAssistantSkillCatalog(), getAssistantRecentSkills()]);
+  const [catRes, recRes, failRes] = await Promise.allSettled([
+    getAssistantSkillCatalog(),
+    getAssistantRecentSkills(),
+    getAssistantSkillFailures()
+  ]);
   catalog.value = catRes.status === 'fulfilled' ? ((catRes.value as unknown as { data?: CatalogRow[] })?.data ?? []) : [];
   recent.value =
     recRes.status === 'fulfilled' ? ((recRes.value as unknown as { data?: Array<{ skillId: string; useCount: number }> })?.data ?? []) : [];
   failed.value = catRes.status === 'rejected';
+  // 2026-11-10 Q3=乙：读到了但有 N 条坏数据被跳过——不静默少几条，黄条说清楚。
+  // 这个端点自己挂了不算「技能加载失败」，按 0 处理（目录那边已经有 failed 态兜底）。
+  skillFailed.value =
+    failRes.status === 'fulfilled' ? Number((failRes.value as unknown as { data?: { failed?: number } })?.data?.failed ?? 0) || 0 : 0;
   loading.value = false;
   await handoff;
   // 自动化通知深链 /agent?thread=…：最后应用，覆盖交接恢复的会话
@@ -459,6 +473,10 @@ html.dark .agent-ws {
 /* 技能条 */
 .ag-strip {
   margin-top: 24px;
+}
+/* Q3=乙：安静一条横条，不抢技能卡的视觉重心（底色/字号全走 .ui-error 共用口径） */
+.ag-strip-warn {
+  margin-top: 12px;
 }
 .ag-strip-h {
   display: flex;
