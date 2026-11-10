@@ -46,9 +46,9 @@ public final class AssistantCompactionAssets {
      *   <li>尾窗=按轮保留最后 1 轮原文（Q5-A）：keepTokens=0 让框架走消息切点
      *       （determineCutoffIndex 字节码：keepTokens&gt;0 走 token 切点，否则 keepMessages），
      *       keepMessages=2 即 user+assistant 一轮；切点落在工具结果上时框架会前移避让；</li>
-     *   <li>flushBeforeCompact/offloadBeforeCompact 双关——框架默认开：flush 会额外发一次
-     *       记忆抽取调用并写全局 MEMORY.md（跨租户共享，读进他人提示词）；offload 会把
-     *       被压段落全量原文落共享 workspace（无租户命名空间、清理链不覆盖）。</li>
+     *   <li>flushBeforeCompact 关——框架默认开：flush 会额外发一次记忆抽取调用并写全局
+     *       MEMORY.md（跨租户共享，读进他人提示词）。注：AgentScope 2.1 已删除
+     *       offloadBeforeCompact 选项（builder 无此方法），原 offload 关闭随之消失。</li>
      * </ul>
      */
     public static CompactionConfig buildConfig(int triggerTokens) {
@@ -60,7 +60,6 @@ public final class AssistantCompactionAssets {
             .keepMessages(AssistantCompactionPolicy.KEEP_MESSAGES)
             .summaryPrompt(SUMMARY_PROMPT)
             .flushBeforeCompact(false)
-            .offloadBeforeCompact(false)
             .build();
     }
 }
