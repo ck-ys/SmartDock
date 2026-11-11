@@ -66,6 +66,14 @@ public interface AssistantMessageMapper extends BaseMapper<DcsAssistantMessage> 
     String selectLatestUserContent(@Param("tenantId") String tenantId,
         @Param("conversationId") Long conversationId, @Param("userId") Long userId);
 
+    /** 本会话最新一条 user 消息行 id（2026-11-11 问题表挂靠锚点：run 终态落问题时，
+     *  按 thread 串行语义此刻的最新 user 行即该轮提问；同 thread 双 RUNNING 被咨询锁挡住） */
+    @Select("SELECT id FROM dcs_assistant_message WHERE tenant_id=#{tenantId}"
+        + " AND conversation_id=#{conversationId} AND user_id=#{userId} AND role='user'"
+        + " ORDER BY id DESC LIMIT 1")
+    Long selectLatestUserMessageId(@Param("tenantId") String tenantId,
+        @Param("conversationId") Long conversationId, @Param("userId") Long userId);
+
     /** 侧车回写追问建议（批5 Q7-3：回答完成后异步 UPDATE，失败=保留空列回退静态池；
      *  tenant_id 谓词=三席共识纵深防御——雪花全局唯一本无越权面，与同 mapper 风格对齐） */
     @Update("UPDATE dcs_assistant_message SET followup_suggestions=#{suggestions}"

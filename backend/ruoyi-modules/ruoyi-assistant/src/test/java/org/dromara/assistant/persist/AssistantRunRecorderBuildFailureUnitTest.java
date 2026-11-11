@@ -113,4 +113,18 @@ class AssistantRunRecorderBuildFailureUnitTest {
         // 回写失败但回读仍见 FAILED（如重试后成功）→ 退款照走；异常本身被吞不影响调用方
         verify(dailyQuota).refundTurn("000000", 9L);
     }
+
+    @Test
+    void 终态写成功同步落问题行_零行被丢弃时不落() {
+        // 2026-11-11 Q1-3：建会话失败终态写赢 → 问题行（other + 原文，刷新后空回合可还原原因）
+        when(conversationService.finishRun("run-6", "FAILED", "agent-build-failed")).thenReturn(1);
+        recorder.finalizeBuildFailure("run-6", "agent-build-failed");
+        verify(conversationService).recordRunIssue("run-6", "other", "agent-build-failed");
+
+        // 终态被兜底抢先终局化（rows=0）→ 不叠问题行
+        when(conversationService.finishRun("run-7", "FAILED", "agent-build-failed")).thenReturn(0);
+        recorder.finalizeBuildFailure("run-7", "agent-build-failed");
+        verify(conversationService, never()).recordRunIssue(
+            org.mockito.ArgumentMatchers.eq("run-7"), anyString(), anyString());
+    }
 }

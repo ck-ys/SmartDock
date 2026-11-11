@@ -44,6 +44,8 @@ public class AssistantConversationService {
     private final org.dromara.assistant.mapper.AssistantCompactionMapper compactionMapper;
     /** 083/ISSUE-F14-02 修：retentionSweep 补附件回收 + purgeUser 补附件行 */
     private final org.dromara.assistant.mapper.AssistantAttachmentMapper attachmentMapper;
+    /** 2026-11-11 拍板 Q1-3：「这轮为什么没回答」问题表 */
+    private final org.dromara.assistant.mapper.AssistantRunIssueMapper issueMapper;
     private final AssistantPiiFilter piiFilter;
     private final JdbcTemplate jdbcTemplate;
     /** 多实例批 3：run 登记时写入归属实例，收割时据此判断“别人的活别碰” */
@@ -210,6 +212,98 @@ public class AssistantConversationService {
 
     public DcsAssistantRun runByRunId(String runId) {
         return runMapper.selectByRunId(runId);
+    }
+
+    /**
+     * 同 thread 最新一条 RUNNING run 的 runId（2026-11-11 拍板 Q2-2 补丁：AgentScope
+     * 2.1.0-BETA1 的 ReActAgent 会把模型错误吞成无终态收流——RUN_ERROR 帧对服务商故障
+     * 永远不出，问题行只能改挂在计费装饰器的错误侧）。thread 发送串行保证至多一条
+     * RUNNING；非 RUNNING 返回 null（调用方跳过，不叠问题行）。
+     */
+    public String latestRunningRunIdOfThread(String tenantId, Long userId, String threadId) {
+        java.util.List<DcsAssistantRun> runs = runMapper.selectByThread(tenantId, threadId, userId, 1);
+        if (runs.isEmpty() || !"RUNNING".equals(runs.get(0).getStatus())) {
+            return null;
+        }
+        return runs.get(0).getRunId();
+    }
+
+    /**
+     * 落一条「这轮为什么没回答」问题行（2026-11-11 拍板 Q1-3/Q2-2）。终态写成功后由
+     * 记录器异步调用；code 为 null 直接跳过（正常有内容的轮次）。归属按 run 登记行
+     * 回查（流线程无登录上下文，与消息落库同口径）；detail 先过纯函数脱敏再按租户
+     * PII 掩码。异常自吞 WARN——问题行是锦上添花，绝不连坐终态链。
+     */
+    public void recordRunIssue(String runId, String code, String rawDetail) {
+        if (runId == null || code == null || code.isBlank()) {
+            return;
+        }
+        try {
+            DcsAssistantRun run = runMapper.selectByRunId(runId);
+            if (run == null) {
+                return;
+            }
+            doInsertIssue(run, code, rawDetail);
+        } catch (Exception e) {
+            log.warn("[AssistantPersist] 问题行落库失败(不影响终态) runId={} code={}: {}", runId, code, e.getMessage());
+        }
+    }
+
+    /**
+     * 模型失败捕获路径专用（终审 P2-1）：只挂「此刻仍在跑」的 run。
+     * 为什么不能无脑挂线程最新 RUNNING：收割器把停滞轮终局化后用户可合法重发新轮，
+     * 旧轮的迟到错误（重试链可超收割窗）若此刻才落库，会把 A 轮的限流/鉴权原因
+     * 错挂到正常完成的 B 轮上（幽灵问题行）。此处回查状态把错挂窗口压到一次 DB 写的毫秒级。
+     * 终态路径（finishRun/finalizeBuildFailure）不走此门——那时 run 已终态，属正常落点。
+     */
+    public void recordRunIssueForRunningRun(String runId, String code, String rawDetail) {
+        if (runId == null || code == null || code.isBlank()) {
+            return;
+        }
+        try {
+            DcsAssistantRun run = runMapper.selectByRunId(runId);
+            if (run == null || !"RUNNING".equals(run.getStatus())) {
+                return;
+            }
+            doInsertIssue(run, code, rawDetail);
+        } catch (Exception e) {
+            log.warn("[AssistantPersist] 问题行落库失败(不影响主流) runId={} code={}: {}", runId, code, e.getMessage());
+        }
+    }
+
+    private void doInsertIssue(DcsAssistantRun run, String code, String rawDetail) {
+        org.dromara.assistant.domain.DcsAssistantRunIssue row = new org.dromara.assistant.domain.DcsAssistantRunIssue();
+        row.setId(IdWorker.getId());
+        row.setTenantId(run.getTenantId());
+        row.setUserId(run.getUserId());
+        row.setThreadId(run.getThreadId());
+        row.setRunId(run.getRunId());
+        row.setCode(code);
+        String detail = org.dromara.assistant.persist.AssistantRunIssues.sanitizeDetail(rawDetail);
+        if (detail != null) {
+            detail = piiFilter.mask(detail, run.getTenantId());
+        }
+        row.setDetail(detail);
+        DcsAssistantConversation conv = conversationMapper.selectByThread(run.getTenantId(), run.getThreadId());
+        if (conv != null) {
+            row.setConversationId(conv.getId());
+            row.setMessageId(messageMapper.selectLatestUserMessageId(run.getTenantId(), conv.getId(), run.getUserId()));
+        }
+        issueMapper.insertIssue(row);
+    }
+
+    /** 历史回放：本会话全部问题行（按落库序；前端按 messageId 挂回对应回合） */
+    public List<org.dromara.assistant.domain.DcsAssistantRunIssue> listRunIssues(String tenantId, Long userId, Long conversationId) {
+        return issueMapper.selectByConversation(tenantId, userId, conversationId);
+    }
+
+    /** 活体：按 runId 取最新问题行（空回答卡延时拉取；归属由控制器校验） */
+    public org.dromara.assistant.domain.DcsAssistantRunIssue latestRunIssue(String tenantId, Long userId, String runId) {
+        org.dromara.assistant.domain.DcsAssistantRunIssue row = issueMapper.selectLatestByRunId(runId);
+        if (row == null || !tenantId.equals(row.getTenantId()) || !userId.equals(row.getUserId())) {
+            return null;
+        }
+        return row;
     }
 
     public DcsAssistantConversation conversationByThread(String tenantId, String threadId) {
@@ -465,9 +559,11 @@ public class AssistantConversationService {
         // 二审 P1 回修：先探表再删——「先部署后跑 migration」的窗口里表不存在时，
         // BadSqlGrammar 会把整个清人事务打回滚（五表一条不删、接口 500），必须防御
         int compacts = compactionTableExists() ? compactionMapper.purgeUser(tenantId, userId) : 0;
-        log.info("[AssistantPersist] 租户清除 tenant={} user={}: message={} conversation={} run={} action={} attachment={} compaction={}",
-            tenantId, userId, msgs, convs, runs, acts, atts, compacts);
-        return msgs + convs + runs + acts + atts + compacts;
+        // 2026-11-11 Q1-3：问题行同批清除（detail 含服务商报错派生内容）；同款先探表防御
+        int issues = issueTableExists() ? issueMapper.purgeUser(tenantId, userId) : 0;
+        log.info("[AssistantPersist] 租户清除 tenant={} user={}: message={} conversation={} run={} action={} attachment={} compaction={} issue={}",
+            tenantId, userId, msgs, convs, runs, acts, atts, compacts, issues);
+        return msgs + convs + runs + acts + atts + compacts + issues;
     }
 
     /** dcs_assistant_compaction 是否已建表（同事务只读探测，异常按不存在处理） */
@@ -475,6 +571,17 @@ public class AssistantConversationService {
         try {
             Boolean ok = jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.dcs_assistant_compaction') IS NOT NULL", Boolean.class);
+            return Boolean.TRUE.equals(ok);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** dcs_assistant_run_issue 是否已建表（同款先探表防御，见 compactionTableExists 注释） */
+    private boolean issueTableExists() {
+        try {
+            Boolean ok = jdbcTemplate.queryForObject(
+                "SELECT to_regclass('public.dcs_assistant_run_issue') IS NOT NULL", Boolean.class);
             return Boolean.TRUE.equals(ok);
         } catch (Exception e) {
             return false;
@@ -658,8 +765,17 @@ public class AssistantConversationService {
                 compacts += n;
             } while (n >= batch);
         }
-        log.info("[AssistantPersist] 保留期清理 conversation={} run={} action={} attachment={} compaction={} 行(180 天)",
-            convs, runs, acts, atts, compacts);
+        // 2026-11-11 Q1-3：问题表 90 天清理（拍板原文「加个定时清理」）——与消息表同期，
+        // 先探表防「先部署后迁移」窗口炸每日 job
+        int issues = 0;
+        if (issueTableExists()) {
+            do {
+                n = issueMapper.deleteExpired(batch);
+                issues += n;
+            } while (n >= batch);
+        }
+        log.info("[AssistantPersist] 保留期清理 conversation={} run={} action={} attachment={} compaction={} 行(180 天) issue={} 行(90 天)",
+            convs, runs, acts, atts, compacts, issues);
     }
 
     /** 080/ISSUE-R13-3 修配套：清人前的该用户 thread 清单（悬挂缓存/步骤缓冲按 thread

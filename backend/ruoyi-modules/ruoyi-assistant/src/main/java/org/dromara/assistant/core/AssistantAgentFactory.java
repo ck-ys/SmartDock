@@ -217,7 +217,10 @@ public class AssistantAgentFactory {
             // 与实际不符——侧车小额消耗同样走积分，与钱包口径行为一致
             .creditService(creditService)
             // AI 缺口批 Q8：主对话链接钥匙池上报（失败冷却/成功清冷却；侧车不接零影响）
-            .keyPool(providerKeyPool);
+            .keyPool(providerKeyPool)
+            // 2026-11-11 Q2-2 补丁：模型失败侧落问题行——框架对服务商故障不出 RUN_ERROR
+            // （活体实证见 BillingModelDecorator#issueRecorder 注释），主链接上捕获链
+            .issueRecorder(conversationService);
         Toolkit toolkit = new Toolkit();
         // S-3 单点化：工具注册+权限规则同循环生成（ToolRegistry 唯一登记处，
         // 替代原 toolkit.registerTool 散调 + buildPermissionContext 硬编码名数组）

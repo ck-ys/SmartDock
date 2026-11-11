@@ -96,6 +96,9 @@ public class BillingModelDecorator implements Model {
     /** R5 积分模式（2026-10-13）：null=钱包计费（原路径零改动）；主链注入后订阅租户走积分前置闸+积分落账 */
     private IDcsAiCreditService creditService;
 
+    /** 2026-11-11 Q2-2 补丁：模型失败侧落问题行用（null=侧车/单测，不落） */
+    private org.dromara.assistant.service.AssistantConversationService conversationService;
+
     /** goal 加固 H5：链式设置场景后缀（构造器保持七参不动，主链调用零改动） */
     /**
      * AI 缺口批 Q8（2026-10-14）：注入厂商钥匙池——流失败按错误分类冷却「本回合用的那把
@@ -115,6 +118,18 @@ public class BillingModelDecorator implements Model {
     /** R5：链式注入积分服务（AssistantAgentFactory 主链；侧车/单测不传=钱包计费） */
     public BillingModelDecorator creditService(IDcsAiCreditService svc) {
         this.creditService = svc;
+        return this;
+    }
+
+    /**
+     * 2026-11-11 拍板 Q2-2 补丁：链式注入会话服务——模型失败侧落「这轮为什么没回答」
+     * 问题行。背景（活体实证，SSE 抓帧+日志）：AgentScope 2.1.0-BETA1 的 ReActAgent
+     * 把模型错误吞成无终态收流（RUN_ERROR 帧对服务商故障永远不出，流里只有
+     * RUN_STARTED），记录器的 RUN_ERROR 分支对这类故障不可达——装饰器是错误必经之
+     * 路，改在这里捕获。null=不落（侧车/单测）。
+     */
+    public BillingModelDecorator issueRecorder(org.dromara.assistant.service.AssistantConversationService svc) {
+        this.conversationService = svc;
         return this;
     }
 
@@ -138,6 +153,56 @@ public class BillingModelDecorator implements Model {
         this.priceService = priceService;
         this.costLedger = costLedger;
         this.threadKey = threadKey;
+    }
+
+    /**
+     * 模型失败侧落问题行（挂在 doOnError、人话映射之前——映射后的文案不含状态码，
+     * 判因抓不到）。runId 按 thread 最新 RUNNING 反查；侧车（threadKey null）与无
+     * 在途 run 不落。走带闸门入口（终审 P2-1）：反查与落库之间 run 若已终局化/换发
+     * 新轮，服务端回查状态后丢弃，防幽灵问题行。异常全吞：问题行绝不连坐计费主流。
+     */
+    private void recordModelFailureIssue(Throwable err) {
+        if (conversationService == null || threadKey == null || threadKey.isBlank()) {
+            return;
+        }
+        try {
+            String runId = conversationService.latestRunningRunIdOfThread(config.getTenantId(), userId, threadKey);
+            if (runId == null) {
+                return;
+            }
+            // 重试耗尽/包装异常都要剥链——RetryExhaustedException 的 "Retries
+            // exhausted" 不含特征词，根因（401/429/超时）才判得出码；suppressed
+            // 也纳入（429 常埋在 suppressed，见 isQuotaLike 同款口径）
+            String signature = failureSignature(err);
+            String code = org.dromara.assistant.persist.AssistantRunIssues.classify(null, signature);
+            conversationService.recordRunIssueForRunningRun(runId, code, signature);
+        } catch (Exception e) {
+            log.warn("[AssistantBilling] 模型失败问题行落库跳过(不影响主流): {}", e.getMessage());
+        }
+    }
+
+    /** 错误链签名：类名+消息逐层拼接（含 suppressed 消息）；限深 8 层+自引用防环 */
+    private static String failureSignature(Throwable err) {
+        StringBuilder sb = new StringBuilder();
+        Throwable t = err;
+        int hops = 0;
+        while (t != null && hops < 8) {
+            if (sb.length() > 0) {
+                sb.append(" <- ");
+            }
+            sb.append(t.getClass().getSimpleName());
+            if (t.getMessage() != null) {
+                sb.append(": ").append(t.getMessage());
+            }
+            for (Throwable s : t.getSuppressed()) {
+                if (s != null && s.getMessage() != null) {
+                    sb.append(" | ").append(s.getMessage());
+                }
+            }
+            t = t.getCause() == t ? null : t.getCause();
+            hops++;
+        }
+        return sb.length() > 600 ? sb.substring(0, 600) : sb.toString();
     }
 
     @Override
@@ -222,6 +287,9 @@ public class BillingModelDecorator implements Model {
                 if (keyPool != null) {
                     keyPool.reportFailure(config.getTenantId(), config.getProvider(), err);
                 }
+                // 2026-11-11 Q2-2 补丁：服务商故障侧的问题行捕获（须在下方 onErrorMap
+                // 之前——doOnError 天然在映射前，拿到的还是原始错误）
+                recordModelFailureIssue(err);
             })
             .doOnComplete(() -> {
                 if (keyPool != null) {

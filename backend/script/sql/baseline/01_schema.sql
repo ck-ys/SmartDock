@@ -4402,3 +4402,28 @@ CREATE TABLE public.dcs_changelog (
 
 CREATE UNIQUE INDEX uk_dcs_changelog_version ON public.dcs_changelog USING btree (version) WHERE (del_flag = '0'::bpchar);
 CREATE INDEX idx_dcs_changelog_status_publish ON public.dcs_changelog USING btree (status, publish_time DESC);
+
+
+-- Name: dcs_assistant_run_issue; Type: TABLE; Schema: public; Owner: -
+-- 2026-11-11 拍板 Q1-3（「这轮为什么没回答」问题表）：一轮至多一条，终态写成功才落；
+-- message_id 指向该轮用户提问行（历史回放挂靠锚点）；detail=脱敏后服务商原文（Q2-2）；
+-- 保留 90 天（消息表为 180 天，issue 表更短），(tenant_id, code, create_time) 给后续按原因统计（Q1 拍板留的口子）。
+CREATE TABLE public.dcs_assistant_run_issue (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    user_id bigint NOT NULL,
+    conversation_id bigint,
+    thread_id character varying(128),
+    run_id character varying(128) NOT NULL,
+    message_id bigint,
+    code character varying(16) NOT NULL,
+    detail character varying(512),
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_dcs_assistant_run_issue PRIMARY KEY (id),
+    CONSTRAINT ck_dcs_asst_issue_code CHECK (code::text = ANY (ARRAY['empty','rate','quota','timeout','auth','other']::text[]))
+);
+
+CREATE INDEX idx_dcs_asst_issue_conv ON public.dcs_assistant_run_issue USING btree (tenant_id, user_id, conversation_id);
+CREATE INDEX idx_dcs_asst_issue_stats ON public.dcs_assistant_run_issue USING btree (tenant_id, code, create_time);
+-- run_id 唯一（终审 P1）：「同 run 只落一条」的 DB 兜底，插入侧配 ON CONFLICT DO NOTHING
+CREATE UNIQUE INDEX uk_dcs_asst_issue_run ON public.dcs_assistant_run_issue USING btree (run_id);

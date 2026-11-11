@@ -168,6 +168,13 @@ public class AssistantRunRecorder {
      *  finishRun 提交前登记、写完撤岗，收割器见此键让行 */
     private final java.util.Set<String> terminalWritePending = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /**
+     * 2026-11-11 拍板 Q4-2：run 级「产出过正文 / 调过工具」标记——正常收尾两者皆无
+     * 即落 empty 问题行（服务商 200 但一个字没回）。键=runId，随 clearRunTracking 清。
+     */
+    private final java.util.Set<String> producedContentRuns = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> producedToolRuns = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     // ===== 批6-#2 刷新保全（2026-10-13）：增量落库 + 失联收割 =====
     // 根因：客户端断连（刷新/断网）后框架往死 socket 写帧抛 IOException → Reactor 取消
     // 整链 → agent 静默死亡（无终态事件）——interrupt-on-disconnect 开关管不到这条拆链。
@@ -415,6 +422,7 @@ public class AssistantRunRecorder {
                     }
                     case TOOL_CALL_START -> {
                         if (event instanceof AguiEvent.ToolCallStart s) {
+                            producedToolRuns.add(runId);
                             stepBuffers.computeIfAbsent(stepKey, k -> new LinkedHashMap<>())
                                 .putIfAbsent(s.toolCallId(), new ToolStepBuf(s.toolCallId(), s.toolCallName(), nextOrder(stepKey)));
                         }
@@ -487,6 +495,7 @@ public class AssistantRunRecorder {
                             Map<String, StringBuilder> runBuffers = buffers.get(runId);
                             StringBuilder buf = runBuffers == null ? null : runBuffers.remove(e.messageId());
                             if (buf != null && !buf.isEmpty()) {
+                                producedContentRuns.add(runId);
                                 String full = buf.toString();
                                 String model = safeModel(context);
                                 // 步骤快照在事件线程取（异步落库前）——终态清缓冲不致丢步骤
@@ -555,7 +564,11 @@ public class AssistantRunRecorder {
                                 // 缓冲按终态清（INTERRUPTED 留缓冲是给 HITL resume 续用的）
                                 evictStepBuffers(List.of(stepKey));
                             } else {
-                                finishRun(runId, "COMPLETED", "normal", stepKey);
+                                // 2026-11-11 拍板 Q4-2：正常收尾但整轮零正文零工具 = empty
+                                // 问题行（读标记须在 finishRun 清跟踪之前——本行先算好再传入）
+                                String emptyIssue = producedContentRuns.contains(runId) || producedToolRuns.contains(runId)
+                                    ? null : AssistantRunIssues.EMPTY;
+                                finishRun(runId, "COMPLETED", "normal", stepKey, emptyIssue, null);
                             }
                             // 二站 T1 清除①：resume 轮终态（用户确认/取消/入口自动解锁三路同口）
                             // =框架已消费全部悬挂，清缓存
@@ -565,7 +578,10 @@ public class AssistantRunRecorder {
                     }
                     case RUN_ERROR -> {
                         if (event instanceof AguiEvent.RunError err) {
-                            finishRun(runId, "FAILED", err.message() == null ? "error" : err.message(), stepKey);
+                            // 2026-11-11 拍板 Q2-2：end_reason 只留生命周期（FAILED→error），
+                            // 服务商原文走问题行（分类码 + 脱敏 detail）
+                            finishRun(runId, "FAILED", "error", stepKey,
+                                AssistantRunIssues.classify(err.code(), err.message()), err.message());
                             // 三审回修（P0-1，glm53+dspro 独立反汇编交叉坐实，javap 亲证）：
                             // 框架 AguiResumeCoordinator.trackPendingInterrupts 只在「无错误的
                             // RunFinished」才移除悬挂（sawError=true 即跳过 remove），RUN_ERROR
@@ -575,7 +591,8 @@ public class AssistantRunRecorder {
                             log.warn("[AssistantRecorder] run 出错保留悬挂缓存 thread={} code={}",
                                 threadId, err.code());
                         } else {
-                            finishRun(runId, "FAILED", "error", stepKey);
+                            finishRun(runId, "FAILED", "error", stepKey,
+                                AssistantRunIssues.OTHER, null);
                         }
                         AssistantRunContext.clear();
                     }
@@ -635,6 +652,18 @@ public class AssistantRunRecorder {
     }
 
     private void finishRun(String runId, String status, String reason, String stepKey) {
+        finishRun(runId, status, reason, stepKey, null, null);
+    }
+
+    /**
+     * 带问题行的终态收尾（2026-11-11 拍板 Q1-3/Q2-2）。issueCode 非 null 时，终态写
+     * 成功（rows&gt;0——迟到终态被丢弃的轮次不写，防收割侧已按 client-disconnect 收账的
+     * run 再叠一条 empty）后异步落 {@code dcs_assistant_run_issue}；issueDetail 为
+     * 服务商原文，脱敏/PII 掩码/挂靠锚点全在 service 侧。生命周期路径（interrupt /
+     * user-stop / 收割）传 null 不落行。
+     */
+    private void finishRun(String runId, String status, String reason, String stepKey,
+                           String issueCode, String issueDetail) {
         // 稳流① Q1：终局诊断（时长/最大静默/心跳数；终态计数改在 DB 写成功分支——
         // glm53 审查 P2-5：迟到终态（rows=0 被条件丢弃）不得与收割终态双计）
         final String outcome = status + "|" + (reason == null ? "-" : reason);
@@ -702,6 +731,15 @@ public class AssistantRunRecorder {
                 } else {
                     // 稳流① Q1 + P2-5 回修：真终态写成功才计数（收割侧已计过的不重复）
                     countOutcome(tenantOfRun(runId), outcome);
+                    // 2026-11-11 Q1-3：终态写赢才落问题行（service 侧自吞异常，外层再兜
+                    // 一道测试替身场景的同步抛）
+                    if (issueCode != null) {
+                        try {
+                            conversationService.recordRunIssue(runId, issueCode, issueDetail);
+                        } catch (Exception e) {
+                            log.warn("[AssistantRecorder] 问题行落库失败(不影响终态) runId={}: {}", runId, e.getMessage());
+                        }
+                    }
                 }
             } catch (Exception e) {
                 log.warn("[AssistantRecorder] run 终态回写失败 runId={}: {}", runId, e.getMessage());
@@ -749,6 +787,14 @@ public class AssistantRunRecorder {
             int rows = conversationService.finishRun(runId, "FAILED", safeReason);
             if (rows == 0) {
                 log.warn("[AssistantRecorder] 建会话失败终态被丢弃（run 已被收割器/兜底终局化）runId={}", runId);
+            } else {
+                // 2026-11-11 Q1-3：终态写赢同步落问题行——刷新后该轮回放是「零正文 done」，
+                // 靠问题行才能还原「建会话失败」这一类 other
+                try {
+                    conversationService.recordRunIssue(runId, AssistantRunIssues.classify(null, reason), reason);
+                } catch (Exception e) {
+                    log.warn("[AssistantRecorder] 建会话失败问题行落库失败 runId={}: {}", runId, e.getMessage());
+                }
             }
         } catch (Exception e) {
             log.warn("[AssistantRecorder] 建会话失败终态回写失败 runId={}: {}", runId, e.getMessage());
@@ -770,6 +816,8 @@ public class AssistantRunRecorder {
         runStepKeys.remove(runId);
         lastPartialFlushAt.remove(runId);
         lastPartialLen.remove(runId);
+        producedContentRuns.remove(runId);
+        producedToolRuns.remove(runId);
         // 三审回修：run 终局一律清停止标记（RUN_ERROR/interrupt 轮等非 else 分支的兜底）
         USER_STOP_MARKS.remove(runId);
     }

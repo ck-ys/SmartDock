@@ -267,6 +267,33 @@ public class AssistantConversationController extends BaseController {
     }
 
     /**
+     * 会话问题行（2026-11-11 拍板 Q1-3/Q3-2）：「这轮为什么没回答」的历史还原源——
+     * 刷新/换设备后按 messageId 把原因挂回对应回合。detail 已脱敏，普通用户看
+     * code 映射人话，原文是否展开由前端按角色控制。
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/conversation/{id}/issues")
+    public R<List<org.dromara.assistant.domain.DcsAssistantRunIssue>> issues(@PathVariable Long id) {
+        return R.ok(conversationService.listRunIssues(TenantHelper.getTenantId(), LoginHelper.getUserId(), id));
+    }
+
+    /**
+     * 活体：按 runId 取最新问题行（空回答卡延时拉取，同追问侧车节奏）。run 归属
+     * 与当前登录不符时按「无记录」返回（不区分不存在与无权——防探测，同 thread 首绑口径）。
+     */
+    @SaCheckPermission("dcs:assistant:use")
+    @GetMapping("/run/{runId}/issue")
+    public R<org.dromara.assistant.domain.DcsAssistantRunIssue> runIssue(@PathVariable String runId) {
+        String tenantId = TenantHelper.getTenantId();
+        Long userId = LoginHelper.getUserId();
+        org.dromara.assistant.domain.DcsAssistantRun run = runMapper.selectByRunId(runId);
+        if (run == null || !tenantId.equals(run.getTenantId()) || !userId.equals(run.getUserId())) {
+            return R.ok(null);
+        }
+        return R.ok(conversationService.latestRunIssue(tenantId, userId, runId));
+    }
+
+    /**
      * G1 乙类#5（Q4=A 查证成立即接）：停止生成=服务端真取消。框架 interrupt(userId, threadId)
      * 定向打断在跑 run（sessionId 维度，AGUI threadId 即 sessionId），终态秒级落 INTERRUPTED
      * 而非等 60s stall 收割。注意：断连仍不打断（interrupt-on-disconnect=false 是 HITL
