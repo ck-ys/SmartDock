@@ -482,7 +482,16 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="dialog.visible" :title="dialog.title" width="760px" append-to-body class="ai-config-dialog">
+    <!-- 2026-11-11：这一页是全站字段最多的配置表单（基础信息 + 两张卡片 + 官方价格面板），
+         760 那一档装不下「110px 标签 + 可读数值」。单独放宽到 980，并用 min() 保证窄屏不出横向滚动
+         （全站其它弹窗仍走 480/640/760 三档，不受影响）。 -->
+    <el-dialog
+      v-model="dialog.visible"
+      :title="dialog.title"
+      width="min(980px, calc(100vw - 32px))"
+      append-to-body
+      class="ai-config-dialog"
+    >
       <el-alert type="info" :closable="false" show-icon class="mb-4">
         <template #title>
           API Key 已加密存储在「厂商接入」里——同厂商加第二个模型不用再填 Key；已有密钥可直接获取模型、查询余额和测速。换 Key
@@ -493,7 +502,7 @@
       <el-form ref="configFormRef" :model="form" :rules="rules" label-width="110px">
         <el-divider content-position="left" class="section-title">基础信息</el-divider>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <el-form-item label="租户编号" prop="tenantId">
               <el-select
                 v-model="form.tenantId"
@@ -510,7 +519,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <el-form-item label="模型厂商" prop="provider">
               <el-select v-model="form.provider" placeholder="请选择模型厂商" style="width: 100%" @change="applyPreset">
                 <el-option v-for="item in providerOptions" :key="item.provider" :label="item.providerName" :value="item.provider" />
@@ -523,7 +532,7 @@
               </div>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <el-form-item label="接入模板">
               <!-- Q5(2026-10-23)：20 家模板=官方地址+接口格式+候选模型一次带出；
                    国内站/国际站、opencode 网关等变体都在这里，选完仍可手改 -->
@@ -547,7 +556,7 @@
               <div v-if="activeTemplate?.note" class="field-hint">{{ activeTemplate.note }}</div>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <el-form-item label="使用类型" prop="useType">
               <el-radio-group v-model="form.useType">
                 <el-radio value="CHAT">AI 调用</el-radio>
@@ -558,7 +567,7 @@
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <el-form-item label="Base URL" prop="baseUrl">
               <!-- 批1：标准厂商按官方地址自动接入（applyPreset 已随厂商切换预填），仅自定义厂商手填；
                    已有厂商接入时维持只读展示（地址由接入层统一管理） -->
@@ -572,7 +581,7 @@
               <div v-if="accessInfo" class="field-hint">接口地址由厂商接入统一管理，如需修改请点「管理钥匙」</div>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <el-form-item label="接口格式" prop="apiFormat">
               <!-- Q5(2026-10-23)：三种格式与主流客户端一致；非 Chat Completions 只做连通测试 -->
               <el-select v-model="form.apiFormat" style="width: 100%">
@@ -588,7 +597,7 @@
           <span v-if="isNonChatFormat" class="ui-pill ui-pill--warn">仅连通测试</span>
         </div>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <!-- 批B(多模型改造): 该厂商已有接入 → 钥匙由接入层统一提供, 表单不再出现 Key 输入框 -->
             <el-form-item v-if="accessInfo" label="API Key">
               <div class="access-provided">
@@ -603,7 +612,7 @@
               <div v-if="form.configId && form.apiKeyMask" class="field-hint">当前密钥：{{ form.apiKeyMask }}。留空保存时沿用原密钥。</div>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :xs="24" :span="12">
             <el-form-item label="模型名称" prop="modelName">
               <el-select
                 v-model="form.modelName"
@@ -683,8 +692,11 @@
             <div class="config-section-grid">
               <div class="config-section-card">
                 <div class="section-card-title">推理参数</div>
+                <!-- 2026-11-11：卡片本身只占弹窗（760 上限档）的一半宽，里层再分两列，
+                     110px 标签外的控件只剩 42px——「上下文」只看得见开头两个数字，
+                     三个步进框只剩上下箭头。这里一律整行，控件回到 210px（与下面「思考档」同宽）。 -->
                 <el-row :gutter="16">
-                  <el-col :span="12">
+                  <el-col :span="24">
                     <el-form-item label="上下文" prop="contextWindow">
                       <!-- 批C 回修（视觉席 P1）：值+后缀拼一起在半宽列被硬裁成「1000K（模型自」——
                            后缀信息下方 field-hint 已完整表述，输入框只留纯值 -->
@@ -721,7 +733,7 @@
                       <div class="field-hint">单次回答最多吐多少 token；长报告/大表格调大，防截断</div>
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :span="24">
                     <el-form-item label="温度" prop="temperature">
                       <el-input-number
                         v-model="form.temperature"
@@ -770,7 +782,7 @@
                       </el-select>
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :span="24">
                     <el-form-item :label="form.billingMode === 'OFFICIAL_PLUS_FEE' ? '每次服务费' : '调用单价'" prop="unitPricePerCall">
                       <el-input-number
                         v-model="form.unitPricePerCall"
@@ -783,7 +795,7 @@
                       <div class="field-hint">{{ unitPriceHint }}</div>
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :span="24">
                     <el-form-item label="服务费率" prop="serviceFeeRate">
                       <el-input-number
                         v-model="form.serviceFeeRate"
@@ -797,13 +809,13 @@
                       <div class="field-hint">按官方 token 原始成本加收百分比；10 表示 +10%（仅「官方 token 计费」模式生效）</div>
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :span="24">
                     <el-form-item label="余额查询" prop="balanceQueryEnabled">
                       <el-switch v-model="form.balanceQueryEnabled" active-value="1" inactive-value="0" active-text="自动" inactive-text="不查" />
                       <div class="field-hint">第三方自定义或无余额接口的厂商可关闭</div>
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :span="24">
                     <!-- 业务反馈批1015b Q13：积分倍率此前零编辑入口只能改库；订阅租户每回合扣分=基础分×此倍率 -->
                     <el-form-item label="积分倍率" prop="creditMultiplier">
                       <el-input-number
@@ -835,12 +847,12 @@
                 }}</span>
               </div>
               <el-row :gutter="16">
-                <el-col :span="12">
+                <el-col :xs="24" :span="12">
                   <el-form-item label="租户">
                     <el-input v-model="inlinePriceForm.tenantId" placeholder="000000 表示全局" />
                   </el-form-item>
                 </el-col>
-                <el-col :span="12">
+                <el-col :xs="24" :span="12">
                   <el-form-item label="币种">
                     <el-select
                       v-model="inlinePriceForm.currency"
@@ -858,19 +870,19 @@
                     <div class="field-hint">默认按浏览器语言匹配，也可直接输入三位币种代码</div>
                   </el-form-item>
                 </el-col>
-                <el-col :span="12">
+                <el-col :xs="24" :span="12">
                   <el-form-item label="厂商">
                     <el-input :model-value="getProviderName(form.provider || '')" disabled />
                   </el-form-item>
                 </el-col>
-                <el-col :span="12">
+                <el-col :xs="24" :span="12">
                   <el-form-item label="模型">
                     <el-input v-model="inlinePriceForm.modelName" placeholder="具体模型或 *" />
                   </el-form-item>
                 </el-col>
               </el-row>
               <el-row :gutter="16">
-                <el-col :span="8">
+                <el-col :xs="24" :span="8">
                   <el-form-item label="输入/1M">
                     <el-input-number
                       v-model="inlinePriceForm.inputPricePerMillion"
@@ -882,7 +894,7 @@
                     />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
+                <el-col :xs="24" :span="8">
                   <el-form-item label="缓存输入/1M">
                     <el-input-number
                       v-model="inlinePriceForm.cachedInputPricePerMillion"
@@ -894,7 +906,7 @@
                     />
                   </el-form-item>
                 </el-col>
-                <el-col :span="8">
+                <el-col :xs="24" :span="8">
                   <el-form-item label="输出/1M">
                     <el-input-number
                       v-model="inlinePriceForm.outputPricePerMillion"
@@ -908,11 +920,13 @@
                 </el-col>
               </el-row>
               <el-form-item label="来源 URL">
-                <div style="display: flex; gap: 8px; width: 100%">
+                <!-- 2026-11-11：手机上（390）这一行原来被「智能识别」按钮挤成 64px；
+                     允许换行 + 输入框保底 180px，窄屏时按钮自动落到下一行 -->
+                <div style="display: flex; gap: 8px; width: 100%; flex-wrap: wrap">
                   <el-input
                     v-model="inlinePriceForm.sourceUrl"
                     placeholder="主流模型可不填(自动查聚合库); 国产小厂填官方价格页 URL"
-                    style="flex: 1"
+                    style="flex: 1 1 180px"
                   />
                   <el-button v-hasPermi="['dcs:ai:edit']" type="success" plain icon="Search" :loading="priceDetecting" @click="detectPrice"
                     >智能识别</el-button
@@ -934,7 +948,7 @@
 
         <el-divider content-position="left" class="section-title">其它</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :xs="24" :span="8">
             <el-form-item label="可用性" prop="enabled">
               <el-radio-group v-model="form.enabled">
                 <el-radio label="1">可用（保存即可被调用）</el-radio>
@@ -945,7 +959,7 @@
               </div>
             </el-form-item>
           </el-col>
-          <el-col :span="16">
+          <el-col :xs="24" :span="16">
             <el-form-item label="备注" prop="remark">
               <el-input v-model="form.remark" placeholder="可记录账号用途、额度或模型选择原因" />
             </el-form-item>

@@ -300,7 +300,7 @@ onMounted(load);
   }
   p {
     margin: 6px 0 0;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.6;
     color: var(--app-muted, #666);
   }
@@ -312,7 +312,7 @@ onMounted(load);
   flex-wrap: wrap;
 }
 .mcp-hint {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--app-faint, #8a8a8a);
 }
 .mcp-link {
@@ -367,7 +367,7 @@ onMounted(load);
   }
 }
 .mcp-meta {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--app-faint, #8a8a8a);
 }
 .mcp-cmd {
@@ -379,7 +379,7 @@ onMounted(load);
   white-space: nowrap;
 }
 .mcp-badge {
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 16px;
   padding: 0 6px;
   border-radius: 999px;

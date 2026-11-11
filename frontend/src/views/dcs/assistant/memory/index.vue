@@ -131,7 +131,7 @@ onMounted(load);
   }
   .mt-title {
     margin: 0 0 6px;
-    font-size: 14.5px;
+    font-size: 15px;
     color: var(--dcs-text-primary);
     font-weight: 600;
   }
@@ -159,7 +159,7 @@ onMounted(load);
       min-width: 0;
     }
     .mem-content {
-      font-size: 13.5px;
+      font-size: 14px;
       color: var(--dcs-text-primary);
       word-break: break-all;
     }
@@ -177,7 +177,7 @@ onMounted(load);
   }
   .mem-foot {
     margin: 14px 0 0;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
   }
 }

@@ -556,7 +556,7 @@ watch(
   border-radius: 10px;
   background: var(--el-bg-color);
   overflow: hidden;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 /* 批3.5·题1：长表摘要行（默认收起时的唯一可见内容，安静边框样式） */
 .dsum {
@@ -621,7 +621,7 @@ watch(
   }
 
   .dfchip {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     background: var(--el-bg-color);
     border: 1px solid var(--dcs-border-color-light);
@@ -658,7 +658,7 @@ watch(
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 th {
   background: var(--el-fill-color-light);
@@ -748,7 +748,7 @@ tr.dr {
 .dsrc {
   padding: 6px 12px 8px;
   border-top: 1px dashed var(--el-border-color-lighter);
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--dcs-text-secondary, #909399);
   text-align: left;
 }
@@ -774,7 +774,7 @@ tr.dr {
   }
 }
 .pgolink {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--el-color-primary);
   cursor: pointer;
   padding: 6px 12px;
@@ -798,7 +798,7 @@ tr.dr {
     border-radius: 6px;
     background: #fdf6ec;
     color: #b88230;
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.6;
   }
   table {
@@ -889,7 +889,7 @@ tr.dr {
     height: 100%;
 
     .v {
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--dcs-text-secondary);
     }
     .b {
@@ -914,7 +914,7 @@ tr.dr {
     > span {
       flex: 1;
       text-align: center;
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--dcs-text-placeholder);
     }
   }

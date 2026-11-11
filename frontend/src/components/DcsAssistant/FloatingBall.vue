@@ -503,7 +503,7 @@ defineExpose({ closeMenu });
     margin-bottom: 6px;
   }
   .pb {
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.65;
     color: var(--dcs-text-regular);
   }
@@ -514,7 +514,7 @@ defineExpose({ closeMenu });
     border: none;
     background: none;
     padding: 0;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--el-color-primary);
     text-decoration: underline;
     text-underline-offset: 2px;

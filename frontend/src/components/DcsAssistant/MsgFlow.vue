@@ -1403,7 +1403,7 @@ defineExpose({ jumpToStep, jumpToConfirm });
   }
   .rc-a {
     margin: 0;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.5;
     color: var(--dcs-text-secondary);
     display: -webkit-box;

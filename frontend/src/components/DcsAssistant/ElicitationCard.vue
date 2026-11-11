@@ -372,7 +372,7 @@ textarea.ev {
   button {
     border-radius: 7px;
     border: 1px solid var(--dcs-border, #dcdfe6);
-    font-size: 12.5px;
+    font-size: 12px;
     padding: 5px 12px;
     cursor: pointer;
     background: var(--el-fill-color-blank, #fff);

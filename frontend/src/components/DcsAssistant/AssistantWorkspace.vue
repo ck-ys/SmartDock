@@ -63,6 +63,9 @@
             class="conv-item"
             :class="{ on: c.id === selectedId, 'has-ops': renamingId !== c.id && c.id !== 'tmp' }"
             :aria-current="c.id === selectedId ? 'true' : undefined"
+            :tabindex="0"
+            @keydown.enter.prevent="openConversation(c)"
+            @keydown.space.prevent="openConversation(c)"
             @click="openConversation(c)"
           >
             <span v-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
@@ -98,7 +101,16 @@
         </template>
 
         <!-- 更早折叠条（与「已归档」同款交互；默认收起） -->
-        <div v-if="olderGroup" class="grp-fold" @click="olderOpen = !olderOpen">
+        <div
+          v-if="olderGroup"
+          class="grp-fold"
+          role="button"
+          :tabindex="0"
+          :aria-expanded="olderOpen ? 'true' : 'false'"
+          @click="olderOpen = !olderOpen"
+          @keydown.enter.prevent="olderOpen = !olderOpen"
+          @keydown.space.prevent="olderOpen = !olderOpen"
+        >
           <IconSpan name="history" :size="13" /> 更早 ({{ olderGroup.items.length }})
           <IconSpan :name="olderOpen ? 'chevron-up' : 'chevron-down'" :size="12" />
         </div>
@@ -109,6 +121,9 @@
             class="conv-item has-ops"
             :class="{ on: c.id === selectedId, 'has-ops': renamingId !== c.id && c.id !== 'tmp' }"
             :aria-current="c.id === selectedId ? 'true' : undefined"
+            :tabindex="0"
+            @keydown.enter.prevent="openConversation(c)"
+            @keydown.space.prevent="openConversation(c)"
             @click="openConversation(c)"
           >
             <span v-if="rowStatus(c) === 'error'" class="sdot sdot-err" title="最近一轮出错，可点重试" />
@@ -144,7 +159,16 @@
         </template>
 
         <!-- 已归档折叠条 -->
-        <div v-if="archived.length > 0" class="arch-fold" @click="archOpen = !archOpen">
+        <div
+          v-if="archived.length > 0"
+          class="arch-fold"
+          role="button"
+          :tabindex="0"
+          :aria-expanded="archOpen ? 'true' : 'false'"
+          @click="archOpen = !archOpen"
+          @keydown.enter.prevent="archOpen = !archOpen"
+          @keydown.space.prevent="archOpen = !archOpen"
+        >
           <IconSpan name="database" /> 已归档 ({{ archived.length }})
           <IconSpan :name="archOpen ? 'chevron-up' : 'chevron-down'" :size="12" />
         </div>
@@ -155,6 +179,9 @@
             class="conv-item archived has-ops"
             :class="{ on: c.id === selectedId }"
             :aria-current="c.id === selectedId ? 'true' : undefined"
+            :tabindex="0"
+            @keydown.enter.prevent="openConversation(c)"
+            @keydown.space.prevent="openConversation(c)"
             @click="openConversation(c)"
           >
             <div class="c-main">
@@ -354,6 +381,7 @@ import { ASSISTANT_ADMIN_PATH } from '@/router';
 import {
   archiveConversation,
   listActions,
+  listConversationIssues,
   listConversations,
   listMessages,
   renameConversation,
@@ -1094,6 +1122,7 @@ async function openConversation(c: AssistantConversation) {
       return;
     }
     const list = msgs?.data ?? [];
+    const issueRows = issues?.data ?? [];
     if (list.length > 0) {
       rebuildFromHistory(list, c.threadId, issueRows);
     } else {
@@ -1122,7 +1151,6 @@ async function openConversation(c: AssistantConversation) {
 
 /** 批A：检测到自动压缩（上下文大幅回落）后重开当前会话——「已自动压缩」分隔条随历史重建出现。
  *  排队/生成中跳过（rebuild 会清队掐流），临时行无 DB 消息可拉。 */
-    const issueRows = issues?.data ?? [];
 function onCompacted() {
   if (state.queue.length > 0 || state.sending || !selected.value || selected.value.id === 'tmp') {
     return;
@@ -1384,7 +1412,7 @@ defineExpose({
       height: 32px;
       padding: 0 12px;
       margin-top: 8px;
-      font-size: 12.5px;
+      font-size: 13px;
       color: var(--dcs-text-secondary);
       overflow: hidden;
 
@@ -1555,6 +1583,7 @@ defineExpose({
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        font-size: 13px;
         border: 0;
         border-radius: 6px;
         background: transparent;
@@ -1584,7 +1613,7 @@ defineExpose({
     align-items: center;
     gap: 5px;
     padding: 10px 6px 4px;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-placeholder);
     .g-badge {
       font-size: var(--dcs-font-xs);
@@ -1616,6 +1645,15 @@ defineExpose({
       margin-left: auto;
     }
   }
+  /* 2026-11-11：会话行与两条折叠条改成键盘可达（role=button + tabindex + Enter/Space），
+     焦点必须看得见——用内缩环，256px 窄栏里不会被裁掉；focus-within 只负责显示行内操作 */
+  .conv-item:focus-visible,
+  .grp-fold:focus-visible,
+  .arch-fold:focus-visible {
+    outline: 2px solid var(--el-color-primary);
+    outline-offset: -2px;
+  }
+
   .conv-item {
     display: flex;
     align-items: center;
@@ -1759,7 +1797,7 @@ defineExpose({
     margin-top: 6px;
     /* R4 二改视觉统一：与「更早」折叠条同为虚线分隔 + chevron 右推（视觉席批注） */
     border-top: 1px dashed var(--dcs-border-color-lighter);
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     padding: 8px 6px;
     cursor: pointer;
@@ -1775,7 +1813,7 @@ defineExpose({
   .load-more {
     padding: 8px 0 4px;
     text-align: center;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--el-color-primary);
     cursor: pointer;
     user-select: none;
@@ -1998,6 +2036,12 @@ html.dark .main.ag-empty :deep(.dcs-comp .box:not(.focus)) {
 .side-close,
 .side-mask {
   display: none;
+}
+
+/* 2026-11-11：原生 button 不继承父级字号，浏览器默认 13.3333px；壳内图标按钮显式归 13 档 */
+.side-close,
+.side-toggle {
+  font-size: 13px;
 }
 
 @media (max-width: 992px) {

@@ -676,7 +676,7 @@ onMounted(load);
   }
 
   .cl-title {
-    font-size: 15.5px;
+    font-size: 16px;
   }
 
   .cl-points li {

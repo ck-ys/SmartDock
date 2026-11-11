@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: var(--el-color-warning-light-9);
   color: var(--dcs-text-secondary);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 .cb-wrap {
   width: 100%;
@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
   padding: 0 2px 6px;
 }
 .cb-title {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--dcs-text-primary, #1f2d3d);
   overflow: hidden;
@@ -556,7 +556,7 @@ onBeforeUnmount(() => {
 }
 .cb-sub {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--dcs-text-secondary, #909399);
 }
 .cb-toggle {
@@ -566,7 +566,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: transparent;
   color: var(--dcs-text-secondary, #606266);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1;
   padding: 4px 10px;
   cursor: pointer;

@@ -301,7 +301,7 @@ defineExpose({ focus: () => rootEl.value?.focus({ preventScroll: true }) });
   padding: 0 7px;
 }
 .pfc-title {
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.4;
   color: var(--app-text, #181818);
   font-weight: 600;
@@ -378,7 +378,7 @@ defineExpose({ focus: () => rootEl.value?.focus({ preventScroll: true }) });
 .pfc-ds {
   flex: 1 1 120px;
   min-width: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 20px;
   color: var(--app-muted, #666);
   overflow-wrap: anywhere;
@@ -448,7 +448,7 @@ defineExpose({ focus: () => rootEl.value?.focus({ preventScroll: true }) });
   border-radius: 8px;
   background: var(--app-surface, #fff);
   color: var(--app-muted, #666);
-  font-size: 12.5px;
+  font-size: 12px;
   cursor: pointer;
 
   &:disabled {
@@ -467,7 +467,7 @@ defineExpose({ focus: () => rootEl.value?.focus({ preventScroll: true }) });
 .pfc-err {
   margin: 4px 0 0;
   min-height: 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--el-color-danger, #d54941);
   &:empty {
     display: none;

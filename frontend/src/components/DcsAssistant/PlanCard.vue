@@ -122,7 +122,7 @@ const footerText = computed(() => {
   border: 1.5px solid var(--dcs-border-color);
   border-radius: 15px;
   padding: 4px 11px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--dcs-text-regular);
   background: var(--el-bg-color);
   transition: 0.2s;
@@ -154,7 +154,7 @@ const footerText = computed(() => {
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px dashed var(--dcs-border-color-light);
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--dcs-text-secondary);
 

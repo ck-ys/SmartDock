@@ -562,7 +562,7 @@ function onConfirm() {
   background: linear-gradient(var(--app-warm-bg-top), var(--app-warm-bg));
 
   b {
-    font-size: 13.5px;
+    font-size: 14px;
     color: var(--dcs-text-primary);
   }
   .ch-ic {
@@ -786,7 +786,7 @@ function onConfirm() {
   align-items: center;
   gap: 6px;
   color: var(--el-color-primary);
-  font-size: 12.5px;
+  font-size: 12px;
 
   .spin {
     animation: dcs-cf-rot 1s linear infinite;
@@ -794,7 +794,7 @@ function onConfirm() {
 }
 .c-done {
   color: var(--dcs-color-success);
-  font-size: 12.5px;
+  font-size: 12px;
 
   &.cancelled {
     color: var(--dcs-text-secondary);

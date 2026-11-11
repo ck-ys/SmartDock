@@ -110,7 +110,7 @@ const emit = defineEmits<{ ok: [] }>();
         align-items: center;
         gap: 5px;
         text-align: left;
-        font-size: 12.5px;
+        font-size: 12px;
         margin: 0 0 2px;
 
         .pr-ic {

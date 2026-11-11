@@ -654,6 +654,13 @@
                   :disabled="modelOptions.length === 0"
                   @change="onDefaultChange"
                 >
+                  <!-- 2026-11-11：默认指向已停用配置时补一条只读项——否则下拉没有匹配 option，会把雪花 configId 当文案露出来 -->
+                  <el-option
+                    v-if="missingDefault"
+                    :value="missingDefault.configId"
+                    :label="missingDefaultLabel"
+                    disabled
+                  />
                   <!-- 批B(Q3:A) 按厂商分组（ZCode 同款）：同厂多模型归堆好找 -->
                   <el-option-group v-for="g in groupedModelOptions" :key="g.provider" :label="g.label">
                     <el-option v-for="o in g.options" :key="o.configId" :value="o.configId" :label="optionLabel(o)">
@@ -678,6 +685,9 @@
                 <span v-if="modelOptions.length === 0" class="cell-note">本租户还没有可用的 AI 调用模型——先去「AI 模型配置」页接入</span>
               </div>
               <div class="cell-sub">用户没自选时走这个模型；模型失效会自动回落可用模型（接口默认★→最近可用）</div>
+              <div v-if="missingDefault" class="cell-sub missing-default-note">
+                当前默认模型已停用或不可用，助手会自动回落到可用模型；请重新选择一个可用模型。
+              </div>
             </el-descriptions-item>
 
             <!-- 业务反馈批2 Q4（2026-10-16 拍板 A：整体搬进画像设置）：「后台 AI 默认」槽从本卡
@@ -1770,6 +1780,7 @@ import ProviderLogo from '@/views/dcs/ai-config/ProviderLogo.vue';
 import {
   getAssistantModelOptions,
   getAssistantModelSetting,
+  getDcsAiConfig,
   matchAiCapability,
   overrideAiCapability,
   resetAiCapability,
@@ -2281,6 +2292,42 @@ const modelForm = reactive({
  *  lastSavedBackend 及 onBackendDefaultChange 已随行移除 */
 const lastSavedAssistant = ref<number | string | undefined>(undefined);
 
+/** 2026-11-11：已保存的默认模型指向一条已停用/不可用的配置时，下拉里没有对应选项，
+ *  Element Plus 会把原始值（雪花 configId）当文案显示——用户看到一串数字。
+ *  这里补一条只读选项：显示模型名 +「已停用」，并提示重选。 */
+const missingDefaultRow = ref<{ configId: number | string; modelName: string } | null>(null);
+const missingDefault = computed(() => {
+  const id = modelForm.assistantDefaultConfigId;
+  if (id === undefined || id === null || id === '') return null;
+  if (modelOptions.value.some((o) => String(o.configId) === String(id))) return null;
+  if (missingDefaultRow.value && String(missingDefaultRow.value.configId) === String(id)) return missingDefaultRow.value;
+  return { configId: id, modelName: '' };
+});
+const missingDefaultLabel = computed(() => {
+  const m = missingDefault.value;
+  if (!m) return '';
+  return m.modelName ? `${m.modelName}（已停用）` : '该模型已停用或不可用';
+});
+
+/** 读停用行的模型名（详情接口要 dcs:ai:query；普通租户管理员可能没有，失败就退回通用文案） */
+async function loadMissingDefaultRow() {
+  const id = modelForm.assistantDefaultConfigId;
+  if (id === undefined || id === null || id === '') {
+    missingDefaultRow.value = null;
+    return;
+  }
+  if (modelOptions.value.some((o) => String(o.configId) === String(id))) {
+    missingDefaultRow.value = null;
+    return;
+  }
+  try {
+    const r = (await getDcsAiConfig(id)) as unknown as { data?: { configId?: number | string; modelName?: string } };
+    missingDefaultRow.value = { configId: r?.data?.configId ?? id, modelName: r?.data?.modelName || '' };
+  } catch {
+    missingDefaultRow.value = { configId: id, modelName: '' };
+  }
+}
+
 /**
  * 业务批4 Q15-B（2026-10-13 拍板）：开放表按厂商「首见聚堆」——维持后端相对次序（★默认最前→默认厂商自然排头），
  * 仅把同厂行挪到一起；每厂前插一行组头哨兵（__group）横跨全表，数据行结构不变（勾选/单价照常）。
@@ -2444,6 +2491,7 @@ async function loadModelSection() {
     settingAllowSwitch.value = sv?.allowUserSwitch ?? '0';
     // 业务批4 Q3：开放表勾选集随设置行恢复（switch_scope JSON 数组串）
     parseScope(sv?.switchScope);
+    await loadMissingDefaultRow();
     await refreshCapability();
   } catch {
     ElMessage.error('模型设置加载失败，请稍后再试');
@@ -4383,6 +4431,10 @@ onMounted(() => {
     line-height: 1.7;
     color: var(--dcs-text-secondary);
   }
+  /* 2026-11-11：默认模型指向已停用配置时的提示行 */
+  .cell-sub.missing-default-note {
+    color: var(--el-color-warning);
+  }
   /* 业务批4 Q3：模型开放表（自选开关下的白名单勾选表） */
   .scope-box {
     margin-top: 10px;
@@ -5415,13 +5467,13 @@ onMounted(() => {
     }
   }
   .cap-bar-cnt {
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     font-variant-numeric: tabular-nums;
   }
   /* 业务工具归属的说明：一行小字，靠 title 展开详情，不再单占一段 */
   .cap-tip {
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     cursor: help;
     border-bottom: 1px dashed var(--el-border-color);
@@ -5482,7 +5534,7 @@ onMounted(() => {
       padding-top: 6px;
     }
     b {
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
       color: var(--dcs-text-primary);
     }
@@ -5555,7 +5607,7 @@ onMounted(() => {
   /* 出现条件跟在名字后面（短句），窄屏收进第二行——字段不丢，只换位置 */
   .cap-when {
     min-width: 0;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     white-space: nowrap;
     overflow: hidden;
@@ -5582,7 +5634,7 @@ onMounted(() => {
   }
   .cap-sub {
     margin-top: 1px;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 18px;
     color: var(--dcs-text-secondary);
     overflow: hidden;
@@ -5616,7 +5668,7 @@ onMounted(() => {
     border-radius: 5px;
     background: transparent;
     font: inherit;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-regular);
     white-space: nowrap;
     cursor: pointer;
@@ -5642,7 +5694,7 @@ onMounted(() => {
     }
   }
   .gate-own {
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 400;
     color: var(--dcs-text-secondary);
   }
@@ -5674,7 +5726,7 @@ onMounted(() => {
     background: var(--el-fill-color-lighter);
 
     .lbl {
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--dcs-text-secondary);
     }
     .xopt {
@@ -5683,7 +5735,7 @@ onMounted(() => {
       border-radius: 6px;
       background: var(--el-bg-color);
       font: inherit;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--dcs-text-regular);
       cursor: pointer;
 
@@ -5728,7 +5780,7 @@ onMounted(() => {
     border: 1px solid var(--el-color-primary-light-7);
     border-radius: 7px;
     background: var(--el-color-primary-light-9);
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-regular);
 
     .n b {

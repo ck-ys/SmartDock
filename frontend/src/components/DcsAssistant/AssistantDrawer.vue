@@ -401,9 +401,11 @@ import {
   listActions,
   listConversations,
   listMessages,
+  listConversationIssues,
   archiveConversation,
   renameConversation,
-  restoreConversation
+  restoreConversation,
+  type AssistantRunIssue
 } from '@/api/dcs/assistant';
 import { getTask, statsOverview } from '@/api/dcs/core/task';
 import { useUserStore } from '@/store/modules/user';
@@ -869,18 +871,22 @@ async function onFpOpen(c: { id: number | string; threadId: string; status?: str
   // resetForNewSession 会清位——必须在 rebuild 之后再置，否则闸永远失效（E2E 实锤）
   const archived = c.status === 'ARCHIVED';
   try {
-    const msgs = (await listMessages(c.id, { limit: 100, tail: true })) as unknown as {
-      data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
-    };
+    // 2026-11-11 Q3-2：问题行随历史一并拉（空回合「这轮为什么没回答」的还原源）；
+    // 失败不阻塞回放——issues 缺席只是少了原因行，消息照常重建
+    const [msgs, issueRes] = await Promise.all([
+      listMessages(c.id, { limit: 100, tail: true }),
+      listConversationIssues(c.id).catch(() => null)
+    ] as const);
     if (mySeq !== fpOpenSeq) {
       return;
     }
-    const list = msgs?.data ?? [];
+    const list = (msgs as unknown as { data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }> })?.data ?? [];
+    const issues = ((issueRes as unknown as { data?: AssistantRunIssue[] } | null)?.data ?? []) as AssistantRunIssue[];
     if (list.length > 0) {
-      rebuildFromHistory(list, c.threadId);
+      rebuildFromHistory(list, c.threadId, issues);
     } else {
       // 空会话保 threadId（AU-16）：newSession 会换新 uuid，左侧行与消息落库分家
-      rebuildFromHistory([], c.threadId);
+      rebuildFromHistory([], c.threadId, issues);
     }
     state.curConvArchived = archived;
     // ZCode 对齐 Q2（批B）：恢复该会话的任务清单（StatPanel TODO 分区）
@@ -983,16 +989,18 @@ function watchRemoteRun(c: { id: number | string; threadId: string; status?: str
         ) {
           return;
         }
-        const msgs = (await listMessages(c.id, { limit: 100, tail: true })) as unknown as {
-          data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
-        };
+        const [msgs, issueRes] = await Promise.all([
+          listMessages(c.id, { limit: 100, tail: true }),
+          listConversationIssues(c.id).catch(() => null)
+        ] as const);
         // await 之后环境可能又变，二次复核后才允许重建
         if (mySeq !== fpOpenSeq || state.threadId !== c.threadId || state.turns[state.turns.length - 1] !== placeholder) {
           return;
         }
-        const list = msgs?.data ?? [];
+        const list = (msgs as unknown as { data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }> })?.data ?? [];
+        const issues = ((issueRes as unknown as { data?: AssistantRunIssue[] } | null)?.data ?? []) as AssistantRunIssue[];
         if (list.length > 0) {
-          rebuildFromHistory(list, c.threadId);
+          rebuildFromHistory(list, c.threadId, issues);
         } else {
           placeholder.phase = 'done';
         }
@@ -1529,12 +1537,15 @@ async function rebuildSession() {
     if (!conv) {
       return;
     }
-    const msgs = (await listMessages(conv.id, { limit: 100, tail: true })) as unknown as {
-      data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
-    };
-    const list = msgs?.data ?? [];
+    // 2026-11-11 Q3-2：刷新恢复路径（最高频）同样带问题行——F5 后空回答卡的原因不丢
+    const [msgs, issueRes] = await Promise.all([
+      listMessages(conv.id, { limit: 100, tail: true }),
+      listConversationIssues(conv.id).catch(() => null)
+    ] as const);
+    const list = (msgs as unknown as { data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }> })?.data ?? [];
+    const issues = ((issueRes as unknown as { data?: AssistantRunIssue[] } | null)?.data ?? []) as AssistantRunIssue[];
     if (list.length > 0) {
-      rebuildFromHistory(list);
+      rebuildFromHistory(list, undefined, issues);
       // k3 P2-1 回修：刷新/重进恢复路径也要拉任务清单——漏接时 F5 后步骤恢复了、
       // 清单分区静默消失（onFpOpen/openConversation 都接了，独漏这条最高频路径）
       loadTodo(state.threadId);
@@ -1579,10 +1590,16 @@ async function reloadCurrentConv() {
     if (!conv) {
       return;
     }
-    const msgs = (await listMessages(conv.id, { limit: 100, tail: true })) as unknown as {
-      data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }>;
-    };
-    rebuildFromHistory((msgs?.data ?? []) as Parameters<typeof rebuildFromHistory>[0], state.threadId);
+    const [msgs, issueRes] = await Promise.all([
+      listMessages(conv.id, { limit: 100, tail: true }),
+      listConversationIssues(conv.id).catch(() => null)
+    ] as const);
+    const issues = ((issueRes as unknown as { data?: AssistantRunIssue[] } | null)?.data ?? []) as AssistantRunIssue[];
+    rebuildFromHistory(
+      ((msgs as unknown as { data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }> })?.data ?? []) as Parameters<typeof rebuildFromHistory>[0],
+      state.threadId,
+      issues
+    );
   } catch {
     /* 拉不到就算了——分隔条在下次打开会话时自然出现 */
   }
@@ -1828,7 +1845,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
   border-radius: 10px;
   background: var(--el-color-primary-light-9);
   color: var(--el-color-primary);
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 20px;
 
   .cb-main {
@@ -1896,7 +1913,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
       background: none;
       text-align: left;
       padding: 6px 8px;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--dcs-text-primary);
       border-radius: 6px;
       cursor: pointer;
@@ -2000,6 +2017,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
     background: none;
     cursor: pointer;
     color: var(--dcs-text-secondary);
+    font-size: 13px;
     /* 业务反馈批1015b Q9：热区 22×26→40×36——小屏/触屏点✕易落空（图标本身不变，只放大可点区） */
     width: 40px;
     height: 36px;
@@ -2023,7 +2041,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
   padding: 8px 14px;
   border-bottom: 1px solid #f3d19e;
   border-radius: 0;
-  font-size: 12.5px;
+  font-size: 12px;
   background: var(--dcs-color-warning-light-9, #fdf6ec);
   color: var(--dcs-text-regular);
 
@@ -2145,6 +2163,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
     background: none;
     cursor: pointer;
     color: var(--dcs-text-secondary);
+    font-size: 13px;
     /* 业务反馈批1015b Q9：热区 22×26→40×36——小屏/触屏点✕易落空（图标本身不变，只放大可点区） */
     width: 40px;
     height: 36px;
@@ -2219,7 +2238,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
       min-width: 0;
       border: none;
       outline: none;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--dcs-text-primary);
       background: none;
     }
@@ -2235,7 +2254,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
     color: var(--dcs-text-secondary);
     border-radius: 8px;
     padding: 6px 0;
-    font-size: 12.5px;
+    font-size: 12px;
     cursor: pointer;
 
     &:hover {
@@ -2335,7 +2354,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
     }
     .fp-time {
       flex: none;
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--dcs-text-secondary);
       /* Q4 甲：转圈与相对时间同一行、居中对齐 */
       display: inline-flex;
@@ -2455,7 +2474,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
       border: none;
       background: none;
       text-align: left;
-      font-size: 12.5px;
+      font-size: 12px;
       color: var(--dcs-text-regular);
       padding: 6px 10px;
       border-radius: 6px;
@@ -2489,7 +2508,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
     border: none;
     border-radius: 8px;
     background: none;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--el-color-primary);
     cursor: pointer;
 
@@ -2529,7 +2548,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
 :global(.dcs-help-body .help-steps) {
   margin: 4px 0 8px;
   padding-left: 20px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--dcs-text-primary);
   line-height: 1.9;
 }
@@ -2552,7 +2571,7 @@ defineExpose({ state, ask: (q: string) => onSend(q, '') });
 }
 :global(.dcs-help-body h4) {
   margin: 10px 0 4px;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--dcs-text-primary);
 }
 :global(.dcs-help-body .help-ul) {

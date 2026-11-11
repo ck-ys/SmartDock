@@ -356,7 +356,7 @@ draw4();
   border-radius: 10px;
   padding: 7px 10px;
   margin-bottom: 10px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--dcs-text-secondary);
 
   .sn {
@@ -364,7 +364,7 @@ draw4();
     color: var(--app-primary-ink);
     border-radius: 6px;
     padding: 1px 8px;
-    font-size: 10.5px;
+    font-size: 11px;
     flex: none;
   }
   b {
@@ -402,7 +402,7 @@ draw4();
 }
 .sub {
   margin: 8px auto 0;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--dcs-text-secondary);
   text-wrap: balance;
   animation: dcs-hero-fade 0.45s ease 0.05s both;
@@ -572,6 +572,7 @@ draw4();
   align-items: center;
   gap: 10px;
   text-align: left;
+  font-size: 13px;
   border: 1px solid var(--dcs-border-color-lighter);
   background: var(--el-bg-color);
   border-radius: 10px;
@@ -616,7 +617,7 @@ draw4();
     min-width: 0;
   }
   b {
-    font-size: 13.5px;
+    font-size: 14px;
     color: var(--dcs-text-primary);
     font-weight: 600;
     /* 业务批4 Q7-A（2026-10-13 拍板）：标题两行封顶（超出省略）——375px 下同排卡
@@ -629,7 +630,7 @@ draw4();
     overflow: hidden;
   }
   .s-sub {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     /* 业务批4 Q7-A：副文案固定一行省略，卡片高度由标题两行封顶 */
     white-space: nowrap;

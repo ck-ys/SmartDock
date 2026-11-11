@@ -569,7 +569,7 @@ function onRevise() {
     border-radius: 6px;
     background: #fafbfc;
     color: #7a8494;
-    font-size: 11.5px;
+    font-size: 12px;
     padding: 2px 8px;
     cursor: pointer;
     &:hover {

@@ -284,7 +284,7 @@ onMounted(load);
 
     .an-card__excerpt {
       max-width: 68ch;
-      font-size: 14.5px;
+      font-size: 14px;
       -webkit-line-clamp: 3;
     }
   }
@@ -307,7 +307,7 @@ onMounted(load);
 
   &__title {
     margin: 0 0 8px;
-    font-size: 16.5px;
+    font-size: 16px;
     line-height: 1.5;
     font-weight: 600;
     color: var(--app-text);
@@ -524,7 +524,7 @@ onMounted(load);
     background: var(--app-surface);
 
     .an-card__title {
-      font-size: 16.5px;
+      font-size: 16px;
       line-height: 1.5;
       letter-spacing: normal;
       -webkit-line-clamp: 2;
@@ -587,7 +587,7 @@ onMounted(load);
   }
 
   .an-article__body {
-    font-size: 14.5px;
+    font-size: 14px;
     line-height: 1.85;
   }
 }

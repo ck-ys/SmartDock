@@ -1045,7 +1045,7 @@ onBeforeUnmount(() => {
   background: var(--el-bg-color);
   border: 1px solid var(--dcs-border-color-lighter);
   box-shadow: 0 8px 28px rgb(16 24 40 / 10%);
-  font-size: 12.5px;
+  font-size: 12px;
   z-index: 5;
   max-height: min(64vh, 32rem);
   display: flex;
@@ -1206,7 +1206,7 @@ onBeforeUnmount(() => {
 /* Q4 乙（2026-11-09 拍板）：抽屉标题行——回答「这是什么」（遮罩负责「你打开了东西」） */
 .sheet-ttl {
   padding: 8px 12px 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--dcs-text-regular);
 }
@@ -1264,7 +1264,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: #111827;
   color: #fff;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
   white-space: nowrap;
   box-shadow: 0 6px 18px rgb(16 24 40 / 18%);
@@ -1391,7 +1391,7 @@ onBeforeUnmount(() => {
 /* Q7 甲（2026-11-07 拍板）：摘要链一行 + 分区清单；详情按 Q3 乙 改为行内展开（2026-11-09） */
 .sp-sum {
   padding: 8px 12px;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--dcs-text-secondary);
   border-bottom: 1px solid var(--dcs-border-color-lighter);
@@ -1628,7 +1628,7 @@ onBeforeUnmount(() => {
       color: var(--dcs-text-primary);
     }
     .todo-cnt {
-      font-size: 11.5px;
+      font-size: 12px;
       color: var(--dcs-text-secondary);
       font-variant-numeric: tabular-nums;
 
@@ -1713,7 +1713,7 @@ onBeforeUnmount(() => {
     background: none;
     padding: 3px 6px;
     font: inherit;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-secondary);
     cursor: pointer;
     text-align: left;
@@ -1822,7 +1822,7 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
   border-top: 1px solid var(--dcs-border-color-lighter);
   color: var(--dcs-text-placeholder);
-  font-size: 11.5px;
+  font-size: 12px;
   /* Q27：220 宽卡片里尾注会在「本轮 / 完成」处折出一个孤字——两行均分，
      不要在第二行只剩两个字（300 宽单行不受影响；不支持则忽略） */
   text-wrap: balance;

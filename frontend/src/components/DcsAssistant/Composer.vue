@@ -2426,7 +2426,7 @@ defineExpose({
     border: 1px solid var(--dcs-border-color-light);
     background: var(--el-bg-color);
     border-radius: 13px;
-    font-size: 12.5px;
+    font-size: 12px;
     color: var(--dcs-text-regular);
     cursor: pointer;
     transition: all 0.15s;
@@ -2564,13 +2564,13 @@ defineExpose({
     background: var(--el-color-primary-light-9);
     color: var(--el-color-primary);
     border-radius: 999px;
-    font-size: 11.5px;
+    font-size: 12px;
     padding: 2px 9px;
     cursor: pointer;
   }
   .qb-p {
     color: var(--dcs-color-warning);
-    font-size: 11.5px;
+    font-size: 12px;
     margin-bottom: 4px;
   }
   .qb-it {
@@ -2676,7 +2676,7 @@ defineExpose({
     b {
       /* 原型 .slash b：Consolas 等宽 600 定宽（命令名列对齐） */
       font-family: Consolas, Monaco, monospace;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
       min-width: 56px;
       color: var(--dcs-text-primary);
@@ -3022,7 +3022,7 @@ html.dark .brow .btool.bicon.wbtn.on {
       cursor: default;
 
       b {
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 600;
         color: var(--dcs-text-primary);
         margin-bottom: 7px;
@@ -3052,7 +3052,7 @@ html.dark .brow .btool.bicon.wbtn.on {
           .ctxest {
             margin-left: 4px;
             padding: 0 5px;
-            font-size: 9.5px;
+            font-size: 10px;
             font-style: normal;
             font-weight: 500;
             color: var(--el-color-warning);
@@ -3086,7 +3086,7 @@ html.dark .brow .btool.bicon.wbtn.on {
         }
         .ctxnums {
           grid-area: nums;
-          font-size: 10.5px;
+          font-size: 11px;
           line-height: 1.4;
           color: var(--dcs-text-placeholder);
         }
@@ -3096,7 +3096,7 @@ html.dark .brow .btool.bicon.wbtn.on {
         display: flex;
         align-items: center;
         gap: 6px;
-        font-size: 10.5px;
+        font-size: 11px;
         color: var(--dcs-text-placeholder);
 
         .fs {
@@ -3110,7 +3110,7 @@ html.dark .brow .btool.bicon.wbtn.on {
         display: flex;
         align-items: center;
         gap: 7px;
-        font-size: 11.5px;
+        font-size: 12px;
         color: var(--dcs-text-secondary);
 
         .cl {
@@ -3122,7 +3122,7 @@ html.dark .brow .btool.bicon.wbtn.on {
           flex: none;
           border-radius: 999px;
           padding: 1px 9px;
-          font-size: 10.5px;
+          font-size: 11px;
           line-height: 1.6;
 
           &.tag-credit {
@@ -3162,7 +3162,7 @@ html.dark .brow .btool.bicon.wbtn.on {
         }
       }
       .ctxsub {
-        font-size: 10.5px;
+        font-size: 11px;
         color: var(--dcs-text-placeholder);
         line-height: 1.5;
         margin: 0 0 5px 59px;
@@ -3242,6 +3242,7 @@ html.dark .brow .btool.bicon.wbtn.on {
   .round-btn {
     width: 32px;
     height: 32px;
+    font-size: 13px;
     border-radius: 8px;
     border: none;
     display: flex;
@@ -3550,7 +3551,7 @@ html.dark .brow .btool.bicon.wbtn.on {
     .tagline {
       margin-left: auto;
       flex: none;
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--dcs-text-placeholder);
       border: 1px solid var(--dcs-border-color-light);
       border-radius: 8px;
@@ -3613,7 +3614,7 @@ html.dark .brow .btool.bicon.wbtn.on {
     padding: 8px 10px 6px;
     margin-top: 6px;
     border-top: 1px solid var(--dcs-border-color-light);
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 18px;
     color: var(--dcs-text-placeholder);
     flex: none;
@@ -3636,7 +3637,7 @@ html.dark .brow .btool.bicon.wbtn.on {
       border: 1px solid var(--dcs-border-color-light);
       border-radius: 4px;
       background: var(--el-fill-color-light);
-      font-size: 10.5px;
+      font-size: 11px;
       color: var(--dcs-text-secondary);
       padding: 0 3px;
       margin-right: 4px;

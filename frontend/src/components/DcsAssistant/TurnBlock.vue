@@ -1760,7 +1760,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     max-width: 100%;
     padding: 5px 10px;
     font: inherit;
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 1.5;
     color: var(--dcs-text-secondary);
     background: var(--el-fill-color-lighter, #f5f7fa);
@@ -1823,7 +1823,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       display: flex;
       align-items: center;
       gap: 6px;
-      font-size: 12.5px;
+      font-size: 12px;
       line-height: 1.5;
       color: var(--dcs-text-secondary);
     }
@@ -2090,7 +2090,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--dcs-text-secondary);
   user-select: none;
   font-variant-numeric: tabular-nums;
@@ -2174,7 +2174,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     color: var(--dcs-color-warning, #e6a23c);
     border: 1px solid var(--app-warm-border);
     border-radius: 999px;
-    font-size: 10.5px;
+    font-size: 11px;
     font-weight: 600;
     padding: 0 8px;
     line-height: 17px;
@@ -2188,7 +2188,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     color: var(--dcs-color-danger);
     border: 1px solid color-mix(in srgb, var(--dcs-color-danger) 34%, transparent);
     border-radius: 999px;
-    font-size: 10.5px;
+    font-size: 11px;
     padding: 0 7px;
     line-height: 17px;
   }
@@ -2365,7 +2365,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   justify-content: flex-end;
   max-height: 40px;
   overflow: hidden;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 20px;
   color: var(--dcs-text-placeholder);
   cursor: pointer;
@@ -2406,7 +2406,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--dcs-color-danger);
   background: var(--el-bg-color);
   border: 1px solid #fbc4c4;
@@ -2469,7 +2469,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     background: none;
     padding: 3px 6px;
     margin-left: 14px;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-placeholder);
     cursor: pointer;
     border-radius: 6px;
@@ -2655,7 +2655,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       background: var(--el-fill-color-light);
       border-radius: 4px;
       padding: 1px 5px;
-      font-size: 11.5px;
+      font-size: 12px;
       font-family: ui-monospace, Menlo, Consolas, monospace;
     }
   }
@@ -2699,7 +2699,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   border: 0;
   background: none;
   border-radius: 6px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--dcs-text-secondary);
   cursor: pointer;
 
@@ -2730,7 +2730,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12.5px;
+  font-size: 12px;
 
   .th {
     display: flex;
@@ -2774,7 +2774,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    font-size: 11.5px;
+    font-size: 12px;
     line-height: 1.6;
 
     /* 2026-11-09：数据卡（rows 型结果）搬进这里后，240px 限高会把它裁成一条缝、
@@ -2785,7 +2785,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     }
   }
   .sd-h {
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--dcs-text-placeholder);
     letter-spacing: 0.04em;
     margin-bottom: 2px;
@@ -2844,13 +2844,13 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   .failword {
     /* 原型 L537：红字+点状下划线（非胶囊） */
     color: var(--dcs-color-danger);
-    font-size: 11.5px;
+    font-size: 12px;
     border-bottom: 1px dotted var(--dcs-color-danger);
     cursor: copy;
   }
   .args {
     margin-left: 25px;
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--dcs-text-placeholder);
     font-family: ui-monospace, Menlo, Consolas, monospace;
     word-break: break-all;
@@ -2930,7 +2930,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     }
     :deep(code) {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 11.5px;
+      font-size: 12px;
       padding: 1px 4px;
       border-radius: 4px;
       background: var(--el-fill-color-light, #f5f5f5);
@@ -3002,7 +3002,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       margin: 8px 0 5px;
       color: var(--dcs-text-primary);
       font-weight: 600;
-      font-size: 15.5px;
+      font-size: 16px;
       &:first-child {
         margin-top: 0;
       }
@@ -3024,7 +3024,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       margin: 0;
       border-collapse: separate;
       border-spacing: 0;
-      font-size: 12.5px;
+      font-size: 12px;
 
       th,
       td {
@@ -3179,6 +3179,12 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     background: var(--dcs-color-danger-light-9, #fef0f0);
   }
 }
+/* 2026-11-11 Q4-2：限流/鉴权类不给按钮，只给一句「接下来做什么」的灰字提示 */
+.ec-note {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--dcs-text-secondary, #909399);
+}
 .ecard {
   border: 1px solid var(--dcs-color-danger-light-7, #fbc4c4);
   background: var(--dcs-color-danger-light-9, #fef0f0);
@@ -3215,7 +3221,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--dcs-text-secondary);
   border: 1px dashed var(--dcs-border-color-light);
   border-radius: 10px;
@@ -3226,7 +3232,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     background: none;
     color: var(--el-color-primary);
     cursor: pointer;
-    font-size: 12.5px;
+    font-size: 12px;
     padding: 0;
 
     &:hover {
@@ -3236,7 +3242,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   /* Q10 停止预期文案的补语（弱化不抢按钮） */
   .sn-hint {
     color: var(--dcs-text-placeholder);
-    font-size: 11.5px;
+    font-size: 12px;
   }
 }
 /* 尾部件（原型 fua：hover 显现操作行） */
@@ -3313,7 +3319,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   padding: 10px 12px;
   width: 236px;
   z-index: 35;
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--dcs-text-regular);
 
   b {
@@ -3443,7 +3449,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
 
   .chip {
     height: 28px;
-    font-size: 12.5px;
+    font-size: 12px;
     background: var(--el-bg-color);
     border: 1px solid var(--dcs-border-color-light);
     color: var(--dcs-text-regular);
@@ -3517,7 +3523,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     white-space: nowrap;
   }
   .src-m {
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--dcs-text-placeholder);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3563,7 +3569,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-size: 12.5px;
+    font-size: 13px;
 
     b {
       font-size: 13px;
@@ -3580,7 +3586,7 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
       border-radius: 8px;
       padding: 6px 10px;
       cursor: pointer;
-      font-size: 12.5px;
+      font-size: 12px;
       text-align: left;
 
       &:hover:not(:disabled) {
