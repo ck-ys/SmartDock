@@ -24,8 +24,10 @@ import {
   getPendingAskUser,
   getConversationTodo,
   getFollowups,
+  getRunIssue,
   revokeAssistantAction,
   getAssistantPlanState,
+  type AssistantRunIssue,
   type PendingHitlItem
 } from '@/api/dcs/assistant';
 import type { AguiResume } from '@/api/dcs/assistant/types';
@@ -41,6 +43,22 @@ import { parseToolJson } from './toolJson';
  *  30s 窗口在队列里还没轮到；90s 兜住两轮生成周期，且配合聚焦/回页补拉（见
  *  scheduleFollowupPull），离开页面期间到手的建议回来立刻可见 */
 const FOLLOWUP_PULL_DELAYS = [3500, 5500, 9000, 12000, 16000, 20000, 24000];
+
+/** 2026-11-11 拍板 Q4-2：问题行拉取间隔——终态写赢后异步落行（终态 UPDATE + issue
+ *  INSERT 两次 DB 往返），1.5s 首拉通常已可见，三轮兜底后放弃（回放走会话问题行仍能还原） */
+const ISSUE_PULL_DELAYS = [1500, 4000, 9000];
+
+/** 2026-11-11 拍板 Q3-2/Q4-2：原因码 → 空回答卡人话 + 下一步动作。文案只在这张表，
+ *  TurnBlock（卡片）与 StatPanel（状态行）共用；后端只发六码，改文案不动后端。
+ *  unknown 码不进表（表里查不到走旧通用文案，向前兼容后端新增码） */
+export const ASSISTANT_ISSUE_COPY: Record<string, { text: string; action: 'retry' | 'wait' | 'quota' | 'admin' }> = {
+  empty: { text: '服务商返回了空回答（这次没有正文）', action: 'retry' },
+  rate: { text: '请求太频繁，被限流了', action: 'wait' },
+  quota: { text: '这个模型的余额或配额用完了', action: 'quota' },
+  timeout: { text: '模型这次响应超时', action: 'retry' },
+  auth: { text: '模型的钥匙无效或已过期', action: 'admin' },
+  other: { text: '这次没有返回内容，原因未识别', action: 'retry' }
+};
 
 /** 计划停靠区「开始执行」发的固定文案（后端只认 planDecision+planId，文案给人看） */
 export const PLAN_CONFIRM_TEXT = '按刚才的计划开始执行';
@@ -226,6 +244,11 @@ export interface AssistantTurn {
   autoRetried?: boolean;
   /** 本轮 runId（排错/续看用；自动重试会换新 runId，靠 resumeRound 防重复落用户消息） */
   runId?: string;
+  /** 2026-11-11 拍板 Q3-2：「这轮为什么没回答」原因码（empty/rate/quota/timeout/auth/other）；
+   *  活体=空回答卡延时拉 /run/{runId}/issue，回放=按问题行 messageId 挂回。无原因的空回答不设 */
+  issueCode?: string;
+  /** 原因背后的服务商原文（后端已脱敏）——仅管理员可展开（TurnBlock/StatPanel 按 superadmin 判） */
+  issueDetail?: string | null;
   costYuan: number | null;
   tokens: number | null;
   stamp: string;
@@ -1618,6 +1641,12 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     if (lastTurn && lastTurn.phase === 'done') {
       scheduleFollowupPull(lastTurn);
     }
+    // 2026-11-11 Q3-2：零正文零工具的轮次延时问服务端「为什么」（内部自判，非空轮直接
+    // 跳过）。error 轮也要问——活体实证：服务商故障时框架不出 RUN_ERROR 只关流，前端
+    // 走 'disconnected'→phase='error'，只认 done 会把这批轮挡在门外（卡面要等刷新才出）
+    if (lastTurn && (lastTurn.phase === 'done' || lastTurn.phase === 'error')) {
+      scheduleIssuePull(lastTurn);
+    }
     const hitlKey = lastTurn?.hitl ? hitlToolKey(lastTurn.hitl) : '';
     // 题9 案1（2026-10-31 拍板）：撤批W2 的「act_ 一律不自动放行」——档位改由后端权限规则
     // 真执行（全自动=写类也放行 / 同类只问一次=同名确认过即放行），前端只省掉「问你」这一步；
@@ -2058,6 +2087,11 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     if (resumeTurn.phase === 'done') {
       scheduleFollowupPull(resumeTurn);
     }
+    // 2026-11-11 Q3-2：确认/续跑轮同样可能零正文（内部自判，非空轮直接跳过；
+    // error 轮同问，口径与 runTurn 主轮一致——框架对服务商故障只关流不出 RUN_ERROR）
+    if (resumeTurn.phase === 'done' || resumeTurn.phase === 'error') {
+      scheduleIssuePull(resumeTurn);
+    }
     state.sending = false;
     consumeQueue(false);
   }
@@ -2299,8 +2333,50 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     attempt(0);
   }
 
+  /**
+   * 2026-11-11 拍板 Q3-2：空回答轮的问题行拉取——done 且零正文零工具时按 runId 问
+   * 服务端「这轮为什么没回答」，拿到原因码/原文写回回合。终态写赢后异步落行（终态
+   * 回写 + issue insert 两次 DB 往返），1.5s 首拉通常已可见；三轮兜底后放弃（回放
+   * 时仍会经会话问题行还原，不丢）。竞态防护沿用 scheduleFollowupPull 的 stillMine。
+   */
+  function scheduleIssuePull(turn: AssistantTurn) {
+    const runId = turn.runId;
+    if (!runId) {
+      return;
+    }
+    const stillMine = () => state.turns[state.turns.length - 1] === turn && ['done', 'error', 'stopped'].includes(turn.phase);
+    const needIssue = () => stillMine() && !turn.bufText && !turn.answerHtml && turn.steps.length === 0 && !turn.issueCode;
+    const attemptIssue = (idx: number) => {
+      globalThis.setTimeout(() => {
+        if (!needIssue()) {
+          return;
+        }
+        try {
+          getRunIssue(runId)
+            .then((res) => {
+              const row = (res as unknown as { data?: AssistantRunIssue | null })?.data;
+              if (row && stillMine() && !turn.issueCode) {
+                turn.issueCode = row.code;
+                turn.issueDetail = row.detail ?? null;
+              }
+            })
+            .catch(() => {
+              /* 静默：回放路径仍会经会话问题行还原 */
+            });
+        } catch {
+          /* 测试环境无 request：静默 */
+        }
+        if (idx + 1 < ISSUE_PULL_DELAYS.length) {
+          attemptIssue(idx + 1);
+        }
+      }, ISSUE_PULL_DELAYS[idx]);
+    };
+    attemptIssue(0);
+  }
+
   function rebuildFromHistory(
     messages: Array<{
+      id?: number | string;
       role: string;
       content: string;
       totalTokens?: number;
@@ -2308,7 +2384,8 @@ export function useAssistant(options: UseAssistantOptions = {}) {
       followupSuggestions?: string | null;
       endReason?: string | null;
     }>,
-    threadId?: string
+    threadId?: string,
+    issues?: AssistantRunIssue[]
   ) {
     // 先按新会话收敛（批H P1-3）：清队列+代数递增（在途回合收尾作废）+sending 复位
     // （stop 的 abort settle 可能滞后数秒——重建的是只读视图，UI 不应停留在旧回合的发送态）
@@ -2328,6 +2405,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     state.turns = [];
     history.length = 0;
     let cur: AssistantTurn | null = null;
+    // 问题行挂靠表：messageId → 行（后端落问题时锚定该轮 user 消息行 id）
+    const issueMap = new Map<string, AssistantRunIssue>(
+      (issues ?? []).filter((i) => i.messageId !== null && i.messageId !== undefined).map((i) => [String(i.messageId), i]));
     // 批17 Q2：role=system 的压缩标记行——挂到下一个回合（compactedBefore 上方渲染分隔条）；
     // 若其后暂无新回合则挂在 state.lastCompaction（尾部悬挂分隔条）。content 形如
     // {"type":"compaction","beforeTokens":N,"afterTokens":N}；解析失败静默忽略（非压缩 system 行）。
@@ -2355,6 +2435,13 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         cur = reactive<AssistantTurn>(emptyTurn(content));
         cur.phase = 'done';
         cur.bufText = '';
+        // 2026-11-11 拍板 Q3-2：问题行按 messageId 挂回本回合——刷新/换设备后
+        // 「这轮为什么没回答」与活体同一句话（空回合 endReason 恒空，此前无从还原）
+        const iss = issueMap.get(String(m.id ?? ''));
+        if (iss) {
+          cur.issueCode = iss.code;
+          cur.issueDetail = iss.detail ?? null;
+        }
         if (pendingCompaction) {
           cur.compactedBefore = pendingCompaction;
           pendingCompaction = null;

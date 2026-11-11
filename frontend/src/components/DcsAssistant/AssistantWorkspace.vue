@@ -359,7 +359,8 @@ import {
   renameConversation,
   restoreConversation,
   type AssistantAction,
-  type AssistantConversation
+  type AssistantConversation,
+  type AssistantRunIssue
 } from '@/api/dcs/assistant';
 import { useUserStore } from '@/store/modules/user';
 import { getAgentPrefs, motionReduced } from '@/components/DcsAssistant/prefsStore';
@@ -1079,20 +1080,26 @@ async function openConversation(c: AssistantConversation) {
   const archived = c.status === 'ARCHIVED';
   try {
     // request 层返回整个 body（{code,msg,data}，与 TurnBlock resolveMessageId 同款取法）
-    const [msgs, acts] = (await Promise.all([listMessages(c.id, { limit: 100, tail: true }), listActions({ threadId: c.threadId })])) as unknown as [
+    // 2026-11-11 Q3-2：同拉本会话「这轮为什么没回答」问题行（挂回对应回合；失败不拦会话打开）
+    const [msgs, acts, issues] = (await Promise.all([
+      listMessages(c.id, { limit: 100, tail: true }),
+      listActions({ threadId: c.threadId }),
+      listConversationIssues(c.id).catch(() => null)
+    ])) as unknown as [
       { data?: Array<{ role: string; content: string; totalTokens?: number; endReason?: string | null }> },
-      { data?: AssistantAction[] }
+      { data?: AssistantAction[] },
+      { data?: AssistantRunIssue[] } | null
     ];
     if (openSeq !== mySeq) {
       return;
     }
     const list = msgs?.data ?? [];
     if (list.length > 0) {
-      rebuildFromHistory(list, c.threadId);
+      rebuildFromHistory(list, c.threadId, issueRows);
     } else {
       // 空会话保 threadId（AU-16）：旧路径 newSession() 换新 uuid——左侧行高亮
       // 仍挂旧行、消息却落新 thread，旧行永远空着（身份漂移）
-      rebuildFromHistory([], c.threadId);
+      rebuildFromHistory([], c.threadId, issueRows);
     }
     state.curConvArchived = archived;
     actions.value = acts?.data ?? [];
@@ -1115,6 +1122,7 @@ async function openConversation(c: AssistantConversation) {
 
 /** 批A：检测到自动压缩（上下文大幅回落）后重开当前会话——「已自动压缩」分隔条随历史重建出现。
  *  排队/生成中跳过（rebuild 会清队掐流），临时行无 DB 消息可拉。 */
+    const issueRows = issues?.data ?? [];
 function onCompacted() {
   if (state.queue.length > 0 || state.sending || !selected.value || selected.value.id === 'tmp') {
     return;

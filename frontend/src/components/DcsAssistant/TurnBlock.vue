@@ -293,15 +293,30 @@
     </div>
 
     <!-- 业务批10 #2/#4：空回答轮诚实化——done 却无正文无工具=模型没吐过一个字（零事件卡死被
-         收割/重放悬挂轮），不再假装"已完成"绿胶囊+静态推荐题；给人话结论+一键重问出路 -->
+         收割/重放悬挂轮），不再假装"已完成"绿胶囊+静态推荐题；给人话结论+一键重问出路。
+         2026-11-11：补上第三种真实成因——模型回了 200 但正文为空（实测 17 token 无内容），
+         原来只写「卡住或中断」会在这种情形下误导；顺带指出去哪查余额/可用性 -->
+    <!-- 2026-11-11 拍板 Q3-2/Q4-2：有原因码（服务端判因、刷新不丢）按码出人话+下一步；
+         无码（拉取未到/历史旧行）回退通用文案。原文仅管理员可展开（Q2-2 脱敏后落库） -->
     <div v-if="emptyFail" class="ecard">
-      这轮没等到回答（模型卡住或中断了）
-      <button v-if="turn.question" class="ec-recover" @click="emit('resend-run', turn.question)">↻ 重新问一次</button>
+      这轮没等到回答：{{ issueLine }}
+      <details v-if="turn.issueDetail && issueAdmin" class="ec-detail">
+        <summary>查看服务商原文</summary>
+        <code>{{ turn.issueDetail }}</code>
+      </details>
+      <!-- 终审 P2-3：quota 的跳转按钮只有能进「AI 模型与钥匙」的人（管理员）才给，
+           普通成员点了会落 404 兜底路由——quota 最常见受众恰是普通成员，给灰字出路 -->
+      <button v-if="issueAction === 'quota' && issueAdmin" class="ec-recover" @click="emit('mdnav', AI_CONFIG_PATH)">去「AI 模型与钥匙」查看</button>
+      <span v-else-if="issueAction === 'quota'" class="ec-note">请联系管理员充值或换模型</span>
+      <button v-else-if="turn.question && (issueAction === 'retry' || issueAction === null)" class="ec-recover" @click="emit('resend-run', turn.question)">↻ 重新问一次</button>
+      <span v-if="issueAction === 'wait'" class="ec-note">等几秒再试就好</span>
+      <span v-else-if="issueAction === 'admin'" class="ec-note">请联系管理员更换钥匙</span>
     </div>
 
     <!-- 错误卡（AU-35 1008拍板A：挂起中断类=恢复优先双按钮——code+框架文案双保险判定，
-         不再只匹配英文文案；「恢复挂起的确认」调 /hitl/pending 重建确认卡，会话不废） -->
-    <div v-if="turn.errorMsg" class="ecard">
+         不再只匹配英文文案；「恢复挂起的确认」调 /hitl/pending 重建确认卡，会话不废）。
+         2026-11-11：emptyFail（判因卡）接管时不叠旧错误文案——判因说得清就不重复报忧 -->
+    <div v-if="turn.errorMsg && !emptyFail" class="ecard">
       {{ turn.errorMsg }}
       <!-- 业务批(1015) Q9：人话化映射后的原始报错收进折叠——用户不慌，排错有现场 -->
       <details v-if="turn.errorDetail" class="ec-detail">
@@ -498,7 +513,7 @@ const favHostDead = reactive(new Set<string>());
  * + 👎问卷（submitFeedback 落库）+ ⭐收藏（favBar）+ 代码卡复制（事件委托）。
  */
 import type { AssistantAskReceipt, AssistantStep, AssistantTurn, HitlEdits, ThinkSeg } from './useAssistant';
-import { ACT, getAssistant } from './useAssistant';
+import { ACT, ASSISTANT_ISSUE_COPY, getAssistant } from './useAssistant';
 import { createVNode, defineAsyncComponent, render, watch } from 'vue';
 import ConfirmCard from './ConfirmCard.vue';
 import DataCard from './DataCard.vue';
@@ -973,8 +988,33 @@ watch(fbOpen, (open) => {
 /** 尾部件显隐口径：waiting（等你确认）还没有可操作的回答，不出操作行/来源条 */
 const hasFoot = computed(() => ['done', 'stopped', 'error'].includes(props.turn.phase));
 /** 业务批10 #2：空回答轮——done 却无正文无工具（零事件卡死收割后重放/悬挂轮回放）。
- *  判定与 statText/推荐题/错误卡三处联动：不显示"已完成"、不荐题、给人话+重问出路 */
-const emptyFail = computed(() => props.turn.phase === 'done' && !props.turn.bufText && !props.turn.answerHtml && props.turn.toolCalls === 0);
+ *  判定与 statText/推荐题/错误卡三处联动：不显示"已完成"、不荐题、给人话+重问出路。
+ *  2026-11-11 补丁：error 轮（服务商故障关流，活体实证框架只关流不出 RUN_ERROR）拿到
+ *  判因码后也归入——判因卡比「连接已断开」说得清；无码 error 轮维持旧错误卡兜底 */
+const emptyFail = computed(() => {
+  const t = props.turn;
+  const zeroContent = !t.bufText && !t.answerHtml && t.toolCalls === 0;
+  if (!zeroContent) {
+    return false;
+  }
+  if (t.phase === 'done') {
+    return true;
+  }
+  return t.phase === 'error' && !!t.issueCode;
+});
+
+/* ---- 2026-11-11 拍板 Q3-2/Q4-2：「这轮为什么没回答」按码出人话 ----
+ * 文案/下一步词典与 StatPanel 共用（useAssistant.ASSISTANT_ISSUE_COPY），后端只发六码；
+ * 无码（拉取未到/历史旧行）回退旧通用文案——卡片文案永不空。原文仅 superadmin 展开。 */
+const AI_CONFIG_PATH = '/tenant/ai-config';
+const issueInfo = computed(() => (props.turn.issueCode ? ASSISTANT_ISSUE_COPY[props.turn.issueCode] : undefined));
+const issueLine = computed(() =>
+  issueInfo.value
+    ? `${issueInfo.value.text}。`
+    : '模型结束时一个字都没返回（可能中途停住，或服务商返回了空回答）。反复出现就去「AI 模型与钥匙」看该模型的余额和可用状态。'
+);
+const issueAction = computed<'retry' | 'wait' | 'quota' | 'admin' | null>(() => issueInfo.value?.action ?? null);
+const issueAdmin = computed(() => userStore.roles.includes('superadmin'));
 
 /* ---- 来源（2026-11-09 按 ZCode 真源码改口径）：只列"真来源" ----
  * ZCode 全仓没有"每轮来源清单"这种东西（ai-elements 的 Sources / SourcesTrigger 零调用）；
@@ -1185,7 +1225,8 @@ const statText = computed(() => {
       // 失败数已由 ts-f 独立 pill 展示，主词回一个词，不重复计数
       return turnStateWord('stopped');
     case 'error':
-      return turnStateWord('error');
+      // 2026-11-11：判因卡接管（拿到服务端码）的断流轮——主词同空回答口径
+      return emptyFail.value ? '没等到回答' : turnStateWord('error');
     default:
       // 业务批10 #2：空回答轮不再显示"已完成"——模型一个字都没吐，绿色完成态是误导
       if (emptyFail.value) {

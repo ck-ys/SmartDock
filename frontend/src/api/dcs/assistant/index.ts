@@ -59,6 +59,35 @@ export interface AssistantAction {
   createTime: string;
 }
 
+/** 「这轮为什么没回答」问题行（2026-11-11 拍板 Q1-3）：code 六码 empty/rate/quota/timeout/auth/other；
+ *  detail=后端已脱敏的服务商原文（仅管理员展开）；messageId=该轮用户提问行（回放挂靠锚点） */
+export interface AssistantRunIssue {
+  id: number | string;
+  runId: string;
+  threadId?: string | null;
+  conversationId?: number | null;
+  messageId?: number | null;
+  code: string;
+  detail?: string | null;
+  createTime: string;
+}
+
+/** 会话全部问题行（历史回放：刷新/换设备后按 messageId 还原「这轮为什么没回答」） */
+export function listConversationIssues(conversationId: number | string) {
+  return request<AssistantRunIssue[]>({
+    url: `/dcs/assistant/conversation/${conversationId}/issues`,
+    method: 'get'
+  });
+}
+
+/** 活体：按 runId 取最新问题行（空回答卡延时拉取，与追问侧车同节奏） */
+export function getRunIssue(runId: string) {
+  return request<AssistantRunIssue | null>({
+    url: `/dcs/assistant/run/${runId}/issue`,
+    method: 'get'
+  });
+}
+
 /** 助手三态+用量（悬浮球出现条件=enabled && modelConfigured；拍板⑤ 未开=零加载；
  *  批B B2：threadId 可选——带上则返回 contextTokens（合并环上下文占用分子） */
 export function getAssistantStatus(threadId?: string) {

@@ -59,6 +59,9 @@
              优先级：在跑的步骤 → 计划进度 → 未完成待办 → 来源 → 文件 → 收尾。
              点这行不做事，只读；要细节去下面的分区。 -->
         <div class="sp-sum" :title="summaryText">{{ summaryText }}</div>
+        <!-- 2026-11-11 拍板 Q3-2（案 2）：状态卡与空回答卡同一句原因——空回合 done 时
+             「这轮为什么没回答」一行说清；词典与 TurnBlock 共用（useAssistant） -->
+        <div v-if="issueLine" class="sp-why">{{ issueLine }}</div>
 
         <!-- Q7 甲：分区清单（计划 / 来源 / 文件 / 动作）——行可点，详情长在这行下面（Q3 乙）；
              同一项再点收起，换一项则替换（不叠 tab 条，ZCode 的多 tab 属于功能变多之后的丙案） -->
@@ -228,6 +231,7 @@
  * 四交互：sph 双钮 / 步骤行点击跳流内工具行 / waiting 点头跳确认卡 / foldrow 双向展开。
  */
 import type { AssistantTurn, AssistantStep } from './useAssistant';
+import { ASSISTANT_ISSUE_COPY } from './useAssistant';
 import type { AssistantTodoItem } from '@/api/dcs/assistant';
 import IconSpan from './IconSpan.vue';
 import { emoToSvgHtml } from './icons';
@@ -758,6 +762,17 @@ const capsuleTitle = computed(() => {
  * ZCode 的原链是 live workflow → currentPlanItem → active Goal → Git → done Goal →
  * completedPlanItem → Todo 数 → latestSessionPlan → runningCount → endedWorkflowRunCount；
  * 本仓没有 workflow/goal/git，能对上的是「在跑步骤 / 计划 / 待办 / 来源」，其余按本仓数据补。 */
+/** 2026-11-11 拍板 Q3-2（案 2）：空回合的状态行——「为什么没回答」与卡片同一句。
+ *  done/error 且零正文零工具有码时出现（error=服务商故障关流轮，活体实证框架不出
+ *  RUN_ERROR 帧只关流，前端落 phase='error'）；无码不显示（面板是速览，宁缺毋假）。 */
+const issueLine = computed(() => {
+  const t = props.turn;
+  if (!t || (t.phase !== 'done' && t.phase !== 'error') || t.bufText || t.answerHtml || t.steps.length > 0 || !t.issueCode) {
+    return '';
+  }
+  return ASSISTANT_ISSUE_COPY[t.issueCode]?.text ?? '';
+});
+
 const summaryText = computed(() => {
   const t = props.turn;
   if (!t) {
@@ -1385,6 +1400,18 @@ onBeforeUnmount(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+/* 2026-11-11 Q3-2：空回合「为什么没回答」一行——比摘要弱半档（只陈述原因，不带进度语义） */
+.sp-why {
+  padding: 6px 12px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dcs-text-secondary);
+  border-bottom: 1px solid var(--dcs-border-color-lighter);
+}
+.sp-why::before {
+  content: '为什么没回答：';
+  color: var(--dcs-text-placeholder, #a8abb2);
 }
 .spsec {
   padding: 6px 8px;
