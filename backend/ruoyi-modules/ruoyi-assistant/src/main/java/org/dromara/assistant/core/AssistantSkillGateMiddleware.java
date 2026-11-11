@@ -3,7 +3,6 @@ package org.dromara.assistant.core;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.skill.AgentSkill;
 import io.agentscope.core.skill.DynamicSkillMiddleware;
-import io.agentscope.core.tool.Toolkit;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,14 +34,16 @@ public class AssistantSkillGateMiddleware extends DynamicSkillMiddleware {
     /**
      * 仓分层栈取 {@link AssistantSkillSource}（前两层进程级共享，FileSystem 记忆化才生效；
      * 5b 批起第三层=数据库在线层，按本租户绑定）。
-     * 三审回修 P1-3：共享稳定 workDir——基类每实例 mkdtemp+挂 shutdown hook，会话级
-     * 实例化下 /tmp 目录与 hook 无界增长；传共享目录后两者只发生一次（caller-supplied
-     * root 不挂 hook），进程级清理由 AssistantSkillSource 静态块兜底。
+     * agentscope 2.0.4→2.1.0 适配：基类构造器瘦身为 (repositories, codeExecutionEnabled)——
+     * toolkit 改为 per-pass 从调用方 Agent 的活体 toolkit 解析（load_skill_through_path
+     * 首个 prompt pass 前自动注册，早于工具 schema 枚举），workDir 改从
+     * {@code Agent.getSkillWorkDir()} 解析（我们在装配面 {@code .skillWorkDir(...)} 传进程级
+     * 单根，P1-3 清理语义不变）；JVM 级兜底目录基类自建一次挂 shutdown hook，原「每实例
+     * mkdtemp 无界增长」病根上游已结构性消除。
      */
-    public AssistantSkillGateMiddleware(Toolkit toolkit, int roleLevel,
+    public AssistantSkillGateMiddleware(int roleLevel,
                                         Map<String, String> toolGate, String tenantId) {
-        super(AssistantSkillSource.repositories(tenantId), toolkit, null, false,
-            AssistantSkillSource.sharedSkillWorkDir());
+        super(AssistantSkillSource.repositories(tenantId), false);
         this.roleLevel = roleLevel;
         this.toolGate = toolGate;
         this.tenantId = tenantId == null || tenantId.isBlank()

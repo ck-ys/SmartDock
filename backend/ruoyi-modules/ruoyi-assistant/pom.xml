@@ -16,25 +16,25 @@
         - P0 阶段（当前）：仅探针模块骨架 + AgentScope 七件套依赖引入，不含任何业务代码
         - 一站规划：HarnessAgent 推理循环/query_*+act_* 工具面/HITL 确认卡/计费装饰/workspace md 体系
         - 实现依据 document/DCS_ASSISTANT_SPEC_20260923.md；进度计划 document/plans/DCS_ASSISTANT_P0_VERIFICATION_PLAN_20260923.md
-        - 版本纪律：全家走根 pom 的 io.agentscope:agentscope-bom 钉版本（升级只改一个号）
+        - 版本纪律：全家走根 pom 的 io.github.ck-ys.agentscope:agentscope-bom 钉版本（升级只改一个号）
     </description>
 
     <dependencies>
         <!-- ===== AgentScope 七件套（版本全部由根 pom agentscope-bom 管理，此处不写 version） ===== -->
         <dependency>
-            <groupId>io.agentscope</groupId>
+            <groupId>io.github.ck-ys.agentscope</groupId>
             <artifactId>agentscope-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentscope</groupId>
+            <groupId>io.github.ck-ys.agentscope</groupId>
             <artifactId>agentscope-harness</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentscope</groupId>
+            <groupId>io.github.ck-ys.agentscope</groupId>
             <artifactId>agentscope-extensions-model-openai</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentscope</groupId>
+            <groupId>io.github.ck-ys.agentscope</groupId>
             <artifactId>agentscope-extensions-redis</artifactId>
             <!-- T5 预警坑提前实锤(2026-10-03): 本件传递 redisson 4.2.0 会顶掉项目基线 3.52.0
                  (4.x 移除 org.redisson.api.NameMapper 等 → ruoyi-common-redis RedisConfig introspect 失败,
@@ -52,11 +52,11 @@
             <artifactId>ruoyi-common-ratelimiter</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentscope</groupId>
+            <groupId>io.github.ck-ys.agentscope</groupId>
             <artifactId>agentscope-extensions-jdbc</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.agentscope</groupId>
+            <groupId>io.github.ck-ys.agentscope</groupId>
             <artifactId>agentscope-agui-spring-boot-starter</artifactId>
             <!-- scope 一律 compile 不设 provided：starter 需要运行时 classpath（Task 0 口径） -->
         </dependency>

@@ -123,11 +123,14 @@
 
             <!-- AgentScope 全家 BOM 钉版本（P0-Task0，2026-10-03）：2.0.x 迭代快，升级只改这一个号；
                  若 Central 无此 BOM 则删除本段改逐坐标钉版本，结论记 document/evidence/assistant-p0/（Task 5 对账）。
-                 2026-11-10 升 2.1.0-BETA1（中央仓已发布，阿里/华为镜像均 200） -->
+                 2026-11-10 升 2.1.0-BETA1（中央仓已发布，阿里/华为镜像均 200）
+                 2026-11-11 切自发布坐标 io.github.ck-ys.agentscope:2.1.0-ckys3
+                 （fork ck-ys/agentscope-java 基于 upstream main 2d70942c 亲发 Central，部署 89462523；
+                  含安全修复 3 笔：技能装载路径穿越/本地盘命名空间边界/write_text_file 行号校验） -->
             <dependency>
-                <groupId>io.agentscope</groupId>
+                <groupId>io.github.ck-ys.agentscope</groupId>
                 <artifactId>agentscope-bom</artifactId>
-                <version>2.1.0-BETA1</version>
+                <version>2.1.0-ckys3</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

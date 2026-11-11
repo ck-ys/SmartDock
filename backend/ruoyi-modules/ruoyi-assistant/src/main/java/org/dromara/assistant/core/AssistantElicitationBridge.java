@@ -130,7 +130,12 @@ public class AssistantElicitationBridge {
         // 三审回修（dsflash P2-14）：expiresAt 在审计之后才定——审计落库耗时不吃用户的答题预算
         long expiresAtMs = System.currentTimeMillis() + elicitTimeoutSeconds() * 1000L;
         p.expiresAtMs = expiresAtMs;
-        submitSignal(threadId, cardPayload(id, serverName, req.message(), req.requestedSchema(),
+        // MCP SDK 0.17.2→2.1.0：ElicitRequest 从 record 变接口，requestedSchema() 挪到
+        // 表单实现类 ElicitFormRequest 上；非表单形态（mode 扩展）无 schema，null 进
+        // cardPayload 的空兜底（与旧行为一致）
+        Map<String, Object> schema = req instanceof McpSchema.ElicitFormRequest form
+            ? form.requestedSchema() : null;
+        submitSignal(threadId, cardPayload(id, serverName, req.message(), schema,
             expiresAtMs - System.currentTimeMillis()));
         McpSchema.ElicitResult result;
         try {

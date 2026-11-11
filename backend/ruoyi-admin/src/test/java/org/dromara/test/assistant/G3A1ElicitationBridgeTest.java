@@ -69,7 +69,7 @@ class G3A1ElicitationBridgeTest {
         AssistantElicitationBridge b = bridge();
         AtomicReference<McpSchema.ElicitResult> out = new AtomicReference<>();
         Thread t = new Thread(() -> out.set(b.handle("weather", "000000", 1L, "th-g3",
-            new McpSchema.ElicitRequest("缺城市", Map.of("type", "object")))));
+            McpSchema.ElicitRequest.builder("缺城市", Map.of("type", "object")).build())));
         t.start();
         // 等卡信号可取（handle 先落信号再阻塞）
         List<Map<String, Object>> cards = null;
@@ -102,7 +102,7 @@ class G3A1ElicitationBridgeTest {
     void handleWithoutThreadRejectsImmediately() {
         AssistantElicitationBridge b = bridge();
         McpSchema.ElicitResult r = b.handle("weather", "000000", 1L, null,
-            new McpSchema.ElicitRequest("?", Map.of()));
+            McpSchema.ElicitRequest.builder("?", Map.of()).build());
         assertEquals(McpSchema.ElicitResult.Action.CANCEL, r.action());
         assertTrue(b.take("th-none") == null);
     }
@@ -115,7 +115,7 @@ class G3A1ElicitationBridgeTest {
         AssistantElicitationBridge b = bridge();
         AtomicReference<McpSchema.ElicitResult> out = new AtomicReference<>();
         Thread t = new Thread(() -> out.set(b.handle("weather", "000000", 1L, "th-to",
-            new McpSchema.ElicitRequest("?", Map.of()))));
+            McpSchema.ElicitRequest.builder("?", Map.of()).build())));
         t.start();
         List<Map<String, Object>> cards = null;
         for (int i = 0; i < 50 && cards == null; i++) {
@@ -157,7 +157,7 @@ class G3A1ElicitationBridgeTest {
         for (int i = 0; i < 8; i++) {
             final int n = i;
             Thread t = new Thread(() -> b.handle("weather", "000000", 1L, "th-m" + n,
-                new McpSchema.ElicitRequest("?", Map.of())));
+                McpSchema.ElicitRequest.builder("?", Map.of()).build()));
             t.start();
             ts.add(t);
         }
@@ -175,7 +175,7 @@ class G3A1ElicitationBridgeTest {
         assertEquals(8, ids.size());
         AtomicReference<McpSchema.ElicitResult> ninth = new AtomicReference<>();
         Thread t9 = new Thread(() -> ninth.set(b.handle("weather", "000000", 1L, "th-m9",
-            new McpSchema.ElicitRequest("?", Map.of()))));
+            McpSchema.ElicitRequest.builder("?", Map.of()).build())));
         t9.start();
         t9.join(2000);
         assertTrue(!t9.isAlive(), "pending 满应立返不挂起");
