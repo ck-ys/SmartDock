@@ -123,6 +123,9 @@ export interface AssistantStep {
   /** 全量工具结果（批C：业务卡/来源折叠条/图表卡渲染地基；20KB 封顶防长回合内存膨胀） */
   resultFull: string;
   status: 'run' | 'ok' | 'err';
+  /** ckys3 题1：执行中工具的真实进度小字（后端 tool_progress 帧按 toolCallId 对行回填；
+   *  只在 status==='run' 期间渲染，终态定格不动——慢工具不再干转圈无解释） */
+  progress?: string;
   /** Q10 单步耗时：创建记 startedAt，终态结算 durMs；回放重建行恒 0（无真值不显示） */
   startedAt: number;
   durMs: number;
@@ -426,6 +429,17 @@ let seq = 0;
 /** R3(2026-10-10) 全局事件序：thinkSegs 与 steps 共用的单调计数器——模块级而非回合级，
  *  防 HITL resume 轮新建 handlers 闭包后 seq 回卷与打断前的段/步碰撞（时间线乱序） */
 let evSeq = 0;
+
+/** ckys3 题1 三审席2 P2：回合离开直播相位（waiting/停止/断线）时清运行中步骤的
+ *  进度小字——挂起等待期间不再显示「执行中·已用时」，resume 后由新节拍重写；
+ *  步骤 status 保持 run（resume 续跑既有语义不变） */
+function clearRunProgress(turn: { steps: Array<{ status: string; progress?: string }> }) {
+  for (const s of turn.steps) {
+    if (s.status === 'run' && s.progress) {
+      s.progress = undefined;
+    }
+  }
+}
 
 /** 新回合骨架（runTurn / resolveHitl 共用） */
 function emptyTurn(question: string): AssistantTurn {
@@ -992,6 +1006,23 @@ export function useAssistant(options: UseAssistantOptions = {}) {
             });
           }
           toast('计划还没确认，这一步写操作已拒绝', 'info');
+        } else if (name === 'tool_progress' && value && typeof value === 'object') {
+          // ckys3 题1 案1：慢工具执行中的真实进度小字（后端节拍器只报真实经过时间，不编步骤）。
+          // 按 toolCallId 对行回填，只在 run 期间生效——终态帧（ok/err）到达后迟到进度不再覆盖。
+          const v = value as { toolCallId?: unknown; toolName?: unknown; text?: unknown };
+          const text = typeof v.text === 'string' && v.text ? v.text : '';
+          if (text) {
+            const pid = typeof v.toolCallId === 'string' ? v.toolCallId : '';
+            let ps = pid ? turn.steps.find((x) => x.id === pid) : undefined;
+            if (!ps && pid) {
+              for (let i = state.turns.length - 1; i >= 0 && !ps; i--) {
+                ps = state.turns[i].steps.find((x) => x.id === pid);
+              }
+            }
+            if (ps && ps.status === 'run') {
+              ps.progress = text;
+            }
+          }
         } else if (name === 'elicitation' && value && typeof value === 'object') {
           // G3-A1：MCP 外部工具执行中反问（server 侧在飞挂起，run 保持 RUNNING）——
           // 卡随本回合渲染，作答走独立端点（不走 resolveHitl/resume）；多 server 可同时反问
@@ -1133,12 +1164,15 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           ensureTypingLoop();
           return;
         }
-        turn.streamDone = true;
-        if (outcome && (outcome as { type?: string }).type === 'interrupt') {
-          // HITL 暂停：确认卡数据提取。真实形态（agentscope 2.0.3 Jackson）=
-          // {type:'interrupt', interrupts:[{id:'threadId:toolCallId', reason, message, toolCallId…}]}
-          // resume 契约键=id（E2E 实证：取顶层 toolCallId 得空串 → must-cover 拒）；顶层形态仅旧 mock 兼容
-          turn.phase = 'waiting';
+          turn.streamDone = true;
+          if (outcome && (outcome as { type?: string }).type === 'interrupt') {
+            // HITL 暂停：确认卡数据提取。真实形态（agentscope 2.0.3 Jackson）=
+            // {type:'interrupt', interrupts:[{id:'threadId:toolCallId', reason, message, toolCallId…}]}
+            // resume 契约键=id（E2E 实证：取顶层 toolCallId 得空串 → must-cover 拒）；顶层形态仅旧 mock 兼容
+            turn.phase = 'waiting';
+            // ckys3 题1 三审席2 P2：挂起等待时清进度小字——「执行中·已用时」在等确认期间
+            // 不该继续挂（resume 后新节拍重写，旧数字还会倒退）；步骤 status 仍 run（续跑语义）
+            clearRunProgress(turn);
           const o = outcome as Record<string, unknown>;
           const interrupts = Array.isArray(o.interrupts) ? (o.interrupts as Array<Record<string, unknown>>) : [];
           const first = interrupts.length > 0 ? interrupts[0] : o;
@@ -1213,6 +1247,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
         }
         turn.errorCode = code || '';
         turn.phase = 'error';
+        clearRunProgress(turn); // 挂起在途工具的进度小字不再说「执行中」（三审席2 P2）
         // AU-23: 错误轮同样收尾——否则打字机光标永久闪烁、部分文本永不渲染 md、ticker 不停
         turn.streamDone = true;
         ensureTypingLoop();
@@ -1610,6 +1645,9 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
     if (result === 'stopped') {
       turn.phase = wasStopped ? 'stopped' : turn.phase;
+      if (wasStopped) {
+        clearRunProgress(turn); // 停止时挂起工具的进度小字同步清（三审席2 P2）
+      }
       turn.streamDone = true;
       ensureTypingLoop();
     } else if (result === 'finished' && !['done', 'waiting', 'error', 'stopped'].includes(turn.phase)) {
@@ -2063,6 +2101,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     }
     if (result === 'stopped') {
       resumeTurn.phase = 'stopped';
+      clearRunProgress(resumeTurn); // 停止/断线时挂起工具进度小字清掉（三审席2 P2，同主轮）
     } else if (result === 'finished' && !['done', 'waiting', 'error', 'stopped'].includes(resumeTurn.phase)) {
       resumeTurn.phase = 'done';
       resumeTurn.streamDone = true;
@@ -2070,6 +2109,7 @@ export function useAssistant(options: UseAssistantOptions = {}) {
     } else if (result === 'disconnected' && !resumeTurn.errorMsg) {
       resumeTurn.errorMsg = '连接已断开，执行结果未知，请到系统页面核实';
       resumeTurn.phase = 'error';
+      clearRunProgress(resumeTurn);
       resumeTurn.streamDone = true; // AU-23: 同主轮口径收尾
       ensureTypingLoop();
     }

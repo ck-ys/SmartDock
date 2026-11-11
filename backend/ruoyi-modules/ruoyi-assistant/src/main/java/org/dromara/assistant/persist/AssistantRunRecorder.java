@@ -372,6 +372,13 @@ public class AssistantRunRecorder {
         }
     }
 
+    /** 活性豁免帧：心跳与工具进度帧只算「连接活着」，不算「业务在动」（挂死收割判据）。
+     *  包级可见=同包单测可直断豁免清单（ckys3 题1 三审席1 P1 的防回归锚） */
+    static boolean isLivenessExemptFrame(String name) {
+        return org.dromara.assistant.core.DcsHeartbeatMiddleware.HEARTBEAT_NAME.equals(name)
+            || org.dromara.assistant.core.AssistantToolProgressConverter.FRAME_NAME.equals(name);
+    }
+
     /**
      * enricher 每批事件回调（同步轻扫+异步落库）。
      */
@@ -389,10 +396,12 @@ public class AssistantRunRecorder {
         // 批6-#2：冲刷/收割线程无 context——run 侧键与时刻在建侧（流线程）登记；
         // 稳流① Q1：首事件时刻+事件间最大静默同刻埋点（终局诊断行数据源）。
         // glm53 审查 P2-1：本批含任何业务帧（非心跳）才刷 lastBusinessEventAt——
-        // 纯心跳批只喂 lastEventAt（看门狗/合法静默豁免），喂不了「真挂起」判据
+        // 纯心跳批只喂 lastEventAt（看门狗/合法静默豁免），喂不了「真挂起」判据。
+        // ckys3 题1 三审席1 P1：tool_progress 进度帧与心跳同口径排除——它只证明
+        // 节拍器活着（独立线程 2s 一跳），不证明工具/模型在动；不排除则挂死工具
+        // 会无限喂养「业务活性」，10 分钟纯心跳收割永不触发（额度与资源被占死）
         boolean anyBusiness = events.stream().anyMatch(e ->
-            !(e instanceof AguiEvent.Custom c
-                && org.dromara.assistant.core.DcsHeartbeatMiddleware.HEARTBEAT_NAME.equals(c.name())));
+            !(e instanceof AguiEvent.Custom c && isLivenessExemptFrame(c.name())));
         long nowMs = System.currentTimeMillis();
         Long prevEventAt = lastEventAt.put(runId, nowMs);
         runFirstEventAt.putIfAbsent(runId, nowMs);

@@ -176,6 +176,9 @@
           </span>
           <!-- 题8：反问的原始参数不摆给用户看（ZCode 那行 <pre> 也是注释掉的）；要排错点详情/看返回 -->
           <span v-if="it.step.argsText && it.step.name !== 'ask_user'" class="args">{{ shortArgs(it.step.argsText) }}</span>
+          <!-- ckys3 题1 案1：慢工具执行中的真实进度小字（后端 tool_progress 帧；只报真实
+               经过时间不编步骤；终态定格时该行随 status!=='run' 条件自然消失，不留残影） -->
+          <div v-if="it.step.status === 'run' && it.step.progress" class="tprog">{{ it.step.progress }}</div>
           <!-- Q6 甲（2026-11-07 拍板，照 ZCode 的 tool 展开）：点开只有三段摘要——
                参数 / 结果 / 错误；原始 JSON 收进第二层折叠，不再一上来铺一屏（限高 240px 内滚）。 -->
           <div v-if="openSteps.has(it.step.id)" class="s-det" :class="{ 'has-dc': isRowsStep(it.step) }">
@@ -2749,6 +2752,18 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   }
   .s-verb {
     font-weight: 500;
+  }
+  /* ckys3 题1 案1：慢工具真实进度小字——左蓝边一行，安静不抢动词；
+     数字用等宽变体防 2→10 秒跳变时行宽抖动 */
+  .tprog {
+    margin-left: 25px;
+    padding-left: 8px;
+    border-left: 2px solid var(--el-color-primary-light-5);
+    color: var(--dcs-text-placeholder);
+    font-size: 11px;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    width: fit-content;
   }
   /* Q10 单步耗时（≥1s 才显示；灰细字不抢动词） */
   .s-dur {

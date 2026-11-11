@@ -76,7 +76,7 @@ public class BizToolAgentAdapter extends ToolBase {
 
     @Override
     public Mono<ToolResultBlock> callAsync(ToolCallParam param) {
-        return Mono.fromCallable(() -> doExecute(param.getInput()));
+        return Mono.fromCallable(() -> doExecute(param.getInput(), param.getEmitter()));
     }
 
     /**
@@ -89,9 +89,23 @@ public class BizToolAgentAdapter extends ToolBase {
      * 行 id=null 时 finishAudit 各收口点均为 no-op，finish 侧无需另判。
      */
     public ToolResultBlock doExecute(Map<String, Object> input) {
+        return doExecute(input, null);
+    }
+
+    /**
+     * 慢路真实计时进度（ckys3 解锁板 题1 案1，2026-11-12）：业务工具多为单次服务调用
+     * （问数据 8s 封顶），没有可报的真实中间阶段——按零模拟数据铁律不编造「第 N 步」，
+     * 只报真实经过时间：超 2s 未返回时每 2s 发一条「执行中·已用时 N 秒」，页面不再黑窗；
+     * 2s 内完成不发（快工具零打扰）。帧经框架 emitter→ToolProgressEvent→
+     * {@link AssistantToolProgressConverter} 出网；取消与异常全兜底，进度失败不影响执行。
+     */
+    public ToolResultBlock doExecute(Map<String, Object> input, io.agentscope.core.tool.ToolEmitter emitter) {
         Long auditRow = (actionLedger == null || spec.isReadOnly()) ? null
             : actionLedger.open(spec.getName(), argsJsonOf(input));
+        // 三审席1 P2：节拍器启动收进 try——池拒绝（理论窗口）也走错误块，审计行不留 EXECUTING 悬挂
+        java.util.concurrent.ScheduledFuture<?> progressTicker = null;
         try {
+            progressTicker = startProgressTicker(emitter);
             // buildCall 一并收进 try(dspro P2-7): provider 配置缺陷(如 params=null)
             // 也走错误块, 不让 NPE 逃进 Reactor 错误通道炸会话
             BizToolCall call = buildCall(input);
@@ -113,6 +127,61 @@ public class BizToolAgentAdapter extends ToolBase {
         } catch (Exception e) {
             finishAudit(auditRow, false, "tool error: " + e.getMessage(), null);
             return ToolResultBlock.error(getName(), "tool error: " + e.getMessage());
+        } finally {
+            stopProgressTicker(progressTicker);
+        }
+    }
+
+    /**
+     * 进度节拍器（守护线程池，进程级共享；每工具执行期一个任务，finally 必取消）。
+     * 三审席1 P2：池 1→2 线程——下游 SSE 是同步写，单个慢客户端阻塞 emit 时
+     * 不拖住其它会话的节拍（单线程会全队停摆）；emit 抛 Error 时任务自止
+     * （scheduleAtFixedRate 语义：抛出即后续全停，显式 return 等价且不吞 OOM 重抛栈）。
+     */
+    private static final java.util.concurrent.ScheduledExecutorService PROGRESS_TICKER =
+        java.util.concurrent.Executors.newScheduledThreadPool(2, r -> {
+            Thread t = new Thread(r, "biz-tool-progress");
+            t.setDaemon(true);
+            return t;
+        });
+
+    /** 节拍自限：30 分钟仍未返回=工具已挂死，任务自取消（三审席1 P2——finally 永不到达时防引用链滞留） */
+    private static final long TICKER_MAX_MS = 30 * 60 * 1000L;
+
+    /** 首报 2s、随后每 2s 一条；emitter 为空不启动（生产路径框架恒注入 NoOp 非空——此守卫只服务单测直入/旧重载） */
+    private static java.util.concurrent.ScheduledFuture<?> startProgressTicker(
+            io.agentscope.core.tool.ToolEmitter emitter) {
+        if (emitter == null) {
+            return null;
+        }
+        final long startAt = System.currentTimeMillis();
+        final java.util.concurrent.atomic.AtomicReference<java.util.concurrent.ScheduledFuture<?>> self =
+            new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.ScheduledFuture<?> future = PROGRESS_TICKER.scheduleAtFixedRate(() -> {
+            try {
+                if (System.currentTimeMillis() - startAt > TICKER_MAX_MS) {
+                    java.util.concurrent.ScheduledFuture<?> f = self.get();
+                    if (f != null) {
+                        f.cancel(false);
+                    }
+                    return;
+                }
+                long elapsedSec = (System.currentTimeMillis() - startAt) / 1000L;
+                emitter.emit(ToolResultBlock.text("执行中·已用时 " + elapsedSec + " 秒"));
+            } catch (Exception ignored) {
+                // 断连/回放后下游 sink 可能已关——进度帧失败绝不影响工具执行
+            } catch (Throwable t) {
+                // Error（OOM 等）：任务自止，不再调度——工具执行不受影响
+                return;
+            }
+        }, 2, 2, java.util.concurrent.TimeUnit.SECONDS);
+        self.set(future);
+        return future;
+    }
+
+    private static void stopProgressTicker(java.util.concurrent.ScheduledFuture<?> ticker) {
+        if (ticker != null) {
+            ticker.cancel(false);
         }
     }
 

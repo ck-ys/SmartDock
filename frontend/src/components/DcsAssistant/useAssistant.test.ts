@@ -1289,3 +1289,102 @@ describe('追问拉取（稳流① Q8①：90s 窗口 + 聚焦/回页补拉）',
     }
   });
 });
+
+describe('ckys3 题1：工具进度帧（CUSTOM tool_progress）', () => {
+  it('运行中步骤按 toolCallId 回填 progress 小字；终态后迟到帧不覆盖', async () => {
+    const { a } = setup();
+    a.state.gateDone = true;
+    a.send('看下近 30 天访问趋势');
+    await Promise.resolve();
+    const turn = a.cur()!;
+
+    liveHandlers!.onToolStart?.('tc-p1', 'analytics_trend');
+    liveHandlers!.onCustom?.('tool_progress', {
+      toolCallId: 'tc-p1',
+      toolName: 'analytics_trend',
+      text: '执行中·已用时 2 秒'
+    });
+    expect(turn.steps[0].status).toBe('run');
+    expect(turn.steps[0].progress).toBe('执行中·已用时 2 秒');
+
+    // 终态结算后迟到的进度帧不得回写（渲染层只认 run 期间，数据层同样守位）
+    liveHandlers!.onToolResult?.('tc-p1', '{"rows":[]}');
+    liveHandlers!.onCustom?.('tool_progress', {
+      toolCallId: 'tc-p1',
+      toolName: 'analytics_trend',
+      text: '执行中·已用时 4 秒'
+    });
+    expect(turn.steps[0].status).toBe('ok');
+    expect(turn.steps[0].progress).toBe('执行中·已用时 2 秒');
+
+    finishTurn();
+    await vi.waitFor(() => expect(a.state.sending).toBe(false));
+  });
+
+  it('跨回合对行：resume 轮的进度帧回填原回合步骤（同 onToolResult 惯用法）', async () => {
+    const { a } = setup();
+    a.state.gateDone = true;
+    a.send('先查漏斗');
+    await Promise.resolve();
+    const t1 = a.cur()!;
+    liveHandlers!.onToolStart?.('tc-old', 'query_funnel');
+    // 该步骤没等到结果就收尾（interrupt 场景残影），status 仍是 run
+    liveHandlers!.onFinished?.(undefined);
+    finishTurn();
+    await vi.waitFor(() => expect(a.state.sending).toBe(false));
+
+    a.send('继续');
+    await Promise.resolve();
+    const t2 = a.cur()!;
+    liveHandlers!.onCustom?.('tool_progress', {
+      toolCallId: 'tc-old',
+      toolName: 'query_funnel',
+      text: '执行中·已用时 6 秒'
+    });
+    // 当前回合没有 tc-old → 扫历史回合回填，且不误挂到新回合
+    expect(t1.steps[0].progress).toBe('执行中·已用时 6 秒');
+    expect(t2.steps.some((s) => s.id === 'tc-old')).toBe(false);
+
+    finishTurn();
+    await vi.waitFor(() => expect(a.state.sending).toBe(false));
+  });
+
+  it('空文本与找不到步骤的帧静默丢弃（不新增步骤行）', async () => {
+    const { a } = setup();
+    a.state.gateDone = true;
+    a.send('随便问问');
+    await Promise.resolve();
+    const turn = a.cur()!;
+
+    liveHandlers!.onCustom?.('tool_progress', { toolCallId: 'tc-x', toolName: 'n', text: '' });
+    liveHandlers!.onCustom?.('tool_progress', { toolCallId: 'tc-y', toolName: 'n', text: '执行中·已用时 2 秒' });
+    liveHandlers!.onCustom?.('tool_progress', '不是对象');
+    expect(turn.steps).toHaveLength(0);
+
+    finishTurn();
+    await vi.waitFor(() => expect(a.state.sending).toBe(false));
+  });
+
+  it('三审席2 P2 回修：HITL 挂起（waiting）清进度小字，步骤保持 run 供续跑', async () => {
+    const { a } = setup();
+    a.state.gateDone = true;
+    a.send('先查漏斗');
+    await Promise.resolve();
+    const turn = a.cur()!;
+    liveHandlers!.onToolStart?.('tc-w', 'query_funnel');
+    liveHandlers!.onCustom?.('tool_progress', {
+      toolCallId: 'tc-w', toolName: 'query_funnel', text: '执行中·已用时 4 秒'
+    });
+    expect(turn.steps[0].progress).toBe('执行中·已用时 4 秒');
+    // interrupt 收尾 → waiting：进度小字清、status 仍 run
+    liveHandlers!.onFinished?.({
+      type: 'interrupt',
+      interrupts: [{ id: 't1:tc-w', toolCallId: 'tc-w', reason: '需要确认' }]
+    });
+    finishTurn();
+    await vi.waitFor(() => expect(a.state.sending).toBe(false));
+    expect(turn.phase).toBe('waiting');
+    expect(turn.steps[0].status).toBe('run');
+    expect(turn.steps[0].progress).toBeUndefined();
+  });
+});
