@@ -152,7 +152,10 @@ async function startHitl(page, timeoutMs = 150000) {
 
 const main = async () => {
   mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  // PW_CHROMIUM_EXE：本机没装 playwright 注册版浏览器时，用环境变量指到已有 chrome.exe
+  const browser = await chromium.launch(
+    process.env.PW_CHROMIUM_EXE ? { executablePath: process.env.PW_CHROMIUM_EXE } : {}
+  );
   const ctx = await browser.newContext({
     viewport: VIEWPORT,
     deviceScaleFactor: 1,
