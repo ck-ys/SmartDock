@@ -27,4 +27,20 @@ public interface AssistantCompactionMapper extends BaseMapper<DcsAssistantCompac
     @Delete("DELETE FROM dcs_assistant_compaction WHERE id IN (SELECT id FROM dcs_assistant_compaction"
         + " WHERE create_time < (CURRENT_TIMESTAMP - INTERVAL '180 days') LIMIT #{batch})")
     int deleteExpired(@Param("batch") int batch);
+
+    /** 状态卡压缩账单（题2 案1）：该会话最近一次压缩（LIMIT 1 按主键序=最新）。
+     *  只取成功行（status='SUCCESS'）——FAILED 行上下文照样收缩但摘要不可信，不上账单。
+     *  三审回修（席2/席1 P2）：改走已索引的 (tenant_id, conversation_id, id)，不用无索引的
+     *  thread_id 前缀扫；显式列不回传 summary（6000 字大字段，账单只要 4 个数） */
+    @Select("SELECT id, before_tokens, after_tokens, create_time FROM dcs_assistant_compaction"
+        + " WHERE tenant_id=#{tenantId} AND conversation_id=#{conversationId}"
+        + " AND status='SUCCESS' ORDER BY id DESC LIMIT 1")
+    DcsAssistantCompaction selectLatestByConversation(@Param("tenantId") String tenantId,
+                                                      @Param("conversationId") Long conversationId);
+
+    /** 该会话累计成功压缩次数（账单行「共 N 次」；同上走已索引键） */
+    @Select("SELECT COUNT(*) FROM dcs_assistant_compaction WHERE tenant_id=#{tenantId}"
+        + " AND conversation_id=#{conversationId} AND status='SUCCESS'")
+    int countOkByConversation(@Param("tenantId") String tenantId,
+                              @Param("conversationId") Long conversationId);
 }

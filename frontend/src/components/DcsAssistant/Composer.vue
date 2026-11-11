@@ -292,6 +292,16 @@
                 title="缓存命中：模型不用重读前文的重复部分，直接用缓存结果——更快更省（缓存价约为原价一折）。这里显示今日平均（今天聊得还少时显示 —）。什么时候会掉：新会话第一轮必不命中；会话中途开联网、换模型会让缓存重新预热。聊天场景普遍在 5~8 成，属健康区间，编码工具的 9 成以上学不来（场景不同）。"
                 >缓存 {{ cacheHitText }}</span
               >
+              <!-- ckys3 题2 案1：压缩账单行——该会话还没压过就整段不渲染；本轮刚压过点亮。
+                   title 讲清楚「压缩是什么+为什么看不见全部原文」 -->
+              <template v-if="compactionBill">
+                <span class="fs">·</span>
+                <span
+                  :class="{ 'ctx-comp-fresh': compactionThisTurn }"
+                  title="自动压缩：对话太长快到模型上限时，把前面的内容收成一份摘要接着聊——更省更快，主线不丢（消息流里「已压缩」分隔条处可看到压缩边界）。这里显示本会话最近一次压缩前后各占多少 token、累计压了几次；本轮刚压过会点亮。"
+                  >压缩 {{ compactionText }}</span
+                >
+              </template>
             </span>
           </span>
         </button>
@@ -1187,6 +1197,30 @@ const sessionCacheHitRate = ref<number | null>(null);
 const sessionCacheHitRequests = ref(0);
 /** 业务反馈批1015b Q11：今日平均缓存命中率（后端 LiteLLM 口径，样本<3 为 null） */
 const cacheHitRateToday = ref<number | null>(null);
+/** ckys3 题2 案1：压缩账单行数据——该会话最近一次成功压缩（status 下发；没压过=后端
+ *  count 0 不下发 → 行整个隐藏，不摆「0 次」占位）；FAILED 行不上账单（摘要不可信） */
+const compactionBill = ref<{ before: number; after: number; atMs: number; count: number } | null>(null);
+/** 「本轮压缩」高亮判定（三审席2 P1 修正）：最近一次压缩发生在**本会话最近一次发送**
+ *  之后才算本轮——基准用 Composer 自持 ref（发送时写、切会话清），不用 turns[last].startedAt
+ *  （历史重拉会把它重置成重拉那一刻，真压缩高亮只活一个 RTT）；无发送（只回看）不点亮 */
+const turnStartAtRef = ref(0);
+const compactionThisTurn = computed(() => {
+  const b = compactionBill.value;
+  if (!b || !b.atMs || turnStartAtRef.value <= 0) {
+    return false;
+  }
+  return b.atMs >= turnStartAtRef.value;
+});
+/** 账单行文案：约4.8万→1.2万 · 省75% · 共2次（省=1−压后/压前；异常比例不硬凑省字） */
+const compactionText = computed(() => {
+  const b = compactionBill.value;
+  if (!b) {
+    return '';
+  }
+  const saved = b.before > 0 && b.after < b.before ? Math.round((1 - b.after / b.before) * 100) : null;
+  const seg = `${fmtNum(b.before)}→${fmtNum(b.after)}` + (saved !== null ? ` · 省${saved}%` : '');
+  return `${seg} · 共${b.count}次`;
+});
 const cacheHitText = computed(() => {
   // 主口径=今日平均；今日样本不足时退回本会话值（聊过才有的看，总好过恒 —）
   const v = cacheHitRateToday.value ?? sessionCacheHitRate.value;
@@ -1361,6 +1395,10 @@ async function refreshStatus() {
         sessionCacheHitRate?: number | null;
         sessionCacheHitRequests?: number;
         cacheHitRateToday?: number | null;
+        compactionBeforeTokens?: number | null;
+        compactionAfterTokens?: number | null;
+        compactionAtMs?: number | null;
+        compactionCount?: number;
       };
     };
     if (seq !== statusSeq || props.state.threadId !== threadAtCall) {
@@ -1373,6 +1411,17 @@ async function refreshStatus() {
     sessionCacheHitRequests.value = typeof d?.sessionCacheHitRequests === 'number' ? d.sessionCacheHitRequests : 0;
     // Q11：今日平均（样本<3 后端 null → 显示层退本会话值）
     cacheHitRateToday.value = typeof d?.cacheHitRateToday === 'number' ? d.cacheHitRateToday : null;
+    // ckys3 题2 案1：压缩账单（同上会话守卫内赋值——慢响应不得把别的会话的账挂过来）
+    compactionBill.value =
+      typeof d?.compactionCount === 'number' && d.compactionCount > 0
+      && typeof d?.compactionBeforeTokens === 'number' && typeof d?.compactionAfterTokens === 'number'
+        ? {
+            before: d.compactionBeforeTokens,
+            after: d.compactionAfterTokens,
+            atMs: typeof d?.compactionAtMs === 'number' ? d.compactionAtMs : 0,
+            count: d.compactionCount
+          }
+        : null;
     if (d?.dailyRoundLimitPerUser) {
       limit.value = Number(d.dailyRoundLimitPerUser);
     }
@@ -1471,6 +1520,8 @@ watch(
   () => {
     ctxTokens.value = null;
     serverTriggerTokens.value = null; // 批A-1 回修：旧会话的后端触发线不带入新会话（响应回来前的窗口也不闪旧线）
+    compactionBill.value = null; // ckys3 题2：旧会话的压缩账单不带入新会话（同上防闪现）
+    turnStartAtRef.value = 0; // ckys3 题2：发送时刻基准不跨会话（回看旧会话不点亮「本轮压缩」）
     readWebOnSync();
     readSkillSync();
     // 业务批7 Q10：切会话/新会话重拉模型选择——新开对话显示的默认模型不再停留旧快照
@@ -1986,6 +2037,11 @@ function onSend() {
     }
     return;
   }
+  // ckys3 题2 三审席2 P1：本会话最近一次发送时刻——「本轮压缩」高亮的基准。
+  // 不用 turns[last].startedAt：压缩触发的 emit('compacted') 会让宿主重拉历史，
+  // 重建行 startedAt=重拉那一刻（必然晚于压缩时刻），高亮只活一个 RTT；本 ref
+  // 是 Composer 自己的状态，rebuild 动不了它
+  turnStartAtRef.value = Date.now();
   // 档位 stamp（原型 aiSay 同款：⚡快速/🧠深入；平衡不带章）
   const stampMap: Record<string, string> = { fast: '⚡ 快速', deep: '🧠 深入' };
   emit('send', q, stampMap[THINK[thinkLevel.value].tier] ?? '', fwdProps());
@@ -3091,11 +3147,14 @@ html.dark .brow .btool.bicon.wbtn.on {
           color: var(--dcs-text-placeholder);
         }
       }
-      /* Q1 甲 第三层：联网/缓存合成一行小字（偶尔才看的数，不跟上下文抢份量） */
+      /* Q1 甲 第三层：联网/缓存合成一行小字（偶尔才看的数，不跟上下文抢份量）。
+         三审回修：加 wrap——账单段加入后固定 250px 弹层放不下三段，允许整段换行
+         （span 为最小单元，不会把「省75%」劈成两半） */
       .ctxfoot {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 6px;
+        gap: 4px 6px;
         font-size: 11px;
         color: var(--dcs-text-placeholder);
 
@@ -3104,6 +3163,10 @@ html.dark .brow .btool.bicon.wbtn.on {
         }
         .web-out {
           color: var(--el-color-danger);
+        }
+        /* ckys3 题2：本轮刚压过点亮（与联网用尽的红相对，压缩是省了钱的好事——用主色不高饱和） */
+        .ctx-comp-fresh {
+          color: var(--el-color-primary);
         }
       }
       .ctxrow {

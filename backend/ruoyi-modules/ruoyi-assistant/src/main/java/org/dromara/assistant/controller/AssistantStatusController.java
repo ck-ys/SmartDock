@@ -215,6 +215,17 @@ public class AssistantStatusController extends BaseController {
                         org.dromara.assistant.core.AssistantCacheHitHolder.aggregate(threadId);
                     out.put("sessionCacheHitRate", agg.ratePct());
                     out.put("sessionCacheHitRequests", agg.requests());
+                    // 题2 案1（2026-11-12）：压缩账单——最近一次成功压缩前后 token/时刻＋累计
+                    // 次数；前端状态卡按 atMs 是否落在当前回合内决定「本轮压缩」高亮行。
+                    // 三审回修：按 conversation_id 查（已索引；thread_id 无索引前缀扫）
+                    org.dromara.assistant.service.AssistantConversationService.CompactionBill bill =
+                        conversationService.compactionBill(tenantId, conv.getId());
+                    if (bill.count() > 0) {
+                        out.put("compactionBeforeTokens", bill.beforeTokens());
+                        out.put("compactionAfterTokens", bill.afterTokens());
+                        out.put("compactionAtMs", bill.atMs());
+                        out.put("compactionCount", bill.count());
+                    }
                 }
             } catch (Exception e) {
                 // 会话行查询失败按无数据处理，不影响状态接口其余字段

@@ -311,6 +311,30 @@ public class AssistantConversationService {
     }
 
     /**
+     * 状态卡压缩账单（ckys3 解锁板 题2 案1，2026-11-12）：该会话最近一次成功压缩
+     * （前后 token）＋累计次数。只读归并两条查询为一个小记录；无压缩记录返回 count=0
+     * 的空账单（前端不渲染行）。口径：只认 SUCCESS 行——FAILED 行上下文虽收缩但摘要
+     * 不可信，不上账单（消息流另有「本次没压成」警示条）。
+     */
+    public CompactionBill compactionBill(String tenantId, Long conversationId) {
+        int count = compactionMapper.countOkByConversation(tenantId, conversationId);
+        if (count == 0) {
+            return new CompactionBill(null, null, null, 0);
+        }
+        org.dromara.assistant.domain.DcsAssistantCompaction latest =
+            compactionMapper.selectLatestByConversation(tenantId, conversationId);
+        if (latest == null) {
+            return new CompactionBill(null, null, null, 0);
+        }
+        return new CompactionBill(latest.getBeforeTokens(), latest.getAfterTokens(),
+            latest.getCreateTime() == null ? null : latest.getCreateTime().getTime(), count);
+    }
+
+    /** 账单载荷：beforeTokens/afterTokens=最近一次成功压缩前后 token；atMs=该次时刻；count=累计次数 */
+    public record CompactionBill(Integer beforeTokens, Integer afterTokens, Long atMs, int count) {
+    }
+
+    /**
      * 「已压缩」分隔条行（批17 Q2）：role=system、content=纯数字 JSON
      * （{"type":"compaction",beforeTokens,afterTokens}），无 PII 新增面（role 列
      * varchar(16) 无约束，零 DDL）。前端 rebuildFromHistory 按本行渲染分隔条。
