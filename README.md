@@ -8,7 +8,7 @@
   <img alt="License" src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square">
   <img alt="Java" src="https://img.shields.io/badge/Java-21-orange?style=flat-square&logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring_Boot-3.5.14-6DB33F?style=flat-square&logo=springboot&logoColor=white">
-  <img alt="AgentScope" src="https://img.shields.io/badge/AgentScope-2.1.0--BETA1-0F766E?style=flat-square">
+  <img alt="AgentScope" src="https://img.shields.io/badge/AgentScope-2.1.0--ckys3-0F766E?style=flat-square">
   <img alt="Vue" src="https://img.shields.io/badge/Vue-3.5-42B883?style=flat-square&logo=vuedotjs&logoColor=white">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-14%2B-4169E1?style=flat-square&logo=postgresql&logoColor=white">
 </p>
@@ -499,7 +499,7 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 
 | 类别 | 组件 |
 |------|------|
-| 后端 | Java 21、Spring Boot 3.5.14、Spring AI 1.1.5、AgentScope 2.1.0-BETA1 |
+| 后端 | Java 21、Spring Boot 3.5.14、Spring AI 1.1.5、AgentScope 2.1.0-ckys3（自发布构建）|
 | 框架 | Sa-Token、MyBatis-Plus、Redisson、Hutool、SnailJob |
 | 前端 | Vue 3.5、TypeScript、Element Plus、Vite、Pinia、ECharts |
 | 数据库 | PostgreSQL 14+、Redis 7、MinIO |
@@ -567,7 +567,7 @@ README 里的界面截图由 `frontend/scripts/readme-screenshots.mjs` 生成（
 
 本项目使用 Apache License 2.0，详见 [LICENSE](LICENSE)。
 
-基础框架来自 [RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) 5.6.1 (MIT)，AI 运行时基于 [AgentScope (Java)](https://github.com/agentscope-ai/agentscope-java) 2.1.0-BETA1，模型访问基于 [Spring AI](https://spring.io/projects/spring-ai) 1.1.5。
+基础框架来自 [RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) 5.6.1 (MIT)，AI 运行时基于 [AgentScope (Java)](https://github.com/agentscope-ai/agentscope-java) 2.1.0-ckys3（非官方自发布构建 [io.github.ck-ys.agentscope](https://central.sonatype.com/namespace/io.github.ck-ys.agentscope)，基于上游 main），模型访问基于 [Spring AI](https://spring.io/projects/spring-ai) 1.1.5。
 
 ## 🙏 特别鸣谢
 
