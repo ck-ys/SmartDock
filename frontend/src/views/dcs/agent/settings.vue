@@ -1259,6 +1259,57 @@ html.dark .set-ws {
   line-height: 16px;
   color: var(--mut);
 }
+/* 2026-11-13 视觉批 Q0①：记忆分节的 .set-line 系列原来只有模板没有样式
+   （真机计算值 display:block、零内距零边框），标题和说明被当同一段文字连排。
+   形态按 08 节模拟图：标题在内容区顶部（和「常规」一样竖排），行与行之间发丝线，
+   不套外框（外框会把「一条设置」画成一张卡，页面上别的分节都不是这个形状）。
+   竖排这条同时是 390 档的修：默认 .set-sheet 是横向 flex，窄屏下卡片会被挤成一条竖字。 */
+.set-sheet.memory {
+  flex-direction: column;
+  overflow: hidden;
+}
+.set-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  padding: 10px 0;
+
+  & + .set-line {
+    border-top: 1px solid var(--bd-soft);
+  }
+
+  > .el-switch,
+  > .el-button {
+    flex: none;
+  }
+}
+.set-line-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  b {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--text);
+  }
+}
+.set-line-sub {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--mut);
+}
+.mem-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--mut);
+}
 .gen-row {
   display: flex;
   align-items: center;

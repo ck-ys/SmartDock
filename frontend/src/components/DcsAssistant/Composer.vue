@@ -3336,9 +3336,12 @@ html.dark .brow .btool.bicon.wbtn.on {
         border-color: var(--dcs-color-danger);
       }
     }
+    /* 2026-11-13 视觉批 F3：空态（还没打字）不再换一套灰底灰箭头——同一个键整体降到 45%，
+       形状/圆角/图标全一致，只表达「现在按不了」。灰底版会让空态看起来是另一个控件。
+       背景显式写回同色：`.send:hover` 在本块之前，空态悬停不该再变深（禁用件不给手势反馈）。 */
     &.send.dim {
-      background: #eceef1;
-      color: #a8abb2;
+      background: #1f2937;
+      opacity: 0.45;
       cursor: default;
     }
     /* 排队角标（原型 .qb：琥珀底+白描边+穿透禁用；挂 send 恒可显，不依赖 busy 换色） */

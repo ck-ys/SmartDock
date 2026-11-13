@@ -49,7 +49,7 @@
               >查看事件流水 <el-icon><ArrowRight /></el-icon
             ></span>
           </button>
-          <button type="button" class="banner" @click="router.push('/dcs/file-review')">
+          <button type="button" class="banner" @click="router.push('/risk/file-review')">
             <el-icon class="banner-icon"><CircleCheckFilled /></el-icon>
             <div class="banner-main">
               <div class="banner-title">

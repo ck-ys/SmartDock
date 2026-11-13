@@ -14,7 +14,6 @@
     >
       <!-- 批3.6：agent 壳左栏 = 新任务 + 导航 + 搜索（四项待建，置灰不可点）；会话页走下面旧分支，一行不变 -->
       <template v-if="variant === 'agent'">
-        <div class="ag-ws" title="当前工作区"><IconSpan name="house" :size="13" /><span>SmartDock 工作区</span></div>
         <div class="ag-side-hd">
           <button class="ag-new" type="button" @click="onNewSession"><IconSpan name="plus" :size="14" /> 新任务</button>
           <button class="side-close" type="button" aria-label="关闭会话列表" @click="sideOpen = false"><IconSpan name="x" /></button>
@@ -1404,24 +1403,9 @@ defineExpose({
 
     /* 批3.6：agent 壳左栏（新任务 / 五项导航 / 搜索）。
        只在本分支渲染，会话页走上面 .side-hd 旧样式，一行不受影响。
-       字号只用 13（档内），间距只用 4/8/12，圆角 8——全部对齐 dcs-tokens。 */
-    .ag-ws {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      height: 32px;
-      padding: 0 12px;
-      margin-top: 8px;
-      font-size: 13px;
-      color: var(--dcs-text-secondary);
-      overflow: hidden;
-
-      span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-    }
+       字号只用 13（档内），间距只用 4/8/12，圆角 8——全部对齐 dcs-tokens。
+       2026-11-13 视觉批 F5：原「SmartDock 工作区」行已删（不可点、零信息量，
+       且把「新任务」挤下第一行）；样式随之移除，避免留孤儿选择器。 */
     .ag-side-hd {
       display: flex;
       align-items: center;
@@ -1520,10 +1504,13 @@ defineExpose({
           outline-offset: 2px;
         }
       }
-      /* 当前所在位置（会话）：不可点，所以不给 hover/焦点，只给选中态 */
+      /* 当前所在位置（会话）：不可点，所以不给 hover/焦点，只给选中态。
+         2026-11-13 视觉批 F1（回执 Q13 参考 ZCode）：选中不用主题蓝底 + 蓝字——那会把
+         「当前位置」画成一颗可点的主按钮，且蓝底和业务壳撞色。改中性底一档（比 hover 的
+         fill-color-light 深一级）+ 文字转正，不加竖条（F1 撤回的就是竖条）。 */
       > .on {
-        background: var(--el-color-primary-light-9);
-        color: var(--el-color-primary);
+        background: var(--el-fill-color);
+        color: var(--dcs-text-primary);
         font-weight: 500;
       }
       /* 置灰：功能本体还没建，留入口但不假装能用——disabled 按钮不进 Tab、不响应点击，
@@ -1537,14 +1524,15 @@ defineExpose({
       margin: 0 12px 8px;
       width: calc(100% - 24px);
     }
-    /* 底部当前用户（只在 agent 壳渲染）——把「我是谁」钉在左栏底，不再挤进顶栏 */
+    /* 底部当前用户（只在 agent 壳渲染）——把「我是谁」钉在左栏底，不再挤进顶栏。
+       2026-11-13 视觉批 F5b：去掉上方那条 border-top——左栏本来就没有别处横线，
+       单独一条把底部分成一个「工具栏」；ZCode 同位置也没有分隔线。 */
     .ag-user {
       flex: none;
       display: flex;
       align-items: center;
       gap: 8px;
       padding: 8px 10px;
-      border-top: 1px solid var(--app-border, rgba(13, 13, 13, 0.1));
 
       .ag-uav {
         width: 28px;
