@@ -261,6 +261,11 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 4. **涉前端的题必须带「修复前后模拟 UI」对比**（手绘 HTML/CSS mock 即可，标注"示意图，落地后换真机截图"）。
 5. 板尾写修订记录（何时补过什么、为什么）。
 6. **板结构必备（2026-10-27 用户加规）**：①**执行流程节**（这批活按什么顺序做、每步怎么验收）；②**问题清单列表且可点击**（锚点导航，从清单点题号直达对应小节，答完可回看）；③题号/结论/已修复状态用文字徽章一目了然。
+7. **选项编号一律用阿拉伯数字 1 / 2 / 3（2026-11-10 用户改规）**：不用甲乙丙——对话里念得出、回执写得清（`Q1-3`、`Q2 改成 2`）。已拍板/弃用这类状态用文字徽章（`已拍 · 专家`、`弃`），不占用编号。
+8. **每个选项都要有自己的真界面（2026-11-10 用户改规）**：不许只给推荐那一案画图、其他案只写文字。同一题的各案用同一套数据、同一尺寸（1440×900），并排比得出"哪种看着舒服"；正文里说清差在哪几行，别让读者自己找。至少含一个「现状/原样」对照案时，明确标"不是推荐"。
+9. **会话内浮层类方案要证明数量够了**：列表类入口不能只摆 3-4 条演示——按真实数据量摆满（本仓演示基线 8 位专家 + 通用），并给搜索/分组；截图里数得出条数。
+10. **板 HTML 常见写法（骨架照抄即可）**：`<header class="top">` 放 kick（版本/日期/未开工）+ h1 + lede + badges → 01 看它到底改了什么（前后两列）→ 02 两种世界/差异表 → 03 明确不做清单 → 04 可点问题清单（`#q0..#qN` 锚点 + 卡片）→ 05 逐题（每题：`.qsub` 导读 + 每案 `.opt`/`.oth`+`.tag`+`.why`+`.risk` + 该案截图）→ 06 执行流程（STEP，每步带验法）→ 07 工程拆解表 → 08 参照仓对照表 → 09 本仓源码依据 → 10 修订记录 → `<footer>` 回执串。图一律 `<a class="shot" href="assets-…/x.png" target="_blank"><img …></a>`（可点开原图），图注写"编号 · 名称｜差在哪"。
+11. **出板门禁（每次必跑，脚本留 `.workshop/tmp/`）**：1440 与 390 双档 `scrollWidth == innerWidth`、逐元素 right 扫描 `bad=[]`、`#q0..#qN` + `#qlist` 锚点全存在、所有 `<img>` `naturalWidth>0`、`pageerror`/console error 为空；再对改动节做分区截图，**模型原生 Read 读图**过一遍。门禁全绿后才双写（`.workshop/plans/` + 会话 viz 目录），两边 `md5` 必须一致；旧板顶部加"已被 vX 取代"横幅，只留档不收新回执。
 
 **前端修复全流程可见（三步缺一不可，收口硬门禁）：**
 ①拍板/计划阶段给修复前后**模拟 UI** 对比 → ②动手前先截**真机修复前**截图存 `.workshop/evidence/` → ③修完截**真机修复后**截图，出**前后对比 HTML**（双写 plans+viz）+ 人话描述改了什么。**修复收口 checklist 必含「对比页已出」一项**——2026-10-27 五审批漏过对比页被用户点名补拍，教训在案；纯后端修复无界面变化的，以单测/活体断言锚点在对比页中说明。
@@ -341,8 +346,10 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | `cline` | 编码智能体（VS Code / CLI / SDK，Apache-2.0） | HEAD `a6507a62a`（本地 git 索引为空，直接读工作区文件） | 工具循环、计划-执行模式、检查点与回滚：`sdk/packages/{core,agents,llms}`、`apps/vscode/src/core`；对应本仓 PlanGate、计划/待办信号、工具审批与运行恢复 |
 | `NextChat` | 轻量 Next.js 聊天前端（MIT） | `v2.16.1` / `1d3dc331` | 多模型提供商适配：`app/client/platforms/*`（deepseek、glm、siliconflow 等）、`app/mcp`、`app/store`；对应本仓模型配置页与 provider 选择逻辑 |
 | `AIClient-2-API` | 订阅账号转 OpenAI 兼容 API 的网关（GPL-3.0） | `v2.13.7` / `d511ba1` | 渠道池、OAuth 凭据、模型路由与降级：`src/providers/*`、`provider-pool-manager.js`；对应本仓模型密钥与渠道路由（选路逻辑）。**只读，禁转录** |
+| `cc-haha` | 中文桌面端 Claude Code / AI Agent 工作台（Electron + React，15k★）：多 agent 协作、Git Worktree、**技能市场** | `9800f4b5`（2026-11-10，depth 1 克隆） | 改「专家 / 技能市场」类界面前先看：`desktop/src/components/market/`（MarketHome + CategoryBar + FilterBar + 详情含安全报告 + 安装确认对话框）、`desktop/src/types/market.ts` 的 `NormalizedSkill` 卡片模型（name/summary/author/stats/tags/category/securityStatus/featured）、`desktop/src/components/agentTeams/`。**许可 = cc-haha Community Source License 1.0（非 OSI）：只读参照，严禁转录代码** |
+| `agency-agents` | 专家人格内容库（167k★，MIT）：数百个「专家」各一个 md | `8ae6164`（2026-11-08，depth 1 克隆） | 改「专家卡 / 分类」文案前先看：每个专家 md 头部 `name / description / color / emoji / vibe`（一句话人设），目录即分类（division），`divisions.json` 定每个分类的显示名 + Lucide 图标 + 品牌色（CI 校验）。MIT 可借鉴结构，文案要自己写 |
 
-**按任务速查**：改会话界面 → `assistant-ui` + `ZCode/packages/ui` + `open-webui` 聊天组件；改 Agent 主链 / 工具 / 技能 → `agentscope-java` + `LibreChat` 的 agents 控制器；改压缩 / 记忆 → `ZCode` 的 compact 设计文档 + `open-webui` 的 `context_compaction.py`；改审批 / HITL → `LibreChat` 的 hitlCheckpoint + `cherry-studio` 的 toolApproval；改模型 / 渠道 → `NextChat` 的 platforms + `AIClient-2-API` 的 providers。
+**按任务速查**：改会话界面 → `assistant-ui` + `ZCode/packages/ui` + `open-webui` 聊天组件；改 Agent 主链 / 工具 / 技能 → `agentscope-java` + `LibreChat` 的 agents 控制器；改压缩 / 记忆 → `ZCode` 的 compact 设计文档 + `open-webui` 的 `context_compaction.py`；改审批 / HITL → `LibreChat` 的 hitlCheckpoint + `cherry-studio` 的 toolApproval；改模型 / 渠道 → `NextChat` 的 platforms + `AIClient-2-API` 的 providers；改「专家 / 技能市场 / 专家卡」→ `cc-haha` 的 market 组件 + `agency-agents` 的分类与人设写法（+ WorkBuddy 实拍截图在 `.workshop/`）。
 
 **不纳入本库**：`glm-coding-grabber` 是油猴抢购脚本，不是智能体源码；`shadcn-admin` / `vue-pure-admin` 是 UI 观感参照（已登记在 `frontend/AGENTS.md`）；其余目录（SpringBoot-Labs、mall-cloud-alibaba、yudao-cloud、newbee-mall-cloud、dddsample-core、pg_jieba、rocketmq-dashboard 等）与智能体无关。
 
