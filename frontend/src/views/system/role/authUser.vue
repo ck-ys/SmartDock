@@ -34,7 +34,7 @@
         </el-row>
       </template>
       <div class="dcs-ops-table-wrap">
-        <el-table v-loading="loading" border class="ui-table" :data="userList" @selection-change="handleSelectionChange">
+        <el-table ref="userTableRef" v-loading="loading" border class="ui-table dcs-table-only" :data="userList" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="55" align="center" />
           <el-table-column label="用户名称" prop="userName" :show-overflow-tooltip="true" />
           <el-table-column label="用户昵称" prop="nickName" :show-overflow-tooltip="true" />
@@ -62,6 +62,36 @@
           </template>
         </el-table>
       </div>
+      <!-- 2026-11-13 题 2（P1-11）：≤992 表格改卡片；批量勾选沿用表格的选择状态（toggleRowSelection），
+           单行「取消授权」照旧走 cancelAuthUser -->
+      <div class="dcs-mobile-list">
+        <div v-if="userList.length === 0 && !loading" class="ui-empty">暂无已授权用户</div>
+        <div v-for="row in userList" :key="row.userId" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title">
+              <el-checkbox :model-value="userIds.includes(row.userId)" @click.stop @change="toggleUserCard(row)" />
+              {{ row.userName }}
+            </span>
+            <span class="dcs-card-badge">
+              <dict-tag :options="sys_normal_disable" :value="row.status" />
+            </span>
+          </div>
+          <div class="dcs-card-meta">
+            <span>{{ row.nickName || '—' }}</span>
+            <span>{{ row.phonenumber || '—' }}</span>
+          </div>
+          <div v-if="row.email" class="dcs-card-field">
+            <span class="dcs-card-field__label">邮箱</span>
+            <span class="dcs-card-field__value">{{ row.email }}</span>
+          </div>
+          <div class="dcs-card-foot">
+            <span class="dcs-card-time">{{ row.createTime }}</span>
+            <div class="dcs-card-actions">
+              <el-button v-hasPermi="['system:role:remove']" link type="primary" icon="CircleClose" @click="cancelAuthUser(row)">取消授权</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" @pagination="getList" />
       <select-user ref="selectRef" :role-id="queryParams.roleId" @ok="handleQuery" />
@@ -86,6 +116,12 @@ const showSearch = ref(true);
 const multiple = ref(true);
 const total = ref(0);
 const userIds = ref<Array<string | number>>([]);
+
+/** 2026-11-13 题 2：手机卡片上的勾选与表格选择共用同一份状态（≤992 表格只是 display:none，选择 API 照常可用） */
+const userTableRef = ref<ElTableInstance>();
+const toggleUserCard = (row: UserVO) => {
+  userTableRef.value?.toggleRowSelection(row);
+};
 
 const queryFormRef = ref<ElFormInstance>();
 const selectRef = ref<InstanceType<typeof SelectUser>>();

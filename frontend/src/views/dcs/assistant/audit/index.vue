@@ -107,6 +107,38 @@
           />
         </template>
       </el-table>
+      <!-- 2026-11-13 题 2（P0）：≤992 表格被 dcs-table-only 整块隐藏，本页原先没配手机替身 → 数据连空态一起消失。
+           照 views/dcs/audit 与 ai-usage 的 dcs-mobile-list 样板补卡片 + 空态替身 -->
+      <div v-loading="loading" class="dcs-mobile-list">
+        <div v-if="rows.length === 0 && !loading" class="ui-empty">
+          <p class="ui-empty__title">{{ searched ? '没有符合条件的审计记录' : '还没有审计记录' }}</p>
+          <p class="ui-empty__hint">
+            {{
+              searched
+                ? '换个筛选条件或放宽时间范围试试。'
+                : 'AI 替成员执行的写操作（建任务、保存记忆等）会按放行方式逐笔记在这里。'
+            }}
+          </p>
+          <el-button plain @click="loadRows">刷新列表</el-button>
+        </div>
+        <div v-for="row in rows" :key="row.id" class="dcs-mobile-card">
+          <div class="dcs-card-head">
+            <span class="dcs-card-title">{{ toolLabel(row.toolName) }}</span>
+            <span class="dcs-card-badge">
+              <el-tag :type="logSt(row.status).type" size="small">{{ logSt(row.status).label }}</el-tag>
+            </span>
+          </div>
+          <div class="dcs-card-meta">
+            <span>成员 {{ row.userName || '—' }}</span>
+            <span>{{ fmtIsoTime(row.createTime) }}</span>
+          </div>
+          <div class="dcs-card-field">
+            <span class="dcs-card-field__label">放行方式</span>
+            <span class="dcs-card-field__value" :class="{ muted: !row.releaseMode }">{{ releaseLabel(row.releaseMode) }}</span>
+          </div>
+          <div v-if="row.resultSummary" class="dcs-card-note">{{ row.resultSummary }}</div>
+        </div>
+      </div>
       <pagination
         v-show="total > 0"
         v-model:page="queryParams.pageNum"

@@ -61,6 +61,8 @@
         </el-row>
       </template>
 
+      <!-- 2026-11-13 题 2：窄屏收列后仍可能横向滚动，先告诉用户还能滑 -->
+      <p v-if="isNarrow" class="table-scroll-hint">表格可左右滑动，右侧还有列</p>
       <div class="dcs-ops-table-wrap">
         <el-table
           ref="operLogTableRef"
@@ -74,7 +76,7 @@
         >
           <el-table-column type="selection" width="50" align="center" />
           <!-- U-05(2026-10-26 拍板A)：19 位雪花 ID 原来无 width 只分到 ~85px 折 3 行撑高行高；定宽+省略+悬浮看全文 -->
-          <el-table-column label="日志编号" align="center" prop="operId" width="160" :show-overflow-tooltip="true" />
+          <el-table-column v-if="!isNarrow" label="日志编号" align="center" prop="operId" width="160" :show-overflow-tooltip="true" />
           <el-table-column label="系统模块" align="center" prop="title" :show-overflow-tooltip="true" />
           <el-table-column label="操作类型" align="center" prop="businessType">
             <template #default="scope">
@@ -90,8 +92,8 @@
             sortable="custom"
             :sort-orders="['descending', 'ascending']"
           />
-          <el-table-column label="部门" align="center" prop="deptName" width="130" :show-overflow-tooltip="true" />
-          <el-table-column label="操作地址" align="center" prop="operIp" width="130" :show-overflow-tooltip="true" />
+          <el-table-column v-if="!isNarrow" label="部门" align="center" prop="deptName" width="130" :show-overflow-tooltip="true" />
+          <el-table-column v-if="!isNarrow" label="操作地址" align="center" prop="operIp" width="130" :show-overflow-tooltip="true" />
           <el-table-column label="操作状态" align="center" prop="status">
             <template #default="scope">
               <dict-tag :options="sys_common_status" :value="scope.row.status" />
@@ -103,6 +105,7 @@
             </template>
           </el-table-column>
           <el-table-column
+            v-if="!isNarrow"
             label="消耗时间"
             align="right"
             class-name="ui-num"
@@ -143,6 +146,13 @@ import OperInfoDialog from './oper-info-dialog.vue';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
 const { sys_oper_type, sys_common_status } = toRefs<any>(proxy?.useDict('sys_oper_type', 'sys_common_status'));
+
+/**
+ * 2026-11-13 题 2（P1-13）：手机/平板（≤992）收列——日志编号/部门/操作地址/消耗时间 4 列隐藏，
+ * 表宽从 ~1120px 收到 ~590px；被收掉的字段点行内「详细」进详情弹窗照样能看。
+ */
+const { width: viewportWidth } = useWindowSize();
+const isNarrow = computed(() => Number(viewportWidth.value ?? 1440) <= 992);
 
 const operlogList = ref<OperLogVO[]>([]);
 const loading = ref(true);
@@ -269,8 +279,11 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.dcs-ops-table-wrap :deep(.el-table) {
-  min-width: 1120px;
+/* 2026-11-13 题 2：1120px 是桌面 11 列的总宽；≤992 已收掉 4 列，再钉这个宽度等于白收 */
+@media (min-width: 993px) {
+  .dcs-ops-table-wrap :deep(.el-table) {
+    min-width: 1120px;
+  }
 }
 
 /* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */

@@ -19,6 +19,7 @@
     <el-card shadow="hover">
       <div class="dcs-ops-table-wrap">
         <el-table
+          v-if="onlineList.length > 0 || loading"
           v-loading="loading"
           border
           :data="onlineList.slice((queryParams.pageNum - 1) * queryParams.pageSize, queryParams.pageNum * queryParams.pageSize)"
@@ -62,17 +63,18 @@
               </el-tooltip>
             </template>
           </el-table-column>
-          <template #empty>
-            <div class="ui-empty">
-              <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的在线用户' : '暂无在线用户' }}</p>
-              <p class="ui-empty__hint">
-                {{ hasFilter ? '换个地址或用户名试试，也可以清空筛选看全部。' : '只有当前会话未超时的人会出现在这里；刚登录的人可能需要几秒才出现。' }}
-              </p>
-              <el-button v-if="hasFilter" type="primary" plain @click="resetQuery">清空筛选，看全部</el-button>
-              <el-button v-else plain @click="getList">刷新列表</el-button>
-            </div>
-          </template>
+          <!-- 2026-11-13 题 2：空态不再放在表格里——表格列宽合计 ~1050px 且外层可横向滚动，
+               居中算的是整张表的宽度，手机（可见 332px）要横滑 ~260px 才读得到文案。
+               空态改到表格外层（见下），表格只在有数据/加载中时渲染 -->
         </el-table>
+      </div>
+      <div v-if="onlineList.length === 0 && !loading" class="ui-empty online-empty">
+        <p class="ui-empty__title">{{ hasFilter ? '没有符合条件的在线用户' : '暂无在线用户' }}</p>
+        <p class="ui-empty__hint">
+          {{ hasFilter ? '换个地址或用户名试试，也可以清空筛选看全部。' : '只有当前会话未超时的人会出现在这里；刚登录的人可能需要几秒才出现。' }}
+        </p>
+        <el-button v-if="hasFilter" type="primary" plain @click="resetQuery">清空筛选，看全部</el-button>
+        <el-button v-else plain @click="getList">刷新列表</el-button>
       </div>
 
       <pagination v-show="total > 0" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" :total="total" />

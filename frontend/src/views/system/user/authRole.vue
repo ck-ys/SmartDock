@@ -25,7 +25,7 @@
             ref="tableRef"
             v-loading="loading"
             border
-            class="ui-table"
+            class="ui-table dcs-table-only"
             :row-key="getRowKey"
             :data="roles.slice((pageNum - 1) * pageSize, pageNum * pageSize)"
             @row-click="clickRow"
@@ -50,8 +50,35 @@
             </template>
           </el-table>
         </div>
+        <!-- 2026-11-13 题 2（P1-10）：≤992 表格改卡片。勾选仍走表格的选择状态（clickRow → toggleRowSelection），
+             只是把整行点击换成卡片点击 + 一个勾选框，提交口径不变 -->
+        <div class="dcs-mobile-list">
+          <div v-if="roles.length === 0 && !loading" class="ui-empty">暂无可分配角色</div>
+          <div
+            v-for="row in roles.slice((pageNum - 1) * pageSize, pageNum * pageSize)"
+            :key="row.roleId"
+            class="dcs-mobile-card"
+            :class="{ 'dcs-card--disabled': !checkSelectable(row) }"
+            @click="toggleRoleCard(row)"
+          >
+            <div class="dcs-card-head">
+              <span class="dcs-card-title">
+                <!-- 勾选态只读自选择状态；点击事件交给卡片统一处理（同一路径只切换一次） -->
+                <el-checkbox :model-value="selectedRoleIds.includes(row.roleId)" :disabled="!checkSelectable(row)" />
+                {{ row.roleName }}
+              </span>
+              <span class="dcs-card-badge">
+                <span class="ui-pill" :class="checkSelectable(row) ? 'ui-pill--pos' : 'ui-pill--muted'">{{ checkSelectable(row) ? '正常' : '停用' }}</span>
+              </span>
+            </div>
+            <div class="dcs-card-meta">
+              <span>权限字符 {{ row.roleKey }}</span>
+            </div>
+            <div class="dcs-card-time">{{ proxy?.parseTime(row.createTime) }}</div>
+          </div>
+        </div>
         <pagination v-show="total > 0" v-model:page="pageNum" v-model:limit="pageSize" :total="total" />
-        <div style="text-align: center; margin-left: -120px; margin-top: 30px">
+        <div class="auth-actions">
           <el-button type="primary" @click="submitForm()">提交</el-button>
           <el-button @click="close()">返回</el-button>
         </div>
@@ -76,6 +103,8 @@ const total = ref(0);
 const pageNum = ref(1);
 const pageSize = ref(10);
 const roleIds = ref<Array<string | number>>([]);
+/** 题 2：卡片勾选态由选择事件回填（不读 row.flag——那张表在手机档是 display:none，flag 只属于表格内部状态） */
+const selectedRoleIds = ref<Array<string | number>>([]);
 const roles = ref<RoleVO[]>([]);
 const form = ref<Partial<UserForm>>({
   nickName: undefined,
@@ -95,6 +124,12 @@ const clickRow = (row: RoleVO) => {
 /** 多选框选中数据 */
 const handleSelectionChange = (selection: RoleVO[]) => {
   roleIds.value = selection.map((item) => item.roleId);
+  selectedRoleIds.value = roleIds.value;
+};
+/** 题 2：手机卡片上的勾选/点卡 = 表格的选择状态（两者共用一份，提交口径不变） */
+const toggleRoleCard = (row: RoleVO) => {
+  if (!checkSelectable(row)) return;
+  tableRef.value?.toggleRowSelection(row);
 };
 /** 保存选中的数据编号 */
 const getRowKey = (row: RoleVO): string => {
@@ -154,5 +189,15 @@ onMounted(() => {
 <style lang="scss" scoped>
 .dcs-ops-table-wrap :deep(.el-table) {
   min-width: 720px;
+}
+
+/* 2026-11-13 题 2：原来靠 margin-left:-120px 把按钮硬拉回中间，手机上会把按钮推出左缘；
+   改成正常居中，桌面观感不变 */
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
 }
 </style>

@@ -58,6 +58,7 @@
         </el-row>
       </template>
 
+      <p v-if="isNarrow" class="table-scroll-hint">表格可左右滑动，右侧还有列</p>
       <div class="dcs-ops-table-wrap">
         <el-table
           ref="loginInfoTableRef"
@@ -70,7 +71,9 @@
           @sort-change="handleSortChange"
         >
           <el-table-column type="selection" width="55" align="center" />
-          <el-table-column label="访问编号" align="center" prop="infoId" width="160" :show-overflow-tooltip="true" />
+          <!-- 2026-11-13 题 2（P1-13）：≤992 收列（访问编号/客户端/设备类型/登录地点/操作系统/浏览器 6 列隐藏），
+               保留 用户名称/地址/登录状态/描述/访问时间——本页没有「详细」弹窗，所以地址这类判断信息留下 -->
+          <el-table-column v-if="!isNarrow" label="访问编号" align="center" prop="infoId" width="160" :show-overflow-tooltip="true" />
           <el-table-column
             label="用户名称"
             align="center"
@@ -79,16 +82,16 @@
             sortable="custom"
             :sort-orders="['descending', 'ascending']"
           />
-          <el-table-column label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
-          <el-table-column label="设备类型" align="center">
+          <el-table-column v-if="!isNarrow" label="客户端" align="center" prop="clientKey" :show-overflow-tooltip="true" />
+          <el-table-column v-if="!isNarrow" label="设备类型" align="center">
             <template #default="scope">
               <dict-tag :options="sys_device_type" :value="scope.row.deviceType" />
             </template>
           </el-table-column>
           <el-table-column label="地址" align="center" prop="ipaddr" :show-overflow-tooltip="true" />
-          <el-table-column label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
-          <el-table-column label="操作系统" align="center" prop="os" :show-overflow-tooltip="true" />
-          <el-table-column label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
+          <el-table-column v-if="!isNarrow" label="登录地点" align="center" prop="loginLocation" :show-overflow-tooltip="true" />
+          <el-table-column v-if="!isNarrow" label="操作系统" align="center" prop="os" :show-overflow-tooltip="true" />
+          <el-table-column v-if="!isNarrow" label="浏览器" align="center" prop="browser" :show-overflow-tooltip="true" />
           <el-table-column label="登录状态" align="center" prop="status">
             <template #default="scope">
               <dict-tag :options="sys_common_status" :value="scope.row.status" />
@@ -116,6 +119,10 @@ import { list, delLoginInfo, cleanLoginInfo, unlockLoginInfo } from '@/api/monit
 import { LoginInfoQuery, LoginInfoVO } from '@/api/monitor/loginInfo/types';
 
 const { proxy } = getCurrentInstance() as ComponentInternalInstance;
+
+/** 2026-11-13 题 2：≤992 收列（配合模板里的 v-if="!isNarrow"） */
+const { width: viewportWidth } = useWindowSize();
+const isNarrow = computed(() => Number(viewportWidth.value ?? 1440) <= 992);
 const { sys_device_type } = toRefs<any>(proxy?.useDict('sys_device_type'));
 const { sys_common_status } = toRefs<any>(proxy?.useDict('sys_common_status'));
 
@@ -219,8 +226,11 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.dcs-ops-table-wrap :deep(.el-table) {
-  min-width: 980px;
+/* 2026-11-13 题 2：980px 是桌面 12 列的总宽；≤992 已收掉 6 列，再钉这个宽度等于白收 */
+@media (min-width: 993px) {
+  .dcs-ops-table-wrap :deep(.el-table) {
+    min-width: 980px;
+  }
 }
 
 /* 字典状态标签统一成药丸形（共用 DictTag 渲染的 el-tag 只调形状，不换组件） */

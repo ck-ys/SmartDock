@@ -92,6 +92,27 @@
   color: var(--el-text-color-secondary);
 }
 
+/* 卡片里的长文本（结果摘要 / 说明）：允许多行、不省略——手机上点不到详情弹窗时，它可能是这条记录唯一的信息 */
+.dcs-card-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-regular);
+  overflow-wrap: anywhere;
+}
+
+/* 窄屏收列后的「还能横滑」提示（2026-11-13 题 2）：一行小字，不占按钮位、不换行 */
+.table-scroll-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+/* 卡片代表「不可选/停用」的整行（如分配角色页停用角色）：降一档对比，不挡读 */
+.dcs-card--disabled {
+  opacity: 0.62;
+}
+
 .dcs-card-foot {
   display: flex;
   align-items: center;
