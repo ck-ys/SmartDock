@@ -82,7 +82,7 @@
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" destroy-on-close append-to-body width="640px">
-      <el-form ref="deptFormRef" :model="form" :rules="rules" label-width="80px">
+      <el-form ref="deptFormRef" :model="form" :rules="rules" label-width="80px" class="dcs-form-narrow">
         <el-row>
           <el-col v-if="form.parentId !== 0" :span="24">
             <el-form-item label="上级部门" prop="parentId">

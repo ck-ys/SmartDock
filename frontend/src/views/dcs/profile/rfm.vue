@@ -215,7 +215,7 @@
 
     <!-- 模型新建/编辑 -->
     <el-dialog v-model="modelDialogVisible" :title="modelForm.modelId ? '编辑评分模型' : '新建评分模型'" width="760px" destroy-on-close>
-      <el-form label-width="96px">
+      <el-form label-width="96px" class="dcs-form-narrow">
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="模型编码">

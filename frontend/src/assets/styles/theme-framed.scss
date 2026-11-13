@@ -942,6 +942,81 @@ html.dark .el-card {
   .el-form--inline .el-form-item__content > .el-autocomplete {
     width: 100% !important;
   }
+
+  /* 2026-11-13 题1 案1：弹窗里的两列/三列在手机档变一列、标签置顶。
+     和 2026-11-01 已修的 AI 模型配置主弹窗同一套观感；只在挂了 .dcs-form-narrow
+     的弹窗表单里生效，桌面三档（1440/1280/1024）完全不受影响。 */
+  .dcs-form-narrow {
+    .el-col {
+      max-width: 100%;
+      flex: 0 0 100%;
+    }
+
+    .el-form-item {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .el-form-item__label {
+      width: auto !important;
+      height: auto;
+      line-height: 1.5;
+      text-align: left;
+      justify-content: flex-start;
+      padding: 0 0 4px;
+    }
+
+    .el-form-item__content {
+      margin-left: 0 !important;
+    }
+
+    .el-form-item__content > .el-input,
+    .el-form-item__content > .el-select,
+    .el-form-item__content > .el-input-number,
+    .el-form-item__content > .el-date-editor,
+    .el-form-item__content > .el-cascader {
+      width: 100% !important;
+    }
+
+    /* 漏斗「步骤」行是手写 flex（事件名 + 展示名并排），手机档同样竖排 */
+    .step-row {
+      flex-wrap: wrap;
+    }
+
+    .step-row > .el-input {
+      flex: 1 1 100%;
+    }
+
+    /* 分群「规则条件」行同样是手写 flex：字段 220px + 运算符 130px + 值 + 移除按钮，
+       手机档被压到 95px 只能显示半截。改成字段一行、运算符+移除一行、值一行 */
+    .condition-row {
+      flex-wrap: wrap;
+    }
+
+    .condition-row > .el-select:first-child {
+      flex: 1 1 100% !important;
+      order: 1;
+      min-width: 0;
+    }
+
+    .condition-row > .el-select + .el-select {
+      flex: 1 1 auto !important;
+      order: 2;
+      min-width: 0;
+    }
+
+    .condition-row > .el-input {
+      flex: 1 1 100% !important;
+      order: 3;
+      min-width: 0;
+    }
+
+    .condition-row > .el-button {
+      order: 2;
+      margin-left: auto;
+    }
+  }
 }
 
 /* Element 的 .el-switch 自身声明了 --el-switch-off-color:var(--el-border-color)，

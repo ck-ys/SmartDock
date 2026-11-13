@@ -91,7 +91,7 @@
     </el-card>
     <!-- 添加或修改公告对话框 -->
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="760px" append-to-body>
-      <el-form ref="noticeFormRef" :model="form" :rules="rules" label-width="80px">
+      <el-form ref="noticeFormRef" :model="form" :rules="rules" label-width="80px" class="dcs-form-narrow">
         <el-row>
           <el-col :span="12">
             <el-form-item label="公告标题" prop="noticeTitle">

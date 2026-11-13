@@ -93,7 +93,7 @@
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" destroy-on-close append-to-body width="760px">
-      <el-form ref="menuFormRef" :model="form" :rules="rules" label-width="100px">
+      <el-form ref="menuFormRef" :model="form" :rules="rules" label-width="100px" class="dcs-form-narrow">
         <el-row>
           <el-col :span="24">
             <el-form-item label="上级菜单">

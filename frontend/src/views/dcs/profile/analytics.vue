@@ -778,7 +778,7 @@
 
     <!-- 漏斗编辑 -->
     <el-dialog v-model="funnelDialog" :title="funnelForm.funnelId ? '编辑漏斗' : '新建漏斗'" width="640px">
-      <el-form :model="funnelForm" label-width="96px">
+      <el-form :model="funnelForm" label-width="96px" class="dcs-form-narrow">
         <el-form-item label="漏斗名称">
           <el-input v-model="funnelForm.funnelName" placeholder="例如：上手转化（登录→发布→提交）" />
         </el-form-item>

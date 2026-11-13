@@ -1040,7 +1040,7 @@
     </el-drawer>
 
     <el-dialog v-model="priceDialog.visible" :title="priceDialog.title" width="760px" append-to-body>
-      <el-form ref="priceFormRef" :model="priceForm" label-width="120px">
+      <el-form ref="priceFormRef" :model="priceForm" label-width="120px" class="dcs-form-narrow">
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="租户编号">

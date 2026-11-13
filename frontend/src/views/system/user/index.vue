@@ -224,7 +224,7 @@
 
     <!-- 添加或修改用户配置对话框 -->
     <el-dialog ref="formDialogRef" v-model="dialog.visible" :title="dialog.title" width="760px" append-to-body @close="closeDialog">
-      <el-form ref="userFormRef" :model="form" :rules="rules" label-width="80px">
+      <el-form ref="userFormRef" :model="form" :rules="rules" label-width="80px" class="dcs-form-narrow">
         <el-row>
           <el-col :span="12">
             <el-form-item label="用户昵称" prop="nickName">

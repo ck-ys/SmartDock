@@ -91,7 +91,7 @@
 
     <!-- 新建/编辑 -->
     <el-dialog v-model="dialogVisible" :title="form.segmentId ? '编辑分群' : '新建分群'" width="760px" destroy-on-close>
-      <el-form label-width="92px">
+      <el-form label-width="92px" class="dcs-form-narrow">
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="分群编码">
