@@ -357,6 +357,42 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 ---
 
+---
+
+## 命名与令牌规矩（2026-11-13 拍板 Q1–Q4，回执全按推荐）
+
+> 四道题的原文与候选方案在 `.workshop/plans/20261113-naming-visual-board.html` 的 Q1–Q4。答案已拍，落地口径写在这里；与本节冲突的旧写法一律以本节为准。
+
+### 包名与目录：域优先
+
+- **后端**（Q1=1、Q2=1）：新代码只进 `com.smartdock.<域>.<层>`。
+  - 域：`profile` / `analytics` / `aibilling` / `filesecurity` / `assistant` / `shared`
+  - 层：`controller` / `service` / `mapper` / `domain/bo` / `domain/vo` / `config` / `query` / `protocol` / `engine` / `tools` / `support`
+  - **禁止新开层优先包**：`com.smartdock.controller.*`、`com.smartdock.service.*`、`com.smartdock.mapper.*`、`com.smartdock.domain.*` 是 ai-billing / file-security 的历史形态，**冻结**——不新增文件、不把别的域往里搬。
+- **两套根包隔离**（Q2=1）：`org.dromara.*` 是底座与助手主线，**老的不搬、只在必要处改**；新域代码进 `com.smartdock.*`。不要为了「统一」做一次 600 文件的大搬迁。
+- **前端**：`views/<域>/<页>.vue`、`api/<域>/<资源>.ts`；跨页复用件进 `components/`，域内专用件留在域目录下。
+
+### 入参 / 出参后缀：四件套
+
+（Q3=1）`*Bo` 进（接口入参）、`*Vo` 出（接口出参）、`*DTO` 跨模块传输、`*Query` 查询条件。
+不再新增 `*Request` / `*Response` / `*Command`；存量文件名不动（改名的收益是零，代价是 import 全线变红）。
+
+### 令牌：六档字号、四档圆角，这次会被测试抓出来
+
+（Q4=1）规矩在三个文件里，缺一不可：
+
+- 定义：`frontend/src/assets/styles/dcs-tokens.scss`（字号 12/13/14/15/20/26；圆角 2/4/8/12，胶囊 999px）
+- **门禁**：`frontend/src/assets/styles/tokens.test.ts` —— 扫 `src/**/*.vue` 的 `<style>` 与 `*.scss`，命中档外**字面量 px** 就失败并报 `文件:行`（`var(--dcs-*)` 令牌写法放行）
+- 存量豁免：`frontend/src/assets/styles/tokens-baseline.json`，**只减不增**——修掉一处就删一行（残留行会被第二条用例抓出来），**新代码不许往这里加**
+
+### 视觉落地范围（Q6=1）
+
+本轮只动**独立工作台三页**（`/agent`、`/agent/settings`、`/agent/automation`）与设置页记忆节；`/ai/*` 业务壳不在范围内（除品牌标与全局主色外，视觉一律不动）。
+
+### 工具 / 技能 / MCP 权限（Q12=1）
+
+停在「接口 + 角色 + 租户」三层，**不做按人开关**：接口层 `@SaCheckPermission`，运行时层 `ToolIdentity` 三档 + 租户 `tool_gate`（执行点 3 处：`AssistantSkillGateMiddleware` / `AssistantSkillUsageMiddleware` / `AssistantMcpController`）。要收紧能力就改角色或租户闸，不给个人开口子。
+
 ## 兜底提醒
 
 - 切到弱模型时，强约束已是 checklist / 编号列表形式，不易遗漏
