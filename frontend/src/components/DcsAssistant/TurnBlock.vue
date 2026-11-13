@@ -295,6 +295,18 @@
       </div>
     </div>
 
+    <!-- ckys3 解锁板题8（2026-11-12）：同主题覆盖小卡——本条记忆把旧的顶掉了，旧内容进历史
+         可回滚；随回合内存态（刷新消失属预期，与 auto_done 同口径） -->
+    <div v-if="turn.memUpdated && turn.memUpdated.length" class="memcard">
+      <div class="mc-head"><IconSpan name="brain" :size="12" /> 记忆已更新</div>
+      <div v-for="(u, i) in turn.memUpdated" :key="i" class="mc-row">
+        <span class="mc-from">{{ u.from }}</span>
+        <span class="mc-arrow">→</span>
+        <span class="mc-to">{{ u.to }}</span>
+        <span class="mc-hint">旧内容进历史，可在记忆页回滚</span>
+      </div>
+    </div>
+
     <!-- 业务批10 #2/#4：空回答轮诚实化——done 却无正文无工具=模型没吐过一个字（零事件卡死被
          收割/重放悬挂轮），不再假装"已完成"绿胶囊+静态推荐题；给人话结论+一键重问出路。
          2026-11-11：补上第三种真实成因——模型回了 200 但正文为空（实测 17 token 无内容），
@@ -489,6 +501,9 @@ ${it.url}`"
       <span v-if="turn.tokens != null" class="fua-t" :title="turn.costYuan != null ? `本回合费用 ¥${turn.costYuan.toFixed(4)}` : '本回合用量'"
         ><!-- 批I 零技术词：tok 英文单位去掉，纯数字+图标（换算成「字」会失真，不给伪精确单位） --><IconSpan name="zap" /> 用量
         {{ turn.tokens }}</span
+      >
+      <span v-if="turn.memInjected" class="fua-mem" :title="`已参考你的 ${turn.memInjected.count} 条记忆，约 ${turn.memInjected.chars} 字（没命中时不显示）`"
+        ><IconSpan name="brain" /> 参考 {{ turn.memInjected.count }} 条记忆 · 约 {{ turn.memInjected.chars }} 字</span
       >
     </div>
   </div>
@@ -3307,6 +3322,56 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
 /* star 收藏态=填充（描边→实心，Q2 ☆/⭐ 统一 star 本体） */
 .fua-b.star.on :deep(svg) {
   fill: currentColor;
+}
+.fua-mem {
+  margin-left: 10px;
+  font-size: 11px;
+  color: var(--dcs-text-placeholder);
+  user-select: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* ckys3 解锁板题8：记忆已更新小卡（安静边框、淡底，不抢回答正文） */
+.memcard {
+  margin: 8px 0 2px;
+  padding: 8px 12px;
+  border: 1px dashed var(--dcs-border-color);
+  border-radius: 8px;
+  background: var(--el-fill-color-lighter);
+  font-size: 12.5px;
+  color: var(--dcs-text-secondary);
+}
+.memcard .mc-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--dcs-text-primary);
+  margin-right: 8px;
+}
+.memcard .mc-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.memcard .mc-from {
+  color: var(--dcs-text-placeholder);
+  text-decoration: line-through;
+}
+.memcard .mc-arrow {
+  color: var(--dcs-text-placeholder);
+}
+.memcard .mc-to {
+  color: var(--dcs-text-primary);
+  font-weight: 600;
+}
+.memcard .mc-hint {
+  font-size: 11.5px;
+  color: var(--dcs-text-placeholder);
 }
 .fua-t {
   margin-left: auto;

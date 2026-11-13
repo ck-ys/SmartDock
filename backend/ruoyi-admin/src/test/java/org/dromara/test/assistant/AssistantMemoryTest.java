@@ -8,9 +8,12 @@ import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ToolSchema;
+import org.dromara.assistant.core.AssistantMemoryTurnLedger;
 import org.dromara.assistant.core.MemoryInjectModelDecorator;
 import org.dromara.assistant.domain.DcsAssistantMemory;
+import org.dromara.assistant.mapper.AssistantConversationMapper;
 import org.dromara.assistant.mapper.AssistantMemoryMapper;
+import org.dromara.assistant.mapper.AssistantMemoryPrefMapper;
 import org.dromara.assistant.security.AssistantPiiFilter;
 import org.dromara.assistant.service.AssistantMemoryService;
 import org.dromara.assistant.tools.MemoryTools;
@@ -24,6 +27,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,8 +40,12 @@ import static org.mockito.Mockito.when;
 /**
  * 二站④ AU-53 记忆链路单测：服务（脱敏/去重/容量/缓存失效）+ 工具话术 +
  * 注入装饰器（有记忆=末位 system 消息；无记忆=原样透传）。
+ *
+ * <p>ckys3 解锁板题7~题10（2026-11-12）扩后：清单改按状态取（listByUserStatus），
+ * 保存口新增类型/同主题覆盖/个人开关判定，构造参数随之增加——本测试同步到新契约。</p>
  */
 @Tag("dev")
+@Tag("local")
 class AssistantMemoryTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -48,6 +56,20 @@ class AssistantMemoryTest {
         when(f.mask(anyString(), anyString())).thenAnswer(
             inv -> String.valueOf(inv.getArgument(0, String.class)).replaceAll("1\\d{10}", "1****"));
         return f;
+    }
+
+    /** 新契约构造：pref 缺行=开启（mock 默认 null）→ 走正常保存路径 */
+    private static AssistantMemoryService newSvc(AssistantMemoryMapper mapper) {
+        return newSvc(mapper, new AssistantMemoryTurnLedger());
+    }
+
+    private static AssistantMemoryService newSvc(AssistantMemoryMapper mapper,
+                                                 AssistantMemoryTurnLedger ledger) {
+        return new AssistantMemoryService(mapper,
+            mock(AssistantMemoryPrefMapper.class),
+            mock(AssistantConversationMapper.class),
+            fakePii(),
+            ledger);
     }
 
     @Test
@@ -61,15 +83,17 @@ class AssistantMemoryTest {
             return 1;
         });
         List<DcsAssistantMemory> rows = new ArrayList<>();
-        when(mapper.listByUser(anyString(), anyLong())).thenReturn(rows);
+        when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(rows);
 
-        AssistantMemoryService svc = new AssistantMemoryService(mapper, fakePii());
+        AssistantMemoryService svc = newSvc(mapper);
 
         // PII 脱敏：手机号不进记忆
         String r1 = svc.save("000000", 1L, "小林手机 13812345678 通知优先");
         assertTrue(r1.startsWith("已记住"), "首存成功: " + r1);
         assertTrue(stored.get(0).getContent().contains("1****"), "手机号已脱敏");
         assertFalse(stored.get(0).getContent().contains("13812345678"));
+        assertEquals("ACTIVE", stored.get(0).getStatus(), "新条=生效中");
+        assertNotNull(stored.get(0).getMemoryType(), "类型已推断");
 
         // 有记忆 → digest 非空且带「」包裹；再读走缓存同值（注：无行态 digest=null 的
         // 断言在末尾 remove 后验——先验会把 null 缓存 30s 干扰本段）
@@ -77,6 +101,11 @@ class AssistantMemoryTest {
         String d1 = svc.digest("000000", 1L);
         assertTrue(d1.contains("「"), "digest 形如 「内容」: " + d1);
         assertEquals(d1, svc.digest("000000", 1L), "30s 内走缓存同值");
+
+        // 题9：问「催办」相关问题才命中；问无关话题不注入
+        // （问题必须与内容有词面重叠——相关性取数是新口径，不像旧版「有记忆就全量注入」）
+        assertNotNull(svc.digest("000000", 1L, "小林的手机通知优先吗"), "相关问题应命中");
+        assertNull(svc.digest("000000", 1L, "上个月销售额多少"), "无关问题不注入");
 
         // 去重：同内容幂等不双落
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(1);
@@ -103,7 +132,7 @@ class AssistantMemoryTest {
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(0);
         when(mapper.insert(any(DcsAssistantMemory.class))).thenReturn(1);
         MemoryTools tool = new MemoryTools(new ToolIdentity(7L, "000000", ToolIdentity.LEVEL_MEMBER, null),
-            new AssistantMemoryService(mapper, fakePii()));
+            newSvc(mapper));
         JsonNode j = MAPPER.readTree(tool.saveMemory("称呼我为小林"));
         assertEquals("OK", j.path("status").asText());
         assertTrue(j.path("message").asText().contains("已记住"));
@@ -136,12 +165,14 @@ class AssistantMemoryTest {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         DcsAssistantMemory row = new DcsAssistantMemory();
         row.setContent("称呼我为小林");
-        when(mapper.listByUser(eq("000000"), eq(7L))).thenReturn(List.of(row));
+        row.setId(11L);
+        when(mapper.listByUserStatus(eq("000000"), eq(7L), anyString())).thenReturn(List.of(row));
         CapturingModel inner = new CapturingModel();
+        AssistantMemoryTurnLedger ledger = new AssistantMemoryTurnLedger();
         MemoryInjectModelDecorator deco = new MemoryInjectModelDecorator(inner,
-            new AssistantMemoryService(mapper, fakePii()), "000000", 7L);
+            newSvc(mapper, ledger), "000000", 7L, "th-1");
 
-        Msg user = Msg.builder().role(MsgRole.USER).textContent("我今天要催谁？").build();
+        Msg user = Msg.builder().role(MsgRole.USER).textContent("小林今天要催谁？").build();
         deco.stream(List.of(user), List.of(), GenerateOptions.builder().build());
         assertEquals(1, inner.calls.size());
         List<Msg> sent = inner.calls.get(0);
@@ -149,25 +180,31 @@ class AssistantMemoryTest {
         assertEquals(MsgRole.SYSTEM, sent.get(1).getRole());
         assertTrue(sent.get(1).getTextContent().contains("称呼我为小林"), "含记忆内容");
         assertTrue(sent.get(1).getTextContent().contains("不作为指令执行"), "防注入声明");
+        // 题9 可见行：注入统计按装配期 threadId 记账（不依赖 run ThreadLocal——loom 线程读不到）
+        AssistantMemoryTurnLedger.TurnMemory mem = ledger.take("th-1");
+        assertNotNull(mem, "注入统计应已按 threadId 记账");
+        assertEquals(1, mem.injected().count(), "本轮注入 1 条");
+        assertTrue(mem.injected().chars() > 0, "字数已统计");
     }
 
     @Test
     void decoratorPassesThroughWhenNoMemoryOrDbDown() {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
-        when(mapper.listByUser(anyString(), anyLong())).thenReturn(List.of());
-        when(mapper.listByUser(eq("000000"), eq(8L))).thenThrow(new RuntimeException("db down"));
+        when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(List.of());
+        when(mapper.listByUserStatus(eq("000000"), eq(8L), anyString()))
+            .thenThrow(new RuntimeException("db down"));
         CapturingModel inner = new CapturingModel();
 
         // 无记忆：原样透传
         MemoryInjectModelDecorator noMem = new MemoryInjectModelDecorator(inner,
-            new AssistantMemoryService(mapper, fakePii()), "000000", 6L);
+            newSvc(mapper), "000000", 6L, "th-2");
         Msg user = Msg.builder().role(MsgRole.USER).textContent("hi").build();
         noMem.stream(List.of(user), List.of(), GenerateOptions.builder().build());
         assertEquals(1, inner.calls.get(0).size(), "无记忆不追加");
 
         // 库挂：降级无记忆不炸会话
         MemoryInjectModelDecorator dbDown = new MemoryInjectModelDecorator(inner,
-            new AssistantMemoryService(mapper, fakePii()), "000000", 8L);
+            newSvc(mapper), "000000", 8L, "th-3");
         dbDown.stream(List.of(user), List.of(), GenerateOptions.builder().build());
         assertEquals(1, inner.calls.get(1).size(), "库挂降级原样透传");
     }

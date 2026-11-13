@@ -60,6 +60,9 @@ public class AssistantEventEnricher implements AguiEventEnricher {
     private final AssistantRunStreamHub runStreamHub;
     /** 题5 案1（2026-10-31）：自选模型回退默认链的提示信号，本批事件前转 model_degrade CUSTOM 帧 */
     private final AssistantModelDegradeSignal modelDegradeSignal;
+    /** ckys3 解锁板题8/题9（2026-11-12）：回合记忆账本——注入条数/字数与同主题覆盖，
+     *  RUN_FINISHED 前转 memory_turn CUSTOM 帧（前端回答下方一行小字/一张小卡） */
+    private final AssistantMemoryTurnLedger memoryTurnLedger;
 
     @Override
     public List<AguiEvent> enrich(AgentEvent rawEvent, List<AguiEvent> events,
@@ -214,6 +217,33 @@ public class AssistantEventEnricher implements AguiEventEnricher {
                 out = new java.util.ArrayList<>(out);
                 out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
                     "cost_meta", value));
+            }
+        }
+        // ckys3 解锁板题8/题9（2026-11-12）：回合记忆帧——本轮注入条数/字数（可见行）
+        // 与同主题覆盖（旧→新小卡）。判据钉死 RUN_FINISHED；取走即清（同 cost_meta 口径）。
+        // 键=threadId（2026-11-12 活体回修）：记账发生在 loom 线程，runId 的 ThreadLocal 读不到，
+        // 用会话键才能和装配期/工具侧（ToolDeps.aguiThreadId）对上。
+        if (memoryTurnLedger != null && context != null && context.getThreadId() != null
+            && events.stream().anyMatch(e -> e.getType() == AguiEventType.RUN_FINISHED)) {
+            AssistantMemoryTurnLedger.TurnMemory mem = memoryTurnLedger.take(context.getThreadId());
+            if (mem != null) {
+                java.util.Map<String, Object> value = new java.util.LinkedHashMap<>();
+                if (mem.injected() != null) {
+                    value.put("injectedCount", mem.injected().count());
+                    value.put("injectedChars", mem.injected().chars());
+                }
+                if (mem.superseded() != null && !mem.superseded().isEmpty()) {
+                    java.util.List<java.util.Map<String, Object>> ups = new java.util.ArrayList<>();
+                    for (AssistantMemoryTurnLedger.Superseded s : mem.superseded()) {
+                        ups.add(java.util.Map.of("from", s.from(), "to", s.to()));
+                    }
+                    value.put("updated", ups);
+                }
+                if (!value.isEmpty()) {
+                    out = new java.util.ArrayList<>(out);
+                    out.add(0, new AguiEvent.Custom(context.getThreadId(), context.getRunId(),
+                        "memory_turn", value));
+                }
             }
         }
         // 三批④（2026-11-01）：全自动档完成通知帧 auto_done——判据钉死：本批含 RUN_FINISHED

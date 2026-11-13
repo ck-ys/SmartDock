@@ -254,6 +254,11 @@ export interface AssistantTurn {
   issueDetail?: string | null;
   costYuan: number | null;
   tokens: number | null;
+  /** ckys3 解锁板题9（2026-11-12）：本轮注入了几条记忆/多少字（CUSTOM memory_turn）；
+   *  null=没命中或拿不到 run 上下文→不显示（不猜、不硬凑） */
+  memInjected: { count: number; chars: number } | null;
+  /** ckys3 解锁板题8：本轮被同主题覆盖的旧记忆（旧→新），渲染「记忆已更新」小卡 */
+  memUpdated: Array<{ from: string; to: string }>;
   stamp: string;
   startedAt: number;
   durMs: number;
@@ -462,6 +467,8 @@ function emptyTurn(question: string): AssistantTurn {
     errorDetail: '',
     costYuan: null,
     tokens: null,
+    memInjected: null,
+    memUpdated: [],
     stamp: '',
     startedAt: Date.now(),
     durMs: 0,
@@ -934,6 +941,22 @@ export function useAssistant(options: UseAssistantOptions = {}) {
           const v = value as { yuan?: number; tokens?: number };
           turn.costYuan = v.yuan ?? null;
           turn.tokens = v.tokens ?? null;
+        } else if (name === 'memory_turn' && value && typeof value === 'object') {
+          // ckys3 解锁板题8/题9：本轮记忆可见（注入条数/字数 + 同主题覆盖的 旧→新）
+          const v = value as {
+            injectedCount?: number;
+            injectedChars?: number;
+            updated?: Array<{ from?: string; to?: string }>;
+          };
+          if (typeof v.injectedCount === 'number' && v.injectedCount > 0) {
+            turn.memInjected = { count: v.injectedCount, chars: v.injectedChars ?? 0 };
+          }
+          if (Array.isArray(v.updated)) {
+            turn.memUpdated = v.updated
+              .filter((u) => u && typeof u.from === 'string' && typeof u.to === 'string')
+              .slice(0, 3)
+              .map((u) => ({ from: String(u.from), to: String(u.to) }));
+          }
         } else if (name === 'plan' && value && typeof value === 'object') {
           // 计划卡（P1-3 拍板补做）：CUSTOM plan 事件带步骤数组；后端无触发源期间组件就绪不出现
           const v = value as { planId?: unknown; title?: string; steps?: Array<{ label?: unknown; state?: unknown }> };

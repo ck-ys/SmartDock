@@ -22,16 +22,25 @@ public class MemoryTools {
     private final AssistantMemoryService memoryService;
     /** 三批③：写操作审计挂钩（可空——null=测试/旧路径不落账本） */
     private final org.dromara.assistant.core.AssistantActionLedgerHook actionLedger;
+    /** 本轮会话 threadId（ckys3 解锁板题7 出处；可空=查不到会话，出处列留空） */
+    private final String aguiThreadId;
 
     public MemoryTools(ToolIdentity identity, AssistantMemoryService memoryService) {
-        this(identity, memoryService, null);
+        this(identity, memoryService, null, null);
     }
 
     public MemoryTools(ToolIdentity identity, AssistantMemoryService memoryService,
                        org.dromara.assistant.core.AssistantActionLedgerHook actionLedger) {
+        this(identity, memoryService, actionLedger, null);
+    }
+
+    public MemoryTools(ToolIdentity identity, AssistantMemoryService memoryService,
+                       org.dromara.assistant.core.AssistantActionLedgerHook actionLedger,
+                       String aguiThreadId) {
         this.identity = identity;
         this.memoryService = memoryService;
         this.actionLedger = actionLedger;
+        this.aguiThreadId = aguiThreadId;
     }
 
     @Tool(name = "save_memory",
@@ -46,10 +55,14 @@ public class MemoryTools {
         Long auditRow = actionLedger == null ? null : actionLedger.open("save_memory", argsJson(content));
         try {
             AssistantMemoryService.SaveOutcome outcome = memoryService.saveReturningId(
-                identity.getTenantId(), identity.getUserId(), content);
+                identity.getTenantId(), identity.getUserId(), content, aguiThreadId);
             boolean saved = outcome.message().startsWith("已记住");
             out.put("status", saved ? "OK" : "SKIP");
-            out.put("message", outcome.message() + (saved ? "（已同步到我的记忆，用户可随时在记忆页删除）" : ""));
+            String suffix = saved ? "（已同步到我的记忆，用户可随时在记忆页删除）" : "";
+            if (saved && outcome.overwritten() != null && !outcome.overwritten().isEmpty()) {
+                suffix = "（已更新同主题旧记忆：旧内容进历史，可在记忆页回滚）";
+            }
+            out.put("message", outcome.message() + suffix);
             // SKIP/空内容=DONE（非失败）；落库成功回填记忆行 id 作回执锚点（④撤回直读用）
             finishAudit(auditRow, true, outcome.message(), outcome.memoryId());
             return ToolSupport.secureJson(out, identity);

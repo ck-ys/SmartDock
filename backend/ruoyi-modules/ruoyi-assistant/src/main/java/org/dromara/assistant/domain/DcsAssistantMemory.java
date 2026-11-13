@@ -40,6 +40,27 @@ public class DcsAssistantMemory implements Serializable {
     /** 来源：AI=助手对话中沉淀；USER=用户手动（预留） */
     private String source;
 
+    /** 记忆类型（ckys3 解锁板题7，2026-11-12）：user/project/team/reference，保存口按关键词推断 */
+    private String memoryType;
+
+    /** 出处会话 id（题7；保存时按 threadId 反查，查不到为 null——前端退化为「对话中沉淀」） */
+    private Long conversationId;
+
+    /** 同主题键（题8）：命中「称呼/语言/催办默认/时区」这类参数型偏好才有值；同键新条覆盖旧条 */
+    private String topicKey;
+
+    /** 状态（题8/题10）：ACTIVE=生效中；SUPERSEDED=被同主题新条替代；ARCHIVED=90 天未用归档 */
+    private String status;
+
+    /** 替代它的新条 id（status=SUPERSEDED 时有值，用于回滚溯源） */
+    private Long supersededBy;
+
+    /** 最近一次被注入的时间（题10：归档只认「90 天没被注入过」，不用创建时间） */
+    private Date lastUsedAt;
+
+    /** 归档时间（status=ARCHIVED 时有值） */
+    private Date archivedAt;
+
     /** 创建部门 */
     private Long createDept;
 

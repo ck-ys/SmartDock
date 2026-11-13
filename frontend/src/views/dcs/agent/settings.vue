@@ -213,6 +213,33 @@
         </section>
 
         <!-- ============ 技能：列表 + 右侧详情（题 2 丙：只读三件套 + 试一句） ============ -->
+        <section v-else-if="section === 'memory'" class="set-sheet memory" aria-label="记忆">
+          <div class="gen-head">
+            <h1>记忆</h1>
+            <p>你告诉助手的偏好会沉淀下来，换会话也不会忘。这里只管开关和入口，搜索、改、看出处都在记忆页做。</p>
+          </div>
+          <div class="gen-scroll">
+            <div class="gen-grp">长期记忆</div>
+            <div class="set-card">
+              <div class="set-line">
+                <div class="set-line-main">
+                  <b>记住我的偏好</b>
+                  <span class="set-line-sub">关掉后：不再把记忆发给模型，也不再保存新的；已经记下的不会删除。</span>
+                </div>
+                <el-switch v-model="memPrefOn" size="small" :loading="memPrefSaving" @change="onToggleMemPref" />
+              </div>
+              <div class="set-line">
+                <div class="set-line-main">
+                  <b>已记 {{ memCount }} / {{ memMax }} 条</b>
+                  <span class="set-line-sub">条数越多，每轮对话越贵：记忆会和你的问题一起发给模型。</span>
+                </div>
+                <el-button size="small" type="primary" plain @click="goMemoryPage">去记忆页</el-button>
+              </div>
+            </div>
+            <p class="mem-note">记忆会按当前问题挑相关的几条带给模型（不再固定拿最近 30 条），没问到的不会被硬塞。</p>
+          </div>
+        </section>
+
         <section v-else-if="section === 'skills'" class="set-sheet" aria-label="技能">
           <div class="set-list" :class="{ 'is-hidden': isNarrow && mobileDetail }">
             <div class="set-lhead">
@@ -520,6 +547,9 @@ import {
   getAssistantToolCatalog,
   pageAssistantActionAudit,
   exportAssistantActionAudit,
+  getAssistantMemoryUsage,
+  getAssistantMemoryPref,
+  setAssistantMemoryPref,
   type AssistantActionAuditRow,
   type AssistantRecentSkill,
   type AssistantSkillDetailView,
@@ -577,7 +607,7 @@ const scopeText = computed(() => {
 });
 
 /* ---------- 分节导航 ---------- */
-type SectionKey = 'general' | 'skills' | 'tools' | 'mcp' | 'audit';
+type SectionKey = 'general' | 'memory' | 'skills' | 'tools' | 'mcp' | 'audit';
 interface NavItem {
   key: SectionKey | string;
   label: string;
@@ -595,9 +625,12 @@ const READY: NavItem[] = [
 const navGroups = computed(() => {
   // 常规是纯本机手感，所有人都有；其余灰项仍按身份显示
   const generalRow = { key: 'general', label: '常规', icon: 'settings', ready: true } as NavItem;
+  // ckys3 解锁板题7/题10（2026-11-12）：记忆分节全员可见（后端只操作本人数据），
+  // 设置页只做「条数＋开关＋入口」，编辑仍单点在记忆页（两处都能改必打架）
+  const memoryRow = { key: 'memory', label: '记忆', icon: 'brain', ready: true } as NavItem;
   if (!isManager.value) {
     return [
-      { label: '工作台', items: [generalRow] },
+      { label: '工作台', items: [generalRow, memoryRow] },
       { label: 'Agent 能力', items: READY.filter((i) => i.key === 'skills' || i.key === 'tools' || i.key === 'mcp') }
     ];
   }
@@ -606,6 +639,7 @@ const navGroups = computed(() => {
       label: '工作台',
       items: [
         generalRow,
+        memoryRow,
         { key: 'appearance', label: '外观', icon: 'lightbulb' },
         { key: 'model', label: '模型', icon: 'brain' }
       ] as NavItem[]
@@ -629,7 +663,7 @@ const navGroups = computed(() => {
     }
   ];
 });
-const SECTION_LABEL: Record<SectionKey, string> = { general: '常规', skills: '技能', tools: '工具', mcp: 'MCP 服务', audit: '审计' };
+const SECTION_LABEL: Record<SectionKey, string> = { general: '常规', memory: '记忆', skills: '技能', tools: '工具', mcp: 'MCP 服务', audit: '审计' };
 
 /** 分节状态跟地址：?s=audit / ?s=tools 可直达（审计只给有权限的人） */
 const section = ref<SectionKey>('general');
@@ -640,7 +674,9 @@ watch(
     const next: SectionKey =
       v === 'general'
         ? 'general'
-        : v === 'audit' && canAudit.value
+        : v === 'memory'
+          ? 'memory'
+          : v === 'audit' && canAudit.value
           ? 'audit'
           : v === 'tools'
             ? 'tools'
@@ -655,9 +691,59 @@ watch(
   },
   { immediate: true }
 );
+// ===== ckys3 解锁板题7/题10：记忆分节（只做条数/开关/入口；编辑单点在记忆页） =====
+const MEMORY_PAGE_PATH = '/ai/memory';
+const memPrefOn = ref(true);
+const memPrefSaving = ref(false);
+const memCount = ref(0);
+const memMax = ref(50);
+
+async function loadMemoryPanel() {
+  try {
+    const usage = (await getAssistantMemoryUsage() as unknown as { data?: { count?: number; max?: number } })?.data;
+    memCount.value = usage?.count ?? 0;
+    memMax.value = usage?.max ?? 50;
+  } catch {
+    memCount.value = 0;
+  }
+  try {
+    const pref = (await getAssistantMemoryPref() as unknown as { data?: { enabled?: boolean } })?.data;
+    memPrefOn.value = pref?.enabled !== false;
+  } catch {
+    memPrefOn.value = true;
+  }
+}
+
+async function onToggleMemPref(val: boolean | string | number) {
+  const want = val === true;
+  memPrefSaving.value = true;
+  try {
+    const r = (await setAssistantMemoryPref(want) as unknown as { data?: { enabled?: boolean } })?.data;
+    memPrefOn.value = r?.enabled !== false;
+  } catch {
+    memPrefOn.value = !want;
+  } finally {
+    memPrefSaving.value = false;
+  }
+}
+
+function goMemoryPage() {
+  router.push(MEMORY_PAGE_PATH);
+}
+
+watch(
+  section,
+  (v) => {
+    if (v === 'memory') {
+      void loadMemoryPanel();
+    }
+  },
+  { immediate: true }
+);
+
 function goSection(key: string) {
   // 三审 P0：mcp 是本批新加的分节，漏在白名单里＝点「MCP 服务」静默无反应（只有 ?s=mcp 直达能进）
-  if (key !== 'general' && key !== 'skills' && key !== 'tools' && key !== 'mcp' && key !== 'audit') return;
+  if (key !== 'general' && key !== 'memory' && key !== 'skills' && key !== 'tools' && key !== 'mcp' && key !== 'audit') return;
   if (key === section.value) return;
   section.value = key;
   // replace：切分节不堆历史，浏览器返回=离开设置页回工作台

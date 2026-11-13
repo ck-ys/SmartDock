@@ -122,7 +122,7 @@ public final class ToolRegistry {
         // 三批③（2026-11-01）：save_memory 挂动作账本（平台放行 release_mode=allow）
         new ToolSpec(Set.of("save_memory"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
-            (id, d) -> new org.dromara.assistant.tools.MemoryTools(id, d.memoryService(), d.actionLedger()),
+            (id, d) -> new org.dromara.assistant.tools.MemoryTools(id, d.memoryService(), d.actionLedger(), d.aguiThreadId()),
             d -> Boolean.TRUE.equals(d.memoryEnabled())),
         // 技能自取（五需求批 R1，2026-10-13）：全角色注册；目录按角色裁剪+体内 minRole 兜底
         new ToolSpec(Set.of("view_skill"),

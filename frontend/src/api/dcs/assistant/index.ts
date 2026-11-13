@@ -607,16 +607,61 @@ export function exportAssistantActionAudit(params: {
 export function revokeAssistantAction(id: string) {
   return request({ url: '/dcs/assistant/action/revoke', method: 'post', data: { id } });
 }
-/** 二站④ AU-53：本人长期记忆（记忆页真数据；memory:manage 权限） */
+/** 二站④ AU-53：本人长期记忆（记忆页真数据；memory:manage 权限）。
+ *  ckys3 解锁板题7~题10（2026-11-12）：类型/出处/状态/最近使用随清单返回。 */
 export interface AssistantMemoryRow {
   id: number | string;
   content: string;
   source?: string;
   createTime?: string;
+  updateTime?: string;
+  /** user=偏好 project=项目 team=协作 reference=参考 */
+  memoryType?: string;
+  /** 出处会话 id（null=查不到，前端显示「对话中沉淀」） */
+  conversationId?: number | string | null;
+  /** ACTIVE / SUPERSEDED（被同主题替代）/ ARCHIVED（90 天未用归档） */
+  status?: string;
+  supersededBy?: number | string | null;
+  lastUsedAt?: string | null;
+  archivedAt?: string | null;
 }
 
 export function listAssistantMemory() {
   return request({ url: '/dcs/assistant/memory/list', method: 'get' });
+}
+
+/** 题7/8：历史清单（被同主题替代 + 90 天归档） */
+export function listAssistantMemoryHistory() {
+  return request({ url: '/dcs/assistant/memory/history', method: 'get' });
+}
+
+/** 题7：条数用量（只算生效中） */
+export function getAssistantMemoryUsage() {
+  return request({ url: '/dcs/assistant/memory/usage', method: 'get' });
+}
+
+/** 题7：行内编辑（后端同闸：长度+脱敏+去重+属主） */
+export function editAssistantMemory(id: number | string, content: string) {
+  return request({ url: '/dcs/assistant/memory/' + id + '/edit', method: 'post', data: { content } });
+}
+
+/** 题10：个人开关 */
+export function getAssistantMemoryPref() {
+  return request({ url: '/dcs/assistant/memory/pref', method: 'get' });
+}
+
+export function setAssistantMemoryPref(enabled: boolean) {
+  return request({ url: '/dcs/assistant/memory/pref', method: 'post', data: { enabled } });
+}
+
+/** 题10：导出本人全部（含历史） */
+export function exportAssistantMemory() {
+  return request({ url: '/dcs/assistant/memory/export', method: 'get' });
+}
+
+/** 题10：清空本人全部（含历史；二次确认在前端） */
+export function clearAssistantMemory() {
+  return request({ url: '/dcs/assistant/memory/clear', method: 'post' });
 }
 
 export function removeAssistantMemory(id: number | string) {

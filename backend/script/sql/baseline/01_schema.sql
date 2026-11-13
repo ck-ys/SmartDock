@@ -462,12 +462,33 @@ CREATE TABLE public.dcs_assistant_memory (
     user_id bigint NOT NULL,
     content character varying(200) NOT NULL,
     source character varying(20) DEFAULT 'AI'::character varying NOT NULL,
+    memory_type character varying(20) DEFAULT 'user'::character varying NOT NULL,
+    conversation_id bigint,
+    topic_key character varying(40),
+    status character varying(16) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    superseded_by bigint,
+    last_used_at timestamp without time zone,
+    archived_at timestamp without time zone,
     create_dept bigint,
     create_by bigint,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     update_by bigint,
     update_time timestamp without time zone,
     del_flag character(1) DEFAULT '0'::bpchar
+);
+
+
+--
+-- Name: dcs_assistant_memory_pref; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.dcs_assistant_memory_pref (
+    id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    user_id bigint NOT NULL,
+    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_time timestamp without time zone
 );
 
 

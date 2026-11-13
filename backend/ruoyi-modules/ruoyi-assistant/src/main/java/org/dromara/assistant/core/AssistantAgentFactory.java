@@ -204,7 +204,7 @@ public class AssistantAgentFactory {
         innermost = new DateInjectModelDecorator(innermost);
         if (memoryOn) {
             innermost = new MemoryInjectModelDecorator(innermost, memoryService,
-                user.getTenantId(), user.getUserId());
+                user.getTenantId(), user.getUserId(), aguiThreadId);
         }
         Model model = new BillingModelDecorator(
             new org.dromara.assistant.security.AssistantPiiModelDecorator(
