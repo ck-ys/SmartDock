@@ -296,6 +296,14 @@ public class BillingModelDecorator implements Model {
                     keyPool.reportSuccess(config.getTenantId(), config.getProvider());
                 }
             })
+            // 2026-11-11 STEP03（下一步批 Q2-1）：额度/限流必须先于「重试用尽」判——
+            // 429 会被框架重试到耗尽，用户看到的原话是「可能正忙或网络不稳」，于是去查网络；
+            // 真实原因是额度或频率封顶，唯一有效出路是换模型/充值。这里按错误链（含 cause
+            // 与 suppressed）找 429 特征，命中就给一条带出路的文案。
+            .onErrorMap(
+                ex -> isQuotaLike(reactor.core.Exceptions.unwrap(ex)),
+                ex -> new ServiceException(
+                    "模型额度或频率已到上限（服务商回了 429）。可以在输入框敲「/模型」换一个模型，或稍后再试"))
             // 业务批7 Q13：agentscope 框架模型重试耗尽抛 RetryExhaustedException（英文
             // "Retries exhausted: 2/2" 原样直出界面）——此处统一映射人话；侧车链自身
             // 吞异常不受影响，正常失败原因（非重试耗尽）原样透传不遮蔽。
@@ -572,6 +580,44 @@ public class BillingModelDecorator implements Model {
 
     private static BigDecimal nvl(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
+    }
+
+    /**
+     * 错误链里是否带「额度/限流」特征（2026-11-11 STEP03，纯函数可测）。
+     *
+     * <p>为什么要走整条链：429 在框架重试后被包成「Retries exhausted」上抛，
+     * 原始状态码可能落在 cause 或 suppressed 里，只在最外层 message 上找会漏。
+     * 命中判定保守（只认明确的 429 / rate limit / quota / 用量上限），
+     * 抓不到就不改文案——宁可泛泛而谈，也不要把网络故障误报成额度问题。</p>
+     */
+    static boolean isQuotaLike(Throwable error) {
+        if (error == null) {
+            return false;
+        }
+        java.util.Set<Throwable> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        java.util.ArrayDeque<Throwable> queue = new java.util.ArrayDeque<>();
+        queue.add(error);
+        while (!queue.isEmpty() && seen.size() < 32) {
+            Throwable cur = queue.poll();
+            if (cur == null || !seen.add(cur)) {
+                continue;
+            }
+            String msg = cur.getMessage();
+            if (msg != null) {
+                String lower = msg.toLowerCase();
+                if (msg.contains("429") || lower.contains("rate limit") || lower.contains("quota")
+                    || lower.contains("token plan") || msg.contains("用量上限")) {
+                    return true;
+                }
+            }
+            if (cur.getCause() != null) {
+                queue.add(cur.getCause());
+            }
+            for (Throwable sup : cur.getSuppressed()) {
+                queue.add(sup);
+            }
+        }
+        return false;
     }
 
     /**

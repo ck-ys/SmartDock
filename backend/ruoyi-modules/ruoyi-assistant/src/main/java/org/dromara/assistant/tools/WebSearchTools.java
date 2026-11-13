@@ -67,7 +67,8 @@ public class WebSearchTools {
      * 避免「没配也能搜」与账单串户。默认租户自身同样按本租户 key 解析。</p>
      */
     private String resolveSearchKey(String tenantId) {
-        String key = org.dromara.common.tenant.helper.TenantHelper.dynamic(
+        // 2026-11-11 STEP02：走先存后还的包装——裸 dynamic 在登录线程上会删掉「切换单位」持久态
+        String key = org.dromara.assistant.core.AssistantTenantScope.call(
             tenantId, () -> configService.getConfigValue(CONFIG_KEY));
         String keyTrim = key == null ? "" : key.trim();
         return isUsableKey(keyTrim) ? keyTrim : "";
@@ -98,8 +99,9 @@ public class WebSearchTools {
             // 无 Spring 上下文
         }
         try {
+            // 2026-11-11 STEP02：同 resolveSearchKey，切租户读 key 必须把「切换单位」态还回去
             String key = tenantEnabled
-                ? org.dromara.common.tenant.helper.TenantHelper.dynamic(
+                ? org.dromara.assistant.core.AssistantTenantScope.call(
                     tenantId, () -> configService.getConfigValue(CONFIG_KEY))
                 : configService.getConfigValue(CONFIG_KEY);
             return key == null ? "" : key.trim();

@@ -142,8 +142,10 @@ public class AssistantAdmissionGate {
      */
     private int readLimit(String key, String tenantId, int defaultValue) {
         try {
+            // 2026-11-11 STEP02：准入闸在请求链上跑，裸 dynamic 会删掉超管「切换单位」持久态
             Integer value = tenantId == null ? null
-                : TenantHelper.dynamic(tenantId, () -> configService.getConfigInt(key));
+                : org.dromara.assistant.core.AssistantTenantScope.call(
+                    tenantId, () -> configService.getConfigInt(key));
             if (value == null) {
                 value = TenantHelper.ignore(() -> configService.getConfigInt(key));
             }
