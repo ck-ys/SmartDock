@@ -248,8 +248,33 @@ public class AssistantMemoryService {
             return (DigestResult) cached[1];
         }
         DigestResult result = buildDigest(tenantId, userId, question);
+        if (result != null) {
+            touchQuietly(tenantId, userId, result.ids());
+        }
         digestCache.put(key, new Object[]{now + DIGEST_TTL_MS, result});
         return result;
+    }
+
+    /** 只读摘要（批A三审 P1）：/status/context 等读接口专用——不回写 last_used_at，
+     *  不污染题10 的 90 天归档判据；也不走缓存（读接口低频，直接算）。
+     *  2026-11-15 三审席1/席3 P1：带本轮最后一条用户提问——与注入路径同口径打分，
+     *  不相关时同样返回 null（面板据此显示「本轮没注入记忆」，而不是记忆库总量）。 */
+    public DigestResult digestReadOnly(String tenantId, Long userId, String question) {
+        return buildDigest(tenantId, userId, question);
+    }
+
+    /** 无问题上下文版（旧调用面保留；/status/context 已改用带 question 的重载） */
+    public DigestResult digestReadOnly(String tenantId, Long userId) {
+        return buildDigest(tenantId, userId, null);
+    }
+
+    private void touchQuietly(String tenantId, Long userId, List<Long> ids) {
+        try {
+            memoryMapper.touchUsed(tenantId, userId, ids, new Date());
+        } catch (RuntimeException e) {
+            // 回写失败不影响注入（归档判据退化为「一直未使用」，不会误删）
+            log.warn("[AssistantMemory] last_used_at 回写失败: {}", e.getMessage());
+        }
     }
 
     /** 兼容旧签名（无问题上下文=全量按新→旧取，行为同升级前，仅用于无法拿到问题的路径） */
@@ -297,17 +322,7 @@ public class AssistantMemoryService {
             contents.add(r.getContent());
             rankedIds.add(r.getId());
         }
-        DigestResult built = joinWithBudget(contents, rankedIds, MAX_DIGEST_CHARS);
-        if (built == null) {
-            return null;
-        }
-        try {
-            memoryMapper.touchUsed(tenantId, userId, built.ids(), new Date());
-        } catch (RuntimeException e) {
-            // 回写失败不影响注入（归档判据退化为「一直未使用」，不会误删）
-            log.warn("[AssistantMemory] last_used_at 回写失败: {}", e.getMessage());
-        }
-        return built;
+        return joinWithBudget(contents, rankedIds, MAX_DIGEST_CHARS);
     }
 
     /**

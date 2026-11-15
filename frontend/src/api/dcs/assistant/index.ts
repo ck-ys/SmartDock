@@ -99,6 +99,38 @@ export function getAssistantStatus(threadId?: string) {
   });
 }
 
+/** 批 A Q6（2026-11-14 拍板案1）：本会话上下文构成——七桶占比（估算，0 桶后端已剔除不下发）
+ *  + 总量/窗口（真值）。buckets 降序；系统提示词桶带逐段 subs；method 供脚注展示。 */
+export interface ContextBreakdownSub {
+  name: string;
+  pct: number;
+}
+
+export interface ContextBreakdownBucket {
+  key: string;
+  label: string;
+  /** 2026-11-15 Q6 框架板 Q3=2：段内字符数（客观量）；pct 由它折算，界面标「估算」 */
+  chars: number;
+  pct: number;
+  lowConfidence: boolean;
+  subs?: ContextBreakdownSub[] | null;
+}
+
+export interface ContextBreakdown {
+  totalTokens?: number | null;
+  windowTokens?: number | null;
+  method: string;
+  buckets: ContextBreakdownBucket[];
+}
+
+export function getAssistantContextBreakdown(threadId: string) {
+  return request<ContextBreakdown>({
+    url: '/dcs/assistant/status/context',
+    method: 'get',
+    params: { threadId },
+    headers: threadHeaders(threadId)
+  });
+}
 /** 业务反馈批1015b Q14：联网搜索配置读（密钥只出掩码；含平台默认开关状态） */
 export function getWebsearchInfo() {
   return request<{ configured: boolean; maskedKey: string; configKey: string }>({

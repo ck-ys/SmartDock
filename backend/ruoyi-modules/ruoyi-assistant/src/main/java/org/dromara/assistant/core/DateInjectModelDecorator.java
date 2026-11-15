@@ -42,13 +42,21 @@ public class DateInjectModelDecorator implements Model {
 
     @Override
     public Flux<ChatResponse> stream(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {
-        LocalDate today = LocalDate.now();
-        String dateMsg = "今天是 " + today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-            + " 星期" + WEEK_CN[today.getDayOfWeek().getValue() - 1]
-            + "（用户问「今天/本周/还剩几天」时以此为基准；涉及业务数据仍以工具返回的 asOf 为准）";
+        String dateMsg = dateSegmentText();
         List<Msg> withDate = new ArrayList<>(messages);
         withDate.add(Msg.builder().role(MsgRole.SYSTEM).textContent(dateMsg).build());
         return delegate.stream(withDate, tools, options);
+    }
+
+    /**
+     * 批 A Q6（2026-11-14）：日期段正文抽成静态方法——状态接口的「其他」桶复用同一份文本
+     * （单一真相，长度随当天日期变化 ±2 字符）。
+     */
+    public static String dateSegmentText() {
+        LocalDate today = LocalDate.now();
+        return "今天是 " + today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+            + " 星期" + WEEK_CN[today.getDayOfWeek().getValue() - 1]
+            + "（用户问「今天/本周/还剩几天」时以此为基准；涉及业务数据仍以工具返回的 asOf 为准）";
     }
 
     @Override

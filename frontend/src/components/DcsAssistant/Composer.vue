@@ -189,11 +189,15 @@
              超 75% 橙 → 超 90% 红）；额度不抢环色，剩<20%/用完只在环角亮哨兵点；
              悬停/点击出同款双段卡（触屏可点）；新会话无 token 记录=空环待测 -->
         <button
+          ref="ctxRingEl"
           class="btool ring-btn"
           :class="{ 'ctx-open': ringCardOpen }"
           :aria-label="ringAria"
+          :aria-expanded="ringCardOpen"
           title="会话状态（悬停或点击看明细）"
           @click="toggleRingCard"
+          @mouseenter="primeCtxBreakdown"
+          @focusin="primeCtxBreakdown"
         >
           <span class="ringwrap">
             <svg class="cring" viewBox="0 0 24 24" aria-hidden="true">
@@ -202,27 +206,43 @@
             </svg>
             <span v-if="quotaBadge" class="qdot" :class="quotaBadge" />
           </span>
-          <!-- 业务批7 Q15（2026-10-14 拍板方案A）：回原尺寸+纯进度条——每行=标签+条+值，
-               长解释/恢复时间全部进 title hover；订阅租户积分区=三行微条 5小时窗→周池→加油包（有余额才显示） -->
-          <span ref="ctxPopEl" class="ctxpop">
-            <b>会话状态</b>
-            <!-- Q1 甲（2026-11-09 拍板，三段分层）：① 上下文=大百分比+条+数字；
-                 ② 额度=微条；③ 底部小字=联网/缓存。信息一个没少，眼睛有了落点。
-                 Q2 甲：首轮没真值先给估算（标「约/估算」）；Q4 甲：自动触发线只留条上那道刻度 -->
-            <span class="ctxhero" :title="ctxHeroTitle">
-              <span class="ctxpct">
-                {{ ctxShown ? Math.round(ctxPct * 100) + '%' : '待测' }}
-                <i v-if="ctxIsEstimate" class="ctxest">估算</i>
+          <!-- 批 A Q6（2026-11-14 拍板案1）：状态浮层照 ZCode 重做——上半=上下文构成
+               （顶部容量行：真值 x/y·pct；堆叠条：整条=窗口、填充=已用、填充内色块=构成；
+               每桶一行=分类色点 + 名称 + 估算占比，0 桶不出现），
+               下半=余额（说「剩」、三行统一低饱和绿、重置时间挪进行内）+ 缓存（≥78% 才显）。
+               2026-11-15 用户两条反馈：逐段子列表整块不要（ZCode/WorkBuddy 都只有桶行）；
+               配色照参照改成彩色分类点 + 同色分段条，不再用灰墨。 -->
+          <span ref="ctxPopEl" class="ctxpop" :class="{ up: ctxPopUp }">
+            <span class="ctx-top">
+              <b>上下文</b>
+              <span class="ctx-cap" :title="ctxHeroTitle">
+                <template v-if="ctxShown"
+                  >{{ ctxIsEstimate ? '约 ' : '' }}{{ fmtNum(ctxShownTokens) }} / {{ fmtNum(ctxWindowDisplay) }} ·
+                  {{ Math.round(ctxPct * 100) }}%</template
+                >
+                <template v-else>待测</template>
               </span>
-              <span class="cbar ctxbar-tick">
-                <i :style="ctxBarStyle" />
-                <b v-if="ctxTriggerPct !== null" :style="{ left: ctxTriggerPct * 100 + '%' }" />
-              </span>
-              <span v-if="ctxShown" class="ctxnums">
-                {{ ctxIsEstimate ? '约 ' : '' }}{{ fmtNum(ctxShownTokens) }} / {{ fmtNum(ctxWindowDisplay) }}{{ ctxWindowUnknown ? '（未配置，按 20 万算）' : '' }}
-              </span>
-              <span v-else class="ctxnums">{{ ctxEmptyHint }}</span>
             </span>
+            <!-- 2026-11-15 三审席2 P1：分母兜底不能装成真值——窗口未配置时原先的
+                 「（未配置，按 20 万算）」被删，读者会把 20 万当管理员配置。恢复成独立一行，
+                 不跟容量行挤（300px 卡片里容量行已经快满）。 -->
+            <span v-if="ctxShown && ctxWindowUnknown" class="ctx-fb">模型窗口未配置，分母按 20 万算</span>
+            <span v-if="ctxShown && ctxStackSegments.length" class="cstack" aria-hidden="true" :title="`整条=上下文窗口 · 填充=已用（${Math.round(ctxPct * 100)}%）· 填充里的色块=构成（估算）`">
+              <i v-for="(s, i) in ctxStackSegments" :key="i" :style="s" />
+            </span>
+            <template v-if="(ctxBreakdown?.buckets?.length ?? 0) > 0">
+              <span
+                v-for="(b, i) in ctxBreakdown!.buckets"
+                :key="b.key"
+                class="ctx-bucket"
+                @click.stop
+              >
+                <i class="dot" :style="{ background: bucketColor(i) }" />
+                <span class="bn">{{ b.label }}</span>
+                <span class="bp">约 {{ b.pct }}%</span>
+              </span>
+            </template>
+            <span v-else class="ctxsub">{{ ctxEmptyHint }}</span>
             <span class="ctxdiv" />
             <template v-if="billingMode === 'credits'">
               <!-- 业务批(1015) Q8：常显消费方式徽标——演示/实测"池子不动"的困惑根因=不知这轮扣哪本账 -->
@@ -230,9 +250,8 @@
                 <span class="cl">消费方式</span>
                 <span class="ctx-tag tag-credit">积分订阅</span>
               </span>
-              <!-- 业务反馈批1015b Q11（用户拍板"尽量简洁"）：撤「本周积分」文本行——周池微条已是
-                   同一口径（悬停有精确值），纯冗余；明细入口挪进周池行 title 提示去积分套餐页 -->
-              <!-- Q15 方案A：三行微条——名字+6px条+%；精确值/恢复时间进 title hover -->
+              <!-- Q6 案1（2026-11-14）：三行微条改「剩」口径——三行统一低饱和绿（告急转赭），
+                   重置时间从 hover 挪进行内（.mreset 一行说清两本账怎么回） -->
               <span v-if="creditSummary" class="mbrows">
                 <span
                   class="mbrow"
@@ -240,8 +259,8 @@
                   :title="`近 5 小时滑动窗口：剩 ${fmtCredit(creditWindowLeft)} / ${fmtCredit(creditSummary.windowCap)} · 早期消耗随时间移出窗口自动回额（防刷护栏）`"
                 >
                   <span class="mn">5小时窗</span>
-                  <span class="mtrack"><i :style="{ width: creditWindowLeftPct + '%', background: 'var(--el-color-primary)' }" /></span>
-                  <span class="mv">{{ creditWindowLeftPct }}%</span>
+                  <span class="mtrack"><i :style="{ width: creditWindowLeftPct + '%' }" /></span>
+                  <span class="mv"><span class="ml">剩</span><span class="mvn">{{ creditWindowLeftPct }}%</span></span>
                 </span>
                 <span
                   class="mbrow"
@@ -249,8 +268,8 @@
                   :title="`本周积分池：剩 ${fmtCredit(creditWeeklyLeft)} / ${fmtCredit(creditSummary.weeklyCap)} · 每周一 0 点整池恢复 · 明细见「租户管理 → 积分套餐」`"
                 >
                   <span class="mn">周池</span>
-                  <span class="mtrack"><i :style="{ width: creditWeeklyLeftPct + '%', background: 'var(--el-color-success)' }" /></span>
-                  <span class="mv">{{ creditWeeklyLeftPct }}%</span>
+                  <span class="mtrack"><i :style="{ width: creditWeeklyLeftPct + '%' }" /></span>
+                  <span class="mv"><span class="ml">剩</span><span class="mvn">{{ creditWeeklyLeftPct }}%</span></span>
                 </span>
                 <span
                   v-if="creditTankShow"
@@ -258,9 +277,10 @@
                   :title="`管理员追加的加油包余额：剩 ${fmtCredit(creditSummary?.tankBalance)} · 用完即止不恢复`"
                 >
                   <span class="mn">加油包</span>
-                  <span class="mtrack"><i :style="{ width: '100%', background: 'var(--el-color-warning)' }" /></span>
+                  <span class="mtrack"><i style="width: 100%" /></span>
                   <span class="mv">{{ fmtCredit(creditSummary?.tankBalance ?? 0) }}</span>
                 </span>
+                <span class="mreset">5 小时窗滑动回额 · 周池每周一 0 点恢复</span>
               </span>
               <!-- dsflash P2-3：summary 未就绪时微条整组不渲染，避免 0 值误报「已用完」 -->
               <span v-else class="ctxsub">三本账待测</span>
@@ -278,8 +298,7 @@
               </span>
             </template>
             <span class="ctxdiv" />
-            <!-- Q1 甲第三层（2026-11-09 拍板）：联网/缓存缩成一行小字——偶尔才看的数
-                 不该跟上下文抢同样的份量；精确说明全进 title hover。 -->
+            <!-- Q6 案1 底部小字：联网 · 缓存（≥78% 才显，ZCode 同款门槛） · 消费方式 · 「占比为估算」常驻 -->
             <span class="ctxfoot">
               <span
                 :class="{ 'web-out': webOn && !webDisabled && webLeft <= 0 }"
@@ -287,13 +306,15 @@
               >
                 联网 {{ webUsed }}/{{ webLimit }}{{ webDisabled ? '（未开放）' : '' }}
               </span>
+              <template v-if="ctxCachePct !== null">
+                <span class="fs">·</span>
+                <span title="缓存命中：模型不用重读前文的重复部分，直接用缓存结果——更快更省。这里显示今日平均（样本不足时退回本会话值），≥78% 才显示，低于门槛不占位。">缓存 {{ ctxCachePct }}%</span>
+              </template>
               <span class="fs">·</span>
-              <span
-                title="缓存命中：模型不用重读前文的重复部分，直接用缓存结果——更快更省（缓存价约为原价一折）。这里显示今日平均（今天聊得还少时显示 —）。什么时候会掉：新会话第一轮必不命中；会话中途开联网、换模型会让缓存重新预热。聊天场景普遍在 5~8 成，属健康区间，编码工具的 9 成以上学不来（场景不同）。"
-                >缓存 {{ cacheHitText }}</span
-              >
-              <!-- ckys3 题2 补拍（2026-11-12 用户裁决「已自动压缩去掉」）：压缩账单段整段撤——
-                   ZCode 同位置（工具条+悬停面板）无任何压缩读数，压缩只在消息流分隔条出现 -->
+              <span v-if="billingMode === 'credits'">积分订阅</span>
+              <span v-else>钱包按量</span>
+              <span class="fs">·</span>
+              <span title="段内字符数占比（本地口径，非账单真值）——只回答「这轮大概花在哪」，不与账单对账">段内字符数 · 占比为估算</span>
             </span>
           </span>
         </button>
@@ -513,8 +534,16 @@
  * +自主权档位按钮（题9）+思考三档（forwardedProps 透传）+发送键状态机（dim/橙+角标/title 三态）+占位轮换（身份词典 5s）
  * +/命令与@引用 cmdPop（↑↓EnterEsc）+ArrowUp 召回上一问+IME 守卫+拖文件虚线高亮。
  */
-import { getAssistantStatus, getAssistantModelChoice, getAssistantSkillCatalog, type AssistantModelChoice } from '@/api/dcs/assistant';
+import {
+  getAssistantStatus,
+  getAssistantContextBreakdown,
+  getAssistantModelChoice,
+  getAssistantSkillCatalog,
+  type AssistantModelChoice,
+  type ContextBreakdown
+} from '@/api/dcs/assistant';
 import { getMyCreditSummary, type CreditSummaryVO } from '@/api/dcs/ai-credit';
+import { useMutationObserver } from '@vueuse/core';
 import { checkPermi } from '@/utils/permission';
 import { readWebOn, writeWebOn, webOnKey } from './webOnState';
 import { skillCatalog, applyRemoteCatalog, readSkillId, writeSkillId, isSkillKey } from './skillState';
@@ -1062,11 +1091,6 @@ const ctxTrigger = computed(() => {
   const reserve = Math.min(maxOut > 0 ? maxOut : 32000, 21000);
   return Math.max(4000, win - reserve - 13000);
 });
-/** 触发线在窗口里的大致位置（进度条刻度） */
-const ctxTriggerPct = computed(() => {
-  const w = ctxWindowDisplay.value;
-  return w > 0 ? Math.min(1, ctxTrigger.value / w) : null;
-});
 /** 离自动压缩还有多远（环色只用它：>75% 橙 / >90% 红）——估算值也参与，首轮环就该有颜色 */
 const ctxNearPct = computed(() => {
   if (!ctxShown.value) {
@@ -1086,7 +1110,6 @@ const ringFgStyle = computed(() => ({
   strokeDashoffset: String(56.5 * (1 - ctxPct.value)),
   stroke: ctxShown.value ? ringColor.value : 'transparent'
 }));
-const ctxBarStyle = computed(() => ({ width: ctxPct.value * 100 + '%', background: ringColor.value }));
 /** 额度哨兵点（不抢环色）：剩 <20% 橙 / 用完红（横幅照旧由抽屉弹）；
  *  业务批7 Q1：订阅租户回合不限次（used/limit 恒 100 万无意义），哨兵点改看积分余量 */
 const quotaBadge = computed(() => {
@@ -1125,7 +1148,130 @@ const ringAria = computed(() => {
 });
 /** 点击=悬停同款卡（细则④：触屏无 hover 也能看） */
 const ringCardOpen = ref(false);
+
+/* ---- 批 A Q6（2026-11-14 拍板案1）：上下文构成——七桶占比全部为估算（行内「约」+脚注常驻），
+       0 桶后端已剔除；2026-11-15 按用户对质参照删掉逐段子列表（ZCode/WorkBuddy 只有桶行），
+       后端 subs/lowConfidence 字段保留、前端不再渲染；拉不到=只显示容量行不显示构成段。 */
+const ctxBreakdown = ref<ContextBreakdown | null>(null);
+/* 拉取失败标记（三审席2 E-1）：失败 ≠ 空会话——不能对已有轮次的会话说「这一轮还没开始」。 */
+const ctxBreakdownFailed = ref(false);
+/* 构成分类色（2026-11-15 拍板 Q1-3）：五彩加深一档——白底对比全部 ≥3.1、两两差异 ≥24；
+   2026-11-15 七段+记忆单列后最多 7 行，再补橄榄绿/青/石板灰三色（同一门槛：
+   白底对比 ≥3.09、与既有五色最小差异 ≥24；第 8 色为将来 MCP 段预留）。按桶序依次发色，
+   第 8 桶以后沿用末色。 */
+const CTX_BUCKET_COLORS = ['#7c3aed', '#0f9d8a', '#d97706', '#3b82f6', '#db2777', '#65a30d', '#0891b2', '#64748b'];
+/** 暗底（#131416）上同色相提亮一档：对比 ≥6.7、两两差异 ≥24，明暗两档都能分清 */
+const CTX_BUCKET_COLORS_DARK = ['#a78bfa', '#2ec4b6', '#f4b545', '#6ea0ff', '#f472b6', '#a3c94a', '#38bdf8', '#94a3b8'];
+const htmlDark = ref(typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+if (typeof document !== 'undefined') {
+  // html.dark 由 theme.ts 搬类名（不触发渲染）——挂成响应式，切明暗时构成条/色点即时换色板
+  useMutationObserver(
+    document.documentElement,
+    () => { htmlDark.value = document.documentElement.classList.contains('dark'); },
+    { attributes: true, attributeFilter: ['class'] }
+  );
+}
+function bucketColor(i: number) {
+  const arr = htmlDark.value ? CTX_BUCKET_COLORS_DARK : CTX_BUCKET_COLORS;
+  return arr[Math.min(i, arr.length - 1)];
+}
+/* 堆叠条三层：整条=窗口（浅底）、填充=已用、填充里的色块=构成（宽=该桶 pct × 已用宽）。
+   2026-11-15 用户「进度条怪异」：用量很小时（<10%），五段构成色只剩 1px 发丝、读起来像
+   渲染故障——低用量改用首桶色整段铺满，用量够了再按桶分段显示。 */
+const ctxStackSegments = computed(() => {
+  const bs = ctxBreakdown.value?.buckets ?? [];
+  if (!bs.length || !ctxShown.value) {
+    return [];
+  }
+  const usedPct = Math.min(100, Math.round(ctxPct.value * 100));
+  // 2026-11-15 三审席2 C-1：门槛用原始占比判（<10%），先舍入再比会把 9.5%~9.9% 漏进多段，
+  // 小桶仍被挤成半像素发丝——正是本段注释要修的现象。
+  if (ctxPct.value < 0.1) {
+    return [{ width: usedPct.toFixed(2) + '%', background: bucketColor(0) }];
+  }
+  // 2026-11-15 三审席3 P2-4：段宽用原始 chars 求和，不用显示用的 0.1 精度 pct——
+  // 七段各自舍入后相加可能偏离 100%，色块与行内「约 x%」对不上；占比列仍按 pct 显示。
+  const totalChars = bs.reduce((n, b) => n + (b.chars > 0 ? b.chars : 0), 0);
+  if (totalChars <= 0) {
+    return [{ width: usedPct.toFixed(2) + '%', background: bucketColor(0) }];
+  }
+  return bs.map((b, i) => ({
+    width: ((b.chars / totalChars) * usedPct).toFixed(2) + '%',
+    background: bucketColor(i)
+  }));
+});
+/* 缓存行门槛（ZCode 同款）：≥78% 才显示，低于门槛整段不占位；口径同 cacheHitText——今日平均优先、本会话兜底 */
+const ctxCachePct = computed<number | null>(() => {
+  const v = cacheHitRateToday.value ?? sessionCacheHitRate.value;
+  return typeof v === 'number' && v >= 78 ? Math.round(v * 10) / 10 : null;
+});
+/* 方向自适应（实测坐实两布局）：标题页输入框在页面中部，向下弹才不压 H1（板上病根）；
+   会话页输入框沉底，向下弹 84% 掉出屏幕（修后取证 top845/bottom1162@900 视口）——
+   而会话页没有 H1 可压，向上弹正合适。谁够用用谁，都不够选宽的一侧。 */
+const ctxPopUp = ref(false);
+function syncCtxPopDir() {
+  // 2026-11-15 实测坐实：原写法从弹层 ref 往上找按钮，弹层没打开时 ref 为 null →
+  // 方向永远沿用上一次的值（进门页也会向上弹）。改成直接量按钮自身。
+  const btn = ctxRingEl.value;
+  if (!btn) {
+    return;
+  }
+  const r = btn.getBoundingClientRect();
+  const below = window.innerHeight - r.bottom - 8;
+  const above = r.top - 8;
+  const need = 390; // 实测满配 339px（七段+记忆单列后最多再加一行 ≈363），留余量
+  ctxPopUp.value = below >= need ? false : above >= need ? true : above > below;
+}
+/* 悬停也开浮层（纯 CSS），mouseenter 先行拉数；点击常开态再触发也无妨（有缓存守卫） */
+const ctxPrimeLoading = ref(false);
+function primeCtxBreakdown() {
+  syncCtxPopDir();
+  if (ctxBreakdown.value || ctxPrimeLoading.value || !props.state.threadId) {
+    return;
+  }
+  const tid = props.state.threadId;
+  ctxPrimeLoading.value = true;
+  ctxBreakdownFailed.value = false;
+  getAssistantContextBreakdown(tid)
+    .finally(() => { ctxPrimeLoading.value = false; })
+    .then((res: unknown) => {
+      if (props.state.threadId !== tid) {
+        return; // 拉取期间换了会话：丢给旧会话的数据不要
+      }
+      ctxBreakdown.value = (res as { data?: ContextBreakdown })?.data ?? (res as ContextBreakdown) ?? null;
+    })
+    .catch(() => {
+      // 拉不到=只显示容量行与余额段；标记失败让空态文案说真话（不是「还没开始」）
+      if (props.state.threadId === tid) {
+        ctxBreakdownFailed.value = true;
+      }
+    });
+}
+watch(ringCardOpen, (open) => {
+  if (open) {
+    syncCtxPopDir();
+    primeCtxBreakdown();
+  }
+});
+/** 2026-11-15 三审席2 P1：构成是「这一轮大概花在哪」的快照，答完一轮必须作废——
+ *  否则容量行每轮换真值、桶行还停在第一次打开时的旧比例（会话越长偏差越大）。
+ *  常开态立即重拉；没开就等下次悬停/点击再拉（缓存守卫认 null）。 */
+function invalidateCtxBreakdown() {
+  ctxBreakdown.value = null;
+  ctxBreakdownFailed.value = false;
+  if (ringCardOpen.value) {
+    primeCtxBreakdown();
+  }
+}
+/* 换会话=另一份构成，旧数据清掉待重拉 */
+watch(
+  () => props.state.threadId,
+  () => {
+    ctxBreakdown.value = null;
+  }
+);
 const ctxPopEl = ref<HTMLElement | null>(null);
+const ctxRingEl = ref<HTMLElement | null>(null);
 function toggleRingCard() {
   ringCardOpen.value = !ringCardOpen.value;
   if (ringCardOpen.value) {
@@ -1159,9 +1305,13 @@ function fmtNum(n?: number | null): string {
 /** 空态文案双分支（step5 P2-1）：缺分母（模型窗口未知）≠ 缺分子（会话无记录），
  *  老会话（改造前历史行无 tokens）与未配置窗口各自归因，不再一律「没有 token 记录」误导 */
 const ctxEmptyHint = computed(() =>
-  (ctxWindow.value ?? 0) <= 0 ? '模型上下文窗口未知（待管理员在模型配置补全后可测量）' : '这一轮还没开始（发一句话就有数：先估算，答完换成真值）'
+  ctxBreakdownFailed.value
+    ? '构成暂时取不到（容量与余额照常显示）· 再开一次试试'
+    : (ctxWindow.value ?? 0) <= 0
+      ? '模型上下文窗口未知（待管理员在模型配置补全后可测量）'
+      : '这一轮还没开始（发一句话就有数：先估算，答完换成真值）'
 );
-/** 上下文块标题（Q4 甲 2026-11-09）：触发线不再当数字摆出来，只在 hover 里说明「条上竖线是什么」 */
+/** 上下文块标题（Q4 甲 2026-11-09）：触发线不再当数字摆出来——刻度元素本批已删，标题只讲环色 */
 const ctxHeroTitle = computed(() => {
   if (!ctxShown.value) {
     return ctxEmptyHint.value;
@@ -1169,7 +1319,7 @@ const ctxHeroTitle = computed(() => {
   const head = ctxIsEstimate.value
     ? `本会话上下文估算 ${fmtNum(ctxShownTokens.value)} / ${fmtNum(ctxWindowDisplay.value)} tokens（首轮还没落库，答完换真值）`
     : `本会话上下文占用 ${fmtNum(ctxShownTokens.value)} / ${fmtNum(ctxWindowDisplay.value)} tokens`;
-  return `${head} · 条上竖线=自动压缩位置 · 环变橙=接近压缩线 · 变红=即将压缩`;
+  return `${head} · 环变橙=接近压缩线 · 变红=即将压缩`;
 });
 
 /* ---- 题10 案1（2026-10-31）：联网搜索默认自动（模型判断搜不搜）+ 可停用 + 配额展示 ---- */
@@ -1189,11 +1339,6 @@ const sessionCacheHitRate = ref<number | null>(null);
 const sessionCacheHitRequests = ref(0);
 /** 业务反馈批1015b Q11：今日平均缓存命中率（后端 LiteLLM 口径，样本<3 为 null） */
 const cacheHitRateToday = ref<number | null>(null);
-const cacheHitText = computed(() => {
-  // 主口径=今日平均；今日样本不足时退回本会话值（聊过才有的看，总好过恒 —）
-  const v = cacheHitRateToday.value ?? sessionCacheHitRate.value;
-  return v == null ? '—' : `${v}%`;
-});
 const webLeft = computed(() => Math.max(0, webLimit.value - webUsed.value));
 /** 租户把联网额度关到 0（m3 二轮 P1）：「未开放」≠「当日用完」——文案/红色状态条都不得承诺明早恢复 */
 const webDisabled = computed(() => webLimit.value <= 0);
@@ -1450,6 +1595,7 @@ watch(
   (v, old) => {
     if (old && !v && amActive()) {
       refreshStatus();
+      invalidateCtxBreakdown();
       // 业务批7 Q10：答完随状态一起重拉模型选择——管理端改默认模型后，输入条显示不再
       // 要整页强刷才更新（modelChoice 原本只在挂载/抽屉重开时拉取）
       void refreshChoice();
@@ -1464,6 +1610,7 @@ watch(
         ringRefetchTimer = null;
         if (amActive()) {
           void refreshStatus();
+          invalidateCtxBreakdown();
         }
       }, 1800);
     }
@@ -3013,17 +3160,27 @@ html.dark .brow .btool.bicon.wbtn.on {
     .ctxpop {
       display: none;
       position: absolute;
-      bottom: calc(100% + 10px);
+      /* 批A Q6：改向下弹（旧向上弹压标题行，修前取证 intersectsH1=true）+ 300px 放七行构成 */
+      top: calc(100% + 8px);
       right: 0;
-      width: 250px;
+      width: 300px;
+      /* 批A Q6 方向自适应：会话页输入框沉底、下方放不下时向上弹（会话页无 H1 可压） */
+      &.up {
+        top: auto;
+        bottom: calc(100% + 8px);
+      }
       padding: 11px 13px;
       border-radius: 10px;
       background: var(--el-bg-color-overlay);
       border: 1px solid var(--dcs-border-color-lighter);
-      box-shadow: 0 6px 24px rgba(16, 24, 40, 0.08);
+      box-shadow: 0 6px 24px rgb(16 24 40 / 10%);
       flex-direction: column;
       gap: 5px;
       white-space: normal;
+      /* 2026-11-15 用户实拍「行名和色点分家」：弹层是圆环 <button> 的子节点，
+         UA 的 button{text-align:center} 被整卡继承（.bn flex:1 于是居中、52px 列里的
+         「周池」也被居中顶偏）。弹层内一律左对齐，只让 .mv 等显式右对齐的规则生效。 */
+      text-align: left;
       z-index: 20;
       cursor: default;
 
@@ -3031,74 +3188,75 @@ html.dark .brow .btool.bicon.wbtn.on {
         font-size: 12px;
         font-weight: 600;
         color: var(--dcs-text-primary);
-        margin-bottom: 7px;
+        margin-bottom: 0;
       }
-      /* Q1 甲 三段卡（2026-11-09 拍板）：① 上下文——大百分比 + 条 + 数字，一眼有落点。
-         百分比=已用/窗口（ZCode 同口径）；条上竖线=自动压缩位置（Q4 甲：不再念触发线数字） */
-      .ctxhero {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-areas:
-          'pct bar'
-          'nums nums';
-        align-items: center;
-        column-gap: 9px;
-        row-gap: 5px;
+      /* ---- 批 A Q6（2026-11-14 拍板案1）：上半=上下文构成 ---- */
+      .ctx-top {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
 
-        .ctxpct {
-          grid-area: pct;
-          font-size: 20px;
+        b {
+          font-size: 12px;
           font-weight: 600;
-          line-height: 1.1;
           color: var(--dcs-text-primary);
+        }
+        .ctx-cap {
+          font-size: 11px;
+          color: var(--dcs-text-placeholder);
           font-variant-numeric: tabular-nums;
           white-space: nowrap;
-
-          /* Q2 甲的「约」标记：估算不是真值，必须自己说出来 */
-          .ctxest {
-            margin-left: 4px;
-            padding: 0 5px;
-            font-size: 10px;
-            font-style: normal;
-            font-weight: 500;
-            color: var(--el-color-warning);
-            border: 1px solid var(--el-color-warning-light-5, #f3d19e);
-            border-radius: 999px;
-            vertical-align: 3px;
-          }
         }
-        .cbar {
-          grid-area: bar;
-          position: relative;
-          height: 6px;
-          border-radius: 3px;
-          background: var(--el-fill-color-light);
-          overflow: hidden;
+      }
+      /* 窗口未配置时的一行小字（兜底分母不能装成真值，见模板注释） */
+      .ctx-fb {
+        font-size: 10px;
+        line-height: 1.5;
+        color: var(--dcs-text-placeholder);
+      }
+      /* 堆叠条：整条=窗口（浅底）、填充=已用（分类色块依次铺开）、剩余=浅底。
+         2026-11-15 微调：10px 太厚像药丸，收到 8px（参照 ZCode/WorkBuddy 的细条） */
+      .cstack {
+        display: flex;
+        height: 8px;
+        border-radius: 4px;
+        background: var(--el-fill-color-light);
+        overflow: hidden;
+        margin-bottom: 2px;
 
-          i {
-            display: block;
-            height: 100%;
-            background: var(--el-color-primary);
-          }
-          &.ctxbar-tick b {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            margin-left: -1px;
-            background: var(--dcs-text-secondary, #909399);
-            opacity: 0.85;
-          }
+        i {
+          display: block;
+          height: 100%;
         }
-        .ctxnums {
-          grid-area: nums;
-          font-size: 11px;
-          line-height: 1.4;
+      }
+      .ctx-bucket {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 12px;
+        line-height: 1.6;
+        color: var(--dcs-text-primary);
+
+        .dot {
+          flex: none;
+          width: 8px;
+          height: 8px;
+          border-radius: 2px;
+        }
+        .bn {
+          flex: 1;
+          min-width: 0;
+        }
+        .bp {
+          flex: none;
           color: var(--dcs-text-placeholder);
+          font-variant-numeric: tabular-nums;
         }
       }
       /* Q1 甲 第三层：联网/缓存合成一行小字（偶尔才看的数，不跟上下文抢份量）。
-         三审回修：加 wrap——账单段加入后固定 250px 弹层放不下三段，允许整段换行
+         三审回修：加 wrap——账单段加入后固定 300px 弹层放不下三段，允许整段换行
          （span 为最小单元，不会把「省75%」劈成两半） */
       .ctxfoot {
         display: flex;
@@ -3158,16 +3316,6 @@ html.dark .brow .btool.bicon.wbtn.on {
             height: 100%;
             background: var(--el-color-primary);
           }
-          /* 批A-1 水位三值：自动压缩线刻度（深色细竖线，压到即自动打包） */
-          &.ctxbar-tick b {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            margin-left: -1px;
-            background: var(--dcs-text-secondary, #909399);
-            opacity: 0.85;
-          }
         }
       }
       .ctxsub {
@@ -3184,6 +3332,12 @@ html.dark .brow .btool.bicon.wbtn.on {
         gap: 5px;
         margin: 3px 0 1px;
       }
+      /* 批A Q6：恢复时间从 title 挪进行内——一行小字说清两本账怎么回 */
+      .mreset {
+        font-size: 10px;
+        line-height: 1.5;
+        color: var(--dcs-text-placeholder);
+      }
       .mbrow {
         display: flex;
         align-items: center;
@@ -3198,23 +3352,48 @@ html.dark .brow .btool.bicon.wbtn.on {
         }
         .mtrack {
           flex: 1;
-          height: 6px;
-          border-radius: 3px;
+          height: 4px;
+          border-radius: 2px;
           background: var(--el-fill-color-light);
           overflow: hidden;
 
           i {
             display: block;
             height: 100%;
-            background: var(--el-color-primary);
+            /* 批A Q6：三行统一低饱和绿（板上定量 #2f7a55），不再按池配色 */
+            background: #2f7a55;
           }
+        }
+        &.warn .mtrack i {
+          background: #a8453c;
         }
         .mv {
           flex: none;
-          min-width: 34px;
-          text-align: right;
-          font-weight: 600;
+          /* 2026-11-15 用户实拍「剩 100% 和剩 99% 没对齐」：min-width 会让列宽随文字变，
+             「剩 100%」42px /「剩 99%」36px → 两行左端错位，mtrack 也被挤成一长一短
+             （99% 的条反而更长）。改为固定列宽 + 两段式：「剩」靠左、数字靠右——
+             两行列宽一致 ⇒ 微条等长；「剩」与数字各自对齐，整数位不同也不歪。 */
+          width: 44px;
+          display: flex;
+          justify-content: flex-end;
+          align-items: center;
+          font-variant-numeric: tabular-nums;
+          /* 2026-11-15 微调：600 加粗压过了卡片里的标题级，降到 500；颜色仍用正文色 */
+          font-weight: 500;
           color: var(--dcs-text-primary);
+
+          /* 「剩」固定宽、数字固定占满余量并右对齐——两行左端/右端同时对齐；
+             不用 auto margin / flex:1（实测在该容器里都不吃剩余空间，仍会左右差几像素） */
+          .ml {
+            flex: none;
+            width: 13px;
+          }
+          .mvn {
+            flex: none;
+            width: 31px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+          }
         }
         &.warn .mv,
         &.warn .mn {
