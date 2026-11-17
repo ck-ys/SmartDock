@@ -123,6 +123,14 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- 结构门禁（2026-11-16 拍板 Q2-1）：分层/包卫生的「会失败的检查」，只在测试期生效 -->
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit5</artifactId>
+            <version>1.4.1</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- PostgreSQL 驱动 -->
         <dependency>
             <groupId>org.postgresql</groupId>
