@@ -110,6 +110,17 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 - 新代码用 Jackson（ruoyi-common-json），不用 Fastjson
 - 注释风格：中文 Javadoc，讲"为什么"不讲"是什么"
 
+## 写码红线（2026-11-17，只收「失败是静默错误」的）
+
+来自 p3c 56 条规则 + 手册的逐条实测筛选；排版/命名类一律不收（2026-11-13 命名拍板已管）。
+
+- **`@Transactional` 一律写 `rollbackFor = Exception.class`**：默认只回滚 `RuntimeException`，受检异常会**提交半条数据**。现存 109 处全带（2026-11-17 实测），新代码别破例。
+- **禁 `Executors.new*`**（`newScheduledThreadPool` / `newSingleThreadScheduledExecutor` 除外）：线程池必须 `ThreadPoolExecutor` 显式参数 + **命名 ThreadFactory**；无界队列在任务堆积时不是拒绝而是无限排队，thread dump 里全是 `pool-1-thread-N`。现存违规 1 处：`AssistantAttachmentService.PARSE_EXECUTOR`。
+- **禁 `new BigDecimal(double)`**：二进制误差会让金额对账差一分；用 `new BigDecimal(String)` 或 `BigDecimal.valueOf`。
+- **foreach 里不改被遍历集合**：要删用 `removeIf`，要改先 `new ArrayList<>(src)`；否则运行时 CME。
+- **可空变量别写 `变量.equals("字面量")`**：反过来写 `"字面量".equals(变量)`。现存 3 处待清：`TenantHelper:200`、`AiBillingService:283`、`SvgXssScanner:68`。
+- **`SimpleDateFormat` 不做静态共享字段**：内部 Calendar 非线程安全，并发下会串日期；新代码优先 `DateTimeFormatter`（现存 0 处静态、8 处局部 new，保持现状）。
+
 ## 包卫生与分层门禁（2026-11-17 起强制）
 
 六条规矩跑在 `ruoyi-admin` 的单测里（`org.dromara.test.arch.*`，`@Tag("local")`；`PackageMigrationGuardTest` 是 `@Tag("dev")`，门禁全跑加 `-Dsurefire.groups=local,dev`），**红线是「只减不增」**：
