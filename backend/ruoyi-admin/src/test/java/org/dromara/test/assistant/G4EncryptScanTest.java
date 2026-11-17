@@ -27,7 +27,9 @@ class G4EncryptScanTest {
     @Test
     void encryptScanCoversMcpServerHeadersAndAiConfigApiKey() {
         // 与 application.yml mybatis-plus.typeAliasesPackage 逐字一致
-        String pkgs = "org.dromara.**.domain,com.smartdock.**.domain";
+        // （含批 1 加的 **.domain.** 递归段：EncryptorManager 单星 *.class 不递归子包，
+        //  实体搬进 domain/model 后只有递归段罩得住——批 1 多审席 B P1）
+        String pkgs = "org.dromara.**.domain,com.smartdock.**.domain,org.dromara.**.domain.**,com.smartdock.**.domain.**";
         EncryptorManager m = new EncryptorManager(pkgs);
 
         Set<Field> mcp = m.getFieldCache(DcsMcpServer.class);
@@ -39,6 +41,15 @@ class G4EncryptScanTest {
         assertNotNull(ai, "DcsAiConfig（先例对照）未被加密扫描收进 fieldCache——扫描机制整体回退");
         assertTrue(ai.stream().anyMatch(f -> "apiKey".equals(f.getName())),
             "DcsAiConfig.apiKey 应带 @EncryptField");
+
+        // 批 1 钉：domain/model 子包里的 @EncryptField 实体也必须在缓存里。
+        // 探针类 EncryptScanProbeEntity 只存在于 test classpath（生产无此类）；
+        // 若有人删掉 yml 里的 **.domain.** 递归段，这里立刻红（明文落库隐患回潮）。
+        Set<Field> probe = m.getFieldCache(com.smartdock.assistant.domain.model.EncryptScanProbeEntity.class);
+        assertNotNull(probe, "domain/model 子包实体未被加密扫描覆盖（typeAliasesPackage 缺 **.domain.** 递归段，"
+            + "下一个带 @EncryptField 的实体将明文落库）");
+        assertTrue(probe.stream().anyMatch(f -> "secretField".equals(f.getName())),
+            "探针实体应扫到 secretField（实收：" + probe + "）");
     }
 
     /** 2026-11-02 密钥整改：注解不再写字面量，只写环境变量占位符；

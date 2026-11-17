@@ -1,5 +1,7 @@
 package org.dromara.assistant.controller;
 
+import com.smartdock.assistant.domain.gateway.ToolCatalogGateway;
+import com.smartdock.assistant.service.ToolViewerService;
 import org.dromara.assistant.core.ToolRegistry;
 import org.dromara.assistant.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
@@ -17,7 +19,7 @@ class AssistantToolViewerUnitTest {
     @Test
     @Tag("local")
     void 租户关掉是已停用() {
-        var st = AssistantToolViewerController.deriveStatus(-1, true);
+        var st = ToolViewerService.deriveStatus(-1, true);
         assertThat(st.code()).isEqualTo("off");
         assertThat(st.text()).isEqualTo("已停用");
     }
@@ -25,7 +27,7 @@ class AssistantToolViewerUnitTest {
     @Test
     @Tag("local")
     void 提到管理员档是管理员限定() {
-        var st = AssistantToolViewerController.deriveStatus(ToolIdentity.LEVEL_ADMIN, true);
+        var st = ToolViewerService.deriveStatus(ToolIdentity.LEVEL_ADMIN, true);
         assertThat(st.code()).isEqualTo("admin");
         assertThat(st.text()).isEqualTo("管理员限定");
     }
@@ -33,7 +35,7 @@ class AssistantToolViewerUnitTest {
     @Test
     @Tag("local")
     void 注册闸未开是等租户开启() {
-        var st = AssistantToolViewerController.deriveStatus(ToolIdentity.LEVEL_MEMBER, false);
+        var st = ToolViewerService.deriveStatus(ToolIdentity.LEVEL_MEMBER, false);
         assertThat(st.code()).isEqualTo("waiting");
         assertThat(st.text()).isEqualTo("等租户开启");
     }
@@ -42,7 +44,7 @@ class AssistantToolViewerUnitTest {
     @Tag("local")
     void 管理员档但闸没开仍说等租户开启() {
         // 闸没开时对管理员也不可见，写「管理员限定」会误导
-        var st = AssistantToolViewerController.deriveStatus(ToolIdentity.LEVEL_ADMIN, false);
+        var st = ToolViewerService.deriveStatus(ToolIdentity.LEVEL_ADMIN, false);
         assertThat(st.code()).isEqualTo("waiting");
         assertThat(st.text()).isEqualTo("等租户开启");
     }
@@ -50,7 +52,7 @@ class AssistantToolViewerUnitTest {
     @Test
     @Tag("local")
     void 成员档且闸开是可用() {
-        var st = AssistantToolViewerController.deriveStatus(ToolIdentity.LEVEL_MEMBER, true);
+        var st = ToolViewerService.deriveStatus(ToolIdentity.LEVEL_MEMBER, true);
         assertThat(st.code()).isEqualTo("ready");
         assertThat(st.text()).isEqualTo("可用");
     }
@@ -58,10 +60,10 @@ class AssistantToolViewerUnitTest {
     @Test
     @Tag("local")
     void 谁能用按生效档给四种答案() {
-        assertThat(AssistantToolViewerController.whoCanUse(-1)).isEqualTo("—");
-        assertThat(AssistantToolViewerController.whoCanUse(ToolIdentity.LEVEL_MEMBER)).isEqualTo("成员");
-        assertThat(AssistantToolViewerController.whoCanUse(ToolIdentity.LEVEL_PUBLISHER)).isEqualTo("发布人及以上");
-        assertThat(AssistantToolViewerController.whoCanUse(ToolIdentity.LEVEL_ADMIN)).isEqualTo("管理员");
+        assertThat(ToolViewerService.whoCanUse(-1)).isEqualTo("—");
+        assertThat(ToolViewerService.whoCanUse(ToolIdentity.LEVEL_MEMBER)).isEqualTo("成员");
+        assertThat(ToolViewerService.whoCanUse(ToolIdentity.LEVEL_PUBLISHER)).isEqualTo("发布人及以上");
+        assertThat(ToolViewerService.whoCanUse(ToolIdentity.LEVEL_ADMIN)).isEqualTo("管理员");
     }
 
     @Test
@@ -86,5 +88,14 @@ class AssistantToolViewerUnitTest {
         }
         assertThat(ToolRegistry.TOOL_META.keySet())
             .containsExactlyInAnyOrderElementsOf(firstNameOfSpecs);
+    }
+
+    @Test
+    @Tag("local")
+    void gateway档位常量与ToolIdentity不漂移() {
+        // 2026-11-17 批 1 ④：service 改用 ToolCatalogGateway 的接口常量，这里钉死两处同值
+        assertThat(ToolCatalogGateway.LEVEL_MEMBER).isEqualTo(ToolIdentity.LEVEL_MEMBER);
+        assertThat(ToolCatalogGateway.LEVEL_PUBLISHER).isEqualTo(ToolIdentity.LEVEL_PUBLISHER);
+        assertThat(ToolCatalogGateway.LEVEL_ADMIN).isEqualTo(ToolIdentity.LEVEL_ADMIN);
     }
 }

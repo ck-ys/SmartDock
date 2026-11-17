@@ -166,7 +166,9 @@ mybatis-plus:
   # 对应的 XML 文件位置
   mapperLocations: classpath*:mapper/**/*Mapper.xml
   # 实体扫描，多个package用逗号或者分号分隔
-  typeAliasesPackage: org.dromara.**.domain,com.smartdock.**.domain
+  # 后两条必须保留：EncryptorManager 按「包表达式/*.class」单星扫 @EncryptField（不递归子包），
+  # 实体搬进 domain/model 后只有 **.domain.** 能罩住（批 1 多审席 B P1，G4EncryptScanTest 钉死）
+  typeAliasesPackage: org.dromara.**.domain,com.smartdock.**.domain,org.dromara.**.domain.**,com.smartdock.**.domain.**
   global-config:
     dbConfig:
       # 主键类型

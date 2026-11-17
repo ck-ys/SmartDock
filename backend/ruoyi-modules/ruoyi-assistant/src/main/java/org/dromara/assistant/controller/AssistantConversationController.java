@@ -2,6 +2,9 @@ package org.dromara.assistant.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.smartdock.assistant.service.ConversationResumeService;
+import com.smartdock.assistant.service.ConversationResumeService.ResumeResult;
+import io.agentscope.core.agui.event.AguiEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.assistant.domain.DcsAssistantAction;
@@ -17,6 +20,8 @@ import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.common.web.core.BaseController;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,9 +29,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 助手会话/消息/动作账本端点（批G G2/G3，spec §18）。
@@ -53,8 +63,6 @@ public class AssistantConversationController extends BaseController {
      *  ConversationService↔RunRecorder 循环依赖） */
     private final org.dromara.assistant.persist.AssistantRunRecorder runRecorder;
     private final org.dromara.assistant.mapper.AssistantRunMapper runMapper;
-    /** B 批题5「续看」：进行中 run 事件广播汇 */
-    private final org.dromara.assistant.core.AssistantRunStreamHub runStreamHub;
     /** 题12 案1：结构化反问桥——停止生成时释放该线程挂起卡（工具线程不空等 240s） */
     private final org.dromara.assistant.core.AssistantAskUserBridge askUserBridge;
     /** ②（2026-10-31）：计划卡取消立即解锁——点「取消」当场清闸的信号仓 */
@@ -65,6 +73,8 @@ public class AssistantConversationController extends BaseController {
     private final org.dromara.assistant.limiter.AssistantDailyQuota dailyQuota;
     /** 四审回修（dsflash-P2-7）：直接注入，不再 SpringUtils.getBean + 失败回落钱包 */
     private final org.dromara.assistant.service.AssistantUserQuotaService quotaLookup;
+    /** 2026-11-17 结构治理批 Q5：attach 的「能不能续、拿哪条流」下沉到 Service，SSE 生命周期留本类 */
+    private final ConversationResumeService resumeService;
 
     /** 退款口径（三审回修 dspro-P2-1）：credits 订阅租户建侧 tryTurn 本就跳过，退回合须同口径
      *  跳过（同 AssistantRunRecorder#refundIfWallet）；查不到模式按钱包口径退（fail-open）。 */
@@ -86,34 +96,30 @@ public class AssistantConversationController extends BaseController {
      * <p>回退：run 不在跑/汇已逐出（终局超 5 分钟/进程重启过）→ 返回 JSON 业务错——
      * 前端回退到既有「轮询等终态再重放历史」路径，能力不倒退。保留窗溢出（超长单轮）
      * 时首帧补 dcs-resume-truncated 提示帧（头部内容稍后从历史消息看全文）。</p>
+     *
+     * <p>2026-11-17 结构治理批 Q5：判定与取流下沉 {@link ConversationResumeService}；
+     * SSE 生命周期（停看/超时/订阅）仍在本类，Service 无状态。</p>
      */
     @SaCheckPermission("dcs:assistant:use")
     @PostMapping(value = "/conversation/attach")
-    public org.springframework.http.ResponseEntity<?> attach(@RequestParam String threadId) {
+    public ResponseEntity<?> attach(@RequestParam String threadId) {
         String tenantId = TenantHelper.getTenantId();
         Long userId = LoginHelper.getUserId();
-        java.util.List<org.dromara.assistant.domain.DcsAssistantRun> latest =
-            runMapper.selectByThread(tenantId, threadId, userId, 1);
-        boolean running = !latest.isEmpty() && "RUNNING".equals(latest.get(0).getStatus());
-        if (!running) {
-            return org.springframework.http.ResponseEntity.ok(
-                R.fail("本轮已结束，刷新消息列表即可看到全文"));
+        ResumeResult prep = resumeService.prepare(tenantId, userId, threadId);
+        if (prep instanceof ResumeResult.Failed failed) {
+            return ResponseEntity.ok(R.fail(failed.message()));
         }
-        String runId = latest.get(0).getRunId();
-        var fluxOpt = runStreamHub.attach(runId);
-        if (fluxOpt.isEmpty()) {
-            return org.springframework.http.ResponseEntity.ok(
-                R.fail("本轮不可续看（可能不在当前服务上、服务重启过或已超保留窗），刷新页面后重试"));
-        }
-        final org.dromara.assistant.domain.DcsAssistantRun run = latest.get(0);
-        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
-            new org.springframework.web.servlet.mvc.method.annotation.SseEmitter(0L);
+        return openStream((ResumeResult.Ready) prep, tenantId, userId);
+    }
+
+    /** SSE 生命周期（留在 Controller）：建 emitter、挂停看回调、订阅出网；失败按 200 + R.fail 回退 */
+    private ResponseEntity<?> openStream(ResumeResult.Ready ready, String tenantId, Long userId) {
+        SseEmitter emitter = new SseEmitter(0L);
         // 三审回修（dsflash-P2-4）：原子引用替代裸数组——订阅线程/容器回调线程/控制器线程
         // 三处读写需 happens-before；统一停看入口
-        java.util.concurrent.atomic.AtomicReference<reactor.core.Disposable> watch =
-            new java.util.concurrent.atomic.AtomicReference<>();
+        AtomicReference<Disposable> watch = new AtomicReference<>();
         Runnable stopWatch = () -> {
-            reactor.core.Disposable d = watch.get();
+            Disposable d = watch.get();
             if (d != null) {
                 d.dispose();
             }
@@ -127,42 +133,34 @@ public class AssistantConversationController extends BaseController {
         // 不减、孤儿判定失真（viewers 永不为零，弃链兜底被废）
         emitter.onError(ex -> stopWatch.run());
         try {
-            reactor.core.publisher.Flux<io.agentscope.core.agui.event.AguiEvent> flux = fluxOpt.get();
-            if (runStreamHub.fedCount(runId) > org.dromara.assistant.core.AssistantRunStreamHub.RING) {
-                flux = flux.startWith(new io.agentscope.core.agui.event.AguiEvent.Custom(
-                    threadId, runId,
-                    org.dromara.assistant.core.AssistantRunStreamHub.TRUNCATED_FRAME,
-                    java.util.Map.of("hint", "本回合内容较长，续看从中间开始；完整回答稍后在历史消息里")));
-            }
             // 三审回修（dsflash-P2-4）：replay 汇订阅即同步重放≤4096 帧（逐帧 Jackson+写响应）
             // ——移出控制器线程；重放期断连时 subscribe 尚未返回、旧写法引用未就位无法自停
-            flux = flux.subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
+            Flux<AguiEvent> flux = ready.flux().subscribeOn(Schedulers.boundedElastic());
             watch.set(flux.subscribe(
-                event -> {
-                    try {
-                        emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter
-                            .event().data(OBJECT_MAPPER.writeValueAsString(event)));
-                    } catch (Exception e) {
-                        // 客户端已断开——停订阅并收口响应（汇继续留驻给下一次 attach）；
-                        // Spring sendFailed 后后续 send 静默短路不再抛，必须在此主动收
-                        stopWatch.run();
-                        emitter.complete();
-                    }
-                },
+                event -> sendFrame(emitter, event, stopWatch),
                 err -> {
-                    log.warn("[AssistantAttach] run {} 续看流异常: {}", runId, err.getMessage());
+                    log.warn("[AssistantAttach] run {} 续看流异常: {}", ready.runId(), err.getMessage());
                     emitter.completeWithError(err);
                 },
                 emitter::complete));
         } catch (Exception e) {
-            return org.springframework.http.ResponseEntity.ok(R.fail("续看通道建立失败：" + e.getMessage()));
+            return ResponseEntity.ok(R.fail("续看通道建立失败：" + e.getMessage()));
         }
-        log.info("[AssistantAttach] run {} 续看挂载 tenant={} user={}", runId, tenantId, userId);
+        log.info("[AssistantAttach] run {} 续看挂载 tenant={} user={}", ready.runId(), tenantId, userId);
         // 显式 text/event-stream：ResponseEntity 裸包 SseEmitter 时 Spring 会落到默认
         // application/json 头（8090 实测），前端按 content-type 分流会把真流误判成 JSON 降级
-        return org.springframework.http.ResponseEntity.ok()
-            .contentType(org.springframework.http.MediaType.TEXT_EVENT_STREAM)
-            .body(emitter);
+        return ResponseEntity.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(emitter);
+    }
+
+    /** 单帧出网：客户端已断开时停订阅并收口响应（汇继续留驻给下一次 attach） */
+    private static void sendFrame(SseEmitter emitter, AguiEvent event, Runnable stopWatch) {
+        try {
+            emitter.send(SseEmitter.event().data(OBJECT_MAPPER.writeValueAsString(event)));
+        } catch (Exception e) {
+            // Spring sendFailed 后后续 send 静默短路不再抛，必须在此主动收
+            stopWatch.run();
+            emitter.complete();
+        }
     }
 
     /** 会话列表（180 天语义=清理 job 保证；perm=use；status=ACTIVE/ARCHIVED/ALL，默认 ACTIVE） */

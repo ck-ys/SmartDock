@@ -53,7 +53,7 @@ public class AssistantMcpController extends BaseController {
 
     /**
      * 成员只读清单：只回**已启用**的服务（停用的对成员等于不存在）。
-     * 状态口径与工具清单（AssistantToolViewerController）一致：租户闸 off → 已停用；
+     * 状态口径与工具清单（ToolViewerService，2026-11-17 批 0 起从 AssistantToolViewerController 下沉）一致：租户闸 off → 已停用；
      * 闸 admin → 管理员限定；tool_gate 污染 → fail-closed。
      */
     @SaCheckPermission("dcs:assistant:use")
