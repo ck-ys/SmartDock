@@ -160,3 +160,9 @@ API 文件在 `src/api/**`（core/assistant/…，子目录含 `index.ts` 与类
 - `noImplicitAny: false`（宽松模式）——跟随现有宽松风格，不擅自加 strict
 - ESLint flat config（`eslint.config.ts`）+ Prettier
 - SFC 里展示 `</script>` 字符串必须 `'</' + 'script>'` 拼，否则 Vue 解析炸
+
+## 与后端结构治理的边界（2026-11-17）
+
+- 后端四层是后端的事，前端不照搬（不建 domain/gateway 目录）
+- 唯一联动：Bo/Vo 字段增删 → `src/api/**` 的 TS 类型同步；接口路径与权限串不变
+- 本批（结构批 1）前端零改动，不需要前端验收

@@ -203,6 +203,28 @@
 
 ---
 
+## 17. 包卫生用测试立规矩，不搬家
+
+新代码只进 `com.smartdock.<域>.<层>`；`org.dromara.assistant` 冻结为 legacy（只许改、不许新增文件）。规矩不靠 review，靠 `ruoyi-admin` 里会失败的测试：行内全限定名、Controller 出参 `R<Map<String,Object>>`、Controller 直连 Mapper / 借外部模块 Service，外加 legacy 根包文件数。存量冻结在 `arch-baseline.json`，**只减不增、残留也红**。
+
+**为什么**：一个 Controller 长到 594 行、最长方法 170 行、97 处把整条包名写进代码，而全仓没有任何检查会因为写歪而失败——只修一次必然长回来。把 191 个文件搬到新根包是一到两周的 diff、多个窗口必冲突，运行时收益为零；「不新增 + 存量冻结」当天就能止血。工具选 ArchUnit 而不是 Spring Modulith：本仓的 `controller / service / domain` 是主类的平级子包，Modulith 的 `verify()` 会把它们当互相禁止访问的模块，第一天就红一片；Modulith 留给真正按域拆模块之后。
+
+**代价**：基线第一版有 586 条行内全限定名 + 35 个返回 Map 的 Controller + 183 个 legacy 文件；清理是长期的、按批递减，短期内不会归零。基线按「文件 / 类型 / 次数」记而不是按行号记，否则任何一次无关编辑都会让清单整体漂移。
+
+**改动前必读**：改完跑 `mvn -P local -DskipTests=false -pl ruoyi-admin -am test -Dtest=PackageHygieneTest,LayeringTest`（根 pom 默认 `skipTests=true`，不显式关掉会假绿）；修掉一条就删 `arch-baseline.json` 里对应行，不许往里加新行。`AssistantStatusController` 的 170 行方法拆解仍待做，其存量已在基线里冻结。
+
+---
+
+## 18. 只借 COLA 的方向，不借名字
+
+分层方向借 COLA（依赖只能向内、跨层经接口），但包名保留 `controller / service / domain / mapper / infrastructure` 这套中文团队习惯的叫法，不引入 COLA 的 `app / client / adapter / domain` 命名。
+
+**为什么**：借的是「依赖方向 + gateway 接口收口」这个思想，思想不挑名字；改名是约 600 个文件的纯 diff，运行时收益为零、多窗口必冲突。COLA 本体是 LGPL-3.0，只读结构参照、严禁转录代码。
+
+**代价**：读 COLA 示例时要做一层「它叫 adapter ≈ 我们叫 infrastructure」的翻译；这份翻译固定写在上表（`backend/AGENTS.md` 四层落点表），不靠各人脑补。
+
+---
+
 ## 想更深一层
 
 | 想看什么 | 去哪 |

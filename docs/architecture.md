@@ -115,7 +115,11 @@ OSS 上传事件 → `OssUploadedEventListener` 建单，判定序（顺序不�
 - 工具循环（查待办/任务进度/看板口径）通过 SPI 注入，页面上下文随对话框携带；
 - 会话状态落 `agentscope` schema（JDBC state store，独立 schema 隔离）；
 - 计费：ai-billing 的钱包/积分双轨（`dcs_tenant_wallet`、`dcs_ai_credit_ledger`），
-  幂等键防重复落账。
+  幂等键防重复落账；
+- 包结构：新代码只进 `com.smartdock.assistant.<层>`，四层各放什么——
+  controller 只做门卫（权限/参数/返回包装）、service 编排用例、
+  domain 放实体（`model/`）与跨层接口（`gateway/`）、infrastructure 放 gateway 实现；
+  `org.dromara.assistant` 是 legacy 根，只许改、不许新增文件（详见 `backend/AGENTS.md` 门禁节）。
 
 ## 6. 前端契约层
 

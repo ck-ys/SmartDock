@@ -110,6 +110,52 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 - 新代码用 Jackson（ruoyi-common-json），不用 Fastjson
 - 注释风格：中文 Javadoc，讲"为什么"不讲"是什么"
 
+## 包卫生与分层门禁（2026-11-17 起强制）
+
+六条规矩跑在 `ruoyi-admin` 的单测里（`org.dromara.test.arch.*`，`@Tag("local")`；`PackageMigrationGuardTest` 是 `@Tag("dev")`，门禁全跑加 `-Dsurefire.groups=local,dev`），**红线是「只减不增」**：
+
+1. **新代码只进 `com.smartdock.<域>.<层>`**；`org.dromara.assistant` 是 legacy，**只许改、不许新增文件**（当前 183 个 .java，只减不增；`PackageHygieneTest.legacy根包不再新增文件` 会拦）。
+2. **禁止行内全限定名**：源码行里不许出现 `org.dromara.` / `com.smartdock.` / `java.util.` 的整条包名（import、注释、字符串不算）。改 import；确实没有替代写法时行尾写 `// arch-ignore-fqn` 并说明原因。
+3. **Controller 只做权限/参数/租户/返回包装**：方法超过 40 行就抽 Service；Controller 不许直接注入 `*Mapper`，也不许借用助手模块以外的 `*Service`（ArchUnit 按字节码查，字段/返回值/参数/调用都算）。
+4. **接口出参不许 `R<Map<String, Object>>`**（含 List 包一层）：定义 `*Vo` 强类型；契约冻结，改字段算破坏性变更。
+5. **domain 不 import 上层**（批 1 规则 7，零容忍）：`com.smartdock.*` 的 domain 包不许 import service / controller / infrastructure / mapper——跨层收口建 `domain/gateway` 接口、`infrastructure` 实现；底座（`org.dromara.common` 等）不算上层。
+6. **新根 service 对 legacy 只减不增**（批 1 规则 8，2026-11-17 已清零）：`com.smartdock.*` 的 service 包 import `org.dromara.assistant.*` 会直接红；legacy 依赖一律经 gateway 收口进 infrastructure。
+
+存量违规冻结在 `backend/ruoyi-admin/src/test/resources/arch-baseline.json`。**修掉一条就删一行**（残留会红，防清单腐烂）；不许往清单里加新行。
+
+```bash
+# 跑门禁（三个测试类八条规则全跑；MigrationGuard 是 dev 标签，groups 要带上）
+mvn -P local -DskipTests=false -pl ruoyi-admin -am test \
+  -Dtest=PackageHygieneTest,LayeringTest,PackageMigrationGuardTest \
+  -Dsurefire.groups=local,dev -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
+# 搬迁/大清理后整份刷新基线（会把当前违规全部冻结，谨慎）
+ARCH_BASELINE_UPDATE=1 mvn -P local -DskipTests=false -pl ruoyi-admin -am test -Dtest=PackageHygieneTest,LayeringTest
+```
+
+### 四层落点（新代码放哪）
+
+| 放什么 | 包 | 允许 import |
+|---|---|---|
+| 入口 / 权限 / 返回包装 | `controller/` | service、`domain/bo`、`domain/vo` |
+| 用例编排 | `service/` | `domain/*`、gateway 接口、mapper（仅自有表） |
+| 实体 / 值对象 | `domain/model/` | 不 import service、controller、infrastructure（MyBatis 注解允许） |
+| 接口菜单 | `domain/gateway/` | 只 import domain 类型 + 端口契约所需的框架类型（如 `Flux` / `AguiEvent`；不许碰本模块 service/mapper/legacy） |
+| 菜单实现 | `infrastructure/` | gateway 接口、legacy、第三方客户端 |
+| 表访问 | `mapper/` | MyBatis-Plus |
+
+### gateway 建不建
+
+- **建**：跨模块调用、流式/长连接、外部服务（会换实现）
+- **不建**：自有单表 CRUD（`BaseMapper` 已经是抽象）、只有一个实现的内部方法
+
+### 引擎内核（冻结，不按业务线搬）
+
+`core`(54) / `tools`(12) / `automation`(14) 是助手引擎；业务层 controller/service/mapper/bo/vo 按触碰式搬空。引擎包是否搬，批 9 单独拍板；旧根改名见拍板板 12D（批 2）。
+
+### 参照仓只读清单
+
+结构参照仓在 `D:\Git\git-github\java-study`（本机只读）。许可分层：Apache-2.0 / MIT（ArchUnit、cargotracker、dddsample 等）可借鉴思路；COLA（LGPL-3.0）与 halo（GPL）只读结构、**严禁转录代码**；JavaNote 无 LICENSE，只读概念、禁转录。完整清单见根 `AGENTS.md`「外部智能体源码参照库」。
+
 ## Security Rules
 
 - 新接口必须 `@SaCheckPermission`（确需匿名白名单的接口才用 `@SaIgnore` + 服务层自查 + `@RateLimiter`；框架自带匿名端点仅登录/验证码/SSE 关闭等，业务模块当前无匿名接口）
@@ -117,6 +163,8 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 - 永不 log token / 密码 / 明文 IP
 - 不信任客户端传的 `createBy`/`updateBy`/`tenantId`——框架自动填
 - 租户隔离是硬边界：不做跨租户数据合并
+- **按 id 取「属于某人的」资源必须二次校归属**：`@SaCheckPermission` 只管「能不能调这个接口」，不管「这条数据是不是你的」；读出后要校 `tenantId` + `userId`（先例 `AssistantMemoryService:215`、`AssistantConversationService:72`），否则换个 id 就能读别人的。
+- **展示层也要脱敏**：手机号 / 邮箱 / 证件号挂 `@Sensitive`（模板 `SysUserVo:64,70`）；**存储加密 ≠ 展示脱敏**。
 
 ## Database Rules
 
@@ -124,8 +172,12 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 - 新表必须带 `tenant_id`（除非进 `tenant.excludes`）
 - **DDL 必须沉淀**：`script/sql/baseline/` 对应文件 + `script/sql/migration/` 新增迁移（可重复执行）
 - 大表操作分批限轮（参照 `ProfileRetentionJob`：单轮 1 万行、封顶 100 轮）
+- **唯一性必须落 DB 唯一索引**，不许「先查再插」：并发下必出脏数据（正例 `uk_profile_event_uid` = `(tenant_id, source, event_uid)`）。
+- **禁外键与级联**：关联在应用层做（现库 0 个外键，保持）；外键会卡逻辑删除、分批清理与按租户建库。
+- **SQL 参数一律 `#{}`**：`${}` 只允许 MyBatis-Plus 生成的 `${ew.xxx}`（现存 3 处全是框架注入）；手写 SQL 出现 `${}` 就是注入面。
 
 ## API Design
 
 - 现存约定：GET 查询 / POST 写入；DELETE 存量存在于采集 demo 模块——新接口跟随现有风格，改动词前先查同路径冲突
 - 分页：`PageQuery` 入 → `TableDataInfo<T>` 出；导出用 FastExcel（ruoyi-common-excel）
+- **分页必须封顶**：`PageQuery.DEFAULT_PAGE_SIZE = Integer.MAX_VALUE`（`PageQuery.java:74`），不传 `pageSize` 等于查全表；新接口一律 `Math.min(…, 100)`（参照 `AssistantActionController:65`、`ProfileQueryService:157`）。

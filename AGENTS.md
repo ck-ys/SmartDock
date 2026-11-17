@@ -171,6 +171,15 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 ---
 
+## 代码落点与结构门禁（2026-11-17 起）
+
+- 新代码只进 `com.smartdock.<域>.<层>`；`org.dromara.assistant` 是 legacy，只许改、不许新增文件
+- 四层一句话：controller 只做门卫 / service 编排 / domain 放实体与接口 / infrastructure 放实现
+- gateway 只在三类边界建：跨模块、流式长连接、外部服务；自有单表 CRUD 不建
+- 改结构前读 `backend/AGENTS.md`「包卫生与分层门禁」；收口跑 `PackageHygieneTest` + `LayeringTest`
+
+---
+
 ## 数据面口径（PG / Redis）
 
 > 本仓自带两个数据面 MCP：`dock-pg` / `dock-redis`（服务端本体在 `tools/mcp/`，随仓开源）。
