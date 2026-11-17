@@ -104,7 +104,7 @@ minRole: member
 
 <table>
 <tr>
-<td width="50%"><img src="docs/images/screenshots/25-workspace-automation.png" alt="自动化列表"><br><sub>自动化列表：进行中 / 已暂停 / 失败三档，内置一条「每日未交摘要」可直接开关</sub></td>
+<td width="50%"><img src="docs/images/screenshots/25-workspace-automation.png" alt="自动化列表"><br><sub>自动化列表：全部 / 进行中 / 已完成 / 已暂停 / 失败五档筛选，下方四张模板一点即建；内置一条「每日未交摘要」可直接开关</sub></td>
 <td width="50%"><img src="docs/images/screenshots/24-workspace-mcp.png" alt="MCP 外部服务"><br><sub>MCP 服务：平台级注册、启停、header 令牌加密存储；外部工具调用单独限频</sub></td>
 </tr>
 </table>

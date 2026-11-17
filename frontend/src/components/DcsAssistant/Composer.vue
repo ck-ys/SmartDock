@@ -321,105 +321,80 @@
 
         <!-- 业务批7 Q2：技能胶囊已挪联网旁，此处原右组位移除 -->
 
-        <!-- 模型选择（批7 Q5 消费端+Q12-④ 按会话记住）：管理员开「允许用户自选」才显示；
-             选中存 localStorage 分 thread 各记一份，同会话后续消息都走它 -->
-        <div
-          v-if="choiceOn"
-          class="btool bpill mpill"
-          :class="{ 'mpill-warn': defaultMissing }"
-          :title="
-            defaultMissing
-              ? '管理员设置的默认模型当前不在可用清单（可能没配人民币价格或已停用），请联系管理员到「AI 配置」处理'
-              : `本会话模型：${modelBtnLabel}`
-          "
-          :aria-expanded="modelPopOpen"
-          aria-label="选择模型"
-          @click="toggleModelPop"
+        <!-- 批 A Q9（2026-11-14 拍板案1）：模型+档位合成一键（ZCode combined-model）——右组少一个键；
+             点开上下两段（选模型 / 选档位）。档位三选与「过程显示」一行没动，只换入口；
+             自选关=模型段退只读组头（不放假选项），模型名/告警文案全部沿用原口径 -->
+        <button
+          v-if="comboShow"
+          class="btool bpill combo-pill"
+          :class="{ 'mpill-warn': choiceOn && defaultMissing, below: comboBelow }"
+          :title="comboTitle"
+          :aria-expanded="comboPopOpen"
+          aria-label="模型与思考档位"
+          @click="toggleComboPop()"
         >
-          <IconSpan name="package" :size="14" />
-          <span class="tlabel">{{ modelBtnLabel }}</span>
+          <i v-if="thinkSupported" class="tprog"><i class="tfill" :style="{ height: ((thinkLevel + 1) / 3) * 100 + '%' }" /></i>
+          <span class="tlabel">{{ comboLabel }}</span>
           <IconSpan name="chevron-down" :size="13" class="bchev" />
-          <!-- 模型选择弹层（与思考弹层同款 autopop 右锚；首行=跟随默认，其余=本租户可用模型+单价） -->
-          <div v-if="modelPopOpen" class="autopop tpop mpop" role="dialog" aria-label="选择模型">
-            <button class="apopt" :class="{ on: !modelPin }" @click="pickModel(null)">
-              <span class="apic"><IconSpan name="star" :size="15" /></span>
-              <span class="aptx"
-                ><b>跟随默认</b><span>{{ defaultModelLabel }}</span></span
-              >
-              <span v-if="!modelPin" class="apck"><IconSpan name="check" :size="14" /></span>
-            </button>
-            <!-- 批B 三审 P1：组头移出按钮独立成行——修两点：①数据源排序不含 provider 时相邻比较会重复组头
-                 ②组头在 button 内点击=误选组首模型。分组改 find-or-create 累计算法（同 admin 页） -->
-            <template v-for="g in groupedModelOptions" :key="g.provider">
-              <div class="apgrp">{{ g.label }}</div>
-              <button
-                v-for="o in g.options"
-                :key="String(o.configId)"
-                class="apopt"
-                :class="{ on: String(o.configId) === modelPin }"
-                @click="pickModel(String(o.configId))"
-              >
-                <span class="apic"><IconSpan name="package" :size="15" /></span>
+          <div v-if="comboPopOpen" class="autopop tpop mpop" role="dialog" aria-label="模型与思考档位">
+            <template v-if="choiceOn">
+              <div class="apgrp">模型</div>
+              <!-- 首行=跟随默认，其余=本租户可用模型+单价（markup 原样搬进合成弹层） -->
+              <button class="apopt" :class="{ on: !modelPin }" @click.stop="pickModel(null)">
+                <span class="apic"><IconSpan name="star" :size="15" /></span>
                 <span class="aptx"
-                  ><b>{{ o.modelName }}</b
-                  ><span>{{ modelPriceLine(o) }}</span></span
+                  ><b>跟随默认</b><span>{{ defaultModelLabel }}</span></span
                 >
-                <span v-if="String(o.configId) === modelPin" class="apck"><IconSpan name="check" :size="14" /></span>
+                <span v-if="!modelPin" class="apck"><IconSpan name="check" :size="14" /></span>
+              </button>
+              <!-- 批B 三审 P1：组头移出按钮独立成行（点组名不误选组首模型） -->
+              <template v-for="g in groupedModelOptions" :key="g.provider">
+                <div class="apgrp">{{ g.label }}</div>
+                <button
+                  v-for="o in g.options"
+                  :key="String(o.configId)"
+                  class="apopt"
+                  :class="{ on: String(o.configId) === modelPin }"
+                  @click.stop="pickModel(String(o.configId))"
+                >
+                  <span class="apic"><IconSpan name="package" :size="15" /></span>
+                  <span class="aptx"
+                    ><b>{{ o.modelName }}</b
+                    ><span>{{ modelPriceLine(o) }}</span></span
+                  >
+                  <span v-if="String(o.configId) === modelPin" class="apck"><IconSpan name="check" :size="14" /></span>
+                </button>
+              </template>
+            </template>
+            <!-- 自选关：模型段退一行只读组头（原 mlock 徽标口径，title 走 defaultBadgeTitle 四态文案） -->
+            <div v-else-if="defaultBadgeOn" class="apgrp">默认模型 · {{ defaultBadgeLabel }}</div>
+
+            <div v-if="thinkSupported && (choiceOn || defaultBadgeOn)" class="apgrp">思考档位</div>
+            <!-- 档位三选+过程显示（T-2 1008 拍板B）：一行没动，只是搬进合成弹层 -->
+            <template v-if="thinkSupported">
+              <button v-for="(t, i) in THINK" :key="t.tier" class="apopt" :class="{ on: i === thinkLevel }" @click.stop="pickThink(i)">
+                <span class="apic"><IconSpan :name="t.icon" :size="15" /></span>
+                <span class="aptx"
+                  ><b>{{ t.label }}</b
+                  ><span>{{ t.title }}</span></span
+                >
+                <span v-if="i === thinkLevel" class="apck"><IconSpan name="check" :size="14" /></span>
+              </button>
+              <button
+                class="apopt tshow"
+                role="switch"
+                :aria-checked="state.showThink"
+                title="开=每条回复的思考过程默认展开；关=点哪条开哪条"
+                @click.stop="emit('think-show', !state.showThink)"
+              >
+                <span class="apic"><IconSpan name="eye" :size="15" /></span>
+                <span class="aptx"><b>过程显示</b><span>展开每条回复的思考过程</span></span>
+                <span class="apsw" :class="{ on: state.showThink }"><i /></span>
               </button>
             </template>
           </div>
-        </div>
-        <!-- G2 问题②（拍板 Q2=A）：只读徽标——自选关（或自选开但白名单圈光无选项，
-             三审回修 P2-⑥：双空档也要有模型指示）时展示当前生效默认模型。纯展示无交互：
-             名字来自后端 defaultModelName，无弹层无 chevron；title 三态（三审回修 P2-④：
-             默认行不可用/无设置行/管理员设置 分别成话，不再一律归因管理员） -->
-        <div
-          v-else-if="defaultBadgeOn"
-          class="btool bpill mpill mlock"
-          :title="defaultBadgeTitle"
-          :aria-label="`当前默认模型：${defaultBadgeLabel}`"
-        >
-          <IconSpan name="package" :size="14" />
-          <span class="tlabel">{{ defaultBadgeLabel }}</span>
-        </div>
-
-        <!-- 思考档位（v3.18.1 → 批I-3 BN-8：主钮恒 🧠+tprog 充能条，点开三选弹层原型 thinkPop）；
-             批7 按能力显隐：当前生效模型能力目录 tierKind=NONE（不支持思考）时隐藏 -->
-        <button
-          v-if="thinkSupported"
-          class="btool bpill"
-          :title="thinkTitle"
-          :aria-expanded="thinkPopOpen"
-          @click="toggleThinkPop()"
-        >
-          <IconSpan name="brain" :size="14" />
-          <i class="tprog"><i class="tfill" :style="{ height: ((thinkLevel + 1) / 3) * 100 + '%' }" /></i>
-          <span class="tlabel">{{ THINK[thinkLevel].label }}</span>
-          <IconSpan name="chevron-down" :size="13" class="bchev" />
-          <!-- 思考三档弹层（原型 thinkPop：zap/scale/microscope 三选+对勾，选中 700ms 收）；
-               T-2(1008 拍板B)：尾部加「过程显示」开关行——档位管思考多少，眼睛管显示与否，凑一组 -->
-          <div v-if="thinkPopOpen" class="autopop tpop" role="dialog" aria-label="思考程度">
-            <button v-for="(t, i) in THINK" :key="t.tier" class="apopt" :class="{ on: i === thinkLevel }" @click="pickThink(i)">
-              <span class="apic"><IconSpan :name="t.icon" :size="15" /></span>
-              <span class="aptx"
-                ><b>{{ t.label }}</b
-                ><span>{{ t.title }}</span></span
-              >
-              <span v-if="i === thinkLevel" class="apck"><IconSpan name="check" :size="14" /></span>
-            </button>
-            <button
-              class="apopt tshow"
-              role="switch"
-              :aria-checked="state.showThink"
-              title="开=每条回复的思考过程默认展开；关=点哪条开哪条"
-              @click="emit('think-show', !state.showThink)"
-            >
-              <span class="apic"><IconSpan name="eye" :size="15" /></span>
-              <span class="aptx"><b>过程显示</b><span>展开每条回复的思考过程</span></span>
-              <span class="apsw" :class="{ on: state.showThink }"><i /></span>
-            </button>
-          </div>
         </button>
+
         <!-- 单按钮状态机（Q14，对齐 ZCode）：生成中且输入框为空 = 停止；一开始打字就变回「排队 / 发送」。
              原先是「停止 + 发送」并排两个按钮：多一个热区、抢输入框宽度，且停止在块内还有第二个入口 -->
         <button
@@ -979,8 +954,9 @@ const autoCur = computed(() => AUTO_LV[autoIdx.value] ?? AUTO_LV[0]);
 const autoPopOpen = ref(false);
 let autoPopTimer: ReturnType<typeof setTimeout> | null = null;
 /** 思考三档弹层（批I-3 BN-8，与自主权弹层同款 700ms 自动收口径） */
-const thinkPopOpen = ref(false);
-let thinkPopTimer: ReturnType<typeof setTimeout> | null = null;
+/** 批 A Q9：合成弹层开关（原 modelPopOpen/thinkPopOpen 两套合一） */
+const comboPopOpen = ref(false);
+let comboPopTimer: ReturnType<typeof setTimeout> | null = null;
 const addpopRef = ref<HTMLDivElement>();
 /** 题9：档位弹层已移出 addpop，点外关闭要单独认它（否则 mousedown 先收、click 落空） */
 const autoPopRef = ref<HTMLDivElement>();
@@ -1666,8 +1642,8 @@ onBeforeUnmount(() => {
   if (autoPopTimer) {
     clearTimeout(autoPopTimer);
   }
-  if (thinkPopTimer) {
-    clearTimeout(thinkPopTimer);
+  if (comboPopTimer) {
+    clearTimeout(comboPopTimer);
   }
   // 批4回修（glm53 P2-3）：零命中回查 timer 同族清理——不清则卸载后 400ms 内仍发一次
   // mentionTasks，token 已失效时命中 request.ts 401 弹「登录状态已过期」幽灵框（step5 P1-2 同族）
@@ -1691,11 +1667,8 @@ function onDocMdown(e: MouseEvent) {
     addOpen.value = false;
     autoPopOpen.value = false;
   }
-  if (thinkPopOpen.value && !t.closest('.bpill')) {
-    thinkPopOpen.value = false;
-  }
-  if (modelPopOpen.value && !t.closest('.bpill')) {
-    modelPopOpen.value = false;
+  if (comboPopOpen.value && !t.closest('.combo-pill')) {
+    comboPopOpen.value = false;
   }
   // step5 P2-5：环卡同口径点外收（钮自身 click 会 toggle，只拦外部点击）
   if (ringCardOpen.value && !t.closest('.ring-btn')) {
@@ -1817,18 +1790,17 @@ function pickThink(i: number) {
     /* 存储不可用忽略 */
   }
   pushToast('思考程度已切换：' + THINK[i].label, 'ok');
-  // 弹层互斥（批7）：选思考档时收模型弹层
-  modelPopOpen.value = false;
-  if (thinkPopTimer) clearTimeout(thinkPopTimer);
-  thinkPopTimer = setTimeout(() => {
-    thinkPopOpen.value = false;
-    thinkPopTimer = null;
+  // 批 A Q9：合成弹层里选完档位 700ms 自动收（原 thinkPop 同款节奏）
+  if (comboPopTimer) clearTimeout(comboPopTimer);
+  comboPopTimer = setTimeout(() => {
+    comboPopOpen.value = false;
+    comboPopTimer = null;
   }, 700);
 }
 
 /* ---- 批7 Q5 消费端+Q12-④：用户侧模型自选（按会话记住）+思考档按能力显隐 ---- */
 const modelChoice = ref<AssistantModelChoice | null>(null);
-const modelPopOpen = ref(false);
+
 const choiceOn = computed(() => modelChoice.value?.allowUserSwitch === '1' && (modelChoice.value?.options?.length ?? 0) > 0);
 /** G2 问题② + Q3-A：自选关时只读徽标；默认缺失但用过模型 → 显示「上次使用」。 */
 const lastUsedConfigId = computed(() => {
@@ -1917,16 +1889,14 @@ function pickModel(cid: string | null) {
   }
   const hit = cid ? modelOptions.value.find((o) => String(o.configId) === cid) : null;
   pushToast(hit ? `本会话已切换：${hit.modelName}` : '本会话已恢复跟随默认模型', 'ok');
-  modelPopOpen.value = false;
-  thinkPopOpen.value = false;
+  comboPopOpen.value = false;
   void refreshCapability();
 }
 /** 输入条弹层互斥（视觉席实证：档位弹层与＋面板能同时展开、叠层露半截） */
-function closePops(keep: 'add' | 'auto' | 'think' | 'model' | null) {
+function closePops(keep: 'add' | 'auto' | 'combo' | null) {
   if (keep !== 'add') addOpen.value = false;
   if (keep !== 'auto') autoPopOpen.value = false;
-  if (keep !== 'think') thinkPopOpen.value = false;
-  if (keep !== 'model') modelPopOpen.value = false;
+  if (keep !== 'combo') comboPopOpen.value = false;
 }
 function toggleAddPop() {
   addOpen.value = !addOpen.value;
@@ -1936,13 +1906,25 @@ function toggleAutoPop() {
   autoPopOpen.value = !autoPopOpen.value;
   if (autoPopOpen.value) closePops('auto');
 }
-function toggleThinkPop() {
-  thinkPopOpen.value = !thinkPopOpen.value;
-  if (thinkPopOpen.value) closePops('think');
+/** 批 A Q9：合成键唯一入口 */
+const comboBelow = ref(false);
+/** 弹层约 520px 高：上方空间不够就向下弹（进门页输入框居中、上方只有 400 来像素） */
+function syncComboDir() {
+  const pill = document.querySelector('.combo-pill');
+  if (!pill) return;
+  comboBelow.value = pill.getBoundingClientRect().top < 560;
 }
-function toggleModelPop() {
-  modelPopOpen.value = !modelPopOpen.value;
-  if (modelPopOpen.value) closePops('model');
+function openComboPop() {
+  syncComboDir();
+  comboPopOpen.value = true;
+  closePops('combo');
+}
+function toggleComboPop() {
+  if (comboPopOpen.value) {
+    comboPopOpen.value = false;
+    return;
+  }
+  openComboPop();
 }
 /** 当前生效模型行（思考能力判定用）：用户 pin > 助手默认 > ★接口默认（options[0]）。
  *  业务批5 Q3-A ③：末段 opts[0] 回退只是能力判定/环分母的近似兜底，显示层见 defaultMissing——
@@ -2094,6 +2076,35 @@ const modelBtnLabel = computed(() => {
     return `上次·${effectiveRow.value.modelName}`;
   }
   return effectiveRow.value ? `默认·${effectiveRow.value.modelName}` : '请先选一个模型';
+});
+
+/* ---- 批 A Q9（2026-11-14 拍板案1）：模型+档位合成一键的标签/提示/可见性 ----
+     标签照板不带「默认·」前缀（前缀的区分信息挪进 title）；档位部分一个字不动。 */
+const comboShow = computed(() => choiceOn.value || defaultBadgeOn.value || thinkSupported.value);
+/** 模型段纯名（前缀语义进 title；「默认模型不可用/请先选一个模型」两种诚实态保留） */
+const comboModelLabel = computed(() => {
+  if (choiceOn.value) {
+    if (defaultMissing.value) {
+      return '默认模型不可用';
+    }
+    return effectiveRow.value ? effectiveRow.value.modelName : '请先选一个模型';
+  }
+  return defaultBadgeOn.value ? defaultBadgeLabel.value : '';
+});
+const comboLabel = computed(() =>
+  [comboModelLabel.value, thinkSupported.value ? THINK[thinkLevel.value].label : ''].filter(Boolean).join(' · ')
+);
+const comboTitle = computed(() => {
+  const parts: string[] = [];
+  if (choiceOn.value) {
+    parts.push(defaultMissing.value ? '管理员设置的默认模型当前不在可用清单（可能没配人民币价格或已停用），请联系管理员到「AI 配置」处理' : `本会话模型：${modelBtnLabel.value}`);
+  } else if (defaultBadgeOn.value) {
+    parts.push(defaultBadgeTitle.value);
+  }
+  if (thinkSupported.value) {
+    parts.push(thinkTitle.value);
+  }
+  return parts.join('\n');
 });
 const defaultModelLabel = computed(() => {
   // 三审回修（三席共识死兜底）：优先按默认 ID 在 options 里命中真名——旧实现恒走
@@ -2381,8 +2392,7 @@ function cmdPick(i?: number) {
       pushToast('管理员未开放模型自选，当前用助手默认模型');
       return;
     }
-    thinkPopOpen.value = false;
-    modelPopOpen.value = true;
+    openComboPop();
     return;
   }
   if (it.text === '__USAGE__') {
@@ -2482,12 +2492,8 @@ function escClosePop(): boolean {
     autoPopOpen.value = false;
     return true;
   }
-  if (modelPopOpen.value) {
-    modelPopOpen.value = false;
-    return true;
-  }
-  if (thinkPopOpen.value) {
-    thinkPopOpen.value = false;
+  if (comboPopOpen.value) {
+    comboPopOpen.value = false;
     return true;
   }
   // 五审回修（step5 P1-4）：上下文环卡进 Esc 链
@@ -3098,7 +3104,8 @@ html.dark .brow .btool.bicon.wbtn.on {
   }
   /* 会话状态合并环（批B B2：环=上下文已用%；14×14 / stroke 3.2 / 底环 .35） */
   .ring-btn {
-    padding: 3px;
+    /* 批 A Q9：热区 20→28（ZCode ContextTrigger size-7）——环视觉仍 14px，横向 padding 补宽 */
+    padding: 3px 7px;
     border-radius: 8px;
 
     &:hover {
@@ -3428,8 +3435,9 @@ html.dark .brow .btool.bicon.wbtn.on {
   }
   /* 发送/停止键族（原型 L255-256/672-673：8px 方圆角） */
   .round-btn {
-    width: 32px;
-    height: 32px;
+    /* 批 A Q9：32→28——ZCode size-7；整排工具条 h-7，32 在 28 的队伍里探出 4px */
+    width: 28px;
+    height: 28px;
     font-size: 13px;
     border-radius: 8px;
     border: none;
@@ -3489,6 +3497,12 @@ html.dark .brow .btool.bicon.wbtn.on {
   }
 }
 /* 弹层族（原型 .autopop v2.0 L807-810+L867：268px/12px 圆角/默认左锚；tpop 右锚） */
+/* 批A三审回修：合成弹层上方空间不够时向下弹（与 ctxpop 同思路；仅 combo 挂 below） */
+.combo-pill.below .autopop {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform-origin: top left;
+}
 .autopop {
   position: absolute;
   bottom: calc(100% + 8px);

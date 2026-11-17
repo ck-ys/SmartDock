@@ -19,7 +19,11 @@
   --bad: #b42318;
   --warn: #9a6700;
   --app-chrome: 0px;
-  min-height: 100vh;
+  /* 批 A Q3：本页从整页路由改为渲染在工作台主区槽内（AssistantWorkspace .main.auto-host）——
+     高度撑满槽位、自身不滚（.auto-main 滚），不再 100vh */
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -47,65 +51,14 @@ html.dark .auto-ws {
   --warn: #d4a72c;
 }
 
-/* 顶栏（48px，与工作台/设置页同高） */
-.auto-top {
-  flex: none;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  padding: 0 18px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--bd);
-}
-.auto-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 6px 0 0;
-  border: 0;
-  background: none;
-  color: var(--text-2);
-  font-family: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.auto-back:hover {
-  color: var(--text);
-}
-.auto-sep {
-  width: 1px;
-  height: 14px;
-  margin: 0 12px;
-  background: var(--bd);
-}
-.auto-crumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--mut);
-}
-.auto-crumb b {
-  font-weight: 600;
-  color: var(--text);
-}
-.auto-crumb .sl {
-  color: var(--faint);
-}
-.auto-scope {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--faint);
-}
-
 .auto-main {
   flex: 1;
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 26px 32px 48px;
+  padding: 20px 32px 48px;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .auto-head {
@@ -174,6 +127,280 @@ html.dark .auto-ws {
 }
 .btn-danger {
   color: var(--bad);
+}
+
+/* 批 A Q3（2026-11-14）：两页签（定时/闲时）与编辑页（设置/历史）共用——安静的底色高亮，
+   不画下划线不画胶囊边；选中=底色一档+文字转正 */
+.ag-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 18px;
+
+  > button {
+    height: 30px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--mut);
+    cursor: pointer;
+
+    &:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    &.on {
+      background: var(--fill);
+      color: var(--text);
+      font-weight: 500;
+    }
+    &:disabled {
+      color: var(--faint);
+      cursor: default;
+    }
+  }
+}
+
+/* 行5：提示行=一行纯文字（ZCode 的「保持唤醒」开关网页做不到，不画假开关） */
+.tip-line {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* 右上刷新图标钮（28px 方块 ghost） */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-2);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--text);
+    color: var(--text);
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+/* 「创建新任务 ▾」下拉（深色主按钮 + 右对齐菜单） */
+.create-drop {
+  position: relative;
+
+  .drop-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 10;
+    /* 2026-11-15 用户截图：原来 min-width:148px 让菜单比按钮（132px）宽 16px，
+       右边缘齐、左边缘探出一截，看着就是「没对齐」。菜单与按钮同宽，两边都齐。 */
+    width: 100%;
+    padding: 4px;
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.1);
+
+    > button {
+      display: block;
+      width: 100%;
+      padding: 7px 10px;
+      border: 0;
+      border-radius: 4px;
+      background: none;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--text-2);
+      text-align: left;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--hover);
+        color: var(--text);
+      }
+    }
+  }
+}
+
+/* 卡片状态徽标（已完成/进行中/失败/已暂停/错过/还没跑过）——彩色只给数据状态 */
+.ac-badge-st {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--fill);
+  color: var(--mut);
+
+  &.st-ok {
+    color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 10%, transparent);
+  }
+  &.st-bad {
+    color: var(--bad);
+    background: color-mix(in srgb, var(--bad) 10%, transparent);
+  }
+  &.st-warn {
+    color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 12%, transparent);
+  }
+  &.st-live {
+    color: var(--text);
+    background: var(--fill);
+  }
+  &.st-paused,
+  &.st-none {
+    color: var(--mut);
+    background: var(--fill);
+  }
+}
+
+/* 行7：模板四卡（图标+标题+说明+时间），点一下预填新建页 */
+.tpl-sec {
+  margin-top: 26px;
+
+  .tpl-hd {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+
+    b {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    span {
+      font-size: 12px;
+      color: var(--faint);
+    }
+  }
+}
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.tpl-card {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  background: var(--panel);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s;
+
+  &:hover {
+    border-color: var(--text);
+  }
+  .tpl-tile {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--fill);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .tpl-body {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+
+    b {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .tpl-desc {
+      font-size: 12px;
+      line-height: 17px;
+      color: var(--mut);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .tpl-time {
+      margin-top: 2px;
+      font-size: 12px;
+      color: var(--faint);
+    }
+  }
+}
+
+/* Q4：设置/历史页签化后，编辑卡单列走完（不再有 320px 侧栏） */
+.edit-card {
+  max-width: 760px;
+}
+
+/* Q4 历史页签：整行一条（时间/结果/耗时/原因/会话），失败原因不再挤窄栏 */
+.hist-full-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 11px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+
+  .hf-when {
+    flex: none;
+    display: inline-flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .hf-manual {
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--fill);
+    color: var(--mut);
+    font-size: 12px;
+  }
+  .hf-dash {
+    color: var(--faint);
+  }
+  .hf-reason {
+    flex: 1;
+    min-width: 0;
+    color: var(--mut);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .run-link {
+    flex: none;
+  }
+}
+
+/* Q4 底部只读模型行 + 脚注 */
+.model-line {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--bd-soft);
+  font-size: 12px;
+  color: var(--mut);
+}
+.edit-footnote {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--faint);
 }
 
 /* 筛选条 */
@@ -717,6 +944,9 @@ html.dark .auto-ws {
 }
 
 @media (max-width: 992px) {
+  .tpl-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .auto-main {
     padding: 18px 16px 40px;
   }
@@ -754,18 +984,14 @@ html.dark .auto-ws {
 /* 手机档（2026-11-06 视觉验收实拍 390）：顶栏只留「返回 + 当前页」，
    面包屑/说明塞不下就藏；卡片操作与次数整块换行，不许把词拆成两行 */
 @media (max-width: 560px) {
+  .tpl-grid {
+    grid-template-columns: 1fr;
+  }
   .auto-top {
     gap: 8px;
     padding: 0 12px;
   }
   .auto-crumb,
-  .auto-sep,
-  .auto-scope {
-    display: none;
-  }
-  .auto-back {
-    white-space: nowrap;
-  }
   .ac-foot {
     flex-wrap: wrap;
     row-gap: 8px;
@@ -779,4 +1005,13 @@ html.dark .auto-ws {
   .ac-ops {
     margin-left: auto;
   }
+}
+
+/* 批 A Q5（2026-11-14）：开关打开色从业务蓝收中性深墨——工作台动作色 = 文字色（Q13 拍），
+   蓝（含业务蓝）留给业务壳主操作；语义绿/红不动。 */
+/* 修正：ac-switch 类挂在 el-switch 根元素上（不是祖先），须用顶层 :deep 自外向内选，
+   同 settings.vue 写法；index.vue / edit.vue 都 @use 本文件，两页同享。 */
+:deep(.el-switch.is-checked .el-switch__core) {
+  background-color: #17181a;
+  border-color: #17181a;
 }

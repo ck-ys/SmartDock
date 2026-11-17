@@ -75,7 +75,24 @@ export const constantRoutes: RouteRecordRaw[] = [
     path: '/agent',
     component: () => import('@/views/dcs/agent/index.vue'),
     hidden: true,
-    meta: { title: '智能体工作台', noCache: true }
+    meta: { title: '智能体工作台', noCache: true },
+    // 批 A Q3（2026-11-14 拍板案1）：自动化收编为子路由——URL 不变（可刷新可分享），
+    // 但渲染发生在工作台主区槽内（AssistantWorkspace 的 router-view），左栏/顶栏原地不动，
+    // 不出面包屑、不出「返回工作台」。设置页维持顶层（A3 拍板：整页跳转）。
+    children: [
+      {
+        path: 'automation',
+        component: () => import('@/views/dcs/agent/automation/index.vue'),
+        hidden: true,
+        meta: { title: '自动化', noCache: true }
+      },
+      {
+        path: 'automation/:id',
+        component: () => import('@/views/dcs/agent/automation/edit.vue'),
+        hidden: true,
+        meta: { title: '自动化 · 编辑', noCache: true }
+      }
+    ]
   },
   // 工作台设置（2026-11-05 拍板 A3）：左栏点「设置」整页跳到这里（真路由：地址变、
   // 浏览器返回可用），技能/工具/审计都收在这一页；不套业务壳、不新增业务菜单。
@@ -85,20 +102,6 @@ export const constantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/dcs/agent/settings.vue'),
     hidden: true,
     meta: { title: '工作台设置', noCache: true }
-  },
-  // 自动化（2026-11-05 拍板 题7 乙）：一级页 + 整页新建/编辑。与工作台同分区，
-  // 权限在页面内自检（agentws:workspace:use + dcs:assistant:automation），未授权跳 /403。
-  {
-    path: '/agent/automation',
-    component: () => import('@/views/dcs/agent/automation/index.vue'),
-    hidden: true,
-    meta: { title: '自动化', noCache: true }
-  },
-  {
-    path: '/agent/automation/:id',
-    component: () => import('@/views/dcs/agent/automation/edit.vue'),
-    hidden: true,
-    meta: { title: '自动化 · 编辑', noCache: true }
   },
   {
     path: '/401',

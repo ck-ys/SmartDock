@@ -76,7 +76,7 @@
  * - 技能/工具/自动化/审计四项功能未建，左栏导航先置灰（积木内），这里不再放任何「即将上线」入口；
  * - 权限自检沿用批3（agentws:workspace:use）。
  */
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router';
 import BrandMark from '@/components/BrandMark.vue';
 import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
@@ -286,7 +286,10 @@ async function fetchDeepLink(): Promise<DeepLinkRow | null> {
   const thread = deepLinkThread();
   if (!thread) return null;
   const res = await getConversationByThread(thread);
-  return ((res as unknown as { data?: DeepLinkRow })?.data ?? null) as DeepLinkRow | null;
+  const row = ((res as unknown as { data?: DeepLinkRow })?.data ?? null) as DeepLinkRow | null;
+  // 批A三审 P2：返回时 query 已又变过（连点两次）——旧 row 不许覆盖新深链
+  if (row && row.threadId !== deepLinkThread()) return null;
+  return row;
 }
 
 /**
@@ -295,6 +298,20 @@ async function fetchDeepLink(): Promise<DeepLinkRow | null> {
  * - 成功后才抹掉 ?thread=：取不到时保留地址，刷新还能再试（先 replace 会让链接一刷就丢）
  * - 打开失败只由 openConversation 自己提示一次，这里不再叠第二个 toast
  */
+/** 批 A Q3：/agent 有了 children 后，从自动化视图点「查看会话」回来不再重挂本页——
+ *  深链 ?thread= 的应用从只靠 onMounted 改为同时监听 query 变化（首挂仍走 onMounted，
+ *  这里只接管“已挂载状态下出现的新深链”；applyDeepLink 成功后 replace 清 query，不会回环）。 */
+watch(
+  () => String(route.query.thread ?? ''),
+  (t, old) => {
+    if (t && t !== old) {
+      void fetchDeepLink()
+        .then(applyDeepLink)
+        .catch(() => null);
+    }
+  }
+);
+
 async function applyDeepLink(row: DeepLinkRow | null) {
   if (!deepLinkThread()) return;
   if (!row) {

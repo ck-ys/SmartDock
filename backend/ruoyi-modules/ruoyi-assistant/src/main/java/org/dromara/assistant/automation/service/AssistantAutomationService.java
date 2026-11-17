@@ -382,7 +382,8 @@ public class AssistantAutomationService {
             return "ALL";
         }
         return switch (filter.toUpperCase()) {
-            case "ENABLED", "PAUSED", "FAILED" -> filter.toUpperCase();
+            // 批 A Q3（2026-11-14 拍板案1）：补 SUCCESS=已完成（最近一次运行成功），列表页五个筛选词齐
+            case "ENABLED", "PAUSED", "FAILED", "SUCCESS" -> filter.toUpperCase();
             default -> "ALL";
         };
     }

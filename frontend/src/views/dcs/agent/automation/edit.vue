@@ -1,24 +1,26 @@
 <template>
   <div v-if="allowed" class="auto-ws">
-    <header class="auto-top">
-      <button class="auto-back" type="button" @click="goList">
-        <IconSpan name="arrow-left" :size="13" /> 自动化
-      </button>
-      <span class="auto-sep" aria-hidden="true"></span>
-      <nav class="auto-crumb" aria-label="当前位置">
-        <span>工作台</span><span class="sl" aria-hidden="true">/</span>
-        <span class="crumb-link" role="button" tabindex="0" @click="goList" @keydown.enter="goList">自动化</span>
-        <span class="sl" aria-hidden="true">/</span><b>{{ isNew ? '新建' : '编辑' }}</b>
-      </nav>
-      <span class="auto-scope">{{ isNew ? '建好后到点会自动跑' : `已跑 ${row?.runCount ?? 0} 次 · 成功 ${row?.successCount ?? 0} 次` }}</span>
-    </header>
-
     <main class="auto-main">
+      <!-- 批 A Q3/Q4：不出面包屑、不出「返回」——这块本来就渲染在工作台主区里，浏览器后退回列表 -->
       <div class="auto-head">
         <div>
           <h1>{{ isNew ? '新建自动化' : row?.title || '编辑自动化' }}</h1>
-          <p>自动化只能用只读查询工具；需要人确认的写操作不会执行。</p>
+          <p>{{ isNew ? '建好后到点会自动跑' : `已跑 ${row?.runCount ?? 0} 次 · 成功 ${row?.successCount ?? 0} 次` }}</p>
         </div>
+      </div>
+
+      <!-- Q4 案1：设置 / 历史 两个页签——历史从 320px 窄栏抬成整页视野 -->
+      <div class="ag-tabs" role="tablist" aria-label="自动化详情">
+        <button type="button" role="tab" :aria-selected="tab === 'set'" :class="{ on: tab === 'set' }" @click="tab = 'set'">设置</button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="tab === 'hist'"
+          :class="{ on: tab === 'hist' }"
+          :disabled="isNew"
+          :title="isNew ? '创建并跑过之后，这里能看到每次的结果' : undefined"
+          @click="tab = 'hist'"
+        >历史</button>
       </div>
 
       <div v-if="!isNew && loading" class="auto-empty">正在读取…</div>
@@ -28,165 +30,155 @@
         <button class="btn-ghost" type="button" @click="goList">返回列表</button>
       </div>
 
-      <div v-else class="edit-grid">
-        <section class="edit-card" aria-label="自动化设置">
-          <div class="field">
-            <label for="auto-title">名称</label>
-            <el-input id="auto-title" v-model="form.title" maxlength="60" show-word-limit placeholder="例如：本周客户跟进盘点" />
-          </div>
+      <!-- ============ 设置页签：任务标题 / 调度 / 指令 三段（+外部工具，能力不倒退） ============ -->
+      <section v-else-if="tab === 'set'" class="edit-card" aria-label="自动化设置">
+        <div class="field">
+          <label for="auto-title">任务标题</label>
+          <el-input id="auto-title" v-model="form.title" maxlength="60" show-word-limit placeholder="例如：每周一 9 点的逾期清单" />
+        </div>
 
-          <div class="field">
-            <label for="auto-prompt">要它做什么</label>
-            <el-input
-              id="auto-prompt"
-              v-model="form.prompt"
-              type="textarea"
-              :rows="7"
-              maxlength="2000"
-              show-word-limit
-              placeholder="写一句人话，例如：汇总上周新增的重点客户，按跟进阶段分组，标出 3 天没联系的。"
-            />
-            <p class="field-hint">到点后模型会自己挑合适的技能和只读工具；写操作一律不执行。</p>
-          </div>
-
-          <div class="field">
-            <label>能用的外部工具</label>
-            <p class="field-hint">
-              默认一个都不挂；勾上才挂，而且只挂只读服务。挂了外部工具的自动化，运行失败不会被连续失败自动停用（外部服务抖动不算你的错）。
-            </p>
-            <div v-if="mcpOptions.length" class="mcp-picks">
-              <label
-                v-for="m in mcpOptions"
-                :key="m.serverName"
-                class="mcp-pick"
-                :class="{ on: form.mcpServers.includes(m.serverName) }"
-              >
-                <input
-                  type="checkbox"
-                  :checked="form.mcpServers.includes(m.serverName)"
-                  @change="toggleMcp(m.serverName)"
-                />
-                <span class="mcp-pick-n">{{ m.displayName }}</span>
-                <span class="mcp-pick-st">{{ m.statusText }}</span>
-                <span class="mcp-pick-d">{{ m.tools.length ? m.tools.join('、') : '还没调用过，工具名用过才出现' }}</span>
-              </label>
-            </div>
-            <p v-else-if="mcpFailed" class="field-hint">
-              外部服务清单没加载出来（网络或权限问题），<button class="mcp-retry" type="button" @click="loadMcpOptions">重试</button>
-            </p>
-            <p v-else class="field-hint">平台还没有开放只读外部服务。</p>
-          </div>
-
-          <div class="field">
-            <label for="auto-time">什么时候跑</label>
-            <div class="sched-row">
-              <div class="seg" role="group" aria-label="频率">
-                <button
-                  type="button"
-                  :class="{ on: form.scheduleType === 'DAILY' }"
-                  :aria-pressed="form.scheduleType === 'DAILY'"
-                  @click="setType('DAILY')"
-                >每天</button>
-                <button
-                  type="button"
-                  :class="{ on: form.scheduleType === 'WEEKLY' }"
-                  :aria-pressed="form.scheduleType === 'WEEKLY'"
-                  @click="setType('WEEKLY')"
-                >每周</button>
-              </div>
-              <!-- id/aria-label 会透传到内层 input（EP 的 picker 是 inheritAttrs:false + v-bind="attrs"） -->
-              <el-time-picker
-                id="auto-time"
-                v-model="form.scheduleTime"
-                format="HH:mm"
-                value-format="HH:mm"
-                :clearable="false"
-                aria-label="运行时间"
-                placeholder="09:00"
-                style="width: 116px"
-              />
-              <span class="field-hint" style="margin: 0">北京时间</span>
-            </div>
-            <div v-if="form.scheduleType === 'WEEKLY'" class="day-chips" style="margin-top: 10px">
+        <div class="field">
+          <label for="auto-time">调度</label>
+          <div class="sched-row">
+            <div class="seg" role="group" aria-label="频率">
               <button
-                v-for="d in week"
-                :key="d.value"
-                class="day-chip"
-                :class="{ on: form.weekdays.includes(d.value) }"
                 type="button"
-                :aria-pressed="form.weekdays.includes(d.value)"
-                @click="toggleDay(d.value)"
-              >
-                {{ d.label }}
-              </button>
+                :class="{ on: form.scheduleType === 'DAILY' }"
+                :aria-pressed="form.scheduleType === 'DAILY'"
+                @click="setType('DAILY')"
+              >每天</button>
+              <button
+                type="button"
+                :class="{ on: form.scheduleType === 'WEEKLY' }"
+                :aria-pressed="form.scheduleType === 'WEEKLY'"
+                @click="setType('WEEKLY')"
+              >每周</button>
             </div>
-            <div class="preview-box">
-              <template v-if="preview.length">
-                <b>接下来 {{ preview.length }} 次：</b>
-                <!-- 一条一个 nowrap，换行只发生在日期之间，不把「2026-11-10 09:00」劈成两半 -->
-                <span class="pv-times">
-                  <span v-for="t in preview" :key="t" class="pv-time">{{ t }}</span>
-                </span>
-              </template>
-              <template v-else>选好时间后这里会列出接下来 5 次。</template>
-            </div>
+            <!-- id/aria-label 会透传到内层 input（EP 的 picker 是 inheritAttrs:false + v-bind="attrs"） -->
+            <el-time-picker
+              id="auto-time"
+              v-model="form.scheduleTime"
+              format="HH:mm"
+              value-format="HH:mm"
+              :clearable="false"
+              aria-label="运行时间"
+              placeholder="09:00"
+              style="width: 116px"
+            />
+            <span class="field-hint" style="margin: 0">北京时间</span>
           </div>
-
-          <div class="edit-actions">
-            <button class="btn-primary" type="button" :disabled="saving || !valid" @click="save">
-              {{ saving ? '保存中…' : isNew ? '创建' : '保存修改' }}
+          <div v-if="form.scheduleType === 'WEEKLY'" class="day-chips" style="margin-top: 10px">
+            <button
+              v-for="d in week"
+              :key="d.value"
+              class="day-chip"
+              :class="{ on: form.weekdays.includes(d.value) }"
+              type="button"
+              :aria-pressed="form.weekdays.includes(d.value)"
+              @click="toggleDay(d.value)"
+            >
+              {{ d.label }}
             </button>
-            <!-- 按钮置灰时得说清缺什么，否则用户只看到一个点不动的按钮 -->
-            <span v-if="invalidHint" class="edit-hint">{{ invalidHint }}</span>
-            <button v-if="!isNew" class="btn-ghost" type="button" :disabled="running" @click="runNow">
-              {{ running ? '已提交…' : '立即运行一次' }}
-            </button>
-            <span class="sp"></span>
-            <button v-if="!isNew" class="btn-ghost btn-danger" type="button" @click="remove">删除</button>
-            <button class="btn-ghost" type="button" @click="goList">返回</button>
           </div>
-        </section>
-
-        <aside>
-          <div class="side-card">
-            <h3>运行历史</h3>
-            <div v-if="isNew" class="run-empty" style="padding: 4px 0">创建并跑过之后，这里能看到每次的结果。</div>
-            <div v-else-if="runs.length === 0" class="run-empty" style="padding: 4px 0">还没跑过。</div>
-            <template v-else>
-              <div v-for="r in runs" :key="r.id" class="hist-row">
-                <div class="hist-main">
-                  <!-- 元信息拆成可换行的独立块：窄侧栏里「13s」被挤成孤零零一行像是坏了 -->
-                  <div class="hist-meta">
-                    <span
-                      :class="'run-status ' + statusTone(r.status)"
-                      :title="r.status === 'MISSED' ? '服务当时停了超过 6 小时，这一次没跑' : undefined"
-                    >{{ statusText(r.status) }}</span>
-                    <span class="run-time">{{ r.scheduledFor }}</span>
-                    <span v-if="r.triggerType === 'MANUAL'" class="run-time">手动</span>
-                    <span v-if="r.status === 'SUCCESS' && r.durationMs != null" class="run-time">{{ durationText(r.durationMs) }}</span>
-                  </div>
-                  <p v-if="r.summary" class="hist-sum">{{ r.summary }}</p>
-                  <p v-else-if="r.error" class="hist-sum">{{ r.error }}</p>
-                </div>
-                <!-- 失败在建会话之前时 conversationId 为空，threadId 也指不到东西 -->
-                <button v-if="r.threadId && r.conversationId != null" class="run-link" type="button" @click="openThread(r.threadId)">
-                  会话
-                </button>
-              </div>
+          <div class="preview-box">
+            <template v-if="preview.length">
+              <b>接下来 {{ preview.length }} 次：</b>
+              <!-- 一条一个 nowrap，换行只发生在日期之间，不把「2026-11-10 09:00」劈成两半 -->
+              <span class="pv-times">
+                <span v-for="t in preview" :key="t" class="pv-time">{{ t }}</span>
+              </span>
             </template>
+            <template v-else>选好时间后这里会列出接下来 5 次。</template>
           </div>
+        </div>
 
-          <div class="side-card">
-            <h3>边界说明</h3>
-            <ul>
-              <li>只读运行：查询、汇总可以做；新增/修改/删除一律不执行。</li>
-              <li>成功的通知直达结果会话；失败的直达这个自动化页，能看原因、手动重跑。</li>
-              <li>失败不自动重试；连续 3 次失败会自动停用，改好再手动打开。</li>
-              <li>每人最多 5 条；只能看到自己的自动化。</li>
-            </ul>
+        <div class="field">
+          <label for="auto-prompt">指令</label>
+          <el-input
+            id="auto-prompt"
+            v-model="form.prompt"
+            type="textarea"
+            :rows="7"
+            maxlength="2000"
+            show-word-limit
+            placeholder="写一句人话，例如：把上周还没提交的人列出来，按截止日排序，标出超期天数。"
+          />
+          <p class="field-hint">到点后模型会自己挑合适的技能和只读工具；写操作一律不执行。</p>
+        </div>
+
+        <div class="field">
+          <label>能用的外部工具</label>
+          <p class="field-hint">
+            默认一个都不挂；勾上才挂，而且只挂只读服务。挂了外部工具的自动化，运行失败不会被连续失败自动停用（外部服务抖动不算你的错）。
+          </p>
+          <div v-if="mcpOptions.length" class="mcp-picks">
+            <label
+              v-for="m in mcpOptions"
+              :key="m.serverName"
+              class="mcp-pick"
+              :class="{ on: form.mcpServers.includes(m.serverName) }"
+            >
+              <input
+                type="checkbox"
+                :checked="form.mcpServers.includes(m.serverName)"
+                @change="toggleMcp(m.serverName)"
+              />
+              <span class="mcp-pick-n">{{ m.displayName }}</span>
+              <span class="mcp-pick-st">{{ m.statusText }}</span>
+              <span class="mcp-pick-d">{{ m.tools.length ? m.tools.join('、') : '还没调用过，工具名用过才出现' }}</span>
+            </label>
           </div>
-        </aside>
-      </div>
+          <p v-else-if="mcpFailed" class="field-hint">
+            外部服务清单没加载出来（网络或权限问题），<button class="mcp-retry" type="button" @click="loadMcpOptions">重试</button>
+          </p>
+          <p v-else class="field-hint">平台还没有开放只读外部服务。</p>
+        </div>
+
+        <div class="edit-actions">
+          <button class="btn-primary" type="button" :disabled="saving || !valid" @click="save">
+            {{ saving ? '保存中…' : isNew ? '创建' : '保存修改' }}
+          </button>
+          <!-- 按钮置灰时得说清缺什么，否则用户只看到一个点不动的按钮 -->
+          <span v-if="invalidHint" class="edit-hint">{{ invalidHint }}</span>
+          <button v-if="!isNew" class="btn-ghost" type="button" :disabled="running" @click="runNow">
+            {{ running ? '已提交…' : '立即运行一次' }}
+          </button>
+          <span class="sp"></span>
+          <button v-if="!isNew" class="btn-ghost btn-danger" type="button" @click="remove">删除</button>
+          <button class="btn-ghost" type="button" @click="goList">返回</button>
+        </div>
+        <!-- Q4 案1：底部只读说明——当前用哪个模型、只读工具、写操作要确认；不在这里换模型
+             （避免和会话级模型选择打架）。模型名 = model-choice 真值，拉不到就写「按租户配置」。 -->
+        <p class="model-line">模型 {{ modelName || '按租户配置' }} · 只读工具 · 写操作需确认</p>
+        <p class="edit-footnote">失败不自动重试；连续 3 次失败会自动停用，改好再手动打开。每人最多 5 条。</p>
+      </section>
+
+      <!-- ============ 历史页签：这条任务跑过的每一次（时间/结果/耗时/失败原因/跳会话） ============ -->
+      <section v-else-if="tab === 'hist'" class="hist-page" aria-label="运行历史">
+        <div v-if="runs.length === 0" class="auto-empty">还没跑过。开启后到点会在这里留痕。</div>
+        <div v-else class="run-list">
+          <div v-for="r in runs" :key="r.id" class="hist-full-row">
+            <div class="hf-when">
+              <span class="run-time">{{ r.scheduledFor }}</span>
+              <span v-if="r.triggerType === 'MANUAL'" class="hf-manual">手动</span>
+            </div>
+            <span class="run-status" :class="statusTone(r.status)" :title="r.status === 'MISSED' ? '服务当时停了超过 6 小时，这一次没跑' : undefined">
+              {{ statusText(r.status) }}
+            </span>
+            <span v-if="r.status === 'SUCCESS' && r.durationMs != null" class="run-time">{{ durationText(r.durationMs) }}</span>
+            <span v-else class="run-time hf-dash">—</span>
+            <span class="hf-reason">
+              <template v-if="r.status === 'FAILED' && r.error">{{ r.error }}</template>
+              <template v-else-if="r.summary">{{ r.summary }}</template>
+            </span>
+            <!-- 失败在建会话之前时 conversationId 为空，threadId 也指不到东西 -->
+            <button v-if="r.threadId && r.conversationId != null" class="run-link" type="button" @click="openThread(r.threadId)">
+              查看会话
+            </button>
+          </div>
+        </div>
+        <p class="edit-footnote">最多显示最近 20 次。</p>
+      </section>
     </main>
   </div>
   <div v-else class="auto-blocked" aria-hidden="true">
@@ -197,14 +189,17 @@
 
 <script setup lang="ts">
 /**
- * 自动化整页新建/编辑（2026-11-05 拍板 题1 乙/题4 乙/题7 乙）。
- * 日程只收「每天/每周几 + HH:mm」，不碰 cron；右栏是运行历史与边界说明。
+ * 自动化新建/编辑（批 A Q4 · 2026-11-14 拍板案1）：「设置 / 历史」两个页签。
+ * 设置=任务标题/调度/指令三段（外部工具保留——能力不倒退）+底部只读模型行；
+ * 历史=这条任务跑过的每一次（时间/结果/耗时/失败原因/跳会话，最近 20 条，
+ * 沿用既有 GET /automations/{id}/runs，本批不加分页不动后端）。
+ * 渲染在工作台主区槽内（Q3），不出面包屑；?tpl= 携带模板 key 预填（列表页模板四卡入口）。
  */
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
 import { useUserStore } from '@/store/modules/user';
+import { getAssistantModelChoice } from '@/api/dcs/assistant';
 import {
   createAutomation,
   deleteAutomation,
@@ -218,6 +213,7 @@ import {
   type AutomationRunRow
 } from '@/api/dcs/assistant/automation';
 import { listAssistantMcpMembers, type AssistantMcpMemberRow } from '@/api/dcs/assistant';
+import { templateByKey } from './templates';
 
 const route = useRoute();
 const router = useRouter();
@@ -237,6 +233,7 @@ const week = [
 
 const id = computed(() => String(route.params.id ?? 'new'));
 const isNew = computed(() => id.value === 'new');
+const tab = ref<'set' | 'hist'>('set');
 
 const form = reactive({
   title: '',
@@ -254,6 +251,17 @@ function toggleMcp(name: string) {
   const i = form.mcpServers.indexOf(name);
   if (i >= 0) form.mcpServers.splice(i, 1);
   else form.mcpServers.push(name);
+}
+
+/** Q4 底部只读模型行：真值来自 model-choice（默认模型名）；拉不到就说「按租户配置」，不编名字 */
+const modelName = ref('');
+async function loadModelName() {
+  try {
+    const res = (await getAssistantModelChoice()) as unknown as { data?: { defaultModelName?: string } };
+    modelName.value = (res?.data?.defaultModelName ?? '').trim();
+  } catch {
+    modelName.value = '';
+  }
 }
 
 const row = ref<AutomationRow | null>(null);
@@ -377,10 +385,24 @@ function openThread(threadId: string | null) {
   router.push({ path: '/agent', query: { thread: threadId } });
 }
 
+/** 批 A Q3：模板预填——/agent/automation/new?tpl=weekly 带 title/prompt/调度进表单 */
+function applyTemplate() {
+  const tpl = templateByKey(route.query.tpl);
+  if (!tpl) return;
+  form.title = tpl.title;
+  form.prompt = tpl.prompt;
+  form.scheduleType = tpl.scheduleType;
+  form.scheduleTime = tpl.scheduleTime;
+  if (tpl.scheduleType === 'WEEKLY' && tpl.weekdays.length) {
+    form.weekdays = [...tpl.weekdays];
+  }
+}
+
 async function load() {
   if (isNew.value) {
     row.value = null;
     runs.value = [];
+    applyTemplate();
     schedulePreview();
     await checkQuota();
     return;
@@ -458,7 +480,7 @@ async function save() {
     const data = (res as unknown as { data?: AutomationRow })?.data;
     ElMessage.success(isNew.value ? '已创建，到点会自动跑' : '已保存');
     if (isNew.value && data?.id != null) {
-      router.replace(`/agent/automation/${data.id}`);
+      router.replace({ path: `/agent/automation/${data.id}` });
       row.value = data;
       await loadRuns();
     } else if (data) {
@@ -478,6 +500,7 @@ async function runNow() {
     await runAutomation(id.value);
     ElMessage.success('已开始运行，跑完会发站内通知');
     await loadRuns();
+    tab.value = 'hist';
     startPoll();
   } catch {
     // 拦截器统一提示
@@ -491,10 +514,23 @@ async function runNow() {
  * 只回读 runCount/successCount，不碰表单——用户可能正在改提示词。
  */
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollFails = 0;
 function startPoll() {
   if (pollTimer) return;
+  pollFails = 0;
   pollTimer = setInterval(async () => {
-    await loadRuns();
+    // 批A三审 P1：loadRuns 没 try/catch——一次 5xx 就是每 5s 一个未处理 rejection；
+    // 连错 3 次直接停轮询（页面还有手动刷新），别无限打
+    try {
+      await loadRuns();
+      pollFails = 0;
+    } catch {
+      if (++pollFails >= 3) {
+        stopPoll();
+        return;
+      }
+      return;
+    }
     if (runs.value.some((r) => r.status === 'RUNNING')) return;
     stopPoll();
     if (isNew.value) return;
@@ -536,13 +572,17 @@ async function remove() {
 
 onMounted(async () => {
   void loadMcpOptions();
+  void loadModelName();
   if (!allowed.value) {
     router.replace('/403');
     return;
   }
   await load();
   // 进页面时若还有在跑的（刷新页面/从通知回来），继续追到结束
-  if (runs.value.some((r) => r.status === 'RUNNING')) startPoll();
+  if (runs.value.some((r) => r.status === 'RUNNING')) {
+    tab.value = 'hist';
+    startPoll();
+  }
 });
 
 onBeforeUnmount(() => {
@@ -553,12 +593,4 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 @use '@/assets/styles/dcs-agent-automation.scss';
-
-.crumb-link {
-  cursor: pointer;
-}
-.crumb-link:hover {
-  color: var(--text);
-  text-decoration: underline;
-}
 </style>

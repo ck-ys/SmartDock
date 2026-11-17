@@ -19,12 +19,11 @@
           <button class="side-close" type="button" aria-label="关闭会话列表" @click="sideOpen = false"><IconSpan name="x" /></button>
         </div>
         <nav class="ag-nav" aria-label="工作台导航">
-          <!-- 「会话」是当前位置标记，不是入口：它原来挂了 onNewSession，正在聊的时候点一下
-               就会清空当前会话（且 selected 不复位，标题栏还挂着旧标题）。做成不可点的当前项。 -->
-          <span class="on" aria-current="page"><IconSpan name="message" :size="15" /> 会话</span>
+          <!-- 2026-11-14 批 A Q1：删掉「会话」死项（ZCode 左栏没有这一项；原先它是不可点的
+               当前位置标记）。左栏高亮改由「当前视图」接管：进入自动化视图时「自动化」点亮（Q3）。 -->
           <!-- 2026-11-05 自动化批（拍板 题7 乙）：左栏「自动化」点亮成真入口——一级页
                （卡片列表 + 整页新建/编辑），结果进通知和会话。 -->
-          <button type="button" title="自动化：到点跑一轮，结果进通知和会话" @click="goAutomation"><IconSpan name="timer" :size="15" /> 自动化</button>
+          <button type="button" :class="{ on: autoMode }" title="自动化：到点跑一轮，结果进通知和会话" @click="goAutomation"><IconSpan name="timer" :size="15" /> 自动化</button>
           <button type="button" title="设置：技能、工具、审计（整页跳转）" @click="goWorkspaceSettings"><IconSpan name="settings" :size="15" /> 设置</button>
         </nav>
         <el-input v-model="kw" class="ag-side-search" placeholder="搜索会话标题" aria-label="搜索会话标题" clearable :prefix-icon="SearchIcon" />
@@ -220,7 +219,11 @@
     <!-- 右：对话区（单例 store 接管——与抽屉/全屏同一状态机，可继续对话） -->
     <!-- Q8/Q9/三反馈②：廊位由 StatPanel 解算写 --sp-strip 变量（面板贴内容列右缘），
          本层只消费变量——消息列与输入框同让同回，浮层面板不吃 padding -->
-    <section class="main" :class="{ 'ag-empty': agEmpty }">
+    <!-- 批 A Q3：自动化视图 = 主区就地换（不跳页）——会话状态单例不动，回来接着聊 -->
+    <section v-if="autoMode" class="main auto-host" aria-label="自动化">
+      <router-view />
+    </section>
+    <section v-else class="main" :class="{ 'ag-empty': agEmpty }">
       <!-- 批3.5·题1/题5：agent 壳进门内容（hero + 能做什么）——空态渲染在会话区顶部，会话开始即让位。
            条件与 agEmpty 同一份（原来内联写了一遍，两处改一处忘一处就会「标题在、技能条不在」） -->
       <slot v-if="agEmpty" name="intro" />
@@ -375,7 +378,7 @@
  */
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Search as SearchIcon } from '@element-plus/icons-vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ASSISTANT_ADMIN_PATH } from '@/router';
 import {
   archiveConversation,
@@ -416,7 +419,11 @@ import type { AssistantTurn } from '@/components/DcsAssistant/useAssistant';
 const props = withDefaults(defineProps<{ variant?: 'session' | 'agent' }>(), { variant: 'session' as const });
 
 const router = useRouter();
+const route = useRoute();
 const userStore = useUserStore();
+/** 批 A Q3（2026-11-14 拍板案1）：自动化视图开关——/agent/automation* 时主区换成 router-view
+ *  （ZCode 交互：左栏/顶栏原地不动、不出面包屑），左栏「自动化」项随之点亮。 */
+const autoMode = computed(() => props.variant === 'agent' && route.path.startsWith('/agent/automation'));
 // E-10（2026-11-06）：置顶键按登录用户分开（换账号不串别人会话）
 initConvPins(userStore.userId);
 const prefs = getAgentPrefs(userStore.userId);
@@ -943,6 +950,7 @@ function onPlanCancel(planId?: string) {
 }
 
 function onNewSession() {
+  if (autoMode.value) router.push('/agent'); // 批A三审 P1：同 openConversation
   // 手机上点「新会话」后收起历史抽屉，新对话区直接可见
   sideOpen.value = false;
   if (state.sending) {
@@ -1014,7 +1022,9 @@ async function doLoadConversations(silent: boolean) {
         state.draftMode = false;
         // 题5 甲根因（2026-11-07）：刷新后左栏/顶栏已指向这个会话，正文却还是欢迎页（0 条消息）。
         // 标题、正文、读数必须同源——没有在飞回合时把历史拉回来；发送后的静默补刷 turns 非空，不会再拉。
-        if (state.turns.length === 0 && !state.sending) {
+        // 2026-11-15 批A Q3 补正：自动化视图（autoMode）里不自动重开——直开/刷新 /agent/automation
+        // 时单例还记着上次会话，这里一开就走 openConversation 的「回 /agent」守卫，页面被弹回工作台。
+        if (!autoMode.value && state.turns.length === 0 && !state.sending) {
           await openConversation(cur);
         }
       }
@@ -1076,6 +1086,9 @@ async function loadMoreConversations() {
 /** 打开会话：DB messages 重放进单例（rebuildFromHistory 同步 threadId+清队列，P1-4/P1-3）+动作账本 */
 let openSeq = 0;
 async function openConversation(c: AssistantConversation) {
+  // 批A三审 P1：自动化视图里主区显示的是路由子页——点会话先回 /agent，
+  // 否则状态悄悄换了、在途回答被掐、画面却还停在自动化页
+  if (autoMode.value) router.push('/agent');
   // 手机端选完会话即收起历史抽屉，主对话区全宽
   sideOpen.value = false;
   // 自查回修(dspro P2)：临时行=当前正在用的会话本身，点它只对齐选中态即可——
@@ -1495,7 +1508,10 @@ defineExpose({
       > button:not(.off) {
         cursor: pointer;
 
-        &:hover {
+        /* 2026-11-15 批 A Q2 补正：本主题 --el-fill-color-light = #f5f5f5，与左栏同色。
+           原来鼠标停在「当前所在项」上时，hover 会把 #e4e4e6 盖回 #f5f5f5——点一下自己
+           高亮就消失（真机取证正好撞上）。选中项不给 hover 覆盖。 */
+        &:hover:not(.on) {
           background: var(--el-fill-color-light);
           color: var(--dcs-text-primary);
         }
@@ -1504,12 +1520,14 @@ defineExpose({
           outline-offset: 2px;
         }
       }
-      /* 当前所在位置（会话）：不可点，所以不给 hover/焦点，只给选中态。
+      /* 当前所在视图：不可点或为当前入口，所以不给 hover/焦点，只给选中态。
          2026-11-13 视觉批 F1（回执 Q13 参考 ZCode）：选中不用主题蓝底 + 蓝字——那会把
-         「当前位置」画成一颗可点的主按钮，且蓝底和业务壳撞色。改中性底一档（比 hover 的
-         fill-color-light 深一级）+ 文字转正，不加竖条（F1 撤回的就是竖条）。 */
+         「当前位置」画成一颗可点的主按钮，且蓝底和业务壳撞色。改中性底一档 + 文字转正，
+         不加竖条（F1 撤回的就是竖条）。
+         2026-11-14 批 A Q2：底色从 var(--el-fill-color)（#f0f0f0，与侧栏 #f5f5f5 只差 5 级）
+         加深到 #e4e4e6（差 17 级）——ZCode 选中底差 11 级，我们底更浅所以加深一档才够分辨。 */
       > .on {
-        background: var(--el-fill-color);
+        background: #e4e4e6;
         color: var(--dcs-text-primary);
         font-weight: 500;
       }
@@ -1909,6 +1927,16 @@ defineExpose({
     border-radius: var(--app-card-radius);
     background: var(--el-bg-color);
     overflow: hidden;
+    /* 批 A Q3：自动化视图宿主——撤掉会话区专属的左右让位与画布伪元素，
+       自动化页自带灰底与滚动（.auto-ws/.auto-main），这里只当一块完整画布 */
+    &.auto-host {
+      padding-right: 0;
+      padding-left: 0;
+
+      &::after {
+        display: none;
+      }
+    }
     /* Q8/Q9/三反馈② 廊位：StatPanel 按容器宽解算（fills P+4 / capped 2P+956-W / 0 贴列）写
        --sp-strip，本层消费——胶囊与面板始终贴内容列右缘，宽屏不再漂在空档；
        StatPanel 为 absolute 浮层不吃本层 padding，正文列与聊天框一起让、一起回

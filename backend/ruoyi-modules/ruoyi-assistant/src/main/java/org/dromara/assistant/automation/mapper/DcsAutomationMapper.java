@@ -33,6 +33,7 @@ public interface DcsAutomationMapper extends BaseMapper<DcsAutomation> {
         + "<if test=\"filter == 'ENABLED'\"> AND enabled='1' AND builtin='0'</if>"
         + "<if test=\"filter == 'PAUSED'\"> AND enabled='0' AND builtin='0'</if>"
         + "<if test=\"filter == 'FAILED'\"> AND last_status='FAILED' AND builtin='0'</if>"
+        + "<if test=\"filter == 'SUCCESS'\"> AND last_status='SUCCESS' AND builtin='0'</if>"
         + " ORDER BY builtin ASC, create_time DESC"
         + "</script>")
     List<DcsAutomation> selectVisible(@Param("tenantId") String tenantId, @Param("userId") Long userId,

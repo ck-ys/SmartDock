@@ -2097,4 +2097,11 @@ html.dark .tool-st .dot.d-off {
     }
   }
 }
+
+/* 批 A Q5（2026-11-14）：开关打开色从业务蓝收中性深墨——工作台动作色 = 文字色（Q13 拍），
+   蓝（含业务蓝）留给业务壳主操作；语义绿/红不动。「去记忆页」是主操作，保留品牌色。 */
+:deep(.el-switch.is-checked .el-switch__core) {
+  background-color: #17181a;
+  border-color: #17181a;
+}
 </style>
