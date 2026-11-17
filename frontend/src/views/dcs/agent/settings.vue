@@ -61,11 +61,11 @@
       </aside>
 
       <main class="set-main">
-        <!-- ============ 常规（C 七行）：只影响本人这台设备的聊天手感 ============ -->
+        <!-- ============ 常规（C 七行）：只影响本人的聊天手感（按账号同步、本机 localStorage 兜底） ============ -->
         <section v-if="section === 'general'" class="set-sheet general" aria-label="常规">
           <div class="gen-head">
             <h1>常规</h1>
-            <p>聊天手感设置——只存你这台设备，改完立即生效，不用保存。换电脑/换账号不会跟着走。</p>
+            <p>聊天手感设置——跟着你的账号走（换电脑登录还在，换账号互不串），改完立即生效，不用保存。</p>
           </div>
 
           <div class="gen-scroll">

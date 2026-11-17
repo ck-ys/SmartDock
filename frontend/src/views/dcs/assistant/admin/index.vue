@@ -176,6 +176,22 @@
             </span>
           </div>
 
+          <!-- 例外清单（批C Q12 案1，2026-11-15）：偏离平台默认的覆盖一条一行、可单条恢复。
+               默认空时只说一句「全部跟随平台默认」——不占高度、不吓人；有偏离才长出条目。 -->
+          <div v-if="tgRows.length && !tgLoading" class="cap-exc" :class="{ empty: !capOverrides.length }">
+            <div class="ce-head">
+              <b>例外清单</b>
+              <span v-if="capOverrides.length" class="ce-cnt">{{ capOverrides.length }} 项偏离平台默认</span>
+              <span v-else class="ce-none">全部跟随平台默认</span>
+            </div>
+            <div v-for="o in capOverrides" :key="o.key" class="ce-row">
+              <span class="ce-nm">{{ o.name }}<span v-if="o.na" class="ce-na">当前不会出现</span></span>
+              <span class="ce-cur">当前 {{ o.cur }}</span>
+              <span class="ce-def">默认 {{ o.def }}</span>
+              <button type="button" class="ce-restore" @click="restoreCapOverride(o)">恢复默认</button>
+            </div>
+          </div>
+
           <div v-if="!tgLoading && tgRows.length === 0" class="cap-empty">能力清单加载失败——切换页签重试</div>
 
           <div v-if="capGroups.length" class="cap-tbl">
@@ -294,6 +310,17 @@
               <span class="n">已选 <b>{{ capSel.size }}</b> 项</span>
               <el-button size="small" @click="batchCapSet('admin')">批量收紧</el-button>
               <el-button size="small" @click="batchCapSet('off')">批量关闭</el-button>
+              <!-- 急停出口（批C Q12 案1）：一步设 off 并立即保存，不用再点「保存」 -->
+              <el-button
+                size="small"
+                type="danger"
+                plain
+                class="cap-estop"
+                title="对选中的能力一步禁用并立即保存（对全租户生效，可再开）"
+                :loading="tgSaving"
+                :disabled="tgSaving"
+                @click="emergencyDisable"
+              >全员禁用</el-button>
               <el-button link size="small" @click="clearCapSel">清除选择</el-button>
               <span class="kbd">↑↓ 移动 · 回车看详情 · 空格勾选</span>
             </div>
@@ -3218,8 +3245,72 @@ const CAP_GROUP_HINT: Record<string, string> = {
   挂进来的外部服务: '服务离线时整组消失'
 };
 /** 覆盖计数：体检条按草稿（改完立刻有反应），页脚按已保存（说清真正生效的） */
-const capOvSavedCount = computed(() => tgRows.value.filter((r) => !!tgSaved.value[r.toolNames[0]]).length);
+/** 页脚与例外清单共用同一份口径（含「当前不会出现」的已存覆盖），避免两句同屏相反 */
+const capOvSavedCount = computed(() => capOverrides.value.length);
 const capOvDraftCount = computed(() => tgRows.value.filter((r) => !!tgDraft.value[r.toolNames[0]]).length);
+
+/* ===== 例外清单（批C Q12 案1，2026-11-15）：只列「已保存且与平台默认不同」的覆盖 =====
+   用 tgSaved 而不是 tgDraft：例外清单要回答「现在真正生效的有哪些偏离」；草稿是还没保存的意图，
+   混进来会让人以为已经生效。存了与默认相同的值也不列（那不是例外）。 */
+interface CapOverride {
+  key: string;
+  name: string;
+  cur: string;
+  def: string;
+  /** 当前「不会出现」（服务停用/密钥未配等）：覆盖还在库里，重新启用后会生效，必须列出来 */
+  na: boolean;
+  row: TgRowUi;
+}
+function capLevelText(lv: number): string {
+  return lv < 0 ? '已关闭' : (LEVEL_LABEL[lv] ?? '');
+}
+const capOverrides = computed<CapOverride[]>(() => {
+  const out: CapOverride[] = [];
+  for (const r of tgRows.value) {
+    // 不按「当前是否会出现」过滤：停用服务上的已存覆盖如果不列，重新启用时会静默复活
+    if (!tgSaved.value[r.toolNames[0]]) continue;
+    const defLv = capLevelOf(r, {});
+    const curLv = capLevelOf(r, tgSaved.value);
+    if (curLv === defLv) continue;
+    out.push({
+      key: r.key,
+      name: r.displayName,
+      cur: capLevelText(curLv),
+      def: capLevelText(defLv),
+      na: !capAvailable(r),
+      row: r
+    });
+  }
+  return out;
+});
+/** 单条恢复默认：把该能力的覆盖从草稿里摘掉（多条工具名一起摘），等底部保存生效 */
+function restoreCapOverride(o: CapOverride) {
+  if (tgSaving.value) return;
+  const next = { ...tgDraft.value };
+  for (const n of o.row.toolNames) delete next[n];
+  tgDraft.value = next;
+  ElMessage.success(`「${o.name}」恢复平台默认已加入待保存改动——点底部「保存」生效`);
+}
+/** 全员禁用急停：对已选能力一步设 off 并立即保存（省掉「批量→选档→保存」的后两步） */
+async function emergencyDisable() {
+  if (tgSaving.value) return;
+  const next = { ...tgDraft.value };
+  let changed = 0;
+  for (const row of tgRows.value) {
+    if (!capSel.value.has(row.key)) continue;
+    if (!capAvailable(row) || row.locked) continue;
+    if (capLevelOf(row, tgDraft.value) < 0) continue; // 已经是关闭，不重复计
+    for (const n of row.toolNames) next[n] = 'off';
+    changed++;
+  }
+  if (!changed) {
+    ElMessage.info('选中的能力已经是关闭状态（或由代码强制，改不动）');
+    return;
+  }
+  tgDraft.value = next;
+  const ok = await onSaveToolGate();
+  if (ok) ElMessage.success(`已对全租户禁用 ${changed} 项；要恢复就在上面「例外清单」点恢复默认`);
+}
 /** 体检句的唯一来源：还有哪些高危能力对全员开放（处理完 = 无事） */
 const capOpenHigh = computed(() =>
   tgRows.value.filter((r) => r.riskLevel === 'high' && capAvailable(r) && capLevelOf(r, tgDraft.value) === 0)
@@ -3310,6 +3401,8 @@ function sameSaved(rows: AssistantToolGateRow[]): boolean {
 async function applyPreset() {
   const preview = capPreview.value;
   if (!preview.length) return;
+  // 能力表保存与推荐应用共用一张全量表：任何一个在途，另一个必须等（否则后写者把前者整份盖掉）
+  if (tgSaving.value || presetApplying.value) return;
   if (tgDirty.value) {
     try {
       await ElMessageBox.confirm(
@@ -3403,6 +3496,8 @@ async function saveCapLevel() {
 }
 /** 一键恢复：清空整张覆盖表（含手工关掉的行），落库后重新拉一次 */
 async function resetAllOverrides() {
+  // 与能力表保存/推荐应用互斥：都是整张覆盖表，在途时并发写＝后写者盖掉前者
+  if (tgSaving.value || presetApplying.value) return;
   try {
     await ElMessageBox.confirm(
       `把 ${capOvSavedCount.value} 处覆盖全部清掉，所有能力回到平台默认档（含你手工关掉的那些）。下一轮新会话生效。`,
@@ -3472,6 +3567,8 @@ function resetToolGate() {
   tgDraft.value = { ...tgSaved.value };
 }
 async function onSaveToolGate(): Promise<boolean> {
+  // 自保：整张表覆盖写，任何在途保存都不许再发一份（调用方漏挡时不至于互相盖）
+  if (tgSaving.value) return false;
   // 快照必须在 await 之前取：请求在飞时用户又改了草稿，不能把没发出去的那份记成「已保存」（会静默丢改动）
   const payload = { ...tgDraft.value };
   tgSaving.value = true;
@@ -5365,6 +5462,83 @@ onMounted(() => {
         font-weight: 400;
         color: var(--dcs-text-secondary);
       }
+    }
+  }
+
+  /* ===== 例外清单（批C Q12 案1）：默认一行灰字；有偏离才长出条目 ===== */
+  .cap-exc {
+    margin: 0 0 10px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: var(--dcs-radius-sm);
+    background: #fff;
+    font-size: 13px;
+
+    .ce-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      color: var(--dcs-text-primary);
+
+      b {
+        font-weight: 600;
+      }
+      .ce-cnt {
+        color: var(--el-color-warning);
+        font-size: 12px;
+      }
+      .ce-none {
+        color: var(--dcs-text-secondary);
+        font-size: 12px;
+      }
+    }
+    .ce-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 7px 10px;
+      border-top: 1px solid var(--el-border-color-lighter);
+
+      .ce-nm {
+        min-width: 140px;
+        font-weight: 500;
+      }
+      .ce-na {
+        margin-left: 6px;
+        padding: 0 6px;
+        border: 1px solid var(--el-border-color-lighter);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 400;
+        color: var(--dcs-text-secondary);
+      }
+      .ce-cur,
+      .ce-def {
+        color: var(--dcs-text-secondary);
+        font-size: 12px;
+      }
+      .ce-restore {
+        margin-left: auto;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        font: inherit;
+        font-size: 12px;
+        color: var(--dcs-text-primary);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        text-decoration-color: color-mix(in srgb, currentColor 32%, transparent);
+        cursor: pointer;
+
+        &:hover {
+          text-decoration-color: currentColor;
+        }
+      }
+    }
+    /* 空态不画分隔线，就是一句话 */
+    &.empty .ce-head {
+      padding: 7px 10px;
     }
   }
   .cap-empty {

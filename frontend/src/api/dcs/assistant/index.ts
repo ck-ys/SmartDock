@@ -131,6 +131,34 @@ export function getAssistantContextBreakdown(threadId: string) {
     headers: threadHeaders(threadId)
   });
 }
+
+/** 批C Q8（2026-11-15）：常规偏好按人入库——换设备仍在。saved=false 表示本次返回的是默认值。 */
+export interface AssistantUserPref {
+  saved: boolean;
+  sendKey: 'enter' | 'ctrl-enter';
+  streamOutput: boolean;
+  toolsOpen: boolean;
+  autoRetry: boolean;
+  motion: 'system' | 'full' | 'reduced';
+  answerSize: 'standard' | 'large';
+  askAutoContinue: boolean;
+}
+
+export function getAssistantUserPref() {
+  return request<AssistantUserPref>({
+    url: '/dcs/assistant/user-pref',
+    method: 'get'
+  });
+}
+
+export function saveAssistantUserPref(data: Omit<AssistantUserPref, 'saved'>) {
+  return request<void>({
+    url: '/dcs/assistant/user-pref',
+    method: 'put',
+    data
+  });
+}
+
 /** 业务反馈批1015b Q14：联网搜索配置读（密钥只出掩码；含平台默认开关状态） */
 export function getWebsearchInfo() {
   return request<{ configured: boolean; maskedKey: string; configKey: string }>({

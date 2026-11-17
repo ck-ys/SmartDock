@@ -692,6 +692,30 @@ CREATE TABLE public.dcs_assistant_user_quota (
 
 
 --
+-- Name: dcs_assistant_user_pref; Type: TABLE; Schema: public; Owner: -
+--
+
+-- 助手「常规偏好」按人入库（批C Q8 案1，2026-11-15）：这七行以前只存浏览器 localStorage，
+-- 换电脑/换浏览器就回默认。缺行=全部默认值（不预插行）。
+CREATE TABLE public.dcs_assistant_user_pref (
+    id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    user_id bigint NOT NULL,
+    send_key character varying(16) DEFAULT 'enter'::character varying NOT NULL,
+    stream_output character(1) DEFAULT '1'::bpchar NOT NULL,
+    tools_open character(1) DEFAULT '0'::bpchar NOT NULL,
+    auto_retry character(1) DEFAULT '1'::bpchar NOT NULL,
+    motion character varying(16) DEFAULT 'system'::character varying NOT NULL,
+    answer_size character varying(16) DEFAULT 'standard'::character varying NOT NULL,
+    ask_auto_continue character(1) DEFAULT '1'::bpchar NOT NULL,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_time timestamp without time zone,
+    CONSTRAINT pk_dcs_assistant_user_pref PRIMARY KEY (id),
+    CONSTRAINT uk_dcs_asst_user_pref UNIQUE (tenant_id, user_id)
+);
+
+
+--
 -- Name: dcs_audit; Type: TABLE; Schema: public; Owner: -
 --
 
