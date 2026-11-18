@@ -165,7 +165,7 @@ ARCH_BASELINE_UPDATE=1 mvn -P local -DskipTests=false -pl ruoyi-admin -am test -
 
 ### 参照仓只读清单
 
-结构参照仓在 `D:\Git\git-github\java-study`（本机只读）。许可分层：Apache-2.0 / MIT（ArchUnit、cargotracker、dddsample 等）可借鉴思路；COLA（LGPL-3.0）与 halo（GPL）只读结构、**严禁转录代码**；JavaNote 无 LICENSE，只读概念、禁转录。完整清单见根 `AGENTS.md`「外部智能体源码参照库」。
+结构参照仓在 `D:\Git\git-github\java-study`（本机只读）。许可分层：Apache-2.0 / MIT（ArchUnit、cargotracker、dddsample 等）可借鉴思路；COLA（LGPL-2.1）与 halo（GPL-3.0）只读结构、**严禁转录代码**；JavaNote 无 LICENSE，只读概念、禁转录。完整清单见根 `AGENTS.md`「外部智能体源码参照库」。
 
 ## Security Rules
 

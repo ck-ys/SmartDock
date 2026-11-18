@@ -219,7 +219,7 @@
 
 分层方向借 COLA（依赖只能向内、跨层经接口），但包名保留 `controller / service / domain / mapper / infrastructure` 这套中文团队习惯的叫法，不引入 COLA 的 `app / client / adapter / domain` 命名。
 
-**为什么**：借的是「依赖方向 + gateway 接口收口」这个思想，思想不挑名字；改名是约 600 个文件的纯 diff，运行时收益为零、多窗口必冲突。COLA 本体是 LGPL-3.0，只读结构参照、严禁转录代码。
+**为什么**：借的是「依赖方向 + gateway 接口收口」这个思想，思想不挑名字；改名是约 600 个文件的纯 diff，运行时收益为零、多窗口必冲突。COLA 本体是 LGPL-2.1，只读结构参照、严禁转录代码。
 
 **代价**：读 COLA 示例时要做一层「它叫 adapter ≈ 我们叫 infrastructure」的翻译；这份翻译固定写在上表（`backend/AGENTS.md` 四层落点表），不靠各人脑补。
 
