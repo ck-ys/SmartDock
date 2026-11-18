@@ -28,4 +28,17 @@ class PackageMigrationGuardTest {
         assertTrue(found.isEmpty(),
             () -> "org.dromara.dcs 残留在 classpath: " + found + " —— 业务代码必须放 com.smartdock.*");
     }
+
+    /** 批 2（2026-11-19）：旧助手根整棵改名到 com.smartdock.assistant.legacy 后，
+     *  非 clean 构建会让新旧两套 class 并存（组件扫描双注册同名 bean，启动期 ConflictingBeanDefinitionException），
+     *  本断言在构建期即红并直接给出修法。 */
+    @Test
+    void legacyAssistantPackageMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        Enumeration<URL> roots = cl.getResources("org/dromara/assistant");
+        List<URL> found = Collections.list(roots);
+        assertTrue(found.isEmpty(),
+            () -> "org.dromara.assistant 残留在 classpath: " + found
+                + " —— 批 2 已整棵改名到 com.smartdock.assistant.legacy，请 mvn clean 后重建");
+    }
 }

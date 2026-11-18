@@ -35,6 +35,8 @@ captcha:
 logging:
   level:
     org.dromara: @logging.level@
+    # 批 2 改名补位：助手模块 logger 前缀已从 org.dromara.assistant 移到 com.smartdock，不补则 prod 降噪口径失效
+    com.smartdock: @logging.level@
     org.springframework: warn
     org.mybatis.spring.mapper: error
     org.apache.fury: warn

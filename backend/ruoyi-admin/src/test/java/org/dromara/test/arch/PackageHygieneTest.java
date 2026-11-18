@@ -63,9 +63,10 @@ class PackageHygieneTest {
     private static final Pattern ARCH_IGNORE = Pattern.compile("//\\s*arch-ignore-fqn\\b");
 
     /** 规则 7：domain 包不许 import 上层；只盯本仓两根（com.smartdock.assistant.legacy / com.smartdock），底座不算上层。
-     *  禁段可以紧贴根（com.smartdock.assistant.legacy.service.X）也可以隔任意层包段（com.smartdock.assistant.service.X）。 */
+     *  禁段可以紧贴根（com.smartdock.assistant.legacy.service.X）也可以隔任意层包段（com.smartdock.assistant.service.X）。
+     *  旧根 org.dromara.assistant 已整棵改名（批 2），源码与 classpath 零断言见规则 3 与 PackageMigrationGuardTest。 */
     private static final Pattern DOMAIN_UPPER_IMPORT = Pattern.compile(
-        "^import\\s+(?:static\\s+)?(?:org\\.dromara\\.assistant|com\\.smartdock)\\.(?:[a-z0-9_]+\\.)*"
+        "^import\\s+(?:static\\s+)?com\\.smartdock\\.(?:[a-z0-9_]+\\.)*"
             + "(?:service|controller|infrastructure|mapper)\\.");
 
     /** 规则 8：legacy 助手根（com.smartdock.assistant.legacy）的任何 import */
