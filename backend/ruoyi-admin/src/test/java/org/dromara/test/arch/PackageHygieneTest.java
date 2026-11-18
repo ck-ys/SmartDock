@@ -156,7 +156,8 @@ class PackageHygieneTest {
         for (String oldRoot : new String[] {
             "ruoyi-modules/ruoyi-assistant/src/main/java/org/dromara" + "/assistant",
             "ruoyi-modules/ruoyi-assistant/src/test/java/org/dromara" + "/assistant",
-            "ruoyi-admin/src/test/java/org/dromara" + "/assistant"}) {
+            "ruoyi-admin/src/test/java/org/dromara" + "/assistant",
+            "ruoyi-admin/src/main/java/org/dromara" + "/assistant"}) {
             Path or = backend.resolve(oldRoot);
             if (Files.isDirectory(or)) {
                 try (Stream<Path> w = Files.walk(or)) {

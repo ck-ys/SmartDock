@@ -14,7 +14,7 @@ if (Test-Path (Join-Path $root '.workshop\tmp\package-backend.ps1')) {
   if ($LASTEXITCODE -ne 0) { throw "后端构建失败（exit $LASTEXITCODE）" }
 } else {
   Push-Location (Join-Path $root 'backend')
-  try { & mvn -q -P dev -DskipTests package -pl ruoyi-admin -am } finally { Pop-Location }
+  try { & mvn -q -P dev -DskipTests clean package -pl ruoyi-admin -am } finally { Pop-Location }
 }
 
 Write-Host '→ 2/3 构建前端'

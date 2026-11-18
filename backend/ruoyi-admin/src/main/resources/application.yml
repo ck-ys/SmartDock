@@ -35,8 +35,8 @@ captcha:
 logging:
   level:
     org.dromara: @logging.level@
-    # 批 2 改名补位：助手模块 logger 前缀已从 org.dromara.assistant 移到 com.smartdock，不补则 prod 降噪口径失效
-    com.smartdock: @logging.level@
+    # 批 2 改名补位：org.dromara.assistant 已迁到 com.smartdock.assistant（含 legacy），严格等价还原 prod 降噪口径
+    com.smartdock.assistant: @logging.level@
     org.springframework: warn
     org.mybatis.spring.mapper: error
     org.apache.fury: warn
@@ -240,7 +240,7 @@ springdoc:
       packages-to-scan: org.dromara.web
     - group: 3.系统模块
       packages-to-scan: org.dromara.system
-    # 批3-2 U2（拍板 2026-10-10「都按推荐」，范围=助手模块全部控制器）：助手模块入接口文档
+    # 批3-2 U2（拍板 2026-10-10「都按推荐」，范围=助手 legacy 控制器；新根 UserPrefController 未入组为既有缺口，见设计决策）：助手模块入接口文档
     - group: 6.DCS助手模块
       packages-to-scan: com.smartdock.assistant.legacy
     # 批1(2026-10-18): 画像引擎模块入接口文档

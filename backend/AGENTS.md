@@ -130,7 +130,7 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 3. **Controller 只做权限/参数/租户/返回包装**：方法超过 40 行就抽 Service；Controller 不许直接注入 `*Mapper`，也不许借用助手模块以外的 `*Service`（ArchUnit 按字节码查，字段/返回值/参数/调用都算）。
 4. **接口出参不许 `R<Map<String, Object>>`**（含 List 包一层）：定义 `*Vo` 强类型；契约冻结，改字段算破坏性变更。
 5. **domain 不 import 上层**（批 1 规则 7，零容忍）：`com.smartdock.*` 的 domain 包不许 import service / controller / infrastructure / mapper——跨层收口建 `domain/gateway` 接口、`infrastructure` 实现；底座（`org.dromara.common` 等）不算上层。
-6. **新根 service 对 legacy 只减不增**（批 1 规则 8，2026-11-17 已清零）：`com.smartdock.*` 的 service 包 import `com.smartdock.assistant.legacy.*` 会直接红；旧根 `org.dromara.assistant` 已批 2 整棵改名消灭，防回潮靠源码零断言（规则 3）+ classpath 守卫（`PackageMigrationGuardTest`）；legacy 依赖一律经 gateway 收口进 infrastructure。
+6. **新根 service 对 legacy 只减不增**（批 1 规则 8，2026-11-17 已清零）：`com.smartdock.*` 的 service 包 import `com.smartdock.assistant.legacy.*` 会直接红；旧根 `org.dromara.assistant` 已批 2 整棵改名消灭，防回潮靠源码零断言（`PackageHygieneTest` 旧根四路径计数）+ classpath 守卫（`PackageMigrationGuardTest`）；legacy 依赖一律经 gateway 收口进 infrastructure。
 
 存量违规冻结在 `backend/ruoyi-admin/src/test/resources/arch-baseline.json`。**修掉一条就删一行**（残留会红，防清单腐烂）；不许往清单里加新行。
 
