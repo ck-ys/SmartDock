@@ -108,8 +108,8 @@ public class AssistantRunRecorder {
         this(conversationService, dailyQuota, pendingInterrupts, piiFilter, followupService, null, costLedger);
     }
 
-    /** 记录专用有界池（dspro P2-1 修：CallerRuns——终态写/refund 任务绝不能被静默丢弃，
-     *  打满时借流线程执行，短阻塞优于丢终态） */
+    /** 记录专用有界池（dspro P2-1 修：CallerRuns——消息落库/truncated 任务绝不能被静默丢弃，
+     *  打满时借流线程执行，短阻塞优于丢消息；run 终态写已改为同线程同步，见 finishRun） */
     private final ExecutorService pool = new ThreadPoolExecutor(
         1, 2, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(256),
         r -> {
@@ -726,10 +726,14 @@ public class AssistantRunRecorder {
         }
         // dspro P1-2 修：end_reason 列宽 64，provider 长文案会 value too long 吞终态+连坐 refund
         String safeReason = reason == null ? null : (reason.length() > 64 ? reason.substring(0, 64) : reason);
-        // P1-2：登记终态写中（收割器让行），异步块 finally 撤岗
+        // P1-2：登记终态写中（收割器让行），同步块 finally 撤岗
+        // 2026-11-18 上游队列验收第 3 项：终态写必须同步完成后再把 RUN_FINISHED 交给客户端。
+        // 原实现 runAsync 排队写库，队列侧 finishRun 已结束、客户端可立即 claim+replay，
+        // 而本仓 countOtherRunning 仍看到 RUNNING → 409/RAW 错误帧。这里改为同线程条件 UPDATE：
+        // enricher 返回前落库完成，重放请求看到的一定是终态；不 sleep、不轮询。
+        // 代价=每个 run 收尾多一次 UPDATE（租户查询本来就在同线程同步读库），换掉毫秒级竞态。
         terminalWritePending.add(runId);
-        CompletableFuture.runAsync(() -> {
-            try {
+        try {
             try {
                 // dspro P0-1③回修：0 行=run 已被收割/兜底抢先终局化，迟到真终态被条件
                 // 丢弃——WARN 留观测痕（否则线上完全不可见，误杀只能靠用户复盘）
@@ -752,7 +756,8 @@ public class AssistantRunRecorder {
                 }
             } catch (Exception e) {
                 log.warn("[AssistantRecorder] run 终态回写失败 runId={}: {}", runId, e.getMessage());
-            }            // refund 独立 try（终态写失败不得连坐吞补偿）；仅 FAILED 退——INTERRUPTED
+            }
+            // refund 独立 try（终态写失败不得连坐吞补偿）；仅 FAILED 退——INTERRUPTED
             // 等确认续跑属正常流转（dspro P1-1 附带：按 run 登记行的租户/人退当日键）。
             // 批6-#2 守卫升级：按「回读实际状态」退——finish 条件化(仅 RUNNING→X)后，
             // 被收割器已迁 INTERRUPTED 的 run 收到迟到 FAILED 终态时 UPDATE 落空，
@@ -767,10 +772,9 @@ public class AssistantRunRecorder {
             } catch (Exception e) {
                 log.warn("[AssistantRecorder] 失败回合补偿失败 runId={}: {}", runId, e.getMessage());
             }
-            } finally {
-                terminalWritePending.remove(runId);
-            }
-        }, pool);
+        } finally {
+            terminalWritePending.remove(runId);
+        }
     }
 
     /**

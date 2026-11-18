@@ -36,6 +36,18 @@ public class PlusWebInvokeTimeInterceptor implements HandlerInterceptor {
 
     private final static ThreadLocal<StopWatch> KEY_CACHE = new ThreadLocal<>();
 
+    /** 测试接缝：生产走 JsonUtils（Spring 上下文里的 mapper），纯单测可传入本地 mapper，
+     *  避免静态初始化 SpringUtil 直接炸。 */
+    private final ObjectMapper objectMapper;
+
+    public PlusWebInvokeTimeInterceptor() {
+        this(null);
+    }
+
+    PlusWebInvokeTimeInterceptor(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String url = request.getMethod() + " " + request.getRequestURI();
@@ -45,10 +57,20 @@ public class PlusWebInvokeTimeInterceptor implements HandlerInterceptor {
             if (request instanceof RepeatedlyRequestWrapper) {
                 jsonParam = IoUtil.read(request.getReader());
                 if (StringUtils.isNotBlank(jsonParam)) {
-                    ObjectMapper objectMapper = JsonUtils.getObjectMapper();
-                    JsonNode rootNode = objectMapper.readTree(jsonParam);
-                    removeSensitiveFields(rootNode, SystemConstants.EXCLUDE_PROPERTIES);
-                    jsonParam = rootNode.toString();
+                    try {
+                        ObjectMapper mapper = this.objectMapper != null ? this.objectMapper : JsonUtils.getObjectMapper();
+                        JsonNode rootNode = mapper.readTree(jsonParam);
+                        removeSensitiveFields(rootNode, SystemConstants.EXCLUDE_PROPERTIES);
+                        jsonParam = rootNode.toString();
+                    } catch (Exception e) {
+                        // 2026-11-18 上游队列验收第 10 项：请求体解析只是日志功能，不能在建
+                        // Controller 之前抛 500。坏 JSON 的 400 归 Controller（/agui/queue 的
+                        // @RequestBody String 会拿到原文并由 AguiQueueController 返回 400）。
+                        // 这里只记长度与异常类型，不落原文（防 PII/令牌进日志）。
+                        log.warn("[PLUS]请求体 JSON 解析失败，交由 Controller 处理 => URL[{}], 长度[{}], 异常[{}]",
+                            url, jsonParam.length(), e.getClass().getSimpleName());
+                        jsonParam = "<无法解析的 JSON，长度=" + jsonParam.length() + ">";
+                    }
                 }
             }
             log.info("[PLUS]开始请求 => URL[{}],参数类型[json],参数:[{}]", url, jsonParam);
