@@ -3,7 +3,7 @@ package org.dromara.test.assistant;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.tool.Toolkit;
-import com.smartdock.assistant.legacy.core.AssistantWebSearchHolder;
+import com.smartdock.assistant.support.AssistantWebSearchHolder;
 import com.smartdock.assistant.legacy.core.ToolRegistry;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;

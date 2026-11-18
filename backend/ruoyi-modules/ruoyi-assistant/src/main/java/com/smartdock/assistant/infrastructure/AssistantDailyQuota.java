@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.limiter;
+package com.smartdock.assistant.infrastructure;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,9 +1,9 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.service.AssistantUserQuotaService;
+import com.smartdock.assistant.service.AssistantUserQuotaService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.log.annotation.Log;

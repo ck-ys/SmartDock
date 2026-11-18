@@ -1,7 +1,7 @@
 package com.smartdock.assistant.legacy.persist;
 
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

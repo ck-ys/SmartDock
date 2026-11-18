@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.billing;
+package com.smartdock.assistant.service;
 
 import org.springframework.stereotype.Component;
 

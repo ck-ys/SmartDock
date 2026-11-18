@@ -1,11 +1,11 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import com.smartdock.assistant.legacy.domain.AssistantUserQuota;
+import com.smartdock.assistant.domain.model.AssistantUserQuota;
 
 import java.util.List;
 import java.util.Map;

@@ -1,11 +1,11 @@
-package com.smartdock.assistant.legacy.service;
+package com.smartdock.assistant.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.AssistantUserQuota;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
-import com.smartdock.assistant.legacy.mapper.AssistantUserQuotaMapper;
+import com.smartdock.assistant.domain.model.AssistantUserQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
+import com.smartdock.assistant.mapper.AssistantUserQuotaMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
 
@@ -28,9 +28,9 @@ import java.util.Map;
 public class AssistantUserQuotaService {
 
     private final AssistantUserQuotaMapper quotaMapper;
-    private final AssistantConfigService configService;
+    private final com.smartdock.assistant.legacy.service.AssistantConfigService configService;
     private final AssistantDailyQuota dailyQuota;
-    private final com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota webSearchQuota;
+    private final com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota;
     /** 业务批7 Q1：订阅态判定+套餐联网档位（积分服务在 billing 模块，跨模块 DI 与 BillingModelDecorator 同源） */
     private final com.smartdock.service.IDcsAiCreditService creditService;
 
@@ -90,7 +90,7 @@ public class AssistantUserQuotaService {
      * 宁可按默认放行也不打断已过闸用户的请求）。额度页降级展示同口径。
      */
     public UserLimits effectiveLimits(String tenantId, Long userId) {
-        AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
+        com.smartdock.assistant.legacy.service.AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
         AssistantUserQuota q = null;
         try {
             q = quotaMapper.selectOne(
@@ -187,7 +187,7 @@ public class AssistantUserQuotaService {
                 costMap.put(((Number) c.get("userid")).longValue(), c.get("monthcost"));
             }
         }
-        AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
+        com.smartdock.assistant.legacy.service.AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
         for (Map<String, Object> r : raw) {
             Long uid = ((Number) r.get("userid")).longValue();

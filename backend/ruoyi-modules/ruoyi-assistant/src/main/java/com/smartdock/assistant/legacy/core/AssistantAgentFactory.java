@@ -8,11 +8,11 @@ import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.tool.Toolkit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.factory.AssistantModelFactory;
+import com.smartdock.assistant.infrastructure.AssistantModelFactory;
 import io.agentscope.core.permission.PermissionContextState;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.dromara.common.core.service.ConfigService;
-import com.smartdock.assistant.legacy.billing.BillingModelDecorator;
+import com.smartdock.assistant.infrastructure.BillingModelDecorator;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.domain.model.LoginUser;
 // 批3 微核心化: 下列 com.smartdock.* 计费域类已归位 ruoyi-ai-billing 模块
@@ -67,7 +67,7 @@ public class AssistantAgentFactory {
     /** 模型价格查询(批D 回修: 装饰器按当前价估算回合门槛) */
     private final IDcsAiModelPriceService modelPriceService;
     /** 回合成本累加器(批E E4: 装饰器逐笔累计, enricher RUN_FINISHED 发 cost_meta) */
-    private final com.smartdock.assistant.legacy.billing.AssistantCostLedger costLedger;
+    private final com.smartdock.assistant.service.AssistantCostLedger costLedger;
     /** 计划卡信号仓(二站③ AU-51: submit_plan 落计划, enricher 转 plan CUSTOM 帧) */
     private final AssistantPlanSignal planSignal;
     /** PII 确定性过滤器(批G G4: 出网消息脱敏装饰) */
@@ -86,11 +86,11 @@ public class AssistantAgentFactory {
     /** 会话服务(ZCode 对齐 Q2, 批A: TodoTools 清单落库) */
     private final com.smartdock.assistant.legacy.service.AssistantConversationService conversationService;
     /** 联网搜索日配额(业务批3-④: web_search 执行闸+失败补偿) */
-    private final com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota webSearchQuota;
+    private final com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota;
     /** run 终局化(Q4/ISSUE-007①: 建会话失败时同步 FAILED+退回合, 免 15min 假生成) */
     private final com.smartdock.assistant.legacy.persist.AssistantRunRecorder runRecorder;
     /** 用户额度服务(业务批3-④: 联网限额三层合成唯一出口) */
-    private final com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService;
+    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     /** 批2 SPI 化: BizToolProvider 注册器(零 provider 时为空表, 助手无业务模块也能起) */
     private final ProviderToolRegistry providerToolRegistry;
     /** 动作账本(三批③ 2026-11-01: 写操作审计 hook 落行/收口的 service 依赖) */
@@ -167,8 +167,8 @@ public class AssistantAgentFactory {
                 sd.scopeIds(), sd.defaultConfigId(), sd.usableSignature()));
         // 业务批3-④: 联网开关同款回写——工具集随开关增删, resolver 对比判缓存失效
         // N3 三审回修：租户从登录快照显式带下（异步 supplier 线程无 Sa-Token 上下文）
-        boolean webSearchOn = com.smartdock.assistant.legacy.core.AssistantWebSearchHolder.isOn(aguiThreadId);
-        com.smartdock.assistant.legacy.core.AssistantWebSearchHolder.markBuilt(aguiThreadId, webSearchOn);
+        boolean webSearchOn = com.smartdock.assistant.support.AssistantWebSearchHolder.isOn(aguiThreadId);
+        com.smartdock.assistant.support.AssistantWebSearchHolder.markBuilt(aguiThreadId, webSearchOn);
         // 题9 案1：自主权档位同款回写——权限规则建时固化，档位翻转由 resolver 判缓存失效
         com.smartdock.assistant.legacy.core.AssistantAutonomyHolder.markBuilt(aguiThreadId,
             com.smartdock.assistant.legacy.core.AssistantAutonomyHolder.level(aguiThreadId));

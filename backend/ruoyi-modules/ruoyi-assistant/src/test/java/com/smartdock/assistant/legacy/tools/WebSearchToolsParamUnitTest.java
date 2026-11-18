@@ -1,8 +1,8 @@
 package com.smartdock.assistant.legacy.tools;
 
-import com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota;
+import com.smartdock.assistant.infrastructure.AssistantWebSearchQuota;
 import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantUserQuotaService;
+import com.smartdock.assistant.service.AssistantUserQuotaService;
 import org.dromara.common.core.service.ConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -1,6 +1,7 @@
-package com.smartdock.assistant.legacy.factory;
+package com.smartdock.assistant.infrastructure;
 
 import cn.hutool.crypto.digest.DigestUtil;
+import com.smartdock.assistant.legacy.factory.HeaderDecoratedTransport;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.transport.HttpTransport;

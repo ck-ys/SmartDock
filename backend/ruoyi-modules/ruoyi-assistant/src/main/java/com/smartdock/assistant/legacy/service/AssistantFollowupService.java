@@ -2,15 +2,16 @@ package com.smartdock.assistant.legacy.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartdock.assistant.service.AssistantUserQuotaService;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.billing.AssistantCostLedger;
-import com.smartdock.assistant.legacy.billing.BillingModelDecorator;
-import com.smartdock.assistant.legacy.factory.AssistantModelFactory;
+import com.smartdock.assistant.service.AssistantCostLedger;
+import com.smartdock.assistant.infrastructure.BillingModelDecorator;
+import com.smartdock.assistant.infrastructure.AssistantModelFactory;
 import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.security.AssistantPiiModelDecorator;
 import com.smartdock.domain.DcsAiConfig;
@@ -125,18 +126,18 @@ public class AssistantFollowupService {
 
     /** 单线程守护池+有界队列+丢弃策略（Title 同款：锦上添花语义） */
     /** goal 加固 H4：侧车补日预算闸（追问是锦上添花，绝不允许绕过预算击穿租户限额） */
-    private final com.smartdock.assistant.legacy.limiter.AssistantDailyQuota dailyQuota;
+    private final com.smartdock.assistant.infrastructure.AssistantDailyQuota dailyQuota;
     /** goal 加固 H4：日预算金额来源（与主链 resolver 同源配置） */
     private final com.smartdock.assistant.legacy.service.AssistantConfigService configService;
     /** 业务批7：credits 订阅判定（预算闸与主链同口径跳过） */
-    private final com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService;
+    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     private final ThreadPoolExecutor executor;
 
     public AssistantFollowupService(AssistantModelFactory modelFactory, AssistantPiiFilter piiFilter,
                                     AiBillingService aiBillingService, TenantWalletService tenantWalletService,
                                     IDcsAiModelPriceService modelPriceService, AssistantCostLedger costLedger,
                                     AssistantConversationService conversationService,
-                                com.smartdock.assistant.legacy.limiter.AssistantDailyQuota dailyQuota,
+                                com.smartdock.assistant.infrastructure.AssistantDailyQuota dailyQuota,
                                 com.smartdock.assistant.legacy.service.AssistantConfigService configService,
                                 AssistantUserQuotaService quotaService,
                                 com.smartdock.service.IDcsAiCreditService creditService) {

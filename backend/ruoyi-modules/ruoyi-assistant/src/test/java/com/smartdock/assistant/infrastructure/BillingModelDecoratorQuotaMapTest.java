@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.billing;
+package com.smartdock.assistant.infrastructure;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

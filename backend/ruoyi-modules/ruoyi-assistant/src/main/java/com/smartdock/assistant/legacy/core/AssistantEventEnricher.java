@@ -45,7 +45,7 @@ public class AssistantEventEnricher implements AguiEventEnricher {
     private final AssistantReasoningGate gate;
     private final AssistantRunRecorder recorder;
     /** 回合成本累加器(批E E4): RUN_FINISHED 前取走, 发 cost_meta CUSTOM 帧给前端角标 */
-    private final com.smartdock.assistant.legacy.billing.AssistantCostLedger costLedger;
+    private final com.smartdock.assistant.service.AssistantCostLedger costLedger;
     /** 计划卡信号仓(二站③ AU-51): submit_plan 工具落计划, 本件取走转发 plan CUSTOM 帧 */
     private final AssistantPlanSignal planSignal;
     /** TODO 清单信号仓(ZCode 对齐 Q2, 批A): todo_write 工具落清单, 本件取走转发 todo CUSTOM 帧 */
@@ -209,7 +209,7 @@ public class AssistantEventEnricher implements AguiEventEnricher {
         // （前端气泡角标「本次 ¥x.xxxx · N tokens」，后端元值——前端禁自算价格）
         if (costLedger != null && context != null && context.getRunId() != null
             && events.stream().anyMatch(e -> e.getType() == AguiEventType.RUN_FINISHED)) {
-            com.smartdock.assistant.legacy.billing.AssistantCostLedger.Cost cost = costLedger.take(context.getRunId());
+            com.smartdock.assistant.service.AssistantCostLedger.Cost cost = costLedger.take(context.getRunId());
             if (cost != null) {
                 java.util.Map<String, Object> value = java.util.Map.of(
                     "yuan", cost.yuan(),

@@ -59,7 +59,7 @@ class WebSearchToolsTest {
         // 批④(2026-10-12)签名扩容：+联网配额 limiter（DISABLED/BAD_REQUEST 前置短路不触达，
         // 传 new 空实例保真实行为）+限额源 service（同路径不触达，null 即可）
         return new WebSearchTools(ToolIdentity.from(user()), cfg, filter(),
-            new com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota(), null);
+            new com.smartdock.assistant.infrastructure.AssistantWebSearchQuota(), null);
     }
 
     /** PiiFilter 仅 DISABLED/BAD_REQUEST 路径不触达 mask——JdbcTemplate 传 null 即可 */

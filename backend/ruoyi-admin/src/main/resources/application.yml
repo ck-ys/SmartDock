@@ -240,9 +240,9 @@ springdoc:
       packages-to-scan: org.dromara.web
     - group: 3.系统模块
       packages-to-scan: org.dromara.system
-    # 批3-2 U2（拍板 2026-10-10「都按推荐」，范围=助手 legacy 控制器；新根 UserPrefController 未入组为既有缺口，见设计决策）：助手模块入接口文档
+    # 批3-2 U2（拍板 2026-10-10）→ 批 3 题 4（2026-11-19）改为单条前缀收全根：新旧两根控制器都入组（UserPrefController 已随前缀放宽入组）
     - group: 6.DCS助手模块
-      packages-to-scan: com.smartdock.assistant.legacy
+      packages-to-scan: com.smartdock.assistant
     # 批1(2026-10-18): 画像引擎模块入接口文档
     - group: 7.画像引擎模块
       packages-to-scan: com.smartdock.profile

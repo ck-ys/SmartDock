@@ -9,9 +9,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota;
+import com.smartdock.assistant.infrastructure.AssistantWebSearchQuota;
 import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantUserQuotaService;
+import com.smartdock.assistant.service.AssistantUserQuotaService;
 import org.dromara.common.core.service.ConfigService;
 
 import java.net.URI;
@@ -236,15 +236,15 @@ public class WebSearchTools {
             }
             // 三态闸（dspro P2-1 回修）：COUNTED=已计数可补偿退款；PASSED_UNCOUNTED=fail-open
             // 放行未计数（Redis 抖动），退款守卫只认 COUNTED——否则会 DECR 掉当日既有计数多退额度
-            com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota.Gate gate =
+            com.smartdock.assistant.infrastructure.AssistantWebSearchQuota.Gate gate =
                 webSearchQuota.trySearch(tenantId, userId, limit);
-            if (gate == com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota.Gate.DENIED) {
+            if (gate == com.smartdock.assistant.infrastructure.AssistantWebSearchQuota.Gate.DENIED) {
                 out.put("status", "LIMIT");
                 out.put("message", "今日联网搜索次数已用完（每人每天 " + limit
                     + " 次），明日 0 点自动恢复；如需提前恢复请联系管理员在「AI 助手管理-用户额度」重置。请转告用户，不要重试。");
                 return ToolSupport.secureJson(out, identity);
             }
-            counted = gate == com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota.Gate.COUNTED;
+            counted = gate == com.smartdock.assistant.infrastructure.AssistantWebSearchQuota.Gate.COUNTED;
 
             String effective = piiFilter.mask(q, tenantId);
             int n = count == null ? DEFAULT_COUNT : Math.max(1, Math.min(MAX_COUNT, count));

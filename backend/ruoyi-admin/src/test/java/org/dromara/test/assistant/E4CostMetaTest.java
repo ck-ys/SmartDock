@@ -2,7 +2,7 @@ package org.dromara.test.assistant;
 
 import io.agentscope.core.agui.event.AguiEvent;
 import io.agentscope.core.agui.event.AguiEventType;
-import com.smartdock.assistant.legacy.billing.AssistantCostLedger;
+import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.legacy.core.AssistantEventEnricher;
 import com.smartdock.assistant.legacy.core.AssistantReasoningGate;
 import org.junit.jupiter.api.Tag;

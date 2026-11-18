@@ -6,7 +6,7 @@ import io.agentscope.core.agui.event.AguiEvent;
 import java.util.List;
 import com.smartdock.assistant.legacy.core.AssistantToolProgressConverter;
 import com.smartdock.assistant.legacy.core.DcsHeartbeatMiddleware;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.junit.jupiter.api.Tag;
@@ -39,7 +39,7 @@ class AssistantRunRecorderLivenessExemptTest {
     @Mock
     private com.smartdock.assistant.legacy.service.AssistantFollowupService followupService;
     @Mock
-    private com.smartdock.assistant.legacy.billing.AssistantCostLedger costLedger;
+    private com.smartdock.assistant.service.AssistantCostLedger costLedger;
 
     @InjectMocks
     private AssistantRunRecorder recorder;

@@ -70,9 +70,9 @@ public class AssistantConversationController extends BaseController {
     /** 多实例批 2：判断这轮 run 是不是落在别的活实例上（别再盲打本机内存） */
     private final com.smartdock.assistant.legacy.core.AssistantInstanceContext instanceContext;
     /** 二审回修：停止端点条件收尾 run 时退回合，口径与收割器一致 */
-    private final com.smartdock.assistant.legacy.limiter.AssistantDailyQuota dailyQuota;
+    private final com.smartdock.assistant.infrastructure.AssistantDailyQuota dailyQuota;
     /** 四审回修（dsflash-P2-7）：直接注入，不再 SpringUtils.getBean + 失败回落钱包 */
-    private final com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaLookup;
+    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaLookup;
     /** 2026-11-17 结构治理批 Q5：attach 的「能不能续、拿哪条流」下沉到 Service，SSE 生命周期留本类 */
     private final ConversationResumeService resumeService;
 

@@ -5,7 +5,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.domain.DcsAssistantConfig;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
@@ -41,11 +41,11 @@ public class AssistantStatusController extends BaseController {
     private final AssistantConfigService configService;
     private final AssistantDailyQuota dailyQuota;
     private final com.smartdock.assistant.legacy.service.AssistantConversationService conversationService;
-    private final com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService;
+    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     /** 批3.5·题5：技能使用统计（最近用过端点数据源） */
     private final com.smartdock.assistant.legacy.service.AssistantSkillUsageService skillUsageService;
     /** 业务批3-④：联网已用次数真值源（此前占位 0） */
-    private final com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota webSearchQuota;
+    private final com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota;
     /** 业务批7 Q7：今日缓存命中率聚合 */
     private final com.smartdock.service.support.AiBillingService aiBillingService;
     /** 业务反馈批1015b Q14：搜索 key 掩码读（写走参数设置/system config 自带缓存刷新，此处零写） */
@@ -55,7 +55,7 @@ public class AssistantStatusController extends BaseController {
     /** 稳流② Q8②：追问失败分类分布（进程内累计） */
     private final com.smartdock.assistant.legacy.service.AssistantFollowupService followupService;
     /** 批A-1：/config 下发压缩策略派生值（按当前默认模型窗口算，只读展示） */
-    private final com.smartdock.assistant.legacy.factory.AssistantModelFactory modelFactory;
+    private final com.smartdock.assistant.infrastructure.AssistantModelFactory modelFactory;
     /** 批 A Q6（2026-11-14）：/status/context「其他」桶的记忆正文体（租户开记忆才有值） */
     private final com.smartdock.assistant.legacy.service.AssistantMemoryService memoryService;
 
@@ -173,7 +173,7 @@ public class AssistantStatusController extends BaseController {
         Long userId = LoginHelper.getUserId();
         AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
         // 业务批7 Q1：计费感知限额——订阅租户回合=UNLIMITED_ROUNDS、联网=套餐档位
-        com.smartdock.assistant.legacy.service.AssistantUserQuotaService.BillingAwareLimits limits =
+        com.smartdock.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits =
             quotaService.billingAwareLimits(tenantId, userId);
         Map<String, Object> out = new LinkedHashMap<>();
         // 快刀批 Q6：助手称呼（租户可改，读侧两级默认合并后必有值）——前端 nameState 全局态数据源

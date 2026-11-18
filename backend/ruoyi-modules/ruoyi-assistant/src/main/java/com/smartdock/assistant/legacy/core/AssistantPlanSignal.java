@@ -17,7 +17,7 @@ import java.util.UUID;
 /**
  * 计划卡信号仓（二站③ AU-51，2026-10-08）：submit_plan 工具把计划存进来，
  * {@link AssistantEventEnricher} 在同线程下一批事件前取走并转发 plan CUSTOM 帧
- * 给前端（TurnBlock/PlanCard 渲染三按钮卡）。模式照抄 {@link com.smartdock.assistant.legacy.billing.AssistantCostLedger}。
+ * 给前端（TurnBlock/PlanCard 渲染三按钮卡）。模式照抄 {@link com.smartdock.assistant.service.AssistantCostLedger}。
  *
  * <p>键=threadId（工具侧拿不到 runId，但 ToolDeps 带 aguiThreadId；单飞行回合
  * 设计下同 thread 同时至多一个 run 在跑，无串扰）。run 中断未取走的残段由

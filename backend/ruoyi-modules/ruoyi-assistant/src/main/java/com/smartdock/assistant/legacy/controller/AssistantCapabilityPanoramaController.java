@@ -31,7 +31,7 @@ public class AssistantCapabilityPanoramaController extends BaseController {
 
     private final AssistantConfigService assistantConfigService;
     /** 批A 回修：租户默认模型读取（压缩派生值与 /config 同源） */
-    private final com.smartdock.assistant.legacy.factory.AssistantModelFactory modelFactory;
+    private final com.smartdock.assistant.infrastructure.AssistantModelFactory modelFactory;
 
     /** 一条工具的全景行（SPECS 注册信息 + TOOL_META 中文元数据合成）；
      *  批1 Q1=B：+toolGate 覆盖档位与 effective 生效档（-1=本租户已关闭） */

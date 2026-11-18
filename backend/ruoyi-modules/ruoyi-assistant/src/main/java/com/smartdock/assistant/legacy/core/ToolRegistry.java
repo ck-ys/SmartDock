@@ -1,5 +1,6 @@
 package com.smartdock.assistant.legacy.core;
 
+import com.smartdock.assistant.support.AssistantWebSearchHolder;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionRule;
@@ -48,8 +49,8 @@ public final class ToolRegistry {
         String tenantId,
         com.smartdock.assistant.legacy.core.AssistantTodoSignal todoSignal,
         com.smartdock.assistant.legacy.service.AssistantConversationService conversationService,
-        com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota webSearchQuota,
-        com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService,
+        com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota,
+        com.smartdock.assistant.service.AssistantUserQuotaService quotaService,
         /** 三审回修 P1-1：view_skill 自取过闸用的租户矩阵快照 */
         java.util.Map<String, String> toolGate,
         /** 题7 案1：驱逐中间件落盘目录（助手工作区）；read_file 只在此根下回读 */

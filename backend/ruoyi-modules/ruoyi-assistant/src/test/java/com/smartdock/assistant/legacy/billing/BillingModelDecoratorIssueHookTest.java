@@ -1,5 +1,7 @@
 package com.smartdock.assistant.legacy.billing;
 
+import com.smartdock.assistant.infrastructure.BillingModelDecorator;
+import com.smartdock.assistant.service.AssistantCostLedger;
 import io.agentscope.core.model.Model;
 import org.dromara.common.core.utils.SpringUtils;
 import org.dromara.common.core.exception.ServiceException;

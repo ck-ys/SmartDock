@@ -9,8 +9,8 @@ import com.smartdock.assistant.legacy.automation.domain.DcsAutomationRun;
 import com.smartdock.assistant.legacy.automation.mapper.DcsAutomationMapper;
 import com.smartdock.assistant.legacy.automation.mapper.DcsAutomationRunMapper;
 import com.smartdock.assistant.legacy.core.AssistantAgentFactory;
-import com.smartdock.assistant.legacy.limiter.AssistantAdmissionGate;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantAdmissionGate;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.dromara.common.core.domain.model.LoginUser;
@@ -58,7 +58,7 @@ public class AutomationRunner {
     private final AssistantAgentFactory agentFactory;
     private final AssistantConfigService configService;
     /** E-13（2026-11-06）：对话侧四道闸对无人值守同样生效——暂停用户 / 日预算 / 准入 / 回合上限 */
-    private final com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService;
+    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     private final AssistantDailyQuota dailyQuota;
     private final AssistantAdmissionGate admissionGate;
     private final AutomationNotifier notifier;
@@ -72,7 +72,7 @@ public class AutomationRunner {
                             AssistantConversationService conversationService,
                             AssistantAgentFactory agentFactory,
                             AssistantConfigService configService,
-                            com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService,
+                            com.smartdock.assistant.service.AssistantUserQuotaService quotaService,
                             AssistantDailyQuota dailyQuota,
                             AssistantAdmissionGate admissionGate,
                             AutomationNotifier notifier,
@@ -156,7 +156,7 @@ public class AutomationRunner {
         // 此前自动化只查租户开关，用户被暂停/预算用完/准入不过都照常扣费（14 条缺陷里唯一的钱相关 P1）。
         // 被后置闸拒绝时退回合（与 AssistantRuntimeContextResolver 的补偿口径一致）；
         // 模型调用本身失败不退——那一次确实跑过了（同对话侧"跑完即算"）。
-        com.smartdock.assistant.legacy.service.AssistantUserQuotaService.BillingAwareLimits limits = null;
+        com.smartdock.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits = null;
         try {
             AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
             limits = quotaService.billingAwareLimits(tenantId, automation.getUserId());

@@ -33,7 +33,7 @@ class H1PendingInterruptCacheTest {
 
     private final AssistantPendingInterruptCache cache = new AssistantPendingInterruptCache();
     /** conversationService/dailyQuota/piiFilter/followupService/costLedger 传 null：本测只触发缓存簿记，异步落库支路 try-catch 自吞 */
-    private final AssistantRunRecorder recorder = new AssistantRunRecorder(null, null, cache, null, null, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
+    private final AssistantRunRecorder recorder = new AssistantRunRecorder(null, null, cache, null, null, new com.smartdock.assistant.service.AssistantCostLedger());
 
     private AguiStreamContext ctx() {
         return new AguiStreamContext(TH, RUN,

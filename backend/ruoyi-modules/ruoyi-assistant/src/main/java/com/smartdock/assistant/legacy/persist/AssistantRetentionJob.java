@@ -4,7 +4,7 @@ import com.baomidou.lock.annotation.Lock4j;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -40,7 +40,7 @@ public class AssistantRetentionJob {
     /** 多实例：收尸后补跑陈旧 ASKING 自愈（run 刚变 INTERRUPTED，启动期扫描错过的那批） */
     private final AssistantStaleAskingRecovery staleAskingRecovery;
     /** 四审（dsflash-P2-7）：直接注入配额服务，退款口径与 stop/resolver 同源 */
-    private final com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaLookup;
+    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaLookup;
 
     @Lock4j(keys = {"'assistant-retention-daily'"})
     @Scheduled(cron = "0 40 3 * * ?")

@@ -2,10 +2,11 @@ package com.smartdock.assistant.legacy.service;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.smartdock.assistant.service.AssistantUserQuotaService;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
-import com.smartdock.assistant.legacy.domain.AssistantUserQuota;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
-import com.smartdock.assistant.legacy.mapper.AssistantUserQuotaMapper;
+import com.smartdock.assistant.domain.model.AssistantUserQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
+import com.smartdock.assistant.mapper.AssistantUserQuotaMapper;
 import com.smartdock.assistant.legacy.service.AssistantConfigService.EffectiveConfig;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,7 +56,7 @@ class AssistantUserQuotaServiceUnitTest {
     @Mock
     private AssistantDailyQuota dailyQuota;
     @Mock
-    private com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota webSearchQuota;
+    private com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota;
 
     @InjectMocks
     private AssistantUserQuotaService service;

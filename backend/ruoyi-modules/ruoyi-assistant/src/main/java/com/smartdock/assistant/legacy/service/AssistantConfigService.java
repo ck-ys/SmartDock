@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.domain.DcsAssistantConfig;
-import com.smartdock.assistant.legacy.limiter.AssistantAdmissionGate;
+import com.smartdock.assistant.infrastructure.AssistantAdmissionGate;
 import com.smartdock.assistant.legacy.mapper.AssistantConfigMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.tenant.helper.TenantHelper;

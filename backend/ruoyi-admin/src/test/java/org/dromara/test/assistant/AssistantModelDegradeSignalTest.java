@@ -2,7 +2,7 @@ package org.dromara.test.assistant;
 
 import com.smartdock.domain.DcsAiConfig;
 import com.smartdock.assistant.legacy.core.AssistantModelDegradeSignal;
-import com.smartdock.assistant.legacy.factory.AssistantModelFactory;
+import com.smartdock.assistant.infrastructure.AssistantModelFactory;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

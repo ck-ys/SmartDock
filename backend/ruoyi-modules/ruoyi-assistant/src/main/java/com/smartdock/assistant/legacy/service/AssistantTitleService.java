@@ -6,9 +6,9 @@ import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.billing.AssistantCostLedger;
-import com.smartdock.assistant.legacy.billing.BillingModelDecorator;
-import com.smartdock.assistant.legacy.factory.AssistantModelFactory;
+import com.smartdock.assistant.service.AssistantCostLedger;
+import com.smartdock.assistant.infrastructure.BillingModelDecorator;
+import com.smartdock.assistant.infrastructure.AssistantModelFactory;
 import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.security.AssistantPiiModelDecorator;
@@ -94,7 +94,7 @@ public class AssistantTitleService {
 
     /** 单线程守护池+有界队列+丢弃策略：侧车是锦上添花，任何拒绝/异常都不影响主对话 */
     /** goal 加固 H4：侧车补日预算闸（起标题是系统小事，绝不允许绕过预算击穿租户限额） */
-    private final com.smartdock.assistant.legacy.limiter.AssistantDailyQuota dailyQuota;
+    private final com.smartdock.assistant.infrastructure.AssistantDailyQuota dailyQuota;
     /** goal 加固 H4：日预算金额来源（与主链 resolver 同源配置） */
     private final com.smartdock.assistant.legacy.service.AssistantConfigService configService;
     private final ThreadPoolExecutor executor;
@@ -103,7 +103,7 @@ public class AssistantTitleService {
                                  AiBillingService aiBillingService, TenantWalletService tenantWalletService,
                                  IDcsAiModelPriceService modelPriceService, AssistantCostLedger costLedger,
                                  AssistantConversationMapper conversationMapper,
-                                 com.smartdock.assistant.legacy.limiter.AssistantDailyQuota dailyQuota,
+                                 com.smartdock.assistant.infrastructure.AssistantDailyQuota dailyQuota,
                                  com.smartdock.assistant.legacy.service.AssistantConfigService configService,
                                  com.smartdock.service.IDcsAiCreditService creditService) {
         this.modelFactory = modelFactory;

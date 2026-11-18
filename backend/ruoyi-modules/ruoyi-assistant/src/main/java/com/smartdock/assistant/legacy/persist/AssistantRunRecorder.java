@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.core.AssistantRunContext;
 import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,7 +74,7 @@ public class AssistantRunRecorder {
     private final com.smartdock.assistant.legacy.core.AssistantInstanceContext instanceContext;
 
     /** 批B B1：末次模型调用 tokens 快照（上下文环数据源），终态 clearLastUsage */
-    private final com.smartdock.assistant.legacy.billing.AssistantCostLedger costLedger;
+    private final com.smartdock.assistant.service.AssistantCostLedger costLedger;
 
     /** Spring 唯一注入构造：必须显式 @Autowired——类里另有一个单测兼容构造，
      *  若两个构造器都不标注，Spring 会退回无参构造并启动失败（三审 A/B 实证）。 */
@@ -85,7 +85,7 @@ public class AssistantRunRecorder {
                                 AssistantPiiFilter piiFilter,
                                 com.smartdock.assistant.legacy.service.AssistantFollowupService followupService,
                                 com.smartdock.assistant.legacy.core.AssistantInstanceContext instanceContext,
-                                com.smartdock.assistant.legacy.billing.AssistantCostLedger costLedger) {
+                                com.smartdock.assistant.service.AssistantCostLedger costLedger) {
         this.conversationService = conversationService;
         this.dailyQuota = dailyQuota;
         this.pendingInterrupts = pendingInterrupts;
@@ -104,7 +104,7 @@ public class AssistantRunRecorder {
                                 AssistantPendingInterruptCache pendingInterrupts,
                                 AssistantPiiFilter piiFilter,
                                 com.smartdock.assistant.legacy.service.AssistantFollowupService followupService,
-                                com.smartdock.assistant.legacy.billing.AssistantCostLedger costLedger) {
+                                com.smartdock.assistant.service.AssistantCostLedger costLedger) {
         this(conversationService, dailyQuota, pendingInterrupts, piiFilter, followupService, null, costLedger);
     }
 
@@ -1198,9 +1198,9 @@ public class AssistantRunRecorder {
      *  与 billingAwareLimits 的 fail-open 及既有行为一致。 */
     private void refundIfWallet(String tenantId, Long userId) {
         try {
-            com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService =
+            com.smartdock.assistant.service.AssistantUserQuotaService quotaService =
                 org.dromara.common.core.utils.SpringUtils.getBean(
-                    com.smartdock.assistant.legacy.service.AssistantUserQuotaService.class);
+                    com.smartdock.assistant.service.AssistantUserQuotaService.class);
             if (quotaService.billingAwareLimits(tenantId, userId).creditsMode()) {
                 log.debug("[AssistantRecorder] credits 订阅租户退款跳过 tenant={} user={}", tenantId, userId);
                 return;

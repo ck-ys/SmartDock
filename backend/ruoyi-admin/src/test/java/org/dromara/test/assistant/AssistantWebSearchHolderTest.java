@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.core.AssistantWebSearchHolder;
+import com.smartdock.assistant.support.AssistantWebSearchHolder;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

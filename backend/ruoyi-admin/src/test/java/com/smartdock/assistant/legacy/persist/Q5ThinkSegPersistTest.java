@@ -30,7 +30,7 @@ class Q5ThinkSegPersistTest {
     private static final String RUN = "run-q5";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AssistantRunRecorder recorder = new AssistantRunRecorder(null, null, null, null, null, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
+    private final AssistantRunRecorder recorder = new AssistantRunRecorder(null, null, null, null, null, new com.smartdock.assistant.service.AssistantCostLedger());
 
     private AguiStreamContext ctx() {
         return new AguiStreamContext(TH, RUN, AguiAdapterConfig.builder().build());
@@ -106,7 +106,7 @@ class Q5ThinkSegPersistTest {
     @Test
     void terminalClearsBuffersInterruptedKeeps() {
         // keep 路径须带真悬挂 interrupt（三席审查 P2-4 后空表=不保留）：真缓存实例防 store NPE
-        AssistantRunRecorder withCache = new AssistantRunRecorder(null, null, new AssistantPendingInterruptCache(), null, null, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
+        AssistantRunRecorder withCache = new AssistantRunRecorder(null, null, new AssistantPendingInterruptCache(), null, null, new com.smartdock.assistant.service.AssistantCostLedger());
         withCache.onEvents(ctx(), List.of(
             new AguiEvent.ReasoningStart(TH, RUN, "rm-1", null, 1000L, null),
             new AguiEvent.ReasoningEnd(TH, RUN, "rm-1", 2000L, null)));
@@ -163,7 +163,7 @@ class Q5ThinkSegPersistTest {
                 public String mask(String text, String tenantId) {
                     return "[已脱敏]";
                 }
-            }, null, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
+            }, null, new com.smartdock.assistant.service.AssistantCostLedger());
         masked.onEvents(ctx(), List.of(
             new AguiEvent.ReasoningMessageStart(TH, RUN, "wm-1", "assistant", 1000L, null),
             new AguiEvent.ReasoningMessageContent(TH, RUN, "wm-1", "联系人 13800000000 尽快"),
@@ -183,7 +183,7 @@ class Q5ThinkSegPersistTest {
                 public String mask(String text, String tenantId) {
                     return "[已脱敏]";
                 }
-            }, null, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
+            }, null, new com.smartdock.assistant.service.AssistantCostLedger());
         masked.onEvents(ctx(), List.of(
             new AguiEvent.ToolCallStart(TH, RUN, "call-1", "list_my_tasks", null, null),
             new AguiEvent.ToolCallArgs(TH, RUN, "call-1", "{\"phone\":\"13800000000\"}", null, null)));
@@ -202,7 +202,7 @@ class Q5ThinkSegPersistTest {
                 public String mask(String text, String tenantId) {
                     return text;
                 }
-            }, null, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
+            }, null, new com.smartdock.assistant.service.AssistantCostLedger());
         plain.onEvents(ctx(), List.of(
             new AguiEvent.ReasoningMessageStart(TH, RUN, "wm-1", "assistant", 1000L, null),
             new AguiEvent.ReasoningMessageContent(TH, RUN, "wm-1", "无敏感内容"),

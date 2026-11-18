@@ -1,5 +1,6 @@
-package com.smartdock.assistant.legacy.billing;
+package com.smartdock.assistant.infrastructure;
 
+import com.smartdock.assistant.service.AssistantCostLedger;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.ChatResponse;

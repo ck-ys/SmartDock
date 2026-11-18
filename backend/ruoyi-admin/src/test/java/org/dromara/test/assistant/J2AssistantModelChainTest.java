@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
 import com.smartdock.assistant.legacy.core.AssistantModelChoiceHolder;
-import com.smartdock.assistant.legacy.factory.AssistantModelFactory;
+import com.smartdock.assistant.infrastructure.AssistantModelFactory;
 import com.smartdock.assistant.legacy.service.AssistantModelSettingService;
 import org.dromara.common.core.exception.ServiceException;
 import com.smartdock.ai.AiNotConfiguredException;

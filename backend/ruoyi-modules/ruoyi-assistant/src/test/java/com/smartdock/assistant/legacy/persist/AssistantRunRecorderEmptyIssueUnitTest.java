@@ -2,9 +2,9 @@ package com.smartdock.assistant.legacy.persist;
 
 import io.agentscope.core.agui.adapter.strategy.AguiStreamContext;
 import io.agentscope.core.agui.event.AguiEvent;
-import com.smartdock.assistant.legacy.billing.AssistantCostLedger;
+import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.legacy.core.AssistantInstanceContext;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import com.smartdock.assistant.legacy.service.AssistantFollowupService;

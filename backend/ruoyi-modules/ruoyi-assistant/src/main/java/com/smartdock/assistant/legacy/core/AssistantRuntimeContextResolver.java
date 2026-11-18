@@ -1,5 +1,6 @@
 package com.smartdock.assistant.legacy.core;
 
+import com.smartdock.assistant.support.AssistantWebSearchHolder;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.agui.model.AguiMessage;
 import io.agentscope.core.agui.model.RunAgentInput;
@@ -7,8 +8,8 @@ import io.agentscope.core.agui.runtime.AguiRuntimeContextRequest;
 import io.agentscope.core.agui.runtime.AguiRuntimeContextResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.limiter.AssistantAdmissionGate;
-import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.infrastructure.AssistantAdmissionGate;
+import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.security.AssistantInputGuard;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
@@ -46,7 +47,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     private final AssistantInputGuard inputGuard;
     private final AssistantDailyQuota dailyQuota;
     private final AssistantConversationService conversationService;
-    private final com.smartdock.assistant.legacy.service.AssistantUserQuotaService quotaService;
+    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     /** ZCode 对齐 Q1（批A 2026-10-10）：首条消息后异步起标题的侧车 */
     private final com.smartdock.assistant.legacy.service.AssistantTitleService titleService;
     /** 批7 Q12-④: 模型切换失效缓存 agent（agent 按 (user,thread) 缓存且模型建时固化） */
@@ -55,7 +56,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     private final com.smartdock.assistant.legacy.service.AssistantModelSettingService modelSettingService;
     private final com.smartdock.assistant.legacy.service.AssistantConfigService assistantConfigService;
     /** 批A-1：压缩触发线指纹需要按当前模型窗口派生（与建侧同源解析） */
-    private final com.smartdock.assistant.legacy.factory.AssistantModelFactory modelFactory;
+    private final com.smartdock.assistant.infrastructure.AssistantModelFactory modelFactory;
     /** N3：搜索 Key 可用性进装配指纹（管理员刚配好 Key 时缓存会话下一请求即重建） */
     private final org.dromara.common.core.service.ConfigService sysConfigService;
     /** 题8 案1（三席回修）：计划待确认态的解除口子（前端 planDecision 上报） */
@@ -110,7 +111,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         // 业务批7 Q1：计费感知限额——积分订阅租户回合不限次（套餐积分即消耗闸）+日预算闸
         // 跳过（积分模式钱包不动账，SUM 恒不增长=空转）；回合急停(配0)仍拦截不被套餐绕过
         AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
-        com.smartdock.assistant.legacy.service.AssistantUserQuotaService.BillingAwareLimits limits =
+        com.smartdock.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits =
             quotaService.billingAwareLimits(tenantId, userId);
         // glm53 终审 P1-1 回修：订阅租户的回合急停(配0)必须仍走 tryTurn——credits 分支
         // 跳过 tryTurn 会连"limit<=0 抛 503 急停"一起跳过，刹车失效；UNLIMITED_ROUNDS

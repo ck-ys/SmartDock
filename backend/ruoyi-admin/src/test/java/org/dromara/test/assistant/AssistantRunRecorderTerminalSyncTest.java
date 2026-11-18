@@ -3,7 +3,7 @@ package org.dromara.test.assistant;
 import io.agentscope.core.agui.adapter.AguiAdapterConfig;
 import io.agentscope.core.agui.adapter.strategy.AguiStreamContext;
 import io.agentscope.core.agui.event.AguiEvent;
-import com.smartdock.assistant.legacy.billing.AssistantCostLedger;
+import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
 import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;

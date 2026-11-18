@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.core;
+package com.smartdock.assistant.support;
 
 import java.util.Locale;
 import java.util.Map;
