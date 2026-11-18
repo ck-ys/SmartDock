@@ -9,11 +9,11 @@ import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.ToolSchema;
-import org.dromara.assistant.core.AssistantTodoSignal;
-import org.dromara.assistant.mapper.AssistantConversationMapper;
-import org.dromara.assistant.service.AssistantTitleService;
-import org.dromara.assistant.tools.ToolIdentity;
-import org.dromara.assistant.tools.TodoTools;
+import com.smartdock.assistant.legacy.core.AssistantTodoSignal;
+import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.legacy.service.AssistantTitleService;
+import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.legacy.tools.TodoTools;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -56,7 +56,7 @@ class TodoAndTitleUnitTest {
     @Test
     void todoWriteNormalListOkAndSignals() throws Exception {
         AssistantTodoSignal signal = new AssistantTodoSignal();
-        org.dromara.assistant.service.AssistantConversationService conv = mock();
+        com.smartdock.assistant.legacy.service.AssistantConversationService conv = mock();
         TodoTools tools = new TodoTools(identity(), signal, conv, "th-1");
         JsonNode out = runTodo(tools, "[{\"content\":\"查未交名单\",\"status\":\"in_progress\",\"priority\":\"high\"},"
             + "{\"content\":\"发送催办\",\"status\":\"pending\",\"priority\":\"medium\"}]");
@@ -75,7 +75,7 @@ class TodoAndTitleUnitTest {
     @Test
     void todoWriteDefaultsAndTruncation() throws Exception {
         AssistantTodoSignal signal = new AssistantTodoSignal();
-        org.dromara.assistant.service.AssistantConversationService conv = mock();
+        com.smartdock.assistant.legacy.service.AssistantConversationService conv = mock();
         TodoTools tools = new TodoTools(identity(), signal, conv, "th-1");
         // status/priority 缺省 → pending/medium；content 超 40 字截断
         StringBuilder long40 = new StringBuilder();
@@ -106,7 +106,7 @@ class TodoAndTitleUnitTest {
     @Test
     void todoWriteRejectsBadPayloads() throws Exception {
         AssistantTodoSignal signal = new AssistantTodoSignal();
-        org.dromara.assistant.service.AssistantConversationService conv = mock();
+        com.smartdock.assistant.legacy.service.AssistantConversationService conv = mock();
         TodoTools tools = new TodoTools(identity(), signal, conv, "th-1");
         // 非法 JSON / 非数组 / 空数组
         for (String bad : new String[] {"不是json", "{\"content\":\"x\"}", "[]", null}) {
@@ -228,12 +228,12 @@ class TodoAndTitleUnitTest {
     @Test
     @SuppressWarnings("unchecked")
     void enricherInjectsTodoCustomFrameAtHead() {
-        org.dromara.assistant.core.AssistantTodoSignal signal = new org.dromara.assistant.core.AssistantTodoSignal();
+        com.smartdock.assistant.legacy.core.AssistantTodoSignal signal = new com.smartdock.assistant.legacy.core.AssistantTodoSignal();
         signal.submit("th-1", List.of(
-            new org.dromara.assistant.core.AssistantTodoSignal.TodoItem("查未交名单", "completed", "high"),
-            new org.dromara.assistant.core.AssistantTodoSignal.TodoItem("发催办", "in_progress", "medium")));
-        org.dromara.assistant.core.AssistantEventEnricher enricher =
-            new org.dromara.assistant.core.AssistantEventEnricher(null, null, null, null, signal, null, null, null, null, null, null);
+            new com.smartdock.assistant.legacy.core.AssistantTodoSignal.TodoItem("查未交名单", "completed", "high"),
+            new com.smartdock.assistant.legacy.core.AssistantTodoSignal.TodoItem("发催办", "in_progress", "medium")));
+        com.smartdock.assistant.legacy.core.AssistantEventEnricher enricher =
+            new com.smartdock.assistant.legacy.core.AssistantEventEnricher(null, null, null, null, signal, null, null, null, null, null, null);
         List<AguiEvent> events = List.of(new AguiEvent.TextMessageContent("th-1", "run-1", "m1", "推进中"));
         List<AguiEvent> out = enricher.enrich(null, events, ctx("th-1", "run-1"));
         assertEquals(2, out.size(), "原 1 帧+todo 帧=2");

@@ -4,7 +4,7 @@ import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.spring.boot.agui.common.AguiProperties;
-import org.dromara.assistant.core.AssistantReasoningGate;
+import com.smartdock.assistant.legacy.core.AssistantReasoningGate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

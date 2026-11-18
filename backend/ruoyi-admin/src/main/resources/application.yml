@@ -240,7 +240,7 @@ springdoc:
       packages-to-scan: org.dromara.system
     # 批3-2 U2（拍板 2026-10-10「都按推荐」，范围=仅助手 10 控制器）：助手模块入接口文档
     - group: 6.DCS助手模块
-      packages-to-scan: org.dromara.assistant
+      packages-to-scan: com.smartdock.assistant.legacy
     # 批1(2026-10-18): 画像引擎模块入接口文档
     - group: 7.画像引擎模块
       packages-to-scan: com.smartdock.profile

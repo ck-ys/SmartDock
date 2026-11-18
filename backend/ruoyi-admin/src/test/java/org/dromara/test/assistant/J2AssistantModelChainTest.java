@@ -1,8 +1,8 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.core.AssistantModelChoiceHolder;
-import org.dromara.assistant.factory.AssistantModelFactory;
-import org.dromara.assistant.service.AssistantModelSettingService;
+import com.smartdock.assistant.legacy.core.AssistantModelChoiceHolder;
+import com.smartdock.assistant.legacy.factory.AssistantModelFactory;
+import com.smartdock.assistant.legacy.service.AssistantModelSettingService;
 import org.dromara.common.core.exception.ServiceException;
 import com.smartdock.ai.AiNotConfiguredException;
 import com.smartdock.domain.DcsAiConfig;
@@ -40,7 +40,7 @@ class J2AssistantModelChainTest {
     private final IDcsAiConfigService aiConfigService = mock(IDcsAiConfigService.class);
     private final AssistantModelSettingService settingService = mock(AssistantModelSettingService.class);
     private final AssistantModelFactory factory = new AssistantModelFactory(aiConfigService, null, settingService,
-        new org.dromara.assistant.core.AssistantModelDegradeSignal());
+        new com.smartdock.assistant.legacy.core.AssistantModelDegradeSignal());
 
     /** Mockito 包装类型默认 0：显式置「无上次成功行」，让各用例落在自己声明的链段上 */
     @org.junit.jupiter.api.BeforeEach

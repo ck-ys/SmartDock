@@ -3,9 +3,9 @@ package org.dromara.test.assistant;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cn.hutool.core.lang.Dict;
-import org.dromara.assistant.security.AssistantPiiFilter;
-import org.dromara.assistant.tools.ToolIdentity;
-import org.dromara.assistant.tools.WebSearchTools;
+import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.legacy.tools.WebSearchTools;
 
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.core.service.ConfigService;
@@ -59,7 +59,7 @@ class WebSearchToolsTest {
         // 批④(2026-10-12)签名扩容：+联网配额 limiter（DISABLED/BAD_REQUEST 前置短路不触达，
         // 传 new 空实例保真实行为）+限额源 service（同路径不触达，null 即可）
         return new WebSearchTools(ToolIdentity.from(user()), cfg, filter(),
-            new org.dromara.assistant.limiter.AssistantWebSearchQuota(), null);
+            new com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota(), null);
     }
 
     /** PiiFilter 仅 DISABLED/BAD_REQUEST 路径不触达 mask——JdbcTemplate 传 null 即可 */

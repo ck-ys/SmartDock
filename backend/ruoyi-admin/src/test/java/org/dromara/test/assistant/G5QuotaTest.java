@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.limiter.AssistantDailyQuota;
+import com.smartdock.assistant.legacy.limiter.AssistantDailyQuota;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
 import org.junit.jupiter.api.AfterEach;

@@ -8,7 +8,7 @@ import cn.hutool.http.useragent.UserAgent;
 import cn.hutool.http.useragent.UserAgentUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.assistant.tools.ToolLoginContext;
+import com.smartdock.assistant.legacy.tools.ToolLoginContext;
 import org.dromara.common.core.constant.CacheConstants;
 import org.dromara.common.core.constant.Constants;
 import org.dromara.common.core.domain.dto.UserOnlineDTO;

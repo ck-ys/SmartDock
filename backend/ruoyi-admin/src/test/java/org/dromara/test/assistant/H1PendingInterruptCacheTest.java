@@ -2,9 +2,9 @@ package org.dromara.test.assistant;
 
 import io.agentscope.core.agui.adapter.strategy.AguiStreamContext;
 import io.agentscope.core.agui.event.AguiEvent;
-import org.dromara.assistant.persist.AssistantPendingInterruptCache;
-import org.dromara.assistant.persist.AssistantPendingInterruptCache.PendingInterrupt;
-import org.dromara.assistant.persist.AssistantRunRecorder;
+import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
+import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache.PendingInterrupt;
+import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +33,7 @@ class H1PendingInterruptCacheTest {
 
     private final AssistantPendingInterruptCache cache = new AssistantPendingInterruptCache();
     /** conversationService/dailyQuota/piiFilter/followupService/costLedger 传 null：本测只触发缓存簿记，异步落库支路 try-catch 自吞 */
-    private final AssistantRunRecorder recorder = new AssistantRunRecorder(null, null, cache, null, null, new org.dromara.assistant.billing.AssistantCostLedger());
+    private final AssistantRunRecorder recorder = new AssistantRunRecorder(null, null, cache, null, null, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
 
     private AguiStreamContext ctx() {
         return new AguiStreamContext(TH, RUN,

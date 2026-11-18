@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.limiter.AssistantWebSearchQuota;
+import com.smartdock.assistant.legacy.limiter.AssistantWebSearchQuota;
 import org.dromara.common.redis.utils.RedisUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;

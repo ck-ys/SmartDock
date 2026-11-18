@@ -7,7 +7,7 @@ import io.agentscope.core.event.ToolProgressEvent;
 import io.agentscope.core.message.TextBlock;
 import java.util.List;
 import java.util.Map;
-import org.dromara.assistant.core.AssistantToolProgressConverter;
+import com.smartdock.assistant.legacy.core.AssistantToolProgressConverter;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

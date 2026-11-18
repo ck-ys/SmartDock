@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.tools.AskUserTools;
+import com.smartdock.assistant.legacy.tools.AskUserTools;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

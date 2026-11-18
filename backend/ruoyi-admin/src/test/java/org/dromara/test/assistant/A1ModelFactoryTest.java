@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
-import org.dromara.assistant.factory.AssistantModelFactory;
+import com.smartdock.assistant.legacy.factory.AssistantModelFactory;
 import com.smartdock.ai.AiNotConfiguredException;
 import com.smartdock.domain.DcsAiConfig;
 import org.junit.jupiter.api.AfterEach;

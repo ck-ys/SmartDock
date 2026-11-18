@@ -1,8 +1,8 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.domain.DcsAssistantFeedback;
-import org.dromara.assistant.service.AssistantConversationService;
-import org.dromara.assistant.service.AssistantFeedbackService;
+import com.smartdock.assistant.legacy.domain.DcsAssistantFeedback;
+import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.legacy.service.AssistantFeedbackService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

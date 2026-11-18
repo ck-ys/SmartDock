@@ -3,9 +3,9 @@ package org.dromara.test.assistant;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.tool.Toolkit;
-import org.dromara.assistant.core.AssistantWebSearchHolder;
-import org.dromara.assistant.core.ToolRegistry;
-import org.dromara.assistant.tools.ToolIdentity;
+import com.smartdock.assistant.legacy.core.AssistantWebSearchHolder;
+import com.smartdock.assistant.legacy.core.ToolRegistry;
+import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +54,7 @@ class ToolRegistryGuardTest {
         org.mockito.Mockito.mock(org.dromara.common.core.service.ConfigService.class);
 
     static {
-        org.mockito.Mockito.when(KEY_CONFIG.getConfigValue(org.dromara.assistant.tools.WebSearchTools.CONFIG_KEY))
+        org.mockito.Mockito.when(KEY_CONFIG.getConfigValue(com.smartdock.assistant.legacy.tools.WebSearchTools.CONFIG_KEY))
             .thenReturn("sk-guard-test");
     }
 

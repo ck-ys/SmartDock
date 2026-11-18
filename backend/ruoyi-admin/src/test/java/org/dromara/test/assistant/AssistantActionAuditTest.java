@@ -1,10 +1,10 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.core.AssistantActionLedgerHook;
-import org.dromara.assistant.core.AssistantReleaseMode;
-import org.dromara.assistant.core.AssistantRunContext;
-import org.dromara.assistant.core.ProviderToolRegistry;
-import org.dromara.assistant.service.AssistantActionService;
+import com.smartdock.assistant.legacy.core.AssistantActionLedgerHook;
+import com.smartdock.assistant.legacy.core.AssistantReleaseMode;
+import com.smartdock.assistant.legacy.core.AssistantRunContext;
+import com.smartdock.assistant.legacy.core.ProviderToolRegistry;
+import com.smartdock.assistant.legacy.service.AssistantActionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.core.AssistantPlanGateMiddleware;
-import org.dromara.assistant.core.AssistantPlanSignal;
+import com.smartdock.assistant.legacy.core.AssistantPlanGateMiddleware;
+import com.smartdock.assistant.legacy.core.AssistantPlanSignal;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

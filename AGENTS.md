@@ -173,7 +173,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 ## 代码落点与结构门禁（2026-11-17 起）
 
-- 新代码只进 `com.smartdock.<域>.<层>`；`org.dromara.assistant` 是 legacy，只许改、不许新增文件
+- 新代码只进 `com.smartdock.<域>.<层>`；`com.smartdock.assistant.legacy` 是 legacy（2026-11-19 批 2 由旧根整棵改名而来，改名记录见 git log），只许改、不许新增文件
 - 四层一句话：controller 只做门卫 / service 编排 / domain 放实体与接口 / infrastructure 放实现
 - gateway 只在三类边界建：跨模块、流式长连接、外部服务；自有单表 CRUD 不建
 - 改结构前读 `backend/AGENTS.md`「包卫生与分层门禁」；收口跑 `PackageHygieneTest` + `LayeringTest`
@@ -347,7 +347,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 目录 | 是什么 | 版本锚点 | 本仓对应位置（改这里先看那里） |
 |------|--------|---------|------------------------------|
 | `agentscope-java` | 本仓助手实际依赖的 Java 智能体框架 | HEAD `997c60ac`（revision `2.1.0-SNAPSHOT`，最近 tag `v2.0.2`） | 后端：`backend/ruoyi-modules/ruoyi-assistant` 的 `core`（Agent 工厂、中间件、工具、技能、压缩、HITL）与 `ruoyi-assistant-spi`（`BizToolProvider`）。改实现前先读 `agentscope-core` 的 `agent` / `tool` / `permission` / `skill` / `memory` / `session` / `interruption` / `middleware` 子包 |
-| `ZCode` | ZCode 客户端与 CLI 真源码（TS monorepo） | `v3.17.1` / `a60ba6a7` | 前端会话：`frontend/src/components/DcsAssistant`（Composer、TurnBlock、MsgFlow、PlanDock、HitlDock）；后端压缩与会话：`org.dromara.assistant.core` 的 `AssistantCompactionPolicy`、`DcsCompactionMiddleware`。读 `packages/services/src/{zcode-agent,zcode-session,subagents,skills}`、`packages/ui/src/lib/contextCompactionRuntime.ts`、`apps/zcode-cli/docs/design/v2/compact/` |
+| `ZCode` | ZCode 客户端与 CLI 真源码（TS monorepo） | `v3.17.1` / `a60ba6a7` | 前端会话：`frontend/src/components/DcsAssistant`（Composer、TurnBlock、MsgFlow、PlanDock、HitlDock）；后端压缩与会话：`com.smartdock.assistant.legacy.core` 的 `AssistantCompactionPolicy`、`DcsCompactionMiddleware`。读 `packages/services/src/{zcode-agent,zcode-session,subagents,skills}`、`packages/ui/src/lib/contextCompactionRuntime.ts`、`apps/zcode-cli/docs/design/v2/compact/` |
 | `LibreChat` | 多用户聊天平台，含 Agents SDK 4.2.1 / MCP / HITL / 权限 | `v0.8.9-rc1` / `f4154b649` | 后端 Agent 控制链与 HITL：`ruoyi-assistant` 的 `controller`、`core`（AGUI 流、run 状态、审批闸）。行为规格优先读 `api/server/controllers/agents/__tests__`（askUserQuestion、hitlCheckpoint、resumeMetadata、eventActorPause、memory），实现读 `api/server/controllers/agents`、`routes/agents`、`packages/chat` |
 | `assistant-ui` | 聊天 UI 基元库（React / Vue 绑定） | HEAD `e8ec559d8`，`@assistant-ui/vue` `0.0.7` | 前端 `frontend/src/components/DcsAssistant` 的流式消息、输入框、工具卡片结构。Vue 绑定看 `packages/vue`，状态机看 `packages/core/src/{runtime,store}`，交互范式看 `packages/react/src/primitives`；只参照结构，不引入依赖 |
 | `open-webui` | FastAPI + Svelte 的 AI 平台 | `v0.12.5` / `f7ac7ee10` | 后端会话、压缩、追问、权限中间件：`ruoyi-assistant` 的 `core` 与 `controller`。读 `backend/open_webui/utils/{context_compaction,ask_user,asgi_middleware}.py`、`routers/{groups,chats,folders}.py`、`utils/access_control`；前端 Svelte 会话只作结构参照（`src/lib/components/chat`） |

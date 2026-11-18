@@ -205,7 +205,7 @@
 
 ## 17. 包卫生用测试立规矩，不搬家
 
-新代码只进 `com.smartdock.<域>.<层>`；`org.dromara.assistant` 冻结为 legacy（只许改、不许新增文件）。规矩不靠 review，靠 `ruoyi-admin` 里会失败的测试：行内全限定名、Controller 出参 `R<Map<String,Object>>`、Controller 直连 Mapper / 借外部模块 Service，外加 legacy 根包文件数。存量冻结在 `arch-baseline.json`，**只减不增、残留也红**。
+新代码只进 `com.smartdock.<域>.<层>`；`com.smartdock.assistant.legacy` 冻结为 legacy（批 2 由旧根整棵改名而来，记录见 git log，只许改、不许新增文件）。规矩不靠 review，靠 `ruoyi-admin` 里会失败的测试：行内全限定名、Controller 出参 `R<Map<String,Object>>`、Controller 直连 Mapper / 借外部模块 Service，外加 legacy 根包文件数。存量冻结在 `arch-baseline.json`，**只减不增、残留也红**。
 
 **为什么**：一个 Controller 长到 594 行、最长方法 170 行、97 处把整条包名写进代码，而全仓没有任何检查会因为写歪而失败——只修一次必然长回来。把 191 个文件搬到新根包是一到两周的 diff、多个窗口必冲突，运行时收益为零；「不新增 + 存量冻结」当天就能止血。工具选 ArchUnit 而不是 Spring Modulith：本仓的 `controller / service / domain` 是主类的平级子包，Modulith 的 `verify()` 会把它们当互相禁止访问的模块，第一天就红一片；Modulith 留给真正按域拆模块之后。
 

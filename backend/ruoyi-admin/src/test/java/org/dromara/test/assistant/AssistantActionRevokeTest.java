@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.service.AssistantActionService;
+import com.smartdock.assistant.legacy.service.AssistantActionService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

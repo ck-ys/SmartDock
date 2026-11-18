@@ -4,7 +4,7 @@ import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.model.Model;
-import org.dromara.assistant.billing.BillingModelDecorator;
+import com.smartdock.assistant.legacy.billing.BillingModelDecorator;
 import org.dromara.common.core.exception.ServiceException;
 import com.smartdock.domain.DcsAiConfig;
 import com.smartdock.domain.bo.WalletOperationBo;
@@ -359,7 +359,7 @@ class D1BillingTest {
             }
         };
         BillingModelDecorator decorator = new BillingModelDecorator(stub, cfg, 1L, billingService, walletService,
-            priceService, new org.dromara.assistant.billing.AssistantCostLedger());
+            priceService, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
         assertNotNull(decorator.stream(List.of(), List.of(), null).blockLast(java.time.Duration.ofSeconds(30)));
         Thread.sleep(500); // doFinally 同线程落账后再断言
         assertEquals(1, delegateCalls.get());
@@ -429,7 +429,7 @@ class D1BillingTest {
             }
         };
         BillingModelDecorator decA = new BillingModelDecorator(errStub, cfgA, 1L, billingService, walletService,
-            priceService, new org.dromara.assistant.billing.AssistantCostLedger());
+            priceService, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
         try {
             decA.stream(List.of(), List.of(), null).blockLast(java.time.Duration.ofSeconds(30));
         } catch (RuntimeException expected) {
@@ -461,7 +461,7 @@ class D1BillingTest {
             }
         };
         BillingModelDecorator decB = new BillingModelDecorator(okStub, cfgB, 1L, billingService, walletService,
-            priceService, new org.dromara.assistant.billing.AssistantCostLedger());
+            priceService, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
         assertNotNull(decB.stream(List.of(), List.of(), null).blockLast(java.time.Duration.ofSeconds(30)));
         Thread.sleep(600);
         java.util.List<String> raised = floorKeysOfTenant();
@@ -523,7 +523,7 @@ class D1BillingTest {
             }
         };
         BillingModelDecorator decorator = new BillingModelDecorator(stub, cfg, 1L, billingService, walletService,
-            priceService, new org.dromara.assistant.billing.AssistantCostLedger());
+            priceService, new com.smartdock.assistant.legacy.billing.AssistantCostLedger());
         ServiceException ex = assertThrows(ServiceException.class,
             () -> decorator.stream(List.of(), List.of(), null).blockFirst(java.time.Duration.ofSeconds(10)));
         assertTrue(ex.getMessage().contains("额度不足"), "友好话术: " + ex.getMessage());

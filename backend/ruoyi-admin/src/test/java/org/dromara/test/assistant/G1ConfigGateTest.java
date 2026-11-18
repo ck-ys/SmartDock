@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.domain.DcsAssistantConfig;
-import org.dromara.assistant.service.AssistantConfigService;
+import com.smartdock.assistant.legacy.domain.DcsAssistantConfig;
+import com.smartdock.assistant.legacy.service.AssistantConfigService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

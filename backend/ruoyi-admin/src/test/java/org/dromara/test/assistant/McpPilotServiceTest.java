@@ -22,67 +22,67 @@ class McpPilotServiceTest {
     void headersShapeAndSizeValidated() {
         // 鉴权头合法接收（这是本功能的目标场景）
         assertEquals(java.util.Map.of("Authorization", "Bearer abc"),
-            org.dromara.assistant.service.McpPilotService.parseHeaders("{\"Authorization\":\"Bearer abc\"}"));
+            com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders("{\"Authorization\":\"Bearer abc\"}"));
         // 空/空白/空对象=空 map
-        assertTrue(org.dromara.assistant.service.McpPilotService.parseHeaders(null).isEmpty());
-        assertTrue(org.dromara.assistant.service.McpPilotService.parseHeaders(" ").isEmpty());
-        assertTrue(org.dromara.assistant.service.McpPilotService.parseHeaders("{}").isEmpty());
+        assertTrue(com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(null).isEmpty());
+        assertTrue(com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(" ").isEmpty());
+        assertTrue(com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders("{}").isEmpty());
         // 畸形：非 JSON / 非对象值 / 非法键名字符 / 超键数 / 值非字符串 / 值过长
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{bad"));
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{\"a b\":\"1\"}"));
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{\"a\":1}"));
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders("{\"a\":\"\"}"));
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders("{bad"));
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders("{\"a b\":\"1\"}"));
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders("{\"a\":1}"));
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders("{\"a\":\"\"}"));
         StringBuilder many = new StringBuilder("{");
         for (int i = 0; i < 11; i++) {
             many.append("\"h").append(i).append("\":\"v\",");
         }
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(
             many.substring(0, many.length() - 1) + "}"));
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(
             "{\"a\":\"" + "x".repeat(1025) + "\"}"));
         // 边界内合法：1024 值上限实测 + 10 键上限实测（三审回修：注释曾声称覆盖未测）
-        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+        assertDoesNotThrow(() -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(
             "{\"X_Api-Key-1\":\"" + "x".repeat(1024) + "\"}"));
         StringBuilder ten = new StringBuilder("{");
         for (int i = 0; i < 10; i++) {
             ten.append("\"H_").append(i).append("\":\"v\",");
         }
-        assertEquals(10, org.dromara.assistant.service.McpPilotService.parseHeaders(
+        assertEquals(10, com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(
             ten.substring(0, ten.length() - 1) + "}").size());
         // G4 三审回修（dsflash P2）：整体 4KB 上限 + 重复键显式拒绝（Jackson 默认后值静默覆盖）
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(
             "{\"a\":\"" + "x".repeat(4200) + "\"}"));
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseHeaders(
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseHeaders(
             "{\"a\":\"1\",\"a\":\"2\"}"));
         // validateHeaders 与 parseHeaders 同口径（委托）
-        assertDoesNotThrow(() -> org.dromara.assistant.service.McpPilotService.validateHeaders("{\"Authorization\":\"t\"}"));
+        assertDoesNotThrow(() -> com.smartdock.assistant.legacy.service.McpPilotService.validateHeaders("{\"Authorization\":\"t\"}"));
     }
 
     /** G4-#3 写类判定纯函数（glm53 终审 P2 抽出后锁行为）：注解显式优先，null 兜底服务级 */
     @Test
     void writeToolDecisionByAnnotationThenServerFlag() {
-        assertTrue(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.FALSE, true), "注解 FALSE 一律写类（即便服务自称只读）");
-        assertTrue(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.FALSE, false), "注解 FALSE ×写类服务=写");
-        assertFalse(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.TRUE, true), "注解 TRUE 放行");
-        assertFalse(org.dromara.assistant.service.McpPilotService.isWriteTool(Boolean.TRUE, false), "注解 TRUE 即便写类服务也放行（工具自声明只读）");
-        assertFalse(org.dromara.assistant.service.McpPilotService.isWriteTool(null, true), "无注解+只读服务（试点恒 '1'）=只读，行为零变化");
-        assertTrue(org.dromara.assistant.service.McpPilotService.isWriteTool(null, false), "无注解+写类服务=fail-safe 视为写（放开 read_only 前置保护）");
+        assertTrue(com.smartdock.assistant.legacy.service.McpPilotService.isWriteTool(Boolean.FALSE, true), "注解 FALSE 一律写类（即便服务自称只读）");
+        assertTrue(com.smartdock.assistant.legacy.service.McpPilotService.isWriteTool(Boolean.FALSE, false), "注解 FALSE ×写类服务=写");
+        assertFalse(com.smartdock.assistant.legacy.service.McpPilotService.isWriteTool(Boolean.TRUE, true), "注解 TRUE 放行");
+        assertFalse(com.smartdock.assistant.legacy.service.McpPilotService.isWriteTool(Boolean.TRUE, false), "注解 TRUE 即便写类服务也放行（工具自声明只读）");
+        assertFalse(com.smartdock.assistant.legacy.service.McpPilotService.isWriteTool(null, true), "无注解+只读服务（试点恒 '1'）=只读，行为零变化");
+        assertTrue(com.smartdock.assistant.legacy.service.McpPilotService.isWriteTool(null, false), "无注解+写类服务=fail-safe 视为写（放开 read_only 前置保护）");
     }
 
     @Test
     void argsMustBeStringArray() {
-        assertEquals(java.util.List.of("a.mjs"), org.dromara.assistant.service.McpPilotService.parseArgs("[\"a.mjs\"]"));
-        assertEquals(java.util.List.of(), org.dromara.assistant.service.McpPilotService.parseArgs(null));
-        assertThrows(ServiceException.class, () -> org.dromara.assistant.service.McpPilotService.parseArgs("{\"a\":1}"));
+        assertEquals(java.util.List.of("a.mjs"), com.smartdock.assistant.legacy.service.McpPilotService.parseArgs("[\"a.mjs\"]"));
+        assertEquals(java.util.List.of(), com.smartdock.assistant.legacy.service.McpPilotService.parseArgs(null));
+        assertThrows(ServiceException.class, () -> com.smartdock.assistant.legacy.service.McpPilotService.parseArgs("{\"a\":1}"));
     }
 
     @Test
     void csvSplitAndTruncate() {
-        assertEquals(java.util.List.of("a", "b"), org.dromara.assistant.service.McpPilotService.splitCsv(" a , ,b,"));
-        assertEquals(java.util.List.of(), org.dromara.assistant.service.McpPilotService.splitCsv(null));
-        assertEquals(480, org.dromara.assistant.service.McpPilotService.truncate("x".repeat(999)).length());
-        assertEquals("ok", org.dromara.assistant.service.McpPilotService.truncate("ok"));
-        assertEquals("", org.dromara.assistant.service.McpPilotService.truncate(null));
+        assertEquals(java.util.List.of("a", "b"), com.smartdock.assistant.legacy.service.McpPilotService.splitCsv(" a , ,b,"));
+        assertEquals(java.util.List.of(), com.smartdock.assistant.legacy.service.McpPilotService.splitCsv(null));
+        assertEquals(480, com.smartdock.assistant.legacy.service.McpPilotService.truncate("x".repeat(999)).length());
+        assertEquals("ok", com.smartdock.assistant.legacy.service.McpPilotService.truncate("ok"));
+        assertEquals("", com.smartdock.assistant.legacy.service.McpPilotService.truncate(null));
     }
 
     /**
@@ -94,7 +94,7 @@ class McpPilotServiceTest {
      */
     @Test
     void auditRowKeepsDurationOutOfErrorMsg() {
-        org.dromara.assistant.domain.DcsMcpCallLog ok = org.dromara.assistant.service.McpPilotService.buildCallLog(
+        com.smartdock.assistant.legacy.domain.DcsMcpCallLog ok = com.smartdock.assistant.legacy.service.McpPilotService.buildCallLog(
             "weather_demo", "000000", 1L, "get_weather", "CALL_OK", "1", null, "4ms");
         assertNull(ok.getErrorMsg(), "成功行不该把耗时写进 error_msg");
         assertEquals(4, ok.getDurationMs());
@@ -102,20 +102,20 @@ class McpPilotServiceTest {
         assertEquals("weather_demo", ok.getServerName());
 
         // 写类成功调用 remark 带 "write " 前缀：耗时仍要解析出来（旧坑：endsWith 解析必抛）
-        org.dromara.assistant.domain.DcsMcpCallLog write = org.dromara.assistant.service.McpPilotService.buildCallLog(
+        com.smartdock.assistant.legacy.domain.DcsMcpCallLog write = com.smartdock.assistant.legacy.service.McpPilotService.buildCallLog(
             "weather_demo", "000000", 1L, "create_task", "CALL_OK", "1", null, "write 123ms");
         assertNull(write.getErrorMsg());
         assertEquals(123, write.getDurationMs());
 
         // 失败行：真错误保留，没有耗时尾缀时 durationMs 为空
-        org.dromara.assistant.domain.DcsMcpCallLog bad = org.dromara.assistant.service.McpPilotService.buildCallLog(
+        com.smartdock.assistant.legacy.domain.DcsMcpCallLog bad = com.smartdock.assistant.legacy.service.McpPilotService.buildCallLog(
             "weather_demo", "000000", 1L, "get_weather", "CALL_ERROR", "0",
             "MCP client 'weather_demo' not initialized", null);
         assertEquals("MCP client 'weather_demo' not initialized", bad.getErrorMsg());
         assertNull(bad.getDurationMs());
 
         // 限频行：既无错误文本也无耗时
-        org.dromara.assistant.domain.DcsMcpCallLog limited = org.dromara.assistant.service.McpPilotService.buildCallLog(
+        com.smartdock.assistant.legacy.domain.DcsMcpCallLog limited = com.smartdock.assistant.legacy.service.McpPilotService.buildCallLog(
             "weather_demo", "000000", 1L, "get_weather", "RATE_LIMITED", "0", null, null);
         assertNull(limited.getErrorMsg());
         assertNull(limited.getDurationMs());
@@ -129,7 +129,7 @@ class McpPilotServiceTest {
      */
     @Test
     void buildCallLogClearsErrorMsgOnSuccessEvenIfProvided() {
-        org.dromara.assistant.domain.DcsMcpCallLog ok = org.dromara.assistant.service.McpPilotService.buildCallLog(
+        com.smartdock.assistant.legacy.domain.DcsMcpCallLog ok = com.smartdock.assistant.legacy.service.McpPilotService.buildCallLog(
             "weather_demo", "000000", 1L, "get_weather", "CALL_OK", "1", "不应出现的错误", "4ms");
         assertNull(ok.getErrorMsg(), "成功行即使传了 errorMsg 也必须置空");
         assertEquals(4, ok.getDurationMs());
@@ -138,13 +138,13 @@ class McpPilotServiceTest {
     @Test
     void buildCallLogParsesFailRemarkMsAndClampsOverflow() {
         // 失败行带耗时尾缀：错误文本保留，duration 照常解析
-        org.dromara.assistant.domain.DcsMcpCallLog fail = org.dromara.assistant.service.McpPilotService.buildCallLog(
+        com.smartdock.assistant.legacy.domain.DcsMcpCallLog fail = com.smartdock.assistant.legacy.service.McpPilotService.buildCallLog(
             "weather_demo", "000000", 1L, "create_task", "CALL_ERROR", "0", "boom", "write 123ms");
         assertEquals("boom", fail.getErrorMsg());
         assertEquals(123, fail.getDurationMs());
 
         // F9：尾缀数字超 int 上限——置 null，不能抛 NumberFormatException 丢整条审计行
-        org.dromara.assistant.domain.DcsMcpCallLog overflow = org.dromara.assistant.service.McpPilotService.buildCallLog(
+        com.smartdock.assistant.legacy.domain.DcsMcpCallLog overflow = com.smartdock.assistant.legacy.service.McpPilotService.buildCallLog(
             "weather_demo", "000000", 1L, "get_weather", "CALL_ERROR", "0", "boom", "99999999999999ms");
         assertEquals("boom", overflow.getErrorMsg());
         assertNull(overflow.getDurationMs(), "超 int 的耗时不该炸行，也不该截断成错值");
@@ -156,9 +156,9 @@ class McpPilotServiceTest {
      */
     @Test
     void automationMountsOnlyExplicitlyReadOnlyTools() {
-        assertTrue(org.dromara.assistant.service.McpPilotService.mountInAutomation(Boolean.TRUE));
-        assertFalse(org.dromara.assistant.service.McpPilotService.mountInAutomation(null),
+        assertTrue(com.smartdock.assistant.legacy.service.McpPilotService.mountInAutomation(Boolean.TRUE));
+        assertFalse(com.smartdock.assistant.legacy.service.McpPilotService.mountInAutomation(null),
             "无 readOnlyHint 注解的工具不得进自动化白名单");
-        assertFalse(org.dromara.assistant.service.McpPilotService.mountInAutomation(Boolean.FALSE));
+        assertFalse(com.smartdock.assistant.legacy.service.McpPilotService.mountInAutomation(Boolean.FALSE));
     }
 }

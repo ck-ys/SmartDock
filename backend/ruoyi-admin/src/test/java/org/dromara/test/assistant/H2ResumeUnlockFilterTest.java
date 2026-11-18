@@ -2,12 +2,12 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.dromara.assistant.core.AssistantResumeUnlockFilter;
-import org.dromara.assistant.domain.DcsAssistantConversation;
-import org.dromara.assistant.mapper.AssistantConversationMapper;
-import org.dromara.assistant.persist.AssistantPendingInterruptCache;
-import org.dromara.assistant.persist.AssistantPendingInterruptCache.PendingInterrupt;
-import org.dromara.assistant.persist.AssistantRunRecorder;
+import com.smartdock.assistant.legacy.core.AssistantResumeUnlockFilter;
+import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
+import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
+import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache.PendingInterrupt;
+import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.junit.jupiter.api.BeforeAll;

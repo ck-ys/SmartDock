@@ -1,12 +1,12 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.core.AssistantMemoryTurnLedger;
-import org.dromara.assistant.domain.DcsAssistantMemory;
-import org.dromara.assistant.mapper.AssistantConversationMapper;
-import org.dromara.assistant.mapper.AssistantMemoryMapper;
-import org.dromara.assistant.mapper.AssistantMemoryPrefMapper;
-import org.dromara.assistant.security.AssistantPiiFilter;
-import org.dromara.assistant.service.AssistantMemoryService;
+import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
+import com.smartdock.assistant.legacy.domain.DcsAssistantMemory;
+import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.legacy.mapper.AssistantMemoryMapper;
+import com.smartdock.assistant.legacy.mapper.AssistantMemoryPrefMapper;
+import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.legacy.service.AssistantMemoryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

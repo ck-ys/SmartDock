@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.service.AssistantMemoryService;
+import com.smartdock.assistant.legacy.service.AssistantMemoryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -122,12 +122,12 @@ class AssistantMemoryLogicTest {
     @Test
     @DisplayName("回合账本按 threadId 会合：取走即清、跨会话不串、count=0 清残留")
     void turnLedger() {
-        org.dromara.assistant.core.AssistantMemoryTurnLedger ledger =
-            new org.dromara.assistant.core.AssistantMemoryTurnLedger();
+        com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger ledger =
+            new com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger();
         // 注入统计 + 覆盖事件同会话会合
         ledger.recordInjected("th-a", 2, 46);
         ledger.recordSuperseded("th-a", "以后叫我老周", "以后叫我老王");
-        org.dromara.assistant.core.AssistantMemoryTurnLedger.TurnMemory mem = ledger.take("th-a");
+        com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger.TurnMemory mem = ledger.take("th-a");
         assertNotNull(mem);
         assertEquals(2, mem.injected().count());
         assertEquals(46, mem.injected().chars());

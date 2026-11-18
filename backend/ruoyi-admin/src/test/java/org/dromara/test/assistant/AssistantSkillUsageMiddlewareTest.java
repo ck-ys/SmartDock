@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.core.AssistantSkillUsageMiddleware;
+import com.smartdock.assistant.legacy.core.AssistantSkillUsageMiddleware;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

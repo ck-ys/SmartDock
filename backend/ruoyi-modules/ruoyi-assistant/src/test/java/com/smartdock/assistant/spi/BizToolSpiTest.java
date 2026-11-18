@@ -2,11 +2,11 @@ package com.smartdock.assistant.spi;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.dromara.assistant.core.AssistantActionLedgerHook;
-import org.dromara.assistant.core.BizToolAgentAdapter;
-import org.dromara.assistant.core.JsonSchemaBuilder;
-import org.dromara.assistant.core.ProviderToolRegistry;
-import org.dromara.assistant.tools.ToolIdentity;
+import com.smartdock.assistant.legacy.core.AssistantActionLedgerHook;
+import com.smartdock.assistant.legacy.core.BizToolAgentAdapter;
+import com.smartdock.assistant.legacy.core.JsonSchemaBuilder;
+import com.smartdock.assistant.legacy.core.ProviderToolRegistry;
+import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.tool.AgentTool;
 import io.agentscope.core.tool.Toolkit;
@@ -148,12 +148,12 @@ class BizToolSpiTest {
     @Test
     void v5_platformToolsDontNeedBusinessModules() {
         // 批3 微核心化: ToolDeps 只剩平台依赖, 业务工具全走 SPI——全 null 依赖即可装配
-        org.dromara.assistant.core.ToolRegistry.ToolDeps emptyDeps =
-            new org.dromara.assistant.core.ToolRegistry.ToolDeps(
+        com.smartdock.assistant.legacy.core.ToolRegistry.ToolDeps emptyDeps =
+            new com.smartdock.assistant.legacy.core.ToolRegistry.ToolDeps(
                 null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null, null,
                 java.nio.file.Path.of("."), null, null, true);
         Toolkit toolkit = new Toolkit();
-        Set<String> registered = org.dromara.assistant.core.ToolRegistry.registerAll(toolkit,
+        Set<String> registered = com.smartdock.assistant.legacy.core.ToolRegistry.registerAll(toolkit,
             identity(2, Set.of("*:*:*")), emptyDeps, PermissionContextState.builder(), null);
 
         assertThat(registered).doesNotContain("query_my_todos", "query_my_missions", "act_remind",

@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import org.dromara.assistant.domain.DcsMcpServer;
+import com.smartdock.assistant.legacy.domain.DcsMcpServer;
 import org.dromara.common.encrypt.core.EncryptorManager;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -71,7 +71,7 @@ class G4EncryptScanTest {
         assertEquals(32, resolved.length(), "解析后应是 32 位真实密钥");
 
         assertThrows(NoSuchFieldException.class,
-            () -> org.dromara.assistant.service.McpPilotService.class.getDeclaredField("HEADERS_ENC_KEY"),
+            () -> com.smartdock.assistant.legacy.service.McpPilotService.class.getDeclaredField("HEADERS_ENC_KEY"),
             "旧的字面量常量必须已删除");
 
         org.dromara.common.encrypt.annotation.EncryptField ai =

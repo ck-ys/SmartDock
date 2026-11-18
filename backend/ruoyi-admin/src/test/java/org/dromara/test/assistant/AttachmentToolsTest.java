@@ -2,10 +2,10 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.dromara.assistant.domain.DcsAssistantAttachment;
-import org.dromara.assistant.service.AssistantAttachmentService;
-import org.dromara.assistant.tools.AttachmentTools;
-import org.dromara.assistant.tools.ToolIdentity;
+import com.smartdock.assistant.legacy.domain.DcsAssistantAttachment;
+import com.smartdock.assistant.legacy.service.AssistantAttachmentService;
+import com.smartdock.assistant.legacy.tools.AttachmentTools;
+import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

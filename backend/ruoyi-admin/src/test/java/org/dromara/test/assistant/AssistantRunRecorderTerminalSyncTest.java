@@ -3,10 +3,10 @@ package org.dromara.test.assistant;
 import io.agentscope.core.agui.adapter.AguiAdapterConfig;
 import io.agentscope.core.agui.adapter.strategy.AguiStreamContext;
 import io.agentscope.core.agui.event.AguiEvent;
-import org.dromara.assistant.billing.AssistantCostLedger;
-import org.dromara.assistant.persist.AssistantPendingInterruptCache;
-import org.dromara.assistant.persist.AssistantRunRecorder;
-import org.dromara.assistant.service.AssistantConversationService;
+import com.smartdock.assistant.legacy.billing.AssistantCostLedger;
+import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
+import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
+import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

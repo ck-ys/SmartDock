@@ -1,0 +1,307 @@
+package com.smartdock.assistant.legacy.controller;
+
+import cn.dev33.satoken.annotation.SaCheckPermission;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import com.smartdock.assistant.legacy.core.DatabaseSkillRepository;
+import com.smartdock.assistant.legacy.core.SkillCacheBroadcaster;
+import com.smartdock.assistant.legacy.core.SkillAssets;
+import com.smartdock.assistant.legacy.domain.DcsAssistantSkill;
+import com.smartdock.assistant.legacy.mapper.AssistantSkillMapper;
+import org.dromara.common.core.domain.R;
+import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
+import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.common.web.core.BaseController;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 技能在线层管理端点（5b 批，题4 乙/题5 甲）：列表/详情/保存/删除（=恢复内置）。
+ *
+ * <p>写权限独立串 {@code dcs:assistant:skill:edit}（超管默认有，租户管理员按需勾——
+ * 敏感级与「改租户预算」不同权）。保存四防呆：①对内置覆写最低角色只升不降；②同租户
+ * 名称唯一（覆写同名内置=允许）；③正文 ≤2 万字＋一句话说明 ≤1024；④写后即时失效缓存
+ * ＋Redis 广播（题3=乙）。删除在线行=下层（内置/目录）自动露出，恢复出厂无损。</p>
+ */
+@Tag(name = "助手技能管理", description = "技能在线层：列表/详情/保存/删除")
+@RestController
+@RequestMapping("/dcs/assistant/skill")
+@RequiredArgsConstructor
+public class AssistantSkillAdminController extends BaseController {
+
+    /** 题5 防呆③上限：正文（字）与一句话说明（字，对齐 DDL varchar(1024)）与技能名（DDL varchar(64)） */
+    static final int BODY_MAX = 20_000;
+    static final int DESC_MAX = 1024;
+    static final int NAME_MAX = 64;
+
+    private final AssistantSkillMapper skillMapper;
+    /** 题2 案3（2026-10-31）：技能使用统计（用次 + 最近一次），管理列表只读展示 */
+    private final com.smartdock.assistant.legacy.service.AssistantSkillUsageService skillUsageService;
+
+    /**
+     * 当前租户口径（三审 dspro P1-5）：动态租户优先（超管切单位看/改谁家就是谁家），
+     * 兜底登录租户/全局——避免超管切到 A 单位时把改动写进 000000 全局基线波及全平台。
+     */
+    private static String currentTenant() {
+        String t;
+        try {
+            t = org.dromara.common.tenant.helper.TenantHelper.getTenantId();
+        } catch (Exception noTenantModule) {
+            t = null;
+        }
+        if (t == null || t.isBlank()) {
+            t = LoginHelper.getTenantId();
+        }
+        return (t == null || t.isBlank()) ? DatabaseSkillRepository.GLOBAL_TENANT : t;
+    }
+
+    /** 管理列表：生效技能（三层叠加后）∪ 停用行（管理台要看得见停用的），带来源徽章与内置档 */
+    @SaCheckPermission("dcs:assistant:config")
+    @GetMapping("/list")
+    public R<List<Map<String, Object>>> list() {
+        String tenantId = currentTenant();
+        Map<String, DcsAssistantSkill> dbRows = indexBySkillId(skillMapper.selectAllForTenant(tenantId));
+        // 题2 案3：一次取全租户统计，逐行补 useCount/lastUsedAt（没有统计=0/null）
+        Map<String, Map<String, Object>> usage = skillUsageService.usageOf(tenantId);
+        List<Map<String, Object>> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (SkillAssets.LoadedSkill s : SkillAssets.skills(tenantId)) {
+            Map<String, Object> row = baseRow(s);
+            DcsAssistantSkill mine = rowFor(dbRows, tenantId, s.id());
+            DcsAssistantSkill global = rowFor(dbRows, DatabaseSkillRepository.GLOBAL_TENANT, s.id());
+            boolean hasBuiltin = !builtinMinRoleName(s.id()).isEmpty();
+            String source;
+            if (mine != null) {
+                source = hasBuiltin ? "online-overwrite" : "online-new";
+            } else if (global != null && (global.getDisabled() == null || global.getDisabled() == 0)) {
+                source = "online-overwrite";
+            } else {
+                source = "builtin";
+            }
+            row.put("source", source);
+            row.put("builtinMinRole", builtinMinRoleName(s.id()));
+            applyUsage(row, usage, s.id());
+            out.add(row);
+            seen.add(s.id());
+        }
+        // 停用行：不在生效视图里（disabled=1 把技能整体藏了），管理台单独补出
+        for (String key : dbRows.keySet()) {
+            DcsAssistantSkill r = dbRows.get(key);
+            if (r.getDisabled() == null || r.getDisabled() == 0 || !key.startsWith(tenantId + ":")
+                || seen.contains(r.getSkillId())) {
+                continue;
+            }
+            Map<String, Object> row = baseRow(new SkillAssets.LoadedSkill(r.getSkillId(),
+                r.getDisplayName() == null || r.getDisplayName().isBlank() ? r.getSkillId() : r.getDisplayName(),
+                r.getDescription(), DatabaseSkillRepository.minRoleOf(r.getMinRole()), r.getBody()));
+            row.put("source", builtinMinRoleName(r.getSkillId()).isEmpty()
+                ? "online-disabled" : "builtin-disabled");
+            row.put("builtinMinRole", builtinMinRoleName(r.getSkillId()));
+            applyUsage(row, usage, r.getSkillId());
+            out.add(row);
+            seen.add(r.getSkillId());
+        }
+        return R.ok(out);
+    }
+
+    /** 详情：生效内容（merged）+ 本租户在线行（编辑回填用）+ 内置基线（恢复预览用） */
+    @SaCheckPermission("dcs:assistant:config")
+    @GetMapping("/{skillId}")
+    public R<Map<String, Object>> detail(@PathVariable String skillId) {
+        String tenantId = currentTenant();
+        SkillAssets.LoadedSkill eff = findEffective(skillId, tenantId);
+        if (eff == null) {
+            // 停用行不在生效视图（遮罩语义），管理台编辑停用技能时仍要给回填
+            for (DcsAssistantSkill r : skillMapper.selectAllForTenant(tenantId)) {
+                if (r.getSkillId() != null && r.getSkillId().equals(skillId)
+                    && r.getDisabled() != null && r.getDisabled() == 1) {
+                    eff = new SkillAssets.LoadedSkill(r.getSkillId(),
+                        r.getDisplayName() == null || r.getDisplayName().isBlank()
+                            ? r.getSkillId() : r.getDisplayName(),
+                        r.getDescription() == null ? "" : r.getDescription(),
+                        DatabaseSkillRepository.minRoleOf(r.getMinRole()),
+                        r.getBody() == null ? "" : r.getBody());
+                    break;
+                }
+            }
+        }
+        if (eff == null) {
+            return R.fail("没有这个技能，或当前租户不可见");
+        }
+        Map<String, Object> out = baseRow(eff);
+        out.put("source", "builtin");
+        out.put("builtinMinRole", builtinMinRoleName(skillId));
+        DcsAssistantSkill mine = skillMapper.selectOne(new LambdaQueryWrapper<DcsAssistantSkill>()
+            .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
+        if (mine != null) {
+            out.put("online", mine);
+            boolean hasBuiltin = !builtinMinRoleName(skillId).isEmpty();
+            if (mine.getDisabled() != null && mine.getDisabled() == 1) {
+                out.put("source", hasBuiltin ? "builtin-disabled" : "online-disabled");
+            } else {
+                out.put("source", hasBuiltin ? "online-overwrite" : "online-new");
+            }
+        }
+        return R.ok(out);
+    }
+
+    /**
+     * 保存（新增/覆写/停用一体）：写本租户行 → 即时失效＋广播。
+     * 只升不降对内置校验；名称唯一（同租户）校验；长度上限校验。
+     */
+    @Log(title = "助手技能", businessType = BusinessType.UPDATE)
+    @PostMapping("/save")
+    @SaCheckPermission("dcs:assistant:skill:edit")
+    public R<Void> save(@RequestBody DcsAssistantSkill body) {
+        String tenantId = currentTenant();
+        Long userId = LoginHelper.getUserId();
+        String skillId = body.getSkillId() == null ? null : body.getSkillId().trim();
+        if (skillId == null || skillId.isBlank() || !skillId.matches("[a-z0-9][a-z0-9-]{0,63}")) {
+            return R.fail("技能标识只能是英文小写/数字/中划线（≤64 位），用于目录与工具调用");
+        }
+        if (body.getDescription() == null || body.getDescription().isBlank()) {
+            return R.fail("一句话说明不能为空——它是助手判断什么时候用这个技能的唯一依据");
+        }
+        if (body.getDescription().length() > DESC_MAX) {
+            return R.fail("一句话说明超长（" + body.getDescription().length() + " > " + DESC_MAX
+                + "）——它是每轮都进目录的文本，写太长会吃掉提示词预算");
+        }
+        if (body.getBody() == null || body.getBody().isBlank()) {
+            return R.fail("正文不能为空");
+        }
+        if (body.getBody().length() > BODY_MAX) {
+            return R.fail("正文超长（" + body.getBody().length() + " > " + BODY_MAX + " 字上限）");
+        }
+        // 三审回修（dsflash P2-7）：技能名长度——DDL varchar(64)，前端只挡 32，直调 API 须人话报错
+        if (body.getDisplayName() != null && body.getDisplayName().length() > NAME_MAX) {
+            return R.fail("技能名超长（" + body.getDisplayName().length() + " > " + NAME_MAX + " 字上限）");
+        }
+        // 三审回修（dsflash P2-7）：minRole 非法值不得静默降档为 member（fail-open）
+        String rawRole = body.getMinRole();
+        if (rawRole != null && !rawRole.isBlank()
+            && !rawRole.matches("member|publisher|admin|0|1|2")) {
+            return R.fail("谁能用只能是 member/publisher/admin（收到：" + rawRole + "）");
+        }
+        int minRole = DatabaseSkillRepository.minRoleOf(rawRole);
+        // 题5 防呆①：对内置技能覆写只升不降（SkillAssets.SKILLS=内置零漂移对照源）
+        for (SkillAssets.Skill builtin : SkillAssets.SKILLS) {
+            if (builtin.id().equals(skillId) && minRole < builtin.minRole()) {
+                return R.fail("内置技能的最低角色只能升不能降（内置档 "
+                    + DatabaseSkillRepository.minRoleName(builtin.minRole()) + " 起）");
+            }
+        }
+        // 同租户唯一（覆写同名内置=允许——覆写正是本表主路径；同租户撞已有在线行已被 exists 判定接走）
+        DcsAssistantSkill exists = skillMapper.selectOne(new LambdaQueryWrapper<DcsAssistantSkill>()
+            .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
+        boolean isNew = exists == null;
+        DcsAssistantSkill row = isNew ? new DcsAssistantSkill() : exists;
+        row.setTenantId(tenantId);
+        row.setSkillId(skillId);
+        row.setDisplayName(body.getDisplayName());
+        row.setDescription(body.getDescription());
+        row.setMinRole(DatabaseSkillRepository.minRoleName(minRole));
+        row.setBody(body.getBody());
+        // 三审回修（dsflash P2-7）：disabled 缺省沿用原值（未传≠启用），新行默认启用
+        if (body.getDisabled() != null) {
+            row.setDisabled(body.getDisabled() == 1 ? 1 : 0);
+        } else if (isNew) {
+            row.setDisabled(0);
+        }
+        row.setUpdateBy(userId);
+        if (isNew) {
+            row.setCreateBy(userId);
+            row.setCreateTime(new java.util.Date());
+            skillMapper.insert(row);
+        } else {
+            row.setUpdateTime(new java.util.Date());
+            // 三审回修（dspro P2-1）：并发删除（恢复内置）后 update 0 行=保存静默丢失，人话拒绝
+            if (skillMapper.updateById(row) == 0) {
+                return R.fail("这条在线版本刚被别人删除（恢复内置），请刷新列表后重试");
+            }
+        }
+        // 题3=乙：本机即时失效＋全机广播（广播丢失 30 秒兜底）
+        SkillCacheBroadcaster.publishReload(tenantId);
+        return R.ok(isNew ? "已新增并生效（下一轮新会话起）" : "已保存并生效（下一轮新会话起）");
+    }
+
+    /** 删除在线行：内置技能=恢复出厂原文；在线新增技能=彻底删除（铁律#21：DELETE→POST） */
+    @Log(title = "助手技能", businessType = BusinessType.DELETE)
+    @PostMapping("/{skillId}")
+    @SaCheckPermission("dcs:assistant:skill:edit")
+    public R<Void> delete(@PathVariable String skillId) {
+        String tenantId = currentTenant();
+        int deleted = skillMapper.delete(new LambdaQueryWrapper<DcsAssistantSkill>()
+            .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
+        if (deleted > 0) {
+            SkillCacheBroadcaster.publishReload(tenantId);
+            // 三审回修（dsflash P2-12）：文案按有没有内置基线分流（纯在线技能删除后无内置可恢复）
+            boolean hasBuiltin = !builtinMinRoleName(skillId).isEmpty();
+            return R.ok(hasBuiltin ? "已删除在线版本（内置原文自动恢复）" : "已彻底删除该在线技能");
+        }
+        return R.fail("没有本租户的在线版本可删");
+    }
+
+    private SkillAssets.LoadedSkill findEffective(String skillId, String tenantId) {
+        for (SkillAssets.LoadedSkill s : SkillAssets.skills(tenantId)) {
+            if (s.id().equals(skillId)) {
+                return s;
+            }
+        }
+        return null;
+    }
+
+    private Map<String, Object> baseRow(SkillAssets.LoadedSkill s) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("skillId", s.id());
+        row.put("displayName", s.name());
+        row.put("description", s.description());
+        row.put("minRole", DatabaseSkillRepository.minRoleName(s.minRole()));
+        row.put("body", s.body());
+        return row;
+    }
+
+    /**
+     * 题2 案3：把使用统计补进行（无统计=0 次 / 从未用过）。
+     * MyBatis 返回的 map 键是 SQL 别名小写（usecount/lastusedat）。
+     */
+    private static void applyUsage(Map<String, Object> row,
+                                   Map<String, Map<String, Object>> usage, String skillId) {
+        Map<String, Object> u = usage.get(skillId);
+        row.put("useCount", u == null || u.get("usecount") == null ? 0L : u.get("usecount"));
+        row.put("lastUsedAt", u == null ? null : u.get("lastusedat"));
+    }
+
+    /** 内置档名（无内置=空串，纯在线技能） */
+    private String builtinMinRoleName(String skillId) {
+        for (SkillAssets.Skill builtin : SkillAssets.SKILLS) {
+            if (builtin.id().equals(skillId)) {
+                return DatabaseSkillRepository.minRoleName(builtin.minRole());
+            }
+        }
+        return "";
+    }
+
+    private Map<String, DcsAssistantSkill> indexBySkillId(List<DcsAssistantSkill> rows) {
+        Map<String, DcsAssistantSkill> out = new LinkedHashMap<>();
+        for (DcsAssistantSkill r : rows) {
+            out.put(r.getTenantId() + ":" + r.getSkillId(), r);
+        }
+        return out;
+    }
+
+    private DcsAssistantSkill rowFor(Map<String, DcsAssistantSkill> idx, String tenantId, String skillId) {
+        return idx.get(tenantId + ":" + skillId);
+    }
+}

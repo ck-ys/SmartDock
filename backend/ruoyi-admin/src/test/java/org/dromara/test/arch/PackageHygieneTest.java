@@ -34,13 +34,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       {@code // arch-ignore-fqn} 并说明原因。</li>
  *   <li><b>接口出参 Map</b>：Controller 方法返回 {@code R<Map<String, Object>>}（含 List 包一层）
  *       → 失败；契约要强类型 VO。</li>
- *   <li><b>legacy 根包不再长文件</b>：{@code org.dromara.assistant} 下的 .java 文件数只减不增
+ *   <li><b>legacy 根包不再长文件</b>：{@code com.smartdock.assistant.legacy} 下的 .java 文件数只减不增
  *       （Q6-1：新代码只进 {@code com.smartdock.assistant}）。</li>
  *   <li><b>domain 不 import 上层</b>（2026-11-17 批 1 规则 7）：{@code com.smartdock.*} 的 domain 包
  *       不许 import service / controller / infrastructure / mapper——实体要编排去 service，
  *       跨层收口建 {@code domain/gateway} 接口、{@code infrastructure} 实现。底座（org.dromara.common 等）不算上层。</li>
  *   <li><b>新根 service 对 legacy 只减不增</b>（2026-11-17 批 1 规则 8）：{@code com.smartdock.*} 的 service 包
- *       import {@code org.dromara.assistant.*}（legacy 助手根）只减不增；清零后段删掉、零容忍。</li>
+ *       import {@code com.smartdock.assistant.legacy.*}（legacy 助手根）只减不增；清零后段删掉、零容忍。</li>
  * </ol>
  *
  * <p><b>豁免清单</b>：{@code src/test/resources/arch-baseline.json}。清单里有的不算新违规；
@@ -62,15 +62,15 @@ class PackageHygieneTest {
 
     private static final Pattern ARCH_IGNORE = Pattern.compile("//\\s*arch-ignore-fqn\\b");
 
-    /** 规则 7：domain 包不许 import 上层；只盯本仓两根（org.dromara.assistant / com.smartdock），底座不算上层。
-     *  禁段可以紧贴根（org.dromara.assistant.service.X）也可以隔任意层包段（com.smartdock.assistant.service.X）。 */
+    /** 规则 7：domain 包不许 import 上层；只盯本仓两根（com.smartdock.assistant.legacy / com.smartdock），底座不算上层。
+     *  禁段可以紧贴根（com.smartdock.assistant.legacy.service.X）也可以隔任意层包段（com.smartdock.assistant.service.X）。 */
     private static final Pattern DOMAIN_UPPER_IMPORT = Pattern.compile(
         "^import\\s+(?:static\\s+)?(?:org\\.dromara\\.assistant|com\\.smartdock)\\.(?:[a-z0-9_]+\\.)*"
             + "(?:service|controller|infrastructure|mapper)\\.");
 
-    /** 规则 8：legacy 助手根（org.dromara.assistant）的任何 import */
+    /** 规则 8：legacy 助手根（com.smartdock.assistant.legacy）的任何 import */
     private static final Pattern LEGACY_ASSISTANT_IMPORT = Pattern.compile(
-        "^import\\s+(?:static\\s+)?org\\.dromara\\.assistant\\.");
+        "^import\\s+(?:static\\s+)?com\\.smartdock\\.assistant\\.legacy\\.");
 
     private static final ObjectMapper JSON = new ObjectMapper();
     /** 数组一项一行：586 条的清单要能逐行 diff / 逐行删，不能挤成一条长线 */
@@ -142,13 +142,30 @@ class PackageHygieneTest {
     @Test
     void legacy根包不再新增文件() throws IOException {
         Path backend = backendRoot();
-        Path legacy = backend.resolve("ruoyi-modules/ruoyi-assistant/src/main/java/org/dromara/assistant");
+        Path legacy = backend.resolve("ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/legacy");
         assertThat(legacy).as("legacy 根包目录必须存在：%s", legacy).isDirectory();
 
         int count;
         try (Stream<Path> walk = Files.walk(legacy)) {
             count = (int) walk.filter(p -> p.toString().endsWith(".java") && Files.isRegularFile(p)).count();
         }
+
+        // 批 2（2026-11-19）整棵改名后：三个旧根下必须一个 .java 都不剩，有人重建旧根也要红
+        int oldCount = 0;
+        for (String oldRoot : new String[] {
+            "ruoyi-modules/ruoyi-assistant/src/main/java/org/dromara" + "/assistant",
+            "ruoyi-modules/ruoyi-assistant/src/test/java/org/dromara" + "/assistant",
+            "ruoyi-admin/src/test/java/org/dromara" + "/assistant"}) {
+            Path or = backend.resolve(oldRoot);
+            if (Files.isDirectory(or)) {
+                try (Stream<Path> w = Files.walk(or)) {
+                    oldCount += (int) w.filter(pp -> pp.toString().endsWith(".java") && Files.isRegularFile(pp)).count();
+                }
+            }
+        }
+        assertThat(oldCount)
+            .as("批 2 前的助手旧根下 .java 文件数必须为 0（已整棵改名到 com.smartdock.assistant.legacy），实剩 %d", oldCount)
+            .isZero();
 
         ObjectNode baseline = readBaseline(backend);
         if (UPDATE) {
@@ -162,7 +179,7 @@ class PackageHygieneTest {
             .isTrue();
         int expected = baseline.get("legacyOrgAssistantFiles").asInt();
         assertThat(count)
-            .as("org.dromara.assistant 下 .java 文件数只减不增（Q6-1：新代码只进 com.smartdock.assistant）。"
+            .as("com.smartdock.assistant.legacy 下 .java 文件数只减不增（Q6-1：新代码只进 com.smartdock.assistant）。"
                 + "当前 %d，基线 %d。删了文件请把基线数字一起调小。", count, expected)
             .isEqualTo(expected);
     }
@@ -201,7 +218,8 @@ class PackageHygieneTest {
         for (Path file : javaFiles(backend)) {
             String rel = rel(backend, file);
             String unix = "/" + rel;
-            if (!unix.contains("/com/smartdock/") || !unix.contains("/service/") || unix.contains("/infrastructure/")) {
+            if (!unix.contains("/com/smartdock/") || !unix.contains("/service/") || unix.contains("/infrastructure/")
+                || unix.contains("/legacy/")) {
                 continue;
             }
             String[] lines = Files.readString(file, StandardCharsets.UTF_8).split("\n", -1);
@@ -229,12 +247,12 @@ class PackageHygieneTest {
         // （那会把违规整段写回基线=自拆门禁，多审席 B P1）
         ObjectNode baseline = readBaseline(backend);
         assertThat(baseline.has("legacyImportsFromNewRoot"))
-            .as("规则 8 已清零删段，零容忍：新根 service 又 import 了 legacy org.dromara.assistant（%d 处，例如 %s）。"
+            .as("规则 8 已清零删段，零容忍：新根 service 又 import 了 legacy com.smartdock.assistant.legacy（%d 处，例如 %s）。"
                 + "改法是经 domain/gateway 收口、实现下沉 infrastructure；【禁止】用 ARCH_BASELINE_UPDATE=1 生成该段把违规合法化",
                 actual.size(), samples.values().iterator().next().get(0))
             .isTrue();
         assertOnlyDecreases("legacyImportsFromNewRoot", flatten(actual), samples,
-            "新根 service import legacy org.dromara.assistant（规则 8：经 domain/gateway 收口，实现下沉 infrastructure）");
+            "新根 service import legacy com.smartdock.assistant.legacy（规则 8：经 domain/gateway 收口，实现下沉 infrastructure）");
     }
 
     // ------------------------------------------------------------------
