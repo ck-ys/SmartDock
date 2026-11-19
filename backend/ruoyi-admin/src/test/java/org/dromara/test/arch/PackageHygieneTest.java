@@ -17,7 +17,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,7 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *       {@link #RULE8_INLINE_ALLOWED}（与实测精确相等，防腐烂）。</li>
  * </ol>
  *
- * <p><b>豁免清单</b>：{@code src/test/resources/arch-baseline.json}。清单里有的不算新违规；
+ * <p><b>豁免清单</b>：{@code src/test/resources/arch-baseline.json}（规则 8 内联豁免例外——点名白名单在代码内
+ * {@link #RULE8_INLINE_ALLOWED}，不走基线）。清单里有的不算新违规；
  * <b>清单里剩着但代码已经改掉的也算失败</b>——修掉一条就必须删一行，防止清单腐烂。
  * 需要整份刷新时（例如大搬迁后）：{@code ARCH_BASELINE_UPDATE=1 mvn -pl ruoyi-admin -P local test -Dtest=PackageHygieneTest}。</p>
  *
@@ -83,12 +83,14 @@ class PackageHygieneTest {
     private static final Pattern LEGACY_ASSISTANT_INLINE = Pattern.compile(
         "\\bcom\\.smartdock\\.assistant\\.legacy\\.(?:[a-z0-9_]+\\.)*[A-Z][A-Za-z0-9_$]*");
 
-    /** 规则 8 内联豁免白名单（点名制，只减不增）：
-     *  批 3 题 2 案 1 的已知债务，共 1 处 3 行；批 9 gateway 收口消掉该依赖后必须同步删掉本行
-     *  （白名单与实测精确相等：多了=豁免腐烂要删，少了=新违规要收口，两头都红）。 */
-    private static final Set<String> RULE8_INLINE_ALLOWED = Set.of(
+    /** 规则 8 内联豁免白名单（点名制，带次数，只减不增）：
+     *  批 3 题 2 案 1 的已知债务，共 1 个键 3 处；批 9 gateway 收口消掉该依赖后必须同步删掉本行。
+     *  断言比「文件|FQN|次数」三元组（多审 #2 dspro P2-1 / dsflash P2-5：只比键不比次数时，
+     *  第 4 处内联 + 行尾 arch-ignore-fqn 可让规则 1/规则 8 同时绿——次数入断言后两条旁路都堵死，
+     *  也不再依赖 inlineFqn 基线通道兜底）。 */
+    private static final Map<String, Integer> RULE8_INLINE_ALLOWED = Map.of(
         "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java"
-            + "|com.smartdock.assistant.legacy.service.AssistantConfigService");
+            + "|com.smartdock.assistant.legacy.service.AssistantConfigService", 3);
 
     private static final ObjectMapper JSON = new ObjectMapper();
     /** 数组一项一行：586 条的清单要能逐行 diff / 逐行删，不能挤成一条长线 */
@@ -271,12 +273,13 @@ class PackageHygieneTest {
             }
         }
         // 内联豁免白名单：与实测精确相等（批 3 已知债务点名制；批 9 gateway 收口消掉后删白名单行）
-        assertThat(inlineActual.keySet())
-            .as("规则 8 内联豁免对账：实际命中与白名单必须精确相等。多出的=新根 service 用内联 FQN 新增 legacy 依赖"
-                + "（绕过 import 扫描也逃不掉，收口进 domain/gateway 或搬走实现）；"
+        assertThat(inlineActual)
+            .as("规则 8 内联豁免对账：实际命中与白名单必须在「文件|FQN|次数」三个维度精确相等。"
+                + "多出的=新根 service 用内联 FQN 新增 legacy 依赖（绕过 import 扫描也逃不掉，收口进 domain/gateway 或搬走实现）；"
+                + "次数超标的=豁免文件在同键下加深 legacy 耦合（arch-ignore-fqn 救不了这里）；"
                 + "白名单里有而实际没有=豁免腐烂（依赖已消，请删 RULE8_INLINE_ALLOWED 对应行）。当前命中样例：%s",
                 inlineSamples.entrySet().stream().findFirst().map(e -> e.getKey() + "@" + e.getValue().get(0)).orElse("(无)"))
-            .containsExactlyInAnyOrderElementsOf(RULE8_INLINE_ALLOWED);
+            .containsExactlyInAnyOrderEntriesOf(RULE8_INLINE_ALLOWED);
         if (actual.isEmpty()) {
             // 清零态：段必须已删（残留即失败，防清单腐烂）；段不存在则零容忍通过
             ObjectNode baseline = readBaseline(backend);

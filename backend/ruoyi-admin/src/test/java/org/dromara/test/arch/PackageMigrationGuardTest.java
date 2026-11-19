@@ -52,7 +52,7 @@ class PackageMigrationGuardTest {
         for (String pkg : new String[] {"com/smartdock/assistant/legacy/limiter",
                                         "com/smartdock/assistant/legacy/billing"}) {
             List<URL> found = Collections.list(cl.getResources(pkg)).stream()
-                .filter(u -> !u.toString().contains("test-classes"))
+                .filter(u -> !u.toString().contains("/target/test-classes/"))
                 .toList();
             assertTrue(found.isEmpty(),
                 () -> pkg + " 残留在主 classes: " + found
