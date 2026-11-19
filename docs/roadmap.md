@@ -1,6 +1,6 @@
 # 路线图
 
-> 最后更新：2026-11-17
+> 最后更新：2026-11-19
 >
 > **这不是承诺书。** 「在讨论」一档随时可能被否掉；只有「已完成」是既成事实。
 > 想知道每个关键口径**为什么**定成现在这样，看 [设计取舍](design-decisions.md)。
@@ -13,6 +13,7 @@
 
 | 批次 | 内容 |
 |---|---|
+| 结构演进批 4 | 技能线整线搬（8 件 771 行 git mv 进四层：技能在线管理 / 技能详情只读 / 能力全景三 controller，使用统计 service，两个 mapper，两个实体），可见性判定由 5 处手写收成 1 处薄编排（AssistantSkillVisibilityService，公式本体仍留引擎侧）；旧区 172→164、旧根内联引用净减 3 处；门禁 5+2+4 全绿 + 批 4 点名残留守卫 8 条（红绿闭环走过），全量 local 组 574 测试 0 失败，活体双视角 11 端点（普通成员 2 通 9 拒）、springdoc 94 路径不变、前端 0 变更。**已实现** |
 | 结构演进批 3 | 额度线整线一次搬（11 文件 2,247 行 git mv 进四层：账本→service、计费装饰器+三闸+模型工厂→infrastructure、额度四件套各归层、搜索上下文→support），billing/limiter 消包；同包断链修复（11 条 import + 内联 1 文件 3 处，按引用点 14）+ 1 测试镜像搬家（包私有访问）；接口文档分组单条前缀收全根（93→94 路径，UserPrefController 入组）；模块 97/97、助手模块 local,dev 219/5=已登记 5 红（整链在模块 5 红处中断、admin SKIPPED，与批 2 同口径）、活体 quota/status/SpringDoc 全过，回滚点 tag `pre-quota-line`。**已实现** |
 | 结构演进批 2 | 助手旧根包整棵改名 `com.smartdock.assistant.legacy`（183 主代码 + 36 测试 git mv、969 行点分引用〔动工锚点实测〕、外部点 7 行），只改名不搬结构；门禁规则 8 改判新根 + 旧根 0 断言，基线走官方通道重生成；模块 97/97、活体七端点 + 接口文档 93 路径过，回滚点 tag `pre-prefix-rename`。**已实现** |
 | 结构演进批 1 | 门禁 6→8 条（domain 不 import 上层 / 新根 service 对 legacy import 只减不增，后者当天清零删段）+ 首两个 gateway（续看 RunFeed、工具清单 ToolCatalog，legacy 依赖 3+8→0 收口进 infrastructure）+ 偏好实体归位 `domain/model`；三接口改前/改后活体逐字一致，前端代码零改动。**已实现** |
