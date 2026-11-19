@@ -13,6 +13,7 @@
 
 | 批次 | 内容 |
 |---|---|
+| 结构演进批 5 | MCP / 工具闸线整线搬（6 件 523 行 git mv 进四层：MCP 管理 + 工具闸两个 controller、服务与调用日志两个实体、两个 mapper），845 行 `McpPilotService` 拆成新根 service（管理面 `McpServerConfigService` + 独立保留期清理 job）+ support（`McpToolFacts` 纯函数 / `McpHeaderCipher` 加解密），运行面留守 legacy 505 行；旧区 164→158、旧根内联引用净减 7 处；命令/目录/host 白名单、加解密、租户、审计口径逐字不变，8 个端点路径 + 权限串由反射契约单测钉死（新增端点即红）；门禁 7 条全绿 + 批 5 点名残留守卫 6 条（红绿闭环），全量 local 组 600 测试 0 失败（8 条红队环境错为既有），活体双视角 29/29 与 headers 落库 `ENC_` 无明文均留档；两轮四席审查均 APPROVE-WITH-NITS、零 P0/P1。**已实现** |
 | 结构演进批 4 | 技能线整线搬（8 件 771 行 git mv 进四层：技能在线管理 / 技能详情只读 / 能力全景三 controller，使用统计 service，两个 mapper，两个实体），可见性判定由 5 处手写收成 1 处薄编排（AssistantSkillVisibilityService，公式本体仍留引擎侧）；旧区 172→164、旧根内联引用净减 3 处；门禁 5+2+4 全绿 + 批 4 点名残留守卫 8 条（红绿闭环走过），全量 local 组 574 测试 0 失败，活体双视角 11 端点（普通成员 2 通 9 拒）、springdoc 94 路径不变、前端 0 变更。**已实现** |
 | 结构演进批 3 | 额度线整线一次搬（11 文件 2,247 行 git mv 进四层：账本→service、计费装饰器+三闸+模型工厂→infrastructure、额度四件套各归层、搜索上下文→support），billing/limiter 消包；同包断链修复（11 条 import + 内联 1 文件 3 处，按引用点 14）+ 1 测试镜像搬家（包私有访问）；接口文档分组单条前缀收全根（93→94 路径，UserPrefController 入组）；模块 97/97、助手模块 local,dev 219/5=已登记 5 红（整链在模块 5 红处中断、admin SKIPPED，与批 2 同口径）、活体 quota/status/SpringDoc 全过，回滚点 tag `pre-quota-line`。**已实现** |
 | 结构演进批 2 | 助手旧根包整棵改名 `com.smartdock.assistant.legacy`（183 主代码 + 36 测试 git mv、969 行点分引用〔动工锚点实测〕、外部点 7 行），只改名不搬结构；门禁规则 8 改判新根 + 旧根 0 断言，基线走官方通道重生成；模块 97/97、活体七端点 + 接口文档 93 路径过，回滚点 tag `pre-prefix-rename`。**已实现** |

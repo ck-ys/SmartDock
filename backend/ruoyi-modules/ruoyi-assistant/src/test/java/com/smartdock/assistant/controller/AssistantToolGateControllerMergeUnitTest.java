@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

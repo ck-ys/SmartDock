@@ -2,8 +2,8 @@ package com.smartdock.assistant.legacy.core;
 
 import io.modelcontextprotocol.spec.McpSchema;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.mapper.DcsMcpCallLogMapper;
-import com.smartdock.assistant.legacy.domain.DcsMcpCallLog;
+import com.smartdock.assistant.mapper.DcsMcpCallLogMapper;
+import com.smartdock.assistant.domain.model.DcsMcpCallLog;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 

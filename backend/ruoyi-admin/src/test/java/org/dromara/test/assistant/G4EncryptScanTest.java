@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.domain.DcsMcpServer;
+import com.smartdock.assistant.domain.model.DcsMcpServer;
 import org.dromara.common.encrypt.core.EncryptorManager;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class G4EncryptScanTest {
     }
 
     /** 2026-11-02 密钥整改：注解不再写字面量，只写环境变量占位符；
-     *  服务层旧常量 HEADERS_ENC_KEY 必须已删除，防止字面量回潮。 */
+     *  服务层旧常量 HEADERS_ENC_KEY 必须已删除（加密件已迁 support.McpHeaderCipher，守卫跟着代码走），防止字面量回潮。 */
     @Test
     void headersKeyComesFromEnvironmentNotLiteral() throws Exception {
         org.dromara.common.encrypt.annotation.EncryptField anno =
@@ -71,7 +71,7 @@ class G4EncryptScanTest {
         assertEquals(32, resolved.length(), "解析后应是 32 位真实密钥");
 
         assertThrows(NoSuchFieldException.class,
-            () -> com.smartdock.assistant.legacy.service.McpPilotService.class.getDeclaredField("HEADERS_ENC_KEY"),
+            () -> com.smartdock.assistant.support.McpHeaderCipher.class.getDeclaredField("HEADERS_ENC_KEY"),
             "旧的字面量常量必须已删除");
 
         org.dromara.common.encrypt.annotation.EncryptField ai =

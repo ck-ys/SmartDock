@@ -1,6 +1,5 @@
 package com.smartdock.assistant.legacy.service;
 
-import com.baomidou.lock.annotation.Lock4j;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.tool.Toolkit;
@@ -8,23 +7,20 @@ import io.agentscope.core.tool.mcp.McpClientBuilder;
 import io.agentscope.core.tool.mcp.McpClientWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsMcpCallLog;
-import com.smartdock.assistant.legacy.domain.DcsMcpServer;
-import com.smartdock.assistant.legacy.mapper.DcsMcpCallLogMapper;
-import com.smartdock.assistant.legacy.mapper.DcsMcpServerMapper;
+import com.smartdock.assistant.domain.model.DcsMcpCallLog;
+import com.smartdock.assistant.domain.model.DcsMcpServer;
+import com.smartdock.assistant.mapper.DcsMcpCallLogMapper;
+import com.smartdock.assistant.mapper.DcsMcpServerMapper;
+import com.smartdock.assistant.support.McpHeaderCipher;
+import com.smartdock.assistant.support.McpToolFacts;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,11 +30,17 @@ import java.util.regex.Pattern;
 /**
  * 批2 Q2=A（2026-10-21）：MCP 外部工具试点。
  *
+ * <p>批 5 题 2 案 1（2026-11-19）按职责拆开：管理面（注册表 CRUD/清单）迁
+ * {@code service/McpServerConfigService}，纯函数（args/headers 解析）迁
+ * {@code support/McpToolFacts}，请求头加解密迁 {@code support/McpHeaderCipher}，
+ * 审计保留期清理 job 迁 {@code service/McpCallLogRetentionJob}。本类只剩运行面：
+ * 挂载、工具闸、限频、双态审计、孤儿客户端清扫。</p>
+ *
  * <p>安全闸（dcs biz22 A4 对照吸收，数字照抄）：①STDIO 命令白名单只允许 node，
  * 脚本路径必须落在配置允许目录内（canonical 前缀比对防穿越）；②HTTP 传输 host
  * 必须在白名单（默认仅 localhost/127.0.0.1，可配置追加）；③试点只收只读服务（DDL
  * 钉死 read_only='1'；G4-#1 起 HTTP 行可配鉴权头——值 AES 加密落库+键名回显，
- * 见 validateHeaders/encryptHeaders）；④挂载失败/服务下线只记审计+warn，绝不连坐助手会话；
+ * 见 support 的 McpToolFacts / McpHeaderCipher）；④挂载失败/服务下线只记审计+warn，绝不连坐助手会话；
  * ⑤调用级限频 30 次/分/租户（GatedMcpClient 装饰层，超限调用报错给模型人话）；
  * ⑥挂载与每次真实调用双态审计落 dcs_mcp_call_log。</p>
  */
@@ -47,37 +49,14 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class McpPilotService {
 
-    /** 试点=平台级共享（预留租户级） */
-    public static final String PLATFORM_TENANT = "000000";
-
     /** dcs 对照吸收：调用限频 30 次/分/租户 */
     static final int RATE_LIMIT_PER_MIN = 30;
 
-    private static final Set<String> ALLOWED_COMMANDS = Set.of("node", "node.exe");
-    private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z][a-z0-9_]{2,29}$");
-
-    /** G4-#1 headers 加密密钥（2026-11-02 密钥整改：不再写死，只从
-     *  smartdock.encrypt.mcp-headers-key / SMARTDOCK_MCP_HEADERS_KEY 读取；
-     *  与实体注解同值，ENC_ 前缀幂等互认不会双重加密。启动自检见
-     *  EncryptKeyStartupRunner——缺失/长度错/旧版内置钥匙一律拒绝启动） */
-
-    /**
-     * G4-#1 实测坑（2026-10-22 活库 g4htest 行实锤）：@EncryptField 注解在、启动扫描
-     * 单测过（G4EncryptScanTest），但运行时插入仍明文——拦截器链为何没吃到本实体留给
-     * 三审深挖。安全字段不赌隐式装配：服务层显式加解密（EncryptorManager 同款算法与
-     * 密钥），对 ENC_ 前缀幂等——无论拦截器将来是否生效，双轨都安全不重不漏。
-     */
-    private final org.springframework.beans.factory.ObjectProvider<org.dromara.common.encrypt.core.EncryptorManager> encryptorManagerProvider;
-
-    /** 独立 mapper（纯函数单测可调——JsonUtils 静态块依赖 Spring 容器，批1 旧坑） */
-    private static final com.fasterxml.jackson.databind.ObjectMapper JSON_MAPPER =
-        new com.fasterxml.jackson.databind.ObjectMapper();
-
     private final DcsMcpServerMapper serverMapper;
     private final DcsMcpCallLogMapper callLogMapper;
+    /** 请求头解密（HTTP 行挂载用；加解密/键名回显实现已迁 support.McpHeaderCipher） */
+    private final McpHeaderCipher headerCipher;
     private final io.agentscope.spring.boot.agui.common.ThreadSessionManager threadSessionManager;
-    /** 2026-11-02 密钥整改：请求头加密密钥从环境变量读（smartdock.encrypt.mcp-headers-key） */
-    private final Environment environment;
 
     /**
      * 三审回修（三席共识 P0/进程泄漏）：(rcUserId, threadId) → 本会话 attach 的 MCP 客户端。
@@ -115,39 +94,6 @@ public class McpPilotService {
         });
     }
 
-    /** STDIO 脚本允许目录（绝对路径，逗号分隔；空=禁用 STDIO 注册） */
-    @Value("${smartdock.mcp.allowed-dirs:}")
-    private String allowedDirs;
-
-    /** G4-#5：审计保留期清理（90 天）——分批 5000 行防长事务锁表。cron 03:55：
-     *  G4 三审回修（dspro P2）错峰——03:40 已被 AssistantRetentionJob/ProfileRetentionJob
-     *  占用；多实例批 3 起加 @Lock4j 单跑，防多节点同时删同一批。 */
-    @Lock4j(keys = {"'assistant-mcp-call-log-sweep'"})
-    @Scheduled(cron = "0 55 3 * * ?")
-    public void sweepExpiredCallLogs() {
-        try {
-            java.util.Date cutoff = new java.util.Date(
-                System.currentTimeMillis() - 90L * 24 * 3600 * 1000);
-            int total = 0;
-            int n;
-            do {
-                n = callLogMapper.deleteBatchBefore(cutoff);
-                total += n;
-            } while (n >= 5000);
-            if (total > 0) {
-                log.info("[McpPilot] 审计保留期清理：删除 {} 行（>90 天）", total);
-            }
-        } catch (Exception e) {
-            // glm53 终审 P2：定时任务必须兜底（对照 AssistantRetentionJob 风格）——
-            // 清理失败不连坐调度线程，明早重试
-            log.error("[McpPilot] 审计保留期清理失败（明日重试）：{}", e.getMessage(), e);
-        }
-    }
-
-    /** HTTP 传输 host 白名单（逗号分隔；默认只放行本机） */
-    @Value("${smartdock.mcp.allowed-http-hosts:localhost,127.0.0.1}")
-    private String allowedHttpHosts;
-
     /** G3-A1：elicitation 反问桥——STDIO 行注册 handler（挂起等用户作答），HTTP 行暂不开（sync handler 阻塞入站线程的滞留风险待真机观察） */
     private final com.smartdock.assistant.legacy.core.AssistantElicitationBridge elicitationBridge;
 
@@ -160,292 +106,6 @@ public class McpPilotService {
     public List<DcsMcpServer> listEnabledForPlatform() {
         return serverMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsMcpServer>()
             .eq(DcsMcpServer::getEnabled, "1"));
-    }
-
-    public List<DcsMcpServer> listAll() {
-        return serverMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsMcpServer>()
-            .orderByDesc(DcsMcpServer::getUpdateTime));
-    }
-
-    /** G4-#4：全部服务名（工具闸 mcp: 键校验用；平台级表，跨租户读） */
-    public java.util.Set<String> allServerNames() {
-        return TenantHelper.ignore(() -> serverMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsMcpServer>()
-                    .select(DcsMcpServer::getServerName))
-            .stream().map(DcsMcpServer::getServerName).collect(java.util.stream.Collectors.toSet()));
-    }
-
-    /** 新增/编辑：白名单校验（命令/脚本目录/host/危险头）全在这——controller 只管鉴权与审计 */
-    public void save(DcsMcpServer row) {
-        if (row.getServerName() == null || !NAME_PATTERN.matcher(row.getServerName()).matches()) {
-            throw new ServiceException("服务名限 3-30 位小写字母/数字/下划线，且以字母开头");
-        }
-        normalizeAndValidate(row);
-        java.util.Date now = new java.util.Date();
-        if (row.getId() == null) {
-            row.setTenantId(PLATFORM_TENANT);
-            row.setReadOnly("1");
-            row.setCreateTime(now);
-            row.setUpdateTime(now);
-            // G4-#1：headers 明文 → ENC_ 密文落库（显式加密，不赌拦截器装配）
-            row.setHeaders(encryptHeaders(row.getHeaders()));
-            try {
-                serverMapper.insert(row);
-            } catch (org.springframework.dao.DuplicateKeyException e) {
-                throw new ServiceException("服务名已存在：" + row.getServerName());
-            }
-        } else {
-            row.setTenantId(null);
-            row.setReadOnly(null);
-            row.setUpdateTime(now);
-            // G4-#1：编辑面只见键名不见值——headers 留空=保持原值（null 不参与 updateById）；
-            // 传 "{}"=清空；传 JSON=替换（加密落库）
-            if (row.getHeaders() != null && row.getHeaders().isBlank()) {
-                row.setHeaders(null);
-            } else {
-                row.setHeaders(encryptHeaders(row.getHeaders()));
-            }
-            serverMapper.updateById(row);
-        }
-    }
-
-    public void toggle(Long id, String enabled) {
-        if (!"0".equals(enabled) && !"1".equals(enabled)) {
-            throw new ServiceException("enabled 只支持 0/1");
-        }
-        DcsMcpServer patch = new DcsMcpServer();
-        patch.setId(id);
-        patch.setEnabled(enabled);
-        patch.setUpdateTime(new java.util.Date());
-        if (serverMapper.updateById(patch) == 0) {
-            throw new ServiceException("记录不存在或已删除");
-        }
-    }
-
-    /** 试点物理删（审计表留痕），无外键依赖 */
-    public void delete(Long id) {
-        serverMapper.deleteById(id);
-    }
-
-    /** 白名单校验单点（save 与测试共用） */
-    void normalizeAndValidate(DcsMcpServer row) {
-        String t = row.getTransportType();
-        if ("STDIO".equals(t)) {
-            if (!ALLOWED_COMMANDS.contains(row.getCommand() == null ? "" : row.getCommand())) {
-                throw new ServiceException("STDIO 试点只允许 node 命令（要接其它运行时请在白名单配置中评估后开放）");
-            }
-            List<String> args = parseArgs(row.getArgs());
-            List<String> dirs = splitCsv(allowedDirs);
-            if (dirs.isEmpty()) {
-                throw new ServiceException("STDIO 未配置脚本允许目录（smartdock.mcp.allowed-dirs），暂不可注册");
-            }
-            for (String a : args) {
-                if (a == null || a.isBlank()) {
-                    throw new ServiceException("args 须是非空字符串数组（元素 " + a + "）");
-                }
-                java.nio.file.Path canonical;
-                try {
-                    canonical = Path.of(a).toRealPath();
-                } catch (java.io.IOException e) {
-                    throw new ServiceException("脚本路径不存在：" + a);
-                } catch (java.nio.file.InvalidPathException e) {
-                    throw new ServiceException("脚本路径非法：" + a);
-                }
-                boolean inside = false;
-                for (String d : dirs) {
-                    try {
-                        // 三审回修（三席共识 P1）：Path.startsWith 按路径段比对——
-                        // 字符串前缀会让同级兄弟目录 mcp-demo-evil 绕过白名单
-                        if (canonical.startsWith(Path.of(d).toRealPath())) {
-                            inside = true;
-                            break;
-                        }
-                    } catch (java.io.IOException e) {
-                        // 白名单目录本身不存在：跳过该目录
-                    }
-                }
-                if (!inside) {
-                    throw new ServiceException("脚本路径不在允许目录内：" + a + "（允许：" + String.join("; ", dirs) + "）");
-                }
-            }
-            row.setUrl(null);
-        } else if ("STREAMABLE_HTTP".equals(t) || "SSE".equals(t)) {
-            URI uri;
-            try {
-                uri = URI.create(row.getUrl() == null ? "" : row.getUrl());
-            } catch (IllegalArgumentException e) {
-                throw new ServiceException("服务地址格式不正确");
-            }
-            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
-            if (!"http".equals(scheme) && !"https".equals(scheme)) {
-                throw new ServiceException("服务地址只支持 http/https");
-            }
-            if (uri.getRawUserInfo() != null || (uri.getRawQuery() != null && uri.getRawQuery().toLowerCase().matches(".*(token|key|secret|password)=.*"))) {
-                throw new ServiceException("服务地址不得携带账号信息或密钥参数（试点免密钥）");
-            }
-            Set<String> hosts = new LinkedHashSet<>(Arrays.asList("localhost", "127.0.0.1"));
-            hosts.addAll(splitCsv(allowedHttpHosts));
-            if (uri.getHost() == null || !hosts.contains(uri.getHost().toLowerCase())) {
-                throw new ServiceException("服务地址 host 不在白名单内（默认仅本机；可在 smartdock.mcp.allowed-http-hosts 追加）");
-            }
-            row.setCommand(null);
-            row.setArgs(null);
-        } else {
-            throw new ServiceException("传输类型只支持 STDIO / STREAMABLE_HTTP / SSE");
-        }
-        validateHeaders(row.getHeaders());
-        // G4 三审回修（dsflash P2-6）：STDIO 行不支持请求头（MCP STDIO 传输无 HTTP 头语义，
-        // 挂载侧只会静默丢弃）——保存面显式拒绝，防"配了却不生效"的错觉
-        if ("STDIO".equals(row.getTransportType())
-            && row.getHeaders() != null && !row.getHeaders().isBlank()
-            && !row.getHeaders().trim().equals("{}")) {
-            throw new ServiceException("STDIO 行不支持请求头（仅 HTTP 行生效）");
-        }
-        if (row.getEnabled() == null) {
-            row.setEnabled("0");
-        }
-    }
-
-    /**
-     * G4-#1（2026-10-22）：放开请求头接收（原试点一律拒收）。三面封死明文风险后黑名单
-     * 不再必要——值显式 AES 落库（见 encryptHeaders）+ 回显只出键名 + save 端点不落请求
-     * 体日志；键名黑名单方案被否：鉴权头（Authorization/X-Api-Key 等）正是本功能要接的
-     * 目标。只做形状与尺寸校验。
-     */
-    public static void validateHeaders(String headersJson) {
-        parseHeaders(headersJson);
-    }
-
-    /** headers 显式加密（G4-#1）：明文 JSON → ENC_ 密文；空/{} 直通（无敏感面） */
-    String encryptHeaders(String plainJson) {
-        if (plainJson == null || plainJson.isBlank() || plainJson.trim().equals("{}")
-            || plainJson.startsWith("ENC_")) {
-            return plainJson;
-        }
-        org.dromara.common.encrypt.core.EncryptorManager m = encryptorManagerProvider.getIfAvailable();
-        if (m == null) {
-            // 加密组件未启用（mybatis-encryptor.enable=false）——安全字段拒绝明文落库，fail-loud
-            throw new ServiceException("加密组件未启用（mybatis-encryptor.enable），无法保存请求头");
-        }
-        return m.encrypt(plainJson, headersEncryptContext());
-    }
-
-    /** headers 显式解密：ENC_ 密文 → 明文 JSON；历史明文/空原样返回（幂等兼容）。
-     *  2026-11-02：加密组件缺失时不再原样返回密文——否则挂载会把 "ENC_..." 当请求头发出去 */
-    String decryptHeaders(String storedJson) {
-        if (storedJson == null || !storedJson.startsWith("ENC_")) {
-            return storedJson;
-        }
-        org.dromara.common.encrypt.core.EncryptorManager m = encryptorManagerProvider.getIfAvailable();
-        if (m == null) {
-            throw new ServiceException("加密组件未启用（mybatis-encryptor.enable），无法读取 MCP 请求头");
-        }
-        return m.decrypt(storedJson, headersEncryptContext());
-    }
-
-    /** G4-#1：回显键名（逗连）——解密后取；管理面列表唯一出口（值永不出库到前端）。
-     *  G4 三审回修（dsflash P2-5）：单行坏密文不得 500 整个列表——解密失败降级
-     *  "(解析失败)"，管理面仍可看到该行并修复 */
-    public String headerKeysOf(DcsMcpServer row) {
-        String json;
-        try {
-            json = decryptHeaders(row.getHeaders());
-        } catch (Exception e) {
-            log.warn("[McpPilot] headers 解密失败（键名降级）：server={}, err={}",
-                row.getServerName(), e.getMessage());
-            return "(解析失败)";
-        }
-        if (json == null || json.isBlank()) {
-            return "";
-        }
-        try {
-            java.util.Map<String, Object> map = JSON_MAPPER.readValue(json, java.util.Map.class);
-            return map == null ? "" : String.join(",", map.keySet());
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            return "(解析失败)";
-        }
-    }
-
-    private org.dromara.common.encrypt.core.EncryptContext headersEncryptContext() {
-        String key = environment.getProperty("smartdock.encrypt.mcp-headers-key", "");
-        if (key == null || key.isBlank()) {
-            // 启动自检已挡；这里是防御性兜底（禁止空密钥加密）
-            throw new ServiceException("MCP 请求头加密密钥未配置（SMARTDOCK_MCP_HEADERS_KEY）");
-        }
-        org.dromara.common.encrypt.core.EncryptContext c = new org.dromara.common.encrypt.core.EncryptContext();
-        c.setAlgorithm(org.dromara.common.encrypt.enumd.AlgorithmType.AES);
-        c.setPassword(key);
-        c.setEncode(org.dromara.common.encrypt.enumd.EncodeType.BASE64);
-        return c;
-    }
-
-    /** headers JSON → 不可变 Map（HTTP 行挂载时喂 McpClientBuilder.headers）；
-     *  校验：整体 ≤4KB、JSON 对象、无重复键、≤10 键、键 1-64 位字母数字-_、
-     *  值非空字符串 ≤1024 字符（G4 三审回修：补整体上限防 Jackson 全量解析面、
-     *  重复键显式拒绝防"后值静默覆盖"歧义） */
-    @SuppressWarnings("unchecked")
-    public static java.util.Map<String, String> parseHeaders(String headersJson) {
-        if (headersJson == null || headersJson.isBlank() || headersJson.trim().equals("{}")) {
-            return java.util.Map.of();
-        }
-        if (headersJson.length() > 4096) {
-            throw new ServiceException("headers JSON 整体过长（≤4KB）");
-        }
-        java.util.Map<String, Object> raw;
-        try {
-            // 重复键显式拒绝：默认 Jackson 后值静默覆盖——管理员改配置看不出哪个键被吞
-            JSON_MAPPER.reader()
-                .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY)
-                .readTree(headersJson);
-            raw = JSON_MAPPER.readValue(headersJson, java.util.Map.class);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new ServiceException("headers 须是无重复键的 {\"键\":\"值\"} JSON 对象");
-        }
-        if (raw == null || raw.isEmpty()) {
-            return java.util.Map.of();
-        }
-        if (raw.size() > 10) {
-            throw new ServiceException("headers 最多 10 个键");
-        }
-        java.util.Map<String, String> out = new java.util.LinkedHashMap<>();
-        for (java.util.Map.Entry<String, Object> e : raw.entrySet()) {
-            String k = e.getKey();
-            if (k == null || k.isBlank() || k.length() > 64 || !k.matches("[A-Za-z0-9_-]+")) {
-                throw new ServiceException("header 键名须为 1-64 位字母数字-_（收到：" + k + "）");
-            }
-            Object v = e.getValue();
-            if (!(v instanceof String s) || s.isBlank()) {
-                throw new ServiceException("header 值须为非空字符串（键：" + k + "）");
-            }
-            if (s.length() > 1024) {
-                throw new ServiceException("header 值过长（≤1024 字符，键：" + k + "）");
-            }
-            out.put(k, s);
-        }
-        return java.util.Collections.unmodifiableMap(out);
-    }
-
-    public static List<String> parseArgs(String argsJson) {
-        if (argsJson == null || argsJson.isBlank()) {
-            return List.of();
-        }
-        String[] arr;
-        try {
-            arr = JSON_MAPPER.readValue(argsJson, String[].class);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            throw new ServiceException("args 须是字符串数组 JSON");
-        }
-        if (arr == null || Arrays.stream(arr).anyMatch(x -> x == null || x.isBlank())) {
-            throw new ServiceException("args 须是非空字符串数组");
-        }
-        return Arrays.asList(arr);
-    }
-
-    public static List<String> splitCsv(String csv) {
-        if (csv == null || csv.isBlank()) {
-            return List.of();
-        }
-        return Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
 
     /* ============================ 挂载（建会话链路） ============================ */
@@ -564,15 +224,15 @@ public class McpPilotService {
                         ? Math.min(595L, elicitationBridge.elicitTimeoutSeconds() + 5L + toolBudgetSeconds) : 10))
                     .initializationTimeout(Duration.ofSeconds(10));
                 if (stdio) {
-                    builder.stdioTransport(row.getCommand(), parseArgs(row.getArgs()), Map.of())
+                    builder.stdioTransport(row.getCommand(), McpToolFacts.parseArgs(row.getArgs()), Map.of())
                         .syncElicitation(req -> elicitationBridge.handle(
                             row.getServerName(), tenantId, userId, aguiThreadId, req));
                 } else if ("STREAMABLE_HTTP".equals(row.getTransportType())) {
                     // G4-#1：HTTP 行带鉴权头——落库密文先解密再喂 builder（2.0.4 javap 实证 headers(Map)）
-                    builder.headers(parseHeaders(decryptHeaders(row.getHeaders())));
+                    builder.headers(McpToolFacts.parseHeaders(headerCipher.decrypt(row.getHeaders())));
                     builder.streamableHttpTransport(row.getUrl());
                 } else {
-                    builder.headers(parseHeaders(decryptHeaders(row.getHeaders())));
+                    builder.headers(McpToolFacts.parseHeaders(headerCipher.decrypt(row.getHeaders())));
                     builder.sseTransport(row.getUrl());
                 }
                 raw = builder.buildSync();

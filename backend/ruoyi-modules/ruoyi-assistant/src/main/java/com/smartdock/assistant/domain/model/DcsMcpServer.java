@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.domain;
+package com.smartdock.assistant.domain.model;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -49,7 +49,7 @@ public class DcsMcpServer implements Serializable {
      *  AES+专用密钥落库（与服务层显式加密同款参数双轨，ENC_ 前缀幂等互认；
      *  2026-11-02 密钥整改：密钥来自 SMARTDOCK_MCP_HEADERS_KEY，源码内不再出现字面量；
      *  缺失/长度错/旧版内置钥匙由 EncryptKeyStartupRunner 拒绝启动），
-     *  回显只出键名（McpPilotService.headerKeysOf），
+     *  回显只出键名（McpServerConfigService.headerKeysOf），
      *  save 端点不落请求体日志；STDIO 行不支持（保存面显式拒绝） */
     @EncryptField(algorithm = AlgorithmType.AES, password = "${smartdock.encrypt.mcp-headers-key}", encode = org.dromara.common.encrypt.enumd.EncodeType.BASE64)
     private String headers;

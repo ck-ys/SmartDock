@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ import java.util.Set;
 public class AssistantToolGateController extends BaseController {
 
     private final AssistantConfigService configService;
-    private final com.smartdock.assistant.legacy.service.McpPilotService mcpPilotService;
+    private final com.smartdock.assistant.service.McpServerConfigService mcpServerConfigService;
     /** 批 4 题 2 案 1：技能行生效档位统一入口（原此处手写复写第 5 份） */
     private final AssistantSkillVisibilityService skillVisibility;
 
@@ -73,8 +73,8 @@ public class AssistantToolGateController extends BaseController {
         }
         // G4-#4：MCP 外部服务并入闸矩阵视图（每服务一行；effective：off=-1/其余取覆盖或 member）。
         // 平台级表（tenant 恒 000000）——ignore 跨租户读，非 000000 租户管理员同样看得到全名单
-        for (com.smartdock.assistant.legacy.domain.DcsMcpServer s :
-            org.dromara.common.tenant.helper.TenantHelper.ignore(mcpPilotService::listAll)) {
+        for (com.smartdock.assistant.domain.model.DcsMcpServer s :
+            org.dromara.common.tenant.helper.TenantHelper.ignore(mcpServerConfigService::listAll)) {
             String key = "mcp:" + s.getServerName();
             String override = gate.get(key);
             int effective = "off".equals(override) ? -1
@@ -118,7 +118,7 @@ public class AssistantToolGateController extends BaseController {
             .collect(java.util.stream.Collectors.toSet());
         Set<String> mcpServers;
         try {
-            mcpServers = mcpPilotService.allServerNames();
+            mcpServers = mcpServerConfigService.allServerNames();
         } catch (Exception e) {
             throw new org.dromara.common.core.exception.ServiceException("外部服务名单查询失败，稍后再试");
         }

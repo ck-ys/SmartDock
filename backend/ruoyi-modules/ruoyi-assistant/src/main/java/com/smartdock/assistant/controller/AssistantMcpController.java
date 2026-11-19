@@ -1,12 +1,12 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.domain.DcsMcpCallLog;
-import com.smartdock.assistant.legacy.domain.DcsMcpServer;
-import com.smartdock.assistant.legacy.mapper.DcsMcpCallLogMapper;
-import com.smartdock.assistant.legacy.service.McpPilotService;
+import com.smartdock.assistant.domain.model.DcsMcpCallLog;
+import com.smartdock.assistant.domain.model.DcsMcpServer;
+import com.smartdock.assistant.mapper.DcsMcpCallLogMapper;
+import com.smartdock.assistant.service.McpServerConfigService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -32,7 +32,7 @@ import java.util.List;
 @RequestMapping("/dcs/assistant/mcp")
 public class AssistantMcpController extends BaseController {
 
-    private final McpPilotService mcpPilotService;
+    private final McpServerConfigService mcpServerConfigService;
     private final DcsMcpCallLogMapper callLogMapper;
     private final com.smartdock.assistant.legacy.service.AssistantConfigService assistantConfigService;
 
@@ -97,7 +97,7 @@ public class AssistantMcpController extends BaseController {
                 .warn("[MCP] 成员工具名读取失败，本次只回服务清单", e);
         }
         java.util.List<McpMemberRow> rows = new java.util.ArrayList<>();
-        for (DcsMcpServer s : org.dromara.common.tenant.helper.TenantHelper.ignore(mcpPilotService::listAll)) {
+        for (DcsMcpServer s : org.dromara.common.tenant.helper.TenantHelper.ignore(mcpServerConfigService::listAll)) {
             if (!"1".equals(s.getEnabled())) {
                 continue;
             }
@@ -136,11 +136,11 @@ public class AssistantMcpController extends BaseController {
         // 三审 P2：平台级配置的取数口径与 member-list 统一——save() 恒写 000000 租户，
         // 超管切到别家租户后若不 ignore，管理清单会空而成员清单照旧有行，自相矛盾
         List<McpServerRow> rows = org.dromara.common.tenant.helper.TenantHelper
-            .ignore(mcpPilotService::listAll).stream().map(s -> new McpServerRow(
+            .ignore(mcpServerConfigService::listAll).stream().map(s -> new McpServerRow(
             s.getId(), s.getServerName(), s.getDisplayName(), s.getTransportType(),
             s.getCommand(), s.getArgs(), s.getUrl(),
             // G4-#1：落库是 ENC_ 密文——先解密再取键名（service 内同款显式解密，与挂载链路一致）
-            mcpPilotService.headerKeysOf(s), s.getEnabled(), s.getReadOnly(), s.getRemark(),
+            mcpServerConfigService.headerKeysOf(s), s.getEnabled(), s.getReadOnly(), s.getRemark(),
             s.getUpdateTime() == null ? null : String.valueOf(s.getUpdateTime().getTime()))).toList();
         return R.ok(rows);
     }
@@ -157,7 +157,7 @@ public class AssistantMcpController extends BaseController {
     @PostMapping("/save")
     public R<Void> save(@RequestBody DcsMcpServer row) {
         requireSuperAdmin();
-        mcpPilotService.save(row);
+        mcpServerConfigService.save(row);
         return R.ok();
     }
 
@@ -166,7 +166,7 @@ public class AssistantMcpController extends BaseController {
     @PostMapping("/toggle")
     public R<Void> toggle(@RequestParam Long id, @RequestParam String enabled) {
         requireSuperAdmin();
-        mcpPilotService.toggle(id, enabled);
+        mcpServerConfigService.toggle(id, enabled);
         return R.ok();
     }
 
@@ -175,7 +175,7 @@ public class AssistantMcpController extends BaseController {
     @PostMapping("/delete")
     public R<Void> delete(@RequestParam Long id) {
         requireSuperAdmin();
-        mcpPilotService.delete(id);
+        mcpServerConfigService.delete(id);
         return R.ok();
     }
 

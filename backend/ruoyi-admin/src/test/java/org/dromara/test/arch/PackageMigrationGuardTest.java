@@ -77,6 +77,29 @@ class PackageMigrationGuardTest {
         "com.smartdock.assistant.legacy.domain.DcsAssistantSkill",
         "com.smartdock.assistant.legacy.domain.DcsAssistantSkillUsage");
 
+    /** 批 5（2026-11-19 题 1/题 4 案 1）：MCP 管理线 6 件搬进新四层后，旧全名在 classpath 上必须一个不剩。
+     *  同批 4 动机：四个 legacy 子包都还在（只是变薄），只能点名；防「没 clean 就编译」的双注册。 */
+    @Test
+    void batch5MovedMcpClassesMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String fqn : BATCH5_MOVED_TO_FOUR_LAYERS) {
+            String path = fqn.replace('.', '/') + ".class";
+            List<URL> found = Collections.list(cl.getResources(path));
+            assertTrue(found.isEmpty(),
+                () -> fqn + " 残留在 classpath: " + found
+                    + " —— 批 5 已把它搬进新四层，请 mvn clean 后重建");
+        }
+    }
+
+    /** 批 5 搬走的 6 个类的旧全名（包还在，所以只能点名） */
+    private static final List<String> BATCH5_MOVED_TO_FOUR_LAYERS = List.of(
+        "com.smartdock.assistant.legacy.controller.AssistantMcpController",
+        "com.smartdock.assistant.legacy.controller.AssistantToolGateController",
+        "com.smartdock.assistant.legacy.domain.DcsMcpServer",
+        "com.smartdock.assistant.legacy.domain.DcsMcpCallLog",
+        "com.smartdock.assistant.legacy.mapper.DcsMcpServerMapper",
+        "com.smartdock.assistant.legacy.mapper.DcsMcpCallLogMapper");
+
     /** 批 3（2026-11-19 多审 dspro P2-2）：额度线整线搬移消包后，billing/limiter 两个旧包
      *  在主 classes 上必须一个资源都不剩——非 clean 增量构建会让旧包 class 与新四层同名类并存，
      *  同样触发组件扫描双注册。只盯主 classes（target/classes 与 jar 内）；test-classes 不算——

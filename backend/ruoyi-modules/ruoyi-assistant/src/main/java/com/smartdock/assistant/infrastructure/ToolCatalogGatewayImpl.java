@@ -5,11 +5,11 @@ import com.smartdock.assistant.domain.gateway.ToolCatalogGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.core.ToolRegistry;
-import com.smartdock.assistant.legacy.domain.DcsMcpCallLog;
-import com.smartdock.assistant.legacy.domain.DcsMcpServer;
-import com.smartdock.assistant.legacy.mapper.DcsMcpCallLogMapper;
+import com.smartdock.assistant.domain.model.DcsMcpCallLog;
+import com.smartdock.assistant.domain.model.DcsMcpServer;
+import com.smartdock.assistant.mapper.DcsMcpCallLogMapper;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
-import com.smartdock.assistant.legacy.service.McpPilotService;
+import com.smartdock.assistant.service.McpServerConfigService;
 import com.smartdock.assistant.legacy.tools.WebSearchTools;
 import org.dromara.common.core.service.ConfigService;
 import org.dromara.common.core.utils.StringUtils;
@@ -39,7 +39,7 @@ public class ToolCatalogGatewayImpl implements ToolCatalogGateway {
     private final AssistantConfigService assistantConfigService;
     /** 租户系统配置（联网搜索 key 的读取口；与建会话时 WebSearchTools 同一来源） */
     private final ConfigService configService;
-    private final McpPilotService mcpPilotService;
+    private final McpServerConfigService mcpServerConfigService;
     private final DcsMcpCallLogMapper callLogMapper;
 
     @Override
@@ -88,7 +88,7 @@ public class ToolCatalogGatewayImpl implements ToolCatalogGateway {
     @Override
     public List<McpServerView> mcpServers() {
         List<McpServerView> out = new ArrayList<>();
-        for (DcsMcpServer s : TenantHelper.ignore(mcpPilotService::listAll)) {
+        for (DcsMcpServer s : TenantHelper.ignore(mcpServerConfigService::listAll)) {
             out.add(new McpServerView(s.getServerName(), s.getDisplayName(), s.getRemark(),
                 s.getEnabled(), s.getReadOnly()));
         }
