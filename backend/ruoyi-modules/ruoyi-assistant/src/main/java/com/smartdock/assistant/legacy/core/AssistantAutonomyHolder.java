@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>{@code auto}：写类工具一律直接放行（审计仍有会话记录，提示文案显式告知）。</li>
  * </ul>
  *
- * <p>与 {@link AssistantWebSearchHolder} 同款「会话级暂存、下一请求生效」；
+ * <p>与 {@link com.smartdock.assistant.support.AssistantWebSearchHolder} 同款「会话级暂存、下一请求生效」；
  * 档位翻转触发 agent 重建由 {@code needsRebuild} 判定（权限规则建时固化）。</p>
  */
 public final class AssistantAutonomyHolder {

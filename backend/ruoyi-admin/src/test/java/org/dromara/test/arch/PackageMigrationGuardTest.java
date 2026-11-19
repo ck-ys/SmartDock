@@ -41,4 +41,22 @@ class PackageMigrationGuardTest {
             () -> "org.dromara.assistant 残留在 classpath: " + found
                 + " —— 批 2 已整棵改名到 com.smartdock.assistant.legacy，请 mvn clean 后重建");
     }
+
+    /** 批 3（2026-11-19 多审 dspro P2-2）：额度线整线搬移消包后，billing/limiter 两个旧包
+     *  在主 classes 上必须一个资源都不剩——非 clean 增量构建会让旧包 class 与新四层同名类并存，
+     *  同样触发组件扫描双注册。只盯主 classes（target/classes 与 jar 内）；test-classes 不算——
+     *  测试树 3 个 legacy.billing 存量测试是已登记债务（批 9 随包名清理），且不进组件扫描。 */
+    @Test
+    void batch3DissolvedPackagesMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String pkg : new String[] {"com/smartdock/assistant/legacy/limiter",
+                                        "com/smartdock/assistant/legacy/billing"}) {
+            List<URL> found = Collections.list(cl.getResources(pkg)).stream()
+                .filter(u -> !u.toString().contains("test-classes"))
+                .toList();
+            assertTrue(found.isEmpty(),
+                () -> pkg + " 残留在主 classes: " + found
+                    + " —— 批 3 已消包（额度线搬进新四层），请 mvn clean 后重建");
+        }
+    }
 }

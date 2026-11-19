@@ -17,6 +17,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -39,8 +40,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>domain 不 import 上层</b>（2026-11-17 批 1 规则 7）：{@code com.smartdock.*} 的 domain 包
  *       不许 import service / controller / infrastructure / mapper——实体要编排去 service，
  *       跨层收口建 {@code domain/gateway} 接口、{@code infrastructure} 实现。底座（org.dromara.common 等）不算上层。</li>
- *   <li><b>新根 service 对 legacy 只减不增</b>（2026-11-17 批 1 规则 8）：{@code com.smartdock.*} 的 service 包
- *       import {@code com.smartdock.assistant.legacy.*}（legacy 助手根）只减不增；清零后段删掉、零容忍。</li>
+ *   <li><b>新根 service 对 legacy 只减不增</b>（2026-11-17 批 1 规则 8；批 3 多审补内联形态）：{@code com.smartdock.*} 的
+ *       service 包 import {@code com.smartdock.assistant.legacy.*}（legacy 助手根）清零后零容忍；代码行里的<b>内联</b>
+ *       legacy 全限定名同样记账（批 3 前门禁只扫 import 行，内联写法可绕过——已堵），既有内联豁免走点名白名单
+ *       {@link #RULE8_INLINE_ALLOWED}（与实测精确相等，防腐烂）。</li>
  * </ol>
  *
  * <p><b>豁免清单</b>：{@code src/test/resources/arch-baseline.json}。清单里有的不算新违规；
@@ -72,6 +75,20 @@ class PackageHygieneTest {
     /** 规则 8：legacy 助手根（com.smartdock.assistant.legacy）的任何 import */
     private static final Pattern LEGACY_ASSISTANT_IMPORT = Pattern.compile(
         "^import\\s+(?:static\\s+)?com\\.smartdock\\.assistant\\.legacy\\.");
+
+    /** 规则 8 补充（批 3 多审 dspro P1-1，2026-11-19）：代码行里的内联 legacy 全限定名。
+     *  批 3 把 AssistantUserQuotaService 搬进新根 service 时，其对 legacy.service.AssistantConfigService
+     *  的同包依赖改用内联 FQN 表达（import 形态会踩规则 8 零容忍；拍板口径「只搬家不装修」，gateway 收口排后批）。
+     *  本模式让门禁看得见内联形态——谁再想用内联写法新增依赖，这里直接红。 */
+    private static final Pattern LEGACY_ASSISTANT_INLINE = Pattern.compile(
+        "\\bcom\\.smartdock\\.assistant\\.legacy\\.(?:[a-z0-9_]+\\.)*[A-Z][A-Za-z0-9_$]*");
+
+    /** 规则 8 内联豁免白名单（点名制，只减不增）：
+     *  批 3 题 2 案 1 的已知债务，共 1 处 3 行；批 9 gateway 收口消掉该依赖后必须同步删掉本行
+     *  （白名单与实测精确相等：多了=豁免腐烂要删，少了=新违规要收口，两头都红）。 */
+    private static final Set<String> RULE8_INLINE_ALLOWED = Set.of(
+        "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java"
+            + "|com.smartdock.assistant.legacy.service.AssistantConfigService");
 
     private static final ObjectMapper JSON = new ObjectMapper();
     /** 数组一项一行：586 条的清单要能逐行 diff / 逐行删，不能挤成一条长线 */
@@ -217,6 +234,8 @@ class PackageHygieneTest {
         Path backend = backendRoot();
         Map<String, Integer> actual = new TreeMap<>();
         Map<String, List<String>> samples = new TreeMap<>();
+        Map<String, Integer> inlineActual = new TreeMap<>();
+        Map<String, List<String>> inlineSamples = new TreeMap<>();
         for (Path file : javaFiles(backend)) {
             String rel = rel(backend, file);
             String unix = "/" + rel;
@@ -224,7 +243,8 @@ class PackageHygieneTest {
                 || unix.contains("/legacy/")) {
                 continue;
             }
-            String[] lines = Files.readString(file, StandardCharsets.UTF_8).split("\n", -1);
+            String raw = Files.readString(file, StandardCharsets.UTF_8);
+            String[] lines = raw.split("\n", -1);
             for (int i = 0; i < lines.length; i++) {
                 String s = lines[i].trim();
                 if (!s.startsWith("import ")) {
@@ -236,7 +256,27 @@ class PackageHygieneTest {
                     samples.computeIfAbsent(rel + "|" + fqn, k -> new ArrayList<>()).add(rel + ":" + (i + 1));
                 }
             }
+            // 内联形态（批 3 多审 dspro P1-1）：import 之外的代码行里出现 legacy 全限定名单独记账
+            String[] codeLines = stripCommentsAndStrings(raw).split("\n", -1);
+            for (int i = 0; i < codeLines.length; i++) {
+                String s = codeLines[i].trim();
+                if (s.startsWith("import ") || s.startsWith("package ")) {
+                    continue;
+                }
+                Matcher m = LEGACY_ASSISTANT_INLINE.matcher(codeLines[i]);
+                while (m.find()) {
+                    inlineActual.merge(rel + "|" + m.group(), 1, Integer::sum);
+                    inlineSamples.computeIfAbsent(rel + "|" + m.group(), k -> new ArrayList<>()).add(rel + ":" + (i + 1));
+                }
+            }
         }
+        // 内联豁免白名单：与实测精确相等（批 3 已知债务点名制；批 9 gateway 收口消掉后删白名单行）
+        assertThat(inlineActual.keySet())
+            .as("规则 8 内联豁免对账：实际命中与白名单必须精确相等。多出的=新根 service 用内联 FQN 新增 legacy 依赖"
+                + "（绕过 import 扫描也逃不掉，收口进 domain/gateway 或搬走实现）；"
+                + "白名单里有而实际没有=豁免腐烂（依赖已消，请删 RULE8_INLINE_ALLOWED 对应行）。当前命中样例：%s",
+                inlineSamples.entrySet().stream().findFirst().map(e -> e.getKey() + "@" + e.getValue().get(0)).orElse("(无)"))
+            .containsExactlyInAnyOrderElementsOf(RULE8_INLINE_ALLOWED);
         if (actual.isEmpty()) {
             // 清零态：段必须已删（残留即失败，防清单腐烂）；段不存在则零容忍通过
             ObjectNode baseline = readBaseline(backend);
