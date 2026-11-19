@@ -85,12 +85,18 @@ class PackageHygieneTest {
 
     /** 规则 8 内联豁免白名单（点名制，带次数，只减不增）：
      *  批 3 题 2 案 1 的已知债务，共 1 个键 3 处；批 9 gateway 收口消掉该依赖后必须同步删掉本行。
+     *  批 4 题 2 案 1 追加 2 个键各 1 处（技能可见性判定收成 AssistantSkillVisibilityService，
+     *  公式本体仍在引擎侧 core，按「只搬家不装修」口径不改引擎件——批 9 引擎收口后改 import 并删这两行）。
      *  断言比「文件|FQN|次数」三元组（多审 #2 dspro P2-1 / dsflash P2-5：只比键不比次数时，
      *  第 4 处内联 + 行尾 arch-ignore-fqn 可让规则 1/规则 8 同时绿——次数入断言后两条旁路都堵死，
      *  也不再依赖 inlineFqn 基线通道兜底）。 */
     private static final Map<String, Integer> RULE8_INLINE_ALLOWED = Map.of(
         "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java"
-            + "|com.smartdock.assistant.legacy.service.AssistantConfigService", 3);
+            + "|com.smartdock.assistant.legacy.service.AssistantConfigService", 3,
+        "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantSkillVisibilityService.java"
+            + "|com.smartdock.assistant.legacy.core.AssistantSkillGateMiddleware", 1,
+        "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantSkillVisibilityService.java"
+            + "|com.smartdock.assistant.legacy.core.ToolRegistry", 1);
 
     private static final ObjectMapper JSON = new ObjectMapper();
     /** 数组一项一行：586 条的清单要能逐行 diff / 逐行删，不能挤成一条长线 */

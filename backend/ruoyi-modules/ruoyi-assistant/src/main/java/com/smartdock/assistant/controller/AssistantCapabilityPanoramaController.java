@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.tags.Tag;

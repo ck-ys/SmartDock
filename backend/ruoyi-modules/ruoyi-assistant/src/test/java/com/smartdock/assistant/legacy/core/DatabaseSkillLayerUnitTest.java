@@ -134,8 +134,8 @@ class DatabaseSkillLayerUnitTest {
 
     /* ===== 2026-11-10 Q3=乙：单条坏数据不得带走整层（可测缝 = DatabaseSkillRepository.toSkill） ===== */
 
-    private static com.smartdock.assistant.legacy.domain.DcsAssistantSkill row(String id, String desc) {
-        com.smartdock.assistant.legacy.domain.DcsAssistantSkill r = new com.smartdock.assistant.legacy.domain.DcsAssistantSkill();
+    private static com.smartdock.assistant.domain.model.DcsAssistantSkill row(String id, String desc) {
+        com.smartdock.assistant.domain.model.DcsAssistantSkill r = new com.smartdock.assistant.domain.model.DcsAssistantSkill();
         r.setSkillId(id);
         r.setDescription(desc);
         r.setBody("# 正文");

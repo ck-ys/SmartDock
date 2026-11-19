@@ -98,7 +98,7 @@ public class AssistantAgentFactory {
 
     private final com.smartdock.assistant.legacy.service.McpPilotService mcpPilotService;
     /** 题2 案3（2026-10-31）：技能使用统计——取用一次记一行，管理页展示「用了几次/最近一次」 */
-    private final com.smartdock.assistant.legacy.service.AssistantSkillUsageService skillUsageService;
+    private final com.smartdock.assistant.service.AssistantSkillUsageService skillUsageService;
     /** 题12 案1：结构化反问桥（ask_user 挂起等用户点选） */
     private final com.smartdock.assistant.legacy.core.AssistantAskUserBridge askUserBridge;
     /** 压缩工作区(批17 Q2: 中间件卸载归档用, AssistantWorkspaceConfig 装配) */

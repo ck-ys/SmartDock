@@ -1,11 +1,10 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.core.AssistantSkillGateMiddleware;
+import com.smartdock.assistant.service.AssistantSkillVisibilityService;
 import com.smartdock.assistant.legacy.core.SkillAssets;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.dromara.common.core.domain.R;
@@ -36,6 +35,8 @@ import java.util.Map;
 public class AssistantSkillViewerController extends BaseController {
 
     private final AssistantConfigService configService;
+    /** 批 4 题 2 案 1：技能可见性判定统一入口 */
+    private final AssistantSkillVisibilityService skillVisibility;
 
     /** 详情：目录里能看见的技能才回正文；看不见与不存在同一句话（不泄露存在性） */
     @SaCheckPermission("dcs:assistant:use")
@@ -51,10 +52,8 @@ public class AssistantSkillViewerController extends BaseController {
             if (!s.id().equals(skillId)) {
                 continue;
             }
-            String key = AssistantSkillGateMiddleware.gateKey(s.id());
-            int effective = ToolRegistry.effectiveMinRoleSingle(key, s.minRole(), gate.get(key));
-            // 与目录端点同一判据：off / 提档到当前角色之上 = 不可见
-            if (effective < 0 || level < effective) {
+            // 批 4 题 2 案 1：与目录端点同一判据（off / 提档到当前角色之上 = 不可见）
+            if (!skillVisibility.visible(s.id(), s.minRole(), level, gate)) {
                 return R.fail("没有这个技能，或当前角色用不了");
             }
             Map<String, Object> out = new LinkedHashMap<>();

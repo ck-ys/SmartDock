@@ -4,8 +4,8 @@ import io.agentscope.core.skill.AgentSkill;
 import io.agentscope.core.skill.repository.AgentSkillRepository;
 import io.agentscope.core.skill.repository.AgentSkillRepositoryInfo;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantSkill;
-import com.smartdock.assistant.legacy.mapper.AssistantSkillMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantSkill;
+import com.smartdock.assistant.mapper.AssistantSkillMapper;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.dromara.common.core.utils.SpringUtils;
 

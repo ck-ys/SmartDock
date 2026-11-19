@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.domain.DcsAssistantConfig;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.service.AssistantSkillVisibilityService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -43,7 +44,9 @@ public class AssistantStatusController extends BaseController {
     private final com.smartdock.assistant.legacy.service.AssistantConversationService conversationService;
     private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     /** 批3.5·题5：技能使用统计（最近用过端点数据源） */
-    private final com.smartdock.assistant.legacy.service.AssistantSkillUsageService skillUsageService;
+    private final com.smartdock.assistant.service.AssistantSkillUsageService skillUsageService;
+    /** 批 4 题 2 案 1：技能可见性判定统一入口（原 4 处手写复写收成一处） */
+    private final AssistantSkillVisibilityService skillVisibility;
     /** 业务批3-④：联网已用次数真值源（此前占位 0） */
     private final com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota;
     /** 业务批7 Q7：今日缓存命中率聚合 */
@@ -104,11 +107,8 @@ public class AssistantStatusController extends BaseController {
         java.util.Map<String, String> gate = configService.effective(identity.getTenantId()).toolGate();
         java.util.List<Map<String, Object>> out = new java.util.ArrayList<>();
         for (com.smartdock.assistant.legacy.core.SkillAssets.LoadedSkill s : com.smartdock.assistant.legacy.core.SkillAssets.skills()) {
-            // P2-8 回修：行键与判定键同源（AssistantSkillGateMiddleware.gateKey 单一真相）
-            String key = com.smartdock.assistant.legacy.core.AssistantSkillGateMiddleware.gateKey(s.id());
-            int effective = com.smartdock.assistant.legacy.core.ToolRegistry.effectiveMinRoleSingle(
-                key, s.minRole(), gate.get(key));
-            if (effective < 0 || level < effective) {
+            // 批 4 题 2 案 1：判定统一走 AssistantSkillVisibilityService（此处原为手写复写第 2 份）
+            if (!skillVisibility.visible(s.id(), s.minRole(), level, gate)) {
                 continue;
             }
             Map<String, Object> row = new LinkedHashMap<>();
@@ -311,11 +311,9 @@ public class AssistantStatusController extends BaseController {
             java.util.Map<String, String> skillGate = configService.effective(tenantId).toolGate();
             for (com.smartdock.assistant.legacy.core.SkillAssets.LoadedSkill sk
                 : com.smartdock.assistant.legacy.core.SkillAssets.skills(tenantId)) {
-                String key = com.smartdock.assistant.legacy.core.AssistantSkillGateMiddleware.gateKey(sk.id());
-                int effective = com.smartdock.assistant.legacy.core.ToolRegistry.effectiveMinRoleSingle(
-                    key, sk.minRole(), skillGate.get(key));
-                if (effective < 0 || roleLevel < effective) {
-                    continue; // 与目录/注入同一道闸：看不见的技能不进构成
+                // 批 4 题 2 案 1：与目录/注入同一道闸（判定统一走 AssistantSkillVisibilityService）
+                if (!skillVisibility.visible(sk.id(), sk.minRole(), roleLevel, skillGate)) {
+                    continue; // 看不见的技能不进构成
                 }
                 skillsChars += com.smartdock.assistant.support.ContextBreakdownEstimator.charsOf(
                     sk.name() + "\n" + sk.description());

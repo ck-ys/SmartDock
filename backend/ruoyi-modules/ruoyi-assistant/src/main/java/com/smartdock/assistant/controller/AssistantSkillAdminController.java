@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 import com.smartdock.assistant.legacy.core.DatabaseSkillRepository;
 import com.smartdock.assistant.legacy.core.SkillCacheBroadcaster;
 import com.smartdock.assistant.legacy.core.SkillAssets;
-import com.smartdock.assistant.legacy.domain.DcsAssistantSkill;
-import com.smartdock.assistant.legacy.mapper.AssistantSkillMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantSkill;
+import com.smartdock.assistant.mapper.AssistantSkillMapper;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -48,7 +48,7 @@ public class AssistantSkillAdminController extends BaseController {
 
     private final AssistantSkillMapper skillMapper;
     /** 题2 案3（2026-10-31）：技能使用统计（用次 + 最近一次），管理列表只读展示 */
-    private final com.smartdock.assistant.legacy.service.AssistantSkillUsageService skillUsageService;
+    private final com.smartdock.assistant.service.AssistantSkillUsageService skillUsageService;
 
     /**
      * 当前租户口径（三审 dspro P1-5）：动态租户优先（超管切单位看/改谁家就是谁家），

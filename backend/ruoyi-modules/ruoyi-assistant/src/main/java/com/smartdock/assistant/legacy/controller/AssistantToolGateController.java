@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
 import com.smartdock.assistant.legacy.core.ToolRegistry;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.service.AssistantSkillVisibilityService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +33,8 @@ public class AssistantToolGateController extends BaseController {
 
     private final AssistantConfigService configService;
     private final com.smartdock.assistant.legacy.service.McpPilotService mcpPilotService;
+    /** 批 4 题 2 案 1：技能行生效档位统一入口（原此处手写复写第 5 份） */
+    private final AssistantSkillVisibilityService skillVisibility;
 
     /** 工具行（合并视图）：spec 粒度一行，toolNames 逗连便于前端展示与批量操作。
      *  G4-#4：MCP 服务以 server 粒度并入同一视图（键 mcp:<server>，内置档=member，
@@ -97,8 +100,7 @@ public class AssistantToolGateController extends BaseController {
                     : "内置档：发布人及以上可用",
                 sk.minRole(),
                 gate.get(key),
-                com.smartdock.assistant.legacy.core.ToolRegistry.effectiveMinRoleSingle(
-                    key, sk.minRole(), gate.get(key)),
+                skillVisibility.effectiveMinRole(sk.id(), sk.minRole(), gate),
                 sk.minRole() >= com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_ADMIN,
                 false,
                 SKILL_RISK.getOrDefault(sk.id(), "mid")));

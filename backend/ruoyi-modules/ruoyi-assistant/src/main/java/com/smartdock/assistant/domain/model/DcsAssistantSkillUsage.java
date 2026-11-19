@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.domain;
+package com.smartdock.assistant.domain.model;
 
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;

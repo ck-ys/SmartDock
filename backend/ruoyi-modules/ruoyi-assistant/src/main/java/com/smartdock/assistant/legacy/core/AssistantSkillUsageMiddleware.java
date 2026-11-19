@@ -8,7 +8,7 @@ import io.agentscope.core.message.ToolResultState;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.middleware.ActingInput;
 import io.agentscope.harness.agent.middleware.HarnessRuntimeMiddleware;
-import com.smartdock.assistant.legacy.service.AssistantSkillUsageService;
+import com.smartdock.assistant.service.AssistantSkillUsageService;
 import reactor.core.publisher.Flux;
 
 import java.util.HashMap;

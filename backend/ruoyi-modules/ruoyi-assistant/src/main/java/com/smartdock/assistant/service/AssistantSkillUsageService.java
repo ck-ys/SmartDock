@@ -1,9 +1,9 @@
-package com.smartdock.assistant.legacy.service;
+package com.smartdock.assistant.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.mapper.AssistantSkillUsageMapper;
+import com.smartdock.assistant.mapper.AssistantSkillUsageMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;

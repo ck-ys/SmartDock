@@ -62,7 +62,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     /** 题8 案1（三席回修）：计划待确认态的解除口子（前端 planDecision 上报） */
     private final AssistantPlanSignal planSignal;
     /** 题2 案3（收口回修）：技能取用统计——手动胶囊选中也要记（原先只统计模型自取会漏主路径） */
-    private final com.smartdock.assistant.legacy.service.AssistantSkillUsageService skillUsageService;
+    private final com.smartdock.assistant.service.AssistantSkillUsageService skillUsageService;
 
     @Override
     public RuntimeContext resolve(AguiRuntimeContextRequest<?> request) {
