@@ -125,7 +125,7 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 
 六条规矩跑在 `ruoyi-admin` 的单测里（`org.dromara.test.arch.*`，`@Tag("local")`；`PackageMigrationGuardTest` 是 `@Tag("dev")`，门禁全跑加 `-Dsurefire.groups=local,dev`），**红线是「只减不增」**：
 
-1. **新代码只进 `com.smartdock.<域>.<层>`**；`com.smartdock.assistant.legacy` 是 legacy（2026-11-19 批 2 由旧根整棵改名而来，旧根已清零，改名记录见 git log），**只许改、不许新增文件**（批 3 后 172 个 .java，只减不增；`PackageHygieneTest.legacy根包不再新增文件` 会拦）。
+1. **新代码只进 `com.smartdock.<域>.<层>`**；`com.smartdock.assistant.legacy` 是 legacy（2026-11-19 批 2 由旧根整棵改名而来，旧根已清零，改名记录见 git log），**只许改、不许新增文件**（批 6 后 143 个 .java，只减不增，基线以 `arch-baseline.json` 的 `legacyOrgAssistantFiles` 为准；`PackageHygieneTest.legacy根包不再新增文件` 会拦）。
 2. **禁止行内全限定名**：源码行里不许出现 `org.dromara.` / `com.smartdock.` / `java.util.` 的整条包名（import、注释、字符串不算）。改 import；确实没有替代写法时行尾写 `// arch-ignore-fqn` 并说明原因。
 3. **Controller 只做权限/参数/租户/返回包装**：方法超过 40 行就抽 Service；Controller 不许直接注入 `*Mapper`，也不许借用助手模块以外的 `*Service`（ArchUnit 按字节码查，字段/返回值/参数/调用都算）。
 4. **接口出参不许 `R<Map<String, Object>>`**（含 List 包一层）：定义 `*Vo` 强类型；契约冻结，改字段算破坏性变更。
@@ -174,7 +174,7 @@ ARCH_BASELINE_UPDATE=1 mvn -P local -DskipTests=false -pl ruoyi-admin -am test -
 - 永不 log token / 密码 / 明文 IP
 - 不信任客户端传的 `createBy`/`updateBy`/`tenantId`——框架自动填
 - 租户隔离是硬边界：不做跨租户数据合并
-- **按 id 取「属于某人的」资源必须二次校归属**：`@SaCheckPermission` 只管「能不能调这个接口」，不管「这条数据是不是你的」；读出后要校 `tenantId` + `userId`（先例 `AssistantMemoryService:215`、`AssistantConversationService:72`），否则换个 id 就能读别人的。
+- **按 id 取「属于某人的」资源必须二次校归属**：`@SaCheckPermission` 只管「能不能调这个接口」，不管「这条数据是不是你的」；读出后要校 `tenantId` + `userId`（先例 `AssistantMemoryService#edit`、`AssistantConversationService:72`），否则换个 id 就能读别人的。
 - **展示层也要脱敏**：手机号 / 邮箱 / 证件号挂 `@Sensitive`（模板 `SysUserVo:64,70`）；**存储加密 ≠ 展示脱敏**。
 
 ## Database Rules

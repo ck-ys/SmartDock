@@ -29,7 +29,7 @@ WHERE update_time IS NULL AND del_flag = '0';
 
 -- 存量 topic_key 回填（题8 同主题覆盖要对老数据生效：老行 topic_key 为空时
 -- 「以后叫我老周」→「以后叫我老王」会并存两条互相矛盾的记忆）。
--- 规则与 AssistantMemoryService.TOPIC_RULES 同序同源；只补空值，重跑安全。
+-- 规则与 AssistantMemoryFacts.TOPIC_RULES 同序同源；只补空值，重跑安全。
 UPDATE public.dcs_assistant_memory SET topic_key = CASE
     WHEN content ~ '叫我|称呼|喊我|我的名字|名字叫' THEN 'call:name'
     WHEN content ~ '用中文|用英文|说中文|说英文|语言|英文回答|中文回答' THEN 'reply:lang'

@@ -54,12 +54,15 @@ public interface AssistantMemoryMapper extends BaseMapper<DcsAssistantMemory> {
                                                @Param("userId") Long userId,
                                                @Param("topicKey") String topicKey);
 
-    /** 本人改一条（题7 行内编辑；属主+租户双谓词，改他人=0 行） */
-    @Update("UPDATE dcs_assistant_memory SET content=#{content}, update_by=#{userId},"
-        + " update_time=#{updateTime} WHERE tenant_id=#{tenantId} AND user_id=#{userId}"
-        + " AND id=#{id} AND del_flag='0'")
+    /** 本人改一条（题7 行内编辑；属主+租户双谓词，改他人=0 行）。
+     *  内容/类型/主题键一条 UPDATE 写完——分两段写会留下「内容新、主题旧」的中间态。 */
+    @Update("UPDATE dcs_assistant_memory SET content=#{content},"
+        + " memory_type=#{memoryType,jdbcType=VARCHAR}, topic_key=#{topicKey,jdbcType=VARCHAR},"
+        + " update_by=#{userId}, update_time=#{updateTime}"
+        + " WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND id=#{id} AND del_flag='0'")
     int updateOwnContent(@Param("tenantId") String tenantId, @Param("userId") Long userId,
                          @Param("id") Long id, @Param("content") String content,
+                         @Param("memoryType") String memoryType, @Param("topicKey") String topicKey,
                          @Param("updateTime") Date updateTime);
 
     /** 同主题覆盖留痕（题8：旧条→SUPERSEDED + 指向新条） */

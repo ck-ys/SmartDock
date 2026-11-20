@@ -59,9 +59,10 @@ public class AssistantMemoryController extends BaseController {
             "max", AssistantMemoryFacts.MAX_PER_USER));
     }
 
-    /** 行内编辑（题7）：与保存口同闸（长度+脱敏+去重+属主谓词） */
+    /** 行内编辑（题7）：与保存口同闸（长度+脱敏+去重+属主谓词）。
+     *  isSaveRequestData=false：body 是用户原文（可能含 PII），审计日志只记操作不记正文。 */
     @SaCheckPermission("dcs:assistant:memory:manage")
-    @Log(title = "AI助手-编辑记忆", businessType = BusinessType.UPDATE)
+    @Log(title = "AI助手-编辑记忆", businessType = BusinessType.UPDATE, isSaveRequestData = false)
     @PostMapping("/{id}/edit")
     public R<Void> edit(@PathVariable Long id, @RequestBody Map<String, String> body) {
         boolean ok = memoryService.edit(LoginHelper.getTenantId(), LoginHelper.getUserId(),

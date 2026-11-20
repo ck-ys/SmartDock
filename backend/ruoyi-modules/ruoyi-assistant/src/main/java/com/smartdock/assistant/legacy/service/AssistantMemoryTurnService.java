@@ -64,11 +64,12 @@ public class AssistantMemoryTurnService {
         if (!memoryService.isUserEnabled(tenantId, userId)) {
             return new SaveOutcome("你已关闭长期记忆，这次没有保存（想开启请到「AI 助手记忆」页打开）", null);
         }
+        // PII 脱敏（手机号/身份证不进长期记忆——记忆页用户可见，更要守住）。
+        // 顺序铁律：先脱敏、后截断——先截会把跨 200 边界的 18 位身份证切出 17 位前缀，正则认不出=明文落库。
+        content = piiFilter.mask(content, tenantId);
         if (content.length() > AssistantMemoryFacts.MAX_CONTENT) {
             content = content.substring(0, AssistantMemoryFacts.MAX_CONTENT);
         }
-        // PII 脱敏（手机号/身份证不进长期记忆——记忆页用户可见，更要守住）
-        content = piiFilter.mask(content, tenantId);
         if (memoryMapper.countByContent(tenantId, userId, content) > 0) {
             return new SaveOutcome("这条已经记过了，不重复保存", null);
         }

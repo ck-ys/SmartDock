@@ -2,6 +2,7 @@ package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import org.dromara.common.log.annotation.Log;
+import org.dromara.common.log.enums.BusinessType;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -113,17 +114,37 @@ class AssistantMemoryEndpointContractTest {
         assertThat(total).as("记忆 + 收藏 + 反馈 handler 总数（新增端点请同步本测试）").isEqualTo(15);
     }
 
-    /** 写操作必须留审计（编辑/开关/清空/删除/反馈提交） */
+    /** 写操作必须留审计（编辑/开关/清空/删除/反馈提交），且标题/业务类型逐字固定 */
     @Test
     void writeHandlersKeepAuditLog() throws Exception {
-        for (String name : List.of("edit", "setPref", "clear", "remove")) {
-            Method m = Arrays.stream(AssistantMemoryController.class.getDeclaredMethods())
-                .filter(x -> x.getName().equals(name)).findFirst().orElseThrow();
-            assertThat(m.getAnnotation(Log.class)).as("AssistantMemoryController." + name + " 缺 @Log").isNotNull();
-        }
+        assertLog(AssistantMemoryController.class, "edit", "AI助手-编辑记忆", BusinessType.UPDATE);
+        assertLog(AssistantMemoryController.class, "setPref", "AI助手-记忆开关", BusinessType.UPDATE);
+        assertLog(AssistantMemoryController.class, "clear", "AI助手-清空记忆", BusinessType.DELETE);
+        assertLog(AssistantMemoryController.class, "remove", "AI助手-删除记忆", BusinessType.DELETE);
+        assertLog(AssistantFeedbackController.class, "submit", "AI助手-反馈", BusinessType.INSERT);
+    }
+
+    /** 正文可能含 PII 的两个写端点：审计日志不得留存请求体（2026-11-20 多审 m3 P1） */
+    @Test
+    void piiWriteHandlersDoNotSaveRequestBody() throws Exception {
+        Method edit = Arrays.stream(AssistantMemoryController.class.getDeclaredMethods())
+            .filter(x -> x.getName().equals("edit")).findFirst().orElseThrow();
+        assertThat(edit.getAnnotation(Log.class).isSaveRequestData())
+            .as("AssistantMemoryController.edit 不得把请求正文写进操作日志").isFalse();
         Method submit = Arrays.stream(AssistantFeedbackController.class.getDeclaredMethods())
             .filter(x -> x.getName().equals("submit")).findFirst().orElseThrow();
-        assertThat(submit.getAnnotation(Log.class)).as("AssistantFeedbackController.submit 缺 @Log").isNotNull();
+        assertThat(submit.getAnnotation(Log.class).isSaveRequestData())
+            .as("AssistantFeedbackController.submit 不得把请求正文写进操作日志").isFalse();
+    }
+
+    private static void assertLog(Class<?> c, String methodName, String title, BusinessType type)
+        throws Exception {
+        Method m = Arrays.stream(c.getDeclaredMethods())
+            .filter(x -> x.getName().equals(methodName)).findFirst().orElseThrow();
+        Log log = m.getAnnotation(Log.class);
+        assertThat(log).as(c.getSimpleName() + "." + methodName + " 缺 @Log").isNotNull();
+        assertThat(log.title()).as(methodName + " 审计标题").isEqualTo(title);
+        assertThat(log.businessType()).as(methodName + " 业务类型").isEqualTo(type);
     }
 
     private static int countHandlers(Class<?> c) {

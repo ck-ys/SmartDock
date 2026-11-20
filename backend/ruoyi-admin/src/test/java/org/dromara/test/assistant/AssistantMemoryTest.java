@@ -36,6 +36,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -223,5 +225,83 @@ class AssistantMemoryTest {
             svc8, newTurn(mapper, svc8), "000000", 8L, "th-3");
         dbDown.stream(List.of(user), List.of(), GenerateOptions.builder().build());
         assertEquals(1, inner.calls.get(1).size(), "库挂降级原样透传");
+    }
+
+    /** 批 6 多审 glm53 P2：拆分后「save 在 TurnService、缓存在存储服务」是跨类链路，
+     *  必须有一条测试钉死——删掉 TurnService 里那行失效，编译/门禁全绿但新记忆 30s 不可见。 */
+    @Test
+    void saveThroughTurnServiceEvictsStorageDigestCache() {
+        AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
+        when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
+        when(mapper.countByUser(anyString(), anyLong())).thenReturn(0);
+        List<DcsAssistantMemory> rows = new ArrayList<>();
+        List<DcsAssistantMemory> stored = new ArrayList<>();
+        when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(rows);
+        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> {
+            stored.add(inv.getArgument(0));
+            return 1;
+        });
+
+        AssistantMemoryService svc = newSvc(mapper);
+        AssistantMemoryTurnService turn = newTurn(mapper, svc);
+
+        assertNull(svc.digest("000000", 1L, null), "空库摘要为 null");
+        assertTrue(svc.cacheSize() > 0, "先证明 null 结果确实进了缓存");
+        turn.save("000000", 1L, "称呼我为小林");
+        assertEquals(0, svc.cacheSize(), "save（另一个类）必须把存储面缓存失效掉");
+        rows.add(stored.get(0));
+        assertNotNull(svc.digest("000000", 1L, null), "新记忆立即可见（不等 30s）");
+    }
+
+    /** 批 6 多审 m3 P2：属主不符时编辑必须一行都不写（回归「按 id 直改」类越权）。 */
+    @Test
+    void editRejectsForeignRowWithoutAnyWrite() {
+        AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
+        DcsAssistantMemory other = new DcsAssistantMemory();
+        other.setId(5L);
+        other.setTenantId("000000");
+        other.setUserId(2L);
+        when(mapper.selectById(5L)).thenReturn(other);
+
+        assertFalse(newSvc(mapper).edit("000000", 1L, 5L, "改别人的记忆"));
+        verify(mapper, never()).updateOwnContent(anyString(), anyLong(), anyLong(), anyString(),
+            anyString(), anyString(), any(java.util.Date.class));
+    }
+
+    /** 批 6 多审 m3 P1：先脱敏后截断——201 字的正文里证件正好跨 200 边界，
+     *  先截会只剩 17 位前缀（两条正则都认不出）→ 明文落库；本用例用「只认完整 18 位」的
+     *  假过滤器复现该语义，断言落库值不含 10 位以上连续明文数字。 */
+    @Test
+    void maskRunsBeforeTruncateSoBoundaryIdDoesNotLeakPrefix() {
+        String raw = "A".repeat(183) + "130203199901011234"; // 201 字，证件跨边界
+        AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
+        when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
+        when(mapper.countByUser(anyString(), anyLong())).thenReturn(0);
+        List<DcsAssistantMemory> stored = new ArrayList<>();
+        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> {
+            stored.add(inv.getArgument(0));
+            return 1;
+        });
+
+        AssistantMemoryService svc = new AssistantMemoryService(mapper,
+            mock(AssistantMemoryPrefMapper.class), strictPii());
+        AssistantMemoryTurnService turn = new AssistantMemoryTurnService(mapper,
+            mock(AssistantConversationMapper.class), strictPii(), new AssistantMemoryTurnLedger(), svc);
+
+        assertTrue(turn.save("000000", 1L, raw).startsWith("已记住"), "首存成功");
+        String saved = stored.get(0).getContent();
+        assertFalse(saved.matches("(?s).*\\d{10,}.*"), "不得残留 10 位以上连续明文数字: " + saved);
+        assertTrue(saved.length() <= 200, "截断仍生效");
+    }
+
+    /** 只认「完整 18 位证件 / 完整 11 位手机号」的假过滤器（与真过滤器同语义：截短即不认） */
+    private static AssistantPiiFilter strictPii() {
+        AssistantPiiFilter f = mock(AssistantPiiFilter.class);
+        when(f.mask(anyString(), anyString())).thenAnswer(inv -> {
+            String s = inv.getArgument(0, String.class);
+            return s.replaceAll("(?<!\\d)\\d{17}[0-9Xx](?!\\d)", "<ID>")
+                .replaceAll("(?<!\\d)1[3-9]\\d{9}(?!\\d)", "<PHONE>");
+        });
+        return f;
     }
 }

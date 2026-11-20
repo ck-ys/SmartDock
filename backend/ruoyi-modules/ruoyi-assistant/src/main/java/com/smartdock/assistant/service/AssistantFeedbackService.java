@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.smartdock.assistant.domain.gateway.MessageOwnershipGateway;
 import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
 import com.smartdock.assistant.mapper.AssistantFeedbackMapper;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
@@ -17,6 +18,9 @@ import java.util.List;
  * <p>迁移口径：只碰反馈自有表；提交时要校验「消息是不是本人的」，而消息表还在 legacy 区，
  * 按 backend/AGENTS.md 规则 8 经 {@link MessageOwnershipGateway} 收口（实现在 infrastructure），
  * 本类对 legacy 零 import——网关只回布尔，legacy 实体不外泄。</p>
+ *
+ * <p>note 是自由文本且会在管理端列表/点踩分布里原样展示，入库前过 PII 脱敏
+ * （用户可能顺手把手机号写进反馈）。</p>
  */
 @Slf4j
 @Service
@@ -25,6 +29,7 @@ public class AssistantFeedbackService {
 
     private final AssistantFeedbackMapper feedbackMapper;
     private final MessageOwnershipGateway messageOwnershipGateway;
+    private final AssistantPiiFilter piiFilter;
 
     /** 提交反馈：带 messageId 时校验消息归属本人（防跨用户刷评）；
      *  AU-40(1008)：消息+评价 10 秒幂等窗——连点几下不重复入库（前端 voted 已挡同类，
@@ -40,8 +45,12 @@ public class AssistantFeedbackService {
             log.debug("[dcs-assistant] 反馈幂等命中（10s 窗内重复），跳过入库: user={} msg={} {}", userId, messageId, rating);
             return;
         }
-        if (note != null && note.length() > 500) {
-            note = note.substring(0, 500);
+        if (note != null) {
+            // 先脱敏、后截断（与被切短的证件/手机号同理：截在前会把 18 位切出 17 位，正则认不出）
+            note = piiFilter.mask(note, tenantId);
+            if (note.length() > 500) {
+                note = note.substring(0, 500);
+            }
         }
         DcsAssistantFeedback row = new DcsAssistantFeedback();
         row.setId(IdWorker.getId());

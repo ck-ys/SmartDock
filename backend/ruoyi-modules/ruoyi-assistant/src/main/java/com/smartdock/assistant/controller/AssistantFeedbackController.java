@@ -33,9 +33,10 @@ public class AssistantFeedbackController extends BaseController {
 
     private final AssistantFeedbackService feedbackService;
 
-    /** 提交反馈（perm=use；messageId 可空=整会话评价） */
+    /** 提交反馈（perm=use；messageId 可空=整会话评价）。
+     *  isSaveRequestData=false：note 是自由文本（可能含 PII），审计日志只记操作不记正文。 */
     @SaCheckPermission("dcs:assistant:use")
-    @Log(title = "AI助手-反馈", businessType = BusinessType.INSERT)
+    @Log(title = "AI助手-反馈", businessType = BusinessType.INSERT, isSaveRequestData = false)
     @PostMapping("/feedback")
     public R<Void> submit(@RequestBody Map<String, Object> body) {
         Long messageId;
