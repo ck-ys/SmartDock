@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 助手长期记忆存储服务（批 6 题 2 案 1，2026-11-20 按表归属从 556 行旧服务拆出）。
@@ -47,16 +48,22 @@ public class AssistantMemoryService {
     private static final long DIGEST_TTL_MS = 30_000;
     /** 进程内缓存条目上限：正常量级（每用户几分钟内几个问题）远达不到，纯防长期机泄漏 */
     private static final int DIGEST_CACHE_MAX = 4096;
+    /** 到这条线就顺手清一遍过期条目：问题原文只在缓存里留 30s，不必等到 4096 才回收 */
+    private static final int DIGEST_SWEEP_AT = 256;
 
     private final AssistantMemoryMapper memoryMapper;
     private final AssistantMemoryPrefMapper prefMapper;
     private final AssistantPiiFilter piiFilter;
 
-    /** digest 缓存：key=tenant:user:questionHash → [0]=过期时刻, [1]=DigestResult（null=查过无命中）, [2]=问题原文 */
+    /** digest 缓存：key=tenant:user:questionHash → [0]=过期时刻, [1]=DigestResult（null=查过无命中）,
+     *  [2]=问题原文, [3]=写入时代际号, [4]=写入时归档代际 */
     private final Map<String, Object[]> digestCache = new ConcurrentHashMap<>();
 
     /** 每用户代际号：写后失效 +1；读路径算完发现代际变了就不再回填（防 cache-aside 把旧值灌回） */
     private final Map<String, Long> digestEpoch = new ConcurrentHashMap<>();
+
+    /** 归档跨租户批量改表，拿不到用户清单：整体代际 +1（命中/回填都先比这一代） */
+    private final AtomicLong archiveEpoch = new AtomicLong();
 
     /** 生效中清单（新→旧；题7 主列表） */
     public List<DcsAssistantMemory> listForUser(String tenantId, Long userId) {
@@ -97,6 +104,9 @@ public class AssistantMemoryService {
         if (content.isEmpty()) {
             return false;
         }
+        if (content.length() > AssistantMemoryFacts.MAX_INPUT_CHARS) {
+            content = content.substring(0, AssistantMemoryFacts.MAX_INPUT_CHARS);
+        }
         content = piiFilter.mask(content, tenantId);
         if (content.length() > AssistantMemoryFacts.MAX_CONTENT) {
             content = content.substring(0, AssistantMemoryFacts.MAX_CONTENT);
@@ -128,22 +138,24 @@ public class AssistantMemoryService {
     public DigestResult digest(String tenantId, Long userId, String question) {
         String userKey = tenantId + ":" + userId;
         long epoch0 = digestEpoch.getOrDefault(userKey, 0L);
+        long arch0 = archiveEpoch.get();
         String key = userKey + ":" + (question == null ? "" : question.hashCode());
         Object[] cached = digestCache.get(key);
         long now = System.currentTimeMillis();
-        if (cached != null && (Long) cached[0] > now && Objects.equals(cached[2], question)) {
+        if (cached != null && (Long) cached[0] > now && Objects.equals(cached[2], question)
+            && Objects.equals(cached[3], epoch0) && Objects.equals(cached[4], arch0)) {
             return (DigestResult) cached[1];
         }
         DigestResult result = buildDigest(tenantId, userId, question);
         if (result != null) {
             touchQuietly(tenantId, userId, result.ids());
         }
-        // 算的过程中该用户发生过写（代际变了）→ 不回填，避免把写前快照盖在失效之后
-        if (digestEpoch.getOrDefault(userKey, 0L) == epoch0) {
-            if (digestCache.size() >= DIGEST_CACHE_MAX) {
+        // 算的过程中该用户发生过写、或期间做过归档 → 不回填，避免把写前快照盖在失效之后
+        if (digestEpoch.getOrDefault(userKey, 0L) == epoch0 && archiveEpoch.get() == arch0) {
+            if (digestCache.size() >= DIGEST_SWEEP_AT) {
                 sweepExpired(now);
             }
-            digestCache.put(key, new Object[]{now + DIGEST_TTL_MS, result, question});
+            digestCache.put(key, new Object[]{now + DIGEST_TTL_MS, result, question, epoch0, arch0});
         }
         return result;
     }
@@ -238,7 +250,9 @@ public class AssistantMemoryService {
         Date before = AssistantMemoryFacts.archiveBefore(new Date(), AssistantMemoryFacts.ARCHIVE_DAYS);
         int n = memoryMapper.archiveStale(before, new Date());
         if (n > 0) {
-            // 跨租户扫描拿不到受影响用户清单，直接整体清空（条目有上限，成本可忽略）
+            // 跨租户扫描拿不到受影响用户清单，直接整体清空（条目有上限，成本可忽略）；
+            // 先升整体代际，让清空瞬间还在算的旧快照放弃回填
+            archiveEpoch.incrementAndGet();
             digestCache.clear();
             log.info("[AssistantMemory] 归档 {} 条 90 天未使用的记忆", n);
         }
@@ -277,16 +291,17 @@ public class AssistantMemoryService {
     private void sweepExpired(long now) {
         digestCache.entrySet().removeIf(e -> (Long) e.getValue()[0] <= now);
         if (digestCache.size() >= DIGEST_CACHE_MAX) {
+            archiveEpoch.incrementAndGet(); // 整体清空同样要挡回填
             digestCache.clear();
         }
     }
 
     /**
      * 供回合写路径调用（旧→新允许）：save 落库后让本服务立即丢弃该用户摘要缓存，
-     * 否则新存的记忆最迟 30s 才出现在注入里。
+     * 否则新存的记忆最迟 30s 才出现在注入里。事务内与 edit/remove 同口径，推迟到提交后。
      */
     public void invalidateDigestCache(String tenantId, Long userId) {
-        evict(tenantId, userId);
+        evictAfterCommit(tenantId, userId);
     }
 
     /** 仅供单测/工具：暴露当前缓存大小（排查「改了不生效」时确认缓存行为） */
@@ -294,9 +309,11 @@ public class AssistantMemoryService {
         return digestCache.size();
     }
 
-    /** 测试辅助：清空缓存 */
+    /** 测试辅助：清空缓存（代际一并重置，防上一用例的飞行中结果串到下一用例） */
     public void clearCacheForTest() {
         digestCache.clear();
+        digestEpoch.clear();
+        archiveEpoch.incrementAndGet();
     }
 
     /** 导出用（题10）：全部条目按 id 倒序（含状态） */

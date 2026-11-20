@@ -65,7 +65,11 @@ public class AssistantMemoryTurnService {
             return new SaveOutcome("你已关闭长期记忆，这次没有保存（想开启请到「AI 助手记忆」页打开）", null);
         }
         // PII 脱敏（手机号/身份证不进长期记忆——记忆页用户可见，更要守住）。
-        // 顺序铁律：先脱敏、后截断——先截会把跨 200 边界的 18 位身份证切出 17 位前缀，正则认不出=明文落库。
+        // 顺序铁律：先粗截断、再脱敏、后精截断——先截 200 会把跨边界的 18 位身份证切出 17 位前缀，正则认不出=明文落库；
+        // 但脱敏不能直接吃超长正文（正则回溯成本随长度涨），所以先粗截到 MAX_INPUT_CHARS 再脱敏。
+        if (content.length() > AssistantMemoryFacts.MAX_INPUT_CHARS) {
+            content = content.substring(0, AssistantMemoryFacts.MAX_INPUT_CHARS);
+        }
         content = piiFilter.mask(content, tenantId);
         if (content.length() > AssistantMemoryFacts.MAX_CONTENT) {
             content = content.substring(0, AssistantMemoryFacts.MAX_CONTENT);

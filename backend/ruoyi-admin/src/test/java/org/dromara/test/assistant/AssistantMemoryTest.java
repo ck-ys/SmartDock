@@ -12,6 +12,7 @@ import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import com.smartdock.assistant.mapper.AssistantMemoryMapper;
 import com.smartdock.assistant.mapper.AssistantMemoryPrefMapper;
 import com.smartdock.assistant.service.AssistantMemoryService;
+import com.smartdock.assistant.support.AssistantMemoryFacts;
 import com.smartdock.assistant.support.AssistantPiiFilter;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
@@ -21,10 +22,13 @@ import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ToolSchema;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -264,8 +268,8 @@ class AssistantMemoryTest {
         when(mapper.selectById(5L)).thenReturn(other);
 
         assertFalse(newSvc(mapper).edit("000000", 1L, 5L, "改别人的记忆"));
-        verify(mapper, never()).updateOwnContent(anyString(), anyLong(), anyLong(), anyString(),
-            anyString(), anyString(), any(java.util.Date.class));
+        verify(mapper, never()).updateOwnContent(any(), any(), any(), any(), any(), any(),
+            any(java.util.Date.class));
     }
 
     /** 批 6 多审 m3 P1：先脱敏后截断——201 字的正文里证件正好跨 200 边界，
@@ -292,6 +296,92 @@ class AssistantMemoryTest {
         String saved = stored.get(0).getContent();
         assertFalse(saved.matches("(?s).*\\d{10,}.*"), "不得残留 10 位以上连续明文数字: " + saved);
         assertTrue(saved.length() <= 200, "截断仍生效");
+    }
+
+    /** 多审二轮 dspro N1 回归：hashCode 碰撞的两个问题不能共用缓存条目
+     *  （"Aa" 与 "BB" 的 String.hashCode 都是 2112）。 */
+    @Test
+    void digestCacheDoesNotMixUpHashCollidingQuestions() {
+        AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
+        DcsAssistantMemory a = row(1L, "Aa");
+        DcsAssistantMemory b = row(2L, "BB");
+        when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(List.of(a, b));
+
+        AssistantMemoryService svc = newSvc(mapper);
+        assertTrue(svc.digest("000000", 1L, "Aa").text().contains("Aa"));
+        String second = svc.digest("000000", 1L, "BB").text();
+        assertTrue(second.contains("BB"), "碰撞键必须按问题原文区分: " + second);
+        assertFalse(second.contains("Aa"), "不得复用上一条问题的结果: " + second);
+    }
+
+    /** 多审二轮 m3 P2：超长正文先粗截再脱敏——正则/词典扫描不得吃无界输入。 */
+    @Test
+    void longRawIsCutBeforeMaskSoFilterNeverSeesUnboundedInput() {
+        AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
+        when(mapper.selectById(7L)).thenReturn(row(7L, "旧内容"));
+        when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
+        when(mapper.updateOwnContent(anyString(), anyLong(), anyLong(), anyString(), anyString(),
+            any(), any(java.util.Date.class))).thenReturn(1);
+
+        AtomicReference<String> seen = new AtomicReference<>();
+        AssistantPiiFilter cap = mock(AssistantPiiFilter.class);
+        when(cap.mask(anyString(), anyString())).thenAnswer(inv -> {
+            seen.set(inv.getArgument(0, String.class));
+            return "x".repeat(200);
+        });
+        AssistantMemoryService svc = new AssistantMemoryService(mapper,
+            mock(AssistantMemoryPrefMapper.class), cap);
+
+        assertTrue(svc.edit("000000", 1L, 7L, "A".repeat(300_000)), "编辑成功");
+        assertTrue(seen.get().length() <= AssistantMemoryFacts.MAX_INPUT_CHARS,
+            "脱敏器收到的输入必须已限长: " + seen.get().length());
+    }
+
+    /** 多审二轮 m3：同 userId 不同租户同样必须拒（属主谓词的两半都要有测试）。 */
+    @Test
+    void editRejectsSameUserInOtherTenant() {
+        AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
+        DcsAssistantMemory otherTenant = row(8L, "别的租户");
+        otherTenant.setTenantId("000001");
+        when(mapper.selectById(8L)).thenReturn(otherTenant);
+
+        assertFalse(newSvc(mapper).edit("000000", 1L, 8L, "跨租户改"));
+        verify(mapper, never()).updateOwnContent(any(), any(), any(), any(), any(), any(),
+            any(java.util.Date.class));
+    }
+
+    /** 多审二轮 dspro N2：事务内 save 的失效必须推迟到提交后，提交前不得动静。 */
+    @Test
+    void invalidateInsideTransactionDefersEvictionUntilCommit() {
+        AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
+        when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(List.of());
+        AssistantMemoryService svc = newSvc(mapper);
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            svc.digest("000000", 1L, null);
+            assertTrue(svc.cacheSize() > 0, "先证明缓存里有东西");
+
+            svc.invalidateDigestCache("000000", 1L);
+            assertTrue(svc.cacheSize() > 0, "提交前不得失效（否则读请求会用未提交旧行回填）");
+
+            List<TransactionSynchronization> syncs = TransactionSynchronizationManager.getSynchronizations();
+            assertEquals(1, syncs.size(), "应登记一个 afterCommit 回调");
+            syncs.forEach(TransactionSynchronization::afterCommit);
+            assertEquals(0, svc.cacheSize(), "提交后才失效");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    private static DcsAssistantMemory row(Long id, String content) {
+        DcsAssistantMemory r = new DcsAssistantMemory();
+        r.setId(id);
+        r.setTenantId("000000");
+        r.setUserId(1L);
+        r.setContent(content);
+        r.setStatus("ACTIVE");
+        return r;
     }
 
     /** 只认「完整 18 位证件 / 完整 11 位手机号」的假过滤器（与真过滤器同语义：截短即不认） */

@@ -28,6 +28,8 @@ public final class AssistantMemoryFacts {
 
     /** 单条上限（与表列宽一致） */
     public static final int MAX_CONTENT = 200;
+    /** 脱敏前先截到这条线（只影响前 200 字，留 10 倍余量足够覆盖边界证件号；防超长正文喂给正则） */
+    public static final int MAX_INPUT_CHARS = MAX_CONTENT * 10;
     /** 每人容量上限（防模型滥存刷库；满=提示清理后再存） */
     public static final int MAX_PER_USER = 50;
     /** 每轮注入字数上限（题9 案1：条数上限≠注入量；示例值，可按经验调整） */
