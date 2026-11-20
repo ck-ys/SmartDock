@@ -11,7 +11,7 @@ import com.smartdock.assistant.legacy.mapper.AssistantActionMapper;
 import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.legacy.mapper.AssistantMessageMapper;
 import com.smartdock.assistant.legacy.mapper.AssistantRunMapper;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
 import org.dromara.common.tenant.helper.TenantHelper;

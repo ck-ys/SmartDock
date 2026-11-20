@@ -60,7 +60,7 @@ public class AssistantStatusController extends BaseController {
     /** 批A-1：/config 下发压缩策略派生值（按当前默认模型窗口算，只读展示） */
     private final com.smartdock.assistant.infrastructure.AssistantModelFactory modelFactory;
     /** 批 A Q6（2026-11-14）：/status/context「其他」桶的记忆正文体（租户开记忆才有值） */
-    private final com.smartdock.assistant.legacy.service.AssistantMemoryService memoryService;
+    private final com.smartdock.assistant.service.AssistantMemoryService memoryService;
 
     /**
      * 批3.5·题5（2026-11-03 拍板）：当前登录人最近用过的技能（真值来自 dcs_assistant_skill_usage
@@ -353,7 +353,7 @@ public class AssistantStatusController extends BaseController {
                     }
                 }
                 // 只读版：不回写 last_used_at（不污染 90 天归档判据）；带上注入前缀同一份文本
-                com.smartdock.assistant.legacy.service.AssistantMemoryService.DigestResult mem =
+                com.smartdock.assistant.domain.model.DigestResult mem =
                     memoryService.digestReadOnly(tenantId, userId, question);
                 if (mem != null) {
                     memoryChars = com.smartdock.assistant.support.ContextBreakdownEstimator.charsOf(

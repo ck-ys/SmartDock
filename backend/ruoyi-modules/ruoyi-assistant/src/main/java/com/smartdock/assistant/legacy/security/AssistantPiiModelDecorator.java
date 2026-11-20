@@ -4,6 +4,7 @@ import io.agentscope.core.message.Msg;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import io.agentscope.core.model.ToolSchema;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;

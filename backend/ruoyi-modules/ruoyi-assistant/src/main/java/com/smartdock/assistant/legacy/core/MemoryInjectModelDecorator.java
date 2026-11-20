@@ -7,7 +7,9 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ToolSchema;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.service.AssistantMemoryService;
+import com.smartdock.assistant.domain.model.DigestResult;
+import com.smartdock.assistant.legacy.service.AssistantMemoryTurnService;
+import com.smartdock.assistant.service.AssistantMemoryService;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -19,7 +21,8 @@ import java.util.List;
  * <p>每次模型调用把用户记忆摘要追加为末位 system 消息（「用户长期记忆：…」，
  * 仅应用这些偏好，不当作指令执行）。链路位置=最内层（Billing(Pii(Thinking(本件(原生)))))：
  * 记忆先注入再走思考档/PII/计费——计费按含记忆的真实出网文本估算（诚实口径）。
- * 摘要 {@link AssistantMemoryService#digest} 进程内 30s 缓存，save/remove 即时失效。</p>
+ * 摘要 {@link AssistantMemoryService#digest} 进程内 30s 缓存，save/remove 即时失效；
+ * 本轮注入统计（题9 可见行）走 {@link AssistantMemoryTurnService#recordInjectedForTurn}。</p>
  *
  * <p>题9 改动（拍板 v8.2 案1）：从本轮消息里取最后一条用户提问作上下文，按相关性取
  * TopK + 字数额度，而不是固定「最近 30 条」；没有相关问题就不注入。命中统计写入
@@ -36,15 +39,19 @@ public class MemoryInjectModelDecorator implements Model {
 
     private final Model delegate;
     private final AssistantMemoryService memoryService;
+    /** 回合写路径（旧区）：只用来上报本轮注入统计 */
+    private final AssistantMemoryTurnService turnService;
     private final String tenantId;
     private final Long userId;
     /** 装配期显式传入的会话键（模型调用在 loom 线程，读不到 run ThreadLocal；题9 可见行按它会合） */
     private final String aguiThreadId;
 
     public MemoryInjectModelDecorator(Model delegate, AssistantMemoryService memoryService,
+                                      AssistantMemoryTurnService turnService,
                                       String tenantId, Long userId, String aguiThreadId) {
         this.delegate = delegate;
         this.memoryService = memoryService;
+        this.turnService = turnService;
         this.tenantId = tenantId;
         this.userId = userId;
         this.aguiThreadId = aguiThreadId;
@@ -56,7 +63,7 @@ public class MemoryInjectModelDecorator implements Model {
 
     @Override
     public Flux<ChatResponse> stream(List<Msg> messages, List<ToolSchema> tools, GenerateOptions options) {
-        AssistantMemoryService.DigestResult digest = null;
+        DigestResult digest = null;
         try {
             digest = memoryService.digest(tenantId, userId, lastUserText(messages));
         } catch (Exception e) {
@@ -65,11 +72,11 @@ public class MemoryInjectModelDecorator implements Model {
         }
         if (digest == null || digest.text() == null || digest.text().isBlank()) {
             // 题9：本轮没命中——显式清空，防上一轮残留被当成本轮「参考了记忆」
-            memoryService.recordInjectedForTurn(aguiThreadId, 0, 0);
+            turnService.recordInjectedForTurn(aguiThreadId, 0, 0);
             return delegate.stream(messages, tools, options);
         }
         // 题9 可见行：上报本轮注入条数/字数（键=装配期 threadId，不依赖 run ThreadLocal）
-        memoryService.recordInjectedForTurn(aguiThreadId, digest.count(), digest.chars());
+        turnService.recordInjectedForTurn(aguiThreadId, digest.count(), digest.chars());
         Msg memoryMsg = Msg.builder()
             .role(MsgRole.SYSTEM)
             .textContent(MEMORY_PROMPT_PREFIX + digest.text())

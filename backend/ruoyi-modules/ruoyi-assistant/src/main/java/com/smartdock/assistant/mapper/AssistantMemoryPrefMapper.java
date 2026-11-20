@@ -1,11 +1,11 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMemoryPref;
+import com.smartdock.assistant.domain.model.DcsAssistantMemoryPref;
 
 /**
  * 记忆个人开关 Mapper（ckys3 解锁板题10 案1）。

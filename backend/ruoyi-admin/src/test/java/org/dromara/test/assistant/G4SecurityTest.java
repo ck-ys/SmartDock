@@ -10,7 +10,7 @@ import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ToolSchema;
 import com.smartdock.assistant.legacy.security.AssistantInjectionFilter;
 import com.smartdock.assistant.legacy.security.AssistantInputGuard;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.security.AssistantPiiModelDecorator;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;

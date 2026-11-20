@@ -39,10 +39,10 @@ public final class ToolRegistry {
      */
     public record ToolDeps(
         ConfigService configService,
-        com.smartdock.assistant.legacy.security.AssistantPiiFilter piiFilter,
+        com.smartdock.assistant.support.AssistantPiiFilter piiFilter,
         com.smartdock.assistant.legacy.service.AssistantAttachmentService attachmentService,
         com.smartdock.assistant.legacy.core.AssistantPlanSignal planSignal,
-        com.smartdock.assistant.legacy.service.AssistantMemoryService memoryService,
+        com.smartdock.assistant.legacy.service.AssistantMemoryTurnService memoryService,
         Boolean memoryEnabled,
         String aguiThreadId,
         /** 建 agent 的生效租户（登录快照）；异步 supplier 线程无 Sa-Token，租户必须显式带进来 */

@@ -1,10 +1,10 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.domain.DcsAssistantFeedback;
-import com.smartdock.assistant.legacy.service.AssistantFeedbackService;
+import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
+import com.smartdock.assistant.service.AssistantFeedbackService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.log.annotation.Log;

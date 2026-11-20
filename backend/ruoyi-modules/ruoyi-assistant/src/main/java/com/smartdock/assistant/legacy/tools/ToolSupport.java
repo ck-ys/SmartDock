@@ -171,11 +171,11 @@ final class ToolSupport {
     static String secureJson(Map<String, Object> out, ToolIdentity identity) {
         String json = toJson(out);
         try {
-            com.smartdock.assistant.legacy.security.AssistantPiiFilter pii =
-                org.dromara.common.core.utils.SpringUtils.getBean(com.smartdock.assistant.legacy.security.AssistantPiiFilter.class);
+            com.smartdock.assistant.support.AssistantPiiFilter pii =
+                org.dromara.common.core.utils.SpringUtils.getBean(com.smartdock.assistant.support.AssistantPiiFilter.class);
             com.smartdock.assistant.legacy.security.AssistantInjectionFilter injection =
                 org.dromara.common.core.utils.SpringUtils.getBean(com.smartdock.assistant.legacy.security.AssistantInjectionFilter.class);
-            String masked = com.smartdock.assistant.legacy.security.AssistantPiiFilter.repairMaskedJsonNumbers(
+            String masked = com.smartdock.assistant.support.AssistantPiiFilter.repairMaskedJsonNumbers(
                 pii.mask(json, identity.getTenantId()));
             if (injection.flagged(json)) {
                 int close = masked.lastIndexOf('}');

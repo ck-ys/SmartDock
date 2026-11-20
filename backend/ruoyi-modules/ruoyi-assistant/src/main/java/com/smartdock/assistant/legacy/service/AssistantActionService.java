@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.domain.DcsAssistantAction;
 import com.smartdock.assistant.legacy.mapper.AssistantActionMapper;
+import com.smartdock.assistant.service.AssistantMemoryService;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
 

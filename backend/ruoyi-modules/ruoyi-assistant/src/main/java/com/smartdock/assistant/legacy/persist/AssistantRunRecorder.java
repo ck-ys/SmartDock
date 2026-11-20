@@ -11,7 +11,7 @@ import com.smartdock.assistant.legacy.core.AssistantRunContext;
 import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;

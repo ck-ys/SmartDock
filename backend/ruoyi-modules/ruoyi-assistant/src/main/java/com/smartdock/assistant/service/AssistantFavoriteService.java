@@ -1,8 +1,8 @@
-package com.smartdock.assistant.legacy.service;
+package com.smartdock.assistant.service;
 
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.domain.DcsAssistantFavorite;
-import com.smartdock.assistant.legacy.mapper.AssistantFavoriteMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantFavorite;
+import com.smartdock.assistant.mapper.AssistantFavoriteMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
 

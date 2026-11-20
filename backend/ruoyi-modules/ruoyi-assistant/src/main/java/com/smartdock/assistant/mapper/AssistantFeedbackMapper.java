@@ -1,10 +1,10 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import com.smartdock.assistant.legacy.domain.DcsAssistantFeedback;
+import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
 
 /**
  * 助手反馈 Mapper（批G G6）。管理端列表查询显式租户谓词。

@@ -1,10 +1,11 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMemory;
-import com.smartdock.assistant.legacy.service.AssistantMemoryService;
+import com.smartdock.assistant.domain.model.DcsAssistantMemory;
+import com.smartdock.assistant.service.AssistantMemoryService;
+import com.smartdock.assistant.support.AssistantMemoryFacts;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -55,7 +56,7 @@ public class AssistantMemoryController extends BaseController {
         Long userId = LoginHelper.getUserId();
         return R.ok(Map.of(
             "count", memoryService.countActive(tenantId, userId),
-            "max", AssistantMemoryService.MAX_PER_USER));
+            "max", AssistantMemoryFacts.MAX_PER_USER));
     }
 
     /** 行内编辑（题7）：与保存口同闸（长度+脱敏+去重+属主谓词） */

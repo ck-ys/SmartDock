@@ -10,7 +10,7 @@ import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.infrastructure.BillingModelDecorator;
 import com.smartdock.assistant.infrastructure.AssistantModelFactory;
 import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.security.AssistantPiiModelDecorator;
 import com.smartdock.domain.DcsAiConfig;
 import com.smartdock.service.IDcsAiModelPriceService;

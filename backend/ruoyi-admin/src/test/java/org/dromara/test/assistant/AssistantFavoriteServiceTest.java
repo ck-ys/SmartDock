@@ -1,8 +1,8 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.domain.DcsAssistantFavorite;
-import com.smartdock.assistant.legacy.mapper.AssistantFavoriteMapper;
-import com.smartdock.assistant.legacy.service.AssistantFavoriteService;
+import com.smartdock.assistant.domain.model.DcsAssistantFavorite;
+import com.smartdock.assistant.mapper.AssistantFavoriteMapper;
+import com.smartdock.assistant.service.AssistantFavoriteService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

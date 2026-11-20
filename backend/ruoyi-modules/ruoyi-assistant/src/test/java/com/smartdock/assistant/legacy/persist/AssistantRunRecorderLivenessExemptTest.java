@@ -7,7 +7,7 @@ import java.util.List;
 import com.smartdock.assistant.legacy.core.AssistantToolProgressConverter;
 import com.smartdock.assistant.legacy.core.DcsHeartbeatMiddleware;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

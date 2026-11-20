@@ -100,6 +100,45 @@ class PackageMigrationGuardTest {
         "com.smartdock.assistant.legacy.mapper.DcsMcpServerMapper",
         "com.smartdock.assistant.legacy.mapper.DcsMcpCallLogMapper");
 
+    /** 批 6（2026-11-20 题 1 案 1）：记忆/收藏/反馈线 15 件搬进新四层、旧记忆服务改名 Turn 后，
+     *  16 个旧全名在 classpath 上必须一个不剩。同批 4/5 动机：四个 legacy 子包都还在（只是变薄），
+     *  只能点名；防「没 clean 就编译」的双注册（含旧 AssistantMemoryService 与新的
+     *  AssistantMemoryTurnService 并存时会话装配拿错 bean 的风险）。 */
+    @Test
+    void batch6MovedMemoryClassesMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String fqn : BATCH6_MOVED_TO_FOUR_LAYERS) {
+            String path = fqn.replace('.', '/') + ".class";
+            List<URL> found = Collections.list(cl.getResources(path));
+            assertTrue(found.isEmpty(),
+                () -> fqn + " 残留在 classpath: " + found
+                    + " —— 批 6 已把它搬进新四层（或改名为 Turn），请 mvn clean 后重建");
+        }
+    }
+
+    /** 批 6 搬走 / 改名的 16 个类的旧全名（包还在，所以只能点名） */
+    private static final List<String> BATCH6_MOVED_TO_FOUR_LAYERS = List.of(
+        // 记忆线 7 件（旧服务改名为 Turn，旧全名随之下线）
+        "com.smartdock.assistant.legacy.controller.AssistantMemoryController",
+        "com.smartdock.assistant.legacy.service.AssistantMemoryService",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantMemory",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantMemoryPref",
+        "com.smartdock.assistant.legacy.mapper.AssistantMemoryMapper",
+        "com.smartdock.assistant.legacy.mapper.AssistantMemoryPrefMapper",
+        "com.smartdock.assistant.legacy.job.AssistantMemoryArchiveJob",
+        // 收藏线 4 件
+        "com.smartdock.assistant.legacy.controller.AssistantFavoriteController",
+        "com.smartdock.assistant.legacy.service.AssistantFavoriteService",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantFavorite",
+        "com.smartdock.assistant.legacy.mapper.AssistantFavoriteMapper",
+        // 反馈线 4 件
+        "com.smartdock.assistant.legacy.controller.AssistantFeedbackController",
+        "com.smartdock.assistant.legacy.service.AssistantFeedbackService",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantFeedback",
+        "com.smartdock.assistant.legacy.mapper.AssistantFeedbackMapper",
+        // 脱敏共享件 1 件
+        "com.smartdock.assistant.legacy.security.AssistantPiiFilter");
+
     /** 批 3（2026-11-19 多审 dspro P2-2）：额度线整线搬移消包后，billing/limiter 两个旧包
      *  在主 classes 上必须一个资源都不剩——非 clean 增量构建会让旧包 class 与新四层同名类并存，
      *  同样触发组件扫描双注册。只盯主 classes（target/classes 与 jar 内）；test-classes 不算——

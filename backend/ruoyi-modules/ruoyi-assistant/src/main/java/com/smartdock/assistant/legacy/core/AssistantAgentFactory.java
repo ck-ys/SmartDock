@@ -9,6 +9,8 @@ import io.agentscope.core.tool.Toolkit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.infrastructure.AssistantModelFactory;
+import com.smartdock.assistant.legacy.service.AssistantMemoryTurnService;
+import com.smartdock.assistant.service.AssistantMemoryService;
 import io.agentscope.core.permission.PermissionContextState;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.dromara.common.core.service.ConfigService;
@@ -71,14 +73,16 @@ public class AssistantAgentFactory {
     /** 计划卡信号仓(二站③ AU-51: submit_plan 落计划, enricher 转 plan CUSTOM 帧) */
     private final AssistantPlanSignal planSignal;
     /** PII 确定性过滤器(批G G4: 出网消息脱敏装饰) */
-    private final com.smartdock.assistant.legacy.security.AssistantPiiFilter piiFilter;
+    private final com.smartdock.assistant.support.AssistantPiiFilter piiFilter;
     /** 系统参数读取(博查搜索 key 走 sys_config, 2026-10-06 用户拍板) */
     private final ConfigService configService;
     /** 会话附件(附件批 ATTACH-2: read_attachment 工具数据源) */
     private final com.smartdock.assistant.legacy.service.AssistantAttachmentService attachmentService;
     /** 长期记忆(二站④ AU-53: memoryEnabled 开关+save_memory 工具+逐轮注入装饰器) */
     private final com.smartdock.assistant.legacy.service.AssistantConfigService assistantConfigService;
-    private final com.smartdock.assistant.legacy.service.AssistantMemoryService memoryService;
+    private final AssistantMemoryService memoryService;
+    /** 回合写路径（旧区）：save_memory 工具与回合统计 */
+    private final AssistantMemoryTurnService memoryTurnService;
     /** 业务批4 Q1-A：建 agent 时回写自选范围指纹基准（resolver 比对判白名单变化失效重建） */
     private final com.smartdock.assistant.legacy.service.AssistantModelSettingService modelSettingService;
     /** TODO 清单信号仓(ZCode 对齐 Q2, 批A: todo_write 工具实时推送) */
@@ -203,7 +207,7 @@ public class AssistantAgentFactory {
         // 技能的轮次技能段才是末位；三席审查探针实测）。尾部=动态区，不碰缓存前缀（Q4 红线）。
         innermost = new DateInjectModelDecorator(innermost);
         if (memoryOn) {
-            innermost = new MemoryInjectModelDecorator(innermost, memoryService,
+            innermost = new MemoryInjectModelDecorator(innermost, memoryService, memoryTurnService,
                 user.getTenantId(), user.getUserId(), aguiThreadId);
         }
         Model model = new BillingModelDecorator(
@@ -241,7 +245,7 @@ public class AssistantAgentFactory {
         Set<String> registered = ToolRegistry.registerAll(toolkit, identity,
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
-                planSignal, memoryService, memoryOn, aguiThreadId, user.getTenantId(),
+                planSignal, memoryTurnService, memoryOn, aguiThreadId, user.getTenantId(),
                 todoSignal, conversationService, webSearchQuota, quotaService, tenantCfg.toolGate(),
                 // 题7 案1：工作区根 = 本会话驱逐落盘目录（read_file 只在此根下回读）
                 threadWorkspace,

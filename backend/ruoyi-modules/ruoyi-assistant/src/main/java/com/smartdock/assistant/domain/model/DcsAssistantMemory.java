@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.domain;
+package com.smartdock.assistant.domain.model;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -13,7 +13,7 @@ import java.util.Date;
  * AI 助手长期记忆（二站④ AU-53，2026-10-08）。
  *
  * <p>用户级偏好/事实（如「称呼我为小林」「催办默认明天 9 点」）：save_memory 工具
- * 经 {@link com.smartdock.assistant.legacy.security.AssistantPiiFilter} 脱敏后落库，
+ * 经 {@link com.smartdock.assistant.support.AssistantPiiFilter} 脱敏后落库，
  * {@link com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator} 逐轮注入模型上下文
  * （跨会话生效），记忆页本人可查可删（dcs:assistant:memory:manage）。</p>
  */

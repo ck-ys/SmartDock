@@ -10,7 +10,7 @@ import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.infrastructure.AssistantWebSearchQuota;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.service.AssistantUserQuotaService;
 import org.dromara.common.core.service.ConfigService;
 

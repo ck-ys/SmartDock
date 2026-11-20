@@ -158,7 +158,7 @@ class Q5ThinkSegPersistTest {
     @Test
     void thinkTextMaskedBeforePersistShape() throws Exception {
         AssistantRunRecorder masked = new AssistantRunRecorder(null, null, null,
-            new com.smartdock.assistant.legacy.security.AssistantPiiFilter(null) {
+            new com.smartdock.assistant.support.AssistantPiiFilter(null) {
                 @Override
                 public String mask(String text, String tenantId) {
                     return "[已脱敏]";
@@ -178,7 +178,7 @@ class Q5ThinkSegPersistTest {
     @Test
     void legacyArrayShapeArgsTextMasked() throws Exception {
         AssistantRunRecorder masked = new AssistantRunRecorder(null, null, null,
-            new com.smartdock.assistant.legacy.security.AssistantPiiFilter(null) {
+            new com.smartdock.assistant.support.AssistantPiiFilter(null) {
                 @Override
                 public String mask(String text, String tenantId) {
                     return "[已脱敏]";
@@ -197,7 +197,7 @@ class Q5ThinkSegPersistTest {
     @Test
     void noPiiHitReturnsOriginalString() throws Exception {
         AssistantRunRecorder plain = new AssistantRunRecorder(null, null, null,
-            new com.smartdock.assistant.legacy.security.AssistantPiiFilter(null) {
+            new com.smartdock.assistant.support.AssistantPiiFilter(null) {
                 @Override
                 public String mask(String text, String tenantId) {
                     return text;

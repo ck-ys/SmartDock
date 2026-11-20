@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
 import com.smartdock.assistant.legacy.security.AssistantInjectionFilter;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantActionService;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.dromara.common.core.exception.ServiceException;

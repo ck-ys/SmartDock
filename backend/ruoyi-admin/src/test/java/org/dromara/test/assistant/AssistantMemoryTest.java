@@ -2,22 +2,23 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantMemory;
+import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
+import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
+import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.legacy.service.AssistantMemoryTurnService;
+import com.smartdock.assistant.legacy.tools.MemoryTools;
+import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.mapper.AssistantMemoryMapper;
+import com.smartdock.assistant.mapper.AssistantMemoryPrefMapper;
+import com.smartdock.assistant.service.AssistantMemoryService;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.ToolSchema;
-import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
-import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMemory;
-import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
-import com.smartdock.assistant.legacy.mapper.AssistantMemoryMapper;
-import com.smartdock.assistant.legacy.mapper.AssistantMemoryPrefMapper;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantMemoryService;
-import com.smartdock.assistant.legacy.tools.MemoryTools;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
@@ -42,7 +43,11 @@ import static org.mockito.Mockito.when;
  * 注入装饰器（有记忆=末位 system 消息；无记忆=原样透传）。
  *
  * <p>ckys3 解锁板题7~题10（2026-11-12）扩后：清单改按状态取（listByUserStatus），
- * 保存口新增类型/同主题覆盖/个人开关判定，构造参数随之增加——本测试同步到新契约。</p>
+ * 保存口新增类型/同主题覆盖/个人开关判定，构造参数随之增加。</p>
+ *
+ * <p>批 6 题 2 案 1（2026-11-20）：556 行服务按表归属拆两份——存储面（清单/编辑/摘要/缓存）
+ * 在 {@link AssistantMemoryService}，回合写路径（save/回合统计）在
+ * {@link AssistantMemoryTurnService}；本测试按新契约分别构造，断言口径不变。</p>
  */
 @Tag("dev")
 @Tag("local")
@@ -58,18 +63,25 @@ class AssistantMemoryTest {
         return f;
     }
 
-    /** 新契约构造：pref 缺行=开启（mock 默认 null）→ 走正常保存路径 */
+    /** 存储面：pref 缺行=开启（mock 默认 null）→ 正常读写 */
     private static AssistantMemoryService newSvc(AssistantMemoryMapper mapper) {
-        return newSvc(mapper, new AssistantMemoryTurnLedger());
+        return new AssistantMemoryService(mapper, mock(AssistantMemoryPrefMapper.class), fakePii());
     }
 
-    private static AssistantMemoryService newSvc(AssistantMemoryMapper mapper,
-                                                 AssistantMemoryTurnLedger ledger) {
-        return new AssistantMemoryService(mapper,
-            mock(AssistantMemoryPrefMapper.class),
+    /** 回合写路径：共享同一个存储面实例，save 后的缓存失效才落在同一份缓存上 */
+    private static AssistantMemoryTurnService newTurn(AssistantMemoryMapper mapper,
+                                                     AssistantMemoryService svc) {
+        return newTurn(mapper, svc, new AssistantMemoryTurnLedger());
+    }
+
+    private static AssistantMemoryTurnService newTurn(AssistantMemoryMapper mapper,
+                                                     AssistantMemoryService svc,
+                                                     AssistantMemoryTurnLedger ledger) {
+        return new AssistantMemoryTurnService(mapper,
             mock(AssistantConversationMapper.class),
             fakePii(),
-            ledger);
+            ledger,
+            svc);
     }
 
     @Test
@@ -86,9 +98,10 @@ class AssistantMemoryTest {
         when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(rows);
 
         AssistantMemoryService svc = newSvc(mapper);
+        AssistantMemoryTurnService turn = newTurn(mapper, svc);
 
         // PII 脱敏：手机号不进记忆
-        String r1 = svc.save("000000", 1L, "小林手机 13812345678 通知优先");
+        String r1 = turn.save("000000", 1L, "小林手机 13812345678 通知优先");
         assertTrue(r1.startsWith("已记住"), "首存成功: " + r1);
         assertTrue(stored.get(0).getContent().contains("1****"), "手机号已脱敏");
         assertFalse(stored.get(0).getContent().contains("13812345678"));
@@ -109,13 +122,13 @@ class AssistantMemoryTest {
 
         // 去重：同内容幂等不双落
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(1);
-        String r2 = svc.save("000000", 1L, stored.get(0).getContent());
+        String r2 = turn.save("000000", 1L, stored.get(0).getContent());
         assertTrue(r2.contains("已经记过"), "重复内容幂等: " + r2);
 
         // 容量闸：满 50 拒存并给指引
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(50); // 容量上限(与服务层 MAX_PER_USER 同值)
-        String r3 = svc.save("000000", 1L, "新记忆");
+        String r3 = turn.save("000000", 1L, "新记忆");
         assertTrue(r3.contains("最多存"), "满员话术: " + r3);
 
         // 删除走属主谓词+缓存失效
@@ -132,7 +145,7 @@ class AssistantMemoryTest {
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(0);
         when(mapper.insert(any(DcsAssistantMemory.class))).thenReturn(1);
         MemoryTools tool = new MemoryTools(new ToolIdentity(7L, "000000", ToolIdentity.LEVEL_MEMBER, null),
-            newSvc(mapper));
+            newTurn(mapper, newSvc(mapper)));
         JsonNode j = MAPPER.readTree(tool.saveMemory("称呼我为小林"));
         assertEquals("OK", j.path("status").asText());
         assertTrue(j.path("message").asText().contains("已记住"));
@@ -169,8 +182,9 @@ class AssistantMemoryTest {
         when(mapper.listByUserStatus(eq("000000"), eq(7L), anyString())).thenReturn(List.of(row));
         CapturingModel inner = new CapturingModel();
         AssistantMemoryTurnLedger ledger = new AssistantMemoryTurnLedger();
+        AssistantMemoryService svc = newSvc(mapper);
         MemoryInjectModelDecorator deco = new MemoryInjectModelDecorator(inner,
-            newSvc(mapper, ledger), "000000", 7L, "th-1");
+            svc, newTurn(mapper, svc, ledger), "000000", 7L, "th-1");
 
         Msg user = Msg.builder().role(MsgRole.USER).textContent("小林今天要催谁？").build();
         deco.stream(List.of(user), List.of(), GenerateOptions.builder().build());
@@ -196,15 +210,17 @@ class AssistantMemoryTest {
         CapturingModel inner = new CapturingModel();
 
         // 无记忆：原样透传
+        AssistantMemoryService svc6 = newSvc(mapper);
         MemoryInjectModelDecorator noMem = new MemoryInjectModelDecorator(inner,
-            newSvc(mapper), "000000", 6L, "th-2");
+            svc6, newTurn(mapper, svc6), "000000", 6L, "th-2");
         Msg user = Msg.builder().role(MsgRole.USER).textContent("hi").build();
         noMem.stream(List.of(user), List.of(), GenerateOptions.builder().build());
         assertEquals(1, inner.calls.get(0).size(), "无记忆不追加");
 
         // 库挂：降级无记忆不炸会话
+        AssistantMemoryService svc8 = newSvc(mapper);
         MemoryInjectModelDecorator dbDown = new MemoryInjectModelDecorator(inner,
-            newSvc(mapper), "000000", 8L, "th-3");
+            svc8, newTurn(mapper, svc8), "000000", 8L, "th-3");
         dbDown.stream(List.of(user), List.of(), GenerateOptions.builder().build());
         assertEquals(1, inner.calls.get(1).size(), "库挂降级原样透传");
     }

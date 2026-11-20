@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * AI 模型能力目录 Mapper（2026-10-09 批1）。SEED 行跨租户共享（tenant 000000），
- * 故 @InterceptorIgnore + SQL 显式 tenant_id 谓词（红线同 {@link AssistantFavoriteMapper}）。
+ * 故 @InterceptorIgnore + SQL 显式 tenant_id 谓词（红线同 {@link com.smartdock.assistant.mapper.AssistantFavoriteMapper}）。
  * 正则匹配放服务层 Java 侧（可单测；坏正则跳过不炸）。
  */
 @InterceptorIgnore(tenantLine = "true")

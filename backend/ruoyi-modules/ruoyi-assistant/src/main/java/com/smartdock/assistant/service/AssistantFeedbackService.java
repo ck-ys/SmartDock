@@ -1,18 +1,22 @@
-package com.smartdock.assistant.legacy.service;
+package com.smartdock.assistant.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.smartdock.assistant.domain.gateway.MessageOwnershipGateway;
+import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
+import com.smartdock.assistant.mapper.AssistantFeedbackMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantFeedback;
-import com.smartdock.assistant.legacy.mapper.AssistantFeedbackMapper;
-import com.smartdock.assistant.legacy.mapper.AssistantMessageMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 /**
- * 助手 👍👎 反馈服务（批G G6，Q13 轻量版）：toast 确认、管理端可查、喂 eval 数据集。
+ * 助手 👍👎 反馈服务（批G G6，Q13 轻量版；批 6 题 3 案 1，2026-11-20 搬入新根）。
+ *
+ * <p>迁移口径：只碰反馈自有表；提交时要校验「消息是不是本人的」，而消息表还在 legacy 区，
+ * 按 backend/AGENTS.md 规则 8 经 {@link MessageOwnershipGateway} 收口（实现在 infrastructure），
+ * 本类对 legacy 零 import——网关只回布尔，legacy 实体不外泄。</p>
  */
 @Slf4j
 @Service
@@ -20,7 +24,7 @@ import java.util.List;
 public class AssistantFeedbackService {
 
     private final AssistantFeedbackMapper feedbackMapper;
-    private final AssistantMessageMapper messageMapper;
+    private final MessageOwnershipGateway messageOwnershipGateway;
 
     /** 提交反馈：带 messageId 时校验消息归属本人（防跨用户刷评）；
      *  AU-40(1008)：消息+评价 10 秒幂等窗——连点几下不重复入库（前端 voted 已挡同类，
@@ -29,11 +33,8 @@ public class AssistantFeedbackService {
         if (!"UP".equals(rating) && !"DOWN".equals(rating)) {
             throw new ServiceException("rating 仅支持 UP/DOWN");
         }
-        if (messageId != null) {
-            var msg = messageMapper.selectById(messageId);
-            if (msg == null || !msg.getTenantId().equals(tenantId) || !msg.getUserId().equals(userId)) {
-                throw new ServiceException("只能评价自己会话中的消息", 403);
-            }
+        if (messageId != null && !messageOwnershipGateway.ownedBy(tenantId, userId, messageId)) {
+            throw new ServiceException("只能评价自己会话中的消息", 403);
         }
         if (feedbackMapper.selectRecentDuplicate(tenantId, userId, messageId, rating) != null) {
             log.debug("[dcs-assistant] 反馈幂等命中（10s 窗内重复），跳过入库: user={} msg={} {}", userId, messageId, rating);

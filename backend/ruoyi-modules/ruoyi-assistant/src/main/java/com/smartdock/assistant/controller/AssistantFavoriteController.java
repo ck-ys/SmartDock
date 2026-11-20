@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.controller;
+package com.smartdock.assistant.controller;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.service.AssistantFavoriteService;
+import com.smartdock.assistant.service.AssistantFavoriteService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.web.core.BaseController;

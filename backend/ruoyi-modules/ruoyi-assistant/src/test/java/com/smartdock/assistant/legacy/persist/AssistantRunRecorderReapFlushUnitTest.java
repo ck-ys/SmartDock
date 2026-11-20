@@ -3,7 +3,7 @@ package com.smartdock.assistant.legacy.persist;
 import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import com.smartdock.assistant.legacy.service.AssistantFollowupService;
 import org.junit.jupiter.api.Tag;

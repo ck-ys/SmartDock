@@ -3,7 +3,7 @@ package org.dromara.test.assistant;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cn.hutool.core.lang.Dict;
-import com.smartdock.assistant.legacy.security.AssistantPiiFilter;
+import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import com.smartdock.assistant.legacy.tools.WebSearchTools;
 
