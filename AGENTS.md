@@ -48,15 +48,15 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 常驻运维脚本（启停/打包/重置） | `.workshop/scripts/` | |
 | 证据截图、对账快照 | `.workshop/evidence/` | |
 | 演示数据种子 | `.workshop/shots/` | |
-| 会话可视化 HTML（拍板页/前后对比图） | **双写**：会话可视化目录（渲染中转）+ `.workshop/plans/`（最终版） | 会话目录随时可能失效，仓内副本才是权威 |
+| 会话可视化 HTML（拍板页/前后对比图） | **只写** `.workshop/plans/`（唯一权威） | 不写会话可视化目录 / 家目录 / C 盘任何位置；要预览就 `file://` 打开仓内文件（2026-11-19 用户改规，废「双写」） |
 | Playwright `take_screenshot` 默认输出 | `frontend/.playwright-mcp/` | gitignored，不提交 |
 
 ### 禁止行为
 
-- ❌ 写系统 `/tmp`（含 `C:\Users\<user>\AppData\Local\Temp`）、家目录、其它盘根、仓外任意位置
+- ❌ 写系统 `/tmp`（含 `C:\Users\<user>\AppData\Local\Temp`）、家目录、其它盘根、仓外任意位置——**含 ZCode 会话可视化目录 `C:\Users\<user>\.zcode\cli\artifacts\…`**（该目录虽由宿主提供、但不是本仓产物目录，一律不往里写 HTML；2026-11-19 用户点名后加）
 - ❌ 产物平铺在仓库根或 `.workshop/` 根——新类型产物没有对应目录时，在 `.workshop/` 下**新建专门子目录**
 - ❌ 把 `.workshop/` 内部资料提交进 git
-- ❌ 拍板页只留在会话可视化目录、不归档仓内
+- ❌ 拍板页 / 前后对比页写进会话可视化目录或家目录（只认 `.workshop/plans/`；给用户的链接一律给仓内路径）
 - ❌ 把内网 IP、密码、真实人名/公司/校名/邮箱写进任何 git 追踪文件（含本文件）
 
 ### 对外可见性（2026-11-02 加）
@@ -244,7 +244,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 - **界面变了顺带刷 README 截图**：动了用户看得见的界面（壳层/首页/画像/分析/助手），收口前跑 `cd frontend && node scripts/readme-screenshots.mjs` 重拍六张（1440×900 亮色）并更新图注版本号；演示库用 `backend/script/demo/seed-internal-ops-demo.js --days 30` + 「数据分析→重建汇总」刷新（内部协作故事，uid 前缀 demo-io-），跨天/换参重播前先按 `demo-io-` 前缀清旧数据，口径回到新基线（见「领域概念速查·演示基线」行）。旧 seed-analytics-demo.js 是退役的访客故事版，仅留档不再作为基线
 - **替换已用顺手的界面须满足五条**：零操作默认价值 / 旧能力不倒退 / 核心路径 ≤2 次点击 / 真人可用 / 并行灰度过渡——不满足就别替换
 - 修复类提交必须在更新日志页补人话条目（≤3 条，类型=新增/优化/修复）并验收首位徽标；2026-10-23 起日志改为数据库驱动（`dcs_changelog`，草稿→发布→通知），操作口径见 `frontend/AGENTS.md`「更新日志铁律」
-- 人话日志追加 `.workshop/logs/`；选择题一律做 HTML 拍板页（双写归档），**答案唯一通道 = 用户在对话里明说**
+- 人话日志追加 `.workshop/logs/`；选择题一律做 HTML 拍板页（归档 `.workshop/plans/`，不写会话目录），**答案唯一通道 = 用户在对话里明说**
 
 **取证与结论口径（审查报告 / 子智能体交付 / 缺陷定性适用，界面与文案微修豁免）：**
 
@@ -259,7 +259,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 **文档分两层**：
 - **总拍板 HTML + 总计划 MD**（每条工作线各一套，如 `20261021-ability2-master-plan.md`、`phase2-master-plan.md`）：跨批次路线图与唯一总账。**每批收口必须回刷总计划状态（打勾+提交锚点）**——只回填拍板页/日志、漏刷总账 = 与漏交代码同罪（2026-10-22 两份总账停更被用户实锤，教训在案）。
-- **多个子拍板 HTML + 子计划 MD**（每批开工前各出一份，双写 `.workshop/plans/` + 会话 viz 目录）。
+- **多个子拍板 HTML + 子计划 MD**（每批开工前各出一份，只写 `.workshop/plans/`，不写会话 viz 目录）。
 
 **前置铁律（2026-10-27 用户加规）**：**每次开发新需求，动手写代码前必须先出拍板 HTML**——没有板不开工；板的每道题（含纯后端题）都要**头脑风暴 2-3 个方案**比出最佳推荐，不是只有界面题才给选项。很小的修补可豁免，但「新需求/新批次/改口径/改交互」一律不豁免。
 
@@ -274,10 +274,11 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 8. **每个选项都要有自己的真界面（2026-11-10 用户改规）**：不许只给推荐那一案画图、其他案只写文字。同一题的各案用同一套数据、同一尺寸（1440×900），并排比得出"哪种看着舒服"；正文里说清差在哪几行，别让读者自己找。至少含一个「现状/原样」对照案时，明确标"不是推荐"。
 9. **会话内浮层类方案要证明数量够了**：列表类入口不能只摆 3-4 条演示——按真实数据量摆满（本仓演示基线 8 位专家 + 通用），并给搜索/分组；截图里数得出条数。
 10. **板 HTML 常见写法（骨架照抄即可）**：`<header class="top">` 放 kick（版本/日期/未开工）+ h1 + lede + badges → 01 看它到底改了什么（前后两列）→ 02 两种世界/差异表 → 03 明确不做清单 → 04 可点问题清单（`#q0..#qN` 锚点 + 卡片）→ 05 逐题（每题：`.qsub` 导读 + 每案 `.opt`/`.oth`+`.tag`+`.why`+`.risk` + 该案截图）→ 06 执行流程（STEP，每步带验法）→ 07 工程拆解表 → 08 参照仓对照表 → 09 本仓源码依据 → 10 修订记录 → `<footer>` 回执串。图一律 `<a class="shot" href="assets-…/x.png" target="_blank"><img …></a>`（可点开原图），图注写"编号 · 名称｜差在哪"。
-11. **出板门禁（每次必跑，脚本留 `.workshop/tmp/`）**：1440 与 390 双档 `scrollWidth == innerWidth`、逐元素 right 扫描 `bad=[]`、`#q0..#qN` + `#qlist` 锚点全存在、所有 `<img>` `naturalWidth>0`、`pageerror`/console error 为空；再对改动节做分区截图，**模型原生 Read 读图**过一遍。门禁全绿后才双写（`.workshop/plans/` + 会话 viz 目录），两边 `md5` 必须一致；旧板顶部加"已被 vX 取代"横幅，只留档不收新回执。
+11. **出板门禁（每次必跑，脚本留 `.workshop/tmp/`）**：1440 与 390 双档 `scrollWidth == innerWidth`、逐元素 right 扫描 `bad=[]`、`#q0..#qN` + `#qlist` 锚点全存在、所有 `<img>` `naturalWidth>0`、`pageerror`/console error 为空；再对改动节做分区截图，**模型原生 Read 读图**过一遍。门禁全绿后才发板；文件**只落 `.workshop/plans/`**（不写会话 viz 目录、不做双写、不校 md5 副本）；旧板顶部加"已被 vX 取代"横幅，只留档不收新回执。
+12. **流程图必须用真图形库画，不许用文字节点凑（2026-11-19 用户加规）**：本地已装 `drawio-skill`（另有 mermaid 可用）；每批证据节的执行流程图、调用链图一律导出 SVG 嵌板（`<img>` 指向 `.workshop/plans/assets-*/x.svg`），画完**原生 Read 打开 SVG/PNG 目检**一遍；用 `<div class="fnode">` 堆箭头只算草稿，不算交付。
 
 **前端修复全流程可见（三步缺一不可，收口硬门禁）：**
-①拍板/计划阶段给修复前后**模拟 UI** 对比 → ②动手前先截**真机修复前**截图存 `.workshop/evidence/` → ③修完截**真机修复后**截图，出**前后对比 HTML**（双写 plans+viz）+ 人话描述改了什么。**修复收口 checklist 必含「对比页已出」一项**——2026-10-27 五审批漏过对比页被用户点名补拍，教训在案；纯后端修复无界面变化的，以单测/活体断言锚点在对比页中说明。
+①拍板/计划阶段给修复前后**模拟 UI** 对比 → ②动手前先截**真机修复前**截图存 `.workshop/evidence/` → ③修完截**真机修复后**截图，出**前后对比 HTML**（落 `.workshop/plans/`）+ 人话描述改了什么。**修复收口 checklist 必含「对比页已出」一项**——2026-10-27 五审批漏过对比页被用户点名补拍，教训在案；纯后端修复无界面变化的，以单测/活体断言锚点在对比页中说明。
 
 **踩坑登记与防再犯：**
 - 每个坑（遗漏/假绿灯/静默失败/文档停更）登记人话日志「坑位」节，必须写**机制级防法**（硬门禁/断言/checklist 项），不接受"下次小心"。
@@ -328,7 +329,8 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 调试系统性问题 | `systematic-debugging` `verification-before-completion` | 先复现再修；完成前逐条验证不靠感觉 |
 | 计划与执行 | `writing-plans` `executing-plans` `planning-with-files-zh` | 批次计划/跨会话续作时用 |
 | 截图还原成代码 | `image-to-code` | 拿设计稿/竞品截图还原页面 |
-| 会话内可视化 | `visualize` | 出 HTML 可视化卡片（对比页/示意图），配合双写归档 |
+| 会话内可视化 | `visualize` | 出 HTML 可视化卡片（对比页/示意图），落 `.workshop/plans/` |
+| ★ 画真流程图 / 架构图 | `drawio-skill` | 2026-11-19 用户加规：流程图必须用图形库画（drawio 导 SVG 嵌板），不许拿文字节点凑；另有 mermaid 可用 |
 | 文档协作 | `documents:docx` `doc-coauthoring` | 交付 Word 类材料 |
 | 工作流编排 | `dynamic-workflows`（先读 skill 再写脚本）`dispatching-parallel-agents` `subagent-driven-development` | 多席并行审查/跑批时用；工作流必须用户明说才开 |
 | 造轮子 | `skill-creator`（做新 skill）`mcp-builder`（做 MCP 工具） | 沉淀可复用能力时 |
