@@ -10,7 +10,7 @@ import io.agentscope.core.model.Model;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.ToolSchema;
 import com.smartdock.assistant.legacy.core.AssistantTodoSignal;
-import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.legacy.service.AssistantTitleService;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import com.smartdock.assistant.legacy.tools.TodoTools;

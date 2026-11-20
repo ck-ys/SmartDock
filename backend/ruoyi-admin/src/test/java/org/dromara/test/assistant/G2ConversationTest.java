@@ -1,9 +1,11 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.DcsAssistantMessage;
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.ConversationMetaService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -37,6 +39,12 @@ class G2ConversationTest {
 
     @Autowired
     AssistantConversationService conversationService;
+    /** 7B：会话只读（listMessages）已搬新根 query 服务 */
+    @Autowired
+    ConversationQueryService conversationQueryService;
+    /** 7B：会话元数据写（归档/恢复）已搬新根 meta 服务 */
+    @Autowired
+    ConversationMetaService conversationMetaService;
     @Autowired
     DataSource ds;
 
@@ -45,12 +53,12 @@ class G2ConversationTest {
     void archivedConversationRejectsWriteUntilRestored() {
         String thread = RUN_KEY + "-arch";
         Long conv = conversationService.ensureConversation("987311", U1, thread, "归档拒写");
-        conversationService.archiveConversation("987311", U1, conv);
+        conversationMetaService.archiveConversation("987311", U1, conv);
         ServiceException ex = assertThrows(ServiceException.class,
             () -> conversationService.ensureConversation("987311", U1, thread, "归档拒写"),
             "归档会话发消息必须 403");
         assertEquals(403, ex.getCode());
-        conversationService.restoreConversation("987311", U1, conv);
+        conversationMetaService.restoreConversation("987311", U1, conv);
         assertEquals(conv, conversationService.ensureConversation("987311", U1, thread, "归档拒写"),
             "恢复后同会话放行");
     }
@@ -92,7 +100,7 @@ class G2ConversationTest {
         conversationService.appendUserMessage("987311", conv, U1, "请联系13800138000");
         conversationService.appendAssistantMessage("987311", conv, U1,
             "好的，已记录你的号码13800138000与邮箱 wang@x.com", null, "stop");
-        List<DcsAssistantMessage> msgs = conversationService.listMessages("987311", U1, conv, 10, 0);
+        List<DcsAssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
         assertEquals(2, msgs.size(), "一问一答两行");
         assertEquals("user", msgs.get(0).getRole());
         assertTrue(msgs.get(0).getContent().contains("13800138000"), "user 侧=X-08 明文例外通道");
@@ -101,7 +109,7 @@ class G2ConversationTest {
         assertTrue(msgs.get(1).getContent().contains("w**@"), "邮箱脱敏形态 a**@域");
         // 异主读消息 → 403
         assertThrows(ServiceException.class,
-            () -> conversationService.listMessages("987311", U2, conv, 10, 0));
+            () -> conversationQueryService.listMessages("987311", U2, conv, 10, 0));
     }
 
     @Test
@@ -135,7 +143,7 @@ class G2ConversationTest {
         assertEquals(409, ex.getCode());
         assertTrue(ex.getMessage().contains("重复请求"), "话术指导用户刷新或重发: " + ex.getMessage());
         DcsAssistantConversation conv = conversationService.conversationByThread("987311", thread);
-        List<DcsAssistantMessage> msgs = conversationService.listMessages("987311", U1, conv.getId(), 10, 0);
+        List<DcsAssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv.getId(), 10, 0);
         assertEquals(1, msgs.size(), "user 消息仍只一行(拒绝不含双落): " + msgs.size());
     }
 
@@ -155,7 +163,7 @@ class G2ConversationTest {
         assertEquals(0L, oldMsg, "91 天消息已删");
         Long oldConv = query("SELECT COUNT(*) FROM dcs_assistant_conversation WHERE thread_id='" + RUN_KEY + "-dead'");
         assertEquals(0L, oldConv, "181 天会话已删");
-        List<DcsAssistantMessage> fresh = conversationService.listMessages("987311", U1, conv, 10, 0);
+        List<DcsAssistantMessage> fresh = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
         assertTrue(fresh.stream().anyMatch(m -> "新消息(90 天内保留)".equals(m.getContent())), "90 天内消息保留");
         // 幂等：再跑一遍无异常无残留
         conversationService.retentionSweep(100);

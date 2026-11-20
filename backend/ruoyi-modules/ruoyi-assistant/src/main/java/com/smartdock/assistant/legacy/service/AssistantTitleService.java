@@ -9,7 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.infrastructure.BillingModelDecorator;
 import com.smartdock.assistant.infrastructure.AssistantModelFactory;
-import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.security.AssistantPiiModelDecorator;
 import com.smartdock.domain.DcsAiConfig;

@@ -1,16 +1,16 @@
 package com.smartdock.assistant.legacy.service;
 
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.DcsAssistantMessage;
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
 import com.smartdock.assistant.legacy.mapper.AssistantActionMapper;
-import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
-import com.smartdock.assistant.legacy.mapper.AssistantMessageMapper;
+import com.smartdock.assistant.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.mapper.AssistantMessageMapper;
 import com.smartdock.assistant.legacy.mapper.AssistantRunMapper;
+import com.smartdock.assistant.query.ConversationQueryService;
 import com.smartdock.assistant.support.AssistantPiiFilter;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
@@ -50,6 +50,9 @@ public class AssistantConversationService {
     private final JdbcTemplate jdbcTemplate;
     /** 多实例批 3：run 登记时写入归属实例，收割时据此判断“别人的活别碰” */
     private final com.smartdock.assistant.legacy.core.AssistantInstanceContext instanceContext;
+    /** 7B Q6 ★：conversationByThread 留 4 行转发壳——实现已搬新根 query 服务，
+     *  9 处外部调用（状态 2 / 计划追问 3 / 压缩 1 / 解析 1 / recorder 2）本批不动，7C 再收口 */
+    private final ConversationQueryService conversationQueryService;
 
     /**
      * thread 归属首绑（G4 Ownership 处置链）：返回会话 id。
@@ -306,8 +309,10 @@ public class AssistantConversationService {
         return row;
     }
 
+    /** 按 thread 取会话（自动化通知深链等 9 处外部调用的入口；实现已搬 7B 新根
+     *  {@link ConversationQueryService}，本壳留到 7C 统一改指向后删除） */
     public DcsAssistantConversation conversationByThread(String tenantId, String threadId) {
-        return conversationMapper.selectByThread(tenantId, threadId);
+        return conversationQueryService.conversationByThread(tenantId, threadId);
     }
 
     /**
@@ -441,123 +446,6 @@ public class AssistantConversationService {
             log.warn("[AssistantTodo] 清单解析失败(按空处理): {}", e.getMessage());
             return List.of();
         }
-    }
-
-    /** 会话列表（180 天语义由清理 job 保证；前端 E2 数据源）。
-     *  status 口径（批H P1-1）：ACTIVE=默认只列活跃（抽屉/悬浮球兼容）；ARCHIVED=只列归档
-     *  （归档折叠条）；ALL=两者都列（会话页本地分组）。del_flag 兜底过滤（本表清理以物理删
-     *  为主，软删行不出现）。 */
-    public List<DcsAssistantConversation> listConversations(String tenantId, Long userId, int limit, int offset, String status) {
-        return conversationMapper.selectList(conversationQuery(tenantId, userId, status)
-            // id 决胜（AU-19）：last_message_time 并列（PG DESC NULLS FIRST + 同秒多行）时
-            // 排序不稳定，跨页会漂移——前端「加载更多」按页追加会漏行/重行
-            .orderByDesc(DcsAssistantConversation::getLastMessageTime)
-            .orderByDesc(DcsAssistantConversation::getId)
-            .last("LIMIT " + limit + " OFFSET " + offset));
-    }
-
-    /** 会话总数（列表分页 total 真值；dsflash P2-6 修——恒 rows.size() 会让翻页失真） */
-    public long countConversations(String tenantId, Long userId, String status) {
-        Long n = conversationMapper.selectCount(conversationQuery(tenantId, userId, status));
-        return n == null ? 0 : n;
-    }
-
-    /**
-     * 会话列表回填 running 标志（业务批4 Q4，2026-10-12）：按 run 表该用户当前
-     * RUNNING 的 thread 集合标"生成中"——刷新/重开后侧栏与列表仍能识别在途轮。
-     * 无 RUNNING 行时一行都不改（保持 null，前端按 false 渲染）。
-     */
-    public void markRunning(List<DcsAssistantConversation> rows, String tenantId, Long userId) {
-        if (rows == null || rows.isEmpty()) {
-            return;
-        }
-        List<String> runningThreads = runMapper.selectRunningThreadIds(tenantId, userId);
-        if (runningThreads.isEmpty()) {
-            return;
-        }
-        java.util.Set<String> set = new java.util.HashSet<>(runningThreads);
-        for (DcsAssistantConversation row : rows) {
-            row.setRunning(set.contains(row.getThreadId()));
-        }
-    }
-
-    private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsAssistantConversation>
-            conversationQuery(String tenantId, Long userId, String status) {
-        String safe = status == null ? "ACTIVE" : status.toUpperCase();
-        com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsAssistantConversation> q =
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsAssistantConversation>()
-                .eq(DcsAssistantConversation::getTenantId, tenantId)
-                .eq(DcsAssistantConversation::getUserId, userId)
-                .eq(DcsAssistantConversation::getDelFlag, "0");
-        if (!"ALL".equals(safe)) {
-            // ALL 之外一律按单值精确过滤（含非法值兜底 ACTIVE，controller 侧已 clamp）
-            q.eq(DcsAssistantConversation::getStatus, "ARCHIVED".equals(safe) ? "ARCHIVED" : "ACTIVE");
-        }
-        return q;
-    }
-
-    /** 历史消息（本人会话；E2 会话重建/独立会话页数据源） */
-    public List<DcsAssistantMessage> listMessages(String tenantId, Long userId, Long conversationId,
-                                                  int limit, int offset) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
-        if (conv == null) {
-            throw new ServiceException("会话不存在或无权访问", 403);
-        }
-        return messageMapper.selectPageOwned(tenantId, conversationId, userId, limit, offset);
-    }
-
-    /** 尾页消息（最新 N 条，返回前反转回时间序）。批A 二审 P1：压缩后的历史重载/长会话
-     *  打开必须取尾部——ASC 首页在 >100 条会话上会把最新回答与压缩分隔条截掉 */
-    public List<DcsAssistantMessage> listMessagesTail(String tenantId, Long userId, Long conversationId,
-                                                       int limit) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
-        if (conv == null) {
-            throw new ServiceException("会话不存在或无权访问", 403);
-        }
-        List<DcsAssistantMessage> rows =
-            new java.util.ArrayList<>(messageMapper.selectPageOwnedDesc(tenantId, conversationId, userId, limit));
-        java.util.Collections.reverse(rows);
-        return rows;
-    }
-
-    /** 本人归档会话（软通道：status=ARCHIVED） */
-    public void archiveConversation(String tenantId, Long userId, Long conversationId) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
-        if (conv == null) {
-            throw new ServiceException("会话不存在或无权访问", 403);
-        }
-        conversationMapper.update(null, new LambdaUpdateWrapper<DcsAssistantConversation>()
-            .eq(DcsAssistantConversation::getTenantId, tenantId)
-            .eq(DcsAssistantConversation::getId, conversationId)
-            .set(DcsAssistantConversation::getStatus, "ARCHIVED"));
-    }
-
-    /** 本人重命名会话（批D P2-7：PATCH title；title 列 varchar(200) 已有，零 DDL） */
-    public void renameConversation(String tenantId, Long userId, Long conversationId, String title) {
-        String safe = title == null ? "" : title.trim();
-        if (safe.isEmpty() || safe.length() > 60) {
-            throw new ServiceException("标题须为 1-60 个字符", 400);
-        }
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
-        if (conv == null) {
-            throw new ServiceException("会话不存在或无权访问", 403);
-        }
-        conversationMapper.update(null, new LambdaUpdateWrapper<DcsAssistantConversation>()
-            .eq(DcsAssistantConversation::getTenantId, tenantId)
-            .eq(DcsAssistantConversation::getId, conversationId)
-            .set(DcsAssistantConversation::getTitle, safe));
-    }
-
-    /** 恢复已归档会话（批D：status=ARCHIVED→ACTIVE） */
-    public void restoreConversation(String tenantId, Long userId, Long conversationId) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
-        if (conv == null) {
-            throw new ServiceException("会话不存在或无权访问", 403);
-        }
-        conversationMapper.update(null, new LambdaUpdateWrapper<DcsAssistantConversation>()
-            .eq(DcsAssistantConversation::getTenantId, tenantId)
-            .eq(DcsAssistantConversation::getId, conversationId)
-            .set(DcsAssistantConversation::getStatus, "ACTIVE"));
     }
 
     /**

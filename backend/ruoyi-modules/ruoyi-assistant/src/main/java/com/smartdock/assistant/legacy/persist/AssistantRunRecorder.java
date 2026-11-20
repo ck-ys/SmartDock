@@ -8,7 +8,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.core.AssistantRunContext;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.support.AssistantPiiFilter;

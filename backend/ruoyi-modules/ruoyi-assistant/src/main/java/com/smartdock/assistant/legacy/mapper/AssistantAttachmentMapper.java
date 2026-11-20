@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * 助手会话附件 Mapper（ATTACH-1，2026-10-07）。显式租户谓词红线同
- * {@link AssistantConversationMapper}（@InterceptorIgnore + SQL 显式 tenant_id）。
+ * {@code AssistantConversationMapper}（@InterceptorIgnore + SQL 显式 tenant_id）。
  */
 @InterceptorIgnore(tenantLine = "true")
 public interface AssistantAttachmentMapper extends BaseMapper<DcsAssistantAttachment> {

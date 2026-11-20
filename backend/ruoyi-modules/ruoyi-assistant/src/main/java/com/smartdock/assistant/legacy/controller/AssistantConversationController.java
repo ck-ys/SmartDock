@@ -8,10 +8,12 @@ import io.agentscope.core.agui.event.AguiEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.domain.DcsAssistantAction;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.DcsAssistantMessage;
 import com.smartdock.assistant.legacy.service.AssistantActionService;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.ConversationMetaService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -75,6 +77,10 @@ public class AssistantConversationController extends BaseController {
     private final com.smartdock.assistant.service.AssistantUserQuotaService quotaLookup;
     /** 2026-11-17 结构治理批 Q5：attach 的「能不能续、拿哪条流」下沉到 Service，SSE 生命周期留本类 */
     private final ConversationResumeService resumeService;
+    /** 7B Q2 ★：会话/消息只读查询（列表 / 按 thread / 历史消息） */
+    private final ConversationQueryService conversationQueryService;
+    /** 7B Q2 ★：会话元数据写（归档 / 重命名 / 恢复） */
+    private final ConversationMetaService conversationMetaService;
 
     /** 退款口径（三审回修 dspro-P2-1）：credits 订阅租户建侧 tryTurn 本就跳过，退回合须同口径
      *  跳过（同 AssistantRunRecorder#refundIfWallet）；查不到模式按钱包口径退（fail-open）。 */
@@ -172,12 +178,12 @@ public class AssistantConversationController extends BaseController {
         int safePage = Math.max(1, pageNum);
         int safeSize = Math.min(Math.max(1, pageSize), 100);
         String safeStatus = clampStatus(status);
-        List<DcsAssistantConversation> rows = conversationService.listConversations(
+        List<DcsAssistantConversation> rows = conversationQueryService.listConversations(
             TenantHelper.getTenantId(), LoginHelper.getUserId(), safeSize, (safePage - 1) * safeSize, safeStatus);
         // 业务批4 Q4：回填 running（在途轮的会话刷新后仍标"生成中"）
-        conversationService.markRunning(rows, TenantHelper.getTenantId(), LoginHelper.getUserId());
+        conversationQueryService.markRunning(rows, TenantHelper.getTenantId(), LoginHelper.getUserId());
         TableDataInfo<DcsAssistantConversation> data = TableDataInfo.build(rows);
-        data.setTotal(conversationService.countConversations(
+        data.setTotal(conversationQueryService.countConversations(
             TenantHelper.getTenantId(), LoginHelper.getUserId(), safeStatus));
         return data;
     }
@@ -186,12 +192,10 @@ public class AssistantConversationController extends BaseController {
     @SaCheckPermission("dcs:assistant:use")
     @GetMapping("/conversation/by-thread")
     public R<DcsAssistantConversation> byThread(@RequestParam String threadId) {
-        DcsAssistantConversation row = conversationService.conversationByThread(
-            TenantHelper.getTenantId(), threadId);
-        if (row == null || !LoginHelper.getUserId().equals(row.getUserId())) {
-            return R.fail("会话不存在或已清理");
-        }
-        return R.ok(row);
+        // 7B：归属判定下沉（不存在与异主同判 null，防探测）；本类只留响应文案
+        DcsAssistantConversation row = conversationQueryService.conversationByThreadOwned(
+            TenantHelper.getTenantId(), LoginHelper.getUserId(), threadId);
+        return row == null ? R.fail("会话不存在或已清理") : R.ok(row);
     }
 
     /** status 合法值收敛（批H P1-1）：ACTIVE/ARCHIVED/ALL 之外的输入一律按 ACTIVE */
@@ -250,8 +254,8 @@ public class AssistantConversationController extends BaseController {
         int safePage = Math.max(1, pageNum);
         // 批A 二审 P1：tail=true 取最新 N 条（压缩重载/长会话打开——ASC 首页会截掉最新回答）
         return R.ok(tail
-            ? conversationService.listMessagesTail(TenantHelper.getTenantId(), LoginHelper.getUserId(), id, safeLimit)
-            : conversationService.listMessages(TenantHelper.getTenantId(),
+            ? conversationQueryService.listMessagesTail(TenantHelper.getTenantId(), LoginHelper.getUserId(), id, safeLimit)
+            : conversationQueryService.listMessages(TenantHelper.getTenantId(),
                 LoginHelper.getUserId(), id, safeLimit, (safePage - 1) * safeLimit));
     }
 
@@ -260,7 +264,7 @@ public class AssistantConversationController extends BaseController {
     @Log(title = "AI助手-归档会话", businessType = BusinessType.DELETE)
     @PostMapping("/conversation/{id}")
     public R<Void> archive(@PathVariable Long id) {
-        conversationService.archiveConversation(TenantHelper.getTenantId(), LoginHelper.getUserId(), id);
+        conversationMetaService.archiveConversation(TenantHelper.getTenantId(), LoginHelper.getUserId(), id);
         return R.ok();
     }
 
@@ -498,7 +502,7 @@ public class AssistantConversationController extends BaseController {
     @Log(title = "AI助手-重命名会话", businessType = BusinessType.UPDATE)
     @PostMapping("/conversation/{id}/title")
     public R<Void> rename(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        conversationService.renameConversation(TenantHelper.getTenantId(), LoginHelper.getUserId(), id, body.get("title"));
+        conversationMetaService.renameConversation(TenantHelper.getTenantId(), LoginHelper.getUserId(), id, body.get("title"));
         return R.ok();
     }
 
@@ -507,7 +511,7 @@ public class AssistantConversationController extends BaseController {
     @Log(title = "AI助手-恢复会话", businessType = BusinessType.UPDATE)
     @PostMapping("/conversation/{id}/restore")
     public R<Void> restore(@PathVariable Long id) {
-        conversationService.restoreConversation(TenantHelper.getTenantId(), LoginHelper.getUserId(), id);
+        conversationMetaService.restoreConversation(TenantHelper.getTenantId(), LoginHelper.getUserId(), id);
         return R.ok();
     }
 

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartdock.assistant.domain.model.DcsAssistantMemory;
 import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
 import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
-import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.legacy.service.AssistantMemoryTurnService;
 import com.smartdock.assistant.legacy.tools.MemoryTools;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;

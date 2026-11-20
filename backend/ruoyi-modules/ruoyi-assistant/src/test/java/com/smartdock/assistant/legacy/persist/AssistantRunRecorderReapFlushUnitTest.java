@@ -219,8 +219,8 @@ class AssistantRunRecorderReapFlushUnitTest {
         org.mockito.Mockito.lenient().when(piiFilter.mask(anyString(), anyString()))
             .thenAnswer(inv -> inv.getArgument(0));
         when(conversationService.runByRunId("run-6")).thenReturn(run("000000", 42L, "th-6"));
-        com.smartdock.assistant.legacy.domain.DcsAssistantConversation conv =
-            new com.smartdock.assistant.legacy.domain.DcsAssistantConversation();
+        com.smartdock.assistant.domain.model.DcsAssistantConversation conv =
+            new com.smartdock.assistant.domain.model.DcsAssistantConversation();
         conv.setId(66L);
         when(conversationService.conversationByThread("000000", "th-6")).thenReturn(conv);
 

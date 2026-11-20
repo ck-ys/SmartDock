@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -7,10 +7,16 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+
+import java.util.List;
 
 /**
- * 助手会话 Mapper（批G G2）。显式租户谓词红线同 {@link AssistantConfigMapper}。
+ * 助手会话 Mapper（批G G2）。显式租户谓词红线同 {@code AssistantConfigMapper}。
+ *
+ * <p>本接口 2026-11-20 由 legacy.mapper 原样迁入（批 7 · 7B，Q2 ★ 按用途三分）：新根
+ * query / meta 服务直接用它，规则 8 禁止新根 service/query import legacy。legacy 侧
+ * 各服务改为 import 本接口（legacy→新根是合法方向）。</p>
  */
 @InterceptorIgnore(tenantLine = "true")
 public interface AssistantConversationMapper extends BaseMapper<DcsAssistantConversation> {
@@ -60,5 +66,5 @@ public interface AssistantConversationMapper extends BaseMapper<DcsAssistantConv
     /** 080/ISSUE-R13-3 修配套：清人前取该用户全部 thread（含已归档/软删行——悬挂缓存
      *  按_thread_键驻留，与行可见性无关）；purgeUser 删行后据此逐 thread 清内存缓存 */
     @Select("SELECT thread_id FROM dcs_assistant_conversation WHERE tenant_id=#{tenantId} AND user_id=#{userId}")
-    java.util.List<String> threadIdsOfUser(@Param("tenantId") String tenantId, @Param("userId") Long userId);
+    List<String> threadIdsOfUser(@Param("tenantId") String tenantId, @Param("userId") Long userId);
 }

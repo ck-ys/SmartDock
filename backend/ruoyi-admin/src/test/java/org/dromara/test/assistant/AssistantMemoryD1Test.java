@@ -2,7 +2,7 @@ package org.dromara.test.assistant;
 
 import com.smartdock.assistant.domain.model.DcsAssistantMemory;
 import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
-import com.smartdock.assistant.legacy.mapper.AssistantConversationMapper;
+import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.legacy.service.AssistantMemoryTurnService;
 import com.smartdock.assistant.mapper.AssistantMemoryMapper;
 import com.smartdock.assistant.mapper.AssistantMemoryPrefMapper;

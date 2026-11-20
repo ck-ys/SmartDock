@@ -1,8 +1,8 @@
 package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.MessageOwnershipGateway;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMessage;
-import com.smartdock.assistant.legacy.mapper.AssistantMessageMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.mapper.AssistantMessageMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

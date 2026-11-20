@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.domain;
+package com.smartdock.assistant.domain.model;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -14,6 +14,9 @@ import java.util.Date;
  *
  * <p>X-08 明文例外矩阵：本人会话原文通道允许明文（assistant 侧落库前经 PII 脱敏），
  * 保留 90 天（Q4）自动删；end_reason 让中断与未持久化可判（X-11）。</p>
+ *
+ * <p>本类 2026-11-20 由 legacy.domain 原样迁入（批 7 · 7B，Q2 ★ 按用途三分）：同
+ * {@link DcsAssistantConversation}——新根 query 服务要读消息行，规则 8 禁止它 import legacy。</p>
  */
 @Data
 @TableName("dcs_assistant_message")

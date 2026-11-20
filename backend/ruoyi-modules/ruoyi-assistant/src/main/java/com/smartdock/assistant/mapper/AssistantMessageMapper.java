@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -7,10 +7,15 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+
+import java.util.List;
 
 /**
  * 助手对话原文 Mapper（批G G2）。保留期 90 天；purge 一条龙成员之一。
+ *
+ * <p>本接口 2026-11-20 由 legacy.mapper 原样迁入（批 7 · 7B，Q2 ★ 按用途三分）：同
+ * {@link AssistantConversationMapper}——新根 query 服务直接用它，legacy 侧改为 import 本接口。</p>
  */
 @InterceptorIgnore(tenantLine = "true")
 public interface AssistantMessageMapper extends BaseMapper<DcsAssistantMessage> {
@@ -18,7 +23,7 @@ public interface AssistantMessageMapper extends BaseMapper<DcsAssistantMessage> 
     /** 历史消息分页读取（本人会话；id 升序=时间序） */
     @Select("SELECT * FROM dcs_assistant_message WHERE tenant_id=#{tenantId} AND conversation_id=#{conversationId}"
         + " AND user_id=#{userId} ORDER BY id ASC LIMIT #{limit} OFFSET #{offset}")
-    java.util.List<DcsAssistantMessage> selectPageOwned(@Param("tenantId") String tenantId,
+    List<DcsAssistantMessage> selectPageOwned(@Param("tenantId") String tenantId,
         @Param("conversationId") Long conversationId, @Param("userId") Long userId,
         @Param("limit") int limit, @Param("offset") int offset);
 
@@ -26,7 +31,7 @@ public interface AssistantMessageMapper extends BaseMapper<DcsAssistantMessage> 
      *  >100 条长会话上会把「最新回答+压缩分隔条」截掉——压缩后的历史重载必须取尾部 */
     @Select("SELECT * FROM dcs_assistant_message WHERE tenant_id=#{tenantId} AND conversation_id=#{conversationId}"
         + " AND user_id=#{userId} ORDER BY id DESC LIMIT #{limit}")
-    java.util.List<DcsAssistantMessage> selectPageOwnedDesc(@Param("tenantId") String tenantId,
+    List<DcsAssistantMessage> selectPageOwnedDesc(@Param("tenantId") String tenantId,
         @Param("conversationId") Long conversationId, @Param("userId") Long userId,
         @Param("limit") int limit);
 

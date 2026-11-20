@@ -2,6 +2,7 @@ package org.dromara.test.assistant;
 
 import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.query.ConversationQueryService;
 import com.smartdock.assistant.service.AssistantFeedbackService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
@@ -31,12 +32,15 @@ class G6FeedbackTest {
     AssistantFeedbackService feedbackService;
     @Autowired
     AssistantConversationService conversationService;
+    /** 7B：会话只读（listMessages）已搬新根 query 服务 */
+    @Autowired
+    ConversationQueryService conversationQueryService;
 
     @Test
     void submitRateAndList() {
         Long conv = conversationService.ensureConversation("987311", U1, RUN_KEY + "-t", "反馈");
         conversationService.appendUserMessage("987311", conv, U1, "这条回答不错");
-        Long messageId = conversationService.listMessages("987311", U1, conv, 10, 0).get(0).getId();
+        Long messageId = conversationQueryService.listMessages("987311", U1, conv, 10, 0).get(0).getId();
 
         feedbackService.submit("987311", U1, messageId, "UP", null);
         feedbackService.submit("987311", U1, null, "DOWN", "第二条整会话差评");
@@ -52,7 +56,7 @@ class G6FeedbackTest {
     void foreignMessageRejected() {
         Long conv = conversationService.ensureConversation("987311", U1, RUN_KEY + "-t2", "归属");
         conversationService.appendUserMessage("987311", conv, U1, "别人的消息");
-        Long messageId = conversationService.listMessages("987311", U1, conv, 10, 0).get(0).getId();
+        Long messageId = conversationQueryService.listMessages("987311", U1, conv, 10, 0).get(0).getId();
         ServiceException ex = assertThrows(ServiceException.class,
             () -> feedbackService.submit("987311", U2, messageId, "UP", null),
             "评他人消息必须 403");
@@ -70,7 +74,7 @@ class G6FeedbackTest {
     void duplicateSubmitWithinWindowDeduped() {
         Long conv = conversationService.ensureConversation("987311", U1, RUN_KEY + "-t3", "幂等");
         conversationService.appendUserMessage("987311", conv, U1, "连点测试");
-        Long messageId = conversationService.listMessages("987311", U1, conv, 10, 0).get(0).getId();
+        Long messageId = conversationQueryService.listMessages("987311", U1, conv, 10, 0).get(0).getId();
 
         feedbackService.submit("987311", U1, messageId, "DOWN", "答非所问");
         feedbackService.submit("987311", U1, messageId, "DOWN", "答非所问");

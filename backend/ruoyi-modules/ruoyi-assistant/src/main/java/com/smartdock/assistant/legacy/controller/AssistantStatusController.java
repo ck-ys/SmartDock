@@ -9,6 +9,7 @@ import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
 import com.smartdock.assistant.query.AssistantStatusContextService;
 import com.smartdock.assistant.service.AssistantSkillVisibilityService;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.log.annotation.Log;
@@ -214,7 +215,7 @@ public class AssistantStatusController extends BaseController {
         // 才返回聚合——防拿他人/他租户 threadId 读走会话指标；非本人时前端显示「刚开了头」
         if (threadId != null && !threadId.isBlank()) {
             try {
-                com.smartdock.assistant.legacy.domain.DcsAssistantConversation conv =
+                DcsAssistantConversation conv =
                     conversationService.conversationByThread(tenantId, threadId);
                 if (conv != null && userId.equals(conv.getUserId())) {
                     com.smartdock.assistant.legacy.core.AssistantCacheHitHolder.Aggregate agg =
@@ -275,7 +276,7 @@ public class AssistantStatusController extends BaseController {
             return null;
         }
         try {
-            com.smartdock.assistant.legacy.domain.DcsAssistantConversation conv =
+            DcsAssistantConversation conv =
                 conversationService.conversationByThread(tenantId, threadId);
             if (conv == null) {
                 return null;

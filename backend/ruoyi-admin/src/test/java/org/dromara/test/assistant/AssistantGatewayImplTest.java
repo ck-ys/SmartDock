@@ -6,10 +6,11 @@ import com.smartdock.assistant.infrastructure.ConversationReadGatewayImpl;
 import com.smartdock.assistant.infrastructure.PromptCatalogGatewayImpl;
 import com.smartdock.assistant.legacy.core.DateInjectModelDecorator;
 import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
-import com.smartdock.assistant.legacy.domain.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.DcsAssistantMessage;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.query.ConversationQueryService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -47,14 +48,15 @@ class AssistantGatewayImplTest {
 
     @Test
     void 会话投影只带id与归属人_不存在返回null() {
-        AssistantConversationService svc = mock(AssistantConversationService.class);
+        ConversationQueryService query = mock(ConversationQueryService.class);
         DcsAssistantConversation row = new DcsAssistantConversation();
         row.setId(CONV_ID);
         row.setUserId(USER_ID);
-        when(svc.conversationByThread(TENANT, "t-1")).thenReturn(row);
-        when(svc.conversationByThread(TENANT, "t-404")).thenReturn(null);
+        when(query.conversationByThread(TENANT, "t-1")).thenReturn(row);
+        when(query.conversationByThread(TENANT, "t-404")).thenReturn(null);
 
-        ConversationReadGateway gw = new ConversationReadGatewayImpl(svc);
+        // 7B：会话只读两条链走新根 query 服务；legacy 服务只剩 latestContextTokens
+        ConversationReadGateway gw = new ConversationReadGatewayImpl(query, mock(AssistantConversationService.class));
         ConversationReadGateway.ConversationRef ref = gw.conversationByThread(TENANT, "t-1");
         assertEquals(CONV_ID, ref.id());
         assertEquals(USER_ID, ref.userId());
@@ -63,7 +65,7 @@ class AssistantGatewayImplTest {
 
     @Test
     void 消息投影保留角色正文与工具步骤且顺序不变() {
-        AssistantConversationService svc = mock(AssistantConversationService.class);
+        ConversationQueryService query = mock(ConversationQueryService.class);
         DcsAssistantMessage a = new DcsAssistantMessage();
         a.setRole("user");
         a.setContent("hello");
@@ -71,9 +73,9 @@ class AssistantGatewayImplTest {
         b.setRole("assistant");
         b.setContent("hi");
         b.setToolSteps("{\"tool\":\"x\"}");
-        when(svc.listMessagesTail(TENANT, USER_ID, CONV_ID, 500)).thenReturn(List.of(a, b));
+        when(query.listMessagesTail(TENANT, USER_ID, CONV_ID, 500)).thenReturn(List.of(a, b));
 
-        ConversationReadGateway gw = new ConversationReadGatewayImpl(svc);
+        ConversationReadGateway gw = new ConversationReadGatewayImpl(query, mock(AssistantConversationService.class));
         List<ConversationReadGateway.MessageRef> out = gw.listMessagesTail(TENANT, USER_ID, CONV_ID, 500);
         assertEquals(2, out.size());
         assertEquals("user", out.get(0).role());
@@ -88,7 +90,8 @@ class AssistantGatewayImplTest {
     void 末次tokens原样透传() {
         AssistantConversationService svc = mock(AssistantConversationService.class);
         when(svc.latestContextTokens(TENANT, USER_ID, CONV_ID)).thenReturn(23260L);
-        assertEquals(23260L, new ConversationReadGatewayImpl(svc).latestContextTokens(TENANT, USER_ID, CONV_ID));
+        assertEquals(23260L,
+            new ConversationReadGatewayImpl(mock(ConversationQueryService.class), svc).latestContextTokens(TENANT, USER_ID, CONV_ID));
     }
 
     // ------------------------------------------------------------------

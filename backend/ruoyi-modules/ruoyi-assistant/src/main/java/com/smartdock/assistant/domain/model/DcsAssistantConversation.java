@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.domain;
+package com.smartdock.assistant.domain.model;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -14,6 +14,9 @@ import java.util.Date;
  *
  * <p>thread 归属首绑载体：(tenant_id, thread_id) 唯一——同一 thread 第二个用户来访即 403
  * （OwnershipResolver 处置链的数据源）。保留 180 天（Q9），清理 job=AssistantRetentionJob。</p>
+ *
+ * <p>本类 2026-11-20 由 legacy.domain 原样迁入（批 7 · 7B，Q2 ★ 按用途三分）：新根
+ * query / meta 服务要读会话行，规则 8 禁止新根 service/query import legacy，实体必须先出 legacy。</p>
  */
 @Data
 @TableName("dcs_assistant_conversation")

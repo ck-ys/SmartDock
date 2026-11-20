@@ -19,7 +19,7 @@ import io.agentscope.harness.agent.memory.compaction.TokenCounterUtil;
 import io.agentscope.harness.agent.middleware.CompactionMiddleware;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import reactor.core.publisher.Flux;
 
