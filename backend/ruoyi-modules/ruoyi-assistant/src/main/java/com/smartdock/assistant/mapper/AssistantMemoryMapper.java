@@ -65,10 +65,18 @@ public interface AssistantMemoryMapper extends BaseMapper<DcsAssistantMemory> {
                          @Param("memoryType") String memoryType, @Param("topicKey") String topicKey,
                          @Param("updateTime") Date updateTime);
 
-    /** 同主题覆盖留痕（题8：旧条→SUPERSEDED + 指向新条） */
+    /**
+     * 同主题覆盖留痕（题8：旧条→SUPERSEDED + 指向新条）。
+     *
+     * <p>WHERE 必须带 {@code status='ACTIVE'}（批 7 多审 P1，scratch 真库探针实证）：
+     * 并发输家的陈旧快照会把赢家已腾走/归档任务已处理的行再 UPDATE 一遍——没有这个谓词时
+     * rowCount 仍为 1，会记出假「已覆盖」并把 ARCHIVED 翻回 SUPERSEDED；带上后陈旧轮
+     * 返回 0 行，调用方据此不进 overwritten/台账。</p>
+     */
     @Update("UPDATE dcs_assistant_memory SET status='SUPERSEDED', superseded_by=#{newId},"
         + " update_by=#{userId}, update_time=#{updateTime}"
-        + " WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND id=#{id} AND del_flag='0'")
+        + " WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND id=#{id} AND del_flag='0'"
+        + " AND status='ACTIVE'")
     int supersedeOwn(@Param("tenantId") String tenantId, @Param("userId") Long userId,
                      @Param("id") Long id, @Param("newId") Long newId,
                      @Param("updateTime") Date updateTime);

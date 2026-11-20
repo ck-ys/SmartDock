@@ -63,8 +63,9 @@ public class MemoryTools {
                 suffix = "（已更新同主题旧记忆：旧内容进历史，可在记忆页回滚）";
             }
             out.put("message", outcome.message() + suffix);
-            // SKIP/空内容=DONE（非失败）；落库成功回填记忆行 id 作回执锚点（④撤回直读用）
-            finishAudit(auditRow, true, outcome.message(), outcome.memoryId());
+            // SKIP/空内容=DONE（非失败）；落库成功回填记忆行 id 作回执锚点（④撤回直读用）。
+            // abandoned（重试耗尽没存上，二轮席1）必须记失败——否则动作账本把未落库的保存计成成功
+            finishAudit(auditRow, !outcome.abandoned(), outcome.message(), outcome.memoryId());
             return ToolSupport.secureJson(out, identity);
         } catch (RuntimeException e) {
             finishAudit(auditRow, false, "保存失败：" + e.getMessage(), null);

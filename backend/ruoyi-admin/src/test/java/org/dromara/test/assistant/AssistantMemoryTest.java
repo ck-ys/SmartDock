@@ -61,6 +61,17 @@ class AssistantMemoryTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** 直返式假事务管理器（D1 批 7 前置）：getTransaction→提交两步直通，回调原地执行；
+     *  服务内部自建 REQUIRES_NEW 模板，测试只须给管理器 */
+    private static org.springframework.transaction.PlatformTransactionManager testTxManager() {
+        org.springframework.transaction.PlatformTransactionManager tm =
+            mock(org.springframework.transaction.PlatformTransactionManager.class);
+        org.mockito.Mockito.when(tm.getTransaction(org.mockito.ArgumentMatchers.any(
+                org.springframework.transaction.TransactionDefinition.class)))
+            .thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
+        return tm;
+    }
+
     /** 直返式假 PII 过滤器（手机号→1****，验证脱敏链路真的走；真过滤器带构造依赖走 mock） */
     private static AssistantPiiFilter fakePii() {
         AssistantPiiFilter f = mock(AssistantPiiFilter.class);
@@ -87,7 +98,8 @@ class AssistantMemoryTest {
             mock(AssistantConversationMapper.class),
             fakePii(),
             ledger,
-            svc);
+            svc,
+            testTxManager());
     }
 
     @Test
@@ -290,7 +302,8 @@ class AssistantMemoryTest {
         AssistantMemoryService svc = new AssistantMemoryService(mapper,
             mock(AssistantMemoryPrefMapper.class), strictPii());
         AssistantMemoryTurnService turn = new AssistantMemoryTurnService(mapper,
-            mock(AssistantConversationMapper.class), strictPii(), new AssistantMemoryTurnLedger(), svc);
+            mock(AssistantConversationMapper.class), strictPii(), new AssistantMemoryTurnLedger(), svc,
+            testTxManager());
 
         assertTrue(turn.save("000000", 1L, raw).startsWith("已记住"), "首存成功");
         String saved = stored.get(0).getContent();

@@ -9,6 +9,7 @@ import com.smartdock.assistant.support.AssistantMemoryFacts;
 import com.smartdock.assistant.support.AssistantPiiFilter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -98,6 +99,11 @@ public class AssistantMemoryService {
      * 先截会把跨边界的 18 位身份证切出 17 位前缀，正则认不出=明文落库）+ 空内容拒绝 + 精确去重。
      * 属主谓词在 SQL（改他人=0 行）。类型/主题键随内容在同一条 UPDATE 里重算（两段写会留下
      * 「内容新、主题旧」的中间态）。
+     *
+     * <p><b>事务红线（二轮席1 P2-6）</b>：本方法只许在<b>无外层事务</b>的调用链里用——
+     * catch 掉 DuplicateKeyException 后 PG 事务已废，若被外层 {@code @Transactional} 包住，
+     * 后续语句会 25P02、外层提交静默变回滚（{@code ProfileEventServiceImpl} 登记过的同款坑）。
+     * 未来若要收进事务方法，须改走「REQUIRES_NEW + 重试」的保存口同款姿势。</p>
      */
     public boolean edit(String tenantId, Long userId, Long id, String raw) {
         String content = raw == null ? "" : raw.trim();
@@ -121,9 +127,16 @@ public class AssistantMemoryService {
         if (memoryMapper.countByContent(tenantId, userId, content) > 0) {
             return false;
         }
-        boolean ok = memoryMapper.updateOwnContent(tenantId, userId, id, content,
-            AssistantMemoryFacts.detectType(content), AssistantMemoryFacts.topicKeyOf(content),
-            new Date()) > 0;
+        boolean ok;
+        try {
+            ok = memoryMapper.updateOwnContent(tenantId, userId, id, content,
+                AssistantMemoryFacts.detectType(content), AssistantMemoryFacts.topicKeyOf(content),
+                new Date()) > 0;
+        } catch (DuplicateKeyException e) {
+            // D1 唯一索引（批 7 前置 STEP 1）：编辑改出来的主题键与另一条生效记忆相撞——
+            // 拒绝保存而不是把 500 抛给用户；内容没变主题也没变的普通编辑不受影响
+            return false;
+        }
         if (ok) {
             evictAfterCommit(tenantId, userId);
         }

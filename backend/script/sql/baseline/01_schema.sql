@@ -488,7 +488,9 @@ CREATE TABLE public.dcs_assistant_memory_pref (
     user_id bigint NOT NULL,
     enabled character(1) DEFAULT '1'::bpchar NOT NULL,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    update_time timestamp without time zone
+    update_time timestamp without time zone,
+    CONSTRAINT pk_dcs_assistant_memory_pref PRIMARY KEY (id),
+    CONSTRAINT uk_dcs_asst_memory_pref UNIQUE (tenant_id, user_id)
 );
 
 
@@ -3260,6 +3262,27 @@ CREATE INDEX idx_dcs_asst_fb_msg ON public.dcs_assistant_feedback USING btree (t
 --
 
 CREATE INDEX idx_dcs_asst_mem_user ON public.dcs_assistant_memory USING btree (tenant_id, user_id);
+
+--
+-- Name: idx_dcs_asst_memory_user_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_asst_memory_user_status ON public.dcs_assistant_memory USING btree (tenant_id, user_id, status);
+
+
+--
+-- Name: idx_dcs_asst_memory_used; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dcs_asst_memory_used ON public.dcs_assistant_memory USING btree (status, last_used_at);
+
+
+--
+-- Name: uk_dcs_asst_memory_active_topic; Type: INDEX; Schema: public; Owner: -
+--
+
+-- D1（批 7 前置 STEP 1）：同一（租户,人,主题）只能一条生效中；topic_key 为空不受限
+CREATE UNIQUE INDEX uk_dcs_asst_memory_active_topic ON public.dcs_assistant_memory USING btree (tenant_id, user_id, topic_key) WHERE status = 'ACTIVE' AND topic_key IS NOT NULL AND del_flag = '0';
 
 
 --

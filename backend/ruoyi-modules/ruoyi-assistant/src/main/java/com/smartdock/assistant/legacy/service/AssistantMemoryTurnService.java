@@ -1,5 +1,6 @@
 package com.smartdock.assistant.legacy.service;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.smartdock.assistant.domain.model.DcsAssistantMemory;
 import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
 import com.smartdock.assistant.legacy.domain.DcsAssistantConversation;
@@ -8,9 +9,13 @@ import com.smartdock.assistant.mapper.AssistantMemoryMapper;
 import com.smartdock.assistant.service.AssistantMemoryService;
 import com.smartdock.assistant.support.AssistantMemoryFacts;
 import com.smartdock.assistant.support.AssistantPiiFilter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -26,11 +31,27 @@ import java.util.List;
  * <p>清单/编辑/开关/归档/导出/摘要等只碰记忆自有表的方法在
  * {@link AssistantMemoryService}（新根，按表归属切）。本类依赖它属于旧→新方向，
  * 门禁规则 8 只禁新→旧；保存成功后会调 {@code invalidateDigestCache} 让其立即失效缓存。</p>
+ *
+ * <p><b>D1 并发栅栏（批 7 前置 STEP 1，2026-11-20；多审回修加固）</b>：同 (租户,人,主题)
+ * 只能一条生效中，靠三件套保证——库层部分唯一索引 {@code uk_dcs_asst_memory_active_topic} +
+ * 保存口「先腾位后插入」同事务（{@link TransactionTemplate}，旧条覆盖与插入原子提交）+
+ * 撞唯一索引时重读主题清单再来一轮。{@code @Transactional} 注解挡不住这个竞态
+ * （读与写之间没有栅栏，批 6 二审已实证），所以用编程式事务 + 重试。
+ * 回合台账只在事务提交成功后补记（回滚轮不留假帧）；重试只认栅栏索引的冲突，
+ * 撞别的唯一约束原样上抛。</p>
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AssistantMemoryTurnService {
+
+    /** D1 重试上限：同主题并发保存时，输家最多重读重试这几轮；再撞就让人稍后再试 */
+    private static final int SAVE_MAX_ATTEMPTS = 3;
+
+    /**
+     * 同主题栅栏索引名（迁移 2026-11-20_memory_active_topic_unique.sql 建的）。
+     * 重试只认撞它的冲突；撞其它唯一约束（如主键）= 数据问题，原样上抛（批 7 多审 P2）。
+     */
+    private static final String TOPIC_FENCE_INDEX = "uk_dcs_asst_memory_active_topic";
 
     private final AssistantMemoryMapper memoryMapper;
     private final AssistantConversationMapper conversationMapper;
@@ -39,14 +60,42 @@ public class AssistantMemoryTurnService {
     private final AssistantMemoryTurnLedger turnLedger;
     /** 存储面（新根）：本人开关判定 + 写后缓存失效 */
     private final AssistantMemoryService memoryService;
+    /**
+     * D1：覆盖旧条 + 插入新条必须同一事务（否则唯一索引会把自己拦死/留下半截状态）。
+     * 固定 REQUIRES_NEW（批 7 多审席2/席3）：撞索引后 PG 事务已废，重试必须换新事务——
+     * 默认 REQUIRED 的共享模板在未来被外层 {@code @Transactional} 包住时会静默加入外层事务，
+     * 第一次 23505 就把外层打成 aborted，重试轮全部 25P02 失效（ProfileEventServiceImpl 同款先例）。
+     */
+    private final TransactionTemplate saveTx;
+
+    public AssistantMemoryTurnService(AssistantMemoryMapper memoryMapper,
+                                      AssistantConversationMapper conversationMapper,
+                                      AssistantPiiFilter piiFilter,
+                                      AssistantMemoryTurnLedger turnLedger,
+                                      AssistantMemoryService memoryService,
+                                      PlatformTransactionManager transactionManager) {
+        this.memoryMapper = memoryMapper;
+        this.conversationMapper = conversationMapper;
+        this.piiFilter = piiFilter;
+        this.turnLedger = turnLedger;
+        this.memoryService = memoryService;
+        this.saveTx = new TransactionTemplate(transactionManager);
+        this.saveTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
 
     /**
-     * 落库结果（三批③，2026-11-01；题8 扩）：message=人话结果；memoryId=落库行 id；
-     * overwritten=本次被同主题覆盖的旧条内容（无覆盖为空列表，供会话内「记忆已更新」卡）。
+     * 落库结果（三批③，2026-11-01；题8 扩；二轮席1 加 abandoned）：
+     * message=人话结果；memoryId=落库行 id；overwritten=本次被同主题覆盖的旧条内容
+     * （无覆盖为空列表，供会话内「记忆已更新」卡）；abandoned=true=重试耗尽没存上
+     * （并发/锁竞争放弃）——动作审计不得记成成功。
      */
-    public record SaveOutcome(String message, Long memoryId, List<String> overwritten) {
+    public record SaveOutcome(String message, Long memoryId, List<String> overwritten, boolean abandoned) {
         public SaveOutcome(String message, Long memoryId) {
-            this(message, memoryId, List.of());
+            this(message, memoryId, List.of(), false);
+        }
+
+        public SaveOutcome(String message, Long memoryId, List<String> overwritten) {
+            this(message, memoryId, overwritten, false);
         }
     }
 
@@ -83,10 +132,75 @@ public class AssistantMemoryTurnService {
         }
 
         String topicKey = AssistantMemoryFacts.topicKeyOf(content);
+        Long conversationId = resolveConversationId(tenantId, threadId);
+        final String text = content; // 截断/脱敏后的最终文本（lambda 捕获要求实际最终）
+        for (int attempt = 1; ; attempt++) {
+            try {
+                SaveOutcome out = saveTx.execute(st ->
+                    saveTopicScopedInTx(tenantId, userId, text, topicKey, conversationId));
+                if (out != null && !out.overwritten().isEmpty()) {
+                    // 会话内「记忆已更新」小卡（题8）：旧→新，随本回合 memory_turn 帧下发。
+                    // 台账只在提交成功后按「该提交轮真正覆盖了谁」补记（批 7 多审 P1-b）——
+                    // 它是内存 Map，不随数据库事务回滚，写在事务核里会给回滚轮留假帧。
+                    // 键用 threadId 而非 ThreadLocal 里的 runId——工具跑在 loom 线程，读不到 run 上下文
+                    try {
+                        for (String old : out.overwritten()) {
+                            turnLedger.recordSuperseded(threadId, old, text);
+                        }
+                    } catch (RuntimeException ex) {
+                        log.debug("[AssistantMemory] 覆盖事件记台账失败(忽略): {}", ex.getMessage());
+                    }
+                }
+                return out;
+            } catch (DuplicateKeyException | PessimisticLockingFailureException e) {
+                // D1：并发赢家已把同主题 ACTIVE 占住（库层唯一索引拦下插入）。
+                // PostgreSQL 里撞索引的事务已废，必须换一个新事务重读主题清单再来一轮；
+                // 40P01/55P03（死锁/锁等待失败）事务同样已废，同一套换新事务重试（多审席2实读映射）。
+                if (e instanceof DuplicateKeyException dke && !isTopicFenceCollision(dke)) {
+                    throw dke; // 撞的不是同主题栅栏（如主键）——属数据问题，不当并发竞态吞掉
+                }
+                if (attempt >= SAVE_MAX_ATTEMPTS) {
+                    // 日志分型（二轮席1）：撞索引=并发竞态；锁等待失败/死锁=别的写者挡路，别混记
+                    if (e instanceof DuplicateKeyException) {
+                        log.warn("[AssistantMemory] 同主题并发保存连续 {} 轮撞唯一索引，放弃: tenant={} user={} topic={}",
+                            attempt, tenantId, userId, topicKey);
+                    } else {
+                        log.warn("[AssistantMemory] 保存锁等待失败/死锁连续 {} 轮，放弃: tenant={} user={} topic={}",
+                            attempt, tenantId, userId, topicKey);
+                    }
+                    return new SaveOutcome("这条正在被同时保存，请稍后再试一次", null, List.of(), true);
+                }
+                try {
+                    Thread.sleep(10L * attempt); // 廉价抖动退避（二轮席1）：连续快重试会放大锁竞争
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return new SaveOutcome("这条正在被同时保存，请稍后再试一次", null, List.of(), true);
+                }
+            }
+        }
+    }
+
+    /** 只把「同主题栅栏索引」的冲突当并发竞态重试；其它唯一冲突原样上抛 */
+    private static boolean isTopicFenceCollision(DuplicateKeyException e) {
+        String msg = e.getMessage();
+        return msg != null && msg.contains(TOPIC_FENCE_INDEX);
+    }
+
+    /**
+     * 事务核心（D1）：重读主题清单 → 预生成新条 id → 先把旧条腾成 SUPERSEDED → 再插入新条。
+     *
+     * <p>顺序不可反：唯一索引只认 ACTIVE，旧条不先腾位，插入会撞自己事务里还没提交的覆盖；
+     * id 必须预生成（{@link IdWorker}），因为 superseded_by 要在插入前就指向新条。
+     * 每轮重试都重新读主题清单（赢家的条这时才可见），输家转化为「后到的保存覆盖先到的」，
+     * 与串行语义一致。这里不做任何不可回滚的副作用（台账在提交成功后由调用方补记）。</p>
+     */
+    private SaveOutcome saveTopicScopedInTx(String tenantId, Long userId, String content,
+                                            String topicKey, Long conversationId) {
         List<DcsAssistantMemory> sameTopic = topicKey == null
             ? List.of() : memoryMapper.listActiveByTopic(tenantId, userId, topicKey);
 
         DcsAssistantMemory row = new DcsAssistantMemory();
+        row.setId(IdWorker.getId());
         row.setTenantId(tenantId);
         row.setUserId(userId);
         row.setContent(content);
@@ -94,22 +208,22 @@ public class AssistantMemoryTurnService {
         row.setMemoryType(AssistantMemoryFacts.detectType(content));
         row.setTopicKey(topicKey);
         row.setStatus(AssistantMemoryFacts.ST_ACTIVE);
-        row.setConversationId(resolveConversationId(tenantId, threadId));
+        row.setConversationId(conversationId);
         row.setCreateBy(userId);
         row.setCreateTime(new Date());
-        memoryMapper.insert(row);
 
-        // 题8：同主题旧条留痕（不删、可回滚）
+        // 题8：同主题旧条留痕（不删、可回滚）——先腾位后插入，同一事务原子提交
         List<String> overwritten = new ArrayList<>();
         Date now = new Date();
         for (DcsAssistantMemory old : sameTopic) {
-            if (memoryMapper.supersedeOwn(tenantId, userId, old.getId(), row.getId(), now) > 0) {
+            if (memoryMapper.supersedeOwn(tenantId, userId, old.getId(), row.getId(), now) > 0
+                // 同内容并发保存时，输家的重试轮会腾掉赢家那条一模一样的条目——
+                // X→X 的帧/文案没有信息量，不进 overwritten（多审席2 检查单4）
+                && !old.getContent().equals(content)) {
                 overwritten.add(old.getContent());
-                // 会话内「记忆已更新」小卡（题8）：旧→新，随本回合 memory_turn 帧下发
-                // 键用 threadId 而非 ThreadLocal 里的 runId——工具跑在 loom 线程，读不到 run 上下文
-                turnLedger.recordSuperseded(threadId, old.getContent(), content);
             }
         }
+        memoryMapper.insert(row);
         memoryService.invalidateDigestCache(tenantId, userId);
         log.info("[AssistantMemory] 已保存 tenant={} user={} contentLen={} memoryId={} type={} topic={} conv={} superseded={}",
             tenantId, userId, content.length(), row.getId(), row.getMemoryType(), topicKey,
