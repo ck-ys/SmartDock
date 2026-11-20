@@ -52,6 +52,7 @@
           <li><a href="#s-2-2" data-target="s-2-2">启动链</a></li>
           <li><a href="#s-2-3" data-target="s-2-3">目录职责</a></li>
           <li><a href="#s-2-4" data-target="s-2-4">本地起项目</a></li>
+          <li><a href="#s-2-5" data-target="s-2-5">页面模块地图</a></li>
         </ul>
       </li>
       <li><a class="nav-ch" href="#ch-3" data-target="h-3"><span class="n">03</span>路由与权限</a>
@@ -101,7 +102,11 @@
           <li><a href="#s-8-4" data-target="s-8-4">HITL</a></li>
           <li><a href="#s-8-5" data-target="s-8-5">恢复与重试</a></li>
           <li><a href="#s-8-6" data-target="s-8-6">加自定义帧</a></li>
-          <li><a href="#s-8-7" data-target="s-8-7">助手排障</a></li>
+          <li><a href="#s-8-7" data-target="s-8-7">帧分发表</a></li>
+          <li><a href="#s-8-8" data-target="s-8-8">回合状态机</a></li>
+          <li><a href="#s-8-9" data-target="s-8-9">计划坞与确认坞</a></li>
+          <li><a href="#s-8-10" data-target="s-8-10">附件与压缩</a></li>
+          <li><a href="#s-8-11" data-target="s-8-11">助手排障</a></li>
         </ul>
       </li>
       <li><a class="nav-ch" href="#ch-9" data-target="h-9"><span class="n">09</span>布局与壳层</a></li>
@@ -139,7 +144,7 @@
       <div class="meta">
         <span class="chip"><b>基准</b> master @ cb44445</span>
         <span class="chip"><b>栈</b> Vue 3.5 · Vite 7 · Element Plus 2.13</span>
-        <span class="chip"><b>规模</b> 13 章 · 17 图</span>
+        <span class="chip"><b>规模</b> 13 章 · 20 图</span>
         <span class="chip accent">读法：图 → 步骤 → 清单 → 验收</span>
       </div>
 
@@ -412,6 +417,31 @@ npx vite --port 5188 --host --strictPort</pre></div>
       <div class="callout warn">
         <span class="t">重启前先确认旧进程已退</span>
         <p>Windows 下 npx 的 vite 子进程会残留占端口。端口被占就清理进程，不要改用 5189 之类的跳号端口。</p>
+      </div>
+
+      <h3 id="s-2-5">页面模块地图：99 个 .vue 按域分组</h3>
+      <p>找不到「某个功能在哪个页面」时先查这张表，再去看路由。列出的代表页面都能从侧栏直达；括号里的数字是该目录下的 .vue 数量。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>域</th><th>数量</th><th>是什么</th><th>代表页面</th></tr></thead>
+          <tbody>
+            <tr><td><code>views/dcs/agent/</code></td><td>5</td><td>智能体工作台</td><td>index（对话工作台）、automation/index+edit（全自动编排）、settings（偏好）、McpPanel</td></tr>
+            <tr><td><code>views/dcs/assistant/</code></td><td>4</td><td>助手管理面</td><td>admin（配置/配额）、audit（审计）、memory（记忆）、session（/ai 会话壳）</td></tr>
+            <tr><td><code>views/dcs/profile/</code></td><td>13</td><td>画像引擎全套</td><td>index（画像列表）、studio（工作室）、detail（单人详情）、rfm、segments、analytics、review+ReviewPanel（低分复核）、ops 三 Pane（重算/健康/管理）</td></tr>
+            <tr><td><code>views/dcs/mission/ + todo/</code></td><td>3</td><td>采集 demo</td><td>mission/index+detail（任务管理）、todo/index（我的待办）</td></tr>
+            <tr><td><code>views/dcs/</code> 计费组</td><td>5</td><td>钱包与账单</td><td>account-billing、tenant-wallet(+ledger)、wallet-payment-order、service-charge-rule、ai-credit</td></tr>
+            <tr><td><code>views/dcs/</code> AI 配置组</td><td>3</td><td>供应商与用量</td><td>ai-config（供应商+文档域页签）、ai-doc-domain、ai-usage</td></tr>
+            <tr><td><code>views/dcs/risk/</code></td><td>8</td><td>风控运营</td><td>dashboard、events、rules、actions、whitelist、sensitive-word、content-config</td></tr>
+            <tr><td><code>views/dcs/</code> 运营杂项</td><td>8</td><td>通用运营件</td><td>dashboard、audit、changelog、announcement、notice、feedback、support、fileReview</td></tr>
+            <tr><td><code>views/system/</code></td><td>25</td><td>RuoYi 系统管理</td><td>user（含头像/三方/设备）、role、menu、dept、dict、config、oss、tenant(+Package)、client</td></tr>
+            <tr><td><code>views/monitor/</code></td><td>7</td><td>运行监控</td><td>admin、cache、online、logininfor、operlog、snailjob</td></tr>
+            <tr><td>根目录</td><td>其余</td><td>入口与错误页</td><td>index、login/register、agreement、error、redirect</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout note">
+        <span class="t">公共件在哪</span>
+        <p>跨页复用件在 <code>src/components/</code>：助手全套积木（DcsAssistant/）、命令面板（DcsCommandPalette）、外观抽屉、运营页头、移动端行列表；RuoYi 原生件（Pagination/DictTag/FileUpload 等）也在那里。工具函数在 <code>src/utils/</code>（约 30 个），弹窗类返回值风格的 hook 只有 <code>useDialog</code> 一个，其余组合式函数在 <code>src/composables/</code>（5 个）。</p>
       </div>
     </section>
 
@@ -1262,11 +1292,241 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
         <li><b>回归</b><span>旧会话回放不报错；未知帧被忽略而不是崩。</span></li>
       </ol>
 
-      <h3 id="s-8-7">助手排障</h3>
+      <h3 id="s-8-7">帧分发表：每个事件去哪</h3>
+      <p>流回来的一切先过 <code>aguiClient.dispatch</code> 的 switch，再进 <code>useAssistant</code> 的回调。这张表就是那个 switch——<b>不在表里的帧会被静默丢弃</b>（default 分支直接 break），所以「后端发了前端没反应」先查这张表有没有这个类型。</p>
+      
+<figure class="diagram-card" id="fig-frontend-10">
+  <div class="diagram-head">
+    <span class="diagram-no">15</span>
+    <div>
+      <h3>8.7 帧分发表：每个 SSE 帧去哪</h3>
+      <p class="diagram-q">流回来的帧分几类？哪类没处理会被静默丢掉？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-bands">
+  <div class="band">
+    <div class="band-k"><span>输入</span><b>一条流</b></div>
+    <div class="band-v">
+      <div class="band-row"><span class="chip-node accent">text/event-stream<small>parseSseFrames 切帧后逐个进 dispatch</small></span></div>
+    </div>
+  </div>
+  <div class="band-arrow"><span>aguiClient.dispatch 的 switch</span></div>
+  <div class="band band-main">
+    <div class="band-k"><span>标准帧</span><b>走固定回调</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node">TEXT_MESSAGE_START/CONTENT/END<small>→ 打字机缓冲</small></span>
+        <span class="chip-node">REASONING_*<small>→ 思考分段</small></span>
+        <span class="chip-node">TOOL_CALL_START/ARGS/RESULT<small>→ 工具步骤卡</small></span>
+        <span class="chip-node">RUN_FINISHED<small>→ 收尾；带 interrupt 则出确认卡</small></span>
+        <span class="chip-node">RUN_ERROR<small>→ 错误卡 + 重试</small></span>
+        <span class="chip-node">RAW 帧 error<small>→ 转 onRunError</small></span>
+      </div>
+    </div>
+  </div>
+  <div class="band-arrow"><span>CUSTOM 帧按 name 进 onCustom 分支</span></div>
+  <div class="band">
+    <div class="band-k"><span>CUSTOM</span><b>11 个名字</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node">cost_meta</span>
+        <span class="chip-node">plan</span>
+        <span class="chip-node">todo</span>
+        <span class="chip-node">tool_progress</span>
+        <span class="chip-node">tool_denied</span>
+        <span class="chip-node">ask_user</span>
+        <span class="chip-node">elicitation</span>
+        <span class="chip-node">memory_turn</span>
+        <span class="chip-node">model_degrade</span>
+        <span class="chip-node">auto_done</span>
+        <span class="chip-node">dcs-resume-truncated</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="dgm-rule"><b>default: break。</b>不在 switch 里的帧被静默丢弃。加新帧必须三处同步：后端发帧 → onCustom 加 case → 卡片组件；漏了前端就是「发了但没人渲染」，且控制台不会有任何报错。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>从上往下：SSE 帧先过 dispatch 的 switch，标准帧走左边这些回调，CUSTOM 帧进 onCustom。</li><li>TEXT 三段负责打字机；TOOL 三段拼工具步骤卡；RUN_FINISHED 兼管 HITL（interrupt 载荷）。</li><li>CUSTOM 共 11 个名字，改名字等于改前后端契约。</li><li>default 分支直接 break——未知帧静默丢弃，不报错也不提示。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="frontend-architecture.md">《前端架构详解》· 8.7 帧→卡片映射</a>
+  </div>
+</figure>
+
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>CUSTOM 帧名</th><th>干什么</th></tr></thead>
+          <tbody>
+            <tr><td><code>cost_meta</code></td><td>本轮费用与 token（写 turn 的 costYuan / tokens）</td></tr>
+            <tr><td><code>plan</code> / <code>todo</code></td><td>计划卡 / 待办卡</td></tr>
+            <tr><td><code>tool_progress</code> / <code>tool_denied</code></td><td>工具进度 / 工具被拒</td></tr>
+            <tr><td><code>ask_user</code> / <code>elicitation</code></td><td>模型反问 / 追问补信息</td></tr>
+            <tr><td><code>memory_turn</code></td><td>本回合记忆写入回执</td></tr>
+            <tr><td><code>model_degrade</code></td><td>模型降级提示</td></tr>
+            <tr><td><code>auto_done</code></td><td>自动化回合完成信号</td></tr>
+            <tr><td><code>dcs-resume-truncated</code></td><td>续看溢出提示（toast）：重放超 4096 帧从中间开始，与压缩无关</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="t">两个容易找错地方的帧</span>
+        <p>没有叫 <code>hitl</code> 或 <code>attachment</code> 的 CUSTOM 帧：人工确认走 <code>RUN_FINISHED</code> 的 interrupt 载荷；附件走 REST 上传与登记，不进事件流。按帧名去搜这两个功能会扑空。</p>
+      </div>
+
+      <h3 id="s-8-8">回合状态机：从发送到落定</h3>
+      <p>一个回合（turn）的生命周期由 <code>turn.phase</code> 驱动，七态流转；另有全局 <code>sending</code> 闸防串写（todo 帧这类写入都拿它做守卫）。</p>
+      
+<figure class="diagram-card" id="fig-frontend-11">
+  <div class="diagram-head">
+    <span class="diagram-no">16</span>
+    <div>
+      <h3>8.8 一个回合的状态流转</h3>
+      <p class="diagram-q">turn.phase 有哪几态？什么时候出确认卡、什么时候能重试？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>runTurn：本地先上屏</b><small>用户消息 + 助手占位回合；<code>sending</code> 闸打开</small></div>
+    <span class="fl-side phase">发送</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>thinking：模型推理中</b><small>REASONING_* 帧进思考分段</small></div>
+    <span class="fl-side phase">主链</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>acting：调工具</b><small>TOOL_CALL_* 拼步骤卡；工具结果回来可能再回 thinking——多轮循环</small></div>
+    <span class="fl-side">循环</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">4</span>
+    <div class="fl-b"><b>writing：写正文</b><small>TEXT_* 打字机切片，60ms 合帧；流尾做全量 markdown 渲染</small></div>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">RUN_FINISHED</b><small>→ done：cost_meta 写费用与 token，sending 关闭</small></div>
+  <div class="fork"><b class="fk n">RUN_FINISHED 带 interrupt</b><small>→ waiting：出确认坞，等下一次 run 恢复</small></div>
+  <div class="fork"><b class="fk n">RUN_ERROR</b><small>→ error：错误卡 + 重试入口</small></div>
+  <div class="fork"><b class="fk n">用户中止</b><small>→ stopped：本轮停止，可继续追问</small></div>
+</div>
+<div class="dgm-note">断言「正在工作」别盯 DOM 文案，盯 <code>turn.phase</code>；「贴底没触发」先看距底是不是超过 92px（回底按钮的阈值），再看 ResizeObserver 是否置脏。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>主链七态：thinking → acting → writing，终态 done / stopped / error，确认等待是 waiting。</li><li>acting 与 thinking 会来回多轮（工具循环），不是走一遍就完。</li><li>sending 是全局闸：开着期间防串写，todo 帧这类写入都拿它做守卫。</li><li>费用只在 cost_meta 帧写入；前端不自己累加 token。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="frontend-architecture.md">《前端架构详解》· 8.8 回合状态机</a>
+  </div>
+</figure>
+
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>机制</th><th>口径</th></tr></thead>
+          <tbody>
+            <tr><td>打字机</td><td>tick 每 60ms 合帧追赶；流结束后才做全量 markdown 渲染——流式期间看到的是纯文本切片</td></tr>
+            <tr><td>贴底滚动</td><td>ResizeObserver 置脏 + rAF 写 scrollTop；距底超过 92px 才显示回底按钮</td></tr>
+            <tr><td>费用</td><td><code>cost_meta</code> 帧写入 costYuan / tokens；前端不自己累加</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="s-8-9">计划坞与确认坞</h3>
+      <p>两个「坞」都是回合外的停靠卡：计划坞接模型的计划提案，确认坞接人工确认。它们的交互模型不一样，别做成一个组件的两种皮肤。</p>
+      
+<figure class="diagram-card" id="fig-frontend-12">
+  <div class="diagram-head">
+    <span class="diagram-no">17</span>
+    <div>
+      <h3>8.9 计划卡从出现到决定的路径</h3>
+      <p class="diagram-q">点了「按计划执行」之后请求发去哪了？为什么没有立刻看到网络请求？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>模型产出计划（plan 帧，pending）</b><small>进入回合消息流的计划卡</small></div>
+    <span class="fl-side phase">出现</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>PlanDock 只挂最新一张 pending</b><small>旧计划自动收起，避免两份计划同时在问</small></div>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>用户三选：按计划执行 / 调整 / 取消</b><small>决策先记在本地（notePlanDecision / notePlanAdjust）</small></div>
+    <span class="fl-side phase">决定</span>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">按计划 / 调整</b><small>不单独发请求：下一条消息带 <code>planDecision</code>（confirm / adjust）一起发出</small></div>
+  <div class="fork"><b class="fk n">取消</b><small>单独调 <code>POST /dcs/assistant/plan/cancel</code>，当场解闸</small></div>
+</div>
+<div class="dgm-flow" style="margin-top:9px">
+  <div class="fl-step">
+    <span class="fl-n">4</span>
+    <div class="fl-b"><b>跨标签页同步</b><small><code>plan/state</code> 每 3 秒轮询；另一个标签页点过的决定这边能看到</small></div>
+    <span class="fl-side phase">同步</span>
+  </div>
+</div>
+<div class="dgm-rule"><b>测试别断言错：</b>点「按计划执行」后网络面板不会立刻出现请求——决策是搭下一条消息的车。断言「点确认立即发请求」必然失败，这不是 bug。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>计划卡只有一张挂着：新的 pending 计划出现，旧的收起。</li><li>确认与调整不单独发请求——决策随下一条消息的 planDecision 字段带出去。</li><li>只有「取消」有独立端点，点了当场解闸。</li><li>跨标签页靠 plan/state 每 3 秒轮询同步，不是推送。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="frontend-architecture.md">《前端架构详解》· 8.9 计划坞决策路径</a>
+  </div>
+</figure>
+
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>行为</th><th>计划坞 PlanDock</th><th>确认坞 HitlDock</th></tr></thead>
+          <tbody>
+            <tr><td>接什么</td><td>只接<b>最新一张</b> pending 计划卡（旧的收起）</td><td>本轮全部待确认项（复用 ConfirmCard）</td></tr>
+            <tr><td>怎么决定</td><td>决策不单独发请求：随<b>下一条消息</b>带 <code>planDecision</code>（confirm / cancel / adjust）</td><td>逐条允许/拒绝；可勾「本会话同类操作不再逐次确认」</td></tr>
+            <tr><td>能改什么</td><td>计划内容的调整意见（adjust）</td><td>只能写备注/转达语——<b>工具实参不可逐条改</b>，别按“可编辑参数”设计</td></tr>
+            <tr><td>立即生效的口子</td><td>「取消」单独调 <code>/dcs/assistant/plan/cancel</code>，当场解闸</td><td>无单独口子；确认=新 run 带 resume</td></tr>
+            <tr><td>跨标签页</td><td><code>plan/state</code> 每 3 秒轮询同步</td><td>刷新后重新拉 <code>/hitl/pending</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="s-8-10">附件与压缩的前端表现</h3>
+      <ol class="steps">
+        <li><b>附件两步走</b><span>先 <code>/resource/oss/upload</code>（bizSource=ASSISTANT）拿 ossId，再 <code>registerAssistantAttachment</code> 登记；登记请求头带 threadId（threadHeaders）。别把两步合成一步直传。</span></li>
+        <li><b>压缩不是弹窗</b><span>回合前出现「已自动压缩 · 打包成摘要」分隔条（lastCompaction）；被熔断时换警示条（lastCompactionBlocked）说明压缩已暂停。注意 <code>dcs-resume-truncated</code> 帧不在这里——它是续看溢出的 toast 提示（见 8.7）。</span></li>
+        <li><b>恢复的表现</b><span>刷新后重开会话，被压缩的旧回合显示为摘要卡，不逐字还原——这是设计，不是丢数据。</span></li>
+      </ol>
+
+      <h3 id="s-8-11">助手排障</h3>
       
 <figure class="diagram-card" id="fig-frontend-x08">
   <div class="diagram-head">
-    <span class="diagram-no">15</span>
+    <span class="diagram-no">18</span>
     <div>
       <h3>助手排障：没发出去、没帧、有帧没渲染、刷新丢内容、卡在确认</h3>
       <p class="diagram-q">助手不工作时，怎么在五步里定位到具体断点？</p>
@@ -1363,7 +1623,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
       
 <figure class="diagram-card" id="fig-frontend-09">
   <div class="diagram-head">
-    <span class="diagram-no">16</span>
+    <span class="diagram-no">19</span>
     <div>
       <h3>9. 布局与壳层</h3>
       <p class="diagram-q">页面外面那层壳由哪些部件组成，哪些是常驻的？</p>
@@ -1558,7 +1818,7 @@ npm run preview   # 预览构建产物（仅本机验证）</pre></div>
       
 <figure class="diagram-card" id="fig-frontend-x06">
   <div class="diagram-head">
-    <span class="diagram-no">17</span>
+    <span class="diagram-no">20</span>
     <div>
       <h3>前端排障决策树：白屏、401、403、无数据、助手断流、样式不生效</h3>
       <p class="diagram-q">前端不对时，按现象分六类，各自第一步查什么？</p>
@@ -1685,8 +1945,8 @@ npm run preview   # 预览构建产物（仅本机验证）</pre></div>
       </div>
 
       <h3 id="s-13-1">图目录</h3>
-      <p>共 17 张，编号即正文图号。</p>
-      <div class="table-wrap"><table><thead><tr><th>编号</th><th>图名</th><th>它回答什么</th><th></th></tr></thead><tbody><tr><td><a href="#fig-frontend-01">01</a></td><td>0. 一分钟总览</td><td>前端整体分成哪几块？启动、壳层、页面、数据各在哪？</td><td><a href="#fig-frontend-01">跳转</a></td></tr><tr><td><a href="#fig-frontend-02">02</a></td><td>2. 启动链：从 index.html 到第一个页面</td><td>从 index.html 到第一个页面，启动链上每一步做什么？</td><td><a href="#fig-frontend-02">跳转</a></td></tr><tr><td><a href="#fig-frontend-03">03</a></td><td>4.2 全局守卫流程</td><td>路由守卫按什么顺序判断？什么情况下会去 /403 而不是 /404？</td><td><a href="#fig-frontend-03">跳转</a></td></tr><tr><td><a href="#fig-frontend-04">04</a></td><td>4.3 动态菜单：sys_menu 怎么变成侧栏</td><td>后端 sys_menu 的一行数据，怎么变成侧栏里的一个菜单？</td><td><a href="#fig-frontend-04">跳转</a></td></tr><tr><td><a href="#fig-frontend-05">05</a></td><td>5.1 一次普通请求</td><td>页面的一次请求，怎么经过 api 函数、拦截器、代理到后端，再回到页面？</td><td><a href="#fig-frontend-05">跳转</a></td></tr><tr><td><a href="#fig-frontend-x01">06</a></td><td>新增一个页面：菜单、路由、页面、接口、双视角验收</td><td>新页面为什么先写 sys_menu，再写 vue？漏掉哪一步会出现“页面能开但侧栏没有”？</td><td><a href="#fig-frontend-x01">跳转</a></td></tr><tr><td><a href="#fig-frontend-x02">07</a></td><td>新增一个 API 调用：从页面到后端再回到页面</td><td>为什么页面不直接写 axios？R 和 TableDataInfo 两种返回怎么解包？</td><td><a href="#fig-frontend-x02">跳转</a></td></tr><tr><td><a href="#fig-frontend-x03">08</a></td><td>新增一个按钮权限：三处同步 + 双视角</td><td>按钮不显示，是前端漏了 v-hasPermi，还是菜单里根本没这行 perms？</td><td><a href="#fig-frontend-x03">跳转</a></td></tr><tr><td><a href="#fig-frontend-x04">09</a></td><td>列表页标准结构：查询、状态、表格、分页、导出</td><td>一个标准列表页有哪些固定件？哪些状态必须自己管，哪些交给组件？</td><td><a href="#fig-frontend-x04">跳转</a></td></tr><tr><td><a href="#fig-frontend-x05">10</a></td><td>改样式的验收链：令牌、门禁、断言、截图、双档</td><td>为什么改完 CSS 不能只看截图？computedStyle 断言和 390 档分别在抓什么？</td><td><a href="#fig-frontend-x05">跳转</a></td></tr><tr><td><a href="#fig-frontend-06">11</a></td><td>8.1 三个宿主，一个单例</td><td>助手为什么在抽屉、/agent、会话页三处状态一致？</td><td><a href="#fig-frontend-06">跳转</a></td></tr><tr><td><a href="#fig-frontend-07">12</a></td><td>8.3 一次发送的完整链路</td><td>用户点发送后，一条消息怎么变成流式回答？</td><td><a href="#fig-frontend-07">跳转</a></td></tr><tr><td><a href="#fig-frontend-08">13</a></td><td>8.6 HITL（人工确认）全流程</td><td>前端 HITL 的确认/拒绝，怎么让后端继续跑？</td><td><a href="#fig-frontend-08">跳转</a></td></tr><tr><td><a href="#fig-frontend-x07">14</a></td><td>给助手加一个自定义帧/卡片：后端事件到前端渲染</td><td>后端多发一个 CUSTOM 帧，前端要改哪几处才会出现新卡片？</td><td><a href="#fig-frontend-x07">跳转</a></td></tr><tr><td><a href="#fig-frontend-x08">15</a></td><td>助手排障：没发出去、没帧、有帧没渲染、刷新丢内容、卡在确认</td><td>助手不工作时，怎么用 threadId、network、事件帧和 pending 接口快速分层定位？</td><td><a href="#fig-frontend-x08">跳转</a></td></tr><tr><td><a href="#fig-frontend-09">16</a></td><td>9. 布局与壳层</td><td>壳层由哪些部分组成？助手悬浮球挂在哪？</td><td><a href="#fig-frontend-09">跳转</a></td></tr><tr><td><a href="#fig-frontend-x06">17</a></td><td>前端排障决策树：白屏、401、403、无数据、助手断流、样式不生效</td><td>页面不对时，先看控制台、网络还是路由？每类现象最短的定位路径是什么？</td><td><a href="#fig-frontend-x06">跳转</a></td></tr></tbody></table></div>
+      <p>共 20 张，编号即正文图号。</p>
+      <div class="table-wrap"><table><thead><tr><th>编号</th><th>图名</th><th>它回答什么</th><th></th></tr></thead><tbody><tr><td><a href="#fig-frontend-01">01</a></td><td>0. 一分钟总览</td><td>前端整体分成哪几块？启动、壳层、页面、数据各在哪？</td><td><a href="#fig-frontend-01">跳转</a></td></tr><tr><td><a href="#fig-frontend-02">02</a></td><td>2. 启动链：从 index.html 到第一个页面</td><td>从 index.html 到第一个页面，启动链上每一步做什么？</td><td><a href="#fig-frontend-02">跳转</a></td></tr><tr><td><a href="#fig-frontend-03">03</a></td><td>4.2 全局守卫流程</td><td>路由守卫按什么顺序判断？什么情况下会去 /403 而不是 /404？</td><td><a href="#fig-frontend-03">跳转</a></td></tr><tr><td><a href="#fig-frontend-04">04</a></td><td>4.3 动态菜单：sys_menu 怎么变成侧栏</td><td>后端 sys_menu 的一行数据，怎么变成侧栏里的一个菜单？</td><td><a href="#fig-frontend-04">跳转</a></td></tr><tr><td><a href="#fig-frontend-05">05</a></td><td>5.1 一次普通请求</td><td>页面的一次请求，怎么经过 api 函数、拦截器、代理到后端，再回到页面？</td><td><a href="#fig-frontend-05">跳转</a></td></tr><tr><td><a href="#fig-frontend-x01">06</a></td><td>新增一个页面：菜单、路由、页面、接口、双视角验收</td><td>新页面为什么先写 sys_menu，再写 vue？漏掉哪一步会出现“页面能开但侧栏没有”？</td><td><a href="#fig-frontend-x01">跳转</a></td></tr><tr><td><a href="#fig-frontend-x02">07</a></td><td>新增一个 API 调用：从页面到后端再回到页面</td><td>为什么页面不直接写 axios？R 和 TableDataInfo 两种返回怎么解包？</td><td><a href="#fig-frontend-x02">跳转</a></td></tr><tr><td><a href="#fig-frontend-x03">08</a></td><td>新增一个按钮权限：三处同步 + 双视角</td><td>按钮不显示，是前端漏了 v-hasPermi，还是菜单里根本没这行 perms？</td><td><a href="#fig-frontend-x03">跳转</a></td></tr><tr><td><a href="#fig-frontend-x04">09</a></td><td>列表页标准结构：查询、状态、表格、分页、导出</td><td>一个标准列表页有哪些固定件？哪些状态必须自己管，哪些交给组件？</td><td><a href="#fig-frontend-x04">跳转</a></td></tr><tr><td><a href="#fig-frontend-x05">10</a></td><td>改样式的验收链：令牌、门禁、断言、截图、双档</td><td>为什么改完 CSS 不能只看截图？computedStyle 断言和 390 档分别在抓什么？</td><td><a href="#fig-frontend-x05">跳转</a></td></tr><tr><td><a href="#fig-frontend-06">11</a></td><td>8.1 三个宿主，一个单例</td><td>助手为什么在抽屉、/agent、会话页三处状态一致？</td><td><a href="#fig-frontend-06">跳转</a></td></tr><tr><td><a href="#fig-frontend-07">12</a></td><td>8.3 一次发送的完整链路</td><td>用户点发送后，一条消息怎么变成流式回答？</td><td><a href="#fig-frontend-07">跳转</a></td></tr><tr><td><a href="#fig-frontend-08">13</a></td><td>8.6 HITL（人工确认）全流程</td><td>前端 HITL 的确认/拒绝，怎么让后端继续跑？</td><td><a href="#fig-frontend-08">跳转</a></td></tr><tr><td><a href="#fig-frontend-x07">14</a></td><td>给助手加一个自定义帧/卡片：后端事件到前端渲染</td><td>后端多发一个 CUSTOM 帧，前端要改哪几处才会出现新卡片？</td><td><a href="#fig-frontend-x07">跳转</a></td></tr><tr><td><a href="#fig-frontend-10">15</a></td><td>8.7 帧分发表：每个 SSE 帧去哪</td><td>流回来的帧分几类？哪类没处理会被静默丢掉？</td><td><a href="#fig-frontend-10">跳转</a></td></tr><tr><td><a href="#fig-frontend-11">16</a></td><td>8.8 一个回合的状态流转</td><td>turn.phase 有哪几态？什么时候出确认卡、什么时候能重试？</td><td><a href="#fig-frontend-11">跳转</a></td></tr><tr><td><a href="#fig-frontend-12">17</a></td><td>8.9 计划卡从出现到决定的路径</td><td>点了「按计划执行」之后请求发去哪了？为什么没有立刻看到网络请求？</td><td><a href="#fig-frontend-12">跳转</a></td></tr><tr><td><a href="#fig-frontend-x08">18</a></td><td>助手排障：没发出去、没帧、有帧没渲染、刷新丢内容、卡在确认</td><td>助手不工作时，怎么用 threadId、network、事件帧和 pending 接口快速分层定位？</td><td><a href="#fig-frontend-x08">跳转</a></td></tr><tr><td><a href="#fig-frontend-09">19</a></td><td>9. 布局与壳层</td><td>壳层由哪些部分组成？助手悬浮球挂在哪？</td><td><a href="#fig-frontend-09">跳转</a></td></tr><tr><td><a href="#fig-frontend-x06">20</a></td><td>前端排障决策树：白屏、401、403、无数据、助手断流、样式不生效</td><td>页面不对时，先看控制台、网络还是路由？每类现象最短的定位路径是什么？</td><td><a href="#fig-frontend-x06">跳转</a></td></tr></tbody></table></div>
 
       <h3 id="s-13-2">目录速查</h3>
       <div class="table-wrap">

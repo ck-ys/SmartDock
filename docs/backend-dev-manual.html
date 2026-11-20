@@ -52,6 +52,7 @@
           <li><a href="#s-2-2" data-target="s-2-2">四层与包</a></li>
           <li><a href="#s-2-3" data-target="s-2-3">一次请求的七道闸</a></li>
           <li><a href="#s-2-4" data-target="s-2-4">组合根</a></li>
+          <li><a href="#s-2-5" data-target="s-2-5">公共底座</a></li>
         </ul>
       </li>
       <li><a class="nav-ch" href="#ch-3" data-target="h-3"><span class="n">03</span>开发流程</a>
@@ -115,8 +116,13 @@
           <li><a href="#s-8-10" data-target="s-8-10">HITL 与卡片</a></li>
           <li><a href="#s-8-11" data-target="s-8-11">事件协议</a></li>
           <li><a href="#s-8-12" data-target="s-8-12">计费链</a></li>
-          <li><a href="#s-8-13" data-target="s-8-13">加工具</a></li>
-          <li><a href="#s-8-14" data-target="s-8-14">核心类与方法</a></li>
+          <li><a href="#s-8-13" data-target="s-8-13">提示词装配</a></li>
+          <li><a href="#s-8-14" data-target="s-8-14">记忆</a></li>
+          <li><a href="#s-8-15" data-target="s-8-15">上下文压缩</a></li>
+          <li><a href="#s-8-16" data-target="s-8-16">run 状态机与多实例</a></li>
+          <li><a href="#s-8-17" data-target="s-8-17">8 个平台工具</a></li>
+          <li><a href="#s-8-18" data-target="s-8-18">加工具</a></li>
+          <li><a href="#s-8-19" data-target="s-8-19">核心类与方法</a></li>
         </ul>
       </li>
       <li><a class="nav-ch" href="#ch-9" data-target="h-9"><span class="n">09</span>测试与门禁</a>
@@ -164,7 +170,7 @@
       <div class="meta">
         <span class="chip"><b>基准</b> master @ cb44445</span>
         <span class="chip"><b>栈</b> Java 21 · Spring Boot 3.5 · PG 17</span>
-        <span class="chip"><b>规模</b> 12 章 · 26 图</span>
+        <span class="chip"><b>规模</b> 12 章 · 34 图</span>
         <span class="chip accent">读法：图 → 步骤 → 清单 → 验收</span>
       </div>
 
@@ -313,7 +319,7 @@
             <li>8.1 框架边界：哪些不在本仓</li>
             <li>8.2 全链路 + 8.3 十道闸</li>
             <li>8.7 工具 / 8.8 技能</li>
-            <li>8.13 加工具的实际步骤</li>
+            <li>8.18 加工具的实际步骤</li>
           </ul>
         </div>
       </div>
@@ -576,6 +582,63 @@
             <tr><td><code>TenantScopes</code></td><td>租户范围解析</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <h3 id="s-2-5">公共底座：ruoyi-common 的 24 件</h3>
+      <p>业务模块不许互相抄工具类，缺什么先来这里找。分两张表记：左表是「几乎每个服务都会碰」的基础设施件，右表是「用到才引」的业务支撑件。各子模块的 artifactId 都是 <code>ruoyi-common</code>，按目录区分；bom 只是依赖清单，不算实现。</p>
+      <div class="grid2">
+        <div class="mini">
+          <h4>基础设施（几乎人人依赖）</h4>
+          <ul>
+            <li><code>core</code> — 工具内核与通用文本（HumanText 等）</li>
+            <li><code>web</code> — 上下文、验证码等 Web 基建</li>
+            <li><code>json</code> — Jackson 全局配置</li>
+            <li><code>mybatis</code> — 数据权限 / 多租户插件</li>
+            <li><code>redis</code> — Redisson 配置</li>
+            <li><code>satoken</code> — 鉴权 DAO</li>
+            <li><code>security</code> — 安全配置</li>
+            <li><code>tenant</code> — 租户实体与拦截</li>
+            <li><code>log</code> — 操作日志切面</li>
+            <li><code>doc</code> — SpringDoc 接口文档</li>
+          </ul>
+        </div>
+        <div class="mini">
+          <h4>业务支撑（用到才引）</h4>
+          <ul>
+            <li><code>excel</code> — Excel 导入导出</li>
+            <li><code>oss</code> — 对象存储客户端</li>
+            <li><code>sse</code> — SSE 推送</li>
+            <li><code>websocket</code> — WS 配置</li>
+            <li><code>encrypt</code> — 接口/字段加密</li>
+            <li><code>sensitive</code> — 字段脱敏</li>
+            <li><code>idempotent</code> — RepeatSubmit 幂等切面</li>
+            <li><code>ratelimiter</code> — 限流切面</li>
+            <li><code>mail / sms</code> — 邮件 / 短信</li>
+            <li><code>social</code> — 三方登录</li>
+            <li><code>translation</code> — 字段翻译</li>
+            <li><code>job</code> — SnailJob 接入配置</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout note">
+        <span class="t">引依赖前先想三秒</span>
+        <p>这里是全仓最底层的横向依赖——你在这层加的每一个包，都会被所有业务模块间接背上。新增公共能力先问：是不是真的「公共」？放业务域里够不够？答案通常是后者。</p>
+      </div>
+      <div class="grid2">
+        <div class="mini">
+          <h4>ruoyi-extend（2 个）</h4>
+          <ul>
+            <li><code>monitor-admin</code> — Spring Boot Admin 监控台</li>
+            <li><code>snailjob-server</code> — SnailJob 调度服务器</li>
+          </ul>
+        </div>
+        <div class="mini">
+          <h4>和业务模块的关系</h4>
+          <ul>
+            <li>方向永远向下：业务 → common，反向禁止。</li>
+            <li>common 之间也有依赖（如 mybatis 依赖 core），改公共件先跑全量编译。</li>
+          </ul>
+        </div>
       </div>
     </section>
 
@@ -1062,9 +1125,9 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <table>
           <thead><tr><th>表</th><th>作用</th></tr></thead>
           <tbody>
-            <tr><td><code>profile_event</code></td><td>事件账本，append-only；<code>(tenant, source, event_uid)</code> 唯一</td></tr>
-            <tr><td><code>profile_identity_link/merge</code></td><td>匿名 ID ↔ 登录主体归并</td></tr>
-            <tr><td><code>profile_score_model/run/snapshot</code></td><td>模型配置、运行记录、评分快照链</td></tr>
+            <tr><td><code>profile_event</code></td><td>事件账本，append-only；<code>(tenant, source, event_uid)</code> 唯一，写入用 ON CONFLICT DO NOTHING</td></tr>
+            <tr><td><code>profile_identity_link / _merge</code></td><td>匿名 ID ↔ 登录主体归并；merge 是审计表，谁并给谁留痕</td></tr>
+            <tr><td><code>profile_score_model / _run / _snapshot</code></td><td>模型配置（JSON）、运行记录、评分快照链</td></tr>
             <tr><td><code>profile_segment*</code></td><td>规则分群 + 静态名单 + 成员快照</td></tr>
             <tr><td><code>profile_review_queue</code></td><td>低分复核队列，抑制重复打扰</td></tr>
           </tbody>
@@ -1129,14 +1192,98 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </figure>
 
+
+      <h4>评分模型：一份 JSON，不是一堆 if</h4>
+      <p>模型定义在 <code>ProfileModelDefinition</code> 解析：<code>preset</code>（GENERIC / RFM）+ <code>dimensions[]</code>，每个维度是「指标 + 分箱 + 权重」。分箱支持四种给法：<code>edges</code>（按边界切）、<code>quantiles</code>（按分位）、<code>bands</code>（枚举档）、<code>n</code>（等宽 N 段）；权重和必须大于 0，由 <code>ProfileModelConfig</code> 校验。计算入口 <code>ProfileScoreEngine.recalcSubject</code>：每个维度归一到 100 后加权合成总分；分箱打分在 <code>ProfileBinResolver.resolve</code>。</p>
+      <div class="callout note">
+        <span class="t">RFM 不是特判，是预设</span>
+        <p>通用模型没有独立的「等级」字段——等级只随 RFM 预设输出：八类分层是 <code>ProfileRfmLevel</code> 的纯函数，R/F/M 三档分界（rfmMid）定义在 <code>ProfileModelDefinition</code>。写文档别再写「指标→分箱→权重→等级」，等级不是通用链路的一环。</p>
+      </div>
+      <h4>快照链：每次计算都能回放</h4>
+      <p>每次计算都插一行快照，新行带 <code>prev_snapshot_id</code> 指向上一行，串成链。写入在 advisory 锁内做「读尾快照 → 插新行」两步，防止并发时链分叉成树。任何历史分数都能沿链回溯，评分模型改了也不影响旧快照的解释。</p>
+      
+<figure class="diagram-card" id="fig-backend-24">
+  <div class="diagram-head">
+    <span class="diagram-no">09</span>
+    <div>
+      <h3>7.1 一条事件算出分数并存进快照链</h3>
+      <p class="diagram-q">维度、分箱、权重怎么变成总分？快照链怎么保证不乱、不重复打扰？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>事件已落账</b><small><code>profile_event</code>，append-only；这一步之前走发布器与身份归并</small></div>
+    <span class="fl-side phase">输入</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>按维度取指标值</b><small>模型 JSON 里每个维度声明一个 metric；取数口径跟着定义走，不写死在代码</small></div>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>分箱打分 ProfileBinResolver.resolve</b><small>四种给法：edges 边界 / quantiles 分位 / bands 枚举档 / n 等宽</small></div>
+    <span class="fl-side phase">计算</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">4</span>
+    <div class="fl-b"><b>归一到 100，按权重合成总分</b><small>权重和必须 &gt; 0（ProfileModelConfig 校验）；RFM 预设额外输出八分层</small></div>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">5</span>
+    <div class="fl-b"><b>advisory 锁：读尾快照</b><small>锁内两步走，并发重算不会互相插队</small></div>
+    <span class="fl-side phase">留痕</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">6</span>
+    <div class="fl-b"><b>插新快照行，prev_snapshot_id 指向上一行</b><small>链永远单链；模型改版不影响旧快照的解释</small></div>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">7</span>
+    <div class="fl-b"><b>低于阈值（默认 60）且开启复核 → 入队</b><small>占位 50 分不入队；上次已确认/忽略且分数未继续下降不再入队；并发靠唯一索引兜底</small></div>
+    <span class="fl-side phase">复核</span>
+  </div>
+</div>
+<div class="dgm-note">排查「分数没变」按 1→2→3 顺查：事件落了没有、指标取到数没有、分箱边界是不是把人全落进同一档。「分数变了但快照断了」查第 5 步的锁与尾快照读取。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>上半段是纯计算：取指标 → 分箱 → 归一 → 加权，全部由模型 JSON 驱动。</li><li>下半段是留痕：advisory 锁内读尾快照再插新行，链永远是单链不成树。</li><li>低分复核在快照之后判断，且带去重——分数不再下降就不重复打扰。</li><li>占位分（50）不触发复核，新主体刚建档时不会立刻进队列。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 评分与快照</a>
+  </div>
+</figure>
+
+
+      <h4>分群：扁平条件列表，不是条件树</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>能力</th><th>入口</th><th>要点</th></tr></thead>
+          <tbody>
+            <tr><td>规则分群</td><td><code>ProfileSegmentRule</code></td><td><code>match</code>=ALL/ANY + 扁平 <code>conditions[]</code>（field/op/value），op 有 EQ/GT/IN/CONTAINS 等 11 种——是列表不是嵌套树，别按树去实现前端编辑器</td></tr>
+            <tr><td>预览</td><td><code>ProfileSegmentService.preview</code></td><td>保存前先看命中多少人</td></tr>
+            <tr><td>静态名单</td><td><code>importMembers</code></td><td>只有 STATIC 分群可导入；按 subjectId 精确匹配生成新 run</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>低分复核：打扰一次，别烦第二次</h4>
+      <p>入队条件：<code>reviewEnabled=1</code> 且总分低于阈值（默认 60）；占位分（50）不入队。去重规则：上次已确认或已忽略、且分数没有继续下降，就不再入队——分数继续往下掉才会再次打扰。并发写入靠唯一索引兜底（捕获 <code>DuplicateKeyException</code>），不会双行。都在 <code>ProfileReviewService</code>。</p>
+      <h4>身份图谱与事件账本</h4>
       <div class="table-wrap">
         <table>
           <thead><tr><th>核心类/方法</th><th>做什么</th></tr></thead>
           <tbody>
             <tr><td><code>ProfileEventPublisher</code></td><td>业务喂事件的唯一门面；不要在业务里直接 insert 事件表</td></tr>
-            <tr><td><code>ProfileEventServiceImpl.publishBatchDetailed</code></td><td>精确对账：逐条返回受理/重复/失败</td></tr>
-            <tr><td><code>IdentityGraphService.resolveAndLink</code></td><td>身份归并；共享浏览器换账号只改挂链接，不搬身份</td></tr>
-            <tr><td><code>ProfileScoreEngine</code></td><td>指标 → 分箱 → 权重 → 等级；每次计算进快照</td></tr>
+            <tr><td><code>ProfileEventServiceImpl.publishBatchDetailed</code></td><td>精确对账：逐条返回 written / duplicated / failures 三桶，管理端灌数专用</td></tr>
+            <tr><td><code>ProfileIdentityService.resolveAndLink</code></td><td>身份归并，advisory 事务锁防并发；共享浏览器换账号只把匿名链接改挂新主体，<b>不搬对方身份</b>；每次归并写 <code>profile_identity_merge</code> 审计</td></tr>
+            <tr><td><code>ProfileScoreEngine</code></td><td>指标 → 分箱 → 权重；每次计算进快照（见上文快照链）</td></tr>
           </tbody>
         </table>
       </div>
@@ -1150,7 +1297,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-05">
   <div class="diagram-head">
-    <span class="diagram-no">09</span>
+    <span class="diagram-no">10</span>
     <div>
       <h3>4.2.3 主流程：事件 → 会话 → 日汇总</h3>
       <p class="diagram-q">事件怎么写完后变成会话和日汇总？并发重建为什么不会撞唯一键？</p>
@@ -1171,28 +1318,114 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </figure>
 
+      <h4>会话重建的四条规则</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>规则</th><th>口径</th></tr></thead>
+          <tbody>
+            <tr><td>显式 sessionId 优先</td><td>事件带了就用（分组键 <code>s:sessionId</code>），不再看时间间隔</td></tr>
+            <tr><td>30 分钟无操作切分</td><td>没有显式 id 时，距上一事件超过 30 分钟就开新会话</td></tr>
+            <tr><td>隐式键锚定首事件</td><td>隐式会话键按首事件所在的分钟桶生成，防止滚动窗口把同一串事件来回拆并</td></tr>
+            <tr><td>跳出 = 单页会话</td><td>会话内最后一个 page 事件就是入口页时算跳出；page_leave 不算「继续」</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>窗口：迟到事件怎么办</h4>
+      <p>事件触发重建 <code>rebuildRecent</code>：默认重算最近 2 天；发现更晚到达的迟到事件时，窗口拉宽到它的自然日、上限 7 天；读取窗口额外左移一个会话间隔，保证跨窗口边界的会话不丢头。<code>AnalyticsDailyBackfillJob</code> 每天补算昨天起往前 3 天。</p>
+      
+<figure class="diagram-card" id="fig-backend-25">
+  <div class="diagram-head">
+    <span class="diagram-no">11</span>
+    <div>
+      <h3>7.2 事件 → 会话 → 六类分析</h3>
+      <p class="diagram-q">六类分析读的是事件还是汇总？迟到的事件怎么补？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-bands">
+  <div class="band">
+    <div class="band-k"><span>事件源</span><b>唯一</b></div>
+    <div class="band-v">
+      <div class="band-row"><span class="chip-node accent">profile_event<small>append-only；CSV 补录也最终落到这里</small></span></div>
+    </div>
+  </div>
+  <div class="band-arrow"><span>AnalyticsSessionizer 会话重建（四条规则）</span></div>
+  <div class="band band-main">
+    <div class="band-k"><span>重建规则</span><b>顺序固定</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node">显式 sessionId 优先</span>
+        <span class="chip-node">30 分钟无操作切分</span>
+        <span class="chip-node">隐式键锚定首事件分钟桶</span>
+        <span class="chip-node">跳出 = 单页会话</span>
+      </div>
+    </div>
+  </div>
+  <div class="band-arrow"><span>2 秒去抖触发；窗口默认 2 天、迟到拉宽上限 7 天；每日补算 3 天</span></div>
+  <div class="band">
+    <div class="band-k"><span>汇总表</span><b>两张</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node">analytics_session<small>会话级</small></span>
+        <span class="chip-node">analytics_daily<small>日汇总</small></span>
+      </div>
+    </div>
+  </div>
+  <div class="band-arrow"><span>AnalyticsService 读汇总表出数</span></div>
+  <div class="band">
+    <div class="band-k"><span>六类分析</span><b>入口 AnalyticsController</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node">流量<small>overview / trend / breakdown</small></span>
+        <span class="chip-node">页面路径<small>paths</small></span>
+        <span class="chip-node">漏斗<small>funnelAnalysis / funnelLoss → analytics_funnel</small></span>
+        <span class="chip-node">留存<small>retention</small></span>
+        <span class="chip-node">自定义<small>custom → analytics_custom_report</small></span>
+        <span class="chip-node">会话<small>sessionPage / sessionDetail</small></span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="dgm-note">验证数字前先「重建汇总」再断言；对不上时先确认口径（跳出、新访客、活跃的定义都在术语表），别先怀疑代码。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>从上往下读：事件账本 → 会话重建 → 会话/日汇总两张表 → 六类分析。</li><li>六类分析全部读汇总表，不直接扫事件账本——所以「刚写入查不到」先看触发去抖。</li><li>窗口规则保证迟到事件能补：默认 2 天、拉宽到自然日、上限 7 天。</li><li>漏斗和自定义分析有各自的落表，其余都从 session / daily 算。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 会话与六分析</a>
+  </div>
+</figure>
+
       <div class="table-wrap">
         <table>
           <thead><tr><th>核心类/方法</th><th>做什么</th></tr></thead>
           <tbody>
-            <tr><td><code>AnalyticsSessionizer</code></td><td>会话切分：显式 sessionId 优先，否则 30 分钟无操作切分；隐式键锚定首事件</td></tr>
-            <tr><td><code>AnalyticsDailySummaryService</code></td><td>日汇总；自动汇总走 2 秒去抖</td></tr>
-            <tr><td><code>AnalyticsQueryService</code></td><td>流量/页面/漏斗/留存/自定义查询</td></tr>
-            <tr><td><code>AnalyticsReplayService</code></td><td>重建汇总；验证时先重建再断言</td></tr>
+            <tr><td><code>AnalyticsSessionizer</code></td><td>会话切分（上表四条规则的实现）</td></tr>
+            <tr><td><code>AnalyticsRollupTrigger</code></td><td>事件写入后 2 秒去抖触发重建汇总</td></tr>
+            <tr><td><code>AnalyticsService</code></td><td>六类分析的查询与计算都在这一个类（见上图），入口在 <code>AnalyticsController</code></td></tr>
+            <tr><td><code>AnalyticsReplayService</code></td><td>重建/回放；验证时先重建再断言</td></tr>
           </tbody>
         </table>
       </div>
+      <h4>CSV 补录（离线数据唯一入口）</h4>
+      <p>外部采集口与 SDK 已移除，离线数据只有 CSV 一条路：<code>AnalyticsController</code> 上传 → <code>AnalyticsService.importCsv</code>。限制：单文件 5MB、5000 行、自动剥 BOM、必须有 <code>eventName</code> 列。补录后要走一次「重建汇总」才进报表。</p>
       <div class="callout note">
         <span class="t">验证时序</span>
         <p>事件写入后自动汇总是 2 秒去抖；验证要 sleep ≥ 5 秒，或手动触发重建。刚写完就查，数字没变是正常的。</p>
       </div>
 
       <h3 id="s-7-3">采集 demo dcs</h3>
-      <p><b>解决什么</b>：保留任务/待办/审核最小闭环，作为内置 demo。它不是主业务，但状态机和权限是完整样板。</p>
+      <p><b>解决什么</b>：保留任务/待办/审核最小闭环，作为内置 demo。它不是主业务，但状态机和权限是完整样板——新域想做状态流转，先照它抄。</p>
       
 <figure class="diagram-card" id="fig-backend-06">
   <div class="diagram-head">
-    <span class="diagram-no">10</span>
+    <span class="diagram-no">12</span>
     <div>
       <h3>4.3.2 状态机与不变量</h3>
       <p class="diagram-q">采集 demo 的任务和提交各有哪些状态？哪些迁移是禁止的？</p>
@@ -1216,7 +1449,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-07">
   <div class="diagram-head">
-    <span class="diagram-no">11</span>
+    <span class="diagram-no">13</span>
     <div>
       <h3>4.3.3 主流程：发布 → 提交 → 审核</h3>
       <p class="diagram-q">一个任务从发布到审核完，谁在什么时候改状态、发事件、通知谁？</p>
@@ -1299,19 +1532,83 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <table>
           <thead><tr><th>核心类/方法</th><th>做什么</th></tr></thead>
           <tbody>
-            <tr><td><code>DcsTaskService.publish/close</code></td><td>发布任务、关闭任务；关闭前校验在途提交已审毕</td></tr>
-            <tr><td><code>DcsSubmissionService.submit</code></td><td>提交/重提；同 (task,user) 多版本，旧版本只读</td></tr>
-            <tr><td><code>DcsAuditService.audit</code></td><td>审核决定；写 append-only 的 <code>dcs_audit</code> 并发通知</td></tr>
+            <tr><td><code>DcsTaskService.publish / close</code></td><td>发布→发 <code>task.published</code>；关闭→发 <code>task.closed</code>；状态迁移走 <code>DcsTaskStateMachine</code></td></tr>
+            <tr><td><code>DcsSubmissionService.submit</code></td><td>提交/重提；同 (task,user) 多版本，旧版本只读；发 <code>data.submitted</code>（带 responseHours）</td></tr>
+            <tr><td><code>DcsAuditService.decide / pending / trailOf</code></td><td>审核决定 PASS/REJECT→发 <code>data.audit_passed / data.audit_rejected</code>（经 publishQuiet）；待审列表与审计轨迹</td></tr>
+            <tr><td><code>DcsNoticeService + InAppReachChannel</code></td><td>逐成员通知，站内信通道</td></tr>
+            <tr><td><code>DcsTodoPolicy</code></td><td>待办生成策略（谁的待办、何时消）</td></tr>
           </tbody>
         </table>
       </div>
+      <p>表就七张：<code>dcs_task / dcs_task_field / dcs_submission / dcs_audit / dcs_notice / dcs_feedback / dcs_changelog</code>。它给画像发的事件全部经 <code>ProfileEventPublisher</code>，本模块不直接写画像表。</p>
 
       <h3 id="s-7-4">风控 risk</h3>
-      <p><b>解决什么</b>：行为事件按规则判定放行/复核/拦截，落处置记录并通知。白名单和内容配置在规则之前生效。</p>
+      <p><b>解决什么</b>：行为事件按规则打分分级，双轨取高做决策；外加敏感词、内容审核、验证码三件配套。它目前只被 file-security 调用（驳回后发风险事件），助手不直接引用它。</p>
+      
+<figure class="diagram-card" id="fig-backend-26">
+  <div class="diagram-head">
+    <span class="diagram-no">14</span>
+    <div>
+      <h3>7.4 风控双轨：事件怎么变成分级决策</h3>
+      <p class="diagram-q">白名单在哪一步生效？规则轨和全局轨谁说了算？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>行为事件进 RiskEventCollector.collect</b><small>来源：页面埋点、文件驳回联动等</small></div>
+    <span class="fl-side phase">收集</span>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">白名单命中</b><small>IP 或 USER 在白名单且 enabled=1 → 跳过，不落风险事件</small></div>
+  <div class="fork"><b class="fk n">其余</b><small>落 dcs_risk_event，带规则给的 risk_score</small></div>
+</div>
+<div class="dgm-flow" style="margin-top:9px">
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>窗口内求和</b><small>RiskScoreService：按用户维度、IP 维度各算一份总分</small></div>
+    <span class="fl-side phase">打分</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>分级 L0–L4</b><small>分数档位映射等级</small></div>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">规则轨</b><small>单事件类型的最高级（一条爆规则就够高）</small></div>
+  <div class="fork"><b class="fk n">全局轨</b><small>总分对应的档（慢积累也能升档）</small></div>
+</div>
+<div class="dgm-flow" style="margin-top:9px">
+  <div class="fl-step">
+    <span class="fl-n">4</span>
+    <div class="fl-b"><b>HybridRiskPolicy.resolve：两轨取高</b><small>决策带 sourceTrack（GLOBAL / RULE），下游知道是哪条轨触的</small></div>
+    <span class="fl-side phase">决策</span>
+  </div>
+</div>
+<div class="dgm-note">排查顺序：这人没风险分 → 先查白名单；分数低但被拦 → 看是不是规则轨单事件触级；两边都高 → 正常拦截。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>白名单在收集入口就跳过——事件根本不落，不是落了再放行。</li><li>分数是窗口内事件 risk_score 的求和，用户和 IP 各算一份。</li><li>双轨取高：规则轨看单事件类型的最高级，全局轨看总分档；决策标注来源轨道。</li><li>目前唯一调用方是 file-security（驳回后发风险事件），助手不直接引用。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 双轨决策</a>
+  </div>
+</figure>
+
+      <h4>主流程时序</h4>
+      <p>上面是概念图，下面这张是真实时序：一次风险事件从收集到处置每一步落在哪个类。</p>
       
 <figure class="diagram-card" id="fig-backend-08">
   <div class="diagram-head">
-    <span class="diagram-no">12</span>
+    <span class="diagram-no">15</span>
     <div>
       <h3>4.4.2 主流程</h3>
       <p class="diagram-q">一条风险行为进来，怎么决定放行、复核还是拦截？</p>
@@ -1332,9 +1629,33 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </figure>
 
-      <div class="callout note">
-        <span class="t">改规则先看顺序</span>
-        <p>白名单 → 内容配置 → 规则 → 处置。顺序调换会让“本该豁免的人”被拦，或“本该拦的内容”直接过。</p>
+      <h4>打分与分级</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>概念</th><th>口径</th></tr></thead>
+          <tbody>
+            <tr><td>事件收集</td><td><code>RiskEventCollector.collect</code>：IP/USER 在白名单（enabled=1）直接跳过，不落风险事件</td></tr>
+            <tr><td>分数</td><td><code>RiskScoreService</code>：窗口内事件的 <code>risk_score</code> 求和，按用户 / IP 两个维度各算一份</td></tr>
+            <tr><td>分级</td><td>L0–L4 五档</td></tr>
+            <tr><td>双轨决策</td><td><code>HybridRiskPolicy.resolve</code>：规则轨（单事件类型最高级）与全局轨（总分档）取高，并标注来源轨道 GLOBAL / RULE</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>九个 Controller 分三组</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>组</th><th>Controller</th></tr></thead>
+          <tbody>
+            <tr><td>风险主数据</td><td>事件、规则、处置动作、白名单、看板</td></tr>
+            <tr><td>内容安全</td><td>敏感词、内容配置（<code>ContentModerationService</code> 做内容审核）</td></tr>
+            <tr><td>人机校验</td><td>验证码（<code>dcs_captcha_log</code>）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>表前缀 <code>dcs_risk_</code>（event/rule/action/whitelist）+ <code>dcs_sensitive_word / dcs_word_fp_feedback / dcs_captcha_log / dcs_profile_review</code>。file-security 驳回文件后在 afterCommit 里发 <code>RiskEventCommand</code>（幂等键 <code>file:review:{id}</code>），这是两个域唯一的接缝。</p>
+      <div class="callout warn">
+        <span class="t">白名单在收集入口，不在决策后</span>
+        <p>豁免是「事件根本不落」，不是「落了再放行」。排查「这人为什么没有风险分」先查白名单，再去对规则。</p>
       </div>
 
       <h3 id="s-7-5">计费 ai-billing</h3>
@@ -1342,7 +1663,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-09">
   <div class="diagram-head">
-    <span class="diagram-no">13</span>
+    <span class="diagram-no">16</span>
     <div>
       <h3>4.5.2 主流程：一次模型调用如何扣费</h3>
       <p class="diagram-q">模型调一次，钱是怎么算出来、扣下去、记成单据的？钱包和积分差在哪？</p>
@@ -1399,17 +1720,84 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </figure>
 
+      
+<figure class="diagram-card" id="fig-backend-27">
+  <div class="diagram-head">
+    <span class="diagram-no">17</span>
+    <div>
+      <h3>7.5 价格从哪来、额度怎么判、key 怎么选</h3>
+      <p class="diagram-q">改了价格为什么不生效？积分不够时先走哪个池？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>findEffectivePrice 取价</b><small>租户价 &gt; 全局价；精确模型名 &gt; 通配 <code>*</code>；且必须 enabled——没价直接拒</small></div>
+    <span class="fl-side phase">取价</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>preGate 判额度（积分轨）</b><small>周池 + 滚动窗口两个口径同时看</small></div>
+    <span class="fl-side phase">额度</span>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">额度够</b><small>继续发起调用</small></div>
+  <div class="fork"><b class="fk n">不够</b><small>先切加油包 tank；再不够才拒绝，不打底层供应商</small></div>
+</div>
+<div class="dgm-flow" style="margin-top:9px">
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>ProviderKeyPool 选 key</b><small>多把供应商 key 轮换；坏 key 在内存冷却 30 分钟后再试</small></div>
+    <span class="fl-side phase">选路</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">4</span>
+    <div class="fl-b"><b>发起上游调用</b><small>钱包轨在此之后才扣（见 7.5 上文的调用扣费图）</small></div>
+  </div>
+</div>
+<div class="dgm-note">「改了价格没生效」三查：改的是租户价还是全局价、模型名是精确还是通配、记录有没有启用。「忽好忽坏」查 key 池冷却——某把 key 被判坏会切到别的 key，表现就是间歇失败。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>取价顺序三层：租户价优先于全局价、精确模型名优先于通配、必须启用。</li><li>额度是积分轨的前置闸：周池 + 滚动窗口，不足先切加油包，再不足才拒。</li><li>供应商 key 是池化的：多把轮换，坏 key 内存冷却 30 分钟。</li><li>模型接入走 AiCapabilityPort：接口定义在计费域，助手侧实现。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 取价与额度</a>
+  </div>
+</figure>
+
+      <h4>价格怎么定</h4>
+      <p><code>findEffectivePrice</code> 的取价顺序固定：<b>租户价优先于全局价，精确模型名优先于通配 <code>*</code>，且必须 enabled</b>。所以「改了价格没生效」先查三件事：改的是租户价还是全局价、模型名写的是精确还是通配、记录是否启用。</p>
+      <h4>两本账 + 配额闸</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>轨</th><th>表</th><th>扣减入口</th></tr></thead>
+          <tbody>
+            <tr><td>钱包</td><td><code>dcs_tenant_wallet</code> + <code>dcs_tenant_wallet_ledger</code></td><td><code>TenantWalletService.deductForAiUsage</code>（JoinTx 版与业务同事务）</td></tr>
+            <tr><td>积分</td><td><code>dcs_ai_credit_ledger / _plan / _subscription</code></td><td><code>DcsAiCreditServiceImpl.deduct(idempotencyKey)</code>；调用前 <code>preGate</code> 判额度：周池 + 滚动窗口，不足时切加油包 tank</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>供应商密钥池</h4>
+      <p><code>ProviderKeyPool</code> 管多把 provider key 轮换；坏 key 在内存里冷却 30 分钟再用。模型接入走端口：<code>AiCapabilityPort</code> 接口定义在 ai-billing，assistant 侧提供实现——方向是「助手实现计费域的端口」，不是反过来。</p>
       <div class="callout danger">
         <span class="t">幂等边界（代码注释已承认）</span>
         <p>幂等键只覆盖同一订阅内的重复帧；跨订阅或 agent 重建后的重放，仍可能重复计费。对账时要按 run/订阅一起看，不能只看单个 key。</p>
       </div>
 
       <h3 id="s-7-6">文件安全 file-security</h3>
-      <p><b>解决什么</b>：OSS 上传后自动建单，按判定序决定拒绝/豁免/人工审/直接过，结果发通知。</p>
+      <p><b>解决什么</b>：OSS 上传后自动建单，按判定序决定拒绝/豁免/人工审/直接过，结果发通知。接口（<code>FileGuardChecker / FileReviewGate</code>）定义在 system，实现落在本模块——换实现不动调用方。</p>
       
 <figure class="diagram-card" id="fig-backend-10">
   <div class="diagram-head">
-    <span class="diagram-no">14</span>
+    <span class="diagram-no">18</span>
     <div>
       <h3>4.6.2 主流程：上传 → 判定 → 审核</h3>
       <p class="diagram-q">一个文件上传后，什么情况下直接拒、什么情况要人审、审完改什么？</p>
@@ -1480,9 +1868,23 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </figure>
 
+      <h4>三道检查</h4>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>#</th><th>检查</th><th>实现</th></tr></thead>
+          <tbody>
+            <tr><td>L1</td><td>扩展名白名单</td><td><code>FileGuardDecision.decide</code> 统一判定</td></tr>
+            <tr><td>L2</td><td>魔数（真文件类型）</td><td><code>MagicNumberTable</code>——改后缀骗不过</td></tr>
+            <tr><td>L3</td><td>深扫</td><td>按扩展名路由：<code>PdfJsScanner</code> / <code>SvgXssScanner</code> / <code>OfficeMacroScanner</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>模式三档 <code>OFF / OBSERVE / ENFORCE</code>；检测对管理员<b>不豁免</b>（代码注释明确）。审核 approve/reject 都是 CAS 条件更新（<code>WHERE status='PENDING'</code>，0 行=已被处理），批量也是逐条 CAS。</p>
+      <h4>下载/预览的判定序（与上传不同）</h4>
+      <p><code>DcsFileReviewGateImpl</code>：①总开关关→全放行；②查 <code>dcs_file_review</code> 该文件的单子；③PENDING / REJECTED / EXEMPT 按放行矩阵走，超管与租户管理员放行。驳回后 afterCommit 记 <code>RiskEventCollector</code>（幂等 <code>file:review:{id}</code>），联动风控。</p>
       <div class="callout warn">
-        <span class="t">判定序不可调换</span>
-        <p>守卫硬拦（宏/伪装/敏感词）必须最先；反馈/助手类目豁免其次；然后才是总开关、管理员豁免、类目配置。顺序错了会出现“该拦的没拦”。</p>
+        <span class="t">上传判定序不可调换</span>
+        <p>守卫硬拦（宏/伪装/XSS）必须最先；类目豁免其次；然后才是总开关与类目配置。顺序错了会出现「该拦的没拦」。</p>
       </div>
 
       <h3 id="s-7-7">系统与任务</h3>
@@ -1490,15 +1892,15 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <div class="mini">
           <h4>system</h4>
           <ul>
-            <li>用户/角色/菜单/租户/字典/公告等 21 个 Controller。</li>
+            <li>用户/角色/菜单/租户/字典/公告等 21 个 Controller；服务面：<code>ISysUserService / ISysRoleService / ISysMenuService / ISysTenantService(+Package) / ISysDictType+DataService / ISysConfigService / ISysNoticeService / ISysOssService(+Config)</code>。</li>
             <li>动态菜单：<code>sys_menu</code> → <code>getRouters</code> → 前端 addRoute。</li>
-            <li>租户开通/套餐/域名在 system 与计费域交界，改前先看两边契约。</li>
+            <li>文件安全的两个接口（<code>FileGuardChecker / FileReviewGate</code>）定义在这里，实现在 file-security——跨域接缝走接口，别直接依赖实现模块。</li>
           </ul>
         </div>
         <div class="mini">
           <h4>job</h4>
           <ul>
-            <li>SnailJob 定时任务模块。</li>
+            <li>SnailJob 定时任务模块（执行器示例在 <code>org.dromara.job.snailjob</code>）。</li>
             <li>大表清理分批：单轮 1 万行、封顶 100 轮。</li>
             <li>多实例必须加分布式锁；任务要可重入、可幂等。</li>
           </ul>
@@ -1536,7 +1938,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-11">
   <div class="diagram-head">
-    <span class="diagram-no">15</span>
+    <span class="diagram-no">19</span>
     <div>
       <h3>5.2 全链路全景图</h3>
       <p class="diagram-q">一条助手请求从浏览器到模型再回到浏览器，中间到底经过哪些环节？</p>
@@ -1650,7 +2052,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-12">
   <div class="diagram-head">
-    <span class="diagram-no">16</span>
+    <span class="diagram-no">20</span>
     <div>
       <h3>5.5 选 agent：注册表 + 线程会话缓存</h3>
       <p class="diagram-q">agentId 从哪来？同一个用户同一线程为什么能复用 agent？</p>
@@ -1695,7 +2097,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-13">
   <div class="diagram-head">
-    <span class="diagram-no">17</span>
+    <span class="diagram-no">21</span>
     <div>
       <h3>5.7 模型装饰器链：六层套娃</h3>
       <p class="diagram-q">模型外面套了哪六层装饰器？顺序反了会出什么问题？</p>
@@ -1718,7 +2120,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
 
       <div class="callout danger">
         <span class="t">顺序不能随便调</span>
-        <p>PII 必须在计费之外、模型调用之内；如果把 PII 放到计费外层，脱敏后的 token 数与计费口径会对不上；把记忆放到 PII 外层，则会先读明文记忆再脱敏，泄露面变大。</p>
+        <p>PII 必须在计费之外、模型调用之内；如果把 PII 放到计费外层，脱敏后的 token 数与计费口径会对不上；把记忆放到 PII 外层，则会先读明文记忆再脱敏，泄露面变大；动态值（日期 / 记忆 / 技能）一律在末位追加——进前缀会击穿全租户的 prompt 缓存。</p>
       </div>
 
       <h3 id="s-8-7">工具系统</h3>
@@ -1726,7 +2128,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-14">
   <div class="diagram-head">
-    <span class="diagram-no">18</span>
+    <span class="diagram-no">22</span>
     <div>
       <h3>5.8.1 三层工具</h3>
       <p class="diagram-q">助手工具到底有几层来源？权限规则在哪里统一生成？</p>
@@ -1751,7 +2153,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <table>
           <thead><tr><th>层</th><th>放哪</th><th>加工具时改什么</th></tr></thead>
           <tbody>
-            <tr><td>平台内置</td><td><code>ruoyi-assistant</code> 的 tools 包</td><td>实现工具类 + 注册表登记 + 权限规则（见 8.13）</td></tr>
+            <tr><td>平台内置</td><td><code>ruoyi-assistant</code> 的 tools 包</td><td>实现工具类 + 注册表登记 + 权限规则（见 8.18）</td></tr>
             <tr><td>SPI 业务</td><td>业务模块实现 <code>BizToolProvider</code></td><td>Provider + 只读标记；不改助手模块</td></tr>
             <tr><td>MCP</td><td><code>dcs_mcp_server</code> 配置</td><td>后台登记服务器与工具开关，代码零改动</td></tr>
           </tbody>
@@ -1759,11 +2161,11 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       </div>
 
       <h3 id="s-8-8">技能系统</h3>
-      <p>技能是“可按需加载的提示词包”，不是工具。仓库分三层（本地/租户/内置），装配时只把目录拼进系统提示词，真正内容在命中时才注入。</p>
+      <p>技能是“可按需加载的提示词包”，不是工具。仓库分三层（内置 / 部署目录 / 数据库），<b>目录不拼进系统提示词</b>——由技能闸中间件在每次模型调用时按角色 + 权限矩阵 + 停用表重组 <code>&lt;skills&gt;</code> 段，正文命中后才注入。可见性变了下一轮立刻生效。</p>
       
 <figure class="diagram-card" id="fig-backend-15">
   <div class="diagram-head">
-    <span class="diagram-no">19</span>
+    <span class="diagram-no">23</span>
     <div>
       <h3>5.9.1 三层仓库</h3>
       <p class="diagram-q">技能从哪来、谁覆盖谁、最后凭什么决定「这个用户能不能看到」？</p>
@@ -1806,7 +2208,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </div>
 <div class="fl-forks">
-  <div class="fork"><b class="fk y">可见</b><small>进模型技能目录 · 当轮按需注入 · 允许 <code>view_skill</code> 读取</small></div>
+  <div class="fork"><b class="fk y">可见</b><small>每次模型调用重组 &lt;skills&gt; 段 · 正文由 <code>view_skill</code> 按需读取</small></div>
   <div class="fork"><b class="fk n">不可见</b><small>直接从候选剔除，模型不知道它存在</small></div>
 </div>
 <div class="dgm-rule"><b>顺序不能反：</b>数据库覆盖部署目录、部署目录覆盖内置。排查「我改了技能为什么没生效」先确认改的是哪一层——改 jar 里的文件但数据库同层有同名技能，就会被数据库盖掉。</div>
@@ -1815,7 +2217,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
     <div class="diagram-read">
       <p class="read-title">读图顺序</p>
-      <ol><li>三个来源按优先级从低到高：内置 classpath → 部署目录 → 数据库。同名时后层覆盖前层。</li><li>合并之后才过可见性闸：先看停用遮罩，再看 minRole，最后看 skill:技能名 权限矩阵。</li><li>闸门不过不是报错，而是直接从候选里剔除——模型根本看不到这个技能。</li><li>通过闸门的技能会同时出现在三处：目录、当轮注入、view_skill 工具。</li></ol>
+      <ol><li>三个来源按优先级从低到高：内置 classpath → 部署目录 → 数据库。同名时后层覆盖前层。</li><li>合并之后才过可见性闸：先看停用遮罩，再看 minRole，最后看 skill:技能名 权限矩阵。</li><li>闸门不过不是报错，而是直接从候选里剔除——模型根本看不到这个技能。</li><li>通过闸门的技能进每次模型调用重组的 &lt;skills&gt; 段；正文由 view_skill 按需读取。</li></ol>
     </div>
   </div>
   <div class="diagram-links">
@@ -1833,7 +2235,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-16">
   <div class="diagram-head">
-    <span class="diagram-no">20</span>
+    <span class="diagram-no">24</span>
     <div>
       <h3>5.10.2 run 生命周期</h3>
       <p class="diagram-q">一次 run 有哪些状态？多实例下谁来收尾？</p>
@@ -1858,10 +2260,10 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <table>
           <thead><tr><th>状态</th><th>含义</th><th>前端表现</th></tr></thead>
           <tbody>
-            <tr><td>QUEUED / RUNNING</td><td>已受理、正在跑</td><td>工作态 + 计时</td></tr>
-            <tr><td>WAITING_INPUT</td><td>等人工确认</td><td>HITL 卡</td></tr>
-            <tr><td>FINISHED</td><td>正常终答</td><td>消息落库</td></tr>
-            <tr><td>FAILED / ABORTED</td><td>失败或用户中止</td><td>错误卡 + 重试入口</td></tr>
+            <tr><td>RUNNING</td><td>跑动中；等人工确认（ask_user / interrupt）也是它，仅做收割豁免</td><td>工作态 + 计时；HITL 卡</td></tr>
+            <tr><td>COMPLETED</td><td>正常终答</td><td>消息落库</td></tr>
+            <tr><td>FAILED</td><td>失败，六类原因码落 <code>dcs_assistant_run_issue</code></td><td>错误卡 + 重试入口</td></tr>
+            <tr><td>INTERRUPTED</td><td>模型中断 / 用户停止 / 客户端断连</td><td>确认卡或停止态</td></tr>
           </tbody>
         </table>
       </div>
@@ -1871,7 +2273,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-17">
   <div class="diagram-head">
-    <span class="diagram-no">21</span>
+    <span class="diagram-no">25</span>
     <div>
       <h3>5.11.1 HITL 的真实流程</h3>
       <p class="diagram-q">模型要调一个危险工具时，确认卡从哪来、点了之后又怎么续上？</p>
@@ -1964,7 +2366,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-18">
   <div class="diagram-head">
-    <span class="diagram-no">22</span>
+    <span class="diagram-no">26</span>
     <div>
       <h3>5.13 Agent 侧计费链</h3>
       <p class="diagram-q">助手这一轮花了多少钱，是谁算的、什么时候告诉前端？</p>
@@ -2032,12 +2434,332 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <p>幂等键只覆盖同一订阅内的重复帧。agent 重建或跨订阅重放，理论上仍可能重复计费。对账要按 run + 订阅组合看，发现差异先查这条，再定性。</p>
       </div>
 
-      <h3 id="s-8-13">加工具</h3>
+      <h3 id="s-8-13">提示词装配：8 段 md 拼出系统提示词</h3>
+      <p>系统提示词不是一整个字符串，而是 8 段 markdown 按<b>固定列表序</b>拼装（<code>PromptAssets</code>）：role → discipline → discipline-urge → layout → cheatsheet → routes → chart → memory。加载三级兜底：<code>config/prompts</code>（部署期覆写）→ classpath <code>prompts/</code> → 内嵌常量，和技能仓库同一套思路。</p>
+      
+<figure class="diagram-card" id="fig-backend-28">
+  <div class="diagram-head">
+    <span class="diagram-no">27</span>
+    <div>
+      <h3>8.13 系统提示词怎么拼出来</h3>
+      <p class="diagram-q">8 段 md 是哪些？哪些段是条件拼的？为什么日期不放开头？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-bands">
+  <div class="band">
+    <div class="band-k"><span>加载</span><b>三级兜底</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node accent">config/prompts<small>部署期覆写</small></span>
+        <span class="chip-node">classpath prompts/<small>随 jar</small></span>
+        <span class="chip-node muted">内嵌常量<small>兜底</small></span>
+      </div>
+    </div>
+  </div>
+  <div class="band-arrow"><span>按列表序拼装（PromptAssets）</span></div>
+  <div class="band band-main">
+    <div class="band-k"><span>8 段</span><b>顺序固定</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node">role<small>角色</small></span>
+        <span class="chip-node">discipline<small>纪律（按工具面裁剪）</small></span>
+        <span class="chip-node">discipline-urge<small>催办纪律·条件段</small></span>
+        <span class="chip-node">layout<small>版式</small></span>
+        <span class="chip-node">cheatsheet<small>速查（按工具面裁剪）</small></span>
+        <span class="chip-node">routes</span>
+        <span class="chip-node">chart</span>
+        <span class="chip-node">memory<small>长期记忆纪律·条件段</small></span>
+      </div>
+    </div>
+  </div>
+  <div class="band-arrow"><span>每轮模型调用时，装饰器在末位追加</span></div>
+  <div class="band">
+    <div class="band-k"><span>动态尾</span><b>不进前缀</b></div>
+    <div class="band-v">
+      <div class="band-row wrap">
+        <span class="chip-node">今天是…（日期）</span>
+        <span class="chip-node">用户长期记忆：…（有命中才拼）</span>
+        <span class="chip-node">命中技能正文（选中那几轮）</span>
+        <span class="chip-node">&lt;skills&gt; 重组段（SkillGate 每次调用）</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="dgm-rule"><b>改段的两个代价：</b>①把日期/记忆挪进 8 段前缀 → 全租户 prompt cache 当日作废（缓存前缀被动态值击穿）；②删 discipline 里的工具说明但工具还注册着 → 模型不知道怎么用，只会在试错里烧 token。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>8 段按列表序拼接，加载三级兜底：config/prompts → classpath → 内嵌常量。</li><li>memory 与 discipline-urge 是条件段；cheatsheet / discipline 按本会话真注册的工具面裁剪。</li><li>日期、动态记忆、命中技能都由装饰器在每轮末位追加 system——不进前缀。</li><li>动态值进前缀会击穿全租户的 prompt cache，这是顺序的根本原因。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 8.13 提示词装配</a>
+  </div>
+</figure>
+
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>段</th><th>什么时候拼</th></tr></thead>
+          <tbody>
+            <tr><td>memory</td><td>只有租户开记忆（memoryOn）才拼静态纪律段；动态记忆走装饰器（见 8.14）</td></tr>
+            <tr><td>discipline-urge</td><td>催办纪律段，urgeVisible 才拼</td></tr>
+            <tr><td>cheatsheet / discipline</td><td>装配时按<b>本会话真注册的工具面</b>裁剪（filterCheatsheet / filterDiscipline）——工具没开就不提它</td></tr>
+            <tr><td>日期</td><td>不在前缀！每轮由装饰器在<b>末位</b>追加 system「今天是…」（见 8.6 顺序的原因）</td></tr>
+            <tr><td>计划</td><td>没有独立段——只在纪律第 9 条要求模型调 <code>submit_plan</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn">
+        <span class="t">技能目录不进系统提示词</span>
+        <p>旧版把技能目录拼进系统串的做法已退役。现在技能段由 <code>AssistantSkillGateMiddleware</code>（官方 DynamicSkillMiddleware 的子类）在<b>每次模型调用时</b>按角色 + <code>skill:</code> 权限闸 + 停用表重组 <code>&lt;skills&gt;</code>——可见性变了下一轮立刻生效，不用重建 agent。</p>
+      </div>
+
+      <h3 id="s-8-14">记忆：一个写工具 + 一张用户私有表</h3>
+      <p>模型侧只有 <b>一个</b>记忆工具 <code>save_memory</code>（写）；读、编辑、清空、删单条全走 REST（<code>AssistantMemoryController</code>），不占工具面。落表 <code>dcs_assistant_memory</code>，行是<b>用户级私有</b>（tenant_id + user_id 双谓词）——没有租户共享记忆这种东西。</p>
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>开关</th><th>管什么</th></tr></thead>
+          <tbody>
+            <tr><td>租户 <code>memoryEnabled</code></td><td>整条记忆链装不装配：关了工具不注册、注入也不发生</td></tr>
+            <tr><td>个人 <code>memory_pref</code></td><td>用户自己的偏好开关</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>注入是动态的：<code>AssistantMemoryService.digest</code> 按最后一条用户提问做相关性打分取 TopK（30 秒缓存）；<code>MemoryInjectModelDecorator</code> 每次模型调用在末位追加 system「用户长期记忆：…」，无命中不注入；同时上报本轮注入条数与字数，供 <code>memory_turn</code> 帧显示。</p>
+      <div class="callout note">
+        <span class="t">排查「记忆没生效」</span>
+        <p>顺序：租户开关 → 个人开关 → digest 有没有命中（看缓存与相关性）→ 注入条数（memory_turn 帧）。四步都过才是真没写入。</p>
+      </div>
+
+      <h3 id="s-8-15">上下文预算与压缩：两级减负</h3>
+      <p>触发线公式（<code>AssistantCompactionPolicy</code>）：<code>max(4000, 窗口 − min(最大输出, 21000) − 13000)</code>——是绝对 token 数，不是百分比。到线后先微压缩，不够再主压缩。</p>
+      
+<figure class="diagram-card" id="fig-backend-29">
+  <div class="diagram-head">
+    <span class="diagram-no">28</span>
+    <div>
+      <h3>8.15 两级压缩：先清工具结果，再做摘要</h3>
+      <p class="diagram-q">到触发线之后先发生什么？什么情况下压缩会被熔断？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>上下文逼近触发线</b><small>公式算的是绝对 token，不是百分比</small></div>
+    <span class="fl-side phase">到线</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>驱逐超大结果</b><small>单条工具结果超 8 万字符 → 落盘，上下文留预览 + 文件路径（read_file 可回读）</small></div>
+    <span class="fl-side phase">先驱逐</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>微压缩</b><small>清最老的工具结果组、保留最近 5 组；省不足 256 token 自动回滚（当没发生）</small></div>
+    <span class="fl-side phase">再微压</span>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">降到线下</b><small>继续跑，不产生摘要</small></div>
+  <div class="fork"><b class="fk n">还在线上</b><small>主压缩：九段模板摘要（诉求/决定/编号/问题/偏好/待办/话题/下一步/红线），最后 1 轮原文保留</small></div>
+</div>
+<div class="dgm-flow" style="margin-top:9px">
+  <div class="fl-step">
+    <span class="fl-n">4</span>
+    <div class="fl-b"><b>写回三处</b><small>AgentState（压缩后上下文）· 消息表 system 分隔条 · dcs_assistant_compaction 审计行（前后 token/条数/prev_id 链）</small></div>
+    <span class="fl-side phase">落账</span>
+  </div>
+</div>
+<div class="dgm-rule"><b>双熔断：</b>连续 3 次摘要失败、或压缩后 3 步内被快速回填（压太狠的信号）→ 压缩停用。「上下文一直涨不压」先查熔断，再谈阈值。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>触发线是绝对数：max(4000, 窗口 − min(最大输出, 21000) − 13000)。</li><li>微压缩先行：清最老的工具结果组，保留最近 5 组；省不出 256 token 就回滚。</li><li>微压缩不够才主压缩：九段模板摘要，最后 1 轮原文保留（keepMessages=2）。</li><li>驱逐在压缩之前：单条结果超 8 万字符先落盘，上下文只留预览 + 路径。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 8.15 上下文预算与压缩</a>
+  </div>
+</figure>
+
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>参数</th><th>值</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td>keepMessages</td><td>2</td><td>最后 1 轮原文保留</td></tr>
+            <tr><td>triggerMessages</td><td>0</td><td>不按条数触发，只按 token</td></tr>
+            <tr><td>flushBeforeCompact</td><td>false</td><td>压缩前不先落盘</td></tr>
+            <tr><td>摘要输出封顶</td><td>2 万 token</td><td>摘要模型 tools 恒为 null（不许它调工具）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>摘要模板九段：诉求 / 决定 / 编号 / 问题 / 偏好 / 待办 / 话题 / 下一步 / 红线，占位 <code>{messages}</code>。压缩后的上下文写回 AgentState（agentscope schema），同时在消息表落一条 role=system 的分隔条、<code>dcs_assistant_compaction</code> 落审计行（前后 token / 条数 / 摘要 / prev_id 链）。</p>
+      <div class="callout danger">
+        <span class="t">双熔断，别当 bug</span>
+        <p>连续 3 次摘要失败、或压缩后 3 步内快速回填（说明压太狠），压缩自动停用。看到「上下文一直涨不压」先查是不是熔断了，而不是去改阈值。</p>
+      </div>
+
+      <h3 id="s-8-16">run 状态机与多实例</h3>
+      <p>run 的 status 是 String，只有四个取值：<code>RUNNING / COMPLETED / FAILED / INTERRUPTED</code>。没有 QUEUED、WAITING、DONE——等人工确认（ask_user / interrupt）期间 run 仍是 RUNNING，只做收割豁免。</p>
+      
+<figure class="diagram-card" id="fig-backend-30">
+  <div class="diagram-head">
+    <span class="diagram-no">29</span>
+    <div>
+      <h3>8.16 run 状态机与收割</h3>
+      <p class="diagram-q">run 到底有哪几个状态？卡住的 run 谁来收？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>insertIgnoreRun → RUNNING</b><small>同刻绑定 tenant / user / thread / owner_instance</small></div>
+    <span class="fl-side phase">开跑</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>跑动中：每 10 秒刷 last_event_at</b><small>心跳 15 秒、实例租约 45 秒；等确认（ask_user / interrupt）也是 RUNNING，仅豁免收割</small></div>
+    <span class="fl-side">豁免≠新态</span>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">正常终答</b><small>→ COMPLETED</small></div>
+  <div class="fork"><b class="fk n">失败</b><small>→ FAILED（六类原因码落 dcs_assistant_run_issue）</small></div>
+  <div class="fork"><b class="fk n">中断</b><small>→ INTERRUPTED：模型 interrupt、用户停止、客户端断连三处各写各的</small></div>
+</div>
+<div class="dgm-flow" style="margin-top:9px">
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>终态都是条件 UPDATE（WHERE status='RUNNING'）</b><small>0 行 = 已被别人收掉；迟到终态直接丢弃，不覆盖</small></div>
+    <span class="fl-side phase">收口</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">4</span>
+    <div class="fl-b"><b>悬挂收割</b><small>本机 60s 无事件 → INTERRUPTED(client-disconnect)；纯心跳 10min → no-terminal-event；RetentionJob 每 15min 兜底</small></div>
+    <span class="fl-side phase">兜底</span>
+  </div>
+</div>
+<div class="dgm-note">跨实例不抢收：owner 非本机且 Redis 租约未过期就跳过；无 owner 的旧数据 30 分钟后才收。判「卡死」先看 owner_instance 是谁、租约过没过，再决定要不要手动收。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>只有四个状态：RUNNING / COMPLETED / FAILED / INTERRUPTED，String 不是枚举。</li><li>等人工确认期间仍是 RUNNING（只做收割豁免）——没有 WAITING 态。</li><li>终态是条件 UPDATE：只有 RUNNING 能迁出，迟到的第二个终态直接丢。</li><li>收割三档：本机 60 秒无事件、纯心跳 10 分钟、RetentionJob 15 分钟兜底。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 8.16 run 状态机</a>
+  </div>
+</figure>
+
+      <div class="table-wrap compact">
+        <table>
+          <thead><tr><th>机制</th><th>口径</th></tr></thead>
+          <tbody>
+            <tr><td>开跑</td><td><code>insertIgnoreRun</code> 写入 RUNNING，同刻绑定 tenant / user / thread / owner_instance</td></tr>
+            <tr><td>收尾</td><td>终态都是<b>条件 UPDATE</b>（仅 <code>status='RUNNING'</code> 可迁移）；迟到的第二个终态直接丢弃，不会覆盖</td></tr>
+            <tr><td>实例身份</td><td>配置 <code>dcs.assistant.instance.id</code>，缺省 <code>hostname:pid:短码</code>；租约 45 秒、心跳 15 秒</td></tr>
+            <tr><td>收割三档</td><td>本机 60 秒无事件 → INTERRUPTED(client-disconnect)；纯心跳 10 分钟 → no-terminal-event；RetentionJob 每 15 分钟兜底迁移悬挂 run</td></tr>
+            <tr><td>跨实例</td><td>owner 非本机且 Redis 租约未过期则<b>不抢收</b>；无 owner 的旧数据 30 分钟后才收</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h4>续看（attach）与回放汇</h4>
+      <p>刷新页面后续看：先查 DB 最新 RUNNING，再 <code>attach</code> 本进程的汇（RunStreamHub）。汇不在本实例或已被逐出 → 返回失败，前端回退刷历史——<b>跨实例不靠汇</b>，靠粘性：LB 按 <code>X-Thread-Id</code> 哈希路由（<code>AssistantStickyHeaderFilter</code> 校验），没有粘性头多实例一启动就报错。</p>
+      
+<figure class="diagram-card" id="fig-backend-31">
+  <div class="diagram-head">
+    <span class="diagram-no">30</span>
+    <div>
+      <h3>8.16 多实例与续看：谁在喂这条流</h3>
+      <p class="diagram-q">刷新之后怎么接上原来的流？跨实例为什么不靠汇？</p>
+    </div>
+  </div>
+  <div class="diagram-body">
+    <div class="diagram-figure">
+      <div class="dgm-wrap">
+<div class="dgm dgm-flow">
+  <div class="fl-step">
+    <span class="fl-n">1</span>
+    <div class="fl-b"><b>前端带 X-Thread-Id 发请求</b><small>AssistantStickyHeaderFilter 校验；LB 按它哈希——没有粘性头，多实例一启动就错</small></div>
+    <span class="fl-side phase">粘性</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">2</span>
+    <div class="fl-b"><b>run 落在本实例：RunStreamHub 建汇</b><small>run 行记 owner_instance；共享态走 Redis 前缀 global:smartdock:asst:</small></div>
+    <span class="fl-side phase">在跑</span>
+  </div>
+  <div class="fl-step">
+    <span class="fl-n">3</span>
+    <div class="fl-b"><b>用户刷新 → attach</b><small>先查 DB 最新 RUNNING，再 attach 本进程汇；命中则重放缓冲帧</small></div>
+    <span class="fl-side phase">续看</span>
+  </div>
+</div>
+<div class="fl-forks">
+  <div class="fork"><b class="fk y">汇在本实例且活着</b><small>重放最多 4096 帧；超出部分首帧补 dcs-resume-truncated（续看截断标记，与压缩无关）</small></div>
+  <div class="fork"><b class="fk n">汇已逐出 / 在别的实例</b><small>attach 失败 → 前端回退刷历史消息；不跨实例拉流</small></div>
+</div>
+<div class="dgm-note">排除断流先问三个问题：粘性头还在吗（LB 换策略会丢）？owner_instance 是不是本机？汇是不是过了窗口（零观众 60s / 终局 300s）？三个都不是才是真断流。</div>
+</div>
+      
+    </div>
+    <div class="diagram-read">
+      <p class="read-title">读图顺序</p>
+      <ol><li>粘性是前提：LB 按 X-Thread-Id 哈希路由，请求始终落到同一实例。</li><li>续看两步：先查 DB 最新 RUNNING，再 attach 本进程的回放汇。</li><li>汇不在本实例或已逐出 → 返回失败，前端回退刷历史——不跨实例拉流。</li><li>五个窗口记牢：4096 帧 / 256 run / 终局 300s / 零观众 60s / 挂死 10min。</li></ol>
+    </div>
+  </div>
+  <div class="diagram-links">
+    <a href="backend-architecture.md">《后端架构详解》· 8.16 多实例与续看</a>
+  </div>
+</figure>
+
+      <div class="callout warn">
+        <span class="t">回放汇的五个窗口</span>
+        <p>单 run 保留 4096 帧；进程内最多 256 个 run；终局后留 300 秒；零观众 60 秒弃链；挂死 10 分钟弃链。溢出只重放最后 4096 帧，并在首帧补 <code>dcs-resume-truncated</code>——它是<b>续看被截断</b>的标记，和上下文压缩无关，别混。</p>
+      </div>
+
+      <h3 id="s-8-17">8 个平台工具逐个说</h3>
+      <p>注册表就一张（<code>ToolRegistry</code>），8 个平台工具与权限规则同一循环注册。行为策略平台工具全是 ALLOW：写类靠 PlanGate 拦，不是靠工具自身弹确认。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>工具</th><th>用途</th><th>读写</th><th>备注</th></tr></thead>
+          <tbody>
+            <tr><td><code>web_search</code></td><td>联网查询</td><td>只读</td><td>出网风险标 high，权限闸最严</td></tr>
+            <tr><td><code>read_attachment</code></td><td>读会话附件</td><td>只读</td><td>配合附件两步上传（前端 8.10）</td></tr>
+            <tr><td><code>submit_plan</code></td><td>提交计划卡</td><td>只读信号</td><td>计划坞的数据源</td></tr>
+            <tr><td><code>ask_user</code></td><td>结构化反问</td><td>只读</td><td>仅交互模式注册——自动化跑批不挂</td></tr>
+            <tr><td><code>todo_write</code></td><td>任务清单</td><td><b>写库</b></td><td>PlanGate 盯着的写操作</td></tr>
+            <tr><td><code>save_memory</code></td><td>写长期记忆</td><td><b>写</b></td><td>仅租户开记忆时注册（见 8.14）</td></tr>
+            <tr><td><code>view_skill</code></td><td>取技能正文</td><td>只读</td><td>技能命中后按需读全文</td></tr>
+            <tr><td><code>read_file</code></td><td>回读工作区文件</td><td>只读</td><td>驱逐结果落盘后的回读路径</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout note">
+        <span class="t">第九个不算平台工具</span>
+        <p><code>load_skill_through_path</code> 由官方技能中间件注册，不在上述 8 个里——数工具时别把它数进去。权限档 <code>ToolIdentity</code> 三档：MEMBER=0 / PUBLISHER·REVIEWER=1 / ADMIN=2；租户 <code>toolGate</code> 只能提档不能降档（member/admin 只升不降）。SPI 业务工具 <code>readOnly</code> 默认 false（fail-closed），写工具走 ASK 确认卡。</p>
+      </div>
+
+      <h3 id="s-8-18">加工具</h3>
       <p>两种加法两条路。先判断工具属于平台能力还是业务能力，再选对应流程，不要混。</p>
       
 <figure class="diagram-card" id="fig-backend-x07">
   <div class="diagram-head">
-    <span class="diagram-no">23</span>
+    <span class="diagram-no">31</span>
     <div>
       <h3>给助手加一个平台工具：注册表、权限规则、前端卡片</h3>
       <p class="diagram-q">平台工具只改 ToolRegistry 就够了吗？模型可见性、HITL、展示文案分别在哪一层？</p>
@@ -2061,7 +2783,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-x08">
   <div class="diagram-head">
-    <span class="diagram-no">24</span>
+    <span class="diagram-no">32</span>
     <div>
       <h3>给助手加一个 SPI 业务工具：Provider、只读标记、自动化裁剪</h3>
       <p class="diagram-q">业务模块想给助手加工具，为什么不能直接改助手模块？只读/写类如何影响自动化？</p>
@@ -2094,7 +2816,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         </table>
       </div>
 
-      <h3 id="s-8-14">核心类与方法</h3>
+      <h3 id="s-8-19">核心类与方法</h3>
       <p>这张表是“改哪里”的索引。行号会随重构漂移，按类名和方法名定位，不要硬记数字。</p>
       <div class="table-wrap">
         <table>
@@ -2144,7 +2866,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-x06">
   <div class="diagram-head">
-    <span class="diagram-no">25</span>
+    <span class="diagram-no">33</span>
     <div>
       <h3>修 bug 的红绿闭环：先红两次，再绿，再撤回验红</h3>
       <p class="diagram-q">怎样证明“修好了”，而不是“这条测试本来就没测到它”？</p>
@@ -2244,7 +2966,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       
 <figure class="diagram-card" id="fig-backend-x05">
   <div class="diagram-head">
-    <span class="diagram-no">26</span>
+    <span class="diagram-no">34</span>
     <div>
       <h3>排障决策树：403、200 但空、500、超时</h3>
       <p class="diagram-q">接口不对时，先看什么、再查什么，怎么避免瞎猜？</p>
@@ -2471,8 +3193,8 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       </div>
 
       <h3 id="s-12-1">图目录</h3>
-      <p>共 26 张。编号即正文中的图号，点“跳转”回到对应图卡。</p>
-      <div class="table-wrap"><table><thead><tr><th>编号</th><th>图名</th><th>它回答什么</th><th></th></tr></thead><tbody><tr><td><a href="#fig-backend-01">01</a></td><td>0. 一分钟总览</td><td>后端整体分成哪几块？请求从哪进、数据存哪、公共件在哪？</td><td><a href="#fig-backend-01">跳转</a></td></tr><tr><td><a href="#fig-backend-02">02</a></td><td>2.3 模块依赖图（谁可以调谁）</td><td>哪些模块可以依赖哪些模块？有没有循环依赖？</td><td><a href="#fig-backend-02">跳转</a></td></tr><tr><td><a href="#fig-backend-03">03</a></td><td>3. 一次普通 HTTP 请求怎么走</td><td>一次普通 HTTP 请求，从进服务器到落库，中间经过哪些闸？</td><td><a href="#fig-backend-03">跳转</a></td></tr><tr><td><a href="#fig-backend-x01">04</a></td><td>新增一个业务接口：从定契约到可验收</td><td>接到“加一个接口”的需求，按什么顺序做才不漏 DDL、权限、前端和测试？</td><td><a href="#fig-backend-x01">跳转</a></td></tr><tr><td><a href="#fig-backend-x02">05</a></td><td>新增一张表：设计、DDL 双写、实体落地、验证</td><td>为什么新表必须同时写 baseline 和 migration？实体和 Mapper 有哪些会静默失败的坑？</td><td><a href="#fig-backend-x02">跳转</a></td></tr><tr><td><a href="#fig-backend-x03">06</a></td><td>新增一个业务模块：pom、包根与依赖方向</td><td>新开一个 ruoyi-modules 子模块，pom 加在哪、包怎么起、跨模块调用怎么收口？</td><td><a href="#fig-backend-x03">跳转</a></td></tr><tr><td><a href="#fig-backend-x04">07</a></td><td>权限串的三段式链路：菜单、后端、前端三处必须一致</td><td>为什么权限串必须三段式？只改后端或只改前端分别会出什么现象？</td><td><a href="#fig-backend-x04">跳转</a></td></tr><tr><td><a href="#fig-backend-04">08</a></td><td>4.1.3 主流程：一条事件如何变成分数</td><td>一条业务事件怎么写进账本、怎么变成画像分数？</td><td><a href="#fig-backend-04">跳转</a></td></tr><tr><td><a href="#fig-backend-05">09</a></td><td>4.2.3 主流程：事件 → 会话 → 日汇总</td><td>事件怎么写完后变成会话和日汇总？并发重建为什么不会撞唯一键？</td><td><a href="#fig-backend-05">跳转</a></td></tr><tr><td><a href="#fig-backend-06">10</a></td><td>4.3.2 状态机与不变量</td><td>采集 demo 的任务和提交各有哪些状态？哪些迁移是禁止的？</td><td><a href="#fig-backend-06">跳转</a></td></tr><tr><td><a href="#fig-backend-07">11</a></td><td>4.3.3 主流程：发布 → 提交 → 审核</td><td>发布 → 提交 → 审核这条主流程，各角色和通知在哪一步发生？</td><td><a href="#fig-backend-07">跳转</a></td></tr><tr><td><a href="#fig-backend-08">12</a></td><td>4.4.2 主流程</td><td>一条风险行为进来，怎么决定放行、复核还是拦截？</td><td><a href="#fig-backend-08">跳转</a></td></tr><tr><td><a href="#fig-backend-09">13</a></td><td>4.5.2 主流程：一次模型调用如何扣费</td><td>一次模型调用怎么扣费？钱包和积分两条路分别写到哪张表？</td><td><a href="#fig-backend-09">跳转</a></td></tr><tr><td><a href="#fig-backend-10">14</a></td><td>4.6.2 主流程：上传 → 判定 → 审核</td><td>文件上传后按什么顺序判定？为什么判定序不能调换？</td><td><a href="#fig-backend-10">跳转</a></td></tr><tr><td><a href="#fig-backend-11">15</a></td><td>5.2 全链路全景图</td><td>一次助手请求从 HTTP 进来到模型开跑，完整链路是什么？哪些在框架 jar 里？</td><td><a href="#fig-backend-11">跳转</a></td></tr><tr><td><a href="#fig-backend-12">16</a></td><td>5.5 选 agent：注册表 + 线程会话缓存</td><td>agentId 从哪来？同一个用户同一线程为什么能复用 agent？</td><td><a href="#fig-backend-12">跳转</a></td></tr><tr><td><a href="#fig-backend-13">17</a></td><td>5.7 模型装饰器链：六层套娃</td><td>模型外面套了哪六层装饰器？顺序反了会出什么问题？</td><td><a href="#fig-backend-13">跳转</a></td></tr><tr><td><a href="#fig-backend-14">18</a></td><td>5.8.1 三层工具</td><td>助手工具到底有几层来源？权限规则在哪里统一生成？</td><td><a href="#fig-backend-14">跳转</a></td></tr><tr><td><a href="#fig-backend-15">19</a></td><td>5.9.1 三层仓库</td><td>技能从哪三层来？为什么数据库里的技能优先级最高？</td><td><a href="#fig-backend-15">跳转</a></td></tr><tr><td><a href="#fig-backend-16">20</a></td><td>5.10.2 run 生命周期</td><td>一次 run 有哪些状态？多实例下谁来收尾？</td><td><a href="#fig-backend-16">跳转</a></td></tr><tr><td><a href="#fig-backend-17">21</a></td><td>5.11.1 HITL 的真实流程</td><td>工具要人工确认时，后端挂起、前端确认、再继续，具体怎么走？</td><td><a href="#fig-backend-17">跳转</a></td></tr><tr><td><a href="#fig-backend-18">22</a></td><td>5.13 Agent 侧计费链</td><td>Agent 侧计费和普通模型调用有什么不同？</td><td><a href="#fig-backend-18">跳转</a></td></tr><tr><td><a href="#fig-backend-x07">23</a></td><td>给助手加一个平台工具：注册表、权限规则、前端卡片</td><td>平台工具只改 ToolRegistry 就够了吗？模型可见性、HITL、展示文案分别在哪一层？</td><td><a href="#fig-backend-x07">跳转</a></td></tr><tr><td><a href="#fig-backend-x08">24</a></td><td>给助手加一个 SPI 业务工具：Provider、只读标记、自动化裁剪</td><td>业务模块想给助手加工具，为什么不能直接改助手模块？只读/写类如何影响自动化？</td><td><a href="#fig-backend-x08">跳转</a></td></tr><tr><td><a href="#fig-backend-x06">25</a></td><td>修 bug 的红绿闭环：先红两次，再绿，再撤回验红</td><td>怎样证明“修好了”，而不是“这条测试本来就没测到它”？</td><td><a href="#fig-backend-x06">跳转</a></td></tr><tr><td><a href="#fig-backend-x05">26</a></td><td>排障决策树：403、200 但空、500、超时</td><td>接口不对时，先看状态码还是先看日志？每条分支最短的定位路径是什么？</td><td><a href="#fig-backend-x05">跳转</a></td></tr></tbody></table></div>
+      <p>共 34 张。编号即正文中的图号，点“跳转”回到对应图卡。</p>
+      <div class="table-wrap"><table><thead><tr><th>编号</th><th>图名</th><th>它回答什么</th><th></th></tr></thead><tbody><tr><td><a href="#fig-backend-01">01</a></td><td>0. 一分钟总览</td><td>后端整体分成哪几块？请求从哪进、数据存哪、公共件在哪？</td><td><a href="#fig-backend-01">跳转</a></td></tr><tr><td><a href="#fig-backend-02">02</a></td><td>2.3 模块依赖图（谁可以调谁）</td><td>哪些模块可以依赖哪些模块？有没有循环依赖？</td><td><a href="#fig-backend-02">跳转</a></td></tr><tr><td><a href="#fig-backend-03">03</a></td><td>3. 一次普通 HTTP 请求怎么走</td><td>一次普通 HTTP 请求，从进服务器到落库，中间经过哪些闸？</td><td><a href="#fig-backend-03">跳转</a></td></tr><tr><td><a href="#fig-backend-x01">04</a></td><td>新增一个业务接口：从定契约到可验收</td><td>接到“加一个接口”的需求，按什么顺序做才不漏 DDL、权限、前端和测试？</td><td><a href="#fig-backend-x01">跳转</a></td></tr><tr><td><a href="#fig-backend-x02">05</a></td><td>新增一张表：设计、DDL 双写、实体落地、验证</td><td>为什么新表必须同时写 baseline 和 migration？实体和 Mapper 有哪些会静默失败的坑？</td><td><a href="#fig-backend-x02">跳转</a></td></tr><tr><td><a href="#fig-backend-x03">06</a></td><td>新增一个业务模块：pom、包根与依赖方向</td><td>新开一个 ruoyi-modules 子模块，pom 加在哪、包怎么起、跨模块调用怎么收口？</td><td><a href="#fig-backend-x03">跳转</a></td></tr><tr><td><a href="#fig-backend-x04">07</a></td><td>权限串的三段式链路：菜单、后端、前端三处必须一致</td><td>为什么权限串必须三段式？只改后端或只改前端分别会出什么现象？</td><td><a href="#fig-backend-x04">跳转</a></td></tr><tr><td><a href="#fig-backend-04">08</a></td><td>4.1.3 主流程：一条事件如何变成分数</td><td>一条业务事件怎么写进账本、怎么变成画像分数？</td><td><a href="#fig-backend-04">跳转</a></td></tr><tr><td><a href="#fig-backend-24">09</a></td><td>7.1 一条事件算出分数并存进快照链</td><td>维度、分箱、权重怎么变成总分？快照链怎么保证不乱、不重复打扰？</td><td><a href="#fig-backend-24">跳转</a></td></tr><tr><td><a href="#fig-backend-05">10</a></td><td>4.2.3 主流程：事件 → 会话 → 日汇总</td><td>事件怎么写完后变成会话和日汇总？并发重建为什么不会撞唯一键？</td><td><a href="#fig-backend-05">跳转</a></td></tr><tr><td><a href="#fig-backend-25">11</a></td><td>7.2 事件 → 会话 → 六类分析</td><td>六类分析读的是事件还是汇总？迟到的事件怎么补？</td><td><a href="#fig-backend-25">跳转</a></td></tr><tr><td><a href="#fig-backend-06">12</a></td><td>4.3.2 状态机与不变量</td><td>采集 demo 的任务和提交各有哪些状态？哪些迁移是禁止的？</td><td><a href="#fig-backend-06">跳转</a></td></tr><tr><td><a href="#fig-backend-07">13</a></td><td>4.3.3 主流程：发布 → 提交 → 审核</td><td>发布 → 提交 → 审核这条主流程，各角色和通知在哪一步发生？</td><td><a href="#fig-backend-07">跳转</a></td></tr><tr><td><a href="#fig-backend-26">14</a></td><td>7.4 风控双轨：事件怎么变成分级决策</td><td>白名单在哪一步生效？规则轨和全局轨谁说了算？</td><td><a href="#fig-backend-26">跳转</a></td></tr><tr><td><a href="#fig-backend-08">15</a></td><td>4.4.2 主流程</td><td>一条风险行为进来，怎么决定放行、复核还是拦截？</td><td><a href="#fig-backend-08">跳转</a></td></tr><tr><td><a href="#fig-backend-09">16</a></td><td>4.5.2 主流程：一次模型调用如何扣费</td><td>一次模型调用怎么扣费？钱包和积分两条路分别写到哪张表？</td><td><a href="#fig-backend-09">跳转</a></td></tr><tr><td><a href="#fig-backend-27">17</a></td><td>7.5 价格从哪来、额度怎么判、key 怎么选</td><td>改了价格为什么不生效？积分不够时先走哪个池？</td><td><a href="#fig-backend-27">跳转</a></td></tr><tr><td><a href="#fig-backend-10">18</a></td><td>4.6.2 主流程：上传 → 判定 → 审核</td><td>文件上传后按什么顺序判定？为什么判定序不能调换？</td><td><a href="#fig-backend-10">跳转</a></td></tr><tr><td><a href="#fig-backend-11">19</a></td><td>5.2 全链路全景图</td><td>一次助手请求从 HTTP 进来到模型开跑，完整链路是什么？哪些在框架 jar 里？</td><td><a href="#fig-backend-11">跳转</a></td></tr><tr><td><a href="#fig-backend-12">20</a></td><td>5.5 选 agent：注册表 + 线程会话缓存</td><td>agentId 从哪来？同一个用户同一线程为什么能复用 agent？</td><td><a href="#fig-backend-12">跳转</a></td></tr><tr><td><a href="#fig-backend-13">21</a></td><td>5.7 模型装饰器链：六层套娃</td><td>模型外面套了哪六层装饰器？顺序反了会出什么问题？</td><td><a href="#fig-backend-13">跳转</a></td></tr><tr><td><a href="#fig-backend-14">22</a></td><td>5.8.1 三层工具</td><td>助手工具到底有几层来源？权限规则在哪里统一生成？</td><td><a href="#fig-backend-14">跳转</a></td></tr><tr><td><a href="#fig-backend-15">23</a></td><td>5.9.1 三层仓库</td><td>技能从哪三层来？为什么数据库里的技能优先级最高？</td><td><a href="#fig-backend-15">跳转</a></td></tr><tr><td><a href="#fig-backend-16">24</a></td><td>5.10.2 run 生命周期</td><td>一次 run 有哪些状态？多实例下谁来收尾？</td><td><a href="#fig-backend-16">跳转</a></td></tr><tr><td><a href="#fig-backend-17">25</a></td><td>5.11.1 HITL 的真实流程</td><td>工具要人工确认时，后端挂起、前端确认、再继续，具体怎么走？</td><td><a href="#fig-backend-17">跳转</a></td></tr><tr><td><a href="#fig-backend-18">26</a></td><td>5.13 Agent 侧计费链</td><td>Agent 侧计费和普通模型调用有什么不同？</td><td><a href="#fig-backend-18">跳转</a></td></tr><tr><td><a href="#fig-backend-28">27</a></td><td>8.13 系统提示词怎么拼出来</td><td>8 段 md 是哪些？哪些段是条件拼的？为什么日期不放开头？</td><td><a href="#fig-backend-28">跳转</a></td></tr><tr><td><a href="#fig-backend-29">28</a></td><td>8.15 两级压缩：先清工具结果，再做摘要</td><td>到触发线之后先发生什么？什么情况下压缩会被熔断？</td><td><a href="#fig-backend-29">跳转</a></td></tr><tr><td><a href="#fig-backend-30">29</a></td><td>8.16 run 状态机与收割</td><td>run 到底有哪几个状态？卡住的 run 谁来收？</td><td><a href="#fig-backend-30">跳转</a></td></tr><tr><td><a href="#fig-backend-31">30</a></td><td>8.16 多实例与续看：谁在喂这条流</td><td>刷新之后怎么接上原来的流？跨实例为什么不靠汇？</td><td><a href="#fig-backend-31">跳转</a></td></tr><tr><td><a href="#fig-backend-x07">31</a></td><td>给助手加一个平台工具：注册表、权限规则、前端卡片</td><td>平台工具只改 ToolRegistry 就够了吗？模型可见性、HITL、展示文案分别在哪一层？</td><td><a href="#fig-backend-x07">跳转</a></td></tr><tr><td><a href="#fig-backend-x08">32</a></td><td>给助手加一个 SPI 业务工具：Provider、只读标记、自动化裁剪</td><td>业务模块想给助手加工具，为什么不能直接改助手模块？只读/写类如何影响自动化？</td><td><a href="#fig-backend-x08">跳转</a></td></tr><tr><td><a href="#fig-backend-x06">33</a></td><td>修 bug 的红绿闭环：先红两次，再绿，再撤回验红</td><td>怎样证明“修好了”，而不是“这条测试本来就没测到它”？</td><td><a href="#fig-backend-x06">跳转</a></td></tr><tr><td><a href="#fig-backend-x05">34</a></td><td>排障决策树：403、200 但空、500、超时</td><td>接口不对时，先看状态码还是先看日志？每条分支最短的定位路径是什么？</td><td><a href="#fig-backend-x05">跳转</a></td></tr></tbody></table></div>
 
       <h3 id="s-12-2">接口索引</h3>
       <p>只列入口 Controller 与前缀，精确路径以类上的 <code>@RequestMapping</code> 为准。新增接口时同步更新此表。</p>
