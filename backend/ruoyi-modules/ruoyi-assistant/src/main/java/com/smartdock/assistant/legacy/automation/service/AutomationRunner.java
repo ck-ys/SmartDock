@@ -1,5 +1,7 @@
 package com.smartdock.assistant.legacy.automation.service;
 
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.service.RunLedgerService;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.Msg;
@@ -12,7 +14,6 @@ import com.smartdock.assistant.legacy.core.AssistantAgentFactory;
 import com.smartdock.assistant.infrastructure.AssistantAdmissionGate;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.tenant.helper.TenantHelper;
@@ -54,7 +55,10 @@ public class AutomationRunner {
 
     private final DcsAutomationMapper automationMapper;
     private final DcsAutomationRunMapper runMapper;
-    private final AssistantConversationService conversationService;
+    /** 7C-1：run 台账（首绑 / 登记 / 终态） */
+    private final RunLedgerService runLedgerService;
+    /** 7C-1：消息写（user / assistant 落库） */
+    private final MessageWriteService messageWriteService;
     private final AssistantAgentFactory agentFactory;
     private final AssistantConfigService configService;
     /** E-13（2026-11-06）：对话侧四道闸对无人值守同样生效——暂停用户 / 日预算 / 准入 / 回合上限 */
@@ -69,7 +73,8 @@ public class AutomationRunner {
 
     public AutomationRunner(DcsAutomationMapper automationMapper,
                             DcsAutomationRunMapper runMapper,
-                            AssistantConversationService conversationService,
+                            RunLedgerService runLedgerService,
+                            MessageWriteService messageWriteService,
                             AssistantAgentFactory agentFactory,
                             AssistantConfigService configService,
                             com.smartdock.assistant.service.AssistantUserQuotaService quotaService,
@@ -82,7 +87,8 @@ public class AutomationRunner {
                             @Qualifier("automationExecutor") Executor executor) {
         this.automationMapper = automationMapper;
         this.runMapper = runMapper;
-        this.conversationService = conversationService;
+        this.runLedgerService = runLedgerService;
+        this.messageWriteService = messageWriteService;
         this.agentFactory = agentFactory;
         this.configService = configService;
         this.quotaService = quotaService;
@@ -185,9 +191,9 @@ public class AutomationRunner {
         String aguiRun = "auto-" + runId;
         Long conversationId;
         try {
-            conversationId = conversationService.ensureConversation(tenantId, automation.getUserId(),
+            conversationId = runLedgerService.ensureConversation(tenantId, automation.getUserId(),
                 threadId, automation.getTitle());
-            conversationService.appendUserMessage(tenantId, conversationId, automation.getUserId(),
+            messageWriteService.appendUserMessage(tenantId, conversationId, automation.getUserId(),
                 promptOf(automation));
             safeRegisterRun(tenantId, automation.getUserId(), threadId, aguiRun);
         } catch (Exception e) {
@@ -236,9 +242,9 @@ public class AutomationRunner {
             // 否则一条残留勾选就能让坏掉的自动化永远停不下来。
             boolean countFailure = mountedMcp.isEmpty();
             try {
-                conversationService.appendAssistantMessage(tenantId, conversationId,
+                messageWriteService.appendAssistantMessage(tenantId, conversationId,
                     automation.getUserId(), "（这次自动化没有跑完）" + reason, null, "error");
-                conversationService.finishRun(aguiRun, "FAILED", "error");
+                runLedgerService.finishRun(aguiRun, "FAILED", "error");
             } catch (Exception ignore) {
                 // 会话写失败不阻断运行记录收口
             }
@@ -247,9 +253,9 @@ public class AutomationRunner {
         }
 
         try {
-            conversationService.appendAssistantMessage(tenantId, conversationId,
+            messageWriteService.appendAssistantMessage(tenantId, conversationId,
                 automation.getUserId(), answer, null, "normal");
-            conversationService.finishRun(aguiRun, "COMPLETED", "normal");
+            runLedgerService.finishRun(aguiRun, "COMPLETED", "normal");
         } catch (Exception e) {
             log.warn("[Automation] 结果消息落库失败 run={}: {}", runId, e.toString());
         }
@@ -343,7 +349,7 @@ public class AutomationRunner {
 
     private void safeRegisterRun(String tenantId, Long userId, String threadId, String aguiRun) {
         try {
-            conversationService.registerRun(tenantId, userId, threadId, aguiRun);
+            runLedgerService.registerRun(tenantId, userId, threadId, aguiRun);
         } catch (Exception e) {
             log.warn("[Automation] run 登记失败（不影响执行） thread={}: {}", threadId, e.toString());
         }

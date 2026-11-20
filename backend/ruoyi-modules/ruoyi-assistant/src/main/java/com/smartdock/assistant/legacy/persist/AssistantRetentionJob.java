@@ -3,9 +3,10 @@ package com.smartdock.assistant.legacy.persist;
 import com.baomidou.lock.annotation.Lock4j;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.service.PurgeService;
+import com.smartdock.assistant.service.RunLedgerService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -30,7 +31,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AssistantRetentionJob {
 
-    private final AssistantConversationService conversationService;
+    /** 7C-1：run 台账（悬挂候选扫描 + 条件终局化） */
+    private final RunLedgerService runLedgerService;
+    /** 7C-2：清人 / 保留期清理 / 清人补偿队列（七张表与框架表，同批搬进新根） */
+    private final PurgeService purgeService;
     private final AssistantDailyQuota dailyQuota;
     /** 二站 T3：悬挂缓存报读（只读，不删悬挂条目） */
     private final AssistantPendingInterruptCache pendingInterrupts;
@@ -46,7 +50,7 @@ public class AssistantRetentionJob {
     @Scheduled(cron = "0 40 3 * * ?")
     public void sweep() {
         try {
-            conversationService.retentionSweep(5000);
+            purgeService.retentionSweep(5000);
         } catch (Exception e) {
             log.error("[AssistantRetention] 保留期清理失败(次日重试, 幂等安全)", e);
         }
@@ -61,7 +65,7 @@ public class AssistantRetentionJob {
     @Scheduled(fixedDelay = 60_000, initialDelay = 120_000)
     public void sweepStuckRuns() {
         try {
-            List<DcsAssistantRun> candidates = conversationService.listStuckRuns(15);
+            List<DcsAssistantRun> candidates = runLedgerService.listStuckRuns(15);
             int closedCount = 0;
             for (DcsAssistantRun r : candidates) {
                 String owner = r.getOwnerInstance();
@@ -75,7 +79,7 @@ public class AssistantRetentionJob {
                     // 这轮还在别的活实例手上，绝不抢收
                     continue;
                 }
-                List<DcsAssistantRun> closed = conversationService.finalizeStuckRun(r.getTenantId(), r.getRunId());
+                List<DcsAssistantRun> closed = runLedgerService.finalizeStuckRun(r.getTenantId(), r.getRunId());
                 for (DcsAssistantRun row : closed) {
                     // 四审回修（dspro-P2-1）：credits 订阅租户建侧 tryTurn 本就跳过，这里
                     // 无条件退会把没扣过的回合退掉（钱包期计数一起被减）。与 stop/resolver
@@ -157,11 +161,11 @@ public class AssistantRetentionJob {
     @Scheduled(fixedDelay = 60_000, initialDelay = 240_000)
     public void retryPurgeCompensation() {
         try {
-            java.util.Set<String> queue = conversationService.purgeCompensationQueue();
+            java.util.Set<String> queue = purgeService.purgeCompensationQueue();
             for (String entry : queue) {
                 int sep = entry.lastIndexOf(':');
                 if (sep <= 0) {
-                    conversationService.dequeuePurgeCompensation(entry);
+                    purgeService.dequeuePurgeCompensation(entry);
                     continue;
                 }
                 String tenantId = entry.substring(0, sep);
@@ -169,11 +173,11 @@ public class AssistantRetentionJob {
                 try {
                     userId = Long.valueOf(entry.substring(sep + 1));
                 } catch (NumberFormatException bad) {
-                    conversationService.dequeuePurgeCompensation(entry);
+                    purgeService.dequeuePurgeCompensation(entry);
                     continue;
                 }
-                if (conversationService.retryPurgeAgentscopeSessions(tenantId, userId)) {
-                    conversationService.dequeuePurgeCompensation(entry);
+                if (purgeService.retryPurgeAgentscopeSessions(tenantId, userId)) {
+                    purgeService.dequeuePurgeCompensation(entry);
                     log.info("[AssistantRetention] agentscope 清除补偿成功出队: {}", entry);
                 }
             }

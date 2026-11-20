@@ -162,6 +162,52 @@ class PackageMigrationGuardTest {
         "com.smartdock.assistant.legacy.mapper.AssistantConversationMapper",
         "com.smartdock.assistant.legacy.mapper.AssistantMessageMapper");
 
+    /** 批 7C-1（2026-11-20）：台账线 2 实体 + 2 mapper 搬进新四层后，旧全名在 classpath 上必须一个不剩。
+     *  动机同 7B：legacy 的 domain / mapper 两个子包都还在（只是变薄），只能点名；防「没 clean 就编译」
+     *  造成 MyBatis 别名撞名与 {@code @MapperScan} bean 名双注册。 */
+    @Test
+    void batch7c1MovedRunClassesMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String fqn : BATCH7C1_MOVED_TO_FOUR_LAYERS) {
+            String path = fqn.replace('.', '/') + ".class";
+            List<URL> found = Collections.list(cl.getResources(path));
+            assertTrue(found.isEmpty(),
+                () -> fqn + " 残留在 classpath: " + found
+                    + " —— 批 7C-1 已把它搬进新四层，请 mvn clean 后重建");
+        }
+    }
+
+    /** 批 7C-1 搬走的 4 个类的旧全名（包还在，所以只能点名） */
+    private static final List<String> BATCH7C1_MOVED_TO_FOUR_LAYERS = List.of(
+        "com.smartdock.assistant.legacy.domain.DcsAssistantRun",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantRunIssue",
+        "com.smartdock.assistant.legacy.mapper.AssistantRunMapper",
+        "com.smartdock.assistant.legacy.mapper.AssistantRunIssueMapper");
+
+    /** 批 7C-2（2026-11-20）：三个实体三个 mapper 搬进新四层 + legacy 会话壳整个删除。
+     *  动机同 7C-1：legacy 的 domain / mapper / service 三个子包都还在，只能点名。 */
+    @Test
+    void batch7c2MovedPurgeClassesMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String fqn : BATCH7C2_MOVED_TO_FOUR_LAYERS) {
+            String path = fqn.replace('.', '/') + ".class";
+            List<URL> found = Collections.list(cl.getResources(path));
+            assertTrue(found.isEmpty(),
+                () -> fqn + " 残留在 classpath: " + found
+                    + " —— 批 7C-2 已把它搬进新四层（或整个删除），请 mvn clean 后重建");
+        }
+    }
+
+    /** 批 7C-2 搬走/删除的 7 个类的旧全名（包还在，所以只能点名） */
+    private static final List<String> BATCH7C2_MOVED_TO_FOUR_LAYERS = List.of(
+        "com.smartdock.assistant.legacy.domain.DcsAssistantAction",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantAttachment",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantCompaction",
+        "com.smartdock.assistant.legacy.mapper.AssistantActionMapper",
+        "com.smartdock.assistant.legacy.mapper.AssistantAttachmentMapper",
+        "com.smartdock.assistant.legacy.mapper.AssistantCompactionMapper",
+        "com.smartdock.assistant.legacy.service.AssistantConversationService");
+
     /** 批 3（2026-11-19 多审 dspro P2-2）：额度线整线搬移消包后，billing/limiter 两个旧包
      *  在主 classes 上必须一个资源都不剩——非 clean 增量构建会让旧包 class 与新四层同名类并存，
      *  同样触发组件扫描双注册。只盯主 classes（target/classes 与 jar 内）；test-classes 不算——

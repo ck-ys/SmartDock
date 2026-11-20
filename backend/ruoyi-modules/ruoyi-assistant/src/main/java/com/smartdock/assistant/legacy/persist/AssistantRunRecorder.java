@@ -9,10 +9,13 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.core.AssistantRunContext;
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.support.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.support.AssistantRunIssues;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.service.RunLedgerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -61,7 +64,12 @@ public class AssistantRunRecorder {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final AssistantConversationService conversationService;
+    /** 7C-1：run 台账（终态/心跳/悬挂收割/问题行/归属回查） */
+    private final RunLedgerService runLedgerService;
+    /** 7C-1：消息写（assistant 落库/partial 增量/删重叠行） */
+    private final MessageWriteService messageWriteService;
+    /** 7C-1：会话与消息只读（按 thread 取会话、本回合提问） */
+    private final ConversationQueryService conversationQueryService;
     private final AssistantDailyQuota dailyQuota;
     /** 悬挂 interrupt 缓存（二站 T1）：interrupt 轮写入 / 干净终态清除——与框架 pending 严格镜像 */
     private final AssistantPendingInterruptCache pendingInterrupts;
@@ -79,14 +87,18 @@ public class AssistantRunRecorder {
     /** Spring 唯一注入构造：必须显式 @Autowired——类里另有一个单测兼容构造，
      *  若两个构造器都不标注，Spring 会退回无参构造并启动失败（三审 A/B 实证）。 */
     @Autowired
-    public AssistantRunRecorder(AssistantConversationService conversationService,
+    public AssistantRunRecorder(RunLedgerService runLedgerService,
+                                MessageWriteService messageWriteService,
+                                ConversationQueryService conversationQueryService,
                                 AssistantDailyQuota dailyQuota,
                                 AssistantPendingInterruptCache pendingInterrupts,
                                 AssistantPiiFilter piiFilter,
                                 com.smartdock.assistant.legacy.service.AssistantFollowupService followupService,
                                 com.smartdock.assistant.legacy.core.AssistantInstanceContext instanceContext,
                                 com.smartdock.assistant.service.AssistantCostLedger costLedger) {
-        this.conversationService = conversationService;
+        this.runLedgerService = runLedgerService;
+        this.messageWriteService = messageWriteService;
+        this.conversationQueryService = conversationQueryService;
         this.dailyQuota = dailyQuota;
         this.pendingInterrupts = pendingInterrupts;
         this.piiFilter = piiFilter;
@@ -99,13 +111,13 @@ public class AssistantRunRecorder {
      * 纯单测兼容构造（无 Spring 容器）：旧测试只关心本机冲刷/收割，不模拟实例归属；
      * instanceContext=null 时归属守卫整体跳过，行为与批 3 之前一致。
      */
-    public AssistantRunRecorder(AssistantConversationService conversationService,
+    public AssistantRunRecorder(RunLedgerService runLedgerService,
                                 AssistantDailyQuota dailyQuota,
                                 AssistantPendingInterruptCache pendingInterrupts,
                                 AssistantPiiFilter piiFilter,
                                 com.smartdock.assistant.legacy.service.AssistantFollowupService followupService,
                                 com.smartdock.assistant.service.AssistantCostLedger costLedger) {
-        this(conversationService, dailyQuota, pendingInterrupts, piiFilter, followupService, null, costLedger);
+        this(runLedgerService, null, null, dailyQuota, pendingInterrupts, piiFilter, followupService, null, costLedger);
     }
 
     /** 记录专用有界池（dspro P2-1 修：CallerRuns——消息落库/truncated 任务绝不能被静默丢弃，
@@ -534,7 +546,7 @@ public class AssistantRunRecorder {
                                     // truncated 时删 0 行天然幂等），内容不丢
                                     if (partialRef != null) {
                                         try {
-                                            conversationService.deletePartialMessage(partialRef.tenantId(),
+                                            messageWriteService.deletePartialMessage(partialRef.tenantId(),
                                                 partialRef.messageId());
                                         } catch (Exception ex) {
                                             log.warn("[AssistantRecorder] partial 行清理失败(残留行将由收割/保留期兜底): {}",
@@ -711,7 +723,7 @@ public class AssistantRunRecorder {
                 }
                 if (partialRef != null) {
                     try {
-                        conversationService.deletePartialMessage(partialRef.tenantId(), partialRef.messageId());
+                        messageWriteService.deletePartialMessage(partialRef.tenantId(), partialRef.messageId());
                     } catch (Exception ex) {
                         log.warn("[AssistantRecorder] 终道 partial 行清理失败: {}", ex.getMessage());
                     }
@@ -737,7 +749,7 @@ public class AssistantRunRecorder {
             try {
                 // dspro P0-1③回修：0 行=run 已被收割/兜底抢先终局化，迟到真终态被条件
                 // 丢弃——WARN 留观测痕（否则线上完全不可见，误杀只能靠用户复盘）
-                int rows = conversationService.finishRun(runId, status, safeReason);
+                int rows = runLedgerService.finishRun(runId, status, safeReason);
                 if (rows == 0) {
                     log.warn("[AssistantRecorder] 迟到终态 {} 被丢弃（run 已被收割器/兜底终局化）runId={}",
                         status, runId);
@@ -748,7 +760,7 @@ public class AssistantRunRecorder {
                     // 一道测试替身场景的同步抛）
                     if (issueCode != null) {
                         try {
-                            conversationService.recordRunIssue(runId, issueCode, issueDetail);
+                            runLedgerService.recordRunIssue(runId, issueCode, issueDetail);
                         } catch (Exception e) {
                             log.warn("[AssistantRecorder] 问题行落库失败(不影响终态) runId={}: {}", runId, e.getMessage());
                         }
@@ -764,7 +776,7 @@ public class AssistantRunRecorder {
             // 不得再退（收割侧已按 RETURNING 退过，防双退）
             try {
                 if ("FAILED".equals(status)) {
-                    DcsAssistantRun run = conversationService.runByRunId(runId);
+                    DcsAssistantRun run = runLedgerService.runByRunId(runId);
                     if (run != null && "FAILED".equals(run.getStatus())) {
                         refundIfWallet(run.getTenantId(), run.getUserId());
                     }
@@ -797,14 +809,14 @@ public class AssistantRunRecorder {
         }
         String safeReason = reason == null ? null : (reason.length() > 64 ? reason.substring(0, 64) : reason);
         try {
-            int rows = conversationService.finishRun(runId, "FAILED", safeReason);
+            int rows = runLedgerService.finishRun(runId, "FAILED", safeReason);
             if (rows == 0) {
                 log.warn("[AssistantRecorder] 建会话失败终态被丢弃（run 已被收割器/兜底终局化）runId={}", runId);
             } else {
                 // 2026-11-11 Q1-3：终态写赢同步落问题行——刷新后该轮回放是「零正文 done」，
                 // 靠问题行才能还原「建会话失败」这一类 other
                 try {
-                    conversationService.recordRunIssue(runId, AssistantRunIssues.classify(null, reason), reason);
+                    runLedgerService.recordRunIssue(runId, AssistantRunIssues.classify(null, reason), reason);
                 } catch (Exception e) {
                     log.warn("[AssistantRecorder] 建会话失败问题行落库失败 runId={}: {}", runId, e.getMessage());
                 }
@@ -813,7 +825,7 @@ public class AssistantRunRecorder {
             log.warn("[AssistantRecorder] 建会话失败终态回写失败 runId={}: {}", runId, e.getMessage());
         }
         try {
-            DcsAssistantRun run = conversationService.runByRunId(runId);
+            DcsAssistantRun run = runLedgerService.runByRunId(runId);
             if (run != null && "FAILED".equals(run.getStatus())) {
                 refundIfWallet(run.getTenantId(), run.getUserId());
             }
@@ -995,7 +1007,7 @@ public class AssistantRunRecorder {
         }
         lastLeaseTouchAt.put(runId, now);
         try {
-            conversationService.touchRun(runId);
+            runLedgerService.touchRun(runId);
         } catch (Exception e) {
             log.debug("[AssistantRecorder] run 末次事件时间心跳失败 runId={}: {}", runId, e.getMessage());
         }
@@ -1023,7 +1035,7 @@ public class AssistantRunRecorder {
      */
     private void reapZeroEventRuns() {
         try {
-            List<DcsAssistantRun> stale = conversationService.listRunningOlderThan((int) (STALL_MS / 1000));
+            List<DcsAssistantRun> stale = runLedgerService.listRunningOlderThan((int) (STALL_MS / 1000));
             for (DcsAssistantRun run : stale) {
                 String runId = run.getRunId();
                 if (runId == null || lastEventAt.containsKey(runId) || terminalWritePending.contains(runId)) {
@@ -1045,7 +1057,7 @@ public class AssistantRunRecorder {
                 if (costLedger.isInFlight(run.getThreadId())) {
                     continue;
                 }
-                List<DcsAssistantRun> closed = conversationService.finalizeStalledRun(run.getTenantId(), runId);
+                List<DcsAssistantRun> closed = runLedgerService.finalizeStalledRun(run.getTenantId(), runId);
                 if (!closed.isEmpty()) {
                     refundIfWallet(run.getTenantId(), run.getUserId());
                     log.warn("[AssistantRecorder] 零事件兜底收割 runId={}（建行≥{}s 无任何事件=建/流侧同步失败路径）："
@@ -1070,22 +1082,22 @@ public class AssistantRunRecorder {
             if (!lastEventAt.containsKey(runId)) {
                 return;
             }
-            DcsAssistantRun run = conversationService.runByRunId(runId);
+            DcsAssistantRun run = runLedgerService.runByRunId(runId);
             if (run == null) {
                 return; // 未登记（resolver 降级路径）——无落库锚，收割时统一清键
             }
-            DcsAssistantConversation conv = conversationService.conversationByThread(run.getTenantId(), run.getThreadId());
+            DcsAssistantConversation conv = conversationQueryService.conversationByThread(run.getTenantId(), run.getThreadId());
             if (conv == null) {
                 return;
             }
             String stepsJson = maskThinkText(snapshotSteps(runStepKeys.get(runId)), run.getTenantId());
-            Long id = conversationService.appendAssistantMessage(run.getTenantId(), conv.getId(), run.getUserId(),
+            Long id = messageWriteService.appendAssistantMessage(run.getTenantId(), conv.getId(), run.getUserId(),
                 merged, null, "partial", stepsJson);
             // dspro P0-2 回修：插行的三次 DB 往返期间终道可能已清跟踪——此刻 put 会「复活」
             // 已终态 run 的锚且无人再删该行（孤儿 partial）。复查发现已被清理→自删刚插的行
             if (!lastEventAt.containsKey(runId)) {
                 try {
-                    conversationService.deletePartialMessage(run.getTenantId(), id);
+                    messageWriteService.deletePartialMessage(run.getTenantId(), id);
                 } catch (Exception ex) {
                     log.warn("[AssistantRecorder] 孤儿 partial 自清失败(保留期兜底): {}", ex.getMessage());
                 }
@@ -1094,7 +1106,7 @@ public class AssistantRunRecorder {
             partialRefs.put(runId, new PartialRef(id, run.getTenantId(), conv.getId(), run.getUserId()));
         } else {
             String stepsJson = maskThinkText(snapshotSteps(runStepKeys.get(runId)), ref.tenantId());
-            conversationService.updatePartialMessage(ref.tenantId(), ref.messageId(), merged, stepsJson, "partial");
+            messageWriteService.updatePartialMessage(ref.tenantId(), ref.messageId(), merged, stepsJson, "partial");
         }
         lastPartialFlushAt.put(runId, now);
         // 业务批7 Q12：长度→联合指纹（正文+思考/工具活动），思考增长也触发下次冲刷
@@ -1150,13 +1162,13 @@ public class AssistantRunRecorder {
             if (ref != null) {
                 String stepsJson = maskThinkText(snapshotSteps(stepKey), ref.tenantId());
                 // 竞态下缓冲已清（merged 空）：COALESCE 保留行内已冲刷内容，仅转 truncated
-                conversationService.updatePartialMessage(ref.tenantId(), ref.messageId(),
+                messageWriteService.updatePartialMessage(ref.tenantId(), ref.messageId(),
                     merged.isEmpty() ? null : merged, stepsJson, "truncated");
             }
             // dspro P0-1②：无锚不补插——锚不在=终道刚摘走（stop 权威行已在落库路上，
             // 此处补插必双行）；正常路径「有内容必有锚」（首冲刷在内容到达后 ≤3s 的 tick
             // 完成），无锚有残余仅剩 resolver 降级路径（run 行不存在，补插同样写不进）
-            java.util.List<DcsAssistantRun> closed = conversationService.finalizeStalledRun(tenantId, runId);
+            java.util.List<DcsAssistantRun> closed = runLedgerService.finalizeStalledRun(tenantId, runId);
             if (!closed.isEmpty()) {
                 DcsAssistantRun r = closed.get(0);
                 USER_STOP_MARKS.remove(runId);
@@ -1216,10 +1228,10 @@ public class AssistantRunRecorder {
         // 纯函数单测装配 service 为 null：诊断/计数跳过即可，不得连坐吞掉 finishRun
         // 的缓冲清除（60bb33e 起本方法被 finishRun 首行同步调用，无守卫时 NPE 先于
         // stepBuffers/thinkBuffers 清除抛出，终态缓冲滞留=Q5 单测实锤回归）
-        if (conversationService == null) {
+        if (runLedgerService == null) {
             return null;
         }
-        DcsAssistantRun run = conversationService.runByRunId(runId);
+        DcsAssistantRun run = runLedgerService.runByRunId(runId);
         return run == null ? null : run.getTenantId();
     }
 
@@ -1236,16 +1248,16 @@ public class AssistantRunRecorder {
     private void persistAssistantMessage(String runId, String content, String model, String endReason,
                                          String toolSteps, Long totalTokens) {
         try {
-            DcsAssistantRun run = conversationService.runByRunId(runId);
+            DcsAssistantRun run = runLedgerService.runByRunId(runId);
             if (run == null) {
                 log.debug("[AssistantRecorder] run 未登记(resolver 侧降级), 跳过落库 runId={}", runId);
                 return;
             }
-            DcsAssistantConversation conv = conversationService.conversationByThread(run.getTenantId(), run.getThreadId());
+            DcsAssistantConversation conv = conversationQueryService.conversationByThread(run.getTenantId(), run.getThreadId());
             if (conv == null) {
                 return;
             }
-            Long messageId = conversationService.appendAssistantMessage(run.getTenantId(), conv.getId(),
+            Long messageId = messageWriteService.appendAssistantMessage(run.getTenantId(), conv.getId(),
                 run.getUserId(), content, model, endReason, maskThinkText(toolSteps, run.getTenantId()), totalTokens);
             // 批5 Q7-3：正常完结的回合发追问侧车（失败/中断不值得追问）；侧车内部全吞异常。
             // question 在记录线程同步取（DESC LIMIT 1 毫秒级）——搬进侧车线程会把排队窗口内
@@ -1253,7 +1265,7 @@ public class AssistantRunRecorder {
             if (endReason == null || "stop".equals(endReason)) {
                 followupService.tryStart(run.getTenantId(), run.getUserId(), messageId, run.getThreadId(),
                     conv.getTitle(),
-                    conversationService.lastUserQuestion(run.getTenantId(), run.getUserId(), conv.getId()),
+                    conversationQueryService.lastUserQuestion(run.getTenantId(), run.getUserId(), conv.getId()),
                     content);
             }
         } catch (Exception e) {

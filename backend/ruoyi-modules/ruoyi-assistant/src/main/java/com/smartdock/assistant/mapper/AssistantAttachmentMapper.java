@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import com.smartdock.assistant.legacy.domain.DcsAssistantAttachment;
+import com.smartdock.assistant.domain.model.DcsAssistantAttachment;
 
 import java.util.List;
 

@@ -1,6 +1,6 @@
 -- 2026-11-11 拍板 Q1-3：「这轮为什么没回答」问题表 dcs_assistant_run_issue
 -- 可重复执行（IF NOT EXISTS）；与 baseline/01_schema.sql 尾部同构。
--- 保留 90 天（AssistantConversationService.retentionSweep 编排），统计索引留给后续按原因聚合。
+-- 保留 90 天（清理由 service/PurgeService.retentionSweep 编排；批 7C-2 前在 AssistantConversationService），统计索引留给后续按原因聚合。
 
 CREATE TABLE IF NOT EXISTS public.dcs_assistant_run_issue (
     id bigint NOT NULL,

@@ -20,7 +20,8 @@ import io.agentscope.harness.agent.middleware.CompactionMiddleware;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.query.ConversationQueryService;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
@@ -58,7 +59,11 @@ public class DcsCompactionMiddleware extends CompactionMiddleware {
     private static final java.util.Set<String> MEDIA_BLOCKS =
         java.util.Set.of("ImageBlock", "AudioBlock", "VideoBlock", "DataBlock");
 
-    private final AssistantConversationService conversationService;
+    /** 7C-1：消息写（压缩分隔条行） */
+    private final MessageWriteService messageWriteService;
+    /** 7C-1：会话只读（压缩记录按 thread 定位会话） */
+    private final ConversationQueryService conversationQueryService;
+    /** 压缩触发阈值（token 数） */
     private final int triggerTokens;
 
     /** 上次压缩以来的推理步数（快速回填判定）。初值=阈值：首压不算 rapid
@@ -72,9 +77,12 @@ public class DcsCompactionMiddleware extends CompactionMiddleware {
     private boolean blocked;
 
     public DcsCompactionMiddleware(WorkspaceManager workspaceManager, Model model,
-                                   CompactionConfig config, AssistantConversationService conversationService) {
+                                   CompactionConfig config,
+                                   MessageWriteService messageWriteService,
+                                   ConversationQueryService conversationQueryService) {
         super(workspaceManager, model, config);
-        this.conversationService = conversationService;
+        this.messageWriteService = messageWriteService;
+        this.conversationQueryService = conversationQueryService;
         this.triggerTokens = config.getTriggerTokens();
     }
 
@@ -362,7 +370,7 @@ public class DcsCompactionMiddleware extends CompactionMiddleware {
                 return;
             }
             String content = MAPPER.writeValueAsString(Map.of("type", type, "reason", reason));
-            conversationService.appendSystemDivider(id.tenantId(), id.conversationId(), id.userId(), content);
+            messageWriteService.appendSystemDivider(id.tenantId(), id.conversationId(), id.userId(), content);
         } catch (Exception e) {
             log.warn("[Compaction] 提示行落库失败(不影响对话) thread={}: {}",
                 ctx.getSessionId(), e.getMessage());
@@ -382,7 +390,7 @@ public class DcsCompactionMiddleware extends CompactionMiddleware {
                 "type", "compaction",
                 "beforeTokens", beforeTokens,
                 "afterTokens", afterTokens));
-            conversationService.appendSystemDivider(id.tenantId(), id.conversationId(), id.userId(), content);
+            messageWriteService.appendSystemDivider(id.tenantId(), id.conversationId(), id.userId(), content);
             recordRecord(ctx, id, before, after, beforeTokens, afterTokens,
                 "SUCCESS", "AUTO_THRESHOLD", extractSummary(after));
             log.info("[Compaction] 自动压缩完成并落分隔条 tenant={} thread={} {}→{} 条消息",
@@ -409,7 +417,7 @@ public class DcsCompactionMiddleware extends CompactionMiddleware {
             if (id == null) {
                 return;
             }
-            conversationService.appendCompactionRecord(id.tenantId(), id.conversationId(), id.userId(),
+            messageWriteService.appendCompactionRecord(id.tenantId(), id.conversationId(), id.userId(),
                 ctx.getSessionId(), beforeTokens, afterTokens, before.size(), after.size(),
                 status, reason, summary);
         } catch (Exception e) {
@@ -448,7 +456,7 @@ public class DcsCompactionMiddleware extends CompactionMiddleware {
         } catch (NumberFormatException e) {
             return null;
         }
-        DcsAssistantConversation conv = conversationService.conversationByThread(parts[1], threadId);
+        DcsAssistantConversation conv = conversationQueryService.conversationByThread(parts[1], threadId);
         if (conv == null) {
             log.debug("[Compaction] 未找到会话行, 跳过落库 tenant={} thread={}", parts[1], threadId);
             return null;

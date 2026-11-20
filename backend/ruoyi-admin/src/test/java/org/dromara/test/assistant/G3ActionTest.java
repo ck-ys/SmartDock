@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.domain.DcsAssistantAction;
+import com.smartdock.assistant.domain.model.DcsAssistantAction;
 import com.smartdock.assistant.legacy.service.AssistantActionService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;

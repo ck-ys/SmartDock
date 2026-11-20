@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -6,7 +6,8 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRunIssue;
+import com.smartdock.assistant.domain.model.DcsAssistantRunIssue;
+import java.util.List;
 
 /**
  * 助手「这轮为什么没回答」问题表 Mapper（2026-11-11 拍板 Q1-3）。
@@ -31,7 +32,7 @@ public interface AssistantRunIssueMapper extends BaseMapper<DcsAssistantRunIssue
     /** 按会话取全部问题行（历史回放，按落库序） */
     @Select("SELECT * FROM dcs_assistant_run_issue WHERE tenant_id=#{tenantId} AND user_id=#{userId}"
         + " AND conversation_id=#{conversationId} ORDER BY id ASC")
-    java.util.List<DcsAssistantRunIssue> selectByConversation(@Param("tenantId") String tenantId,
+    List<DcsAssistantRunIssue> selectByConversation(@Param("tenantId") String tenantId,
         @Param("userId") Long userId, @Param("conversationId") Long conversationId);
 
     /** 保留期清理：90 天口径（消息表为 180 天，本表更短），分批物理删 */

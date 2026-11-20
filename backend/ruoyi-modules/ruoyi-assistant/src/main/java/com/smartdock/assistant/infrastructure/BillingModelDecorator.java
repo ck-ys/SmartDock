@@ -19,6 +19,8 @@ import com.smartdock.service.IDcsAiModelPriceService;
 import com.smartdock.service.support.AiBillingService;
 import com.smartdock.service.support.AiTokenUsageSnapshot;
 import com.smartdock.service.support.TenantWalletService;
+import com.smartdock.assistant.service.RunLedgerService;
+import com.smartdock.assistant.support.AssistantRunIssues;
 import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
@@ -98,7 +100,7 @@ public class BillingModelDecorator implements Model {
     private IDcsAiCreditService creditService;
 
     /** 2026-11-11 Q2-2 补丁：模型失败侧落问题行用（null=侧车/单测，不落） */
-    private com.smartdock.assistant.legacy.service.AssistantConversationService conversationService;
+    private RunLedgerService runLedgerService;
 
     /** goal 加固 H5：链式设置场景后缀（构造器保持七参不动，主链调用零改动） */
     /**
@@ -129,8 +131,8 @@ public class BillingModelDecorator implements Model {
      * RUN_STARTED），记录器的 RUN_ERROR 分支对这类故障不可达——装饰器是错误必经之
      * 路，改在这里捕获。null=不落（侧车/单测）。
      */
-    public BillingModelDecorator issueRecorder(com.smartdock.assistant.legacy.service.AssistantConversationService svc) {
-        this.conversationService = svc;
+    public BillingModelDecorator issueRecorder(RunLedgerService svc) {
+        this.runLedgerService = svc;
         return this;
     }
 
@@ -163,11 +165,11 @@ public class BillingModelDecorator implements Model {
      * 新轮，服务端回查状态后丢弃，防幽灵问题行。异常全吞：问题行绝不连坐计费主流。
      */
     private void recordModelFailureIssue(Throwable err) {
-        if (conversationService == null || threadKey == null || threadKey.isBlank()) {
+        if (runLedgerService == null || threadKey == null || threadKey.isBlank()) {
             return;
         }
         try {
-            String runId = conversationService.latestRunningRunIdOfThread(config.getTenantId(), userId, threadKey);
+            String runId = runLedgerService.latestRunningRunIdOfThread(config.getTenantId(), userId, threadKey);
             if (runId == null) {
                 return;
             }
@@ -175,8 +177,8 @@ public class BillingModelDecorator implements Model {
             // exhausted" 不含特征词，根因（401/429/超时）才判得出码；suppressed
             // 也纳入（429 常埋在 suppressed，见 isQuotaLike 同款口径）
             String signature = failureSignature(err);
-            String code = com.smartdock.assistant.legacy.persist.AssistantRunIssues.classify(null, signature);
-            conversationService.recordRunIssueForRunningRun(runId, code, signature);
+            String code = AssistantRunIssues.classify(null, signature);
+            runLedgerService.recordRunIssueForRunningRun(runId, code, signature);
         } catch (Exception e) {
             log.warn("[AssistantBilling] 模型失败问题行落库跳过(不影响主流): {}", e.getMessage());
         }

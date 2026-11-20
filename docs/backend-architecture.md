@@ -1087,11 +1087,15 @@ stateDiagram-v2
 
 | 类 | 核心方法 | 做什么 |
 |---|---|---|
-| `AssistantConversationService` | `ensureConversation`（L58） | thread 首绑；异主 403；归档 403 |
-| 同上 | `registerRun`（L87） | 同 runId 异主/异租户 403；返回是否新建；重放 409 |
-| 同上 | `persistUserRound`（L700） | **一个事务**里完成 ensure + register + 双 RUNNING 检查 + 落 user 消息，防 PG 闪断空壳会话 |
-| 同上 | `finishRun`（L209） | 按 runId 条件更新终态 |
-| 同上 | `conversationByThread`（L309） | 按 thread 查会话 |
+| `service/RunLedgerService` | `ensureConversation` | thread 首绑；异主 403；归档 403 |
+| 同上 | `registerRun` | 同 runId 异主/异租户 403；返回是否新建；重放 409 |
+| 同上 | `persistUserRound` | **一个事务**里完成 线程发送锁 + ensure + register + 双 RUNNING 检查 + 落 user 消息，防 PG 闪断空壳会话与并发双流 |
+| 同上 | `finishRun` | 按 runId 条件更新终态 |
+| `query/ConversationQueryService` | `conversationByThread` | 按 thread 查会话 |
+| `service/MessageWriteService` | `appendUserMessage` / `appendAssistantMessage` | 消息落库；assistant 侧过 PII 掩码 |
+| `service/PurgeService` | `purgeUser` | 清人七表事务；框架表与补偿队列在事务外 |
+
+> 批 7C（2026-11-20）把原先 698 行的 `legacy/service/AssistantConversationService` 整个删掉，上面的职责拆到四个新根服务；`AssistantRunRecorder` 仍留 legacy（与批 9 的引擎边界相邻）。
 | `AssistantRunRecorder` | `onEvents`（L385） | 文本/工具/思考分段缓冲落 `dcs_assistant_message`；RUN_FINISHED 前同步写终态 |
 | 同上 | `finalizeBuildFailure`（L794） | 建会话失败时同步 FAILED + 退回合，避免 60 秒僵尸 RUNNING |
 
@@ -1304,7 +1308,7 @@ AutomationRunner.run
 
 | 类 | 文件:行 | 一句话职责 | 核心方法 | 具体做什么 | 去掉会怎样 |
 |---|---|---|---|---|---|
-| `AssistantConversationService` | `legacy/service/AssistantConversationService.java:58` | 会话/消息/run 落库 | `ensureConversation` / `registerRun` / `persistUserRound` / `finishRun` | 首绑、登记、单事务落 user 轮、终态 | 没有会话历史 |
+| `RunLedgerService` | `service/RunLedgerService.java:58` | 会话/run 落库 | `ensureConversation` / `registerRun` / `persistUserRound` / `finishRun` | 首绑、登记、单事务落 user 轮、终态 | 没有会话历史 |
 | `ConversationResumeService` | `service/ConversationResumeService.java:39` | 续看判定 | `prepare` | 查最新 RUNNING run；能续就 attach，不能就轮询 | attach 端点失效 |
 | `AssistantHitlController` | `legacy/controller/AssistantHitlController.java:48` | 悬挂卡查询 | `pending` | 归属校验 + 缓存重建；跨实例 409 | 刷新后确认卡消失 |
 | `AssistantPendingInterruptCache` | `legacy/persist/AssistantPendingInterruptCache.java:59` | 悬挂卡缓存 | `store` / `peek` / `clear` | 按 thread 存 interrupt 卡 | 换设备无法恢复 |

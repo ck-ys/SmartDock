@@ -18,6 +18,7 @@ import com.smartdock.domain.DcsAiConfig;
 import com.smartdock.service.IDcsAiModelPriceService;
 import com.smartdock.service.support.AiBillingService;
 import com.smartdock.service.support.TenantWalletService;
+import com.smartdock.assistant.service.MessageWriteService;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -122,7 +123,8 @@ public class AssistantFollowupService {
     private final TenantWalletService tenantWalletService;
     private final IDcsAiModelPriceService modelPriceService;
     private final AssistantCostLedger costLedger;
-    private final AssistantConversationService conversationService;
+    /** 7C-1：消息写（追问建议回写消息行） */
+    private final MessageWriteService messageWriteService;
 
     /** 单线程守护池+有界队列+丢弃策略（Title 同款：锦上添花语义） */
     /** goal 加固 H4：侧车补日预算闸（追问是锦上添花，绝不允许绕过预算击穿租户限额） */
@@ -136,7 +138,7 @@ public class AssistantFollowupService {
     public AssistantFollowupService(AssistantModelFactory modelFactory, AssistantPiiFilter piiFilter,
                                     AiBillingService aiBillingService, TenantWalletService tenantWalletService,
                                     IDcsAiModelPriceService modelPriceService, AssistantCostLedger costLedger,
-                                    AssistantConversationService conversationService,
+                                    MessageWriteService messageWriteService,
                                 com.smartdock.assistant.infrastructure.AssistantDailyQuota dailyQuota,
                                 com.smartdock.assistant.legacy.service.AssistantConfigService configService,
                                 AssistantUserQuotaService quotaService,
@@ -148,7 +150,7 @@ public class AssistantFollowupService {
         this.tenantWalletService = tenantWalletService;
         this.modelPriceService = modelPriceService;
         this.costLedger = costLedger;
-        this.conversationService = conversationService;
+        this.messageWriteService = messageWriteService;
         this.dailyQuota = dailyQuota;
         this.configService = configService;
         this.quotaService = quotaService;
@@ -287,7 +289,7 @@ public class AssistantFollowupService {
                 return;
             }
             recordOutcome(tenantId, "succeeded");
-            conversationService.writeFollowupSuggestions(tenantId, messageId, MAPPER.writeValueAsString(followups));
+            messageWriteService.writeFollowupSuggestions(tenantId, messageId, MAPPER.writeValueAsString(followups));
             log.info("[AssistantFollowup] 追问建议已生成 message={} {}", messageId, followups);
         } catch (Exception e) {
             // 稳流② Q8②：reactor blockLast 超时=IllegalStateException("Timeout on blocking read…")

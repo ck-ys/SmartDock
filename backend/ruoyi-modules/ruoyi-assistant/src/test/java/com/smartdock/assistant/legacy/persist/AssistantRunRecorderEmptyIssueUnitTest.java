@@ -6,7 +6,9 @@ import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.legacy.core.AssistantInstanceContext;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.support.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.service.RunLedgerService;
 import com.smartdock.assistant.legacy.service.AssistantFollowupService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -38,7 +40,13 @@ import static org.mockito.Mockito.when;
 class AssistantRunRecorderEmptyIssueUnitTest {
 
     @Mock
-    private AssistantConversationService conversationService;
+    private RunLedgerService runLedgerService;
+
+    @Mock
+    private MessageWriteService messageWriteService;
+
+    @Mock
+    private ConversationQueryService conversationQueryService;
     @Mock
     private AssistantDailyQuota dailyQuota;
     @Mock
@@ -66,7 +74,7 @@ class AssistantRunRecorderEmptyIssueUnitTest {
 
     @Test
     void 空增量帧正常收尾_落empty问题行() {
-        when(conversationService.finishRun("run-e1", "COMPLETED", "normal")).thenReturn(1);
+        when(runLedgerService.finishRun("run-e1", "COMPLETED", "normal")).thenReturn(1);
 
         // 服务商真吐空轮的形态：CONTENT 帧来了但 delta 为空 → buffer isEmpty 不算产出
         play("run-e1", "th-e1",
@@ -75,13 +83,13 @@ class AssistantRunRecorderEmptyIssueUnitTest {
             new AguiEvent.RunFinished("th-e1", "run-e1", null,
                 new AguiEvent.RunFinishedSuccessOutcome()));
 
-        verify(conversationService, timeout(3000)).recordRunIssue("run-e1", "empty", null);
-        verify(conversationService, timeout(3000)).finishRun("run-e1", "COMPLETED", "normal");
+        verify(runLedgerService, timeout(3000)).recordRunIssue("run-e1", "empty", null);
+        verify(runLedgerService, timeout(3000)).finishRun("run-e1", "COMPLETED", "normal");
     }
 
     @Test
     void 有正文的轮次_不落empty() throws InterruptedException {
-        when(conversationService.finishRun("run-e2", "COMPLETED", "normal")).thenReturn(1);
+        when(runLedgerService.finishRun("run-e2", "COMPLETED", "normal")).thenReturn(1);
 
         play("run-e2", "th-e2",
             new AguiEvent.TextMessageContent("th-e2", "run-e2", "m1", "hi"),
@@ -90,39 +98,39 @@ class AssistantRunRecorderEmptyIssueUnitTest {
                 new AguiEvent.RunFinishedSuccessOutcome()));
 
         // 先等终态写到位，再留一小窗让同异步块内紧随其后的问题行路径（若有）跑完
-        verify(conversationService, timeout(3000)).finishRun("run-e2", "COMPLETED", "normal");
+        verify(runLedgerService, timeout(3000)).finishRun("run-e2", "COMPLETED", "normal");
         Thread.sleep(300);
-        verify(conversationService, never()).recordRunIssue(eq("run-e2"), anyString(), anyString());
-        verify(conversationService, never()).recordRunIssue(eq("run-e2"), eq("empty"), org.mockito.ArgumentMatchers.isNull());
+        verify(runLedgerService, never()).recordRunIssue(eq("run-e2"), anyString(), anyString());
+        verify(runLedgerService, never()).recordRunIssue(eq("run-e2"), eq("empty"), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
     void 只出过工具的轮次_不落empty() throws InterruptedException {
-        when(conversationService.finishRun("run-e3", "COMPLETED", "normal")).thenReturn(1);
+        when(runLedgerService.finishRun("run-e3", "COMPLETED", "normal")).thenReturn(1);
 
         play("run-e3", "th-e3",
             new AguiEvent.ToolCallStart("th-e3", "run-e3", "tc1", "web_search"),
             new AguiEvent.RunFinished("th-e3", "run-e3", null,
                 new AguiEvent.RunFinishedSuccessOutcome()));
 
-        verify(conversationService, timeout(3000)).finishRun("run-e3", "COMPLETED", "normal");
+        verify(runLedgerService, timeout(3000)).finishRun("run-e3", "COMPLETED", "normal");
         Thread.sleep(300);
-        verify(conversationService, never()).recordRunIssue(eq("run-e3"), anyString(), anyString());
-        verify(conversationService, never()).recordRunIssue(eq("run-e3"), eq("empty"), org.mockito.ArgumentMatchers.isNull());
+        verify(runLedgerService, never()).recordRunIssue(eq("run-e3"), anyString(), anyString());
+        verify(runLedgerService, never()).recordRunIssue(eq("run-e3"), eq("empty"), org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
     void 迟到终态被丢弃_不叠empty() throws InterruptedException {
         // 收割器已抢先终局化（rows=0）→ 不得再叠问题行（Q1-3 收口规则）
-        when(conversationService.finishRun("run-e4", "COMPLETED", "normal")).thenReturn(0);
+        when(runLedgerService.finishRun("run-e4", "COMPLETED", "normal")).thenReturn(0);
 
         play("run-e4", "th-e4",
             new AguiEvent.RunFinished("th-e4", "run-e4", null,
                 new AguiEvent.RunFinishedSuccessOutcome()));
 
-        verify(conversationService, timeout(3000)).finishRun("run-e4", "COMPLETED", "normal");
+        verify(runLedgerService, timeout(3000)).finishRun("run-e4", "COMPLETED", "normal");
         Thread.sleep(300);
-        verify(conversationService, never()).recordRunIssue(eq("run-e4"), anyString(), anyString());
-        verify(conversationService, never()).recordRunIssue(eq("run-e4"), eq("empty"), org.mockito.ArgumentMatchers.isNull());
+        verify(runLedgerService, never()).recordRunIssue(eq("run-e4"), anyString(), anyString());
+        verify(runLedgerService, never()).recordRunIssue(eq("run-e4"), eq("empty"), org.mockito.ArgumentMatchers.isNull());
     }
 }

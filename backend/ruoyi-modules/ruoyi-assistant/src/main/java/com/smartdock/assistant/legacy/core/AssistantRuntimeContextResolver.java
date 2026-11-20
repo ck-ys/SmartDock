@@ -12,8 +12,10 @@ import com.smartdock.assistant.infrastructure.AssistantAdmissionGate;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.legacy.security.AssistantInputGuard;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import com.smartdock.assistant.legacy.service.AssistantModelSettingService;
+import com.smartdock.assistant.service.RunLedgerService;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
@@ -46,7 +48,10 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
     private final AssistantConfigService configService;
     private final AssistantInputGuard inputGuard;
     private final AssistantDailyQuota dailyQuota;
-    private final AssistantConversationService conversationService;
+    /** 7C-1：run 台账（一轮准入 + 三表同事务落库 + 失联收割） */
+    private final RunLedgerService runLedgerService;
+    /** 7C-1：会话只读（首轮判定按 thread 取会话） */
+    private final ConversationQueryService conversationQueryService;
     private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     /** ZCode 对齐 Q1（批A 2026-10-10）：首条消息后异步起标题的侧车 */
     private final com.smartdock.assistant.legacy.service.AssistantTitleService titleService;
@@ -180,10 +185,10 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
                     // 三审回修（dspro-P1-1）：run 行是按动态租户 tenantId 落的（见上方 persistUserSide），
                     // 这里若用登录快照 user.getTenantId()，超管切租户时恒 0 行=收尾失败；
                     // 退款同口径跳过 credits 订阅（否则会误退钱包期计数，见 resolver catch 补偿注释）。
-                    java.util.List<com.smartdock.assistant.legacy.domain.DcsAssistantRun> closed =
-                        conversationService.finalizeStalledRun(tenantId, input.getRunId());
+                    java.util.List<DcsAssistantRun> closed =
+                        runLedgerService.finalizeStalledRun(tenantId, input.getRunId());
                     if (!limits.creditsMode()) {
-                        for (com.smartdock.assistant.legacy.domain.DcsAssistantRun row : closed) {
+                        for (DcsAssistantRun row : closed) {
                             dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
                         }
                     }
@@ -286,7 +291,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
             String threadId = input.getThreadId();
             // ZCode 对齐 Q1：会话行不存在=首条消息，落库后触发标题侧车（AGUI 每轮重传全量
             // 历史，必须用「落库前查行」判首条，否则每轮都会重复起标题）
-            boolean firstRound = conversationService.conversationByThread(tenantId, threadId) == null;
+            boolean firstRound = conversationQueryService.conversationByThread(tenantId, threadId) == null;
             String title = firstUserText(input);
             // 当轮口径（glm53 P1-2/dsflash 同源修）：AGUI 每轮重传全量历史，
             // 只落最后一条 user 消息（本轮新增）——逐条落库会在批E 客户端上线后
@@ -301,7 +306,7 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
             // glm53 P2-3 回修：按码点截断（substring 会劈开边界代理对，与 shouldGenerate 的码点口径对齐）
             String initialTitle = title == null ? "新会话"
                 : title.substring(0, title.offsetByCodePoints(0, Math.min(30, title.codePointCount(0, title.length()))));
-            conversationService.persistUserRound(tenantId, userId, threadId, input.getRunId(),
+            runLedgerService.persistUserRound(tenantId, userId, threadId, input.getRunId(),
                 initialTitle, resumeRound || current == null ? null : current.getTextContent());
             // 首条且够长：异步侧车把截断标题总结成短标题（CAS 防覆盖用户重命名）
             if (firstRound && title != null) {

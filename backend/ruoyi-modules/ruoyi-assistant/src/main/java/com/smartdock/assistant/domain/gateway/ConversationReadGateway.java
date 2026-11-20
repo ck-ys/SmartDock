@@ -6,11 +6,12 @@ import java.util.List;
  * 「会话只读」取数口（批 7 · 7A，2026-11-20）。
  *
  * <p>为什么建 gateway：{@code /status/context} 要读会话归属、消息尾部与最新 tokens，
- * 现由 legacy 的 {@code AssistantConversationService}（810 行）提供。规则 8 禁新根 service
+ * 原先由 legacy 的 {@code AssistantConversationService} 提供——该类已在批 7C-2 整个删除，
+ * 读侧现归新根 {@code query/ConversationQueryService}。规则 8 禁新根 service
  * import legacy，故收在此接口后面。</p>
  *
- * <p><b>7B 衔接</b>：批 7B 搬会话/消息线时，只需换本接口的实现指向（新根 service），
- * 接口签名与调用方不动。</p>
+ * <p><b>现状（7C-2 后）</b>：接口签名与调用方一直没动，实现已指向新根查询服务，
+ * 不再跨线读 legacy。</p>
  */
 public interface ConversationReadGateway {
 

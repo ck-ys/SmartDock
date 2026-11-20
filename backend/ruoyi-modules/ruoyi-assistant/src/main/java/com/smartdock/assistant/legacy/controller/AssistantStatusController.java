@@ -16,6 +16,7 @@ import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.satoken.utils.LoginHelper;
 import com.smartdock.assistant.legacy.tools.WebSearchTools;
+import com.smartdock.assistant.query.ConversationQueryService;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -43,7 +44,8 @@ public class AssistantStatusController extends BaseController {
 
     private final AssistantConfigService configService;
     private final AssistantDailyQuota dailyQuota;
-    private final com.smartdock.assistant.legacy.service.AssistantConversationService conversationService;
+    /** 7C-1：会话与消息只读（按 thread 取会话 / 最新上下文 tokens / 压缩账单 7C-2 并入） */
+    private final ConversationQueryService conversationQueryService;
     private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
     /** 批3.5·题5：技能使用统计（最近用过端点数据源） */
     private final com.smartdock.assistant.service.AssistantSkillUsageService skillUsageService;
@@ -216,7 +218,7 @@ public class AssistantStatusController extends BaseController {
         if (threadId != null && !threadId.isBlank()) {
             try {
                 DcsAssistantConversation conv =
-                    conversationService.conversationByThread(tenantId, threadId);
+                    conversationQueryService.conversationByThread(tenantId, threadId);
                 if (conv != null && userId.equals(conv.getUserId())) {
                     com.smartdock.assistant.legacy.core.AssistantCacheHitHolder.Aggregate agg =
                         com.smartdock.assistant.legacy.core.AssistantCacheHitHolder.aggregate(threadId);
@@ -225,8 +227,8 @@ public class AssistantStatusController extends BaseController {
                     // 题2 案1（2026-11-12）：压缩账单——最近一次成功压缩前后 token/时刻＋累计
                     // 次数；前端状态卡按 atMs 是否落在当前回合内决定「本轮压缩」高亮行。
                     // 三审回修：按 conversation_id 查（已索引；thread_id 无索引前缀扫）
-                    com.smartdock.assistant.legacy.service.AssistantConversationService.CompactionBill bill =
-                        conversationService.compactionBill(tenantId, conv.getId());
+                    ConversationQueryService.CompactionBill bill =
+                        conversationQueryService.compactionBill(tenantId, conv.getId());
                     if (bill.count() > 0) {
                         out.put("compactionBeforeTokens", bill.beforeTokens());
                         out.put("compactionAfterTokens", bill.afterTokens());
@@ -277,11 +279,11 @@ public class AssistantStatusController extends BaseController {
         }
         try {
             DcsAssistantConversation conv =
-                conversationService.conversationByThread(tenantId, threadId);
+                conversationQueryService.conversationByThread(tenantId, threadId);
             if (conv == null) {
                 return null;
             }
-            return conversationService.latestContextTokens(tenantId, userId, conv.getId());
+            return conversationQueryService.latestContextTokens(tenantId, userId, conv.getId());
         } catch (Exception e) {
             return null;
         }

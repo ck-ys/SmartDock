@@ -2,8 +2,8 @@ package com.smartdock.assistant.legacy.persist;
 
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.legacy.core.AssistantInstanceContext;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
-import com.smartdock.assistant.legacy.mapper.AssistantRunMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import com.smartdock.assistant.mapper.AssistantRunMapper;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;

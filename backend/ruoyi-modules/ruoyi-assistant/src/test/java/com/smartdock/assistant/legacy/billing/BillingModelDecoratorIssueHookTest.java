@@ -9,7 +9,7 @@ import com.smartdock.domain.DcsAiConfig;
 import com.smartdock.service.IDcsAiModelPriceService;
 import com.smartdock.service.support.AiBillingService;
 import com.smartdock.service.support.TenantWalletService;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.service.RunLedgerService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -58,7 +58,7 @@ class BillingModelDecoratorIssueHookTest {
     @Mock
     private IDcsAiModelPriceService priceService;
     @Mock
-    private AssistantConversationService conversationService;
+    private RunLedgerService conversationService;
 
     @BeforeAll
     static void seedSpringContextForRedisUtils() {

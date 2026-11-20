@@ -2,9 +2,11 @@ package org.dromara.test.assistant;
 
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import com.smartdock.assistant.domain.model.DcsAssistantMessage;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
 import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.service.RunLedgerService;
+import com.smartdock.assistant.service.PurgeService;
 import com.smartdock.assistant.service.ConversationMetaService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
@@ -37,8 +39,15 @@ class G2ConversationTest {
     private static final Long U1 = 910000000000101L;
     private static final Long U2 = 910000000000102L;
 
+    /** 7C-1：run 台账（首绑 / 登记 / 一轮三表写）已搬新根 service */
     @Autowired
-    AssistantConversationService conversationService;
+    RunLedgerService runLedgerService;
+    /** 7C-1：消息写（user / assistant 落库）已搬新根 service */
+    @Autowired
+    MessageWriteService messageWriteService;
+    /** 7C-2：清人与保留期清理已搬新根 purge 服务 */
+    @Autowired
+    PurgeService purgeService;
     /** 7B：会话只读（listMessages）已搬新根 query 服务 */
     @Autowired
     ConversationQueryService conversationQueryService;
@@ -52,53 +61,53 @@ class G2ConversationTest {
     @Test
     void archivedConversationRejectsWriteUntilRestored() {
         String thread = RUN_KEY + "-arch";
-        Long conv = conversationService.ensureConversation("987311", U1, thread, "归档拒写");
+        Long conv = runLedgerService.ensureConversation("987311", U1, thread, "归档拒写");
         conversationMetaService.archiveConversation("987311", U1, conv);
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> conversationService.ensureConversation("987311", U1, thread, "归档拒写"),
+            () -> runLedgerService.ensureConversation("987311", U1, thread, "归档拒写"),
             "归档会话发消息必须 403");
         assertEquals(403, ex.getCode());
         conversationMetaService.restoreConversation("987311", U1, conv);
-        assertEquals(conv, conversationService.ensureConversation("987311", U1, thread, "归档拒写"),
+        assertEquals(conv, runLedgerService.ensureConversation("987311", U1, thread, "归档拒写"),
             "恢复后同会话放行");
     }
 
     @Test
     void threadFirstBindRejectsCrossUser() {
         String thread = RUN_KEY + "-t1";
-        Long conv1 = conversationService.ensureConversation("987311", U1, thread, "标题");
+        Long conv1 = runLedgerService.ensureConversation("987311", U1, thread, "标题");
         assertNotNull(conv1);
         // 同租户异主 → 403（不区分不存在与无权, 防探测）
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> conversationService.ensureConversation("987311", U2, thread, "标题"),
+            () -> runLedgerService.ensureConversation("987311", U2, thread, "标题"),
             "thread 归属首绑后异主必须 403");
         assertEquals(403, ex.getCode());
         // 异租户同 threadId → 各自独立（租户隔离键）
-        Long convOther = conversationService.ensureConversation("000000", U1, thread, "标题");
+        Long convOther = runLedgerService.ensureConversation("000000", U1, thread, "标题");
         assertNotEquals(conv1, convOther, "租户维度隔离");
     }
 
     @Test
     void runRegistryBindsOwnership() {
         String runId = RUN_KEY + "-r1";
-        conversationService.registerRun("987311", U1, RUN_KEY + "-t2", runId);
-        DcsAssistantRun bound = conversationService.runByRunId(runId);
+        runLedgerService.registerRun("987311", U1, RUN_KEY + "-t2", runId);
+        DcsAssistantRun bound = runLedgerService.runByRunId(runId);
         assertEquals(U1, bound.getUserId(), "runId 首现绑定归属");
         // 重放同 runId 异主 → 403（S-04① 防重放换人）
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> conversationService.registerRun("987311", U2, RUN_KEY + "-t2", runId));
+            () -> runLedgerService.registerRun("987311", U2, RUN_KEY + "-t2", runId));
         assertEquals(403, ex.getCode());
         // 同主重放（resume 同 runId）→ 幂等放行不换绑
-        conversationService.registerRun("987311", U1, RUN_KEY + "-t2", runId);
-        assertEquals(U1, conversationService.runByRunId(runId).getUserId());
+        runLedgerService.registerRun("987311", U1, RUN_KEY + "-t2", runId);
+        assertEquals(U1, runLedgerService.runByRunId(runId).getUserId());
     }
 
     @Test
     void messageRoundtripAssistantSideMasked() {
         String thread = RUN_KEY + "-t3";
-        Long conv = conversationService.ensureConversation("987311", U1, thread, "消息往返");
-        conversationService.appendUserMessage("987311", conv, U1, "请联系13800138000");
-        conversationService.appendAssistantMessage("987311", conv, U1,
+        Long conv = runLedgerService.ensureConversation("987311", U1, thread, "消息往返");
+        messageWriteService.appendUserMessage("987311", conv, U1, "请联系13800138000");
+        messageWriteService.appendAssistantMessage("987311", conv, U1,
             "好的，已记录你的号码13800138000与邮箱 wang@x.com", null, "stop");
         List<DcsAssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
         assertEquals(2, msgs.size(), "一问一答两行");
@@ -116,41 +125,41 @@ class G2ConversationTest {
     void purgeUserIsTenantScoped() throws Exception {
         String threadA = RUN_KEY + "-pa";
         String threadB = RUN_KEY + "-pb";
-        Long convA = conversationService.ensureConversation("987311", U1, threadA, "A");
-        conversationService.appendUserMessage("987311", convA, U1, "A 的消息");
-        Long convB = conversationService.ensureConversation("000000", U1, threadB, "B");
-        conversationService.appendUserMessage("000000", convB, U1, "B 的消息");
+        Long convA = runLedgerService.ensureConversation("987311", U1, threadA, "A");
+        messageWriteService.appendUserMessage("987311", convA, U1, "A 的消息");
+        Long convB = runLedgerService.ensureConversation("000000", U1, threadB, "B");
+        messageWriteService.appendUserMessage("000000", convB, U1, "B 的消息");
 
-        int purged = conversationService.purgeUser("987311", U1);
+        int purged = purgeService.purgeUser("987311", U1);
         org.junit.jupiter.api.Assertions.assertTrue(purged >= 2, "至少删掉 A 会话+消息: " + purged);
         // 框架表清理独立于四表事务（表缺失环境 tolerated，且不得连坐回滚四表删除）
-        conversationService.purgeAgentscopeSessions("987311", U1);
+        purgeService.purgeAgentscopeSessions("987311", U1);
 
-        assertNull(conversationService.conversationByThread("987311", threadA), "A 租户行已清");
-        assertNotNull(conversationService.conversationByThread("000000", threadB), "B 租户不受影响");
+        assertNull(conversationQueryService.conversationByThread("987311", threadA), "A 租户行已清");
+        assertNotNull(conversationQueryService.conversationByThread("000000", threadB), "B 租户不受影响");
     }
 
     @Test
     void userRoundReplayRejectedNotSilentlyIgnored() {
         String thread = RUN_KEY + "-rp";
         String runId = RUN_KEY + "-rp-run";
-        conversationService.persistUserRound("987311", U1, thread, runId, "重放", "第一条消息");
+        runLedgerService.persistUserRound("987311", U1, thread, runId, "重放", "第一条消息");
         // goal 加固 H1：同主重放（断线重试同 runId）必须整体拒绝——此前静默吞掉会放行 agent
         // 重跑=双扣费+assistant 消息可双落；拒绝后框架转 RUN_ERROR，前端不再自动重试
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> conversationService.persistUserRound("987311", U1, thread, runId, "重放", "第一条消息"),
+            () -> runLedgerService.persistUserRound("987311", U1, thread, runId, "重放", "第一条消息"),
             "同 runId 同主重放必须拒绝");
         assertEquals(409, ex.getCode());
         assertTrue(ex.getMessage().contains("重复请求"), "话术指导用户刷新或重发: " + ex.getMessage());
-        DcsAssistantConversation conv = conversationService.conversationByThread("987311", thread);
+        DcsAssistantConversation conv = conversationQueryService.conversationByThread("987311", thread);
         List<DcsAssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv.getId(), 10, 0);
         assertEquals(1, msgs.size(), "user 消息仍只一行(拒绝不含双落): " + msgs.size());
     }
 
     @Test
     void retentionSweepDeletesExpiredAndIdempotent() throws Exception {
-        Long conv = conversationService.ensureConversation("987311", U1, RUN_KEY + "-rt", "清理");
-        conversationService.appendUserMessage("987311", conv, U1, "新消息(90 天内保留)");
+        Long conv = runLedgerService.ensureConversation("987311", U1, RUN_KEY + "-rt", "清理");
+        messageWriteService.appendUserMessage("987311", conv, U1, "新消息(90 天内保留)");
         // 手工注入一条过期消息（91 天前）与一条过期会话
         exec("INSERT INTO dcs_assistant_message (id, tenant_id, conversation_id, user_id, role, content, create_time)"
             + " VALUES (" + (System.currentTimeMillis() % 100000) + ", '987311', " + conv + ", " + U1
@@ -158,7 +167,7 @@ class G2ConversationTest {
         exec("INSERT INTO dcs_assistant_conversation (id, tenant_id, user_id, thread_id, title, create_time)"
             + " VALUES (" + (System.currentTimeMillis() % 100000 + 1) + ", '987311', " + U1 + ", '"
             + RUN_KEY + "-dead', '旧会话', CURRENT_TIMESTAMP - INTERVAL '181 days')");
-        conversationService.retentionSweep(100);
+        purgeService.retentionSweep(100);
         Long oldMsg = query("SELECT COUNT(*) FROM dcs_assistant_message WHERE content='old'");
         assertEquals(0L, oldMsg, "91 天消息已删");
         Long oldConv = query("SELECT COUNT(*) FROM dcs_assistant_conversation WHERE thread_id='" + RUN_KEY + "-dead'");
@@ -166,7 +175,7 @@ class G2ConversationTest {
         List<DcsAssistantMessage> fresh = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
         assertTrue(fresh.stream().anyMatch(m -> "新消息(90 天内保留)".equals(m.getContent())), "90 天内消息保留");
         // 幂等：再跑一遍无异常无残留
-        conversationService.retentionSweep(100);
+        purgeService.retentionSweep(100);
     }
 
     private void exec(String sql) throws Exception {

@@ -30,7 +30,7 @@ class DcsCompactionMiddlewareTest {
     private static DcsCompactionMiddleware middleware(int triggerTokens) {
         // 构造器只存字段（2.0.4 字节码实证）；微压缩路径不碰 workspace/model/service
         return new DcsCompactionMiddleware(null, null,
-            AssistantCompactionAssets.buildConfig(triggerTokens), null);
+            AssistantCompactionAssets.buildConfig(triggerTokens), null, null);
     }
 
     /** assistant(tool_use) + tool(result) 一组，共 n 组（消息带显式 id——真实链路同款） */

@@ -9,7 +9,6 @@ import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import com.smartdock.assistant.domain.model.DcsAssistantMessage;
 import com.smartdock.assistant.legacy.service.AssistantConfigService;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import com.smartdock.assistant.query.ConversationQueryService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -55,8 +54,8 @@ class AssistantGatewayImplTest {
         when(query.conversationByThread(TENANT, "t-1")).thenReturn(row);
         when(query.conversationByThread(TENANT, "t-404")).thenReturn(null);
 
-        // 7B：会话只读两条链走新根 query 服务；legacy 服务只剩 latestContextTokens
-        ConversationReadGateway gw = new ConversationReadGatewayImpl(query, mock(AssistantConversationService.class));
+        // 7C-1：三条读链全部走新根 query 服务，实现已不依赖 legacy
+        ConversationReadGateway gw = new ConversationReadGatewayImpl(query);
         ConversationReadGateway.ConversationRef ref = gw.conversationByThread(TENANT, "t-1");
         assertEquals(CONV_ID, ref.id());
         assertEquals(USER_ID, ref.userId());
@@ -75,7 +74,7 @@ class AssistantGatewayImplTest {
         b.setToolSteps("{\"tool\":\"x\"}");
         when(query.listMessagesTail(TENANT, USER_ID, CONV_ID, 500)).thenReturn(List.of(a, b));
 
-        ConversationReadGateway gw = new ConversationReadGatewayImpl(query, mock(AssistantConversationService.class));
+        ConversationReadGateway gw = new ConversationReadGatewayImpl(query);
         List<ConversationReadGateway.MessageRef> out = gw.listMessagesTail(TENANT, USER_ID, CONV_ID, 500);
         assertEquals(2, out.size());
         assertEquals("user", out.get(0).role());
@@ -88,10 +87,11 @@ class AssistantGatewayImplTest {
 
     @Test
     void 末次tokens原样透传() {
-        AssistantConversationService svc = mock(AssistantConversationService.class);
-        when(svc.latestContextTokens(TENANT, USER_ID, CONV_ID)).thenReturn(23260L);
+        // 7C-1：latestContextTokens 随消息只读三件一并搬进新根 query 服务（写路径已不在此）
+        ConversationQueryService query = mock(ConversationQueryService.class);
+        when(query.latestContextTokens(TENANT, USER_ID, CONV_ID)).thenReturn(23260L);
         assertEquals(23260L,
-            new ConversationReadGatewayImpl(mock(ConversationQueryService.class), svc).latestContextTokens(TENANT, USER_ID, CONV_ID));
+            new ConversationReadGatewayImpl(query).latestContextTokens(TENANT, USER_ID, CONV_ID));
     }
 
     // ------------------------------------------------------------------

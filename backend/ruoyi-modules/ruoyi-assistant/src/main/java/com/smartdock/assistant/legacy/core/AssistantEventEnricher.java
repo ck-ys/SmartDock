@@ -1,12 +1,15 @@
 package com.smartdock.assistant.legacy.core;
 
+import com.smartdock.assistant.domain.model.AssistantTodoItem;
+import com.smartdock.assistant.domain.model.DcsAssistantAction;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
 import io.agentscope.core.agui.adapter.strategy.AguiEventEnricher;
 import io.agentscope.core.agui.event.AguiEvent;
 import io.agentscope.core.agui.event.AguiEventType;
 import io.agentscope.core.event.AgentEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -90,7 +93,7 @@ public class AssistantEventEnricher implements AguiEventEnricher {
                 // 三审回修（三席共识）：归属锚从 thread 反查会话行改为 runId 反查 run 登记行
                 // ——runId 全局唯一且登记时已做归属校验；thread 裸查在跨租户同 threadId
                 // （超管切租户复用前端持久化 threadId）时会错挂租户，且无 thread 单列索引
-                com.smartdock.assistant.legacy.domain.DcsAssistantRun run = actionService.findRun(context.getRunId());
+                DcsAssistantRun run = actionService.findRun(context.getRunId());
                 if (run != null) {
                     for (io.agentscope.core.event.ConfirmResult cr : ucr.getConfirmResults()) {
                         if (cr.isConfirmed() || cr.getToolCall() == null) {
@@ -171,10 +174,10 @@ public class AssistantEventEnricher implements AguiEventEnricher {
         // ZCode 对齐 Q2（批A）：todo_write 落的清单信号同线程下一批事件前转发——前端
         // StatPanel 回合进行中就更新任务清单分区；整表替换语义下同回合多次调用只发最新版
         if (todoSignal != null && context != null && context.getThreadId() != null) {
-            java.util.List<AssistantTodoSignal.TodoItem> todo = todoSignal.take(context.getThreadId());
+            java.util.List<AssistantTodoItem> todo = todoSignal.take(context.getThreadId());
             if (todo != null) {
                 java.util.List<java.util.Map<String, String>> items = new java.util.ArrayList<>();
-                for (AssistantTodoSignal.TodoItem item : todo) {
+                for (AssistantTodoItem item : todo) {
                     items.add(java.util.Map.of(
                         "content", item.content(),
                         "status", item.status(),
@@ -259,11 +262,11 @@ public class AssistantEventEnricher implements AguiEventEnricher {
             && events.stream().noneMatch(e -> e instanceof AguiEvent.RunFinished fin
                 && fin.outcome() instanceof AguiEvent.RunFinishedInterruptOutcome)) {
             try {
-                List<com.smartdock.assistant.legacy.domain.DcsAssistantAction> rows =
+                List<DcsAssistantAction> rows =
                     actionService.listRevocableByRun(context.getRunId());
                 if (!rows.isEmpty()) {
                     java.util.List<java.util.Map<String, Object>> items = new java.util.ArrayList<>();
-                    for (com.smartdock.assistant.legacy.domain.DcsAssistantAction r : rows) {
+                    for (DcsAssistantAction r : rows) {
                         items.add(java.util.Map.of(
                             "id", String.valueOf(r.getId()),
                             "toolName", r.getToolName() == null ? "" : r.getToolName(),

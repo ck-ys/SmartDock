@@ -4,8 +4,8 @@ import com.smartdock.assistant.domain.gateway.RunFeedGateway;
 import io.agentscope.core.agui.event.AguiEvent;
 import lombok.RequiredArgsConstructor;
 import com.smartdock.assistant.legacy.core.AssistantRunStreamHub;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
-import com.smartdock.assistant.legacy.mapper.AssistantRunMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import com.smartdock.assistant.mapper.AssistantRunMapper;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 

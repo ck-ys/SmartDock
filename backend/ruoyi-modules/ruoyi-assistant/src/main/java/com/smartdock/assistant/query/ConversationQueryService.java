@@ -1,12 +1,18 @@
 package com.smartdock.assistant.query;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartdock.assistant.domain.gateway.RunStatusGateway;
+import com.smartdock.assistant.domain.model.AssistantTodoItem;
+import com.smartdock.assistant.domain.model.DcsAssistantCompaction;
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.mapper.AssistantCompactionMapper;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.mapper.AssistantMessageMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
 
@@ -25,12 +31,14 @@ import java.util.Set;
  *
  * <p>「生成中」标志经 {@link RunStatusGateway} 读 run 表（规则 8：本类不许 import legacy）。</p>
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ConversationQueryService {
 
     private final AssistantConversationMapper conversationMapper;
     private final AssistantMessageMapper messageMapper;
+    private final AssistantCompactionMapper compactionMapper;
     private final RunStatusGateway runStatusGateway;
 
     /**
@@ -113,6 +121,82 @@ public class ConversationQueryService {
         Collections.reverse(rows);
         return rows;
     }
+
+    /** 本会话最新一条 assistant 消息（批5 Q7-3：前端 done 后拉追问建议）。
+     *  批 7C-1（2026-11-20）从 legacy 会话服务搬入——消息写路径已迁 {@code service.MessageWriteService}，
+     *  只读不再寄生在写服务上。 */
+    public DcsAssistantMessage latestAssistant(String tenantId, Long userId, Long conversationId) {
+        return messageMapper.selectLatestAssistant(tenantId, conversationId, userId);
+    }
+
+    /** 批B B1 修：环数据源——最新一条 tokens 非空 assistant 行（truncated 空值行不遮蔽旧读数）。
+     *  批 7C-1 从 legacy 搬入（同上）。 */
+    public Long latestContextTokens(String tenantId, Long userId, Long conversationId) {
+        return messageMapper.selectLatestContextTokens(tenantId, conversationId, userId);
+    }
+
+    /** 本回合用户提问（批5 Q7-3：assistant 落库前该会话最后一条 user 消息即本回合问题。
+     *  七席审查 P1 回修：DESC LIMIT 1 单行单列，替换 ASC 500 行倒扫）。
+     *  批 7C-1 从 legacy 搬入（同上）。 */
+    public String lastUserQuestion(String tenantId, Long userId, Long conversationId) {
+        return messageMapper.selectLatestUserContent(tenantId, conversationId, userId);
+    }
+
+    /**
+     * 状态卡压缩账单（ckys3 解锁板 题2 案1，2026-11-12）：该会话最近一次成功压缩
+     * （前后 token）＋累计次数。只读归并两条查询为一个小记录；无压缩记录返回 count=0
+     * 的空账单（前端不渲染行）。口径：只认 SUCCESS 行——FAILED 行上下文虽收缩但摘要
+     * 不可信，不上账单（消息流另有「本次没压成」警示条）。
+     *
+     * <p>批 7C-2 从 legacy 搬入（逐行一致）；写入侧在
+     * {@code service.MessageWriteService#appendCompactionRecord}。</p>
+     */
+    public CompactionBill compactionBill(String tenantId, Long conversationId) {
+        int count = compactionMapper.countOkByConversation(tenantId, conversationId);
+        if (count == 0) {
+            return new CompactionBill(null, null, null, 0);
+        }
+        DcsAssistantCompaction latest = compactionMapper.selectLatestByConversation(tenantId, conversationId);
+        if (latest == null) {
+            return new CompactionBill(null, null, null, 0);
+        }
+        return new CompactionBill(latest.getBeforeTokens(), latest.getAfterTokens(),
+            latest.getCreateTime() == null ? null : latest.getCreateTime().getTime(), count);
+    }
+
+    /** 账单载荷：beforeTokens/afterTokens=最近一次成功压缩前后 token；atMs=该次时刻；count=累计次数 */
+    public record CompactionBill(Integer beforeTokens, Integer afterTokens, Long atMs, int count) {
+    }
+
+    /**
+     * 当前会话 TODO 清单（前端打开会话恢复分区；无清单返回空数组）。
+     *
+     * <p>只读会话行的一个 JSON 列（{@code dcs_assistant_conversation.todo_items}）；
+     * 写入侧在 {@code service.MessageWriteService#saveTodo}。批 7C-2 从 legacy 搬入。</p>
+     */
+    public List<AssistantTodoItem> todoOf(String tenantId, Long userId, String threadId) {
+        DcsAssistantConversation conv = conversationMapper.selectByThread(tenantId, threadId);
+        if (conv == null || !conv.getUserId().equals(userId)
+            || conv.getTodoItems() == null || conv.getTodoItems().isBlank()) {
+            return List.of();
+        }
+        try {
+            return OBJECT_MAPPER.readValue(conv.getTodoItems(),
+                new TypeReference<List<AssistantTodoItem>>() {
+                });
+        } catch (Exception e) {
+            log.warn("[AssistantTodo] 清单解析失败(按空处理): {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** 清单 JSON 读写（懒初始化，避免每次调用都 new）。
+     *
+     *  <p><b>与旧实现的唯一差异</b>（多审 glm53 P2-2）：原 {@code AssistantConversationService}
+     *  是每次调用 {@code new ObjectMapper()}，这里改成类级 static 共享。{@code ObjectMapper}
+     *  线程安全、无状态，共享不改变解析口径与结果，只是少建对象；{@link #todoOf} 的判空顺序、
+     *  异常降级（WARN + 返回空表）与旧实现逐行一致。</p> */
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private LambdaQueryWrapper<DcsAssistantConversation> conversationQuery(String tenantId, Long userId, String status) {
         String safe = status == null ? "ACTIVE" : status.toUpperCase();

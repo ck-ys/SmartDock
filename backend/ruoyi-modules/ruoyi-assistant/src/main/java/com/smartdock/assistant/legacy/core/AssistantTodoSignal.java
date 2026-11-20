@@ -1,5 +1,6 @@
 package com.smartdock.assistant.legacy.core;
 
+import com.smartdock.assistant.domain.model.AssistantTodoItem;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -20,12 +21,11 @@ import java.util.Map;
 @Component
 public class AssistantTodoSignal {
 
-    /** 一条任务（ZCode TodoItem 同构；status=pending/in_progress/completed，priority=high/medium/low） */
-    public record TodoItem(String content, String status, String priority) {
-    }
+    // 批 7C-2：一条任务的结构已提升为 domain.model.AssistantTodoItem（字段与 JSON 键名不变），
+    // 本类不再自带 record——新根 service 读写清单要用同一类型，规则 8 又不许新根 import legacy。
 
     /** threadId → 最新清单 */
-    private final Map<String, List<TodoItem>> signals;
+    private final Map<String, List<AssistantTodoItem>> signals;
 
     /** 兜底清理上限：超限按插入序淘汰最旧（run 中断未收尾的残段防泄漏） */
     private static final int MAX_ENTRIES = 128;
@@ -33,14 +33,14 @@ public class AssistantTodoSignal {
     public AssistantTodoSignal() {
         this.signals = Collections.synchronizedMap(new LinkedHashMap<>(16, 0.75f, false) {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<String, List<TodoItem>> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<String, List<AssistantTodoItem>> eldest) {
                 return size() > MAX_ENTRIES;
             }
         });
     }
 
     /** todo_write 工具落信号（threadId 空或清单空=非会话态，丢弃；整表替换） */
-    public void submit(String threadId, List<TodoItem> items) {
+    public void submit(String threadId, List<AssistantTodoItem> items) {
         if (threadId == null || threadId.isBlank() || items == null || items.isEmpty()) {
             return;
         }
@@ -48,7 +48,7 @@ public class AssistantTodoSignal {
     }
 
     /** enricher 取走并清除；无记录返回 null */
-    public List<TodoItem> take(String threadId) {
+    public List<AssistantTodoItem> take(String threadId) {
         if (threadId == null || threadId.isBlank()) {
             return null;
         }

@@ -2,7 +2,7 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartdock.assistant.legacy.domain.DcsAssistantAttachment;
+import com.smartdock.assistant.domain.model.DcsAssistantAttachment;
 import com.smartdock.assistant.legacy.service.AssistantAttachmentService;
 import com.smartdock.assistant.legacy.tools.AttachmentTools;
 import com.smartdock.assistant.legacy.tools.ToolIdentity;

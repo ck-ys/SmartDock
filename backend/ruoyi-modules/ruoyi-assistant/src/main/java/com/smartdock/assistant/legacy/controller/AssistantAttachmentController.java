@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.domain.DcsAssistantAttachment;
+import com.smartdock.assistant.domain.model.DcsAssistantAttachment;
 import com.smartdock.assistant.legacy.service.AssistantAttachmentService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.satoken.utils.LoginHelper;

@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.persist;
+package com.smartdock.assistant.support;
 
 /**
  * 「这一轮为什么没回答」原因码纯函数（2026-11-11 拍板 Q1-3/Q2-2/Q4-2）。

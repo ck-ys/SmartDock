@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -7,7 +7,8 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import java.util.List;
 
 /**
  * 助手 run 登记 Mapper（批G G3）。runId 首绑归属（S-04①）+ 终态回写。
@@ -59,7 +60,7 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
     /** 按 thread 查 run（断线恢复列表，最新在前） */
     @Select("SELECT * FROM dcs_assistant_run WHERE tenant_id=#{tenantId} AND thread_id=#{threadId} AND user_id=#{userId}"
         + " ORDER BY id DESC LIMIT #{limit}")
-    java.util.List<DcsAssistantRun> selectByThread(@Param("tenantId") String tenantId,
+    List<DcsAssistantRun> selectByThread(@Param("tenantId") String tenantId,
         @Param("threadId") String threadId, @Param("userId") Long userId, @Param("limit") int limit);
 
     /**
@@ -68,7 +69,7 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
      */
     @Select("SELECT DISTINCT thread_id FROM dcs_assistant_run"
         + " WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND status='RUNNING'")
-    java.util.List<String> selectRunningThreadIds(@Param("tenantId") String tenantId,
+    List<String> selectRunningThreadIds(@Param("tenantId") String tenantId,
         @Param("userId") Long userId);
 
     /** 保留期清理：run>180 天分批物理删（与 conversation 同期，登记项） */
@@ -87,13 +88,13 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
      */
     @Select("SELECT * FROM dcs_assistant_run WHERE status='RUNNING'"
         + " AND COALESCE(last_event_at, create_time) < (CURRENT_TIMESTAMP - make_interval(mins => #{minutes}))")
-    java.util.List<DcsAssistantRun> selectStuck(@Param("minutes") int minutes);
+    List<DcsAssistantRun> selectStuck(@Param("minutes") int minutes);
 
     /** 条件迁移悬挂 run（只迁 RUNNING；RETURNING 让迁移成功的行才退回合） */
     @Select("UPDATE dcs_assistant_run SET status='INTERRUPTED', end_reason='no-terminal-event',"
         + " update_time=CURRENT_TIMESTAMP WHERE run_id=#{runId} AND tenant_id=#{tenantId} AND status='RUNNING'"
         + " RETURNING tenant_id, user_id, run_id")
-    java.util.List<DcsAssistantRun> finalizeStuck(@Param("tenantId") String tenantId, @Param("runId") String runId);
+    List<DcsAssistantRun> finalizeStuck(@Param("tenantId") String tenantId, @Param("runId") String runId);
 
     /**
      * 批6-#2 失联收割（刷新/断网拆链的 run）：RunRecorder 实测「事件停滞超阈值」后
@@ -105,7 +106,7 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
     @Select("UPDATE dcs_assistant_run SET status='INTERRUPTED', end_reason='client-disconnect',"
         + " update_time=CURRENT_TIMESTAMP WHERE run_id=#{runId} AND tenant_id=#{tenantId} AND status='RUNNING'"
         + " RETURNING tenant_id, user_id, run_id")
-    java.util.List<DcsAssistantRun> finalizeStalled(@Param("tenantId") String tenantId, @Param("runId") String runId);
+    List<DcsAssistantRun> finalizeStalled(@Param("tenantId") String tenantId, @Param("runId") String runId);
 
     /**
      * 业务批10 #2：RUNNING 超时行扫描（收割器零事件二扫用）。建行后从未有 enricher
@@ -115,5 +116,5 @@ public interface AssistantRunMapper extends BaseMapper<DcsAssistantRun> {
      */
     @Select("SELECT * FROM dcs_assistant_run WHERE status='RUNNING'"
         + " AND COALESCE(last_event_at, create_time) < (CURRENT_TIMESTAMP - make_interval(secs => #{seconds}))")
-    java.util.List<DcsAssistantRun> selectRunningOlderThan(@Param("seconds") int seconds);
+    List<DcsAssistantRun> selectRunningOlderThan(@Param("seconds") int seconds);
 }

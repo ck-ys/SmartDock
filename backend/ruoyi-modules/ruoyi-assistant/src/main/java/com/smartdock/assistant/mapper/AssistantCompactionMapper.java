@@ -1,11 +1,11 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import com.smartdock.assistant.legacy.domain.DcsAssistantCompaction;
+import com.smartdock.assistant.domain.model.DcsAssistantCompaction;
 
 /**
  * 自动压缩记录 Mapper（批A-2）。表带 tenant_id，SQL 显式租户条件 + 关闭租户插件注入。

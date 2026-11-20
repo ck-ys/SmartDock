@@ -2,7 +2,7 @@ package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.RunStatusGateway;
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.legacy.mapper.AssistantRunMapper;
+import com.smartdock.assistant.mapper.AssistantRunMapper;
 import com.smartdock.assistant.query.ConversationQueryService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -72,7 +72,7 @@ class RunStatusGatewayPinUnitTest {
 
         RunStatusGateway gateway = (tenantId, userId) -> Set.of("t-1");
         // mapper 传 null：markRunning 只读网关，不碰库——碰了就 NPE 自己证伪
-        new ConversationQueryService(null, null, gateway)
+        new ConversationQueryService(null, null, null, gateway)
             .markRunning(List.of(hit, miss), TENANT, USER_ID);
 
         assertEquals(Boolean.TRUE, hit.getRunning(), "在途 thread 标 true");
@@ -85,7 +85,7 @@ class RunStatusGatewayPinUnitTest {
         a.setThreadId("t-1");
 
         RunStatusGateway none = (tenantId, userId) -> Set.of();
-        new ConversationQueryService(null, null, none).markRunning(List.of(a), TENANT, USER_ID);
+        new ConversationQueryService(null, null, null, none).markRunning(List.of(a), TENANT, USER_ID);
 
         assertNull(a.getRunning(), "无 RUNNING 行时保持 null（前端按 false 渲染）");
     }
@@ -95,7 +95,7 @@ class RunStatusGatewayPinUnitTest {
         RunStatusGateway boom = (tenantId, userId) -> {
             throw new AssertionError("rows 为空时不该查 run 表");
         };
-        ConversationQueryService svc = new ConversationQueryService(null, null, boom);
+        ConversationQueryService svc = new ConversationQueryService(null, null, null, boom);
         svc.markRunning(null, TENANT, USER_ID);
         svc.markRunning(List.of(), TENANT, USER_ID);
     }

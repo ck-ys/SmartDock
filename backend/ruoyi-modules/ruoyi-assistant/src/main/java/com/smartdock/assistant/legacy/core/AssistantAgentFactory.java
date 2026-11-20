@@ -23,6 +23,9 @@ import com.smartdock.domain.DcsAiConfig;
 import com.smartdock.service.IDcsAiModelPriceService;
 import com.smartdock.service.support.AiBillingService;
 import com.smartdock.service.support.TenantWalletService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.RunLedgerService;
 import org.springframework.stereotype.Component;
 
 import java.util.Set;
@@ -87,8 +90,12 @@ public class AssistantAgentFactory {
     private final com.smartdock.assistant.legacy.service.AssistantModelSettingService modelSettingService;
     /** TODO 清单信号仓(ZCode 对齐 Q2, 批A: todo_write 工具实时推送) */
     private final AssistantTodoSignal todoSignal;
-    /** 会话服务(ZCode 对齐 Q2, 批A: TodoTools 清单落库) */
-    private final com.smartdock.assistant.legacy.service.AssistantConversationService conversationService;
+    /** 7C-1：消息写（压缩分隔条行；TodoTools 走 TODO 信号仓，不落此服务） */
+    private final MessageWriteService messageWriteService;
+    /** 7C-1：会话只读（压缩中间件按 thread 定位会话） */
+    private final ConversationQueryService conversationQueryService;
+    /** 7C-1：run 台账（模型失败侧问题行挂在 run 上） */
+    private final RunLedgerService runLedgerService;
     /** 联网搜索日配额(业务批3-④: web_search 执行闸+失败补偿) */
     private final com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota;
     /** run 终局化(Q4/ISSUE-007①: 建会话失败时同步 FAILED+退回合, 免 15min 假生成) */
@@ -224,7 +231,7 @@ public class AssistantAgentFactory {
             .keyPool(providerKeyPool)
             // 2026-11-11 Q2-2 补丁：模型失败侧落问题行——框架对服务商故障不出 RUN_ERROR
             // （活体实证见 BillingModelDecorator#issueRecorder 注释），主链接上捕获链
-            .issueRecorder(conversationService);
+            .issueRecorder(runLedgerService);
         Toolkit toolkit = new Toolkit();
         // S-3 单点化：工具注册+权限规则同循环生成（ToolRegistry 唯一登记处，
         // 替代原 toolkit.registerTool 散调 + buildPermissionContext 硬编码名数组）
@@ -246,7 +253,7 @@ public class AssistantAgentFactory {
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
                 planSignal, memoryTurnService, memoryOn, aguiThreadId, user.getTenantId(),
-                todoSignal, conversationService, webSearchQuota, quotaService, tenantCfg.toolGate(),
+                todoSignal, messageWriteService, webSearchQuota, quotaService, tenantCfg.toolGate(),
                 // 题7 案1：工作区根 = 本会话驱逐落盘目录（read_file 只在此根下回读）
                 threadWorkspace,
                 // 题12 案1：结构化反问桥（ask_user）
@@ -372,7 +379,7 @@ public class AssistantAgentFactory {
                 new CompactionSummaryModel(model),
                 AssistantCompactionAssets.buildConfig(
                     AssistantCompactionPolicy.deriveTriggerTokens(cfg.getContextWindow(), cfg.getMaxTokens())),
-                conversationService))
+                messageWriteService, conversationQueryService))
             // 业务批7 Q16-①：恢复态 pending（无结果的 tool_use）官方恢复分支——合成工具
             // 失败结果后会话继续；配合 AssistantStaleAskingRecovery 启动翻转 asking→allowed，
             // 根治「重启后旧确认挂起毒化 thread」（ASKING 分支在恢复开关前硬抛英文错）

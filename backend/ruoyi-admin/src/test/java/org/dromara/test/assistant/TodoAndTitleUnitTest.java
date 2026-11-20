@@ -56,14 +56,14 @@ class TodoAndTitleUnitTest {
     @Test
     void todoWriteNormalListOkAndSignals() throws Exception {
         AssistantTodoSignal signal = new AssistantTodoSignal();
-        com.smartdock.assistant.legacy.service.AssistantConversationService conv = mock();
+        com.smartdock.assistant.service.MessageWriteService conv = mock();
         TodoTools tools = new TodoTools(identity(), signal, conv, "th-1");
         JsonNode out = runTodo(tools, "[{\"content\":\"查未交名单\",\"status\":\"in_progress\",\"priority\":\"high\"},"
             + "{\"content\":\"发送催办\",\"status\":\"pending\",\"priority\":\"medium\"}]");
         assertEquals("OK", out.path("status").asText());
         assertEquals(2, out.path("count").asInt());
         // 信号仓取到最新一版（整表替换语义）
-        List<AssistantTodoSignal.TodoItem> items = signal.take("th-1");
+        List<com.smartdock.assistant.domain.model.AssistantTodoItem> items = signal.take("th-1");
         assertNotNull(items);
         assertEquals(2, items.size());
         assertEquals("查未交名单", items.get(0).content());
@@ -75,7 +75,7 @@ class TodoAndTitleUnitTest {
     @Test
     void todoWriteDefaultsAndTruncation() throws Exception {
         AssistantTodoSignal signal = new AssistantTodoSignal();
-        com.smartdock.assistant.legacy.service.AssistantConversationService conv = mock();
+        com.smartdock.assistant.service.MessageWriteService conv = mock();
         TodoTools tools = new TodoTools(identity(), signal, conv, "th-1");
         // status/priority 缺省 → pending/medium；content 超 40 字截断
         StringBuilder long40 = new StringBuilder();
@@ -84,7 +84,7 @@ class TodoAndTitleUnitTest {
         }
         JsonNode out = runTodo(tools, "[{\"content\":\"" + long40 + "\"}]");
         assertEquals("OK", out.path("status").asText());
-        List<AssistantTodoSignal.TodoItem> items = signal.take("th-1");
+        List<com.smartdock.assistant.domain.model.AssistantTodoItem> items = signal.take("th-1");
         assertEquals(40, items.get(0).content().length(), "content 截到 40 字");
         assertEquals("pending", items.get(0).status());
         assertEquals("medium", items.get(0).priority());
@@ -106,7 +106,7 @@ class TodoAndTitleUnitTest {
     @Test
     void todoWriteRejectsBadPayloads() throws Exception {
         AssistantTodoSignal signal = new AssistantTodoSignal();
-        com.smartdock.assistant.legacy.service.AssistantConversationService conv = mock();
+        com.smartdock.assistant.service.MessageWriteService conv = mock();
         TodoTools tools = new TodoTools(identity(), signal, conv, "th-1");
         // 非法 JSON / 非数组 / 空数组
         for (String bad : new String[] {"不是json", "{\"content\":\"x\"}", "[]", null}) {
@@ -230,8 +230,8 @@ class TodoAndTitleUnitTest {
     void enricherInjectsTodoCustomFrameAtHead() {
         com.smartdock.assistant.legacy.core.AssistantTodoSignal signal = new com.smartdock.assistant.legacy.core.AssistantTodoSignal();
         signal.submit("th-1", List.of(
-            new com.smartdock.assistant.legacy.core.AssistantTodoSignal.TodoItem("查未交名单", "completed", "high"),
-            new com.smartdock.assistant.legacy.core.AssistantTodoSignal.TodoItem("发催办", "in_progress", "medium")));
+            new com.smartdock.assistant.domain.model.AssistantTodoItem("查未交名单", "completed", "high"),
+            new com.smartdock.assistant.domain.model.AssistantTodoItem("发催办", "in_progress", "medium")));
         com.smartdock.assistant.legacy.core.AssistantEventEnricher enricher =
             new com.smartdock.assistant.legacy.core.AssistantEventEnricher(null, null, null, null, signal, null, null, null, null, null, null);
         List<AguiEvent> events = List.of(new AguiEvent.TextMessageContent("th-1", "run-1", "m1", "推进中"));

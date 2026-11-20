@@ -1,24 +1,29 @@
 package com.smartdock.assistant.legacy.controller;
 
-import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import com.smartdock.assistant.service.ConversationResumeService;
-import com.smartdock.assistant.service.ConversationResumeService.ResumeResult;
-import io.agentscope.core.agui.event.AguiEvent;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantAction;
+import com.smartdock.assistant.domain.model.AssistantTodoItem;
+import com.smartdock.assistant.domain.model.DcsAssistantAction;
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import com.smartdock.assistant.domain.model.DcsAssistantRunIssue;
 import com.smartdock.assistant.legacy.service.AssistantActionService;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.mapper.AssistantRunMapper;
 import com.smartdock.assistant.query.ConversationQueryService;
 import com.smartdock.assistant.service.ConversationMetaService;
+import com.smartdock.assistant.service.ConversationResumeService.ResumeResult;
+import com.smartdock.assistant.service.ConversationResumeService;
+import com.smartdock.assistant.service.PurgeService;
+import com.smartdock.assistant.service.RunLedgerService;
+import io.agentscope.core.agui.event.AguiEvent;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
-import org.dromara.common.idempotent.annotation.RepeatSubmit;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.tenant.helper.TenantHelper;
 import org.dromara.common.web.core.BaseController;
@@ -27,8 +32,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -57,14 +62,17 @@ public class AssistantConversationController extends BaseController {
     private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
         new com.fasterxml.jackson.databind.ObjectMapper();
 
-    private final AssistantConversationService conversationService;
+    /** 7C-2：清人（七表 + agentscope 框架表 + 补偿队列） */
+    private final PurgeService purgeService;
+    /** 7C-1：run 台账（问题行查询 / 失联条件收尾） */
+    private final RunLedgerService runLedgerService;
     private final AssistantActionService actionService;
     /** 业务批4 Q1：@ 候选读链（批3 微核心化：mentionCandidates 显式 userId, 无 Sa-Token 依赖） */
     private final org.springframework.beans.factory.ObjectProvider<com.smartdock.dcs.service.DcsTaskService> dcsTaskServiceProvider;
     /** 080/ISSUE-R13-3 修：清人后按 thread 清悬挂缓存/步骤缓冲（控制器收口避
-     *  ConversationService↔RunRecorder 循环依赖） */
+     *  会话服务↔RunRecorder 循环依赖；旧会话服务已在批 7C-2 删除，收口仍保留） */
     private final com.smartdock.assistant.legacy.persist.AssistantRunRecorder runRecorder;
-    private final com.smartdock.assistant.legacy.mapper.AssistantRunMapper runMapper;
+    private final AssistantRunMapper runMapper;
     /** 题12 案1：结构化反问桥——停止生成时释放该线程挂起卡（工具线程不空等 240s） */
     private final com.smartdock.assistant.legacy.core.AssistantAskUserBridge askUserBridge;
     /** ②（2026-10-31）：计划卡取消立即解锁——点「取消」当场清闸的信号仓 */
@@ -275,8 +283,8 @@ public class AssistantConversationController extends BaseController {
      */
     @SaCheckPermission("dcs:assistant:use")
     @GetMapping("/conversation/{id}/issues")
-    public R<List<com.smartdock.assistant.legacy.domain.DcsAssistantRunIssue>> issues(@PathVariable Long id) {
-        return R.ok(conversationService.listRunIssues(TenantHelper.getTenantId(), LoginHelper.getUserId(), id));
+    public R<List<DcsAssistantRunIssue>> issues(@PathVariable Long id) {
+        return R.ok(runLedgerService.listRunIssues(TenantHelper.getTenantId(), LoginHelper.getUserId(), id));
     }
 
     /**
@@ -285,14 +293,14 @@ public class AssistantConversationController extends BaseController {
      */
     @SaCheckPermission("dcs:assistant:use")
     @GetMapping("/run/{runId}/issue")
-    public R<com.smartdock.assistant.legacy.domain.DcsAssistantRunIssue> runIssue(@PathVariable String runId) {
+    public R<DcsAssistantRunIssue> runIssue(@PathVariable String runId) {
         String tenantId = TenantHelper.getTenantId();
         Long userId = LoginHelper.getUserId();
-        com.smartdock.assistant.legacy.domain.DcsAssistantRun run = runMapper.selectByRunId(runId);
+        DcsAssistantRun run = runMapper.selectByRunId(runId);
         if (run == null || !tenantId.equals(run.getTenantId()) || !userId.equals(run.getUserId())) {
             return R.ok(null);
         }
-        return R.ok(conversationService.latestRunIssue(tenantId, userId, runId));
+        return R.ok(runLedgerService.latestRunIssue(tenantId, userId, runId));
     }
 
     /**
@@ -313,14 +321,14 @@ public class AssistantConversationController extends BaseController {
         String rcUserId = "t:" + tenantId + ":" + userId;
         // 三审回修（三席共识 P1）：只对该 thread 最新 run 仍在 RUNNING 时打标+打断——
         // 盲打会把标记留给一个已终局的 run（残留=同 thread 下一轮被误判 user-stop）
-        java.util.List<com.smartdock.assistant.legacy.domain.DcsAssistantRun> latest =
+        java.util.List<DcsAssistantRun> latest =
             runMapper.selectByThread(tenantId, threadId, userId, 1);
         boolean running = !latest.isEmpty() && "RUNNING".equals(latest.get(0).getStatus());
         if (!running) {
             askUserBridge.cancelThread(bridgeTenant(tenantId), userId, threadId);
             return R.ok();
         }
-        com.smartdock.assistant.legacy.domain.DcsAssistantRun run = latest.get(0);
+        DcsAssistantRun run = latest.get(0);
         String owner = run.getOwnerInstance();
         boolean ownedHere = owner == null || owner.isBlank() || owner.equals(instanceContext.current());
         // 三审回修（dspro-P1-2 / dsflash-P2-2）：owner 为空是升级期旧版本实例写的行，旧进程
@@ -347,10 +355,10 @@ public class AssistantConversationController extends BaseController {
         // 正确动作是条件迁移收尾 + 退回合 + 释放挂起卡，而不是假装 interrupt 成功、
         // 也不是回 409 把 RUNNING 幽灵行留给收割器（期间同 thread 新消息会被双 RUNNING 门挡）。
         if (!ownedHere || session.isEmpty()) {
-            java.util.List<com.smartdock.assistant.legacy.domain.DcsAssistantRun> closed =
-                conversationService.finalizeStalledRun(tenantId, run.getRunId());
+            java.util.List<DcsAssistantRun> closed =
+                runLedgerService.finalizeStalledRun(tenantId, run.getRunId());
             if (!creditsMode(tenantId, userId)) {
-                for (com.smartdock.assistant.legacy.domain.DcsAssistantRun row : closed) {
+                for (DcsAssistantRun row : closed) {
                     dailyQuota.refundTurn(row.getTenantId(), row.getUserId());
                 }
             }
@@ -406,7 +414,7 @@ public class AssistantConversationController extends BaseController {
     @PostMapping("/plan/cancel")
     public R<Void> cancelPlan(@RequestParam String threadId,
                               @RequestParam(required = false) String planId) {
-        DcsAssistantConversation conv = conversationService.conversationByThread(
+        DcsAssistantConversation conv = conversationQueryService.conversationByThread(
             TenantHelper.getTenantId(), threadId);
         Long me = LoginHelper.getUserId();
         PlanCancelAction action = planCancelAction(conv == null ? null : conv.getUserId(), me);
@@ -430,7 +438,7 @@ public class AssistantConversationController extends BaseController {
     @GetMapping("/plan/state")
     public R<com.smartdock.assistant.legacy.core.AssistantPlanSignal.PlanState> planState(
         @RequestParam String threadId) {
-        DcsAssistantConversation conv = conversationService.conversationByThread(
+        DcsAssistantConversation conv = conversationQueryService.conversationByThread(
             TenantHelper.getTenantId(), threadId);
         if (conv == null || !conv.getUserId().equals(LoginHelper.getUserId())) {
             return R.ok(new com.smartdock.assistant.legacy.core.AssistantPlanSignal.PlanState("none", null));
@@ -459,8 +467,8 @@ public class AssistantConversationController extends BaseController {
     /** 当前会话 TODO 清单（ZCode 对齐 Q2，批A：前端打开会话时恢复状态面板分区） */
     @SaCheckPermission("dcs:assistant:use")
     @GetMapping("/conversation/todo")
-    public R<List<com.smartdock.assistant.legacy.core.AssistantTodoSignal.TodoItem>> todo(@RequestParam String threadId) {
-        return R.ok(conversationService.todoOf(TenantHelper.getTenantId(), LoginHelper.getUserId(), threadId));
+    public R<List<AssistantTodoItem>> todo(@RequestParam String threadId) {
+        return R.ok(conversationQueryService.todoOf(TenantHelper.getTenantId(), LoginHelper.getUserId(), threadId));
     }
 
     /**
@@ -471,13 +479,13 @@ public class AssistantConversationController extends BaseController {
     @SaCheckPermission("dcs:assistant:use")
     @GetMapping("/conversation/followups")
     public R<Map<String, Object>> followups(@RequestParam String threadId) {
-        DcsAssistantConversation conv = conversationService.conversationByThread(TenantHelper.getTenantId(), threadId);
+        DcsAssistantConversation conv = conversationQueryService.conversationByThread(TenantHelper.getTenantId(), threadId);
         // 归属校验（七席审查 P2 回修）：与 todoOf 同口径显式拒异主——latestAssistant 的
         // user_id 过滤只是兜底，纵深防御不留「复用去参即越权」的口
         if (conv == null || !conv.getUserId().equals(LoginHelper.getUserId())) {
             return R.ok(Map.of("messageId", "0", "followups", List.of()));
         }
-        DcsAssistantMessage msg = conversationService.latestAssistant(
+        DcsAssistantMessage msg = conversationQueryService.latestAssistant(
             TenantHelper.getTenantId(), LoginHelper.getUserId(), conv.getId());
         List<String> items = List.of();
         if (msg != null && msg.getFollowupSuggestions() != null && !msg.getFollowupSuggestions().isBlank()) {
@@ -531,11 +539,11 @@ public class AssistantConversationController extends BaseController {
     public R<Integer> purge(@RequestParam Long userId) {
         String tenantId = TenantHelper.getTenantId();
         // 080 修：先取 thread 清单（purgeUser 删行后就查不到了），事务提交后按清单清内存缓存
-        List<String> threads = conversationService.threadIdsOfUser(tenantId, userId);
-        int n = conversationService.purgeUser(tenantId, userId);
+        List<String> threads = purgeService.threadIdsOfUser(tenantId, userId);
+        int n = purgeService.purgeUser(tenantId, userId);
         // 框架表清理必须在五表事务提交之后（事务内失败语句会把 PG 事务打 aborted，
         // COMMIT 静默回滚四表删除——G2 实证），缺失环境仅日志
-        conversationService.purgeAgentscopeSessions(tenantId, userId);
+        purgeService.purgeAgentscopeSessions(tenantId, userId);
         // 080 修：悬挂确认卡缓存（含 argsJson）+步骤缓冲按 thread 配对清理——被清用户
         // 数据不再驻留内存至进程重启
         runRecorder.evictPendingInterrupts(threads);

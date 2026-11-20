@@ -174,7 +174,7 @@ ARCH_BASELINE_UPDATE=1 mvn -P local -DskipTests=false -pl ruoyi-admin -am test -
 - 永不 log token / 密码 / 明文 IP
 - 不信任客户端传的 `createBy`/`updateBy`/`tenantId`——框架自动填
 - 租户隔离是硬边界：不做跨租户数据合并
-- **按 id 取「属于某人的」资源必须二次校归属**：`@SaCheckPermission` 只管「能不能调这个接口」，不管「这条数据是不是你的」；读出后要校 `tenantId` + `userId`（先例 `AssistantMemoryService#edit`、`AssistantConversationService:72`），否则换个 id 就能读别人的。
+- **按 id 取「属于某人的」资源必须二次校归属**：`@SaCheckPermission` 只管「能不能调这个接口」，不管「这条数据是不是你的」；读出后要校 `tenantId` + `userId`（先例 `AssistantMemoryService#edit`、`RunLedgerService#ensureConversation`），否则换个 id 就能读别人的。
 - **展示层也要脱敏**：手机号 / 邮箱 / 证件号挂 `@Sensitive`（模板 `SysUserVo:64,70`）；**存储加密 ≠ 展示脱敏**。
 
 ## Database Rules

@@ -1,8 +1,10 @@
 package com.smartdock.assistant.legacy.persist;
 
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.service.RunLedgerService;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,7 +32,13 @@ import static org.mockito.Mockito.when;
 class AssistantRunRecorderBuildFailureUnitTest {
 
     @Mock
-    private AssistantConversationService conversationService;
+    private RunLedgerService runLedgerService;
+
+    @Mock
+    private MessageWriteService messageWriteService;
+
+    @Mock
+    private ConversationQueryService conversationQueryService;
 
     @Mock
     private AssistantDailyQuota dailyQuota;
@@ -48,30 +56,30 @@ class AssistantRunRecorderBuildFailureUnitTest {
 
     @Test
     void 正常终局化_条件FAILED_按回读状态退款() {
-        when(conversationService.finishRun("run-1", "FAILED", "agent-build-failed")).thenReturn(1);
-        when(conversationService.runByRunId("run-1")).thenReturn(run("FAILED", "000000", 42L));
+        when(runLedgerService.finishRun("run-1", "FAILED", "agent-build-failed")).thenReturn(1);
+        when(runLedgerService.runByRunId("run-1")).thenReturn(run("FAILED", "000000", 42L));
 
         recorder.finalizeBuildFailure("run-1", "agent-build-failed");
 
-        verify(conversationService).finishRun("run-1", "FAILED", "agent-build-failed");
+        verify(runLedgerService).finishRun("run-1", "FAILED", "agent-build-failed");
         verify(dailyQuota).refundTurn("000000", 42L);
     }
 
     @Test
     void 防双退_终态写零行_已被兜底抢先终局化时不退款() {
-        when(conversationService.finishRun("run-2", "FAILED", "agent-build-failed")).thenReturn(0);
-        when(conversationService.runByRunId("run-2")).thenReturn(run("INTERRUPTED", "000000", 42L));
+        when(runLedgerService.finishRun("run-2", "FAILED", "agent-build-failed")).thenReturn(0);
+        when(runLedgerService.runByRunId("run-2")).thenReturn(run("INTERRUPTED", "000000", 42L));
 
         recorder.finalizeBuildFailure("run-2", "agent-build-failed");
 
-        verify(conversationService).finishRun("run-2", "FAILED", "agent-build-failed");
+        verify(runLedgerService).finishRun("run-2", "FAILED", "agent-build-failed");
         verify(dailyQuota, never()).refundTurn(anyString(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
     void run行不存在_静默跳过不退款() {
-        when(conversationService.finishRun("run-3", "FAILED", "agent-build-failed")).thenReturn(1);
-        when(conversationService.runByRunId("run-3")).thenReturn(null);
+        when(runLedgerService.finishRun("run-3", "FAILED", "agent-build-failed")).thenReturn(1);
+        when(runLedgerService.runByRunId("run-3")).thenReturn(null);
 
         recorder.finalizeBuildFailure("run-3", "agent-build-failed");
 
@@ -83,20 +91,20 @@ class AssistantRunRecorderBuildFailureUnitTest {
         recorder.finalizeBuildFailure("  ", "agent-build-failed");
         recorder.finalizeBuildFailure(null, "agent-build-failed");
 
-        verifyNoInteractions(conversationService, dailyQuota);
+        verifyNoInteractions(runLedgerService, dailyQuota);
     }
 
     @Test
     void reason超长截断_防end_reason列宽吞终态() {
-        when(conversationService.finishRun(org.mockito.ArgumentMatchers.eq("run-4"),
+        when(runLedgerService.finishRun(org.mockito.ArgumentMatchers.eq("run-4"),
             org.mockito.ArgumentMatchers.eq("FAILED"), anyString())).thenReturn(1);
-        when(conversationService.runByRunId("run-4")).thenReturn(run("FAILED", "000000", 7L));
+        when(runLedgerService.runByRunId("run-4")).thenReturn(run("FAILED", "000000", 7L));
         String longReason = "x".repeat(100);
 
         recorder.finalizeBuildFailure("run-4", longReason);
 
         var captor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(conversationService).finishRun(org.mockito.ArgumentMatchers.eq("run-4"),
+        verify(runLedgerService).finishRun(org.mockito.ArgumentMatchers.eq("run-4"),
             org.mockito.ArgumentMatchers.eq("FAILED"), captor.capture());
         assertThat(captor.getValue()).hasSize(64);
         verify(dailyQuota).refundTurn("000000", 7L);
@@ -104,9 +112,9 @@ class AssistantRunRecorderBuildFailureUnitTest {
 
     @Test
     void 终态回写抛异常_不连坐退款以外的补偿路径() {
-        when(conversationService.finishRun("run-5", "FAILED", "agent-build-failed"))
+        when(runLedgerService.finishRun("run-5", "FAILED", "agent-build-failed"))
             .thenThrow(new RuntimeException("pg down"));
-        when(conversationService.runByRunId("run-5")).thenReturn(run("FAILED", "000000", 9L));
+        when(runLedgerService.runByRunId("run-5")).thenReturn(run("FAILED", "000000", 9L));
 
         recorder.finalizeBuildFailure("run-5", "agent-build-failed");
 
@@ -117,14 +125,14 @@ class AssistantRunRecorderBuildFailureUnitTest {
     @Test
     void 终态写成功同步落问题行_零行被丢弃时不落() {
         // 2026-11-11 Q1-3：建会话失败终态写赢 → 问题行（other + 原文，刷新后空回合可还原原因）
-        when(conversationService.finishRun("run-6", "FAILED", "agent-build-failed")).thenReturn(1);
+        when(runLedgerService.finishRun("run-6", "FAILED", "agent-build-failed")).thenReturn(1);
         recorder.finalizeBuildFailure("run-6", "agent-build-failed");
-        verify(conversationService).recordRunIssue("run-6", "other", "agent-build-failed");
+        verify(runLedgerService).recordRunIssue("run-6", "other", "agent-build-failed");
 
         // 终态被兜底抢先终局化（rows=0）→ 不叠问题行
-        when(conversationService.finishRun("run-7", "FAILED", "agent-build-failed")).thenReturn(0);
+        when(runLedgerService.finishRun("run-7", "FAILED", "agent-build-failed")).thenReturn(0);
         recorder.finalizeBuildFailure("run-7", "agent-build-failed");
-        verify(conversationService, never()).recordRunIssue(
+        verify(runLedgerService, never()).recordRunIssue(
             org.mockito.ArgumentMatchers.eq("run-7"), anyString(), anyString());
     }
 }

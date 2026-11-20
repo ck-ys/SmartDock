@@ -59,7 +59,7 @@ class ConversationLineServicePinUnitTest {
         AssistantConversationMapper mapper = mock(AssistantConversationMapper.class);
         when(mapper.selectOwned(anyString(), anyLong(), anyLong())).thenReturn(null);
         // messageMapper 传 null：403 必须在查消息前抛出——顺序变了就 NPE
-        ConversationQueryService svc = new ConversationQueryService(mapper, null, null);
+        ConversationQueryService svc = new ConversationQueryService(mapper, null, null, null);
 
         assertEquals(403, catchServiceException(() -> svc.listMessages(TENANT, OTHER_USER, CONV_ID, 10, 0)).getCode());
         assertEquals(403, catchServiceException(() -> svc.listMessagesTail(TENANT, OTHER_USER, CONV_ID, 10)).getCode());
@@ -101,7 +101,7 @@ class ConversationLineServicePinUnitTest {
         when(mapper.selectByThread(TENANT, "t-other")).thenReturn(other);
         when(mapper.selectByThread(TENANT, "t-404")).thenReturn(null);
 
-        ConversationQueryService svc = new ConversationQueryService(mapper, null, null);
+        ConversationQueryService svc = new ConversationQueryService(mapper, null, null, null);
         assertNotNull(svc.conversationByThreadOwned(TENANT, USER_ID, "t-own"));
         assertNull(svc.conversationByThreadOwned(TENANT, USER_ID, "t-other"), "异主必须同判 null（防探测）");
         assertNull(svc.conversationByThreadOwned(TENANT, USER_ID, "t-404"));

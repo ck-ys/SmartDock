@@ -1,10 +1,12 @@
 package com.smartdock.assistant.legacy.persist;
 
 import com.smartdock.assistant.service.AssistantCostLedger;
-import com.smartdock.assistant.legacy.domain.DcsAssistantRun;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.support.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.service.RunLedgerService;
 import com.smartdock.assistant.legacy.service.AssistantFollowupService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -40,7 +42,13 @@ import static org.mockito.Mockito.when;
 class AssistantRunRecorderReapFlushUnitTest {
 
     @Mock
-    private AssistantConversationService conversationService;
+    private RunLedgerService runLedgerService;
+
+    @Mock
+    private MessageWriteService messageWriteService;
+
+    @Mock
+    private ConversationQueryService conversationQueryService;
 
     @Mock
     private AssistantDailyQuota dailyQuota;
@@ -94,14 +102,14 @@ class AssistantRunRecorderReapFlushUnitTest {
         seedRun("run-1", "th-1", "已生成部分", 9001L);
         recorder.lastEventAt.put("run-1", NOW - STALL - 1);
         when(costLedger.isInFlight("th-1")).thenReturn(false);
-        when(conversationService.runByRunId("run-1")).thenReturn(run("000000", 42L));
-        when(conversationService.finalizeStalledRun("000000", "run-1")).thenReturn(List.of(run("000000", 42L)));
+        when(runLedgerService.runByRunId("run-1")).thenReturn(run("000000", 42L));
+        when(runLedgerService.finalizeStalledRun("000000", "run-1")).thenReturn(List.of(run("000000", 42L)));
 
         recorder.flushAndReap(NOW);
 
-        verify(conversationService).updatePartialMessage(eq("000000"), eq(9001L), eq("已生成部分"),
+        verify(messageWriteService).updatePartialMessage(eq("000000"), eq(9001L), eq("已生成部分"),
             isNull(), eq("truncated"));
-        verify(conversationService).finalizeStalledRun("000000", "run-1");
+        verify(runLedgerService).finalizeStalledRun("000000", "run-1");
         verify(dailyQuota).refundTurn("000000", 42L);
         assertThat(recorder.lastEventAt).doesNotContainKey("run-1");
         assertThat(recorder.partialRefs).doesNotContainKey("run-1");
@@ -115,8 +123,8 @@ class AssistantRunRecorderReapFlushUnitTest {
         seedRun("run-c", "th-c", "已生成部分", 9005L);
         recorder.lastEventAt.put("run-c", NOW - STALL - 1);
         when(costLedger.isInFlight("th-c")).thenReturn(false);
-        when(conversationService.runByRunId("run-c")).thenReturn(run("000000", 42L));
-        when(conversationService.finalizeStalledRun("000000", "run-c")).thenReturn(List.of(run("000000", 42L)));
+        when(runLedgerService.runByRunId("run-c")).thenReturn(run("000000", 42L));
+        when(runLedgerService.finalizeStalledRun("000000", "run-c")).thenReturn(List.of(run("000000", 42L)));
 
         recorder.flushAndReap(NOW);
 
@@ -136,7 +144,7 @@ class AssistantRunRecorderReapFlushUnitTest {
 
         recorder.flushAndReap(NOW);
 
-        verify(conversationService, never()).finalizeStalledRun(anyString(), anyString());
+        verify(runLedgerService, never()).finalizeStalledRun(anyString(), anyString());
         verify(dailyQuota, never()).refundTurn(anyString(), any());
         assertThat(recorder.interactionWaitUntil).containsKey("run-i1");
         assertThat(recorder.lastEventAt).containsKey("run-i1");
@@ -149,12 +157,12 @@ class AssistantRunRecorderReapFlushUnitTest {
         recorder.lastEventAt.put("run-i2", NOW - STALL - 1);
         recorder.markInteractionWait("run-i2", NOW - 1);
         when(costLedger.isInFlight("th-i2")).thenReturn(false);
-        when(conversationService.runByRunId("run-i2")).thenReturn(run("000000", 42L));
-        when(conversationService.finalizeStalledRun("000000", "run-i2")).thenReturn(List.of(run("000000", 42L)));
+        when(runLedgerService.runByRunId("run-i2")).thenReturn(run("000000", 42L));
+        when(runLedgerService.finalizeStalledRun("000000", "run-i2")).thenReturn(List.of(run("000000", 42L)));
 
         recorder.flushAndReap(NOW);
 
-        verify(conversationService).finalizeStalledRun("000000", "run-i2");
+        verify(runLedgerService).finalizeStalledRun("000000", "run-i2");
         assertThat(recorder.interactionWaitUntil).doesNotContainKey("run-i2");
     }
 
@@ -166,7 +174,7 @@ class AssistantRunRecorderReapFlushUnitTest {
 
         recorder.flushAndReap(NOW);
 
-        verify(conversationService, never()).finalizeStalledRun(anyString(), anyString());
+        verify(runLedgerService, never()).finalizeStalledRun(anyString(), anyString());
         verify(dailyQuota, never()).refundTurn(anyString(), any());
         assertThat(recorder.lastEventAt).containsKey("run-2");
     }
@@ -177,8 +185,8 @@ class AssistantRunRecorderReapFlushUnitTest {
         long staleAt = NOW - STALL - 1;
         recorder.lastEventAt.put("run-3", staleAt);
         when(costLedger.isInFlight("th-3")).thenReturn(false);
-        when(conversationService.runByRunId("run-3")).thenReturn(run("000000", 42L));
-        when(conversationService.finalizeStalledRun("000000", "run-3")).thenThrow(new RuntimeException("db down"));
+        when(runLedgerService.runByRunId("run-3")).thenReturn(run("000000", 42L));
+        when(runLedgerService.finalizeStalledRun("000000", "run-3")).thenThrow(new RuntimeException("db down"));
 
         recorder.flushAndReap(NOW);
 
@@ -196,7 +204,7 @@ class AssistantRunRecorderReapFlushUnitTest {
 
         recorder.flushAndReap(NOW);
 
-        verify(conversationService).updatePartialMessage(eq("000000"), eq(9004L), eq("部分答案"),
+        verify(messageWriteService).updatePartialMessage(eq("000000"), eq(9004L), eq("部分答案"),
             isNull(), eq("partial"));
         assertThat(recorder.lastPartialFlushAt.get("run-4")).isEqualTo(NOW);
         // 业务批7 Q12：lastPartialLen 语义=正文+活动联合指纹（dspro P2-4 位移组合）
@@ -204,7 +212,7 @@ class AssistantRunRecorderReapFlushUnitTest {
 
         // 同 now 再 tick：内容无变（len 相同）→ 不空写
         recorder.flushAndReap(NOW);
-        verify(conversationService, times(1)).updatePartialMessage(anyString(), any(), anyString(),
+        verify(messageWriteService, times(1)).updatePartialMessage(anyString(), any(), anyString(),
             any(), anyString());
     }
 
@@ -218,15 +226,15 @@ class AssistantRunRecorderReapFlushUnitTest {
         recorder.thinkBuffers.computeIfAbsent("th-6", k -> new java.util.ArrayList<>()).add(seg);
         org.mockito.Mockito.lenient().when(piiFilter.mask(anyString(), anyString()))
             .thenAnswer(inv -> inv.getArgument(0));
-        when(conversationService.runByRunId("run-6")).thenReturn(run("000000", 42L, "th-6"));
+        when(runLedgerService.runByRunId("run-6")).thenReturn(run("000000", 42L, "th-6"));
         com.smartdock.assistant.domain.model.DcsAssistantConversation conv =
             new com.smartdock.assistant.domain.model.DcsAssistantConversation();
         conv.setId(66L);
-        when(conversationService.conversationByThread("000000", "th-6")).thenReturn(conv);
+        when(conversationQueryService.conversationByThread("000000", "th-6")).thenReturn(conv);
 
         recorder.flushAndReap(NOW);
 
-        verify(conversationService).appendAssistantMessage(eq("000000"), eq(66L), eq(42L),
+        verify(messageWriteService).appendAssistantMessage(eq("000000"), eq(66L), eq(42L),
             eq(""), isNull(), eq("partial"), org.mockito.ArgumentMatchers.contains("thinkSegs"));
         assertThat(recorder.partialRefs).containsKey("run-6");
     }
@@ -236,14 +244,14 @@ class AssistantRunRecorderReapFlushUnitTest {
         seedRun("run-5", "th-5", "残余文本", null);
         recorder.lastEventAt.put("run-5", NOW - STALL - 1);
         when(costLedger.isInFlight("th-5")).thenReturn(false);
-        when(conversationService.runByRunId("run-5")).thenReturn(run("000000", 42L));
-        when(conversationService.finalizeStalledRun("000000", "run-5")).thenReturn(List.of(run("000000", 42L)));
+        when(runLedgerService.runByRunId("run-5")).thenReturn(run("000000", 42L));
+        when(runLedgerService.finalizeStalledRun("000000", "run-5")).thenReturn(List.of(run("000000", 42L)));
 
         recorder.flushAndReap(NOW);
 
         // dspro P0-1②：无锚=终道刚摘走（stop 权威行在途），补插必双行
-        verify(conversationService).finalizeStalledRun("000000", "run-5");
-        verify(conversationService, never()).updatePartialMessage(anyString(), any(), anyString(),
+        verify(runLedgerService).finalizeStalledRun("000000", "run-5");
+        verify(messageWriteService, never()).updatePartialMessage(anyString(), any(), anyString(),
             any(), anyString());
         assertThat(recorder.lastEventAt).doesNotContainKey("run-5");
     }

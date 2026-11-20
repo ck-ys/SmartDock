@@ -1,4 +1,4 @@
-package com.smartdock.assistant.legacy.persist;
+package com.smartdock.assistant.support;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

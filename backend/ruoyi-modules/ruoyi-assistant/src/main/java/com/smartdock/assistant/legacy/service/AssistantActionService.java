@@ -3,9 +3,11 @@ package com.smartdock.assistant.legacy.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantAction;
-import com.smartdock.assistant.legacy.mapper.AssistantActionMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantAction;
+import com.smartdock.assistant.mapper.AssistantActionMapper;
 import com.smartdock.assistant.service.AssistantMemoryService;
+import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import com.smartdock.assistant.mapper.AssistantRunMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
 
@@ -50,7 +52,7 @@ public class AssistantActionService {
     private static final int EXPORT_MAX_ROWS = 50_000;
 
     private final AssistantActionMapper actionMapper;
-    private final com.smartdock.assistant.legacy.mapper.AssistantRunMapper runMapper;
+    private final AssistantRunMapper runMapper;
     /** 三批④：save_memory 撤回=记忆行属主删除（本模块内直达，不经 SPI） */
     private final AssistantMemoryService memoryService;
     /** 三批④：provider 工具撤回分派（按 tools() 含名找 provider，无 Spring 依赖收集） */
@@ -245,7 +247,7 @@ public class AssistantActionService {
 
     /** 按 runId 反解归属（三审回修：G1 拒绝审计锚点——run 登记行全局唯一且首绑校验过归属；
      *  按 thread 裸查会话行在跨租户同 threadId 时会错挂租户） */
-    public com.smartdock.assistant.legacy.domain.DcsAssistantRun findRun(String runId) {
+    public DcsAssistantRun findRun(String runId) {
         return runMapper.selectByRunId(runId);
     }
 

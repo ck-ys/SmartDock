@@ -4,7 +4,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.mapper.AssistantRunMapper;
+import com.smartdock.assistant.mapper.AssistantRunMapper;
 import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.satoken.utils.LoginHelper;

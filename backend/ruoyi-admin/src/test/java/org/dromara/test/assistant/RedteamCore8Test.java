@@ -1,9 +1,9 @@
 package org.dromara.test.assistant;
 
 import com.smartdock.assistant.legacy.security.AssistantInjectionFilter;
+import com.smartdock.assistant.service.RunLedgerService;
 import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.legacy.service.AssistantActionService;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -35,8 +35,9 @@ class RedteamCore8Test {
     AssistantInjectionFilter injectionFilter;
     @Autowired
     AssistantPiiFilter piiFilter;
+    /** 7C-1：run 台账（首绑 / 登记归属校验）已搬新根 */
     @Autowired
-    AssistantConversationService conversationService;
+    RunLedgerService runLedgerService;
     @Autowired
     AssistantActionService actionService;
 
@@ -67,9 +68,9 @@ class RedteamCore8Test {
     @Test
     void authz1_threadCrossUserRejected() {
         String thread = RUN_KEY + "-t";
-        conversationService.ensureConversation("987311", VICTIM, thread, "受害者的会话");
+        runLedgerService.ensureConversation("987311", VICTIM, thread, "受害者的会话");
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> conversationService.ensureConversation("987311", ATTACKER, thread, "攻击者撞 thread"),
+            () -> runLedgerService.ensureConversation("987311", ATTACKER, thread, "攻击者撞 thread"),
             "thread 归属首绑后异主必须 403");
         assertEquals(403, ex.getCode());
     }
@@ -77,9 +78,9 @@ class RedteamCore8Test {
     @Test
     void authz2_runIdReplayCrossUserRejected() {
         String runId = RUN_KEY + "-r";
-        conversationService.registerRun("987311", VICTIM, RUN_KEY + "-t2", runId);
+        runLedgerService.registerRun("987311", VICTIM, RUN_KEY + "-t2", runId);
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> conversationService.registerRun("987311", ATTACKER, RUN_KEY + "-t2", runId),
+            () -> runLedgerService.registerRun("987311", ATTACKER, RUN_KEY + "-t2", runId),
             "重放他人 runId 换人必须 403（S-04①）");
         assertEquals(403, ex.getCode());
     }

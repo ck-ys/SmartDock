@@ -4,7 +4,6 @@ import com.smartdock.assistant.domain.gateway.ConversationReadGateway;
 import lombok.RequiredArgsConstructor;
 import com.smartdock.assistant.domain.model.DcsAssistantConversation;
 import com.smartdock.assistant.domain.model.DcsAssistantMessage;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
 import com.smartdock.assistant.query.ConversationQueryService;
 import org.springframework.stereotype.Component;
 
@@ -16,16 +15,15 @@ import java.util.List;
  *
  * <p>只做投影转换，口径与 {@code AssistantStatusController} 原内联调用逐行一致。
  * 7B 起两条读链（按 thread 取会话 / 尾页消息）改指向新根 {@link ConversationQueryService}；
- * {@code latestContextTokens} 仍走 legacy 服务（消息写入侧本批未搬，7C 再收口）。接口未动。</p>
+ * 7C-1 起 {@code latestContextTokens} 也改指向它——三个只读方法已随消息写路径一并从
+ * legacy 会话服务搬走，本实现至此只依赖新根，不再碰 legacy。接口未动。</p>
  */
 @Component
 @RequiredArgsConstructor
 public class ConversationReadGatewayImpl implements ConversationReadGateway {
 
-    /** 7B：会话/消息只读查询（新根） */
+    /** 会话/消息只读查询（新根；7C-1 起覆盖会话、尾页消息与最新 tokens 三条读链） */
     private final ConversationQueryService conversationQueryService;
-    /** 7C 前仍留：latestContextTokens 的写入侧（消息落库）本批未搬 */
-    private final AssistantConversationService conversationService;
 
     @Override
     public ConversationRef conversationByThread(String tenantId, String threadId) {
@@ -50,6 +48,6 @@ public class ConversationReadGatewayImpl implements ConversationReadGateway {
 
     @Override
     public Long latestContextTokens(String tenantId, Long userId, Long conversationId) {
-        return conversationService.latestContextTokens(tenantId, userId, conversationId);
+        return conversationQueryService.latestContextTokens(tenantId, userId, conversationId);
     }
 }

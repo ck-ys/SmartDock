@@ -1,12 +1,13 @@
 package com.smartdock.assistant.legacy.tools;
 
+import com.smartdock.assistant.domain.model.AssistantTodoItem;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import com.smartdock.assistant.legacy.core.AssistantTodoSignal;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.service.MessageWriteService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,15 +38,15 @@ public class TodoTools {
 
     private final ToolIdentity identity;
     private final AssistantTodoSignal todoSignal;
-    private final AssistantConversationService conversationService;
+    private final MessageWriteService messageWriteService;
     private final String tenantId;
     private final String aguiThreadId;
 
     public TodoTools(ToolIdentity identity, AssistantTodoSignal todoSignal,
-                     AssistantConversationService conversationService, String aguiThreadId) {
+                     MessageWriteService messageWriteService, String aguiThreadId) {
         this.identity = identity;
         this.todoSignal = todoSignal;
-        this.conversationService = conversationService;
+        this.messageWriteService = messageWriteService;
         this.tenantId = identity.getTenantId();
         this.aguiThreadId = aguiThreadId;
     }
@@ -67,7 +68,7 @@ public class TodoTools {
                 + "[{\"content\":\"查未交名单\",\"status\":\"in_progress\",\"priority\":\"high\"},"
                 + "{\"content\":\"发送催办\",\"status\":\"pending\",\"priority\":\"medium\"}]") String todos) {
         ObjectNode out = MAPPER.createObjectNode();
-        List<AssistantTodoSignal.TodoItem> items = new ArrayList<>();
+        List<AssistantTodoItem> items = new ArrayList<>();
         JsonNode arr;
         try {
             JsonNode parsed = MAPPER.readTree(todos == null ? "" : todos);
@@ -101,7 +102,7 @@ public class TodoTools {
                 out.put("message", "第 " + (i + 1) + " 条 priority 只能是 high/medium/low");
                 return ToolSupport.secureJson(out, identity);
             }
-            items.add(new AssistantTodoSignal.TodoItem(
+            items.add(new AssistantTodoItem(
                 truncateCodePoints(content, MAX_CONTENT_CHARS),
                 status, priority));
         }
@@ -113,7 +114,7 @@ public class TodoTools {
             out.put("truncated", true);
             message = "清单超过 " + MAX_ITEMS + " 条，只保留前 " + MAX_ITEMS + " 条。" + message;
         }
-        conversationService.saveTodo(tenantId, aguiThreadId, items);
+        messageWriteService.saveTodo(tenantId, aguiThreadId, items);
         todoSignal.submit(aguiThreadId, items);
         out.put("status", "OK");
         out.put("count", items.size());

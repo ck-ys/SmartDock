@@ -1,11 +1,12 @@
 package com.smartdock.assistant.legacy.core;
 
+import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.service.MessageWriteService;
 import com.smartdock.assistant.support.AssistantWebSearchHolder;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionRule;
 import io.agentscope.core.tool.Toolkit;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
 import org.dromara.common.core.service.ConfigService;
 
 import java.util.LinkedHashSet;
@@ -48,7 +49,7 @@ public final class ToolRegistry {
         /** 建 agent 的生效租户（登录快照）；异步 supplier 线程无 Sa-Token，租户必须显式带进来 */
         String tenantId,
         com.smartdock.assistant.legacy.core.AssistantTodoSignal todoSignal,
-        com.smartdock.assistant.legacy.service.AssistantConversationService conversationService,
+        MessageWriteService messageWriteService,
         com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota,
         com.smartdock.assistant.service.AssistantUserQuotaService quotaService,
         /** 三审回修 P1-1：view_skill 自取过闸用的租户矩阵快照 */
@@ -117,7 +118,7 @@ public final class ToolRegistry {
         new ToolSpec(Set.of("todo_write"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
             (id, d) -> new com.smartdock.assistant.legacy.tools.TodoTools(id, d.todoSignal(),
-                d.conversationService(), d.aguiThreadId()), null),
+                d.messageWriteService(), d.aguiThreadId()), null),
         // 长期记忆（二站④ AU-53）：仅租户 memoryEnabled='1' 时注册——
         // 未开启租户模型不可见 save_memory，也拿不到记忆注入（工厂侧同开关）
         // 三批③（2026-11-01）：save_memory 挂动作账本（平台放行 release_mode=allow）

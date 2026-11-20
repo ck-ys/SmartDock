@@ -6,7 +6,7 @@ import io.agentscope.core.agui.event.AguiEvent;
 import com.smartdock.assistant.service.AssistantCostLedger;
 import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
 import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.service.RunLedgerService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +37,7 @@ class AssistantRunRecorderTerminalSyncTest {
 
     @Test
     void terminalWriteCompletesBeforeOnEventsReturns() throws Exception {
-        AssistantConversationService service = mock(AssistantConversationService.class);
+        RunLedgerService service = mock(RunLedgerService.class);
         when(service.runByRunId("run-sync")).thenReturn(null);
 
         CountDownLatch writeStarted = new CountDownLatch(1);

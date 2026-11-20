@@ -1,13 +1,17 @@
-package com.smartdock.assistant.legacy.mapper;
+package com.smartdock.assistant.mapper;
 
 import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.smartdock.assistant.domain.model.DcsAssistantAction;
+import com.smartdock.assistant.legacy.domain.AssistantActionLogVo;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import com.smartdock.assistant.legacy.domain.DcsAssistantAction;
+
+import java.util.Collection;
+import java.util.List;
 
 /**
  * 助手动作账本 Mapper（批G G3）。幂等键唯一索引=双发防线（@RepeatSubmit 替代件）。
@@ -43,7 +47,7 @@ public interface AssistantActionMapper extends BaseMapper<DcsAssistantAction> {
     @Select("SELECT * FROM dcs_assistant_action WHERE tenant_id=#{tenantId} AND user_id=#{userId}"
         + " AND (#{runId}::varchar IS NULL OR run_id=#{runId}) AND (#{threadId}::varchar IS NULL OR thread_id=#{threadId})"
         + " ORDER BY id DESC LIMIT 100")
-    java.util.List<DcsAssistantAction> selectForUser(@Param("tenantId") String tenantId,
+    List<DcsAssistantAction> selectForUser(@Param("tenantId") String tenantId,
         @Param("userId") Long userId, @Param("runId") String runId, @Param("threadId") String threadId);
 
     /** 保留期清理：action>180 天分批物理删（归档=删除前计数进 job 日志，P2 冷备） */
@@ -64,7 +68,7 @@ public interface AssistantActionMapper extends BaseMapper<DcsAssistantAction> {
         + " <if test='beginTime != null and beginTime != \"\"'>AND a.create_time &gt;= CAST(#{beginTime} AS timestamp)</if>"
         + " <if test='endTime != null and endTime != \"\"'>AND a.create_time &lt;= CAST(#{endTime} AS timestamp)</if>"
         + " ORDER BY a.id DESC LIMIT #{limit} OFFSET #{offset}</script>")
-    java.util.List<com.smartdock.assistant.legacy.domain.AssistantActionLogVo> selectLogPage(
+    List<AssistantActionLogVo> selectLogPage(
         @Param("tenantId") String tenantId, @Param("limit") int limit, @Param("offset") int offset,
         @Param("keyword") String keyword, @Param("status") String status,
         @Param("beginTime") String beginTime, @Param("endTime") String endTime);
@@ -99,7 +103,7 @@ public interface AssistantActionMapper extends BaseMapper<DcsAssistantAction> {
         + " <if test='beginTime != null and beginTime != \"\"'>AND a.create_time &gt;= CAST(#{beginTime} AS timestamp)</if>"
         + " <if test='endTime != null and endTime != \"\"'>AND a.create_time &lt;= CAST(#{endTime} AS timestamp)</if>"
         + " ORDER BY a.id DESC LIMIT #{limit} OFFSET #{offset}</script>")
-    java.util.List<com.smartdock.assistant.legacy.domain.AssistantActionLogVo> selectAuditPage(
+    List<AssistantActionLogVo> selectAuditPage(
         @Param("tenantId") String tenantId, @Param("limit") int limit, @Param("offset") int offset,
         @Param("keyword") String keyword, @Param("toolName") String toolName,
         @Param("releaseMode") String releaseMode,
@@ -145,6 +149,6 @@ public interface AssistantActionMapper extends BaseMapper<DcsAssistantAction> {
         + " WHERE run_id=#{runId} AND status='DONE' AND result_summary LIKE '%（记录 #%）'"
         + " AND tool_name IN <foreach collection='tools' item='t' open='(' separator=',' close=')'>#{t}</foreach>"
         + " ORDER BY id</script>")
-    java.util.List<DcsAssistantAction> selectRevocableByRun(@Param("runId") String runId,
-                                                            @Param("tools") java.util.Collection<String> tools);
+    List<DcsAssistantAction> selectRevocableByRun(@Param("runId") String runId,
+                                                            @Param("tools") Collection<String> tools);
 }

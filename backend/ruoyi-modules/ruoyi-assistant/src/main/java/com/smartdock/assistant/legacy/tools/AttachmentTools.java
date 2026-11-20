@@ -3,7 +3,7 @@ package com.smartdock.assistant.legacy.tools;
 import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.ToolParam;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.domain.DcsAssistantAttachment;
+import com.smartdock.assistant.domain.model.DcsAssistantAttachment;
 import com.smartdock.assistant.legacy.service.AssistantAttachmentService;
 
 import java.util.LinkedHashMap;

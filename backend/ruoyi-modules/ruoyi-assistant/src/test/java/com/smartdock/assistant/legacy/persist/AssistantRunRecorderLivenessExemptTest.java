@@ -8,7 +8,9 @@ import com.smartdock.assistant.legacy.core.AssistantToolProgressConverter;
 import com.smartdock.assistant.legacy.core.DcsHeartbeatMiddleware;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import com.smartdock.assistant.support.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantConversationService;
+import com.smartdock.assistant.query.ConversationQueryService;
+import com.smartdock.assistant.service.MessageWriteService;
+import com.smartdock.assistant.service.RunLedgerService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AssistantRunRecorderLivenessExemptTest {
 
     @Mock
-    private AssistantConversationService conversationService;
+    private RunLedgerService runLedgerService;
+
+    @Mock
+    private MessageWriteService messageWriteService;
+
+    @Mock
+    private ConversationQueryService conversationQueryService;
     @Mock
     private AssistantDailyQuota dailyQuota;
     @Mock
