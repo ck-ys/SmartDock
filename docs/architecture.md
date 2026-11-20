@@ -2,6 +2,8 @@
 
 本文面向想"读懂这套代码"的开发者：先讲全局分层，再按模块拆解关键决策点。
 
+> **想按代码层级逐层读**：见 [后端架构详解](backend-architecture.md)（构建层级/四层分包/逐域业务接口/智能体全链路，含核心类与方法表）与 [前端架构详解](frontend-architecture.md)（启动链/动态路由与权限/请求层/助手三宿主与 AGUI 事件消费）。本篇保留模块级总览，作为两份详解的索引与交叉对照；冲突时以详解里的 `file:line` 证据为准。
+
 ## 1. 全局分层
 
 ![SmartDock 技术架构](images/architecture.svg)
@@ -110,12 +112,12 @@ OSS 上传事件 → `OssUploadedEventListener` 建单，判定序（顺序不�
 
 ## 5. 智能体运行时（ruoyi-assistant）
 
-- Agent 按 `agentId` 注册到 AGUI 注册表，统一从 `POST /agui/run/{agentId}` 进入（内置 `dcs-assistant` 助手应用）；
-- SSE 流式（前端 `utils/sse.ts`），AG-UI 风格事件协议；
-- 工具循环（查待办/任务进度/看板口径）通过 SPI 注入，页面上下文随对话框携带；
+- Agent 按 `agentId` 注册到 AGUI 注册表，统一从 `POST /agui/run/{agentId}` 进入（内置 `dcs-assistant` 助手应用；该端点由 starter jar 提供，不在本仓源码里）；
+- SSE 流式：前端走 `api/dcs/assistant/aguiClient.ts` 的 `fetch + ReadableStream`（`utils/sse.ts` 是站内通知 EventSource，不是对话流）；
+- 工具循环三层：8 个平台工具（`ToolRegistry`）+ 3 个 `BizToolProvider` SPI（dcs/profile/analytics，共 14 个业务工具）+ 租户级 MCP；页面上下文随对话框携带；
 - 会话状态落 `agentscope` schema（JDBC state store，独立 schema 隔离）；
-- 计费：ai-billing 的钱包/积分双轨（`dcs_tenant_wallet`、`dcs_ai_credit_ledger`），
-  幂等键防重复落账；
+- 计费：ai-billing 的钱包/积分双轨（`dcs_tenant_wallet`、`dcs_ai_credit_ledger`）；
+  幂等键只覆盖同一订阅内的重复帧，跨订阅或 agent 重建后的重放仍可能重复计费（`BillingModelDecorator` 注释已承认该边界）；
 - 包结构：新代码只进 `com.smartdock.assistant.<层>`，四层各放什么——
   controller 只做门卫（权限/参数/返回包装）、service 编排用例、
   domain 放实体（`model/`）与跨层接口（`gateway/`）、infrastructure 放 gateway 实现；
@@ -132,4 +134,4 @@ core 层内统一解包，页面只消费业务形状。
 - 微核心状态机/三方鉴权：`ruoyi-dcs` 模块测试
 - 引擎评分/重算：`ruoyi-profile-engine`
 - 适配器桥接（租户穿越/幂等）：`ruoyi-admin/src/test/.../adapter`
-- 前端：vitest（notice store 单飞守卫/助手上下文/风控呈现等 200 例）
+- 前端：vitest 34 个测试文件、275 条用例（AGUI 帧解析/助手状态迁移/令牌门禁等；没有 jsdom 组件挂载测试，也没有 E2E）

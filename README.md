@@ -124,7 +124,7 @@ minRole: member
   <img src="docs/images/ai-flow.svg" alt="智能体运行时：一次请求的完整链路" width="100%">
 </p>
 
-接入 → ReAct 推理循环 → 工具行动 → AGUI 流式输出；模型装饰器链与权限闸贯穿同一次请求。分层细节、模块边界与判定顺序见 [docs/architecture.md](docs/architecture.md)。
+接入 → ReAct 推理循环 → 工具行动 → AGUI 流式输出；模型装饰器链与权限闸贯穿同一次请求。分层细节、模块边界与判定顺序见 [docs/architecture.md](docs/architecture.md)；逐层代码地图看 [后端架构详解](docs/backend-architecture.md) 与 [前端架构详解](docs/frontend-architecture.md)。
 
 ## 技术架构
 
