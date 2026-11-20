@@ -10,9 +10,13 @@ import java.util.List;
  * 不下发——工具 schema 需活连接 listTools，状态接口不做网络调用，留待下批。
  *
  * <ul>
- *   <li>totalTokens / windowTokens 是<b>真值</b>（该会话最新一次模型调用的 tokens、生效模型窗口）；</li>
+ *   <li>totalTokens / windowTokens 是<b>真值</b>（该会话最新一次模型调用的 tokens、生效模型窗口）；
+ *       <b>如实登记</b>（批 7 · 7A 多审 glm53flash 席 P2-4，2026-11-20）：当前前端<b>不消费</b>这两个字段——
+ *       占用环的分子走 {@code /status} 的 contextTokens、分母走模型配置行；本处保留供后续接线与排错，
+ *       不动契约以免前端跟着改；</li>
  *   <li>buckets 里 chars 是<b>客观字符数</b>、pct 是折算后的估算占比（降序，四舍五入到 0.1）；</li>
- *   <li>subs 只给系统提示词桶（逐段展开），前端行内只显示 pct、不显示分项字符数。</li>
+ *   <li>subs 只给系统提示词桶（逐段展开），前端行内只显示 pct、不显示分项字符数；</li>
+ *   <li>method 当前同样<b>不被前端读取</b>（脚注文案写死），改口径时仍需同步改这里与脚注。</li>
  * </ul>
  */
 public record ContextBreakdownVo(

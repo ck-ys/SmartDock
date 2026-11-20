@@ -39,10 +39,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li><b>domain 不 import 上层</b>（2026-11-17 批 1 规则 7）：{@code com.smartdock.*} 的 domain 包
  *       不许 import service / controller / infrastructure / mapper——实体要编排去 service，
  *       跨层收口建 {@code domain/gateway} 接口、{@code infrastructure} 实现。底座（org.dromara.common 等）不算上层。</li>
- *   <li><b>新根 service 对 legacy 只减不增</b>（2026-11-17 批 1 规则 8；批 3 多审补内联形态）：{@code com.smartdock.*} 的
- *       service 包 import {@code com.smartdock.assistant.legacy.*}（legacy 助手根）清零后零容忍；代码行里的<b>内联</b>
- *       legacy 全限定名同样记账（批 3 前门禁只扫 import 行，内联写法可绕过——已堵），既有内联豁免走点名白名单
- *       {@link #RULE8_INLINE_ALLOWED}（与实测精确相等，防腐烂）。</li>
+ *   <li><b>新根 service / query 对 legacy 只减不增</b>（2026-11-17 批 1 规则 8；批 3 多审补内联形态；批 7 7A 多审把 <code>/query/</code>
+ *       并入扫描面）：{@code com.smartdock.*} 的 service 与 query 包 import {@code com.smartdock.assistant.legacy.*}
+ *       （legacy 助手根）清零后零容忍；代码行里的<b>内联</b> legacy 全限定名同样记账（批 3 前门禁只扫 import 行，内联写法可绕过——已堵），
+ *       既有内联豁免走点名白名单 {@link #RULE8_INLINE_ALLOWED}（与实测精确相等，防腐烂）。</li>
  * </ol>
  *
  * <p><b>豁免清单</b>：{@code src/test/resources/arch-baseline.json}（规则 8 内联豁免例外——点名白名单在代码内
@@ -247,8 +247,12 @@ class PackageHygieneTest {
         for (Path file : javaFiles(backend)) {
             String rel = rel(backend, file);
             String unix = "/" + rel;
-            if (!unix.contains("/com/smartdock/") || !unix.contains("/service/") || unix.contains("/infrastructure/")
-                || unix.contains("/legacy/")) {
+            // 批 7 · 7A 多审（dspro 席，2026-11-20）：扫描面从 /service/ 扩到 /service/ 或 /query/。
+            // 原因是 7A 新建了 query 层（AGENTS「层」清单里本来就有 query），旧写法只认 /service/——
+            // 新层今天恰好没有 legacy import 所以不红，但门禁对这一层是空的，等于给下一个人留了后门。
+            if (!unix.contains("/com/smartdock/")
+                || !(unix.contains("/service/") || unix.contains("/query/"))
+                || unix.contains("/infrastructure/") || unix.contains("/legacy/")) {
                 continue;
             }
             String raw = Files.readString(file, StandardCharsets.UTF_8);
