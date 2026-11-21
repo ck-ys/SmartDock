@@ -208,6 +208,64 @@ class PackageMigrationGuardTest {
         "com.smartdock.assistant.legacy.mapper.AssistantCompactionMapper",
         "com.smartdock.assistant.legacy.service.AssistantConversationService");
 
+    /** 批 8A（2026-11-21）：自动化/公告/报告外壳 17 件搬进新四层后，旧全名在 classpath 上必须一个不剩。
+     *  动机同 7B/7C：legacy 的 automation 各子包与 controller/domain/mapper/service 都还在（只是变薄），
+     *  只能点名；防「没 clean 就编译」造成 MyBatis 别名撞名与 {@code @MapperScan} bean 名双注册
+     *  （同名 DcsAutomation 实体与同名 mapper 双份并存，批 2 实际踩过的形态）。 */
+    @Test
+    void batch8aMovedAutomationShellClassesMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String fqn : BATCH8A_MOVED_TO_FOUR_LAYERS) {
+            String path = fqn.replace('.', '/') + ".class";
+            List<URL> found = Collections.list(cl.getResources(path));
+            assertTrue(found.isEmpty(),
+                () -> fqn + " 残留在 classpath: " + found
+                    + " —— 批 8A 已把它搬进新四层，请 mvn clean 后重建");
+        }
+    }
+
+    /** 批 8A 搬走的 17 个类的旧全名（包还在，所以只能点名） */
+    private static final List<String> BATCH8A_MOVED_TO_FOUR_LAYERS = List.of(
+        "com.smartdock.assistant.legacy.automation.domain.DcsAutomation",
+        "com.smartdock.assistant.legacy.automation.domain.DcsAutomationRun",
+        "com.smartdock.assistant.legacy.automation.domain.AutomationBo",
+        "com.smartdock.assistant.legacy.automation.domain.vo.AutomationVo",
+        "com.smartdock.assistant.legacy.automation.domain.vo.AutomationRunVo",
+        "com.smartdock.assistant.legacy.automation.mapper.DcsAutomationMapper",
+        "com.smartdock.assistant.legacy.automation.mapper.DcsAutomationRunMapper",
+        "com.smartdock.assistant.legacy.automation.service.AutomationSchedule",
+        "com.smartdock.assistant.legacy.automation.service.AutomationNotifier",
+        "com.smartdock.assistant.legacy.automation.service.AutomationFailurePolicy",
+        "com.smartdock.assistant.legacy.automation.config.AutomationConfig",
+        "com.smartdock.assistant.legacy.controller.AssistantAutomationController",
+        "com.smartdock.assistant.legacy.controller.AssistantAnnouncementController",
+        "com.smartdock.assistant.legacy.domain.DcsAssistantAnnouncement",
+        "com.smartdock.assistant.legacy.mapper.AssistantAnnouncementMapper",
+        "com.smartdock.assistant.legacy.controller.AssistantReportController",
+        "com.smartdock.assistant.legacy.service.AssistantReportService");
+
+    /** 批 8B（2026-11-21）：内核 4 件（Service/Runner/ScanJob/每日摘要 job）经红桥+紫桥换根后，
+     *  旧全名在 classpath 上必须一个不剩。同批 8A 动机；这四件是带 @Scheduled 的活组件，
+     *  双注册的最坏形态是同一定时任务被两份 bean 各跑一遍（重复推送/重复烧模型）。 */
+    @Test
+    void batch8bMovedKernelClassesMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String fqn : BATCH8B_MOVED_TO_FOUR_LAYERS) {
+            String path = fqn.replace('.', '/') + ".class";
+            List<URL> found = Collections.list(cl.getResources(path));
+            assertTrue(found.isEmpty(),
+                () -> fqn + " 残留在 classpath: " + found
+                    + " —— 批 8B 已把它搬进新四层，请 mvn clean 后重建");
+        }
+    }
+
+    /** 批 8B 搬走的 4 个类的旧全名（包还在，所以只能点名） */
+    private static final List<String> BATCH8B_MOVED_TO_FOUR_LAYERS = List.of(
+        "com.smartdock.assistant.legacy.automation.service.AssistantAutomationService",
+        "com.smartdock.assistant.legacy.automation.service.AutomationRunner",
+        "com.smartdock.assistant.legacy.automation.job.AutomationScanJob",
+        "com.smartdock.assistant.legacy.job.AssistantDailyDigestJob");
+
     /** 批 3（2026-11-19 多审 dspro P2-2）：额度线整线搬移消包后，billing/limiter 两个旧包
      *  在主 classes 上必须一个资源都不剩——非 clean 增量构建会让旧包 class 与新四层同名类并存，
      *  同样触发组件扫描双注册。只盯主 classes（target/classes 与 jar 内）；test-classes 不算——
