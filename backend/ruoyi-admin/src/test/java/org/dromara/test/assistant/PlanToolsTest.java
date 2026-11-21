@@ -2,9 +2,9 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartdock.assistant.legacy.core.AssistantPlanSignal;
-import com.smartdock.assistant.legacy.tools.PlanTools;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.engine.core.AssistantPlanSignal;
+import com.smartdock.assistant.engine.tools.PlanTools;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

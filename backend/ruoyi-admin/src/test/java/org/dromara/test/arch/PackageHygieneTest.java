@@ -66,7 +66,7 @@ class PackageHygieneTest {
     private static final Pattern ARCH_IGNORE = Pattern.compile("//\\s*arch-ignore-fqn\\b");
 
     /** 规则 7：domain 包不许 import 上层；只盯本仓两根（com.smartdock.assistant.legacy / com.smartdock），底座不算上层。
-     *  禁段可以紧贴根（com.smartdock.assistant.legacy.service.X）也可以隔任意层包段（com.smartdock.assistant.service.X）。
+     *  禁段可以紧贴根（com.smartdock.assistant.service.X）也可以隔任意层包段（com.smartdock.assistant.service.X）。
      *  旧根 org.dromara.assistant 已整棵改名（批 2），源码与 classpath 零断言见规则 3 与 PackageMigrationGuardTest。 */
     private static final Pattern DOMAIN_UPPER_IMPORT = Pattern.compile(
         "^import\\s+(?:static\\s+)?com\\.smartdock\\.(?:[a-z0-9_]+\\.)*"
@@ -90,13 +90,8 @@ class PackageHygieneTest {
      *  断言比「文件|FQN|次数」三元组（多审 #2 dspro P2-1 / dsflash P2-5：只比键不比次数时，
      *  第 4 处内联 + 行尾 arch-ignore-fqn 可让规则 1/规则 8 同时绿——次数入断言后两条旁路都堵死，
      *  也不再依赖 inlineFqn 基线通道兜底）。 */
-    private static final Map<String, Integer> RULE8_INLINE_ALLOWED = Map.of(
-        "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java"
-            + "|com.smartdock.assistant.legacy.service.AssistantConfigService", 3,
-        "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantSkillVisibilityService.java"
-            + "|com.smartdock.assistant.legacy.core.AssistantSkillGateMiddleware", 1,
-        "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantSkillVisibilityService.java"
-            + "|com.smartdock.assistant.legacy.core.ToolRegistry", 1);
+    /** 批 9（2026-11-21）：legacy 整树清零后新根 service 不可能再引用 legacy，豁免清单全数失效删除 */
+    private static final Map<String, Integer> RULE8_INLINE_ALLOWED = Map.of();
 
     private static final ObjectMapper JSON = new ObjectMapper();
     /** 数组一项一行：586 条的清单要能逐行 diff / 逐行删，不能挤成一条长线 */
@@ -169,20 +164,29 @@ class PackageHygieneTest {
     void legacy根包不再新增文件() throws IOException {
         Path backend = backendRoot();
         Path legacy = backend.resolve("ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/legacy");
-        assertThat(legacy).as("legacy 根包目录必须存在：%s", legacy).isDirectory();
 
-        int count;
-        try (Stream<Path> walk = Files.walk(legacy)) {
-            count = (int) walk.filter(p -> p.toString().endsWith(".java") && Files.isRegularFile(p)).count();
+        // 批 9（2026-11-21）：legacy 整树清零（引擎包进 engine.*、业务残壳搬四层），
+        // 目录本身已删除；有人重建旧根也要红
+        int count = 0;
+        if (Files.isDirectory(legacy)) {
+            try (Stream<Path> walk = Files.walk(legacy)) {
+                count = (int) walk.filter(p -> p.toString().endsWith(".java") && Files.isRegularFile(p)).count();
+            }
         }
+        assertThat(count)
+            .as("批 9 后 com.smartdock.assistant.legacy 下必须 0 个 .java（引擎进 engine.*、业务进四层），实剩 %d", count)
+            .isZero();
 
         // 批 2（2026-11-19）整棵改名后：三个旧根下必须一个 .java 都不剩，有人重建旧根也要红
+        // 批 9（2026-11-21）追加：com.smartdock.assistant.legacy 的测试树（assistant/admin 两模块）同样清零
         int oldCount = 0;
         for (String oldRoot : new String[] {
             "ruoyi-modules/ruoyi-assistant/src/main/java/org/dromara" + "/assistant",
             "ruoyi-modules/ruoyi-assistant/src/test/java/org/dromara" + "/assistant",
             "ruoyi-admin/src/test/java/org/dromara" + "/assistant",
-            "ruoyi-admin/src/main/java/org/dromara" + "/assistant"}) {
+            "ruoyi-admin/src/main/java/org/dromara" + "/assistant",
+            "ruoyi-modules/ruoyi-assistant/src/test/java/com/smartdock/assistant/legacy",
+            "ruoyi-admin/src/test/java/com/smartdock/assistant/legacy"}) {
             Path or = backend.resolve(oldRoot);
             if (Files.isDirectory(or)) {
                 try (Stream<Path> w = Files.walk(or)) {
@@ -191,24 +195,15 @@ class PackageHygieneTest {
             }
         }
         assertThat(oldCount)
-            .as("批 2 前的助手旧根下 .java 文件数必须为 0（已整棵改名到 com.smartdock.assistant.legacy），实剩 %d", oldCount)
+            .as("批 2 旧助手根 + 批 9 legacy 测试树下 .java 文件数必须为 0，实剩 %d", oldCount)
             .isZero();
 
+        // 批 9 后基线段 legacyOrgAssistantFiles 已废（恒 0 直接断言），重生成时顺手摘除
         ObjectNode baseline = readBaseline(backend);
-        if (UPDATE) {
-            baseline.put("legacyOrgAssistantFiles", count);
+        if (UPDATE && baseline.has("legacyOrgAssistantFiles")) {
+            baseline.remove("legacyOrgAssistantFiles");
             writeBaseline(backend, baseline);
-            System.out.println("[arch-baseline] legacyOrgAssistantFiles = " + count);
-            return;
         }
-        assertThat(baseline.has("legacyOrgAssistantFiles"))
-            .as("arch-baseline.json 缺 legacyOrgAssistantFiles；用 ARCH_BASELINE_UPDATE=1 生成")
-            .isTrue();
-        int expected = baseline.get("legacyOrgAssistantFiles").asInt();
-        assertThat(count)
-            .as("com.smartdock.assistant.legacy 下 .java 文件数只减不增（Q6-1：新代码只进 com.smartdock.assistant）。"
-                + "当前 %d，基线 %d。删了文件请把基线数字一起调小。", count, expected)
-            .isEqualTo(expected);
     }
 
     @Test

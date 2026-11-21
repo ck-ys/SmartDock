@@ -20,8 +20,8 @@ import java.util.List;
  * 判限与入册在同一 Lua 脚本内完成, 多实例并发下无竞态窗口; ZSET 共享于 Redis,
  * 天然跨实例生效。</p>
  *
- * <p>上限与窗口读 sys_config(000000 全局参数): dcs.assistant.max-sessions-per-tenant=20 /
- * dcs.assistant.max-sessions-global=200 / dcs.assistant.session-window-minutes=30;
+ * <p>上限与窗口读 sys_config(000000 全局参数): assistant.max-sessions-per-tenant=20 /
+ * assistant.max-sessions-global=200 / assistant.session-window-minutes=30;
  * 缺失走代码默认(与种子同值, 缓存空值陈旧也不改变行为)。</p>
  *
  * <p>超限话术统一「当前使用人数较多，请稍后再试」——按窗口自动释放, 不承诺
@@ -33,11 +33,11 @@ import java.util.List;
 public class AssistantAdmissionGate {
 
     /** 租户级活跃上限参数键 */
-    public static final String CONFIG_TENANT_MAX = "dcs.assistant.max-sessions-per-tenant";
+    public static final String CONFIG_TENANT_MAX = "assistant.max-sessions-per-tenant";
     /** 全站级活跃上限参数键 */
-    public static final String CONFIG_GLOBAL_MAX = "dcs.assistant.max-sessions-global";
+    public static final String CONFIG_GLOBAL_MAX = "assistant.max-sessions-global";
     /** 活跃窗口(分钟)参数键 */
-    public static final String CONFIG_WINDOW_MINUTES = "dcs.assistant.session-window-minutes";
+    public static final String CONFIG_WINDOW_MINUTES = "assistant.session-window-minutes";
 
     static final int DEFAULT_TENANT_MAX = 20;
     static final int DEFAULT_GLOBAL_MAX = 200;
@@ -99,8 +99,8 @@ public class AssistantAdmissionGate {
             throw new ServiceException(BUSY_MESSAGE);
         }
         String member = tenantId + ":" + userId;
-        String tenantKey = "dcs:assistant:admit:tenant:" + tenantId;
-        String globalKey = "dcs:assistant:admit:global";
+        String tenantKey = "smartdock:assistant:admit:tenant:" + tenantId;
+        String globalKey = "smartdock:assistant:admit:global";
         int v;
         try {
             RScript script = RedisUtils.getClient().getScript(StringCodec.INSTANCE);
@@ -144,7 +144,7 @@ public class AssistantAdmissionGate {
         try {
             // 2026-11-11 STEP02：准入闸在请求链上跑，裸 dynamic 会删掉超管「切换单位」持久态
             Integer value = tenantId == null ? null
-                : com.smartdock.assistant.legacy.core.AssistantTenantScope.call(
+                : com.smartdock.assistant.engine.core.AssistantTenantScope.call(
                     tenantId, () -> configService.getConfigInt(key));
             if (value == null) {
                 value = TenantHelper.ignore(() -> configService.getConfigInt(key));

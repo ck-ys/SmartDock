@@ -3,8 +3,8 @@ package com.smartdock.assistant.infrastructure;
 import com.smartdock.assistant.domain.gateway.RunFeedGateway;
 import io.agentscope.core.agui.event.AguiEvent;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.core.AssistantRunStreamHub;
-import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import com.smartdock.assistant.engine.core.AssistantRunStreamHub;
+import com.smartdock.assistant.domain.model.AssistantRun;
 import com.smartdock.assistant.mapper.AssistantRunMapper;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -28,7 +28,7 @@ public class RunFeedGatewayImpl implements RunFeedGateway {
 
     @Override
     public Optional<String> latestRunningRunId(String tenantId, Long userId, String threadId) {
-        List<DcsAssistantRun> latest = runMapper.selectByThread(tenantId, threadId, userId, 1);
+        List<AssistantRun> latest = runMapper.selectByThread(tenantId, threadId, userId, 1);
         if (latest.isEmpty() || !"RUNNING".equals(latest.get(0).getStatus())) {
             return Optional.empty();
         }

@@ -72,9 +72,9 @@ public class EncryptKeyMigrationRunner implements ApplicationRunner {
         String mcpKey = environment.getProperty(EncryptKeyStartupRunner.MCP_KEY_PROP, "");
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
 
-        migrate(jdbc, manager, new Target("dcs_ai_config", "config_id", "api_key", aiKey, LEGACY_AI_KEY, ValueKind.API_KEY));
-        migrate(jdbc, manager, new Target("dcs_ai_provider_access", "id", "api_key", aiKey, LEGACY_AI_KEY, ValueKind.API_KEY));
-        migrate(jdbc, manager, new Target("dcs_mcp_server", "id", "headers", mcpKey, LEGACY_MCP_KEY, ValueKind.HEADERS_JSON));
+        migrate(jdbc, manager, new Target("ai_config", "config_id", "api_key", aiKey, LEGACY_AI_KEY, ValueKind.API_KEY));
+        migrate(jdbc, manager, new Target("ai_provider_access", "id", "api_key", aiKey, LEGACY_AI_KEY, ValueKind.API_KEY));
+        migrate(jdbc, manager, new Target("mcp_server", "id", "headers", mcpKey, LEGACY_MCP_KEY, ValueKind.HEADERS_JSON));
     }
 
     private void migrate(JdbcTemplate jdbc, EncryptorManager manager, Target target) {

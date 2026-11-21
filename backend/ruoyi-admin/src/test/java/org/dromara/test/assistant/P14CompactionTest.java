@@ -24,8 +24,8 @@ import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
 import io.agentscope.harness.agent.middleware.CompactionMiddleware;
 import io.agentscope.harness.agent.middleware.ToolResultEvictionMiddleware;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -73,7 +73,7 @@ class P14CompactionTest {
     private static final String RED_LINE = "成员身份禁止发起催办";
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
     /** 清理口径：仅删本探针 namespace 的 PG 行（X-05 写入），schema/表保留 */
     @org.junit.jupiter.api.AfterAll
@@ -89,7 +89,7 @@ class P14CompactionTest {
     @TempDir
     Path workspaceDir;
 
-    private Model buildModel(DcsAiConfig cfg) {
+    private Model buildModel(AiConfig cfg) {
         return OpenAIChatModel.builder()
             .baseUrl(cfg.getBaseUrl()).apiKey(cfg.getApiKey()).modelName(cfg.getModelName())
             .stream(false).formatter(new DeepSeekFormatter()).build();
@@ -133,12 +133,12 @@ class P14CompactionTest {
         // P1 装配层钳制公式【预演】（三审修正：此处不做 Math.min 结果自断言的同义反复——
         // 生效值的真回合证据见 middlewareE2e 配对：同 trigger=600，keepTokens 未设(默认-1)=压缩静默跳过，
         // keepTokens=1500=压缩触发，配置生效性由该配对实证；本方法只锁定公式输入的窗口值来源）
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         Model model = buildModel(cfg);
         int ctxSize = model.getContextWindowSize();
         System.out.println("[P14] model.getContextWindowSize() = " + ctxSize
-            + "（0=模型未上报→窗口值不能靠模型接口，P1 须 dcs_assistant_config 配置兜底）");
+            + "（0=模型未上报→窗口值不能靠模型接口，P1 须 assistant_config 配置兜底）");
         assertEquals(0, ctxSize, "deepseek-v4-flash 经 OpenAIChatModel 不上报窗口（实测锁定：P1 配置兜底为唯一路径）");
     }
 
@@ -201,7 +201,7 @@ class P14CompactionTest {
 
     @Test
     void compactorSummaryKeepsBusinessMarkers() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         Model model = buildModel(cfg);
         // WorkspaceManager 持 SQLite 索引句柄——全程 try/finally close（三审 P2 修正）
@@ -266,7 +266,7 @@ class P14CompactionTest {
 
     @Test
     void middlewareE2eEvictionCompactionAndContinuity() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         Model model = buildModel(cfg);
         // 坑67：WorkspaceManager(Path) 单参构造 getFilesystem() 返回 null（惰性字段不初始化）——
@@ -283,7 +283,7 @@ class P14CompactionTest {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new BigReportTools());
 
-        String sysPrompt = "你是 DCS 数据采集系统的工作助手。红线：" + RED_LINE
+        String sysPrompt = "你是 SmartDock的工作助手。红线：" + RED_LINE
             + "。回答用简洁中文，需要数据时必须调用工具。";
         ReActAgent agent = ReActAgent.builder()
             .name("p0-evict-agent")   // 坑66：eviction 路径清洗用 agent.getName()，不命名=NPE 静默失败
@@ -395,7 +395,7 @@ class P14CompactionTest {
 
     @Test
     void overflowBehaviorExplicitErrorNoHang() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         Model model = buildModel(cfg);
         // 直接打模型（不经 agent/压缩）：≈200K token 输入远超 128K 窗口
@@ -430,13 +430,13 @@ class P14CompactionTest {
 
     @Test
     void sixtyKTierWithKnowledgePack() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         String pack = Files.readString(Path.of("document", "evidence", "assistant-p0", "05b-knowledge-pack.md"),
             StandardCharsets.UTF_8);
         // 知识包（≈1.8K tok）+ 填充至 ≈60K token（中文≈0.3 token/字符 → ≈180K 字符）
         String fillerText = filler(178000, "60K档填充");
-        String sysPrompt = pack + "\n\n你是 DCS 数据采集系统的工作助手，回答用简洁中文。";
+        String sysPrompt = pack + "\n\n你是 SmartDock的工作助手，回答用简洁中文。";
         ReActAgent agent = ReActAgent.builder()
             .sysPrompt(sysPrompt).model(buildModel(cfg)).maxIters(2).build();
         RuntimeContext rc = RuntimeContext.builder()

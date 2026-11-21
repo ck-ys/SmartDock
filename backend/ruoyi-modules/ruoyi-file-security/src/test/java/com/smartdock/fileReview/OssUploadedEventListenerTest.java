@@ -2,11 +2,11 @@ package com.smartdock.fileReview;
 
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.domain.DcsFileReview;
-import com.smartdock.domain.DcsFileReviewConfig;
+import com.smartdock.domain.FileReview;
+import com.smartdock.domain.FileReviewConfig;
 import com.smartdock.listener.OssUploadedEventListener;
-import com.smartdock.mapper.DcsFileReviewMapper;
-import com.smartdock.service.IDcsFileReviewConfigService;
+import com.smartdock.mapper.FileReviewMapper;
+import com.smartdock.service.IFileReviewConfigService;
 import org.dromara.system.event.OssFileUploadedEvent;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -32,8 +32,8 @@ import static org.mockito.Mockito.when;
 @Tag("dev")
 class OssUploadedEventListenerTest {
 
-    private final IDcsFileReviewConfigService configService = mock(IDcsFileReviewConfigService.class);
-    private final DcsFileReviewMapper reviewMapper = mock(DcsFileReviewMapper.class);
+    private final IFileReviewConfigService configService = mock(IFileReviewConfigService.class);
+    private final FileReviewMapper reviewMapper = mock(FileReviewMapper.class);
     private final OssUploadedEventListener listener = new OssUploadedEventListener(configService, reviewMapper);
 
     private static OssFileUploadedEvent event(String suffix, String bizSource, String guardReason) {
@@ -59,7 +59,7 @@ class OssUploadedEventListenerTest {
             listener.onUploaded(e);
             assertEquals("PENDING", e.getReviewStatus());
         }
-        ArgumentCaptor<DcsFileReview> cap = ArgumentCaptor.forClass(DcsFileReview.class);
+        ArgumentCaptor<FileReview> cap = ArgumentCaptor.forClass(FileReview.class);
         verify(reviewMapper).insert(cap.capture());
         assertEquals("PENDING", cap.getValue().getStatus());
         assertEquals("MAGIC_MISMATCH", cap.getValue().getGuardReason());
@@ -73,7 +73,7 @@ class OssUploadedEventListenerTest {
             listener.onUploaded(e);
             assertEquals("SKIPPED", e.getReviewStatus());
         }
-        ArgumentCaptor<DcsFileReview> cap = ArgumentCaptor.forClass(DcsFileReview.class);
+        ArgumentCaptor<FileReview> cap = ArgumentCaptor.forClass(FileReview.class);
         verify(reviewMapper).insert(cap.capture());
         assertEquals("EXEMPT", cap.getValue().getStatus());
         assertNull(cap.getValue().getGuardReason());
@@ -81,7 +81,7 @@ class OssUploadedEventListenerTest {
 
     @Test
     void disabledConfigSkipsWithoutRow() {
-        DcsFileReviewConfig cfg = new DcsFileReviewConfig();
+        FileReviewConfig cfg = new FileReviewConfig();
         cfg.setEnabled("0");
         cfg.setCategories("DOCUMENT");
         when(configService.getEffective()).thenReturn(cfg);
@@ -90,12 +90,12 @@ class OssUploadedEventListenerTest {
             listener.onUploaded(e);
             assertEquals("SKIPPED", e.getReviewStatus());
         }
-        verify(reviewMapper, never()).insert(any(DcsFileReview.class));
+        verify(reviewMapper, never()).insert(any(FileReview.class));
     }
 
     @Test
     void adminUploadSkipsWithoutRow() {
-        DcsFileReviewConfig cfg = new DcsFileReviewConfig();
+        FileReviewConfig cfg = new FileReviewConfig();
         cfg.setEnabled("1");
         cfg.setCategories("DOCUMENT");
         when(configService.getEffective()).thenReturn(cfg);
@@ -106,12 +106,12 @@ class OssUploadedEventListenerTest {
             listener.onUploaded(e);
             assertEquals("SKIPPED", e.getReviewStatus());
         }
-        verify(reviewMapper, never()).insert(any(DcsFileReview.class));
+        verify(reviewMapper, never()).insert(any(FileReview.class));
     }
 
     @Test
     void unselectedCategorySkipsWithoutRow() {
-        DcsFileReviewConfig cfg = new DcsFileReviewConfig();
+        FileReviewConfig cfg = new FileReviewConfig();
         cfg.setEnabled("1");
         cfg.setCategories("IMAGE,VIDEO");
         when(configService.getEffective()).thenReturn(cfg);
@@ -120,12 +120,12 @@ class OssUploadedEventListenerTest {
             listener.onUploaded(e);
             assertEquals("SKIPPED", e.getReviewStatus());
         }
-        verify(reviewMapper, never()).insert(any(DcsFileReview.class));
+        verify(reviewMapper, never()).insert(any(FileReview.class));
     }
 
     @Test
     void selectedCategoryCreatesPendingRow() {
-        DcsFileReviewConfig cfg = new DcsFileReviewConfig();
+        FileReviewConfig cfg = new FileReviewConfig();
         cfg.setEnabled("1");
         cfg.setCategories("IMAGE,DOCUMENT");
         when(configService.getEffective()).thenReturn(cfg);
@@ -134,7 +134,7 @@ class OssUploadedEventListenerTest {
             listener.onUploaded(e);
             assertEquals("PENDING", e.getReviewStatus());
         }
-        ArgumentCaptor<DcsFileReview> cap = ArgumentCaptor.forClass(DcsFileReview.class);
+        ArgumentCaptor<FileReview> cap = ArgumentCaptor.forClass(FileReview.class);
         verify(reviewMapper).insert(cap.capture());
         assertEquals("PENDING", cap.getValue().getStatus());
         assertEquals("DOCUMENT", cap.getValue().getFileCategory());

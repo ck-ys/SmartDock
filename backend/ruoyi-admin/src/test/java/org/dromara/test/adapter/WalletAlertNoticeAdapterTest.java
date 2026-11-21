@@ -1,6 +1,6 @@
 package org.dromara.test.adapter;
 
-import com.smartdock.dcs.service.DcsNoticeService;
+import com.smartdock.mission.service.NoticeService;
 import org.dromara.common.tenant.helper.TenantHelper;
 import com.smartdock.service.support.WalletAlertEvent;
 import org.dromara.web.adapter.WalletAlertNoticeAdapter;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
 @Tag("local")
 class WalletAlertNoticeAdapterTest {
 
-    private final DcsNoticeService noticeService = mock(DcsNoticeService.class);
+    private final NoticeService noticeService = mock(NoticeService.class);
     private final WalletAlertNoticeAdapter adapter = new WalletAlertNoticeAdapter(noticeService);
 
     private static MockedStatic<TenantHelper> tenantPassThrough() {

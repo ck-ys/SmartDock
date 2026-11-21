@@ -26,7 +26,7 @@ import java.net.URLConnection;
  */
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("/dcs/ai/favicon")
+@RequestMapping("/ai/favicon")
 public class AiFaviconController extends BaseController {
 
     private final FaviconProxyService faviconProxyService;

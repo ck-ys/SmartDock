@@ -28,11 +28,11 @@ CREATE INDEX IF NOT EXISTS idx_sys_notice_read_user
     ON public.sys_notice_read (tenant_id, user_id);
 
 -- ===== 3. 站内通知支持跳转链接 =====
-ALTER TABLE public.dcs_notice ADD COLUMN IF NOT EXISTS ref_url character varying(500);
-COMMENT ON COLUMN public.dcs_notice.ref_url IS '点击通知跳转的前端路由（可空）';
+ALTER TABLE public.notice ADD COLUMN IF NOT EXISTS ref_url character varying(500);
+COMMENT ON COLUMN public.notice.ref_url IS '点击通知跳转的前端路由（可空）';
 
 -- ===== 4. 反馈中心 =====
-CREATE TABLE IF NOT EXISTS public.dcs_feedback (
+CREATE TABLE IF NOT EXISTS public.feedback (
     feedback_id   bigint NOT NULL,
     tenant_id     character varying(20) NOT NULL DEFAULT '000000'::character varying,
     title         character varying(200) NOT NULL,
@@ -52,19 +52,19 @@ CREATE TABLE IF NOT EXISTS public.dcs_feedback (
     update_by     bigint,
     update_time   timestamp(6) without time zone,
     del_flag      char(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_dcs_feedback PRIMARY KEY (feedback_id),
-    CONSTRAINT ck_dcs_feedback_type CHECK (feedback_type::text = ANY (ARRAY['BUG','EXPERIENCE','SUGGEST','OTHER']::text[])),
-    CONSTRAINT ck_dcs_feedback_status CHECK (status::text = ANY (ARRAY['PENDING','PROCESSING','RESOLVED','CLOSED']::text[]))
+    CONSTRAINT pk_feedback PRIMARY KEY (feedback_id),
+    CONSTRAINT ck_feedback_type CHECK (feedback_type::text = ANY (ARRAY['BUG','EXPERIENCE','SUGGEST','OTHER']::text[])),
+    CONSTRAINT ck_feedback_status CHECK (status::text = ANY (ARRAY['PENDING','PROCESSING','RESOLVED','CLOSED']::text[]))
 );
 
-COMMENT ON TABLE public.dcs_feedback IS '产品反馈（单表；最近一次处理意见覆盖式存储）';
-COMMENT ON COLUMN public.dcs_feedback.feedback_type IS 'BUG=缺陷 EXPERIENCE=体验 SUGGEST=建议 OTHER=其它';
-COMMENT ON COLUMN public.dcs_feedback.context_json IS '提交时自动采集的页面/浏览器/版本上下文（JSON）';
+COMMENT ON TABLE public.feedback IS '产品反馈（单表；最近一次处理意见覆盖式存储）';
+COMMENT ON COLUMN public.feedback.feedback_type IS 'BUG=缺陷 EXPERIENCE=体验 SUGGEST=建议 OTHER=其它';
+COMMENT ON COLUMN public.feedback.context_json IS '提交时自动采集的页面/浏览器/版本上下文（JSON）';
 
-CREATE INDEX IF NOT EXISTS idx_dcs_feedback_status ON public.dcs_feedback (status);
-CREATE INDEX IF NOT EXISTS idx_dcs_feedback_create_by ON public.dcs_feedback (create_by);
-CREATE INDEX IF NOT EXISTS idx_dcs_feedback_tenant_status
-    ON public.dcs_feedback (tenant_id, status, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON public.feedback (status);
+CREATE INDEX IF NOT EXISTS idx_feedback_create_by ON public.feedback (create_by);
+CREATE INDEX IF NOT EXISTS idx_feedback_tenant_status
+    ON public.feedback (tenant_id, status, create_time DESC);
 
 -- ===== 5. 更新日志（全局表，已在 tenant.excludes） =====
 CREATE TABLE IF NOT EXISTS public.dcs_changelog (
@@ -81,8 +81,8 @@ CREATE TABLE IF NOT EXISTS public.dcs_changelog (
     update_by      bigint,
     update_time    timestamp(6) without time zone,
     del_flag       char(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_dcs_changelog PRIMARY KEY (log_id),
-    CONSTRAINT ck_dcs_changelog_status CHECK (status::text = ANY (ARRAY['0','1']::text[]))
+    CONSTRAINT pk_changelog PRIMARY KEY (log_id),
+    CONSTRAINT ck_changelog_status CHECK (status::text = ANY (ARRAY['0','1']::text[]))
 );
 
 COMMENT ON TABLE public.dcs_changelog IS '更新日志（全局；visible 由 target_tenants 名单控制）';
@@ -90,9 +90,9 @@ COMMENT ON COLUMN public.dcs_changelog.items IS '条目 JSON：[{"type":"new|opt
 COMMENT ON COLUMN public.dcs_changelog.target_tenants IS '推送租户名单 JSON：["000000",...]';
 COMMENT ON COLUMN public.dcs_changelog.status IS '0=草稿 1=已发布';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_changelog_version
+CREATE UNIQUE INDEX IF NOT EXISTS uk_changelog_version
     ON public.dcs_changelog (version) WHERE (del_flag = '0'::bpchar);
-CREATE INDEX IF NOT EXISTS idx_dcs_changelog_status_publish
+CREATE INDEX IF NOT EXISTS idx_changelog_status_publish
     ON public.dcs_changelog (status, publish_time DESC);
 
 -- ===== 6. 菜单与权限 =====
@@ -102,8 +102,8 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (9150, '公告', 9180, 0, 'announcement', 'dcs/announcement/index', '',
-     '1', '0', 'C', '0', '0', 'dcs:announcement:list', 'message',
+    (9150, '公告', 9180, 0, 'announcement', 'smartdock/announcement/index', '',
+     '1', '0', 'C', '0', '0', 'smartdock:announcement:list', 'message',
      103, 1, now(), NULL, NULL, '公告卡片流与文章页（全体登录角色）')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id, path = EXCLUDED.path, component = EXCLUDED.component,
@@ -111,7 +111,7 @@ ON CONFLICT (menu_id) DO UPDATE SET
     perms = EXCLUDED.perms, remark = EXCLUDED.remark, update_time = now();
 
 -- 6.2 更新日志：补列表权限 + 四个按钮
-UPDATE public.sys_menu SET perms = 'dcs:changelog:list', remark = '系统版本迭代记录（数据库驱动）', update_time = now()
+UPDATE public.sys_menu SET perms = 'smartdock:changelog:list', remark = '系统版本迭代记录（数据库驱动）', update_time = now()
  WHERE menu_id = 9160;
 
 INSERT INTO public.sys_menu
@@ -119,10 +119,10 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (9161, '日志查询', 9160, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:query', '#', 103, 1, now(), NULL, NULL, ''),
-    (9162, '版本新增', 9160, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:add', '#', 103, 1, now(), NULL, NULL, ''),
-    (9163, '版本编辑', 9160, 3, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:edit', '#', 103, 1, now(), NULL, NULL, ''),
-    (9164, '版本删除', 9160, 4, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:remove', '#', 103, 1, now(), NULL, NULL, '')
+    (9161, '日志查询', 9160, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:query', '#', 103, 1, now(), NULL, NULL, ''),
+    (9162, '版本新增', 9160, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:add', '#', 103, 1, now(), NULL, NULL, ''),
+    (9163, '版本编辑', 9160, 3, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:edit', '#', 103, 1, now(), NULL, NULL, ''),
+    (9164, '版本删除', 9160, 4, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:remove', '#', 103, 1, now(), NULL, NULL, '')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id, perms = EXCLUDED.perms, visible = EXCLUDED.visible,
     status = EXCLUDED.status, update_time = now();
@@ -133,11 +133,11 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (9170, '反馈中心', 9180, 2, 'feedback', 'dcs/feedback/index', '',
-     '1', '0', 'C', '0', '0', 'dcs:feedback:list', 'email',
+    (9170, '反馈中心', 9180, 2, 'feedback', 'smartdock/feedback/index', '',
+     '1', '0', 'C', '0', '0', 'smartdock:feedback:list', 'email',
      103, 1, now(), NULL, NULL, '产品反馈管理（租户管理员与超管）'),
-    (9171, '反馈查询', 9170, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:feedback:query', '#', 103, 1, now(), NULL, NULL, ''),
-    (9172, '反馈处理', 9170, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:feedback:handle', '#', 103, 1, now(), NULL, NULL, '')
+    (9171, '反馈查询', 9170, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:feedback:query', '#', 103, 1, now(), NULL, NULL, ''),
+    (9172, '反馈处理', 9170, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:feedback:handle', '#', 103, 1, now(), NULL, NULL, '')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id, path = EXCLUDED.path, component = EXCLUDED.component,
     menu_type = EXCLUDED.menu_type, visible = EXCLUDED.visible, status = EXCLUDED.status,

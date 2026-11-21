@@ -2,7 +2,7 @@ package com.smartdock.assistant.support;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartdock.assistant.domain.model.DcsMcpServer;
+import com.smartdock.assistant.domain.model.McpServer;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.encrypt.core.EncryptContext;
@@ -79,7 +79,7 @@ public class McpHeaderCipher {
      * <p>G4 三审回修（dsflash P2-5）：单行坏密文不得 500 整个列表——解密失败降级
      * "(解析失败)"，管理面仍可看到该行并修复（日志带服务名便于定位坏行）。</p>
      */
-    public String headerKeysOf(DcsMcpServer row) {
+    public String headerKeysOf(McpServer row) {
         String storedJson = row == null ? null : row.getHeaders();
         String json;
         try {

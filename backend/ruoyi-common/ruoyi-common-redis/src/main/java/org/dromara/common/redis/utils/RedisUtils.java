@@ -27,7 +27,7 @@ public class RedisUtils {
 
     // ===== DCS 调用指南 =====
     // DCS 引用频次: 12+ 个文件
-    // 典型用法: DCS 用它做对象缓存(mission:fields, setCacheObject 带 TTL 防内存泄漏)、ZSET 排行榜(profile:rank)、发布订阅(DcsNoticeEvent 跨节点广播); 全静态方法, MQ 线程也能用
+    // 典型用法: DCS 用它做对象缓存(mission:fields, setCacheObject 带 TTL 防内存泄漏)、ZSET 排行榜(profile:rank)、发布订阅(NoticeEvent 跨节点广播); 全静态方法, MQ 线程也能用
     // ⚠️ DCS 踩过的坑: 缓存键需自行拼接租户前缀(keys/deleteKeys 全局匹配忽略租户), setCacheObject 不传 Duration 会永久驻留, 必须 TTL
     // ===== DCS 调用指南 结束 =====
 

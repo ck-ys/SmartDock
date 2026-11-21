@@ -21,25 +21,25 @@ import com.smartdock.assistant.service.AssistantUserPrefService;
  * 助手常规偏好接口（批C Q8 案1，2026-11-15）。
  *
  * <p>只操作本人的数据（租户+用户双谓词在 Mapper 里），所以权限沿用
- * {@code dcs:assistant:use}——不新增权限串、不新增菜单。</p>
+ * {@code smartdock:assistant:use}——不新增权限串、不新增菜单。</p>
  */
 @Tag(name = "助手常规偏好", description = "本人七项常规设置（换设备仍在）")
 @RestController
-@RequestMapping("/dcs/assistant/user-pref")
+@RequestMapping("/assistant/user-pref")
 @RequiredArgsConstructor
 public class AssistantUserPrefController {
 
     private final AssistantUserPrefService prefService;
 
     /** 读本人偏好；没存过返回默认值 + saved=false */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @GetMapping
     public R<AssistantUserPrefVo> get() {
         return R.ok(prefService.load(LoginHelper.getTenantId(), LoginHelper.getUserId()));
     }
 
     /** 全量覆盖保存（七项一起交；不传的按默认值） */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @Log(title = "助手-常规偏好", businessType = BusinessType.UPDATE)
     @PutMapping
     public R<Void> save(@RequestBody AssistantUserPrefBo bo) {

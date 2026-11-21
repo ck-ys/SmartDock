@@ -65,7 +65,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 - **想让人知道「接下来做什么 / 明确不做什么」→ 只改 `docs/roadmap.md` 一页**，状态用文字徽章（已完成 / 正在做 / 等开工 / 在讨论 / 明确不做）。不推未完成计划原件。
 - **想让人知道「为什么这么设计」→ 只改 `docs/design-decisions.md`**（按主题组织，不按时间）。
 - **精选决策板归档**：只有结论具备长期参考价值时才脱敏后进 `docs/decisions/`，并在 `docs/decisions/README.md` 索引加一行。脱敏 = 去掉内网地址、本机路径、内部代号（含沿用旧系统的名字）、内部协作语境。
-- **允许出现的**：真实代码标识符（如 `dcs-assistant` 这个 agentId、`dcs_` 前缀表名）——它们是可运行的代码，不是内部代号；批 11B 改名后自然消失。
+- **允许出现的**：真实代码标识符（可运行的表名 / agentId / 配置键）不是内部代号；批 9（2026-11-21）起 dcs 六层已清零，新代码一律不再用 dcs 前缀，有意保留的例外见「代码落点与结构门禁」的数据面白名单。
 - **每批收口必做**：回刷 `docs/roadmap.md`（状态变更 ≤5 行）。
 
 ---
@@ -162,8 +162,8 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 7. **表结构变更必须沉淀 DDL**（见上文「DDL 与部署口径」）
 8. **时区铁律**：后端固定 GMT+8（启动参数 `-Duser.timezone=GMT+8`）；种子/测试数据按 UTC+8 墙上时间生成
 9. **安全密钥铁律（2026-11-02 密钥整改）**：加密密钥一律只从环境变量注入，**禁止写进源码 / yml / SQL / 种子 / 文档示例**
-   - `SMARTDOCK_AI_CONFIG_KEY` → 保护 `dcs_ai_config.api_key`、`dcs_ai_provider_access.api_key`
-   - `SMARTDOCK_MCP_HEADERS_KEY` → 保护 `dcs_mcp_server.headers`（第三方 MCP 请求头令牌）
+   - `SMARTDOCK_AI_CONFIG_KEY` → 保护 `ai_config.api_key`、`ai_provider_access.api_key`（批 9 前表名带 `dcs_` 前缀）
+   - `SMARTDOCK_MCP_HEADERS_KEY` → 保护 `mcp_server.headers`（第三方 MCP 请求头令牌）
    - 两把必须不同，16/24/32 位可见 ASCII；未配置 / 长度错 / 仍用旧版内置钥匙 → 服务**拒绝启动**（`EncryptKeyStartupRunner`）
    - `@EncryptField` 的 password 只写占位符 `${smartdock.encrypt.*}`，由框架运行时解析；新增加密字段照此办理，禁止字面量
    - 历史密文由 `EncryptKeyMigrationRunner` 启动时自动换锁（旧钥匙只解密、绝不加密）；迁移走原生 SQL，绕开 MyBatis 加解密拦截器
@@ -177,6 +177,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 - 四层一句话：controller 只做门卫 / service 编排 / domain 放实体与接口 / infrastructure 放实现
 - gateway 只在三类边界建：跨模块、流式长连接、外部服务；自有单表 CRUD 不建
 - 改结构前读 `backend/AGENTS.md`「包卫生与分层门禁」；收口跑 `PackageHygieneTest` + `LayeringTest`
+- **批 9（2026-11-21）起 dcs 六层清零，新代码不许再出现 dcs**：`Dcs*` 类名、`com.smartdock.dcs` 包、`dcs_` 表、`/dcs` 路径、`dcs:` 权限串、`dcs-assistant` agentId、`dcs.*` 配置键一律不写（权限用 `smartdock:` 三段式、配置键按域裸名如 `assistant.*`）。**数据面白名单例外**（有意保留，不改不迁）：`dcs_changelog` / `dcs_mid` / `dcs_assistant_conversation_title_bak_*` 表、画像 source `'dcs'`（`ProfileSources.UNIFIED`，历史数据不迁移）、烧录密钥名 `DcsAiCfgEncKey16` / `DcsMcpHeadersK16`（`EncryptKey*Runner` 识别旧钥匙用）、`PackageMigrationGuardTest` 钉死的迁移前旧全名、注释里带「批9 前名为」字样的历史叙述、`backend/script/sql/migration/` 历史迁移文件（批 9 已统一改写为新名表名/权限串，原文见 git 历史——保证「新 baseline + 全量迁移重放」自洽；存量旧库升级走 2026-11-21_b9_strip_dcs_prefix.sql）。守卫：`PackageMigrationGuardTest.batch9LegacyTreeMustBeAbsentFromClasspath`（classpath 整树缺席）+ `PackageHygieneTest`（legacy 双树 0 文件）
 
 ---
 
@@ -349,9 +350,9 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 | 目录 | 是什么 | 版本锚点 | 本仓对应位置（改这里先看那里） |
 |------|--------|---------|------------------------------|
 | `agentscope-java` | 本仓助手实际依赖的 Java 智能体框架 | HEAD `997c60ac`（revision `2.1.0-SNAPSHOT`，最近 tag `v2.0.2`） | 后端：`backend/ruoyi-modules/ruoyi-assistant` 的 `core`（Agent 工厂、中间件、工具、技能、压缩、HITL）与 `ruoyi-assistant-spi`（`BizToolProvider`）。改实现前先读 `agentscope-core` 的 `agent` / `tool` / `permission` / `skill` / `memory` / `session` / `interruption` / `middleware` 子包 |
-| `ZCode` | ZCode 客户端与 CLI 真源码（TS monorepo） | `v3.17.1` / `a60ba6a7` | 前端会话：`frontend/src/components/DcsAssistant`（Composer、TurnBlock、MsgFlow、PlanDock、HitlDock）；后端压缩与会话：`com.smartdock.assistant.legacy.core` 的 `AssistantCompactionPolicy`、`DcsCompactionMiddleware`。读 `packages/services/src/{zcode-agent,zcode-session,subagents,skills}`、`packages/ui/src/lib/contextCompactionRuntime.ts`、`apps/zcode-cli/docs/design/v2/compact/` |
+| `ZCode` | ZCode 客户端与 CLI 真源码（TS monorepo） | `v3.17.1` / `a60ba6a7` | 前端会话：`frontend/src/components/Assistant`（Composer、TurnBlock、MsgFlow、PlanDock、HitlDock）；后端压缩与会话：`com.smartdock.assistant.engine.core` 的 `AssistantCompactionPolicy`、`AssistantCompactionMiddleware`（批 9 前位于 legacy 根）。读 `packages/services/src/{zcode-agent,zcode-session,subagents,skills}`、`packages/ui/src/lib/contextCompactionRuntime.ts`、`apps/zcode-cli/docs/design/v2/compact/` |
 | `LibreChat` | 多用户聊天平台，含 Agents SDK 4.2.1 / MCP / HITL / 权限 | `v0.8.9-rc1` / `f4154b649` | 后端 Agent 控制链与 HITL：`ruoyi-assistant` 的 `controller`、`core`（AGUI 流、run 状态、审批闸）。行为规格优先读 `api/server/controllers/agents/__tests__`（askUserQuestion、hitlCheckpoint、resumeMetadata、eventActorPause、memory），实现读 `api/server/controllers/agents`、`routes/agents`、`packages/chat` |
-| `assistant-ui` | 聊天 UI 基元库（React / Vue 绑定） | HEAD `e8ec559d8`，`@assistant-ui/vue` `0.0.7` | 前端 `frontend/src/components/DcsAssistant` 的流式消息、输入框、工具卡片结构。Vue 绑定看 `packages/vue`，状态机看 `packages/core/src/{runtime,store}`，交互范式看 `packages/react/src/primitives`；只参照结构，不引入依赖 |
+| `assistant-ui` | 聊天 UI 基元库（React / Vue 绑定） | HEAD `e8ec559d8`，`@assistant-ui/vue` `0.0.7` | 前端 `frontend/src/components/Assistant` 的流式消息、输入框、工具卡片结构。Vue 绑定看 `packages/vue`，状态机看 `packages/core/src/{runtime,store}`，交互范式看 `packages/react/src/primitives`；只参照结构，不引入依赖 |
 | `open-webui` | FastAPI + Svelte 的 AI 平台 | `v0.12.5` / `f7ac7ee10` | 后端会话、压缩、追问、权限中间件：`ruoyi-assistant` 的 `core` 与 `controller`。读 `backend/open_webui/utils/{context_compaction,ask_user,asgi_middleware}.py`、`routers/{groups,chats,folders}.py`、`utils/access_control`；前端 Svelte 会话只作结构参照（`src/lib/components/chat`） |
 | `cherry-studio` | Electron 桌面 AI 客户端（AGPL-3.0） | `2.1.10` / `8e13399fa2` | 工具审批、技能、MCP、提示注入防护：`src/main/ai/{toolApproval,skills,mcp,agentSession}`、`untrustedContent.ts`、`steerReminder.ts`；对应本仓 `AssistantSkillGateMiddleware`、`AssistantPlanGateMiddleware`、MCP 注册与工具开关。**只读，禁转录** |
 | `cline` | 编码智能体（VS Code / CLI / SDK，Apache-2.0） | HEAD `a6507a62a`（本地 git 索引为空，直接读工作区文件） | 工具循环、计划-执行模式、检查点与回滚：`sdk/packages/{core,agents,llms}`、`apps/vscode/src/core`；对应本仓 PlanGate、计划/待办信号、工具审批与运行恢复 |

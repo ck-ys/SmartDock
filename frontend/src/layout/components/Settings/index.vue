@@ -93,7 +93,7 @@ const showSettings = ref(false);
 const storeSettings = computed(() => settingsStore);
 const navType = ref(settingsStore.navType);
 const radiusBase = ref(settingsStore.radiusBase);
-// 2026-10-30 题5（方案A）：明暗唯一入口在顶栏「外观」抽屉（DcsAppearanceDrawer → settings.setDark），
+// 2026-10-30 题5（方案A）：明暗唯一入口在顶栏「外观」抽屉（AppearanceDrawer → settings.setDark），
 // 这里原「纯黑夜主题」开关已撤；本抽屉只管布局，不再持有明暗状态。
 
 /** 菜单导航设置 */
@@ -170,7 +170,7 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-/* U-13：主题预览块（setting-drawer-block-checbox 系）已随 U-24 外观抽屉（DcsAppearanceDrawer）下线，
+/* U-13：主题预览块（setting-drawer-block-checbox 系）已随 U-24 外观抽屉（AppearanceDrawer）下线，
    模板零引用的死样式连同其中灰阴影 / Ant 旧蓝对勾 / rgba 近黑标题三处字面量一并删除；
    旧嵌套的 .setting-drawer-title .drawer-title 选择器本就不命中现役 h3.drawer-title（无样式变化） */
 /* P7 补刀(四席复审 P2-6)：裸 h3 落浏览器默认（1.17em+1em 边距）比抽屉标题还大——层级倒挂；

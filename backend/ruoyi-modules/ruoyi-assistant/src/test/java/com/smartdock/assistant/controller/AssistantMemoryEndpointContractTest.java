@@ -34,12 +34,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("local")
 class AssistantMemoryEndpointContractTest {
 
-    private static final String MEMORY = "/dcs/assistant/memory";
-    private static final String FAVORITE = "/dcs/assistant/favorite";
-    private static final String FEEDBACK = "/dcs/assistant";
-    private static final String MEMORY_PERM = "dcs:assistant:memory:manage";
-    private static final String USE_PERM = "dcs:assistant:use";
-    private static final String FEEDBACK_QUERY = "dcs:assistant:feedback:query";
+    private static final String MEMORY = "/assistant/memory";
+    private static final String FAVORITE = "/assistant/favorite";
+    private static final String FEEDBACK = "/assistant";
+    private static final String MEMORY_PERM = "smartdock:assistant:memory:manage";
+    private static final String USE_PERM = "smartdock:assistant:use";
+    private static final String FEEDBACK_QUERY = "smartdock:assistant:feedback:query";
 
     private static void assertClassMapping(Class<?> c, String expected) {
         RequestMapping rm = c.getAnnotation(RequestMapping.class);

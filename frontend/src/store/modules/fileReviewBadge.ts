@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia';
-import { getFileReviewPendingCount } from '@/api/dcs/fileReview';
+import { getFileReviewPendingCount } from '@/api/smartdock/fileReview';
 import { useUserStore } from './user';
 
 /**
  * 文件审核待审徽标（12b，Q7-A）
  *
- * 仅有 dcs:fileReview:list 权限的用户启动 60s 轮询；无权限者 ensureStarted 直接空跑。
+ * 仅有 smartdock:fileReview:list 权限的用户启动 60s 轮询；无权限者 ensureStarted 直接空跑。
  * 轮询失败静默（徽标是非关键信息，不打扰用户）；审核动作后可调 decrement 本地修正，
  * 下轮轮询自然对齐真值。
  */
@@ -17,7 +17,7 @@ export const useFileReviewBadgeStore = defineStore('fileReviewBadge', () => {
   const canView = () => {
     const userStore = useUserStore();
     const perms: string[] = userStore.permissions || [];
-    return perms.includes('*:*:*') || perms.includes('dcs:fileReview:list');
+    return perms.includes('*:*:*') || perms.includes('smartdock:fileReview:list');
   };
 
   const fetchPendingCount = async () => {
@@ -50,7 +50,7 @@ export const useFileReviewBadgeStore = defineStore('fileReviewBadge', () => {
   if (typeof window !== 'undefined' && !(window as any).__dcsBadgeTenantListener) {
     // store 重建（HMR/测试）会重复挂监听导致一次事件多次拉数，模块级旗子防重
     (window as any).__dcsBadgeTenantListener = true;
-    window.addEventListener('dcs:tenant-changed', () => {
+    window.addEventListener('tenant-changed', () => {
       fetchPendingCount();
     });
   }

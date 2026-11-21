@@ -2,11 +2,11 @@ package com.smartdock.risk;
 
 import org.dromara.common.core.utils.ServletUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.risk.config.DcsRolloutProperties;
+import com.smartdock.risk.config.RolloutProperties;
 import com.smartdock.risk.domain.bo.RiskEventCommand;
 import com.smartdock.risk.service.ContentModerationResult;
 import com.smartdock.risk.service.ContentModerationService;
-import com.smartdock.risk.service.DcsSensitiveWordFilterService;
+import com.smartdock.risk.service.SensitiveWordFilterService;
 import com.smartdock.risk.service.RiskEventCollector;
 import com.smartdock.risk.support.SensitiveWordMatcher;
 import org.junit.jupiter.api.Tag;
@@ -50,9 +50,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void moderationDisabledSkipsMatchingAndRecording() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(false);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
 
@@ -67,9 +67,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void formBlockHitRecordsEventAndObservationModeNeverRejects() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(true);
         rollout.setContentBlockEnabled(false);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
@@ -95,9 +95,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void idempotencyKeyStableForSameContentAndChangesForNewContent() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(true);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
         stubInspect(wordFilter, PLACEHOLDER_BLOCK_WORD, SensitiveWordMatcher.ACTION_BLOCK);
@@ -124,9 +124,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void reviewOnlyHitNeverRejectsEvenWithBlockSwitchOn() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(true);
         rollout.setContentBlockEnabled(true);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
@@ -143,9 +143,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void enforceModeRejectsBlockHitAndMessageNamesFieldWithoutWord() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(true);
         rollout.setContentBlockEnabled(true);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
@@ -163,9 +163,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void nestedFieldsFlattenWithPathInHits() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(true);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
         stubInspect(wordFilter, PLACEHOLDER_REVIEW_WORD, SensitiveWordMatcher.ACTION_REVIEW);
@@ -185,9 +185,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void machineMarkerMapsHitsToStatusAndCleanToNull() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(true);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
         stubInspectTwoWords(wordFilter, PLACEHOLDER_BLOCK_WORD, PLACEHOLDER_REVIEW_WORD);
@@ -220,9 +220,9 @@ class ContentModerationServiceUnitTest {
 
     @Test
     void machineMarkerTruncatesLongFieldListAndSplitsMixedLevels() {
-        DcsSensitiveWordFilterService wordFilter = mock(DcsSensitiveWordFilterService.class);
+        SensitiveWordFilterService wordFilter = mock(SensitiveWordFilterService.class);
         RiskEventCollector collector = mock(RiskEventCollector.class);
-        DcsRolloutProperties rollout = new DcsRolloutProperties();
+        RolloutProperties rollout = new RolloutProperties();
         rollout.setContentModerationEnabled(true);
         ContentModerationService service = new ContentModerationService(wordFilter, collector, rollout);
 
@@ -254,7 +254,7 @@ class ContentModerationServiceUnitTest {
     // ---------------------------------------------------------------
 
     /** stub: 仅当文本包含占位词时返回命中(干净文本返回空, 与真实词库行为一致) */
-    private void stubInspect(DcsSensitiveWordFilterService wordFilter, String word, String action) {
+    private void stubInspect(SensitiveWordFilterService wordFilter, String word, String action) {
         SensitiveWordMatcher.Hit hit = new SensitiveWordMatcher.Hit(word, action, 0, Math.max(1, word.length()));
         SensitiveWordMatcher.InspectionResult inspection = new SensitiveWordMatcher.InspectionResult(
             List.of(hit), SensitiveWordMatcher.ACTION_BLOCK.equalsIgnoreCase(action), false);
@@ -264,7 +264,7 @@ class ContentModerationServiceUnitTest {
     }
 
     /** stub(批2): 双占位词并存, 文本含哪个词记哪个命中——供 BLOCK/REVIEW 标记映射用例 */
-    private void stubInspectTwoWords(DcsSensitiveWordFilterService wordFilter, String blockWord, String reviewWord) {
+    private void stubInspectTwoWords(SensitiveWordFilterService wordFilter, String blockWord, String reviewWord) {
         SensitiveWordMatcher.Hit blockHit = new SensitiveWordMatcher.Hit(
             blockWord, SensitiveWordMatcher.ACTION_BLOCK, 0, Math.max(1, blockWord.length()));
         SensitiveWordMatcher.Hit reviewHit = new SensitiveWordMatcher.Hit(

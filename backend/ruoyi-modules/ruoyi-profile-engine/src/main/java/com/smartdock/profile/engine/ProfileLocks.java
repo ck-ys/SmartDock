@@ -30,27 +30,27 @@ public final class ProfileLocks {
 
     /** 会话重建互斥: 同(租户,业务源)同一时间只有一个重建者。 */
     public static String rebuild(String tenantId, String source) {
-        return "smartdock:analytics:rebuild:" + tenantId + ":" + source;
+        return "analytics:rebuild:" + tenantId + ":" + source;
     }
 
     /** 单主体自动重算互斥: 跨实例同主体只算一次。 */
     public static String recalcSubject(String tenantId, String source, String subjectType, String subjectId) {
-        return "smartdock:profile:recalc:" + tenantId + ":" + source + ":"
+        return "profile:recalc:" + tenantId + ":" + source + ":"
             + subjectType + ":" + subjectId;
     }
 
     /** 模型全量运行互斥: publish / rollback / 直接 run / 回放重算共用。 */
     public static String modelRun(Long modelId) {
-        return "smartdock:profile:model-run:" + modelId;
+        return "profile:model-run:" + modelId;
     }
 
     /** 触达批次重试互斥: 并发重试不双发不覆盖计数。 */
     public static String reachRetry(Long reachId) {
-        return "smartdock:profile:reach-retry:" + reachId;
+        return "profile:reach-retry:" + reachId;
     }
 
     /** 回放任务互斥: 回放与自动重建/其他回放互斥(拍板 C.6: 回放须持 Q1 分布式锁)。 */
     public static String replay(String tenantId, String source) {
-        return "smartdock:analytics:replay:" + tenantId + ":" + source;
+        return "analytics:replay:" + tenantId + ":" + source;
     }
 }

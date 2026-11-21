@@ -16,7 +16,7 @@ public class DetectPriceBo implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /** 探测目标模型厂商(见 DcsAiProvider 枚举) */
+    /** 探测目标模型厂商(见 AiProvider 枚举) */
     private String provider;
     /** 探测目标模型名称(为空时探测该厂商全部模型) */
     private String modelName;

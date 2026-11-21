@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.domain.model.DcsAssistantAnnouncement;
+import com.smartdock.assistant.domain.model.AssistantAnnouncement;
 import com.smartdock.assistant.mapper.AssistantAnnouncementMapper;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
@@ -35,17 +35,17 @@ import java.util.Map;
  */
 @Tag(name = "助手公告", description = "管理台发布/撤回 + 用户侧横幅")
 @RestController
-@RequestMapping("/dcs/assistant/announcement")
+@RequestMapping("/assistant/announcement")
 @RequiredArgsConstructor
 public class AssistantAnnouncementController extends BaseController {
 
     private final AssistantAnnouncementMapper announcementMapper;
 
     /** 用户侧：当前租户最新一条生效公告（无=null，前端不渲染横幅） */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @GetMapping("/active")
     public R<Map<String, Object>> active() {
-        DcsAssistantAnnouncement row =
+        AssistantAnnouncement row =
             announcementMapper.selectActive(LoginHelper.getTenantId());
         if (row == null) {
             return R.ok(null);
@@ -59,15 +59,15 @@ public class AssistantAnnouncementController extends BaseController {
     }
 
     /** 管理端：本租户公告列表（含已撤回，发布时间倒序） */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping("/admin/list")
-    public TableDataInfo<DcsAssistantAnnouncement> adminList() {
-        List<DcsAssistantAnnouncement> rows = announcementMapper.selectList(
-            new LambdaQueryWrapper<DcsAssistantAnnouncement>()
-                .eq(DcsAssistantAnnouncement::getTenantId, LoginHelper.getTenantId())
-                .orderByDesc(DcsAssistantAnnouncement::getPublishTime)
-                .orderByDesc(DcsAssistantAnnouncement::getId));
-        TableDataInfo<DcsAssistantAnnouncement> data = TableDataInfo.build(rows);
+    public TableDataInfo<AssistantAnnouncement> adminList() {
+        List<AssistantAnnouncement> rows = announcementMapper.selectList(
+            new LambdaQueryWrapper<AssistantAnnouncement>()
+                .eq(AssistantAnnouncement::getTenantId, LoginHelper.getTenantId())
+                .orderByDesc(AssistantAnnouncement::getPublishTime)
+                .orderByDesc(AssistantAnnouncement::getId));
+        TableDataInfo<AssistantAnnouncement> data = TableDataInfo.build(rows);
         data.setTotal(rows.size());
         return data;
     }
@@ -86,7 +86,7 @@ public class AssistantAnnouncementController extends BaseController {
     }
 
     /** 管理端：发布/编辑公告（保存即生效 status=1，publish_time 刷新=置顶重现） */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @Log(title = "AI助手-公告发布", businessType = BusinessType.INSERT)
     @PostMapping("/admin/publish")
     public R<Void> publish(@RequestBody AnnouncementBo bo) {
@@ -100,7 +100,7 @@ public class AssistantAnnouncementController extends BaseController {
         String tenantId = LoginHelper.getTenantId();
         Date now = new Date();
         if (bo.getId() == null) {
-            DcsAssistantAnnouncement row = new DcsAssistantAnnouncement();
+            AssistantAnnouncement row = new AssistantAnnouncement();
             row.setId(IdWorker.getId());
             row.setTenantId(tenantId);
             row.setTitle(bo.getTitle().trim());
@@ -112,7 +112,7 @@ public class AssistantAnnouncementController extends BaseController {
             row.setCreateTime(now);
             announcementMapper.insert(row);
         } else {
-            DcsAssistantAnnouncement existing = announcementMapper.selectById(bo.getId());
+            AssistantAnnouncement existing = announcementMapper.selectById(bo.getId());
             if (existing == null || !existing.getTenantId().equals(tenantId)) {
                 throw new ServiceException("公告不存在或不属于当前租户", 403);
             }
@@ -132,15 +132,15 @@ public class AssistantAnnouncementController extends BaseController {
     }
 
     /** 管理端：撤回公告（status=0 保留历史；用户侧横幅立即消失） */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @Log(title = "AI助手-公告撤回", businessType = BusinessType.UPDATE)
     @PostMapping("/admin/revoke")
     public R<Void> revoke(@RequestParam Long id) {
-        DcsAssistantAnnouncement existing = announcementMapper.selectById(id);
+        AssistantAnnouncement existing = announcementMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(LoginHelper.getTenantId())) {
             throw new ServiceException("公告不存在或不属于当前租户", 403);
         }
-        DcsAssistantAnnouncement patch = new DcsAssistantAnnouncement();
+        AssistantAnnouncement patch = new AssistantAnnouncement();
         patch.setId(id);
         patch.setStatus("0");
         patch.setUpdateTime(new Date());

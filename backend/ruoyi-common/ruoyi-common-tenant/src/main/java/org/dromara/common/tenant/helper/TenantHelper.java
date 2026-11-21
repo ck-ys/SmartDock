@@ -47,7 +47,7 @@ public class TenantHelper {
     //   - MQ/定时线程: setDynamic(tenantId, true) 写 Redis 全局租户(线程无登录态)
     // ⚠️ DCS 踩过的坑:
     //   - MQ 消费线程/@Async 线程无 ThreadLocal 登录态, getTenantId() 返回 null
-    //     解决: 生产者发消息时带 tenantId, 消费者 setDynamic 恢复(见 DcsStreamMqConsumer)
+    //     解决: 生产者发消息时带 tenantId, 消费者 setDynamic 恢复(同款做法见任一 MQ 消费者（批9 前示例 DcsStreamMqConsumer）)
     //   - ScheduleScanner 扫描全租户: 用 ignore 包裹单租户处理逻辑, 避免租户过滤
     //   - ignore() 是可重入的(Stack), 嵌套调用安全; 但 Supplier 抛异常时 finally 会恢复
     // 安全边界: ignore 模式会查全租户数据, 仅限管理后台/定时任务, 禁止在用户请求路径用

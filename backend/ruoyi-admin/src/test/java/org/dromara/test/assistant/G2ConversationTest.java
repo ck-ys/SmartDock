@@ -1,8 +1,8 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.domain.model.DcsAssistantMessage;
-import com.smartdock.assistant.domain.model.DcsAssistantRun;
+import com.smartdock.assistant.domain.model.AssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantMessage;
+import com.smartdock.assistant.domain.model.AssistantRun;
 import com.smartdock.assistant.query.ConversationQueryService;
 import com.smartdock.assistant.service.MessageWriteService;
 import com.smartdock.assistant.service.RunLedgerService;
@@ -91,7 +91,7 @@ class G2ConversationTest {
     void runRegistryBindsOwnership() {
         String runId = RUN_KEY + "-r1";
         runLedgerService.registerRun("987311", U1, RUN_KEY + "-t2", runId);
-        DcsAssistantRun bound = runLedgerService.runByRunId(runId);
+        AssistantRun bound = runLedgerService.runByRunId(runId);
         assertEquals(U1, bound.getUserId(), "runId 首现绑定归属");
         // 重放同 runId 异主 → 403（S-04① 防重放换人）
         ServiceException ex = assertThrows(ServiceException.class,
@@ -109,7 +109,7 @@ class G2ConversationTest {
         messageWriteService.appendUserMessage("987311", conv, U1, "请联系13800138000");
         messageWriteService.appendAssistantMessage("987311", conv, U1,
             "好的，已记录你的号码13800138000与邮箱 wang@x.com", null, "stop");
-        List<DcsAssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
+        List<AssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
         assertEquals(2, msgs.size(), "一问一答两行");
         assertEquals("user", msgs.get(0).getRole());
         assertTrue(msgs.get(0).getContent().contains("13800138000"), "user 侧=X-08 明文例外通道");
@@ -151,8 +151,8 @@ class G2ConversationTest {
             "同 runId 同主重放必须拒绝");
         assertEquals(409, ex.getCode());
         assertTrue(ex.getMessage().contains("重复请求"), "话术指导用户刷新或重发: " + ex.getMessage());
-        DcsAssistantConversation conv = conversationQueryService.conversationByThread("987311", thread);
-        List<DcsAssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv.getId(), 10, 0);
+        AssistantConversation conv = conversationQueryService.conversationByThread("987311", thread);
+        List<AssistantMessage> msgs = conversationQueryService.listMessages("987311", U1, conv.getId(), 10, 0);
         assertEquals(1, msgs.size(), "user 消息仍只一行(拒绝不含双落): " + msgs.size());
     }
 
@@ -161,18 +161,18 @@ class G2ConversationTest {
         Long conv = runLedgerService.ensureConversation("987311", U1, RUN_KEY + "-rt", "清理");
         messageWriteService.appendUserMessage("987311", conv, U1, "新消息(90 天内保留)");
         // 手工注入一条过期消息（91 天前）与一条过期会话
-        exec("INSERT INTO dcs_assistant_message (id, tenant_id, conversation_id, user_id, role, content, create_time)"
+        exec("INSERT INTO assistant_message (id, tenant_id, conversation_id, user_id, role, content, create_time)"
             + " VALUES (" + (System.currentTimeMillis() % 100000) + ", '987311', " + conv + ", " + U1
             + ", 'user', 'old', CURRENT_TIMESTAMP - INTERVAL '91 days')");
-        exec("INSERT INTO dcs_assistant_conversation (id, tenant_id, user_id, thread_id, title, create_time)"
+        exec("INSERT INTO assistant_conversation (id, tenant_id, user_id, thread_id, title, create_time)"
             + " VALUES (" + (System.currentTimeMillis() % 100000 + 1) + ", '987311', " + U1 + ", '"
             + RUN_KEY + "-dead', '旧会话', CURRENT_TIMESTAMP - INTERVAL '181 days')");
         purgeService.retentionSweep(100);
-        Long oldMsg = query("SELECT COUNT(*) FROM dcs_assistant_message WHERE content='old'");
+        Long oldMsg = query("SELECT COUNT(*) FROM assistant_message WHERE content='old'");
         assertEquals(0L, oldMsg, "91 天消息已删");
-        Long oldConv = query("SELECT COUNT(*) FROM dcs_assistant_conversation WHERE thread_id='" + RUN_KEY + "-dead'");
+        Long oldConv = query("SELECT COUNT(*) FROM assistant_conversation WHERE thread_id='" + RUN_KEY + "-dead'");
         assertEquals(0L, oldConv, "181 天会话已删");
-        List<DcsAssistantMessage> fresh = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
+        List<AssistantMessage> fresh = conversationQueryService.listMessages("987311", U1, conv, 10, 0);
         assertTrue(fresh.stream().anyMatch(m -> "新消息(90 天内保留)".equals(m.getContent())), "90 天内消息保留");
         // 幂等：再跑一遍无异常无残留
         purgeService.retentionSweep(100);

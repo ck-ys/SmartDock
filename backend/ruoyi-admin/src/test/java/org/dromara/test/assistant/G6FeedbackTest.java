@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
+import com.smartdock.assistant.domain.model.AssistantFeedback;
 import com.smartdock.assistant.query.ConversationQueryService;
 import com.smartdock.assistant.service.MessageWriteService;
 import com.smartdock.assistant.service.RunLedgerService;
@@ -49,7 +49,7 @@ class G6FeedbackTest {
         feedbackService.submit("987311", U1, messageId, "UP", null);
         feedbackService.submit("987311", U1, null, "DOWN", "第二条整会话差评");
 
-        List<DcsAssistantFeedback> rows = feedbackService.listForTenant("987311", 50, 0);
+        List<AssistantFeedback> rows = feedbackService.listForTenant("987311", 50, 0);
         assertTrue(rows.stream().anyMatch(r -> "UP".equals(r.getRating()) && messageId.equals(r.getMessageId())),
             "点赞落库并关联消息");
         assertTrue(rows.stream().anyMatch(r -> "DOWN".equals(r.getRating()) && r.getMessageId() == null),

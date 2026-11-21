@@ -2,8 +2,8 @@ package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.engine.core.ToolRegistry;
+import com.smartdock.assistant.service.AssistantConfigService;
 import com.smartdock.assistant.service.AssistantSkillVisibilityService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.web.core.BaseController;
@@ -22,13 +22,13 @@ import java.util.Set;
 
 /**
  * 批1 Q1=B（2026-10-21 开关矩阵）：租户级工具档位管理接口。
- * 权限复用 dcs:assistant:config（助手管理既有编辑权，零菜单 SQL）。
+ * 权限复用 smartdock:assistant:config（助手管理既有编辑权，零菜单 SQL）。
  * GET=合并视图（前端零拼装）；POST=整列覆盖（值域/工具名校验，只升不降由
  * effectiveMinRole 的 max 语义结构性保证）。生效时机=下一轮建会话。
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/dcs/assistant/toolgate")
+@RequestMapping("/assistant/toolgate")
 public class AssistantToolGateController extends BaseController {
 
     private final AssistantConfigService configService;
@@ -50,7 +50,7 @@ public class AssistantToolGateController extends BaseController {
      */
     private static final Map<String, String> SKILL_RISK = Map.of("data-reading", "low");
 
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping
     public R<List<ToolGateRow>> view() {
         Map<String, String> gate = configService.effective(org.dromara.common.satoken.utils.LoginHelper.getTenantId()).toolGate();
@@ -67,54 +67,54 @@ public class AssistantToolGateController extends BaseController {
                 spec.minRoleLevel(),
                 gate.get(firstName),
                 effective,
-                spec.minRoleLevel() >= com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_ADMIN,
+                spec.minRoleLevel() >= com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_ADMIN,
                 spec.behavior() == io.agentscope.core.permission.PermissionBehavior.ASK,
                 meta != null ? meta.riskLevel() : "mid"));
         }
         // G4-#4：MCP 外部服务并入闸矩阵视图（每服务一行；effective：off=-1/其余取覆盖或 member）。
         // 平台级表（tenant 恒 000000）——ignore 跨租户读，非 000000 租户管理员同样看得到全名单
-        for (com.smartdock.assistant.domain.model.DcsMcpServer s :
+        for (com.smartdock.assistant.domain.model.McpServer s :
             org.dromara.common.tenant.helper.TenantHelper.ignore(mcpServerConfigService::listAll)) {
             String key = "mcp:" + s.getServerName();
             String override = gate.get(key);
             int effective = "off".equals(override) ? -1
-                : "admin".equals(override) ? com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_ADMIN
-                : com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_MEMBER;
+                : "admin".equals(override) ? com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_ADMIN
+                : com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_MEMBER;
             rows.add(new ToolGateRow(
                 List.of(key),
                 s.getDisplayName() != null && !s.getDisplayName().isBlank() ? s.getDisplayName() : s.getServerName(),
                 "外部工具",
                 "外部服务（" + s.getTransportType() + "）；off=本租户不挂载，admin=仅管理员可用",
-                com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_MEMBER,
+                com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_MEMBER,
                 override, effective, false, "0".equals(s.getReadOnly()), "high"));
         }
         // B 批题4（2026-10-27）：技能并入同一矩阵（每技能一行，键 skill:<name>）——
         // 行数据经 AssistantSkillSource 官方仓视图；effective 与工具行共用单键档位核心
-        for (com.smartdock.assistant.legacy.core.SkillAssets.LoadedSkill sk :
-            com.smartdock.assistant.legacy.core.SkillAssets.skills()) {
+        for (com.smartdock.assistant.engine.core.SkillAssets.LoadedSkill sk :
+            com.smartdock.assistant.engine.core.SkillAssets.skills()) {
             // P2-8 回修：行键同源 gateKey()
-            String key = com.smartdock.assistant.legacy.core.AssistantSkillGateMiddleware.gateKey(sk.id());
+            String key = com.smartdock.assistant.engine.core.AssistantSkillGateMiddleware.gateKey(sk.id());
             rows.add(new ToolGateRow(
                 List.of(key), "技能：" + sk.name(), "技能",
-                sk.minRole() <= com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_MEMBER ? ""
+                sk.minRole() <= com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_MEMBER ? ""
                     : "内置档：发布人及以上可用",
                 sk.minRole(),
                 gate.get(key),
                 skillVisibility.effectiveMinRole(sk.id(), sk.minRole(), gate),
-                sk.minRole() >= com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_ADMIN,
+                sk.minRole() >= com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_ADMIN,
                 false,
                 SKILL_RISK.getOrDefault(sk.id(), "mid")));
         }
         return R.ok(rows);
     }
 
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @Log(title = "AI助手-工具开关", businessType = BusinessType.UPDATE)
     @PostMapping
     public R<Void> save(@RequestBody Map<String, String> gate) {
         Set<String> known = ToolRegistry.allToolNames();
-        Set<String> skillIds = com.smartdock.assistant.legacy.core.SkillAssets.skills().stream()
-            .map(com.smartdock.assistant.legacy.core.SkillAssets.LoadedSkill::id)
+        Set<String> skillIds = com.smartdock.assistant.engine.core.SkillAssets.skills().stream()
+            .map(com.smartdock.assistant.engine.core.SkillAssets.LoadedSkill::id)
             .collect(java.util.stream.Collectors.toSet());
         Set<String> mcpServers;
         try {
@@ -140,7 +140,7 @@ public class AssistantToolGateController extends BaseController {
         String tenant = org.dromara.common.satoken.utils.LoginHelper.getTenantId();
         configService.updateToolGate(tenant, preserveHiddenSkillOverrides(
             gate, configService.effective(tenant).toolGate(),
-            com.smartdock.assistant.legacy.core.DatabaseSkillRepository.disabledIds(tenant)));
+            com.smartdock.assistant.engine.core.DatabaseSkillRepository.disabledIds(tenant)));
         return R.ok();
     }
 

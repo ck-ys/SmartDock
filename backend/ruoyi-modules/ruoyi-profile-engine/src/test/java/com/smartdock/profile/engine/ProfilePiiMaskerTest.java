@@ -26,7 +26,7 @@ class ProfilePiiMaskerTest {
 
     @Test
     void ipMasksLastTwoSegments() {
-        assertThat(ProfilePiiMasker.mask("IP", "192.168.3.131")).isEqualTo("192.168.*.*");
+        assertThat(ProfilePiiMasker.mask("IP", "192.0.2.131")).isEqualTo("192.0.*.*");
         assertThat(ProfilePiiMasker.mask("IP", "not-ip")).isEqualTo("***");
     }
 

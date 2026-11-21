@@ -3,9 +3,9 @@ package com.smartdock.assistant.controller;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.domain.model.DcsMcpCallLog;
-import com.smartdock.assistant.domain.model.DcsMcpServer;
-import com.smartdock.assistant.mapper.DcsMcpCallLogMapper;
+import com.smartdock.assistant.domain.model.McpCallLog;
+import com.smartdock.assistant.domain.model.McpServer;
+import com.smartdock.assistant.mapper.McpCallLogMapper;
 import com.smartdock.assistant.service.McpServerConfigService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
@@ -24,17 +24,17 @@ import java.util.List;
 
 /**
  * 批2 Q2=A（2026-10-21）：管理台「外部工具」页签接口（MCP 试点）。
- * 权限复用 dcs:assistant:config（与工具开关同页同权限域，零菜单 SQL）；
+ * 权限复用 smartdock:assistant:config（与工具开关同页同权限域，零菜单 SQL）；
  * 铁律#21：全部 GET/POST。
  */
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/dcs/assistant/mcp")
+@RequestMapping("/assistant/mcp")
 public class AssistantMcpController extends BaseController {
 
     private final McpServerConfigService mcpServerConfigService;
-    private final DcsMcpCallLogMapper callLogMapper;
-    private final com.smartdock.assistant.legacy.service.AssistantConfigService assistantConfigService;
+    private final McpCallLogMapper callLogMapper;
+    private final com.smartdock.assistant.service.AssistantConfigService assistantConfigService;
 
     /** 服务行 VO：headers 只回键名不回值（免密钥试点仍防误回显） */
     public record McpServerRow(Long id, String serverName, String displayName, String transportType,
@@ -56,7 +56,7 @@ public class AssistantMcpController extends BaseController {
      * 状态口径与工具清单（ToolViewerService，2026-11-17 批 0 起从 AssistantToolViewerController 下沉）一致：租户闸 off → 已停用；
      * 闸 admin → 管理员限定；tool_gate 污染 → fail-closed。
      */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @GetMapping("/member-list")
     public R<java.util.List<McpMemberRow>> memberList() {
         String dynamic = org.dromara.common.tenant.helper.TenantHelper.getTenantId();
@@ -65,12 +65,12 @@ public class AssistantMcpController extends BaseController {
         var cfg = assistantConfigService.effective(tenantId);
         java.util.Map<String, String> gate = cfg.toolGate();
         boolean poisoned = gate != null
-            && gate.containsKey(com.smartdock.assistant.legacy.service.AssistantConfigService.POISONED_GATE_SENTINEL);
+            && gate.containsKey(com.smartdock.assistant.service.AssistantConfigService.POISONED_GATE_SENTINEL);
         // 工具名按本租户真实调用去重（排除每次建会话都写的挂载行）——没有账本的服务 tools 为空
         java.util.Map<String, java.util.List<String>> toolsByServer = new java.util.HashMap<>();
         try {
             java.util.List<java.util.Map<String, Object>> maps = callLogMapper.selectMaps(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<DcsMcpCallLog>()
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<McpCallLog>()
                     .select("server_name", "tool_name")
                     .eq("tenant_id", tenantId)
                     // 三审 P2：javadoc 写的「最近 90 天」此前没落进 SQL——账本 append-only，
@@ -97,14 +97,14 @@ public class AssistantMcpController extends BaseController {
                 .warn("[MCP] 成员工具名读取失败，本次只回服务清单", e);
         }
         java.util.List<McpMemberRow> rows = new java.util.ArrayList<>();
-        for (DcsMcpServer s : org.dromara.common.tenant.helper.TenantHelper.ignore(mcpServerConfigService::listAll)) {
+        for (McpServer s : org.dromara.common.tenant.helper.TenantHelper.ignore(mcpServerConfigService::listAll)) {
             if (!"1".equals(s.getEnabled())) {
                 continue;
             }
             String override = gate == null ? null : gate.get("mcp:" + s.getServerName());
             int effective = "off".equals(override) ? -1
-                : "admin".equals(override) ? com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_ADMIN
-                : com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_MEMBER;
+                : "admin".equals(override) ? com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_ADMIN
+                : com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_MEMBER;
             if (poisoned) {
                 effective = -1;
             }
@@ -113,7 +113,7 @@ public class AssistantMcpController extends BaseController {
             if (effective < 0) {
                 status = "off";
                 statusText = "已停用";
-            } else if (effective >= com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_ADMIN) {
+            } else if (effective >= com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_ADMIN) {
                 status = "admin";
                 statusText = "管理员限定";
             } else {
@@ -121,7 +121,7 @@ public class AssistantMcpController extends BaseController {
                 statusText = "可用";
             }
             String who = effective < 0 ? "—"
-                : effective >= com.smartdock.assistant.legacy.tools.ToolIdentity.LEVEL_ADMIN ? "管理员" : "成员";
+                : effective >= com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_ADMIN ? "管理员" : "成员";
             rows.add(new McpMemberRow(s.getServerName(),
                 s.getDisplayName() == null || s.getDisplayName().isBlank() ? s.getServerName() : s.getDisplayName(),
                 s.getTransportType(), s.getReadOnly(), status, statusText, who,
@@ -130,7 +130,7 @@ public class AssistantMcpController extends BaseController {
         return R.ok(rows);
     }
 
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping("/list")
     public R<List<McpServerRow>> list() {
         // 三审 P2：平台级配置的取数口径与 member-list 统一——save() 恒写 000000 租户，
@@ -152,16 +152,16 @@ public class AssistantMcpController extends BaseController {
         }
     }
 
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @Log(title = "AI助手-外部工具", businessType = BusinessType.INSERT, isSaveRequestData = false)
     @PostMapping("/save")
-    public R<Void> save(@RequestBody DcsMcpServer row) {
+    public R<Void> save(@RequestBody McpServer row) {
         requireSuperAdmin();
         mcpServerConfigService.save(row);
         return R.ok();
     }
 
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @Log(title = "AI助手-外部工具", businessType = BusinessType.UPDATE)
     @PostMapping("/toggle")
     public R<Void> toggle(@RequestParam Long id, @RequestParam String enabled) {
@@ -170,7 +170,7 @@ public class AssistantMcpController extends BaseController {
         return R.ok();
     }
 
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @Log(title = "AI助手-外部工具", businessType = BusinessType.DELETE)
     @PostMapping("/delete")
     public R<Void> delete(@RequestParam Long id) {
@@ -179,7 +179,7 @@ public class AssistantMcpController extends BaseController {
         return R.ok();
     }
 
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping("/calllog")
     public R<java.util.Map<String, Object>> callLog(@RequestParam(required = false) String serverName,
                                                     @RequestParam(required = false) Boolean realOnly,
@@ -188,22 +188,22 @@ public class AssistantMcpController extends BaseController {
         // PageQuery 缺省 MAX_VALUE 全表扫（dsflash P2）
         boolean superAdmin = LoginHelper.isSuperAdmin();
         pageQuery.setPageSize(Math.min(pageQuery.getPageSize() == null || pageQuery.getPageSize() > 200 ? 20 : pageQuery.getPageSize(), 200));
-        LambdaQueryWrapper<DcsMcpCallLog> q = new LambdaQueryWrapper<DcsMcpCallLog>()
-            .eq(!superAdmin, DcsMcpCallLog::getTenantId, LoginHelper.getTenantId())
-            .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName)
+        LambdaQueryWrapper<McpCallLog> q = new LambdaQueryWrapper<McpCallLog>()
+            .eq(!superAdmin, McpCallLog::getTenantId, LoginHelper.getTenantId())
+            .eq(serverName != null && !serverName.isBlank(), McpCallLog::getServerName, serverName)
             // 管理页默认只看真实调用与失败：挂载成功/失败是每次建会话的例行记录，
             // 混在调用里会把真正要看的一屏淹掉。realOnly=true 时排除两条 MOUNT_*。
-            .notIn(Boolean.TRUE.equals(realOnly), DcsMcpCallLog::getAction, java.util.List.of("MOUNT_OK", "MOUNT_ERROR"))
-            .orderByDesc(DcsMcpCallLog::getCreateTime);
+            .notIn(Boolean.TRUE.equals(realOnly), McpCallLog::getAction, java.util.List.of("MOUNT_OK", "MOUNT_ERROR"))
+            .orderByDesc(McpCallLog::getCreateTime);
         var page = callLogMapper.selectPage(pageQuery.build(), q);
         // 摘要三格：全部 / 挂载记录 / 真实调用——同 where 口径计数，前端不必自己猜占比
-        long all = callLogMapper.selectCount(new LambdaQueryWrapper<DcsMcpCallLog>()
-            .eq(!superAdmin, DcsMcpCallLog::getTenantId, LoginHelper.getTenantId())
-            .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName));
-        long mounts = callLogMapper.selectCount(new LambdaQueryWrapper<DcsMcpCallLog>()
-            .eq(!superAdmin, DcsMcpCallLog::getTenantId, LoginHelper.getTenantId())
-            .eq(serverName != null && !serverName.isBlank(), DcsMcpCallLog::getServerName, serverName)
-            .in(DcsMcpCallLog::getAction, java.util.List.of("MOUNT_OK", "MOUNT_ERROR")));
+        long all = callLogMapper.selectCount(new LambdaQueryWrapper<McpCallLog>()
+            .eq(!superAdmin, McpCallLog::getTenantId, LoginHelper.getTenantId())
+            .eq(serverName != null && !serverName.isBlank(), McpCallLog::getServerName, serverName));
+        long mounts = callLogMapper.selectCount(new LambdaQueryWrapper<McpCallLog>()
+            .eq(!superAdmin, McpCallLog::getTenantId, LoginHelper.getTenantId())
+            .eq(serverName != null && !serverName.isBlank(), McpCallLog::getServerName, serverName)
+            .in(McpCallLog::getAction, java.util.List.of("MOUNT_OK", "MOUNT_ERROR")));
         // R.ok 统一包装（同 /list 口径）——TableDataInfo 顶层 rows 结构与前端 request 层解析不符（老坑）
         return R.ok(java.util.Map.of(
             "rows", page.getRecords(),

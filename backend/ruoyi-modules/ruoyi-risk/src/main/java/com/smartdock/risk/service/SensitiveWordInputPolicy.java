@@ -2,8 +2,8 @@ package com.smartdock.risk.service;
 
 import cn.hutool.core.util.StrUtil;
 import org.dromara.common.core.exception.ServiceException;
-import com.smartdock.risk.domain.DcsSensitiveWord;
-import com.smartdock.risk.domain.bo.DcsSensitiveWordBo;
+import com.smartdock.risk.domain.SensitiveWord;
+import com.smartdock.risk.domain.bo.SensitiveWordBo;
 import com.smartdock.risk.support.SensitiveWordMatcher;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +17,7 @@ import java.util.Locale;
 @Component
 public class SensitiveWordInputPolicy {
 
-    public void prepareCreate(DcsSensitiveWordBo bo, String tenantId) {
+    public void prepareCreate(SensitiveWordBo bo, String tenantId) {
         bo.setWordId(null);
         bo.setTenantId(tenantId);
         bo.setBuiltin("0");
@@ -25,20 +25,20 @@ public class SensitiveWordInputPolicy {
         normalizeAndValidate(bo);
     }
 
-    public void prepareUpdate(DcsSensitiveWordBo bo, String tenantId, DcsSensitiveWord existing) {
+    public void prepareUpdate(SensitiveWordBo bo, String tenantId, SensitiveWord existing) {
         bo.setTenantId(tenantId);
         bo.setBuiltin(existing.getBuiltin());
         clearAuditFields(bo);
         normalizeAndValidate(bo);
     }
 
-    public void assertDeletable(Collection<DcsSensitiveWord> rows) {
+    public void assertDeletable(Collection<SensitiveWord> rows) {
         if (rows.stream().anyMatch(row -> "1".equals(row.getBuiltin()))) {
             throw new ServiceException("内置敏感词不允许删除");
         }
     }
 
-    private void normalizeAndValidate(DcsSensitiveWordBo bo) {
+    private void normalizeAndValidate(SensitiveWordBo bo) {
         bo.setWordText(StrUtil.trim(bo.getWordText()));
         bo.setCategory(StrUtil.blankToDefault(StrUtil.trim(bo.getCategory()), "GENERAL"));
         bo.setAction(StrUtil.blankToDefault(StrUtil.trim(bo.getAction()), SensitiveWordMatcher.ACTION_MASK).toUpperCase(Locale.ROOT));
@@ -84,7 +84,7 @@ public class SensitiveWordInputPolicy {
         return String.join(",", scenes);
     }
 
-    private void clearAuditFields(DcsSensitiveWordBo bo) {
+    private void clearAuditFields(SensitiveWordBo bo) {
         bo.setCreateDept(null);
         bo.setCreateBy(null);
         bo.setCreateTime(null);

@@ -5,8 +5,8 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.risk.domain.DcsCaptchaLog;
-import com.smartdock.risk.mapper.DcsCaptchaLogMapper;
+import com.smartdock.risk.domain.CaptchaLog;
+import com.smartdock.risk.mapper.CaptchaLogMapper;
 import com.smartdock.risk.service.CaptchaPassService.PassBinding;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
@@ -45,13 +45,13 @@ import java.util.HexFormat;
 @RequiredArgsConstructor
 public class CaptchaService {
 
-    private static final String CACHE_PREFIX = "dcs:captcha:";
+    private static final String CACHE_PREFIX = "smartdock:captcha:";
     private static final Duration EXPIRE = Duration.ofSeconds(60);
     private static final Duration OTP_EXPIRE = Duration.ofSeconds(300);
     private static final int MAX_FAILED_ATTEMPTS = 5;
 
     /** 验证码日志 Mapper(记录生成/校验) */
-    private final DcsCaptchaLogMapper captchaLogMapper;
+    private final CaptchaLogMapper captchaLogMapper;
     /** 验证码通行证服务(签发一次性 pass) */
     private final CaptchaPassService captchaPassService;
     /** Redisson 客户端(缓存挑战/答案哈希) */
@@ -304,7 +304,7 @@ public class CaptchaService {
 
     private void writeLog(String token, int level, PassBinding binding, String failReason) {
         try {
-            DcsCaptchaLog entry = new DcsCaptchaLog();
+            CaptchaLog entry = new CaptchaLog();
             entry.setTenantId(binding.tenantId());
             entry.setToken(token);
             entry.setLevel((short) level);
@@ -324,12 +324,12 @@ public class CaptchaService {
     private void updateLog(String token, boolean success, String failReason) {
         try {
             // 简化: 直接 selectOne + updateById
-            DcsCaptchaLog existing = captchaLogMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsCaptchaLog>()
-                .eq(DcsCaptchaLog::getToken, token)
-                .orderByDesc(DcsCaptchaLog::getCreatedTime)
+            CaptchaLog existing = captchaLogMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CaptchaLog>()
+                .eq(CaptchaLog::getToken, token)
+                .orderByDesc(CaptchaLog::getCreatedTime)
                 .last("LIMIT 1"));
             if (existing != null) {
-                DcsCaptchaLog patch = new DcsCaptchaLog();
+                CaptchaLog patch = new CaptchaLog();
                 patch.setLogId(existing.getLogId());
                 patch.setVerified(success ? "1" : "0");
                 patch.setFailReason(failReason);

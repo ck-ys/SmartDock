@@ -1,8 +1,8 @@
 package com.smartdock.service.support;
 
-import com.smartdock.domain.vo.DcsAiProviderTemplateVo;
-import com.smartdock.enums.DcsAiProvider;
-import com.smartdock.enums.DcsAiProviderTemplates;
+import com.smartdock.domain.vo.AiProviderTemplateVo;
+import com.smartdock.enums.AiProvider;
+import com.smartdock.enums.AiProviderTemplates;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -20,35 +20,35 @@ class N1BaseUrlVariantUnitTest {
     @Test
     @Tag("local")
     void allowsInternationalTemplateHosts() {
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.ZHIPU, "https://api.z.ai/api/paas/v4")).isTrue();
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.KIMI, "https://api.moonshot.cn/v1")).isTrue();
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.QWEN, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")).isTrue();
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.MINIMAX, "https://api.minimax.io/v1")).isTrue();
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.SILICONFLOW, "https://api.siliconflow.com/v1")).isTrue();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.ZHIPU, "https://api.z.ai/api/paas/v4")).isTrue();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.KIMI, "https://api.moonshot.cn/v1")).isTrue();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.QWEN, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")).isTrue();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.MINIMAX, "https://api.minimax.io/v1")).isTrue();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.SILICONFLOW, "https://api.siliconflow.com/v1")).isTrue();
     }
 
     @Test
     @Tag("local")
     void everyTemplateBaseUrlPassesItsProviderGuard() {
-        for (DcsAiProviderTemplateVo tpl : DcsAiProviderTemplates.list()) {
+        for (AiProviderTemplateVo tpl : AiProviderTemplates.list()) {
             if (tpl.getProvider() == null || tpl.getBaseUrl() == null || tpl.getBaseUrl().isBlank()) {
                 continue;
             }
-            DcsAiProvider provider;
+            AiProvider provider;
             try {
-                provider = DcsAiProvider.valueOf(tpl.getProvider());
+                provider = AiProvider.valueOf(tpl.getProvider());
             } catch (IllegalArgumentException e) {
                 continue;
             }
-            if (provider == DcsAiProvider.CUSTOM) {
+            if (provider == AiProvider.CUSTOM) {
                 continue;
             }
-            assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(provider, tpl.getBaseUrl()))
+            assertThat(AiProviderProbeClient.isBaseUrlAllowed(provider, tpl.getBaseUrl()))
                 .as("模板 %s 的地址 %s 应通过 %s 的白名单", tpl.getTemplateId(), tpl.getBaseUrl(), provider)
                 .isTrue();
         }
@@ -58,12 +58,12 @@ class N1BaseUrlVariantUnitTest {
     @Tag("local")
     void stillRejectsForeignAndInternalHosts() {
         // 变体放行只限官方域名，攻击者域名/内网 IP 照拒
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.ZHIPU, "https://attacker.example.com/api/paas/v4")).isFalse();
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.KIMI, "http://192.168.50.10:8080/v1")).isFalse();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.ZHIPU, "https://attacker.example.com/api/paas/v4")).isFalse();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.KIMI, "http://192.0.2.10:8080/v1")).isFalse();
         // 跨厂商模板域名也不能借道（Kimi 不能指向智谱域名）
-        assertThat(DcsAiProviderProbeClient.isBaseUrlAllowed(
-            DcsAiProvider.KIMI, "https://open.bigmodel.cn/api/paas/v4")).isFalse();
+        assertThat(AiProviderProbeClient.isBaseUrlAllowed(
+            AiProvider.KIMI, "https://open.bigmodel.cn/api/paas/v4")).isFalse();
     }
 }

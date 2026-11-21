@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.assistant.legacy.core.AssistantModelDegradeSignal;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.assistant.engine.core.AssistantModelDegradeSignal;
 import com.smartdock.assistant.infrastructure.AssistantModelFactory;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -37,11 +37,11 @@ class AssistantModelDegradeSignalTest {
     void modelLabelNeverNull() {
         assertEquals("默认模型", AssistantModelFactory.modelLabel(null));
 
-        DcsAiConfig blank = new DcsAiConfig();
+        AiConfig blank = new AiConfig();
         blank.setConfigId(42L);
         assertEquals("配置 #42", AssistantModelFactory.modelLabel(blank), "模型名空走配置号");
 
-        DcsAiConfig named = new DcsAiConfig();
+        AiConfig named = new AiConfig();
         named.setConfigId(7L);
         named.setModelName("deepseek-v4");
         assertEquals("deepseek-v4", AssistantModelFactory.modelLabel(named));

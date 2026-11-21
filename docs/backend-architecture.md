@@ -261,7 +261,7 @@ sequenceDiagram
 
 ### 3.2 Controller 的"门卫三件事"
 
-以 `DcsTaskController` 为例：
+以 `TaskController` 为例：
 
 ```java
 @SaCheckPermission("dcs:task:publish")
@@ -436,13 +436,13 @@ flowchart TB
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `DcsTaskController` | `/dcs/task` | 8 | 任务分页、我的任务、详情、创建/更新/发布/关闭 |
-| `DcsSubmissionController` | `/dcs/submission` | 2 | 提交、我的提交 |
-| `DcsAuditController` | `/dcs/audit` | 3 | 待审列表、审核决定、审计轨迹 |
-| `DcsFeedbackController` | `/dcs/feedback` | 7 | 产品反馈 |
-| `DcsNoticeController` | `/dcs/notice` | 2 | 我的通知、标记已读 |
-| `DcsChangelogController` | `/dcs/changelog` | 5 | 更新日志（全局表） |
-| `DcsStatsController` | `/dcs/stats` | 1 | 发布人/成员双视角概览 |
+| `TaskController` | `/dcs/task` | 8 | 任务分页、我的任务、详情、创建/更新/发布/关闭 |
+| `SubmissionController` | `/dcs/submission` | 2 | 提交、我的提交 |
+| `AuditController` | `/dcs/audit` | 3 | 待审列表、审核决定、审计轨迹 |
+| `FeedbackController` | `/dcs/feedback` | 7 | 产品反馈 |
+| `NoticeController` | `/dcs/notice` | 2 | 我的通知、标记已读 |
+| `ChangelogController` | `/dcs/changelog` | 5 | 更新日志（全局表） |
+| `StatsController` | `/dcs/stats` | 1 | 发布人/成员双视角概览 |
 
 #### 4.3.2 状态机与不变量
 
@@ -473,11 +473,11 @@ flowchart LR
 sequenceDiagram
   autonumber
   participant P as 发布人
-  participant T as DcsTaskService
-  participant S as DcsSubmissionService
-  participant A as DcsAuditService
+  participant T as TaskService
+  participant S as SubmissionService
+  participant A as AuditService
   participant E as ProfileEventPublisher
-  participant N as DcsNoticeService
+  participant N as NoticeService
   P->>T: publish(taskId)
   T->>T: 校验字段/成员/审核人 + CAS 状态迁移
   T->>E: task.published（publishQuiet）
@@ -496,11 +496,11 @@ sequenceDiagram
 
 | 类 | 核心方法 | 具体做什么 |
 |---|---|---|
-| `DcsTaskService` | `publish` / `close` | 校验 → CAS 状态迁移 → 翻译画像事件 → 通知成员 |
-| `DcsSubmissionService` | `submit` | 任务/成员/字段校验 → `insertJsonb` 新版本 → 发事件 → 通知审核人 |
-| `DcsAuditService` | `decide` | 归属校验 → `auditStatus` CAS → 写 `dcs_audit` → 发事件 → 通知提交人 |
-| `DcsNoticeService` | `notify` | 按用户投递，`dedup_key` 幂等 |
-| `DcsToolProvider` | `tools` / `execute` | 把"查任务/查我的待办/查提交/建任务"插给 AI 助手 |
+| `TaskService` | `publish` / `close` | 校验 → CAS 状态迁移 → 翻译画像事件 → 通知成员 |
+| `SubmissionService` | `submit` | 任务/成员/字段校验 → `insertJsonb` 新版本 → 发事件 → 通知审核人 |
+| `AuditService` | `decide` | 归属校验 → `auditStatus` CAS → 写 `dcs_audit` → 发事件 → 通知提交人 |
+| `NoticeService` | `notify` | 按用户投递，`dedup_key` 幂等 |
+| `ToolProvider` | `tools` / `execute` | 把"查任务/查我的待办/查提交/建任务"插给 AI 助手 |
 
 ### 4.4 风控（risk）
 
@@ -512,14 +512,14 @@ sequenceDiagram
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `DcsRiskDashboardController` | `/dcs/risk` | 3 | 看板、我的风险分、指定用户风险分 |
-| `DcsRiskEventController` | `/dcs/risk` | 2 | 事件列表/详情 |
-| `DcsRiskActionController` | `/dcs/risk` | 11 | 处置动作列表/解除/复核、画像高风险复核 |
-| `DcsRiskRuleController` | `/dcs/risk` | 5 | 规则增删改查/启停 |
-| `DcsRiskWhitelistController` | `/dcs/risk` | 4 | 白名单 |
-| `DcsRiskContentConfigController` | `/dcs/risk/content-config` | 2 | 内容机审开关 |
-| `DcsSensitiveWordController` | `/dcs/sensitive-word` | 8 | 敏感词库 |
-| `DcsCaptchaController` | `/dcs/captcha` | 4 | 验证码 need/generate/verify/verify-otp |
+| `RiskDashboardController` | `/dcs/risk` | 3 | 看板、我的风险分、指定用户风险分 |
+| `RiskEventController` | `/dcs/risk` | 2 | 事件列表/详情 |
+| `RiskActionController` | `/dcs/risk` | 11 | 处置动作列表/解除/复核、画像高风险复核 |
+| `RiskRuleController` | `/dcs/risk` | 5 | 规则增删改查/启停 |
+| `RiskWhitelistController` | `/dcs/risk` | 4 | 白名单 |
+| `RiskContentConfigController` | `/dcs/risk/content-config` | 2 | 内容机审开关 |
+| `SensitiveWordController` | `/dcs/sensitive-word` | 8 | 敏感词库 |
+| `RiskCaptchaController` | `/dcs/captcha` | 4 | 验证码 need/generate/verify/verify-otp |
 
 #### 4.4.2 主流程
 
@@ -546,7 +546,7 @@ flowchart LR
 | `RiskActionService` | `syncAssessment` | L3/L4 才处置；先过期旧 ACTIVE，再按 `userId:actionType` 唯一键幂等插入 |
 | `CaptchaService` | `generate` / `verify` | L1–L4 难度；Redis 存挑战；L4 加 OTP；成功后发一次性 pass |
 | `ContentModerationService` | `moderateDetail` | 填报文本机审；命中记 `TASK_CONTENT_RISK`；灰度开关决定是否拦截 |
-| `DcsFileReviewServiceImpl` | `reject` | 文件审核驳回后补记 `FILE_REJECTED` 风险事件 |
+| `FileReviewServiceImpl` | `reject` | 文件审核驳回后补记 `FILE_REJECTED` 风险事件 |
 
 **关键点**：
 
@@ -563,16 +563,16 @@ flowchart LR
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `DcsAiConfigController` | `/dcs/ai-config` | 29 | 模型/供应商/密钥/探活/默认槽 |
-| `DcsAiModelPriceController` | `/dcs/ai-model-price` | 7 | 模型价格 |
-| `DcsAiPriceController` | `/dcs/ai-price` | 2 | 生效价格 |
-| `DcsAiUsageController` | `/dcs/ai-usage` | 5 | 用量查询/汇总 |
-| `DcsAiCreditController` | `/dcs/ai-credit` | 12 | 积分套餐/订阅/加油包/流水 |
-| `DcsTenantWalletController` | `/dcs/tenant-wallet` | 8 | 钱包/充值/扣减/阈值 |
-| `DcsTenantWalletLedgerController` | `/dcs/tenant-wallet-ledger` | 1 | 钱包流水 |
-| `DcsWalletPaymentOrderController` | `/dcs/wallet-payment-order` | 3 | 充值订单 |
-| `DcsServiceChargeRuleController` | `/dcs/service-charge-rule` | 5 | 服务费规则 |
-| `DcsAiDocDomainController` | `/dcs/ai-doc-domain` | 5 | 文档域名白名单 |
+| `AiConfigController` | `/dcs/ai-config` | 29 | 模型/供应商/密钥/探活/默认槽 |
+| `AiModelPriceController` | `/dcs/ai-model-price` | 7 | 模型价格 |
+| `AiPriceController` | `/dcs/ai-price` | 2 | 生效价格 |
+| `AiUsageController` | `/dcs/ai-usage` | 5 | 用量查询/汇总 |
+| `AiCreditController` | `/dcs/ai-credit` | 12 | 积分套餐/订阅/加油包/流水 |
+| `TenantWalletController` | `/dcs/tenant-wallet` | 8 | 钱包/充值/扣减/阈值 |
+| `TenantWalletLedgerController` | `/dcs/tenant-wallet-ledger` | 1 | 钱包流水 |
+| `WalletPaymentOrderController` | `/dcs/wallet-payment-order` | 3 | 充值订单 |
+| `ServiceChargeRuleController` | `/dcs/service-charge-rule` | 5 | 服务费规则 |
+| `AiDocDomainController` | `/dcs/ai-doc-domain` | 5 | 文档域名白名单 |
 | `AiFaviconController` | `/dcs/ai/favicon` | 1 | Favicon 代理（匿名 + IP 限流） |
 
 #### 4.5.2 主流程：一次模型调用如何扣费
@@ -607,7 +607,7 @@ sequenceDiagram
 | `AiBillingService` | `recordTransactional` | 幂等回查 → 取生效价格 → 算价 → 同事务扣钱包 → 插 `dcs_ai_usage` |
 | 同上 | `recordTransactionalCredits` | 积分模式：同事务扣积分，钱包不动，快照标 `walletDeducted:false` |
 | `TenantWalletService` | `deductForAiUsageJoinTx` | 条件 UPDATE "足额才扣"，写流水；余额不足只留痕不阻断 |
-| `DcsAiCreditServiceImpl` | `preGate` / `deduct` | 订阅/周池/加油包夹逼扣减（两个上限口径取更紧的那个，两头都够才扣）；幂等流水 |
+| `AiCreditServiceImpl` | `preGate` / `deduct` | 订阅/周池/加油包夹逼扣减（两个上限口径取更紧的那个，两头都够才扣）；幂等流水 |
 | `AiBillingCalculator` | `calculate` | 纯计算：token/次数计费、服务费、币种、账单快照 |
 | `WalletReconcileJob` | `reconcile` | 每晚 02:30 对账（余额 vs 流水净额、流水链、空 biz_id、助手计费），只告警不动账 |
 
@@ -626,7 +626,7 @@ sequenceDiagram
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `DcsFileReviewController` | `/dcs/fileReview` | 9 | 审核列表/通过/驳回/配置/guard 统计与日志 |
+| `FileReviewController` | `/dcs/fileReview` | 9 | 审核列表/通过/驳回/配置/guard 统计与日志 |
 
 #### 4.6.2 主流程：上传 → 判定 → 审核
 
@@ -651,10 +651,10 @@ flowchart TB
 | 类 | 核心方法 | 具体做什么 |
 |---|---|---|
 | `OssUploadedEventListener` | `onUploaded` | 与上传同事务；按"guard → 反馈/助手豁免 → 开关 → 管理员 → 类目 → PENDING"顺序建单 |
-| `DcsFileReviewServiceImpl` | `approve` / `reject` | 逐条 CAS；通过后头像回写；驳回后发通知 + 风险事件 |
-| `DcsFileReviewGateImpl` | `isVisibleToCurrentUser` | 预览/下载/列表/删除的放行矩阵；删除级联闭单 |
-| `DcsFileGuardCheckerImpl` | `checkUpload` | 扩展名白名单 → 魔数 → 宏/PDF JS/SVG XSS 深扫 |
-| `DcsFileReviewConfigServiceImpl` | `save` | 租户级开关、类目、guard 模式、白名单扩展名 |
+| `FileReviewServiceImpl` | `approve` / `reject` | 逐条 CAS；通过后头像回写；驳回后发通知 + 风险事件 |
+| `FileReviewGateImpl` | `isVisibleToCurrentUser` | 预览/下载/列表/删除的放行矩阵；删除级联闭单 |
+| `FileGuardCheckerImpl` | `checkUpload` | 扩展名白名单 → 魔数 → 宏/PDF JS/SVG XSS 深扫 |
+| `FileReviewConfigServiceImpl` | `save` | 租户级开关、类目、guard 模式、白名单扩展名 |
 
 **关键点**：
 
@@ -698,7 +698,7 @@ sys_menu 表
 SysTenantServiceImpl.insertByBo
   → 创建租户 + 套餐/菜单/角色/字典初始化
   → TenantProvisioningHandler.provision(tenantId)
-      风控模块在这里复制默认规则（DcsRiskTenantProvisioningHandler）
+      风控模块在这里复制默认规则（RiskTenantProvisioningHandler）
 ```
 
 **核心类**：
@@ -728,7 +728,7 @@ SysTenantServiceImpl.insertByBo
 | `CreditAlertScheduler.scanCreditState` | 每天 09:10 | 积分到期/周池/加油包告警 |
 | `WalletReconcileJob.reconcile` | 每天 02:30 | 钱包对账（只告警） |
 | `ModelHealthScheduler.patrol` | 每天 04:00 | 在用模型探活 |
-| `DcsAiProviderAccessServiceImpl.scheduledBalanceRefresh` | 每天 04:30 | 厂商钥匙余额刷新 |
+| `AiProviderAccessServiceImpl.scheduledBalanceRefresh` | 每天 04:30 | 厂商钥匙余额刷新 |
 
 #### 4.8.2 SnailJob
 
@@ -740,12 +740,12 @@ SysTenantServiceImpl.insertByBo
 
 | 暗线 | 怎么连的 |
 |---|---|
-| 采集 → 画像 | `DcsTaskService/DcsSubmissionService/DcsAuditService` 调 `ProfileEventPublisher.publishQuiet` |
-| 采集 → 通知 | `DcsNoticeService`；文件驳回/钱包告警通过 admin 的 adapter 桥进来 |
+| 采集 → 画像 | `TaskService/SubmissionService/AuditService` 调 `ProfileEventPublisher.publishQuiet` |
+| 采集 → 通知 | `NoticeService`；文件驳回/钱包告警通过 admin 的 adapter 桥进来 |
 | 风控 → 画像 | `RiskBehaviorSinkAdapter` 把风险行为写成 `source=risk` 的画像事件 |
 | 文件 → 风控 | 文件驳回后 `RiskEventCollector.record(FILE_REJECTED)` |
-| 文件 → 通知 | `FileReviewNoticeEvent` → `FileReviewNoticeAdapter` → `DcsNoticeService` |
-| 计费 → 通知 | `WalletAlertEvent` → `WalletAlertNoticeAdapter` → `DcsNoticeService` |
+| 文件 → 通知 | `FileReviewNoticeEvent` → `FileReviewNoticeAdapter` → `NoticeService` |
+| 计费 → 通知 | `WalletAlertEvent` → `WalletAlertNoticeAdapter` → `NoticeService` |
 | 画像 → 采集 | 分群触达 `ProfileReachChannel` 的实现是 dcs 的 `InAppReachChannel`（站内通知） |
 | 助手 → 业务 | `BizToolProvider` SPI：dcs/profile/analytics 三个提供方 |
 
@@ -887,7 +887,7 @@ flowchart LR
 
 | 类 | 路径 | 核心方法 | 具体做什么 |
 |---|---|---|---|
-| `DcsAssistantAgentConfiguration` | `legacy/config/DcsAssistantAgentConfiguration.java:31` | `dcsAssistantAgentRegistryCustomizer()` | 向框架注册惰性工厂：`registerFactory("dcs-assistant", agentFactory::createFromLogin)` |
+| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | `dcsAssistantAgentRegistryCustomizer()` | 向框架注册惰性工厂：`registerFactory("dcs-assistant", agentFactory::createFromLogin)` |
 | `AguiAgentRegistry`（框架） | starter jar | `registerFactory` / `getAgent` | 有 factory 就每次 `get()` 新实例；否则回退 singleton |
 | `DefaultAgentResolver`（框架） | starter jar | `resolveAgent(agentId, threadId, userId)` | `server-side-memory=true` 时走线程会话缓存，否则直接查注册表 |
 | `ThreadSessionManager`（框架） | starter jar | `getOrCreateAgent` / `removeSession` | 以 `(normalizeUser(userId), threadId)` 为键；首次或 agentId 变化才建，否则复用 |
@@ -1119,8 +1119,8 @@ stateDiagram-v2
 | 结构化反问 | 模型调 `ask_user` | `AskUserTools` → `AssistantAskUserBridge` | `ask_user` CUSTOM 帧 |
 | TODO | 模型调 `todo_write` | `TodoTools` → `AssistantTodoSignal` | `todo` CUSTOM 帧 |
 | 附件 | 前端上传后注册 | `AssistantAttachmentService` | 工具结果，不单独出帧 |
-| 压缩 | 上下文超触发线 | `DcsCompactionMiddleware` | 不单独出帧；写 system 分隔条 + `dcs_assistant_compaction` |
-| 心跳 | 每 20 秒 | `DcsHeartbeatMiddleware` | `dcs-heartbeat` CUSTOM 帧 |
+| 压缩 | 上下文超触发线 | `AssistantCompactionMiddleware` | 不单独出帧；写 system 分隔条 + `dcs_assistant_compaction` |
+| 心跳 | 每 20 秒 | `HeartbeatMiddleware` | `dcs-heartbeat` CUSTOM 帧 |
 | 费用 | 回合结束 | `AssistantCostLedger` | `cost_meta` CUSTOM 帧 |
 | 记忆 | 回合结束 | `AssistantMemoryTurnLedger` | `memory_turn` CUSTOM 帧 |
 | 自动完成 | 回合结束 | `AssistantEventEnricher` | `auto_done` CUSTOM 帧 |
@@ -1204,7 +1204,7 @@ sequenceDiagram
 | `cost_meta` | 同上 L210-220 | 本回合金额/token |
 | `memory_turn` | 同上 L226-247 | 记忆注入/更新统计 |
 | `auto_done` | 同上 L256-277 | 自动完成的可撤回动作 |
-| `dcs-heartbeat` | `DcsHeartbeatMiddleware` L49 | 20 秒心跳，喂前端 600 秒看门狗 |
+| `dcs-heartbeat` | `HeartbeatMiddleware` L49 | 20 秒心跳，喂前端 600 秒看门狗 |
 | `dcs-resume-truncated` | `AssistantRunStreamHub` L52 | 续看保留窗溢出提示 |
 
 ### 5.13 Agent 侧计费链
@@ -1275,7 +1275,7 @@ AutomationRunner.run
 | `AguiRequestProcessor`（框架） | starter jar | 协议编排 | `process` / `resolveAgentId` | 解析 context → 选 agentId → 选 agent → 建 adapter → run | 协议无法启动 |
 | `AssistantRuntimeContextResolver` | `legacy/core/AssistantRuntimeContextResolver.java:68` | 身份/准入/落库门卫 | `resolve` | 10 道闸 + 身份桥 + Holder + 缓存失效 | 无鉴权、无限额、不落库，裸跑烧钱 |
 | `AssistantIdentityHolder` | `legacy/core/AssistantIdentityHolder.java:30` | 同线程身份桥 | `set` / `consumeEntry` | ThreadLocal 一次一递；同线程 + 30s 时效；取不到 401 | 工厂拿不到身份，建会话失败 |
-| `DcsAssistantAgentConfiguration` | `legacy/config/DcsAssistantAgentConfiguration.java:31` | 注册 agent 工厂 | `dcsAssistantAgentRegistryCustomizer` | `registerFactory("dcs-assistant", ...)` | `/agui/run/dcs-assistant` 找不到 agent |
+| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | 注册 agent 工厂 | `dcsAssistantAgentRegistryCustomizer` | `registerFactory("dcs-assistant", ...)` | `/agui/run/dcs-assistant` 找不到 agent |
 | `AguiAgentRegistry`（框架） | starter jar | agent 注册表 | `registerFactory` / `getAgent` | factory 优先，每次新实例；否则 singleton | 无 agent 可选 |
 | `ThreadSessionManager`（框架） | starter jar | 会话级 agent 缓存 | `getOrCreateAgent` / `removeSession` | `(user, thread)` 首次创建、之后复用 | 每轮重建，状态/成本都失控 |
 | `AssistantAgentFactory` | `legacy/core/AssistantAgentFactory.java:158` | Agent 总装配 | `create` / `createFromLogin` | 模型配置 → 装饰器 → 工具 → 中间件 → ReActAgent | 没有 agent |
@@ -1300,8 +1300,8 @@ AutomationRunner.run
 | `AssistantSkillGateMiddleware` | `legacy/core/AssistantSkillGateMiddleware.java:55` | 技能可见性权威 | `filterVisible` / `visibleTo` | 停用遮罩 + minRole + 矩阵 | 技能对所有人可见 |
 | `AssistantSkillUsageMiddleware` | `legacy/core/AssistantSkillUsageMiddleware.java:58` | 技能使用统计 | `onActing` | 成功取用才 +1；手动胶囊去重 | 使用次数恒 0 |
 | `AssistantPlanGateMiddleware` | `legacy/core/AssistantPlanGateMiddleware.java:78` | 计划待确认写闸 | `onReasoning` / `onActing` | 摘写工具；拒同批写调用 | 没确认就能写 |
-| `DcsHeartbeatMiddleware` | `legacy/core/DcsHeartbeatMiddleware.java:49` | 流层心跳 | `withHeartbeat` | 每 20 秒发 `dcs-heartbeat` | 静默期前端误判断线 |
-| `DcsCompactionMiddleware` | `legacy/core/DcsCompactionMiddleware.java:82` | 自动压缩 | `onReasoning` / `microcompact` | 微压缩 → 全量摘要 → 写分隔条/审计；失败熔断 | 上下文超窗 |
+| `HeartbeatMiddleware` | `legacy/core/HeartbeatMiddleware.java:49` | 流层心跳 | `withHeartbeat` | 每 20 秒发 `dcs-heartbeat` | 静默期前端误判断线 |
+| `AssistantCompactionMiddleware` | `legacy/core/AssistantCompactionMiddleware.java:82` | 自动压缩 | `onReasoning` / `microcompact` | 微压缩 → 全量摘要 → 写分隔条/审计；失败熔断 | 上下文超窗 |
 
 #### 表 C：会话、HITL、技能仓、计费、自动化
 
@@ -1444,7 +1444,7 @@ AutomationRunner.run
 | `ruoyi-ai-billing` | 19 | `AiBillingCalculatorUnitTest`、`ProviderKeyPoolUnitTest` |
 | `ruoyi-risk` | 19 | `RiskScoreServiceUnitTest`、`CaptchaServiceUnitTest` |
 | `ruoyi-file-security` | 12 | `FileGuardDecisionUnitTest`、`PdfJsScannerUnitTest` |
-| `ruoyi-dcs` | 4 | `DcsStateMachineTest`、`DcsFieldValidatorTest` |
+| `ruoyi-dcs` | 4 | `StateMachineTest`、`FieldValidatorTest` |
 | `ruoyi-system` / `ruoyi-job` / `ruoyi-assistant-spi` | 0 | 无 `src/test` |
 
 ### 8.3 跑测试的两个坑
@@ -1464,7 +1464,7 @@ AutomationRunner.run
 |---:|---|---|---|---|
 | 1 | `SearchPathDataSource.withSearchPath` 在 `SET search_path` 失败时泄漏池连接 | `AssistantStateStoreConfig.java:59-62`：`try` 只包了 `stmt`，`conn` 既没 close 也没归还 | PG 抖动时每次状态读写漏一条连接，Hikari 池可能被抽干 | 外层 try/catch，SET 失败先 `conn.close()` 再抛 |
 | 2 | 计费幂等键的保障范围比旧文档窄 | `BillingModelDecorator.java:38-41/373`：键含 `instanceId`；跨订阅/agent 重建重放会生成新键 | 重放场景可能双记费用 | 文档口径改成"同订阅内防重"；跨订阅防重要另加业务键 |
-| 3 | 压缩熔断是 agent 实例级且不可恢复 | `DcsCompactionMiddleware.java:139-157`（连败计数）+ `350-353`（`blocked=true`） | 熔断后该会话长对话可能撞供应商窗口报错，无自愈 | 换会话/触发重建；或加"人工重置"入口 |
+| 3 | 压缩熔断是 agent 实例级且不可恢复 | `AssistantCompactionMiddleware.java:139-157`（连败计数）+ `350-353`（`blocked=true`） | 熔断后该会话长对话可能撞供应商窗口报错，无自愈 | 换会话/触发重建；或加"人工重置"入口 |
 | 4 | Enricher 热路径内联同步查库 | `AssistantEventEnricher.java:88-107/256-279`；`AssistantRunRecorder.java:385/730` | PG 慢时 SSE 尾帧延迟放大 | 把 run 反查做短缓存；终态写保持同步（正确性优先） |
 
 ### 9.2 未验证（需要运行时/环境）
@@ -1474,7 +1474,7 @@ AutomationRunner.run
 | 5 | 超管切租户时，resolver 的动态租户键与工厂的快照租户键可能分叉 | 需要实际超管切租户 + 翻档位 + 看日志 | 观察 `[AgentRebuild] 权限规则装回旧会话 state 失败` 是否出现 |
 | 6 | `ProfileRiskReviewService.ensurePending` 是否有生产调用点 | 全仓只找到单测调用 | 全局搜索调用点；若确实没有，确认是否预留接口 |
 | 7 | `AiGateway` 是否有业务消费方 | 只找到 billing 内部与单测引用 | 搜前端/后端调用；确认是否二期启用 |
-| 8 | `DcsCaptchaController` 是否可匿名访问 | 类上无权限注解，依赖全局登录拦截 | 用未登录请求实测 + 看 `security.excludes` |
+| 8 | `RiskCaptchaController` 是否可匿名访问 | 类上无权限注解，依赖全局登录拦截 | 用未登录请求实测 + 看 `security.excludes` |
 | 9 | `JdbcAgentStateStore` 的 `session_id` 拼接格式 | 框架实现不在本仓 | 反编译/查 AgentScope 源码；或在 PG 里看实际行 |
 | 10 | POM 级无循环依赖，但字节码级是否有隐藏运行期环 | 未做全仓字节码分析 | 用 `jdeps`/ArchUnit 做一次全量依赖分析 |
 
@@ -1523,48 +1523,48 @@ AutomationRunner.run
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `DcsTaskController` | `/dcs/task` | 8 |
-| `DcsSubmissionController` | `/dcs/submission` | 2 |
-| `DcsAuditController` | `/dcs/audit` | 3 |
-| `DcsFeedbackController` | `/dcs/feedback` | 7 |
-| `DcsNoticeController` | `/dcs/notice` | 2 |
-| `DcsChangelogController` | `/dcs/changelog` | 5 |
-| `DcsStatsController` | `/dcs/stats` | 1 |
+| `TaskController` | `/dcs/task` | 8 |
+| `SubmissionController` | `/dcs/submission` | 2 |
+| `AuditController` | `/dcs/audit` | 3 |
+| `FeedbackController` | `/dcs/feedback` | 7 |
+| `NoticeController` | `/dcs/notice` | 2 |
+| `ChangelogController` | `/dcs/changelog` | 5 |
+| `StatsController` | `/dcs/stats` | 1 |
 
 ### A.4 风控 risk（8 个）
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `DcsRiskDashboardController` | `/dcs/risk` | 3 |
-| `DcsRiskEventController` | `/dcs/risk` | 2 |
-| `DcsRiskActionController` | `/dcs/risk` | 11 |
-| `DcsRiskRuleController` | `/dcs/risk` | 5 |
-| `DcsRiskWhitelistController` | `/dcs/risk` | 4 |
-| `DcsRiskContentConfigController` | `/dcs/risk/content-config` | 2 |
-| `DcsSensitiveWordController` | `/dcs/sensitive-word` | 8 |
-| `DcsCaptchaController` | `/dcs/captcha` | 4 |
+| `RiskDashboardController` | `/dcs/risk` | 3 |
+| `RiskEventController` | `/dcs/risk` | 2 |
+| `RiskActionController` | `/dcs/risk` | 11 |
+| `RiskRuleController` | `/dcs/risk` | 5 |
+| `RiskWhitelistController` | `/dcs/risk` | 4 |
+| `RiskContentConfigController` | `/dcs/risk/content-config` | 2 |
+| `SensitiveWordController` | `/dcs/sensitive-word` | 8 |
+| `RiskCaptchaController` | `/dcs/captcha` | 4 |
 
 ### A.5 计费 ai-billing（11 个）
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `DcsAiConfigController` | `/dcs/ai-config` | 29 |
-| `DcsAiModelPriceController` | `/dcs/ai-model-price` | 7 |
-| `DcsAiPriceController` | `/dcs/ai-price` | 2 |
-| `DcsAiUsageController` | `/dcs/ai-usage` | 5 |
-| `DcsAiCreditController` | `/dcs/ai-credit` | 12 |
-| `DcsTenantWalletController` | `/dcs/tenant-wallet` | 8 |
-| `DcsTenantWalletLedgerController` | `/dcs/tenant-wallet-ledger` | 1 |
-| `DcsWalletPaymentOrderController` | `/dcs/wallet-payment-order` | 3 |
-| `DcsServiceChargeRuleController` | `/dcs/service-charge-rule` | 5 |
-| `DcsAiDocDomainController` | `/dcs/ai-doc-domain` | 5 |
+| `AiConfigController` | `/dcs/ai-config` | 29 |
+| `AiModelPriceController` | `/dcs/ai-model-price` | 7 |
+| `AiPriceController` | `/dcs/ai-price` | 2 |
+| `AiUsageController` | `/dcs/ai-usage` | 5 |
+| `AiCreditController` | `/dcs/ai-credit` | 12 |
+| `TenantWalletController` | `/dcs/tenant-wallet` | 8 |
+| `TenantWalletLedgerController` | `/dcs/tenant-wallet-ledger` | 1 |
+| `WalletPaymentOrderController` | `/dcs/wallet-payment-order` | 3 |
+| `ServiceChargeRuleController` | `/dcs/service-charge-rule` | 5 |
+| `AiDocDomainController` | `/dcs/ai-doc-domain` | 5 |
 | `AiFaviconController` | `/dcs/ai/favicon` | 1 |
 
 ### A.6 文件安全 file-security（1 个）
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `DcsFileReviewController` | `/dcs/fileReview` | 9 |
+| `FileReviewController` | `/dcs/fileReview` | 9 |
 
 ### A.7 系统管理 system（21 个）
 
@@ -1645,7 +1645,7 @@ AutomationRunner.run
 | 画像事件入口 | `backend/ruoyi-modules/ruoyi-profile-engine/src/main/java/com/smartdock/profile/event/ProfileEventServiceImpl.java` |
 | 评分引擎 | `.../profile/engine/ProfileScoreEngine.java` |
 | 会话重建 | `.../analytics/engine/AnalyticsSessionizer.java` |
-| 采集状态机 | `.../dcs/statemachine/DcsTaskStateMachine.java` / `DcsSubmissionStateMachine.java` |
+| 采集状态机 | `.../dcs/statemachine/TaskStateMachine.java` / `SubmissionStateMachine.java` |
 | 风控评分 | `.../risk/service/RiskScoreService.java` |
 | 计费落账 | `.../ruoyi-ai-billing/.../service/support/AiBillingService.java` |
 | 文件审核 | `.../ruoyi-file-security/.../listener/OssUploadedEventListener.java` |
@@ -1654,7 +1654,7 @@ AutomationRunner.run
 | Agent 事件 | `.../assistant/legacy/core/AssistantEventEnricher.java` |
 | 工具注册 | `.../assistant/legacy/core/ToolRegistry.java` / `ProviderToolRegistry.java` |
 | 技能闸 | `.../assistant/legacy/core/AssistantSkillGateMiddleware.java` |
-| 压缩 | `.../assistant/legacy/core/AssistantCompactionPolicy.java` / `DcsCompactionMiddleware.java` |
+| 压缩 | `.../assistant/legacy/core/AssistantCompactionPolicy.java` / `AssistantCompactionMiddleware.java` |
 | 状态存储 | `.../assistant/legacy/config/AssistantStateStoreConfig.java` |
 | 回放汇 | `.../assistant/legacy/core/AssistantRunStreamHub.java` |
 | 前端 AGUI 客户端 | `frontend/src/api/dcs/assistant/aguiClient.ts` |

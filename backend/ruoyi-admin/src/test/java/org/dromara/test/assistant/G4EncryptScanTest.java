@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.domain.model.DcsMcpServer;
+import com.smartdock.assistant.domain.model.McpServer;
 import org.dromara.common.encrypt.core.EncryptorManager;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * （typeAliasesPackage 逐包 PathMatchingResourcePatternResolver 扫 *.class）收进
  * fieldCache——不在缓存=拦截器静默跳过=明文落库（2026-10-22 实测 g4htest 行明文实锤）。
  * 本测纯 new EncryptorManager(生产同款包表达式) 复现扫描，锁死两个加密实体都在缓存：
- * DcsMcpServer.headers（G4-#1 新增）与 DcsAiConfig.apiKey（仓内在用先例）。
+ * McpServer.headers（G4-#1 新增）与 AiConfig.apiKey（仓内在用先例）。
  */
 @Tag("local")
 class G4EncryptScanTest {
@@ -32,15 +32,15 @@ class G4EncryptScanTest {
         String pkgs = "org.dromara.**.domain,com.smartdock.**.domain,org.dromara.**.domain.**,com.smartdock.**.domain.**";
         EncryptorManager m = new EncryptorManager(pkgs);
 
-        Set<Field> mcp = m.getFieldCache(DcsMcpServer.class);
-        assertNotNull(mcp, "DcsMcpServer 未被加密扫描收进 fieldCache（headers 将明文落库）");
+        Set<Field> mcp = m.getFieldCache(McpServer.class);
+        assertNotNull(mcp, "McpServer 未被加密扫描收进 fieldCache（headers 将明文落库）");
         assertTrue(mcp.stream().anyMatch(f -> "headers".equals(f.getName())),
-            "DcsMcpServer.headers 应带 @EncryptField（实收字段：" + mcp + "）");
+            "McpServer.headers 应带 @EncryptField（实收字段：" + mcp + "）");
 
-        Set<Field> ai = m.getFieldCache(com.smartdock.domain.DcsAiConfig.class);
-        assertNotNull(ai, "DcsAiConfig（先例对照）未被加密扫描收进 fieldCache——扫描机制整体回退");
+        Set<Field> ai = m.getFieldCache(com.smartdock.domain.AiConfig.class);
+        assertNotNull(ai, "AiConfig（先例对照）未被加密扫描收进 fieldCache——扫描机制整体回退");
         assertTrue(ai.stream().anyMatch(f -> "apiKey".equals(f.getName())),
-            "DcsAiConfig.apiKey 应带 @EncryptField");
+            "AiConfig.apiKey 应带 @EncryptField");
 
         // 批 1 钉：domain/model 子包里的 @EncryptField 实体也必须在缓存里。
         // 探针类 EncryptScanProbeEntity 只存在于 test classpath（生产无此类）；
@@ -57,7 +57,7 @@ class G4EncryptScanTest {
     @Test
     void headersKeyComesFromEnvironmentNotLiteral() throws Exception {
         org.dromara.common.encrypt.annotation.EncryptField anno =
-            DcsMcpServer.class.getDeclaredField("headers")
+            McpServer.class.getDeclaredField("headers")
                 .getAnnotation(org.dromara.common.encrypt.annotation.EncryptField.class);
         assertNotNull(anno, "headers 缺 @EncryptField");
         assertEquals("${smartdock.encrypt.mcp-headers-key}", anno.password(),
@@ -75,9 +75,9 @@ class G4EncryptScanTest {
             "旧的字面量常量必须已删除");
 
         org.dromara.common.encrypt.annotation.EncryptField ai =
-            com.smartdock.domain.DcsAiConfig.class.getDeclaredField("apiKey")
+            com.smartdock.domain.AiConfig.class.getDeclaredField("apiKey")
                 .getAnnotation(org.dromara.common.encrypt.annotation.EncryptField.class);
-        assertNotNull(ai, "DcsAiConfig.apiKey 缺 @EncryptField");
+        assertNotNull(ai, "AiConfig.apiKey 缺 @EncryptField");
         assertEquals("${smartdock.encrypt.ai-config-key}", ai.password(),
             "AI 配置密钥也必须是占位符");
     }
@@ -88,7 +88,7 @@ class G4EncryptScanTest {
     @Test
     void headersAesRoundtripWithAnnotationParams() throws Exception {
         org.dromara.common.encrypt.annotation.EncryptField anno =
-            DcsMcpServer.class.getDeclaredField("headers")
+            McpServer.class.getDeclaredField("headers")
                 .getAnnotation(org.dromara.common.encrypt.annotation.EncryptField.class);
         org.springframework.mock.env.MockEnvironment env =
             new org.springframework.mock.env.MockEnvironment();

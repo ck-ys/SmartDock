@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.domain.DcsAssistantConfig;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.domain.model.AssistantConfig;
+import com.smartdock.assistant.service.AssistantConfigService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,7 +49,7 @@ class G1ConfigGateTest {
 
     @Test
     void upsertOverridesTakeEffect() {
-        DcsAssistantConfig row = new DcsAssistantConfig();
+        AssistantConfig row = new AssistantConfig();
         row.setTenantId(TENANT_OPEN);
         row.setEnabled("1");
         row.setDailyRoundLimitPerUser(30);

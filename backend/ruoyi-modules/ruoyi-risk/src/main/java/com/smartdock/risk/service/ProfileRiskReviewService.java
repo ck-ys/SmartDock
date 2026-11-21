@@ -9,9 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.tenant.helper.TenantHelper;
-import com.smartdock.risk.domain.DcsProfileReview;
+import com.smartdock.risk.domain.ProfileReview;
 import com.smartdock.risk.domain.vo.ProfileReviewAggregateVo;
-import com.smartdock.risk.mapper.DcsProfileReviewMapper;
+import com.smartdock.risk.mapper.ProfileReviewMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,7 +24,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProfileRiskReviewService {
     /** 画像复核表读写 Mapper（HIGH 风险入队/分页/复核） */
-    private final DcsProfileReviewMapper reviewMapper;
+    private final ProfileReviewMapper reviewMapper;
     /** 风险处置策略服务（校验复核结论/理由） */
     private final RiskActionPolicy policy;
 
@@ -37,7 +37,7 @@ public class ProfileRiskReviewService {
     public void ensurePending(String tenantId, Long userId, Long scoreId, String ruleVersion,
                               String profileRiskLevel, String triggerReason) {
         if (!"HIGH".equals(profileRiskLevel) || userId == null || scoreId == null) return;
-        DcsProfileReview review = new DcsProfileReview();
+        ProfileReview review = new ProfileReview();
         review.setReviewId(IdUtil.getSnowflakeNextId());
         review.setTenantId(tenantId);
         review.setUserId(userId);
@@ -54,13 +54,13 @@ public class ProfileRiskReviewService {
     }
 
     /** 分页查询画像复核记录(按状态/用户筛选)。 */
-    public Page<DcsProfileReview> page(String tenantId, String status, Long userId, PageQuery pageQuery) {
+    public Page<ProfileReview> page(String tenantId, String status, Long userId, PageQuery pageQuery) {
         return TenantHelper.ignore(() -> reviewMapper.selectPage(pageQuery.build(),
-            new LambdaQueryWrapper<DcsProfileReview>()
-                .eq(DcsProfileReview::getTenantId, tenantId)
-                .eq(status != null && !status.isBlank(), DcsProfileReview::getStatus, status)
-                .eq(userId != null, DcsProfileReview::getUserId, userId)
-                .orderByDesc(DcsProfileReview::getCreateTime)));
+            new LambdaQueryWrapper<ProfileReview>()
+                .eq(ProfileReview::getTenantId, tenantId)
+                .eq(status != null && !status.isBlank(), ProfileReview::getStatus, status)
+                .eq(userId != null, ProfileReview::getUserId, userId)
+                .orderByDesc(ProfileReview::getCreateTime)));
     }
 
     /** 统计租户内待复核<b>用户</b>数(同人只算一个, 2026-08-23 口径改造, 大盘卡片使用)。 */
@@ -100,15 +100,15 @@ public class ProfileRiskReviewService {
         String normalizedConclusion = policy.requireConclusion(conclusion);
         String normalizedReason = policy.requireReason(reason);
         int updated = TenantHelper.ignore(() -> reviewMapper.update(null,
-            new LambdaUpdateWrapper<DcsProfileReview>()
-                .eq(DcsProfileReview::getTenantId, tenantId)
-                .eq(DcsProfileReview::getUserId, userId)
-                .eq(DcsProfileReview::getStatus, "PENDING")
-                .set(DcsProfileReview::getStatus, normalizedConclusion)
-                .set(DcsProfileReview::getConclusion, normalizedConclusion)
-                .set(DcsProfileReview::getReviewReason, normalizedReason)
-                .set(DcsProfileReview::getReviewedBy, operatorId)
-                .set(DcsProfileReview::getReviewedTime, new Date())));
+            new LambdaUpdateWrapper<ProfileReview>()
+                .eq(ProfileReview::getTenantId, tenantId)
+                .eq(ProfileReview::getUserId, userId)
+                .eq(ProfileReview::getStatus, "PENDING")
+                .set(ProfileReview::getStatus, normalizedConclusion)
+                .set(ProfileReview::getConclusion, normalizedConclusion)
+                .set(ProfileReview::getReviewReason, normalizedReason)
+                .set(ProfileReview::getReviewedBy, operatorId)
+                .set(ProfileReview::getReviewedTime, new Date())));
         if (updated == 0) throw new ServiceException("该用户当前没有待复核画像");
         log.info("[ProfileReview] review-all-user tenant={} user={} operator={} conclusion={} rows={}",
             tenantId, userId, operatorId, normalizedConclusion, updated);
@@ -123,15 +123,15 @@ public class ProfileRiskReviewService {
         String normalizedConclusion = policy.requireConclusion(conclusion);
         String normalizedReason = policy.requireReason(reason);
         int updated = TenantHelper.ignore(() -> reviewMapper.update(null,
-            new LambdaUpdateWrapper<DcsProfileReview>()
-                .eq(DcsProfileReview::getTenantId, tenantId)
-                .eq(DcsProfileReview::getReviewId, reviewId)
-                .eq(DcsProfileReview::getStatus, "PENDING")
-                .set(DcsProfileReview::getStatus, normalizedConclusion)
-                .set(DcsProfileReview::getConclusion, normalizedConclusion)
-                .set(DcsProfileReview::getReviewReason, normalizedReason)
-                .set(DcsProfileReview::getReviewedBy, operatorId)
-                .set(DcsProfileReview::getReviewedTime, new Date())));
+            new LambdaUpdateWrapper<ProfileReview>()
+                .eq(ProfileReview::getTenantId, tenantId)
+                .eq(ProfileReview::getReviewId, reviewId)
+                .eq(ProfileReview::getStatus, "PENDING")
+                .set(ProfileReview::getStatus, normalizedConclusion)
+                .set(ProfileReview::getConclusion, normalizedConclusion)
+                .set(ProfileReview::getReviewReason, normalizedReason)
+                .set(ProfileReview::getReviewedBy, operatorId)
+                .set(ProfileReview::getReviewedTime, new Date())));
         if (updated == 0) throw new ServiceException("画像复核不存在、已处理或不属于当前租户");
         log.info("[ProfileReview] reviewed tenant={} review={} operator={} conclusion={}",
             tenantId, reviewId, operatorId, normalizedConclusion);
@@ -161,15 +161,15 @@ public class ProfileRiskReviewService {
         List<String> failures = new ArrayList<>();
         for (Long reviewId : reviewIds) {
             int updated = TenantHelper.ignore(() -> reviewMapper.update(null,
-                new LambdaUpdateWrapper<DcsProfileReview>()
-                    .eq(DcsProfileReview::getTenantId, tenantId)
-                    .eq(DcsProfileReview::getReviewId, reviewId)
-                    .eq(DcsProfileReview::getStatus, "PENDING")
-                    .set(DcsProfileReview::getStatus, normalizedConclusion)
-                    .set(DcsProfileReview::getConclusion, normalizedConclusion)
-                    .set(DcsProfileReview::getReviewReason, normalizedReason)
-                    .set(DcsProfileReview::getReviewedBy, operatorId)
-                    .set(DcsProfileReview::getReviewedTime, now)));
+                new LambdaUpdateWrapper<ProfileReview>()
+                    .eq(ProfileReview::getTenantId, tenantId)
+                    .eq(ProfileReview::getReviewId, reviewId)
+                    .eq(ProfileReview::getStatus, "PENDING")
+                    .set(ProfileReview::getStatus, normalizedConclusion)
+                    .set(ProfileReview::getConclusion, normalizedConclusion)
+                    .set(ProfileReview::getReviewReason, normalizedReason)
+                    .set(ProfileReview::getReviewedBy, operatorId)
+                    .set(ProfileReview::getReviewedTime, now)));
             if (updated > 0) {
                 success++;
             } else {

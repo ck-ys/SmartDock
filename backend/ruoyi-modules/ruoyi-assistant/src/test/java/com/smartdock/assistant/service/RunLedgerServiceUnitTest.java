@@ -1,9 +1,9 @@
 package com.smartdock.assistant.service;
 
 import com.smartdock.assistant.domain.gateway.InstanceIdentityGateway;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.domain.model.DcsAssistantRun;
-import com.smartdock.assistant.domain.model.DcsAssistantRunIssue;
+import com.smartdock.assistant.domain.model.AssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantRun;
+import com.smartdock.assistant.domain.model.AssistantRunIssue;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.mapper.AssistantMessageMapper;
 import com.smartdock.assistant.mapper.AssistantRunIssueMapper;
@@ -67,11 +67,11 @@ class RunLedgerServiceUnitTest {
 
     @Test
     void 首绑_会话不存在时插行后回查_返回新会话id() {
-        DcsAssistantConversation created = conv(77L, USER, "ACTIVE");
+        AssistantConversation created = conv(77L, USER, "ACTIVE");
         when(conversationMapper.selectByThread(TENANT, THREAD)).thenReturn(null, created);
 
         assertEquals(77L, svc().ensureConversation(TENANT, USER, THREAD, "标题"));
-        verify(conversationMapper).insertIgnoreThread(any(DcsAssistantConversation.class));
+        verify(conversationMapper).insertIgnoreThread(any(AssistantConversation.class));
     }
 
     @Test
@@ -105,12 +105,12 @@ class RunLedgerServiceUnitTest {
     @Test
     void 登记_首现写入本实例归属并返回true() {
         when(instanceIdentity.currentInstanceId()).thenReturn("host:1:abc");
-        when(runMapper.insertIgnoreRun(any(DcsAssistantRun.class))).thenReturn(1);
+        when(runMapper.insertIgnoreRun(any(AssistantRun.class))).thenReturn(1);
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", USER, TENANT, "RUNNING"));
 
         assertTrue(svc().registerRun(TENANT, USER, THREAD, "r-1"));
 
-        ArgumentCaptor<DcsAssistantRun> cap = ArgumentCaptor.forClass(DcsAssistantRun.class);
+        ArgumentCaptor<AssistantRun> cap = ArgumentCaptor.forClass(AssistantRun.class);
         verify(runMapper).insertIgnoreRun(cap.capture());
         assertEquals("host:1:abc", cap.getValue().getOwnerInstance(),
             "归属实例必须来自 gateway（写错=收割器把本机活 run 当别人的死 run 收掉）");
@@ -118,7 +118,7 @@ class RunLedgerServiceUnitTest {
 
     @Test
     void 登记_同主重放返回false() {
-        when(runMapper.insertIgnoreRun(any(DcsAssistantRun.class))).thenReturn(0);
+        when(runMapper.insertIgnoreRun(any(AssistantRun.class))).thenReturn(0);
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", USER, TENANT, "RUNNING"));
 
         assertFalse(svc().registerRun(TENANT, USER, THREAD, "r-1"), "同主重放=已有行，交给上层 409");
@@ -126,7 +126,7 @@ class RunLedgerServiceUnitTest {
 
     @Test
     void 登记_异主或异租户一律403() {
-        when(runMapper.insertIgnoreRun(any(DcsAssistantRun.class))).thenReturn(0);
+        when(runMapper.insertIgnoreRun(any(AssistantRun.class))).thenReturn(0);
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", 999L, TENANT, "RUNNING"));
         assertEquals(Integer.valueOf(403), assertThrows(ServiceException.class,
             () -> svc().registerRun(TENANT, USER, THREAD, "r-1")).getCode());
@@ -137,12 +137,29 @@ class RunLedgerServiceUnitTest {
             "异租户同样必须拒（runId 全局唯一不豁免租户隔离）");
     }
 
+    // ── 钉 ④（批 9，7C-1 登记 P2-1）双 RUNNING 守卫的空 runId 语义 ──────────────
+
+    /**
+     * runId 为空时 {@code run_id<>NULL} 恒为 NULL → 计数恒 0 → 并发门被绕过
+     * （批主已在 PG 实测坐实，档位①）。修正后的谓词必须 fail-safe：
+     * 空 runId 时不排除任何行（数全部在途）。SQL 在注解里，mock 测不到，钉注解原文。
+     */
+    @Test
+    void 双RUNNING守卫_空runId不许绕过() throws Exception {
+        String sql = String.join(" ", org.apache.ibatis.annotations.Select.class.cast(
+                AssistantRunMapper.class
+                    .getMethod("countOtherRunning", String.class, String.class, Long.class, String.class)
+                    .getAnnotation(org.apache.ibatis.annotations.Select.class)).value());
+        assertTrue(sql.contains("(#{runId,jdbcType=VARCHAR} IS NULL OR run_id<>#{runId,jdbcType=VARCHAR})"),
+            "countOtherRunning 必须对空 runId fail-safe（数全部在途而非恒 0），当前 SQL：" + sql);
+    }
+
     // ── 钉 ③ 一轮三表写的门序与短路 ────────────────────────────────────
 
     @Test
     void 一轮落库_重放时409且不落user消息() {
         when(conversationMapper.selectByThread(TENANT, THREAD)).thenReturn(conv(77L, USER, "ACTIVE"));
-        when(runMapper.insertIgnoreRun(any(DcsAssistantRun.class))).thenReturn(0);
+        when(runMapper.insertIgnoreRun(any(AssistantRun.class))).thenReturn(0);
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", USER, TENANT, "RUNNING"));
 
         ServiceException ex = assertThrows(ServiceException.class,
@@ -154,7 +171,7 @@ class RunLedgerServiceUnitTest {
     @Test
     void 一轮落库_存在其它在途run时409() {
         when(conversationMapper.selectByThread(TENANT, THREAD)).thenReturn(conv(77L, USER, "ACTIVE"));
-        when(runMapper.insertIgnoreRun(any(DcsAssistantRun.class))).thenReturn(1);
+        when(runMapper.insertIgnoreRun(any(AssistantRun.class))).thenReturn(1);
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", USER, TENANT, "RUNNING"));
         when(runMapper.countOtherRunning(TENANT, THREAD, USER, "r-1")).thenReturn(1);
 
@@ -168,7 +185,7 @@ class RunLedgerServiceUnitTest {
     @Test
     void 一轮落库_先取线程锁再插行再查在途() {
         when(conversationMapper.selectByThread(TENANT, THREAD)).thenReturn(conv(77L, USER, "ACTIVE"));
-        when(runMapper.insertIgnoreRun(any(DcsAssistantRun.class))).thenReturn(1);
+        when(runMapper.insertIgnoreRun(any(AssistantRun.class))).thenReturn(1);
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", USER, TENANT, "RUNNING"));
 
         svc().persistUserRound(TENANT, USER, THREAD, "r-1", "标题", "内容");
@@ -176,7 +193,7 @@ class RunLedgerServiceUnitTest {
         var order = org.mockito.Mockito.inOrder(runMapper, conversationMapper, messageWriteService);
         order.verify(runMapper).acquireThreadSendLock(TENANT, USER, THREAD);
         order.verify(conversationMapper).selectByThread(TENANT, THREAD);
-        order.verify(runMapper).insertIgnoreRun(any(DcsAssistantRun.class));
+        order.verify(runMapper).insertIgnoreRun(any(AssistantRun.class));
         order.verify(runMapper).countOtherRunning(TENANT, THREAD, USER, "r-1");
         order.verify(messageWriteService).appendUserMessage(eq(TENANT), eq(77L), eq(USER), eq("内容"));
     }
@@ -184,7 +201,7 @@ class RunLedgerServiceUnitTest {
     @Test
     void 一轮落库_空白内容不落user消息() {
         when(conversationMapper.selectByThread(TENANT, THREAD)).thenReturn(conv(77L, USER, "ACTIVE"));
-        when(runMapper.insertIgnoreRun(any(DcsAssistantRun.class))).thenReturn(1);
+        when(runMapper.insertIgnoreRun(any(AssistantRun.class))).thenReturn(1);
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", USER, TENANT, "RUNNING"));
 
         svc().persistUserRound(TENANT, USER, THREAD, "r-1", "标题", "  ");
@@ -217,7 +234,7 @@ class RunLedgerServiceUnitTest {
 
         when(runMapper.selectByRunId("r-2")).thenReturn(run("r-2", USER, TENANT, "RUNNING"));
         svc().recordRunIssueForRunningRun("r-2", "rate", "429 too many");
-        verify(issueMapper).insertIssue(any(DcsAssistantRunIssue.class));
+        verify(issueMapper).insertIssue(any(AssistantRunIssue.class));
     }
 
     @Test
@@ -236,9 +253,9 @@ class RunLedgerServiceUnitTest {
         assertFalse(maskIn.getValue().contains("sk-abcdefgh12345678"),
             "掩码器拿到的入参必须已被纯函数脱敏（否则明文密钥进过掩码器=多一处暴露面）");
 
-        ArgumentCaptor<DcsAssistantRunIssue> cap = ArgumentCaptor.forClass(DcsAssistantRunIssue.class);
+        ArgumentCaptor<AssistantRunIssue> cap = ArgumentCaptor.forClass(AssistantRunIssue.class);
         verify(issueMapper).insertIssue(cap.capture());
-        DcsAssistantRunIssue row = cap.getValue();
+        AssistantRunIssue row = cap.getValue();
         assertFalse(row.getDetail().contains("sk-abcdefgh"), "密钥必须先被纯函数抹掉");
         assertTrue(row.getDetail().startsWith("MASKED("), "然后才过租户 PII 掩码（顺序反了=掩码看不到明文密钥）");
         assertEquals(77L, row.getConversationId());
@@ -248,7 +265,7 @@ class RunLedgerServiceUnitTest {
     @Test
     void 问题行_落库异常自吞不影响终态链() {
         when(runMapper.selectByRunId("r-1")).thenReturn(run("r-1", USER, TENANT, "FAILED"));
-        when(issueMapper.insertIssue(any(DcsAssistantRunIssue.class))).thenThrow(new RuntimeException("db down"));
+        when(issueMapper.insertIssue(any(AssistantRunIssue.class))).thenThrow(new RuntimeException("db down"));
 
         // 不抛=锦上添花不连坐；抛了就会把终态链一起带崩
         svc().recordRunIssue("r-1", "other", "boom");
@@ -258,7 +275,7 @@ class RunLedgerServiceUnitTest {
 
     @Test
     void 按runId取问题行_异租户或异主一律null() {
-        DcsAssistantRunIssue row = issue("r-1", USER, TENANT);
+        AssistantRunIssue row = issue("r-1", USER, TENANT);
         when(issueMapper.selectLatestByRunId("r-1")).thenReturn(row);
 
         assertEquals(row, svc().latestRunIssue(TENANT, USER, "r-1"));
@@ -283,8 +300,8 @@ class RunLedgerServiceUnitTest {
 
     // ── 夹具 ─────────────────────────────────────────────────────────
 
-    private static DcsAssistantConversation conv(Long id, Long userId, String status) {
-        DcsAssistantConversation c = new DcsAssistantConversation();
+    private static AssistantConversation conv(Long id, Long userId, String status) {
+        AssistantConversation c = new AssistantConversation();
         c.setId(id);
         c.setTenantId(TENANT);
         c.setUserId(userId);
@@ -293,8 +310,8 @@ class RunLedgerServiceUnitTest {
         return c;
     }
 
-    private static DcsAssistantRun run(String runId, Long userId, String tenantId, String status) {
-        DcsAssistantRun r = new DcsAssistantRun();
+    private static AssistantRun run(String runId, Long userId, String tenantId, String status) {
+        AssistantRun r = new AssistantRun();
         r.setRunId(runId);
         r.setUserId(userId);
         r.setTenantId(tenantId);
@@ -303,8 +320,8 @@ class RunLedgerServiceUnitTest {
         return r;
     }
 
-    private static DcsAssistantRunIssue issue(String runId, Long userId, String tenantId) {
-        DcsAssistantRunIssue i = new DcsAssistantRunIssue();
+    private static AssistantRunIssue issue(String runId, Long userId, String tenantId) {
+        AssistantRunIssue i = new AssistantRunIssue();
         i.setRunId(runId);
         i.setUserId(userId);
         i.setTenantId(tenantId);

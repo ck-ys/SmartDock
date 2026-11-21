@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 「问数据」批·题6② 口径钉死: 已交判定 / 幂等键 / 截止倒计时人话 / 名单截断。
- * 纯函数层——定时任务与租户遍历的集成行为靠活体验收（手动触发一枪看 dcs_notice 落行）。
+ * 纯函数层——定时任务与租户遍历的集成行为靠活体验收（手动触发一枪看 notice 落行）。
  */
 @Tag("local")
 class AssistantDailyDigestJobTest {

@@ -3,7 +3,7 @@ package com.smartdock.assistant.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
+import com.smartdock.assistant.domain.model.AssistantFeedback;
 import com.smartdock.assistant.service.AssistantFeedbackService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
@@ -27,7 +27,7 @@ import java.util.Map;
  */
 @Tag(name = "助手反馈", description = "助手 👍👎 反馈：提交 + 管理端查询")
 @RestController
-@RequestMapping("/dcs/assistant")
+@RequestMapping("/assistant")
 @RequiredArgsConstructor
 public class AssistantFeedbackController extends BaseController {
 
@@ -35,7 +35,7 @@ public class AssistantFeedbackController extends BaseController {
 
     /** 提交反馈（perm=use；messageId 可空=整会话评价）。
      *  isSaveRequestData=false：note 是自由文本（可能含 PII），审计日志只记操作不记正文。 */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @Log(title = "AI助手-反馈", businessType = BusinessType.INSERT, isSaveRequestData = false)
     @PostMapping("/feedback")
     public R<Void> submit(@RequestBody Map<String, Object> body) {
@@ -52,22 +52,22 @@ public class AssistantFeedbackController extends BaseController {
     }
 
     /** Q10（AI 缺口批）：反馈聚合统计——好评率/点踩原因分布/近4周趋势（days 默认 28） */
-    @SaCheckPermission("dcs:assistant:feedback:query")
+    @SaCheckPermission("smartdock:assistant:feedback:query")
     @GetMapping("/feedback/stats")
     public R<Map<String, Object>> stats(@RequestParam(defaultValue = "28") int days) {
         return R.ok(feedbackService.stats(LoginHelper.getTenantId(), days));
     }
 
-    /** 管理端反馈列表（perm=feedback:query） */
-    @SaCheckPermission("dcs:assistant:feedback:query")
+    /** 管理端反馈列表（perm=smartdock:feedback:query） */
+    @SaCheckPermission("smartdock:assistant:feedback:query")
     @GetMapping("/feedback/list")
-    public TableDataInfo<DcsAssistantFeedback> list(
+    public TableDataInfo<AssistantFeedback> list(
         @RequestParam(defaultValue = "1") int pageNum, @RequestParam(defaultValue = "20") int pageSize) {
         int safePage = Math.max(1, pageNum);
         int safeSize = Math.min(Math.max(1, pageSize), 100);
-        List<DcsAssistantFeedback> rows = feedbackService.listForTenant(
+        List<AssistantFeedback> rows = feedbackService.listForTenant(
             LoginHelper.getTenantId(), safeSize, (safePage - 1) * safeSize);
-        TableDataInfo<DcsAssistantFeedback> data = TableDataInfo.build(rows);
+        TableDataInfo<AssistantFeedback> data = TableDataInfo.build(rows);
         data.setTotal(feedbackService.countForTenant(LoginHelper.getTenantId()));
         return data;
     }

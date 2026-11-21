@@ -1,8 +1,8 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.domain.DcsAiModelCapability;
-import com.smartdock.assistant.legacy.service.CapabilityService;
-import com.smartdock.assistant.legacy.service.CapabilityService.CapabilityVo;
+import com.smartdock.assistant.domain.model.AiModelCapability;
+import com.smartdock.assistant.service.CapabilityService;
+import com.smartdock.assistant.service.CapabilityService.CapabilityVo;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -21,9 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Tag("dev")
 class CapabilityMatchUnitTest {
 
-    private static DcsAiModelCapability row(String provider, String pattern, String kind,
+    private static AiModelCapability row(String provider, String pattern, String kind,
                                             String source, Integer order) {
-        DcsAiModelCapability r = new DcsAiModelCapability();
+        AiModelCapability r = new AiModelCapability();
         r.setProvider(provider);
         r.setModelPattern(pattern);
         r.setTierKind(kind);
@@ -49,8 +49,8 @@ class CapabilityMatchUnitTest {
     /** RF③：MANUAL 覆盖行压过同名 SEED 行 */
     @Test
     void manualOverridesSeed() {
-        DcsAiModelCapability seed = row("DEEPSEEK", "^deepseek-v4.*$", "TIERS", "SEED", 10);
-        DcsAiModelCapability manual = row("DEEPSEEK", "^deepseek\\-v4\\-flash$", "SWITCH", "MANUAL", 1);
+        AiModelCapability seed = row("DEEPSEEK", "^deepseek-v4.*$", "TIERS", "SEED", 10);
+        AiModelCapability manual = row("DEEPSEEK", "^deepseek\\-v4\\-flash$", "SWITCH", "MANUAL", 1);
         manual.setSemanticMap("{\"FAST\":\"disabled\",\"BALANCED\":\"enabled\",\"DEEP\":\"enabled\"}");
         CapabilityVo vo = CapabilityService.resolve(List.of(seed, manual), "DEEPSEEK", "deepseek-v4-flash");
         assertEquals("MANUAL", vo.getSource());
@@ -61,8 +61,8 @@ class CapabilityMatchUnitTest {
     /** SEED 内部：rule_order 小者（specific）先命中 */
     @Test
     void seedSpecificOrderWins() {
-        DcsAiModelCapability generic = row("MINIMAX", "^MiniMax-M3.*$", "SWITCH", "SEED", 10);
-        DcsAiModelCapability specific = row("MINIMAX", "^MiniMax-M3\\.1-Flash.*$", "TIERS", "SEED", 5);
+        AiModelCapability generic = row("MINIMAX", "^MiniMax-M3.*$", "SWITCH", "SEED", 10);
+        AiModelCapability specific = row("MINIMAX", "^MiniMax-M3\\.1-Flash.*$", "TIERS", "SEED", 5);
         specific.setTierValues("[\"low\",\"medium\",\"high\",\"xhigh\",\"max\"]");
         CapabilityVo vo = CapabilityService.resolve(List.of(generic, specific), "MINIMAX", "MiniMax-M3.1-Flash-Preview");
         assertEquals("SEED", vo.getSource());
@@ -73,7 +73,7 @@ class CapabilityMatchUnitTest {
     /** 兜底行（provider='*'）在厂商未收录时生效——longcat 类二态模型落兜底=正确答案 */
     @Test
     void wildcardRowCoversUnknownProvider() {
-        DcsAiModelCapability wildcard = row("*", ".*", "SWITCH", "SEED", 999);
+        AiModelCapability wildcard = row("*", ".*", "SWITCH", "SEED", 999);
         CapabilityVo vo = CapabilityService.resolve(List.of(wildcard), "SOMEONE", "brand-new-model");
         assertEquals("SEED", vo.getSource());
         assertEquals("SWITCH", vo.getTierKind());
@@ -83,8 +83,8 @@ class CapabilityMatchUnitTest {
     /** 坏正则行跳过不炸，落同组下一行 */
     @Test
     void badRegexRowSkipped() {
-        DcsAiModelCapability bad = row("QWEN", "^qwen[.*$", "TIERS", "SEED", 5);
-        DcsAiModelCapability good = row("QWEN", "^qwen.*$", "SWITCH", "SEED", 30);
+        AiModelCapability bad = row("QWEN", "^qwen[.*$", "TIERS", "SEED", 5);
+        AiModelCapability good = row("QWEN", "^qwen.*$", "SWITCH", "SEED", 30);
         CapabilityVo vo = CapabilityService.resolve(List.of(bad, good), "QWEN", "qwen3.7-max");
         assertEquals("SWITCH", vo.getTierKind());
         assertEquals("^qwen.*$", vo.getMatchedPattern());
@@ -101,7 +101,7 @@ class CapabilityMatchUnitTest {
     /** NONE（不支持思考）：档位与映射为空集合，不抛 NPE */
     @Test
     void noneKindParsesEmptyCollections() {
-        DcsAiModelCapability none = row("MINIMAX", "^MiniMax-M2.*$", "NONE", "SEED", 20);
+        AiModelCapability none = row("MINIMAX", "^MiniMax-M2.*$", "NONE", "SEED", 20);
         none.setTierValues("[]");
         none.setSemanticMap("{}");
         CapabilityVo vo = CapabilityService.resolve(List.of(none), "MINIMAX", "MiniMax-M2.7");

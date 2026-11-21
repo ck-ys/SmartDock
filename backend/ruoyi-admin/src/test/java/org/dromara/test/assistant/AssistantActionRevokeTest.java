@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.service.AssistantActionService;
+import com.smartdock.assistant.service.AssistantActionService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>护栏重点：①canRevoke 矩阵（DONE+锚点+白名单缺一不可，REVOKED/FAILED/REJECTED/
  * 无锚点/非白名单全拒）；②REVOCABLE_TOOLS 内容钉死（双处清单的助手侧半边——
- * provider 侧另半边在 DcsToolProvider.revoke，漂移即此断言红）；③parseRefId 尾段
+ * provider 侧另半边在 ToolProvider.revoke，漂移即此断言红）；③parseRefId 尾段
  * 直读（「（记录 #id）」尾段完整可解析=markDone/withRefTail 拼接口径成立；
  * 无尾段/垃圾→null 不猜）。</p>
  */
@@ -25,7 +25,7 @@ class AssistantActionRevokeTest {
     @Test
     void canRevokeMatrix() {
         assertTrue(AssistantActionService.canRevoke("DONE", 123L, "save_memory"), "DONE+锚点+save_memory→可撤");
-        assertTrue(AssistantActionService.canRevoke("DONE", 456L, "dcs_create_task"), "DONE+锚点+dcs_create_task→可撤");
+        assertTrue(AssistantActionService.canRevoke("DONE", 456L, "create_task"), "DONE+锚点+create_task→可撤");
 
         assertFalse(AssistantActionService.canRevoke("REVOKED", 123L, "save_memory"), "已撤回过→不可再撤");
         assertFalse(AssistantActionService.canRevoke("FAILED", 123L, "save_memory"), "失败执行→不可撤");
@@ -36,10 +36,10 @@ class AssistantActionRevokeTest {
         assertFalse(AssistantActionService.canRevoke(null, 123L, "save_memory"), "状态空→不可撤");
     }
 
-    /** 可撤白名单内容钉死：只认 save_memory / dcs_create_task（新增须双处登记，见常量注释） */
+    /** 可撤白名单内容钉死：只认 save_memory / create_task（新增须双处登记，见常量注释） */
     @Test
     void revocableToolsPinned() {
-        assertEquals(java.util.Set.of("save_memory", "dcs_create_task"),
+        assertEquals(java.util.Set.of("save_memory", "create_task"),
             AssistantActionService.REVOCABLE_TOOLS, "白名单漂移=完成卡撤回按钮口径漂移，须与 provider.revoke 同批改");
     }
 

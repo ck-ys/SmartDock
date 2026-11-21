@@ -2,9 +2,9 @@ package org.dromara.test.assistant;
 
 import io.agentscope.core.agui.adapter.strategy.AguiStreamContext;
 import io.agentscope.core.agui.event.AguiEvent;
-import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
-import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache.PendingInterrupt;
-import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
+import com.smartdock.assistant.engine.persist.AssistantPendingInterruptCache;
+import com.smartdock.assistant.engine.persist.AssistantPendingInterruptCache.PendingInterrupt;
+import com.smartdock.assistant.engine.persist.AssistantRunRecorder;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

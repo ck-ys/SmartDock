@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantConversation;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.service.ConversationMetaService;
 import org.dromara.common.core.exception.ServiceException;
@@ -46,7 +46,7 @@ class ConversationLineServicePinUnitTest {
      *  纯单测没有 Spring / MapperScan 帮忙初始化，这里手工种一次（不连库、不扫包）。 */
     static {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""),
-            DcsAssistantConversation.class);
+            AssistantConversation.class);
     }
 
     private static ServiceException catchServiceException(Runnable r) {
@@ -91,10 +91,10 @@ class ConversationLineServicePinUnitTest {
     @Test
     void byThread异主与不存在同判null() {
         AssistantConversationMapper mapper = mock(AssistantConversationMapper.class);
-        DcsAssistantConversation own = new DcsAssistantConversation();
+        AssistantConversation own = new AssistantConversation();
         own.setId(CONV_ID);
         own.setUserId(USER_ID);
-        DcsAssistantConversation other = new DcsAssistantConversation();
+        AssistantConversation other = new AssistantConversation();
         other.setId(CONV_ID);
         other.setUserId(OTHER_USER);
         when(mapper.selectByThread(TENANT, "t-own")).thenReturn(own);
@@ -115,7 +115,7 @@ class ConversationLineServicePinUnitTest {
         when(mapper.selectOwned(anyString(), anyLong(), anyLong())).thenReturn(owned());
         new ConversationMetaService(mapper).archiveConversation(TENANT, USER_ID, CONV_ID);
 
-        LambdaUpdateWrapper<DcsAssistantConversation> wrapper = captureUpdate(mapper);
+        LambdaUpdateWrapper<AssistantConversation> wrapper = captureUpdate(mapper);
         assertTrue(wrapper.getSqlSet().startsWith("status="), "归档 set 的列必须是 status，实际: " + wrapper.getSqlSet());
         assertThat(wrapper.getParamNameValuePairs().values())
             .as("归档写的值必须是 ARCHIVED").contains("ARCHIVED").doesNotContain("ACTIVE");
@@ -129,7 +129,7 @@ class ConversationLineServicePinUnitTest {
         when(mapper.selectOwned(anyString(), anyLong(), anyLong())).thenReturn(owned());
         new ConversationMetaService(mapper).restoreConversation(TENANT, USER_ID, CONV_ID);
 
-        LambdaUpdateWrapper<DcsAssistantConversation> wrapper = captureUpdate(mapper);
+        LambdaUpdateWrapper<AssistantConversation> wrapper = captureUpdate(mapper);
         assertTrue(wrapper.getSqlSet().startsWith("status="), "恢复 set 的列必须是 status，实际: " + wrapper.getSqlSet());
         assertThat(wrapper.getParamNameValuePairs().values())
             .as("恢复写的值必须是 ACTIVE").contains("ACTIVE").doesNotContain("ARCHIVED");
@@ -143,24 +143,24 @@ class ConversationLineServicePinUnitTest {
         when(mapper.selectOwned(anyString(), anyLong(), anyLong())).thenReturn(owned());
         new ConversationMetaService(mapper).renameConversation(TENANT, USER_ID, CONV_ID, "  新标题  ");
 
-        LambdaUpdateWrapper<DcsAssistantConversation> wrapper = captureUpdate(mapper);
+        LambdaUpdateWrapper<AssistantConversation> wrapper = captureUpdate(mapper);
         assertTrue(wrapper.getSqlSet().startsWith("title="), "重命名 set 的列必须是 title，实际: " + wrapper.getSqlSet());
         assertThat(wrapper.getParamNameValuePairs().values()).contains("新标题");
         assertThat(wrapper.getSqlSegment()).contains("tenant_id").containsPattern("\\bid\\b");
     }
 
-    private static DcsAssistantConversation owned() {
-        DcsAssistantConversation row = new DcsAssistantConversation();
+    private static AssistantConversation owned() {
+        AssistantConversation row = new AssistantConversation();
         row.setId(CONV_ID);
         row.setUserId(USER_ID);
         return row;
     }
 
     @SuppressWarnings("unchecked")
-    private static LambdaUpdateWrapper<DcsAssistantConversation> captureUpdate(
+    private static LambdaUpdateWrapper<AssistantConversation> captureUpdate(
         AssistantConversationMapper mapper) {
-        ArgumentCaptor<Wrapper<DcsAssistantConversation>> cap = ArgumentCaptor.forClass(Wrapper.class);
+        ArgumentCaptor<Wrapper<AssistantConversation>> cap = ArgumentCaptor.forClass(Wrapper.class);
         verify(mapper).update(isNull(), cap.capture());
-        return (LambdaUpdateWrapper<DcsAssistantConversation>) cap.getValue();
+        return (LambdaUpdateWrapper<AssistantConversation>) cap.getValue();
     }
 }

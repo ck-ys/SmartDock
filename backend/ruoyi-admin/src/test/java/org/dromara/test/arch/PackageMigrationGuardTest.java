@@ -283,4 +283,18 @@ class PackageMigrationGuardTest {
                     + " —— 批 3 已消包（额度线搬进新四层），请 mvn clean 后重建");
         }
     }
+
+    /** 批 9（2026-11-21）：legacy 整树清零（引擎包改名 engine.*、业务残壳搬四层）后，
+     *  com.smartdock.assistant.legacy 在 classpath 上必须整树缺席——目录级缺席比逐类点名强，
+     *  有人往旧包塞新文件（哪怕全新类名）也会被 getResources 扫出来。 */
+    @Test
+    void batch9LegacyTreeMustBeAbsentFromClasspath() throws Exception {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        for (String pkg : new String[] {"com/smartdock/assistant/legacy", "com/smartdock/dcs"}) {
+            List<URL> found = Collections.list(cl.getResources(pkg));
+            assertTrue(found.isEmpty(),
+                () -> pkg + " 残留在 classpath: " + found
+                    + " —— 批 9 已整树清零（engine.* / 四层），请 mvn clean 后重建");
+        }
+    }
 }

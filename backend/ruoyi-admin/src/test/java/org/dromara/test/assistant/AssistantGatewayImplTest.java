@@ -4,11 +4,11 @@ import com.smartdock.assistant.domain.gateway.ConversationReadGateway;
 import com.smartdock.assistant.domain.gateway.PromptCatalogGateway;
 import com.smartdock.assistant.infrastructure.ConversationReadGatewayImpl;
 import com.smartdock.assistant.infrastructure.PromptCatalogGatewayImpl;
-import com.smartdock.assistant.legacy.core.DateInjectModelDecorator;
-import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.domain.model.DcsAssistantMessage;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.engine.core.DateInjectModelDecorator;
+import com.smartdock.assistant.engine.core.MemoryInjectModelDecorator;
+import com.smartdock.assistant.domain.model.AssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantMessage;
+import com.smartdock.assistant.service.AssistantConfigService;
 import com.smartdock.assistant.query.ConversationQueryService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -48,7 +48,7 @@ class AssistantGatewayImplTest {
     @Test
     void 会话投影只带id与归属人_不存在返回null() {
         ConversationQueryService query = mock(ConversationQueryService.class);
-        DcsAssistantConversation row = new DcsAssistantConversation();
+        AssistantConversation row = new AssistantConversation();
         row.setId(CONV_ID);
         row.setUserId(USER_ID);
         when(query.conversationByThread(TENANT, "t-1")).thenReturn(row);
@@ -65,10 +65,10 @@ class AssistantGatewayImplTest {
     @Test
     void 消息投影保留角色正文与工具步骤且顺序不变() {
         ConversationQueryService query = mock(ConversationQueryService.class);
-        DcsAssistantMessage a = new DcsAssistantMessage();
+        AssistantMessage a = new AssistantMessage();
         a.setRole("user");
         a.setContent("hello");
-        DcsAssistantMessage b = new DcsAssistantMessage();
+        AssistantMessage b = new AssistantMessage();
         b.setRole("assistant");
         b.setContent("hi");
         b.setToolSteps("{\"tool\":\"x\"}");

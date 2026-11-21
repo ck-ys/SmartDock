@@ -15,7 +15,7 @@ import java.util.Map;
 /**
  * 风控行为埋点端口适配器（批3 微核心化，2026-10-18）。
  *
- * <p>旧 dcs 的 BehaviorEventServiceImpl（dcs_behavior_event 表底座）随模块退役。
+ * <p>旧 dcs 的 BehaviorEventServiceImpl（behavior_event 表底座）随模块退役。
  * 风控侧 RiskEventCollector 只写不读行为流水，行为账本在新架构里就是画像事件表
  * profile_event——本适配器把 record() 翻译成 source=risk 的画像事件，
  * 登录监听/RFM/风控埋点天然进画像重算口径。</p>

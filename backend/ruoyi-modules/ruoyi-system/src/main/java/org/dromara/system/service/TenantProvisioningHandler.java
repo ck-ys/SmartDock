@@ -17,10 +17,10 @@ package org.dromara.system.service;
  * @since 5.x
  */
 public interface TenantProvisioningHandler {
-    // ===== DCS 调用指南 =====
-    // DCS 实现: 2 个 Bean 实现此 SPI
-    //   - DcsRiskTenantProvisioningHandler: 初始化租户风控规则(敏感词/黑名单/验证码默认配置)
-    //   - DcsScoreTenantProvisioningHandler: 初始化租户评分规则(默认维度/权重/标签模板)
+    // ===== 实现指南 =====
+    // 实现: 当前 1 个 Bean 实现此 SPI
+    //   - RiskTenantProvisioningHandler: 初始化租户风控规则(敏感词/黑名单/验证码默认配置)
+    //   （批9 前另有 DcsScoreTenantProvisioningHandler 初始化评分规则, 已随评分线重构退役）
     // 扩展点: C1组织/C2定时任务等新模块如需租户初始化数据, 新增实现类即可(自动被 Spring 收集)
     // ⚠️ 注意: provision 内不要假设其他模块已初始化(调用顺序不保证), 模块间数据依赖需另行编排
     // ===== DCS 调用指南 结束 =====

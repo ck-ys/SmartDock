@@ -1,12 +1,12 @@
 package com.smartdock.service.support;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.DcsAiModelHealth;
-import com.smartdock.domain.vo.DcsAiTestResultVo;
-import com.smartdock.mapper.DcsAiConfigMapper;
-import com.smartdock.mapper.DcsAiModelHealthMapper;
-import com.smartdock.service.IDcsAiConfigService;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.AiModelHealth;
+import com.smartdock.domain.vo.AiTestResultVo;
+import com.smartdock.mapper.AiConfigMapper;
+import com.smartdock.mapper.AiModelHealthMapper;
+import com.smartdock.service.IAiConfigService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,13 +42,13 @@ import static org.mockito.Mockito.when;
 class ModelHealthSchedulerUnitTest {
 
     @Mock
-    private DcsAiModelHealthMapper healthMapper;
+    private AiModelHealthMapper healthMapper;
 
     @Mock
-    private DcsAiConfigMapper aiConfigMapper;
+    private AiConfigMapper aiConfigMapper;
 
     @Mock
-    private IDcsAiConfigService aiConfigService;
+    private IAiConfigService aiConfigService;
 
     @Mock
     private WalletAlertService walletAlertService;
@@ -76,19 +76,19 @@ class ModelHealthSchedulerUnitTest {
     @Test
     void probeOne_firstFail_insertsStreak1_noAlert() {
         ModelHealthScheduler s = scheduler();
-        when(aiConfigService.patrolProbe(9L)).thenReturn(new DcsAiTestResultVo(false, "401 Unauthorized"));
+        when(aiConfigService.patrolProbe(9L)).thenReturn(new AiTestResultVo(false, "401 Unauthorized"));
         when(healthMapper.selectOne(any(Wrapper.class))).thenReturn(null);
         lenient().when(aiConfigMapper.selectById(9L)).thenReturn(configRow());
 
         assertThat(s.probeOneForTest("000000", 9L)).isTrue();
 
-        ArgumentCaptor<DcsAiModelHealth> cap = ArgumentCaptor.forClass(DcsAiModelHealth.class);
+        ArgumentCaptor<AiModelHealth> cap = ArgumentCaptor.forClass(AiModelHealth.class);
         verify(healthMapper).insert(cap.capture());
         assertThat(cap.getValue().getStatus()).isEqualTo("FAIL");
         assertThat(cap.getValue().getFailStreak()).isEqualTo(1);
         assertThat(cap.getValue().getDetail()).isEqualTo("401 Unauthorized");
         assertThat(cap.getValue().getLatencyMs()).isNull();
-        verify(healthMapper, never()).updateById(any(DcsAiModelHealth.class));
+        verify(healthMapper, never()).updateById(any(AiModelHealth.class));
         verify(walletAlertService, never()).publishCreditAlert(anyString(), anyString(), anyString(), anyString(),
             anyString(), any(), anyString());
     }
@@ -96,15 +96,15 @@ class ModelHealthSchedulerUnitTest {
     @Test
     void probeOne_thirdConsecutiveFail_alertsMonthlyKey() {
         ModelHealthScheduler s = scheduler();
-        when(aiConfigService.patrolProbe(9L)).thenReturn(new DcsAiTestResultVo(false, "timeout"));
-        DcsAiModelHealth prev = new DcsAiModelHealth();
+        when(aiConfigService.patrolProbe(9L)).thenReturn(new AiTestResultVo(false, "timeout"));
+        AiModelHealth prev = new AiModelHealth();
         prev.setFailStreak(2);
         when(healthMapper.selectOne(any(Wrapper.class))).thenReturn(prev);
         lenient().when(aiConfigMapper.selectById(9L)).thenReturn(configRow());
 
         s.probeOneForTest("000000", 9L);
 
-        ArgumentCaptor<DcsAiModelHealth> cap = ArgumentCaptor.forClass(DcsAiModelHealth.class);
+        ArgumentCaptor<AiModelHealth> cap = ArgumentCaptor.forClass(AiModelHealth.class);
         verify(healthMapper).updateById(cap.capture());
         assertThat(cap.getValue().getFailStreak()).isEqualTo(3);
         verify(walletAlertService).publishCreditAlert(eq("000000"), eq("MODEL_HEALTH_DOWN"),
@@ -114,15 +114,15 @@ class ModelHealthSchedulerUnitTest {
     @Test
     void probeOne_recoveryResetsStreak_noAlert() {
         ModelHealthScheduler s = scheduler();
-        when(aiConfigService.patrolProbe(9L)).thenReturn(new DcsAiTestResultVo(true, "连接成功", 812L));
-        DcsAiModelHealth prev = new DcsAiModelHealth();
+        when(aiConfigService.patrolProbe(9L)).thenReturn(new AiTestResultVo(true, "连接成功", 812L));
+        AiModelHealth prev = new AiModelHealth();
         prev.setFailStreak(3);
         when(healthMapper.selectOne(any(Wrapper.class))).thenReturn(prev);
         lenient().when(aiConfigMapper.selectById(9L)).thenReturn(configRow());
 
         assertThat(s.probeOneForTest("000000", 9L)).isFalse();
 
-        ArgumentCaptor<DcsAiModelHealth> cap = ArgumentCaptor.forClass(DcsAiModelHealth.class);
+        ArgumentCaptor<AiModelHealth> cap = ArgumentCaptor.forClass(AiModelHealth.class);
         verify(healthMapper).updateById(cap.capture());
         assertThat(cap.getValue().getStatus()).isEqualTo("OK");
         assertThat(cap.getValue().getFailStreak()).isZero();
@@ -138,8 +138,8 @@ class ModelHealthSchedulerUnitTest {
 
         assertThat(s.probeOneForTest("000000", 9L)).isFalse();
 
-        verify(healthMapper, never()).insert(any(DcsAiModelHealth.class));
-        verify(healthMapper, never()).updateById(any(DcsAiModelHealth.class));
+        verify(healthMapper, never()).insert(any(AiModelHealth.class));
+        verify(healthMapper, never()).updateById(any(AiModelHealth.class));
     }
 
     @Test
@@ -174,8 +174,8 @@ class ModelHealthSchedulerUnitTest {
         assertThat(s.resolveTargetsForTest("000000", new Date())).containsExactly(9L);
     }
 
-    private DcsAiConfig configRow() {
-        DcsAiConfig c = new DcsAiConfig();
+    private AiConfig configRow() {
+        AiConfig c = new AiConfig();
         c.setProvider("SILICONFLOW");
         c.setModelName("Qwen/Qwen3-8B");
         c.setEnabled("1");

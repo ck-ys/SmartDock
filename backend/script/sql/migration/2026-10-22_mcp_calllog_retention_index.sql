@@ -3,5 +3,5 @@
 -- 索引前导列分别是 tenant_id / server_name，create_time 无前导索引 → 每批顺序扫
 -- （dspro/dsflash 双席共识 P2）。本索引专供清理路径；可重复执行。
 
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_create_time
-    ON public.dcs_mcp_call_log (create_time);
+CREATE INDEX IF NOT EXISTS idx_mcp_call_create_time
+    ON public.mcp_call_log (create_time);

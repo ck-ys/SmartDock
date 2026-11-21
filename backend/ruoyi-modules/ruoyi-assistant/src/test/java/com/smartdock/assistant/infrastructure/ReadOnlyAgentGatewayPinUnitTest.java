@@ -1,6 +1,6 @@
 package com.smartdock.assistant.infrastructure;
 
-import com.smartdock.assistant.legacy.core.AssistantAgentFactory;
+import com.smartdock.assistant.engine.core.AssistantAgentFactory;
 import io.agentscope.core.ReActAgent;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.junit.jupiter.api.Tag;

@@ -2,9 +2,9 @@ package org.dromara.test.assistant;
 
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.bo.DcsAiConfigBo;
-import com.smartdock.service.IDcsAiConfigService;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.bo.AiConfigBo;
+import com.smartdock.service.IAiConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -58,7 +58,7 @@ class J1AiConfigResolverTest {
         " config_id BETWEEN 9199100000000001 AND 9199100000000099 ";
 
     @Autowired
-    IDcsAiConfigService aiConfigService;
+    IAiConfigService aiConfigService;
     @Autowired
     DataSource ds;
 
@@ -68,14 +68,14 @@ class J1AiConfigResolverTest {
      */
     @Test
     void resolvePicksNewestByUpdateTimeWhenNoStar() throws Exception {
-        // 同租户每厂商仅一行活行(uk_dcs_ai_config_tenant_provider 部分唯一索引), 两行分用厂商;
+        // 同租户每厂商仅一行活行(uk_ai_config_tenant_provider 部分唯一索引), 两行分用厂商;
         // 旧行也过闸(FIXED 免费豁免)——排序若回归会在 modelName 断言上干净暴露, 而非闸异常噪音
         exec(cfgSql(9199100000000001L, T_ORDER, "OPENCODE", "longcat-2.5-preview-free", "FIXED_PER_CALL", "0", "1", null)
             + ", '2026-01-01 00:00:00')");
         exec(cfgSql(9199100000000002L, T_ORDER, "DEEPSEEK", "deepseek-v4-pro", "OFFICIAL_TOKEN", null, "1", null)
                 .replace(", 'CHAT',", ", 'EMBEDDING',")
             + ", '2026-06-01 00:00:00')");
-        DcsAiConfig cfg = aiConfigService.resolveEnabledConfig(T_ORDER, null);
+        AiConfig cfg = aiConfigService.resolveEnabledConfig(T_ORDER, null);
         assertEquals("deepseek-v4-pro", cfg.getModelName(), "无星回退必须取 update_time 最新可用行");
         assertEquals(9199100000000002L, cfg.getConfigId());
         assertEquals("EMBEDDING", cfg.getUseType());
@@ -89,7 +89,7 @@ class J1AiConfigResolverTest {
             + ", '2026-01-01 00:00:00')");
         exec(cfgSql(9199100000000004L, T_STAR, "DEEPSEEK", "deepseek-v4-flash", "OFFICIAL_TOKEN", null, "1", null)
             + ", '2026-06-01 00:00:00')");
-        DcsAiConfig cfg = aiConfigService.resolveEnabledConfig(T_STAR, "CHAT");
+        AiConfig cfg = aiConfigService.resolveEnabledConfig(T_STAR, "CHAT");
         assertEquals("longcat-2.5-preview-free", cfg.getModelName(), "★默认行必须优先于更新的无星行");
         assertEquals(9199100000000003L, cfg.getConfigId());
     }
@@ -102,7 +102,7 @@ class J1AiConfigResolverTest {
             + ", '2026-01-01 00:00:00')");
         exec(cfgSql(9199100000000008L, T_STAR, "DEEPSEEK", "deepseek-v4-flash", "OFFICIAL_TOKEN", null, "1", null)
             + ", '2026-06-01 00:00:00')");
-        DcsAiConfig cfg = aiConfigService.resolveEnabledConfig(T_STAR, "CHAT");
+        AiConfig cfg = aiConfigService.resolveEnabledConfig(T_STAR, "CHAT");
         assertEquals("deepseek-v4-flash", cfg.getModelName(), "停用★必须被跳过, 回退可用行");
         assertEquals(9199100000000008L, cfg.getConfigId());
     }
@@ -131,7 +131,7 @@ class J1AiConfigResolverTest {
     void resolveAllowsFixedFreeWithoutPriceRow() throws Exception {
         exec(cfgSql(9199100000000006L, T_FIXED, "OPENCODE", "longcat-2.5-preview-free", "FIXED_PER_CALL", "0", "1", null)
             + ", '2026-06-01 00:00:00')");
-        DcsAiConfig cfg = aiConfigService.resolveEnabledConfig(T_FIXED, "CHAT");
+        AiConfig cfg = aiConfigService.resolveEnabledConfig(T_FIXED, "CHAT");
         assertEquals("FIXED_PER_CALL", cfg.getBillingMode(), "真免费豁免必须放行");
     }
 
@@ -172,7 +172,7 @@ class J1AiConfigResolverTest {
             + ", '2026-01-01 00:00:00')");
         exec(cfgSql(9199100000000015L, T_GUARD, "OPENAI", "gpt-4.1-mini", "OFFICIAL_TOKEN", null, "0", null)
             + ", '2026-01-01 00:00:00')");
-        DcsAiConfigBo patch = bo(T_GUARD, "OPENAI", "gpt-4.1-mini", "1");
+        AiConfigBo patch = bo(T_GUARD, "OPENAI", "gpt-4.1-mini", "1");
         patch.setConfigId(9199100000000015L);
         patch.setIsDefault("1");
         try (var login = mockStatic(LoginHelper.class)) {
@@ -227,7 +227,7 @@ class J1AiConfigResolverTest {
 
     /**
      * ④批3: DB 唯一默认索引——同租户同用途第二条带星行被部分唯一索引拒绝
-     * (uk_dcs_ai_config_tenant_default; 竞态窗口由索引封死, 人话转译在 Service 层 catch)。
+     * (uk_ai_config_tenant_default; 竞态窗口由索引封死, 人话转译在 Service 层 catch)。
      */
     @Test
     void uniqueDefaultIndexRejectsSecondStar() throws Exception {
@@ -237,14 +237,14 @@ class J1AiConfigResolverTest {
         boolean rejected = false;
         try (Connection c = ds.getConnection();
              PreparedStatement ps = c.prepareStatement(
-                 "INSERT INTO dcs_ai_config (config_id, tenant_id, provider, base_url, api_key, model_name,"
+                 "INSERT INTO ai_config (config_id, tenant_id, provider, base_url, api_key, model_name,"
                  + " use_type, enabled, is_default, del_flag, update_time) VALUES (9199100000000020, '" + T_GUARD
                  + "', 'QWEN', 'https://api.example.com/v1', 'x', 'qwen3.7-max', 'CHAT', '1', '1', '0', CURRENT_TIMESTAMP)")) {
             ps.executeUpdate();
         } catch (java.sql.SQLException e) {
-            rejected = e.getMessage().contains("uk_dcs_ai_config_tenant_default");
+            rejected = e.getMessage().contains("uk_ai_config_tenant_default");
         }
-        assertTrue(rejected, "并发双星必须被部分唯一索引拒绝(uk_dcs_ai_config_tenant_default)");
+        assertTrue(rejected, "并发双星必须被部分唯一索引拒绝(uk_ai_config_tenant_default)");
     }
 
     /** ⑤resolveConfigById(助手默认槽供值): 可用行放行(同 CNY 闸, FIXED 免费夹具) */
@@ -252,7 +252,7 @@ class J1AiConfigResolverTest {
     void resolveConfigByIdAllowsUsableRow() throws Exception {
         exec(cfgSql(9199100000000021L, T_STAR, "OPENCODE", "longcat-2.5-preview-free", "FIXED_PER_CALL", "0", "1", null)
             + ", '2026-01-01 00:00:00')");
-        DcsAiConfig cfg = aiConfigService.resolveConfigById(T_STAR, 9199100000000021L);
+        AiConfig cfg = aiConfigService.resolveConfigById(T_STAR, 9199100000000021L);
         assertEquals("longcat-2.5-preview-free", cfg.getModelName());
     }
 
@@ -279,13 +279,13 @@ class J1AiConfigResolverTest {
     /** EMBEDDING 同闸同源: 000000 嵌入行过 CNY 闸(价格行由 migration_20261008_05 补种; 批3 migration 已带★) */
     @Test
     void embeddingPathPassesGateWithSeededCnyRow() {
-        DcsAiConfig cfg = aiConfigService.resolveEnabledConfig("000000", "EMBEDDING");
+        AiConfig cfg = aiConfigService.resolveEnabledConfig("000000", "EMBEDDING");
         assertEquals("Qwen/Qwen3-Embedding-8B", cfg.getModelName(), "嵌入行必须过闸可用");
     }
 
     /** 构造合法新增 BO(normalize 会补齐缺省字段, 这里只填必填+被测字段) */
-    private DcsAiConfigBo bo(String tenantId, String provider, String modelName, String enabled) {
-        DcsAiConfigBo b = new DcsAiConfigBo();
+    private AiConfigBo bo(String tenantId, String provider, String modelName, String enabled) {
+        AiConfigBo b = new AiConfigBo();
         b.setTenantId(tenantId);
         b.setProvider(provider);
         b.setBaseUrl("https://api.example.com/v1");
@@ -301,7 +301,7 @@ class J1AiConfigResolverTest {
                           String billingMode, String unitPrice, String enabled, String star) {
         String price = unitPrice == null ? "NULL" : unitPrice;
         String starVal = star == null ? "NULL" : "'" + star + "'";
-        return "INSERT INTO dcs_ai_config (config_id, tenant_id, provider, base_url, api_key, model_name,"
+        return "INSERT INTO ai_config (config_id, tenant_id, provider, base_url, api_key, model_name,"
             + " use_type, enabled, is_default, del_flag, billing_mode, unit_price_per_call, update_time) VALUES ("
             + id + ", '" + tenant + "', '" + provider + "', 'https://api.example.com/v1', 'x', '" + model
             + "', 'CHAT', '" + enabled + "', " + starVal + ", '0', '" + billingMode + "', " + price;
@@ -318,7 +318,7 @@ class J1AiConfigResolverTest {
     private String colOf(String col, long configId) throws Exception {
         try (Connection c = ds.getConnection();
              PreparedStatement ps = c.prepareStatement(
-                 "SELECT " + col + " FROM dcs_ai_config WHERE config_id=" + configId);
+                 "SELECT " + col + " FROM ai_config WHERE config_id=" + configId);
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next(), "行必须存在: " + configId);
             return rs.getString(1);
@@ -327,7 +327,7 @@ class J1AiConfigResolverTest {
 
     @AfterEach
     void cleanFixture() throws Exception {
-        exec("DELETE FROM dcs_ai_config WHERE" + FIXTURE_ID_RANGE
+        exec("DELETE FROM ai_config WHERE" + FIXTURE_ID_RANGE
             + " OR tenant_id IN ('" + T_ORDER + "','" + T_EMPTY + "','" + T_USD + "','"
             + T_GUARD + "','" + T_FIXED + "','" + T_STAR + "')");
     }

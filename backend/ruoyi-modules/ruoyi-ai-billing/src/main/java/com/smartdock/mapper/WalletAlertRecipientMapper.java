@@ -11,7 +11,7 @@ import java.util.List;
  *
  * <p>背景: 原 WalletAlertService.findTenantAdminUserIds 按"userId≤2 即管理员"的简化约定圈人,
  * 无 userId≤2 用户的租户(如 900001)低余额告警静默无人接收。本 Mapper 按 sys_user_role 关联
- * 真角色解析, 口径与 dcs 侧 DcsChangelogMapper.selectAllTenantAdmins 一致(role_key='admin',
+ * 真角色解析, 口径与 dcs 侧 ChangelogMapper.selectAllTenantAdmins 一致(role_key='admin',
  * 角色启用、在职未删)。</p>
  *
  * <p>类级 {@code @InterceptorIgnore(tenantLine="true")}: 调度线程无租户上下文, 显式租户谓词

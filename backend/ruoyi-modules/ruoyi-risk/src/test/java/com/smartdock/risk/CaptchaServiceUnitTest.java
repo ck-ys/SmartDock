@@ -1,6 +1,6 @@
 package com.smartdock.risk;
 
-import com.smartdock.risk.mapper.DcsCaptchaLogMapper;
+import com.smartdock.risk.mapper.CaptchaLogMapper;
 import com.smartdock.risk.service.CaptchaPassService;
 import com.smartdock.risk.service.CaptchaPassService.PassBinding;
 import com.smartdock.risk.service.CaptchaService;
@@ -144,7 +144,7 @@ class CaptchaServiceUnitTest {
         when(deliveryService.deliver(eq(7L), anyString(), eq(Duration.ofSeconds(300))))
             .thenReturn(new OtpDeliveryService.DeliveryReceipt("a***@example.com"));
         CaptchaService service = new CaptchaService(
-            mock(DcsCaptchaLogMapper.class),
+            mock(CaptchaLogMapper.class),
             mock(CaptchaPassService.class),
             client,
             deliveryService
@@ -160,7 +160,7 @@ class CaptchaServiceUnitTest {
 
     private CaptchaService service(RedissonClient client, CaptchaPassService passService) {
         return new CaptchaService(
-            mock(DcsCaptchaLogMapper.class),
+            mock(CaptchaLogMapper.class),
             passService,
             client,
             mock(OtpDeliveryService.class)

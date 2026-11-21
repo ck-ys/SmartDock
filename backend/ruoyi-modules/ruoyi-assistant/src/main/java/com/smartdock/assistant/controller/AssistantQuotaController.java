@@ -22,20 +22,20 @@ import java.util.Map;
 /**
  * 用户额度管理端点（业务批3-③ #16，2026-10-12）。
  *
- * <p>页面读走 perm=dcs:assistant:config（管理页同源），四个操作端点走
- * perm=dcs:assistant:quota:edit（菜单 F 按钮 11935 独立授权——可只发查询权不发操作权）。
+ * <p>页面读走 perm=smartdock:assistant:config（管理页同源），四个操作端点走
+ * perm=smartdock:assistant:quota:edit（菜单 F 按钮 11935 独立授权——可只发查询权不发操作权）。
  * 操作审计走 @Log（sys_oper_log 标准通道）。</p>
  */
 @Tag(name = "AI助手-用户额度", description = "单人上限覆盖/重置/禁用/启用")
 @RestController
-@RequestMapping("/dcs/assistant/quota")
+@RequestMapping("/assistant/quota")
 @RequiredArgsConstructor
 public class AssistantQuotaController extends BaseController {
 
     private final AssistantUserQuotaService quotaService;
 
     /** 用户额度页数据（分页行：用户/部门/覆盖值/今日回合/本月费用/状态）；pageSize 收口 ≤100 防逐行 Redis 放大 */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping("/page")
     public R<Map<String, Object>> page(@RequestParam(required = false) String keyword,
                                        @RequestParam(required = false) String disabledOnly,
@@ -46,7 +46,7 @@ public class AssistantQuotaController extends BaseController {
     }
 
     /** 重置某用户今日额度（DEL 当日回合计数键，立即恢复可用） */
-    @SaCheckPermission("dcs:assistant:quota:edit")
+    @SaCheckPermission("smartdock:assistant:quota:edit")
     @Log(title = "AI助手-额度重置", businessType = BusinessType.UPDATE)
     @PostMapping("/reset")
     public R<Void> reset(@RequestBody Map<String, Object> body) {
@@ -55,7 +55,7 @@ public class AssistantQuotaController extends BaseController {
     }
 
     /** 单人限额覆盖（roundLimit/websearchLimit，null=清空跟随租户默认）；铁律#21：PUT→POST（2026-10-16 批17 Q4） */
-    @SaCheckPermission("dcs:assistant:quota:edit")
+    @SaCheckPermission("smartdock:assistant:quota:edit")
     @Log(title = "AI助手-额度限额", businessType = BusinessType.UPDATE)
     @PostMapping("/limits")
     public R<Void> limits(@RequestBody Map<String, Object> body) {
@@ -65,7 +65,7 @@ public class AssistantQuotaController extends BaseController {
     }
 
     /** 禁用（该用户全部助手请求被拒，人话 429） */
-    @SaCheckPermission("dcs:assistant:quota:edit")
+    @SaCheckPermission("smartdock:assistant:quota:edit")
     @Log(title = "AI助手-额度禁用", businessType = BusinessType.UPDATE)
     @PostMapping("/disable")
     public R<Void> disable(@RequestBody Map<String, Object> body) {
@@ -74,7 +74,7 @@ public class AssistantQuotaController extends BaseController {
     }
 
     /** 启用（恢复） */
-    @SaCheckPermission("dcs:assistant:quota:edit")
+    @SaCheckPermission("smartdock:assistant:quota:edit")
     @Log(title = "AI助手-额度启用", businessType = BusinessType.UPDATE)
     @PostMapping("/enable")
     public R<Void> enable(@RequestBody Map<String, Object> body) {

@@ -16,7 +16,7 @@ import java.util.TimeZone;
  * 多视角审查问卷 E2/Q5 拍板升级：时区不对直接拒绝启动。本类仍不做任何"拨正"（不写数据、
  * 不改时区），只拒启，与 09-17"不做拨正"拍板不冲突。</p>
  *
- * <p>逃生开关：确需在非北京时区跑对比测试时，显式带 {@code -Ddcs.timezone.enforce=false}
+ * <p>逃生开关：确需在非北京时区跑对比测试时，显式带 {@code -Dtimezone.enforce=false}
  * 启动（默认强制）。开关只在日志留痕，不降低默认防线。</p>
  */
 @Slf4j
@@ -26,8 +26,8 @@ public class TimezoneStartupRunner implements ApplicationRunner {
     /** 北京时间原始偏移毫秒数（GMT+8，不含夏令时） */
     private static final int BEIJING_RAW_OFFSET_MILLIS = 8 * 3600 * 1000;
 
-    /** 逃生开关：-Ddcs.timezone.enforce=false 时只告警不拒启（默认强制） */
-    static final String ENFORCE_PROPERTY = "dcs.timezone.enforce";
+    /** 逃生开关：-Dtimezone.enforce=false 时只告警不拒启（默认强制） */
+    static final String ENFORCE_PROPERTY = "timezone.enforce";
 
     @Override
     public void run(ApplicationArguments args) {

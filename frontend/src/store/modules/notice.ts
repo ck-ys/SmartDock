@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
-import { myNotices, markNoticeRead, type DcsNoticeRow } from '@/api/dcs/core/notice';
+import { myNotices, markNoticeRead, type NoticeRow } from '@/api/smartdock/core/notice';
 import { isPersistedNotice, isNoticeUnread, markNoticeItemRead } from './notice-helpers';
 
 interface RealtimeNoticeItem {
@@ -10,7 +10,7 @@ interface RealtimeNoticeItem {
   time: string;
 }
 
-/** 持久化通知(铃铛侧统一形状): /dcs/notice/my 行映射为 helpers 认识的 noticeId/readStatus */
+/** 持久化通知(铃铛侧统一形状): /notice/my 行映射为 helpers 认识的 noticeId/readStatus */
 export interface PersistedNoticeItem {
   noticeId: string;
   noticeType?: string;
@@ -24,7 +24,7 @@ export interface PersistedNoticeItem {
 
 export type NoticeItem = PersistedNoticeItem | RealtimeNoticeItem;
 
-const toPersisted = (row: DcsNoticeRow): PersistedNoticeItem => ({
+const toPersisted = (row: NoticeRow): PersistedNoticeItem => ({
   noticeId: row.id,
   noticeType: row.noticeType,
   title: row.title,
@@ -70,7 +70,7 @@ export const useNoticeStore = defineStore('notice', () => {
       // allSettled 防连坐——未读数单点失败不得拖垮通知列表(列表成功就照常渲染, 三审 P1)
       const [listResult] = await Promise.allSettled([myNotices({ pageNum: 1, pageSize: 8 }) as any, refreshUnreadCount()]);
       if (listResult.status === 'fulfilled') {
-        const rows: DcsNoticeRow[] = listResult.value?.rows || [];
+        const rows: NoticeRow[] = listResult.value?.rows || [];
         state.notices = rows.map(toPersisted);
       }
     } finally {

@@ -87,7 +87,7 @@ class B3IsolationE2eTest {
         body.put("state", new LinkedHashMap<>());
         body.put("forwardedProps", new LinkedHashMap<>());
 
-        HttpURLConnection conn = (HttpURLConnection) new URL(BASE + "/agui/run/dcs-assistant").openConnection();
+        HttpURLConnection conn = (HttpURLConnection) new URL(BASE + "/agui/run/smartdock-assistant").openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("Authorization", "Bearer " + token);
@@ -236,7 +236,7 @@ class B3IsolationE2eTest {
         }
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(
-                 "SELECT tenant_id FROM dcs_mission WHERE mission_id = ?")) {
+                 "SELECT tenant_id FROM mission WHERE mission_id = ?")) {
             for (String mid : missionIds) {
                 ps.setLong(1, Long.parseLong(mid));
                 try (ResultSet rs = ps.executeQuery()) {

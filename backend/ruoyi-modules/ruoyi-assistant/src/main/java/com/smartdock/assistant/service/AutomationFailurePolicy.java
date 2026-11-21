@@ -2,7 +2,7 @@ package com.smartdock.assistant.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.mapper.DcsAutomationMapper;
+import com.smartdock.assistant.mapper.AutomationMapper;
 import org.springframework.stereotype.Component;
 
 /**
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AutomationFailurePolicy {
 
-    private final DcsAutomationMapper automationMapper;
+    private final AutomationMapper automationMapper;
 
     /**
      * 失败次数 +1；达到 {@link AutomationSchedule#FAILURE_LIMIT} 自动停用。

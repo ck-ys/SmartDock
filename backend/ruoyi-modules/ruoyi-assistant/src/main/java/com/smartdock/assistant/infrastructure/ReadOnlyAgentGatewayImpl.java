@@ -1,7 +1,7 @@
 package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.ReadOnlyAgentGateway;
-import com.smartdock.assistant.legacy.core.AssistantAgentFactory;
+import com.smartdock.assistant.engine.core.AssistantAgentFactory;
 import io.agentscope.core.ReActAgent;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.model.LoginUser;

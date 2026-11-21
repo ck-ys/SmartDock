@@ -5,10 +5,10 @@ import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.risk.domain.DcsRiskRule;
+import com.smartdock.risk.domain.RiskRule;
 import com.smartdock.risk.domain.vo.RiskRuleScoreVo;
-import com.smartdock.risk.mapper.DcsRiskEventMapper;
-import com.smartdock.risk.mapper.DcsRiskRuleMapper;
+import com.smartdock.risk.mapper.RiskEventMapper;
+import com.smartdock.risk.mapper.RiskRuleMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.Calendar;
@@ -30,7 +30,7 @@ import java.util.List;
  *   <li>L3 高风险: 扭曲码 + 手机 OTP</li>
  *   <li>L4 极高危: 邮箱 + OTP + 临时封禁</li>
  * </ul>
- * 阈值来自 dcs_risk_rule(可配置)。</p>
+ * 阈值来自 risk_rule(可配置)。</p>
  *
  * @author smartdock
  */
@@ -46,9 +46,9 @@ public class RiskScoreService {
     public static final int LEVEL_L4 = 4;
 
     /** 风险事件 Mapper(滑动窗口内累计评分) */
-    private final DcsRiskEventMapper eventMapper;
+    private final RiskEventMapper eventMapper;
     /** 风险规则 Mapper(取全局阈值/窗口) */
-    private final DcsRiskRuleMapper ruleMapper;
+    private final RiskRuleMapper ruleMapper;
     /** 混合风控策略(按类型/全局取严决策) */
     private final HybridRiskPolicy hybridRiskPolicy;
 
@@ -82,10 +82,10 @@ public class RiskScoreService {
 
         // 步骤3: 加载 GLOBAL 规则(全局阈值, 只有一条 enabled 的)
         // 显式租户条件与 eventRuleScores(S-1)同款: 拦截器之外的第二层防线, 口径统一
-        DcsRiskRule globalRule = ruleMapper.selectOne(new LambdaQueryWrapper<DcsRiskRule>()
-            .eq(DcsRiskRule::getRuleScope, "GLOBAL")
-            .eq(DcsRiskRule::getEnabled, "1")
-            .eq(DcsRiskRule::getTenantId, tenantId)
+        RiskRule globalRule = ruleMapper.selectOne(new LambdaQueryWrapper<RiskRule>()
+            .eq(RiskRule::getRuleScope, "GLOBAL")
+            .eq(RiskRule::getEnabled, "1")
+            .eq(RiskRule::getTenantId, tenantId)
             .last("LIMIT 1"));
         int globalScore = 0;
         int globalLevel = LEVEL_L0;
@@ -135,7 +135,7 @@ public class RiskScoreService {
     /**
      * 按阈值解析风险等级。
      */
-    public int resolveLevel(int score, DcsRiskRule rule) {
+    public int resolveLevel(int score, RiskRule rule) {
         if (rule == null) {
             // 默认阈值(与 DDL seed 一致)
             if (score >= 80) return LEVEL_L4;

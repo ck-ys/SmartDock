@@ -13,7 +13,7 @@ import java.util.Date;
  * 展示该用户<b>最新一条</b>快照的评分字段, 外加积压快照数与首末入队时间;
  * 配合 review-user 端点(按人一键复核)消化同人全部积压。</p>
  *
- * <p>字段由 {@code DcsProfileReviewMapper.selectPendingAggregate} 的 SQL 别名直接映射。</p>
+ * <p>字段由 {@code ProfileReviewMapper.selectPendingAggregate} 的 SQL 别名直接映射。</p>
  *
  * @author smartdock
  */

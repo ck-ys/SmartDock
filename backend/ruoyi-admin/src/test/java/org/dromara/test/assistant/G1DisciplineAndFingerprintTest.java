@@ -1,10 +1,10 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.core.AssistantModelChoiceHolder;
-import com.smartdock.assistant.legacy.core.PromptAssets;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.engine.core.AssistantModelChoiceHolder;
+import com.smartdock.assistant.engine.core.PromptAssets;
+import com.smartdock.assistant.engine.core.ToolRegistry;
+import com.smartdock.assistant.service.AssistantConfigService;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -100,7 +100,7 @@ class G1DisciplineAndFingerprintTest {
         Map<String, String> b = new HashMap<>();
         b.put("y", "member");
         b.put("x", "off");
-        int trigger = com.smartdock.assistant.legacy.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
+        int trigger = com.smartdock.assistant.engine.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
         assertEquals(AssistantModelChoiceHolder.assemblyFingerprint(cfg(a, "1", 60000), trigger, true),
             AssistantModelChoiceHolder.assemblyFingerprint(cfg(b, "1", 60000), trigger, true),
             "toolGate 键序不得影响指纹（HashMap 序不定）");
@@ -108,7 +108,7 @@ class G1DisciplineAndFingerprintTest {
 
     @Test
     void configRebuildTriggersOnlyOnChange() {
-        int trigger = com.smartdock.assistant.legacy.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
+        int trigger = com.smartdock.assistant.engine.core.AssistantCompactionPolicy.deriveTriggerTokens(128_000, 32_000);
         String f1 = AssistantModelChoiceHolder.assemblyFingerprint(cfg(Map.of("t", "off"), "1", 60000), trigger, true);
         AssistantModelChoiceHolder.markConfigBuilt("g1-test-thread", f1);
         assertFalse(AssistantModelChoiceHolder.needsConfigRebuild("g1-test-thread", f1), "同指纹不重建");

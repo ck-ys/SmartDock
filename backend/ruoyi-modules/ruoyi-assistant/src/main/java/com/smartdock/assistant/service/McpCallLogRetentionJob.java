@@ -1,7 +1,7 @@
 package com.smartdock.assistant.service;
 
 import com.baomidou.lock.annotation.Lock4j;
-import com.smartdock.assistant.mapper.DcsMcpCallLogMapper;
+import com.smartdock.assistant.mapper.McpCallLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,7 +29,7 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class McpCallLogRetentionJob {
 
-    private final DcsMcpCallLogMapper callLogMapper;
+    private final McpCallLogMapper callLogMapper;
 
     @Lock4j(name = "assistant-mcp-call-log-sweep", keys = {"'assistant-mcp-call-log-sweep'"})
     @Scheduled(cron = "0 55 3 * * ?")

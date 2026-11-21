@@ -1,6 +1,6 @@
 package com.smartdock.risk;
 
-import com.smartdock.risk.domain.DcsRiskWhitelist;
+import com.smartdock.risk.domain.RiskWhitelist;
 import com.smartdock.risk.service.RiskWhitelistPolicy;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,7 @@ class RiskWhitelistPolicyUnitTest {
 
     @Test
     void normalizesAndClearsClientControlledFields() {
-        DcsRiskWhitelist entry = entry(" ip ", " 192.168.1.10 ");
+        RiskWhitelist entry = entry(" ip ", " 192.168.1.10 ");
         entry.setWhitelistId(99L);
         entry.setTenantId("forged");
         entry.setCreateDept(91L);
@@ -52,19 +52,19 @@ class RiskWhitelistPolicyUnitTest {
 
     @Test
     void rejectsOversizedReasonAndInvalidEnabledFlag() {
-        DcsRiskWhitelist oversized = entry("IP", "127.0.0.1");
+        RiskWhitelist oversized = entry("IP", "127.0.0.1");
         oversized.setReason("x".repeat(201));
         assertThatThrownBy(() -> policy.prepareCreate(oversized))
             .hasMessageContaining("200");
 
-        DcsRiskWhitelist invalidEnabled = entry("USER", "9100000001");
+        RiskWhitelist invalidEnabled = entry("USER", "9100000001");
         invalidEnabled.setEnabled("yes");
         assertThatThrownBy(() -> policy.prepareCreate(invalidEnabled))
             .hasMessageContaining("0 或 1");
     }
 
-    private DcsRiskWhitelist entry(String type, String value) {
-        DcsRiskWhitelist entry = new DcsRiskWhitelist();
+    private RiskWhitelist entry(String type, String value) {
+        RiskWhitelist entry = new RiskWhitelist();
         entry.setListType(type);
         entry.setValue(value);
         return entry;

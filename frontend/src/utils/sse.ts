@@ -2,7 +2,7 @@ import { getToken } from '@/utils/auth';
 import { ElNotification } from 'element-plus';
 import { useNoticeStore } from '@/store/modules/notice';
 // 批5: 群聊模块退役, chat envelope 分发移除
-import { shouldDisplayDcsNotice } from '@/utils/sseNoticeDedup';
+import { shouldDisplayNotice } from '@/utils/sseNoticeDedup';
 
 // 初始化
 export const initSSE = (url: any) => {
@@ -50,7 +50,7 @@ export const initSSE = (url: any) => {
     // DCS 业务通知 (催办/审核/转发等): 取 envelope.data 的 title/content 友好展示, 不再显示 raw JSON
     if (!handled && ev === 'DCS_NOTIFY') {
       const d = envelope?.data || {};
-      if (!shouldDisplayDcsNotice(d)) {
+      if (!shouldDisplayNotice(d)) {
         handled = true;
         data.value = null;
         return;

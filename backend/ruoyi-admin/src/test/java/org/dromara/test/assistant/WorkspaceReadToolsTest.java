@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.tools.WorkspaceReadTools;
+import com.smartdock.assistant.engine.tools.WorkspaceReadTools;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

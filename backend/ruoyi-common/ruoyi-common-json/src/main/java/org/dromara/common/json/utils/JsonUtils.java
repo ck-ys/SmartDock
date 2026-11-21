@@ -28,7 +28,7 @@ public class JsonUtils {
     // ===== DCS 调用指南 =====
     // DCS 引用频次: 17+ 个文件
     // 典型用法: DCS item_value 等字段 JSON 序列化/反序列化用它; toJsonString/parseObject/parseArray 是核心方法; 全静态线程安全(ObjectMapper 单例包装)
-    // ⚠️ DCS 踩过的坑: 复杂泛型(如 List<DcsXxx>)用 parseObject(String, TypeReference) 而非 parseObject(String, Class), 否则类型擦除导致转换失败
+    // ⚠️ DCS 踩过的坑: 复杂泛型(如 List<TaskBo>)用 parseObject(String, TypeReference) 而非 parseObject(String, Class), 否则类型擦除导致转换失败
     // ===== DCS 调用指南 结束 =====
 
     private static final ObjectMapper OBJECT_MAPPER = SpringUtils.getBean(ObjectMapper.class);

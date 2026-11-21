@@ -43,9 +43,9 @@ class D2AdmissionTest {
     @AfterEach
     void cleanup() {
         RedisUtils.getClient().getKeys().delete(
-            "dcs:assistant:admit:tenant:" + T1,
-            "dcs:assistant:admit:tenant:999997",
-            "dcs:assistant:admit:global");
+            "smartdock:assistant:admit:tenant:" + T1,
+            "smartdock:assistant:admit:tenant:999997",
+            "smartdock:assistant:admit:global");
     }
 
     /** ①租户超限: 上限 2, 第 3 个新用户被拦, 话术统一 */

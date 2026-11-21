@@ -4,8 +4,8 @@ import com.baomidou.lock.annotation.Lock4j;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.domain.DcsTenantWallet;
-import com.smartdock.mapper.DcsTenantWalletMapper;
+import com.smartdock.domain.TenantWallet;
+import com.smartdock.mapper.TenantWalletMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Lazy;
@@ -23,7 +23,7 @@ import java.util.List;
  *
  * <p>每日 09:00 扫描所有 ACTIVE 钱包, 低于阈值的记录告警状态(按日历天判重)。
  * 告警经 WalletAlertEvent 域事件发布, dcs 侧 WalletAlertNoticeAdapter 同步翻译进
- * DcsNoticeEvent 通知管道(2026-09-24 模块化拆分)。</p>
+ * NoticeEvent 通知管道(2026-09-24 模块化拆分)。</p>
  *
  * <p>批1 2026-09-25(拍板 Q4:B)两处加固:</p>
  * <ul>
@@ -47,7 +47,7 @@ public class WalletAlertScheduler {
     private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
 
     /** 租户钱包表读写 Mapper（扫描活跃钱包） */
-    private final DcsTenantWalletMapper walletMapper;
+    private final TenantWalletMapper walletMapper;
     /** 钱包告警业务服务（发送低余额告警，按日历天判重） */
     private final WalletAlertService walletAlertService;
 
@@ -103,11 +103,11 @@ public class WalletAlertScheduler {
      * 扫描所有活跃钱包: 低于阈值即告警; 单钱包失败只记堆栈, 不中断其余钱包。
      */
     private void scanActiveWallets(String trigger) {
-        List<DcsTenantWallet> wallets = walletMapper.selectList(new LambdaQueryWrapper<DcsTenantWallet>()
-            .eq(DcsTenantWallet::getStatus, "ACTIVE")
-            .eq(DcsTenantWallet::getDelFlag, "0"));
+        List<TenantWallet> wallets = walletMapper.selectList(new LambdaQueryWrapper<TenantWallet>()
+            .eq(TenantWallet::getStatus, "ACTIVE")
+            .eq(TenantWallet::getDelFlag, "0"));
         int alerted = 0;
-        for (DcsTenantWallet wallet : wallets) {
+        for (TenantWallet wallet : wallets) {
             try {
                 BigDecimal available = wallet.getBalanceAmount().subtract(
                     wallet.getFrozenAmount() == null ? BigDecimal.ZERO : wallet.getFrozenAmount());

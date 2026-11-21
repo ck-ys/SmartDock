@@ -3,7 +3,7 @@ package com.smartdock.risk.domain.bo;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * 风控复核/释放操作命令 BO，用于后台管理员对处置动作 (DcsRiskAction) 给出最终结论或进行释放。
+ * 风控复核/释放操作命令 BO，用于后台管理员对处置动作 (RiskAction) 给出最终结论或进行释放。
  * <p>
  * 写接口只接受此 BO，<b>不直接接受</b>持久化实体，避免外部传入越权字段。
  * <ul>

@@ -24,7 +24,7 @@ import java.util.List;
  *       上游 HTTP 失败（非 200/超时/异常）由调用方 {@code refundSearch} 补偿——
  *       用户不为「没搜到」买单（与回合失败补偿同哲学）；</li>
  *   <li>限额源=effectiveLimits().websearchLimit（单人覆盖 &gt; 租户默认
- *       dcs_assistant_config.websearch_limit_per_user，批③三层合成的联网列）。</li>
+ *       assistant_config.websearch_limit_per_user，批③三层合成的联网列）。</li>
  * </ul>
  *
  * <p>fail 口径：Redis 故障=放行本此搜索（回合闸已兜总频次+预算闸兜成本，

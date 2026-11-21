@@ -4,7 +4,7 @@
 BEGIN;
 
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
-SELECT 11989, '引擎管理', 12000, 9, 'engine-admin', 'dcs/profile/admin', '', '1', '0', 'C', '0', '0', 'profile:engine:query', 'setting', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '画像引擎运维: 重算/协议/Schema/灌数(写操作复用 11971-11976 按钮位)'
+SELECT 11989, '引擎管理', 12000, 9, 'engine-admin', 'smartdock/profile/admin', '', '1', '0', 'C', '0', '0', 'profile:engine:query', 'setting', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '画像引擎运维: 重算/协议/Schema/灌数(写操作复用 11971-11976 按钮位)'
 WHERE NOT EXISTS (SELECT 1 FROM public.sys_menu WHERE menu_id = 11989);
 
 INSERT INTO public.sys_role_menu (role_id, menu_id)

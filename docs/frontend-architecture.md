@@ -150,7 +150,7 @@ sequenceDiagram
 |---|---|---|
 | `api` | 后端接口模块，按域拆分；`api/dcs` 是业务，`api/system`/`api/monitor` 是 RuoYi 底座 | `api/dcs/assistant/index.ts`、`api/dcs/core/profile.ts` |
 | `assets` | 图标、图片、Logo、401/404 图、全局样式与设计令牌 | `assets/styles/dcs-tokens.scss` |
-| `components` | 共享/全局组件；`DcsAssistant` 是 AI 助手全家桶 | `components/DcsAssistant/*` |
+| `components` | 共享/全局组件；`Assistant` 是 AI 助手全家桶 | `components/Assistant/*` |
 | `composables` | 跨组件复用的组合式函数 | `tenantMirror.ts`、`useWorkspace.ts` |
 | `directive` | 全局指令 | `permission/index.ts`（`hasPermi`） |
 | `enums` | 语言/菜单类型/导航类型/响应码枚举 | `enums/*` |
@@ -185,19 +185,19 @@ sequenceDiagram
 
 | 前端模块 | 主要端点 | 后端 Controller |
 |---|---|---|
-| `api/dcs/core/task.ts` | `/dcs/task/*`、`/dcs/stats/overview` | `DcsTaskController`、`DcsStatsController` |
-| `api/dcs/core/submission.ts` | `/dcs/submission/*`、`/dcs/audit/*` | `DcsSubmissionController`、`DcsAuditController` |
-| `api/dcs/core/notice.ts` | `/dcs/notice/*` | `DcsNoticeController` |
+| `api/dcs/core/task.ts` | `/dcs/task/*`、`/dcs/stats/overview` | `TaskController`、`StatsController` |
+| `api/dcs/core/submission.ts` | `/dcs/submission/*`、`/dcs/audit/*` | `SubmissionController`、`AuditController` |
+| `api/dcs/core/notice.ts` | `/dcs/notice/*` | `NoticeController` |
 | `api/dcs/core/analytics.ts` | `/analytics/*`、`/analytics/replay/*`、`/analytics/health` | `AnalyticsController`、`AnalyticsReplayController`、`AnalyticsHealthController` |
 | `api/dcs/core/profile.ts` | `/profile/*` | 15 个 profile Controller（见后端文档附录 A.1） |
 | `api/dcs/assistant/*` | `/dcs/assistant/**`、`/agui/run/dcs-assistant` | 23 个 assistant Controller + AGUI 运行时 |
-| `api/dcs/ai/*` | `/dcs/ai-config`、`/dcs/ai-price`、`/dcs/ai-model-price`、`/dcs/ai-usage`、`/dcs/ai/capability` | `DcsAiConfigController` 等 5 个 |
+| `api/dcs/ai/*` | `/dcs/ai-config`、`/dcs/ai-price`、`/dcs/ai-model-price`、`/dcs/ai-usage`、`/dcs/ai/capability` | `AiConfigController` 等 5 个 |
 | `api/dcs/risk/*` | `/dcs/risk/*`、`/dcs/captcha/*` | 8 个 risk Controller |
-| `api/dcs/fileReview/*` | `/dcs/fileReview/*` | `DcsFileReviewController` |
-| `api/dcs/feedback/*` | `/dcs/feedback/*` | `DcsFeedbackController` |
+| `api/dcs/fileReview/*` | `/dcs/fileReview/*` | `FileReviewController` |
+| `api/dcs/feedback/*` | `/dcs/feedback/*` | `FeedbackController` |
 | `api/dcs/announcement/*` | `/dcs/announcement/*` | `SysNoticePortalController` |
-| `api/dcs/changelog/*` | `/dcs/changelog/*` | `DcsChangelogController` |
-| `api/dcs/account-billing/*` | `/dcs/tenant-wallet/summary` + 旧三组 re-export | `DcsTenantWalletController` 等 |
+| `api/dcs/changelog/*` | `/dcs/changelog/*` | `ChangelogController` |
+| `api/dcs/account-billing/*` | `/dcs/tenant-wallet/summary` + 旧三组 re-export | `TenantWalletController` 等 |
 
 `api/dcs/core/` 是 DCS 微核心的"契约层"：与后端端点一一对应，页面只消费业务形状，不直接拼 URL。它里面的 `r<T>()` 取 `R<T>.data`，`table<T>()` 返回完整 `TableDataInfo<T>`。
 
@@ -446,12 +446,12 @@ sequenceDiagram
 | 助手运营台 | `api/dcs/assistant/index.ts` | `/dcs/assistant/admin/*`、`/quota/*`、`/toolgate`、`/tools`、`/config`、`/feedback/*` | `AssistantStatusController`、`AssistantQuotaController`、`AssistantToolGateController` 等 |
 | 画像 | `api/dcs/core/profile.ts` | `/profile/*` | 15 个 profile Controller |
 | 分析 | `api/dcs/core/analytics.ts` | `/analytics/*` | `AnalyticsController` 等 |
-| 任务/待办/审核 | `api/dcs/core/task.ts`、`submission.ts`、`notice.ts` | `/dcs/task/*`、`/dcs/submission/*`、`/dcs/audit/*`、`/dcs/notice/*` | `DcsTaskController` 等 |
-| 账户与账单 | `api/dcs/account-billing/*` | `/dcs/tenant-wallet/summary` + 旧三组 | `DcsTenantWalletController` 等 |
-| AI 额度 | `api/dcs/ai-credit/*` | `/dcs/ai-credit/*` | `DcsAiCreditController` |
-| AI 配置/用量 | `api/dcs/ai/*` | `/dcs/ai-config/*`、`/dcs/ai-price/*`、`/dcs/ai-usage/*` | `DcsAiConfigController` 等 |
+| 任务/待办/审核 | `api/dcs/core/task.ts`、`submission.ts`、`notice.ts` | `/dcs/task/*`、`/dcs/submission/*`、`/dcs/audit/*`、`/dcs/notice/*` | `TaskController` 等 |
+| 账户与账单 | `api/dcs/account-billing/*` | `/dcs/tenant-wallet/summary` + 旧三组 | `TenantWalletController` 等 |
+| AI 额度 | `api/dcs/ai-credit/*` | `/dcs/ai-credit/*` | `AiCreditController` |
+| AI 配置/用量 | `api/dcs/ai/*` | `/dcs/ai-config/*`、`/dcs/ai-price/*`、`/dcs/ai-usage/*` | `AiConfigController` 等 |
 | 风控 | `api/dcs/risk/*`、`api/dcs/sensitive-word/*` | `/dcs/risk/*`、`/dcs/sensitive-word/*`、`/dcs/captcha/*` | 8 个 risk Controller |
-| 文件审查 | `api/dcs/fileReview/*` | `/dcs/fileReview/*` | `DcsFileReviewController` |
+| 文件审查 | `api/dcs/fileReview/*` | `/dcs/fileReview/*` | `FileReviewController` |
 | 首页 `/index` | 组合调用 | `/analytics/overview`、`/profile/overview`、`/dcs/stats/overview`、`/dcs/assistant/status`、`/dcs/changelog/list` | 对应 Controller |
 
 > 遗留项：`api/dcs/audit-log` 目录存在，但未找到同名后端 Controller，也未发现页面导入，疑似未接线；`views/dcs/support` 只有共享页头、没有独立页面；`tenant-wallet`/`tenant-wallet-ledger`/`wallet-payment-order`/`ai-doc-domain` 旧页面文件仍在，但路由已重定向。
@@ -467,7 +467,7 @@ sequenceDiagram
 ```mermaid
 flowchart LR
   subgraph HOST["三个宿主"]
-    H1["layout/index.vue<br/>异步挂 DcsAssistant/index.vue<br/>（全局悬浮球 + 抽屉）"]
+    H1["layout/index.vue<br/>异步挂 Assistant/index.vue<br/>（全局悬浮球 + 抽屉）"]
     H2["views/dcs/agent/index.vue<br/>/agent 全屏工作台"]
     H3["views/dcs/assistant/session/index.vue<br/>会话管理页（动态菜单挂载）"]
   end
@@ -497,7 +497,7 @@ flowchart LR
 
 ### 8.2 组件分层
 
-`components/DcsAssistant/` 下 23 个 `.vue` + 18 个 `.ts` 模块。按职责分五层：
+`components/Assistant/` 下 23 个 `.vue` + 18 个 `.ts` 模块。按职责分五层：
 
 | 层 | 组件 | 职责 |
 |---|---|---|
@@ -695,8 +695,8 @@ flowchart TB
   L --> NB["Navbar/<br/>面包屑 + 通知 + 用户菜单"]
   L --> AM["AppMain/<br/>router-view + keep-alive"]
   L --> ST["Settings/<br/>主题/皮肤/布局"]
-  L --> DA["DcsAssistant/index.vue<br/>悬浮球 + 抽屉"]
-  L --> CP["DcsCommandPalette<br/>Ctrl+K 命令面板"]
+  L --> DA["Assistant/index.vue<br/>悬浮球 + 抽屉"]
+  L --> CP["CommandPalette<br/>Ctrl+K 命令面板"]
   SB --> DCS["views/dcs/**"]
   AM --> DCS
 ```
@@ -708,7 +708,7 @@ flowchart TB
 | keep-alive | `tagsViewStore.addView` 把路由加进 `cachedViews` | 标签页 UI 已注释掉，但缓存机制还在用 |
 | 通知 | `layout/index.vue` `onMounted` 里 `initSSE('/resource/sse')` | 通知 SSE，与助手 AGUI 无关 |
 | WebSocket | `utils/websocket.ts` | 在线状态/系统消息 |
-| 命令面板 | `DcsCommandPalette`，Ctrl+K | 全局快捷键 |
+| 命令面板 | `CommandPalette`，Ctrl+K | 全局快捷键 |
 | 主题 | `settings.dark` + `settings.skin` | 见第 10 章 |
 
 ---
@@ -827,11 +827,11 @@ type-check vue-tsc --noEmit
 | 权限指令 | `src/directive/permission/index.ts` |
 | 通知 SSE | `src/utils/sse.ts` |
 | AGUI 客户端 | `src/api/dcs/assistant/aguiClient.ts`（`startTurn:403`、`attach:471`、`parseSseFrames:50`、`dispatch:88`） |
-| 助手状态机 | `src/components/DcsAssistant/useAssistant.ts`（`runTurn:1572`、`resolveHitl:1970`、`onCustom:939`、`getAssistant:2761`） |
-| 输入区 | `src/components/DcsAssistant/Composer.vue` |
-| 消息流 | `src/components/DcsAssistant/MsgFlow.vue`、`TurnBlock.vue` |
-| 计划卡 | `src/components/DcsAssistant/PlanCard.vue` |
-| 审批坞 | `src/components/DcsAssistant/HitlDock.vue` |
+| 助手状态机 | `src/components/Assistant/useAssistant.ts`（`runTurn:1572`、`resolveHitl:1970`、`onCustom:939`、`getAssistant:2761`） |
+| 输入区 | `src/components/Assistant/Composer.vue` |
+| 消息流 | `src/components/Assistant/MsgFlow.vue`、`TurnBlock.vue` |
+| 计划卡 | `src/components/Assistant/PlanCard.vue` |
+| 审批坞 | `src/components/Assistant/HitlDock.vue` |
 | 令牌定义 | `src/assets/styles/dcs-tokens.scss` |
 | 令牌门禁 | `src/assets/styles/tokens.test.ts` |
 | 构建配置 | `vite.config.ts` |

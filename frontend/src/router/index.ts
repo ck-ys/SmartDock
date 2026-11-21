@@ -73,7 +73,7 @@ export const constantRoutes: RouteRecordRaw[] = [
   // 避免同一个组件在业务壳内再注册一份）；未授权跳 /403 说明页。
   {
     path: '/agent',
-    component: () => import('@/views/dcs/agent/index.vue'),
+    component: () => import('@/views/smartdock/agent/index.vue'),
     hidden: true,
     meta: { title: '智能体工作台', noCache: true },
     // 批 A Q3（2026-11-14 拍板案1）：自动化收编为子路由——URL 不变（可刷新可分享），
@@ -82,13 +82,13 @@ export const constantRoutes: RouteRecordRaw[] = [
     children: [
       {
         path: 'automation',
-        component: () => import('@/views/dcs/agent/automation/index.vue'),
+        component: () => import('@/views/smartdock/agent/automation/index.vue'),
         hidden: true,
         meta: { title: '自动化', noCache: true }
       },
       {
         path: 'automation/:id',
-        component: () => import('@/views/dcs/agent/automation/edit.vue'),
+        component: () => import('@/views/smartdock/agent/automation/edit.vue'),
         hidden: true,
         meta: { title: '自动化 · 编辑', noCache: true }
       }
@@ -99,7 +99,7 @@ export const constantRoutes: RouteRecordRaw[] = [
   // 权限与工作台同源（agentws:workspace:use），页面内自检，未授权统一 /403。
   {
     path: '/agent/settings',
-    component: () => import('@/views/dcs/agent/settings.vue'),
+    component: () => import('@/views/smartdock/agent/settings.vue'),
     hidden: true,
     meta: { title: '工作台设置', noCache: true }
   },
@@ -157,16 +157,16 @@ export const constantRoutes: RouteRecordRaw[] = [
   // ============================================================
 
   {
-    path: '/dcs/mission/detail',
+    path: '/smartdock/mission/detail',
     component: Layout,
     hidden: true,
-    permissions: ['dcs:submission:submit', 'dcs:task:list'],
+    permissions: ['smartdock:submission:submit', 'smartdock:task:list'],
     children: [
       {
         path: ':id',
-        component: () => import('@/views/dcs/mission/detail.vue'),
-        name: 'DcsMissionDetail',
-        meta: { title: '任务详情', activeMenu: '/dcs/mission' }
+        component: () => import('@/views/smartdock/mission/detail.vue'),
+        name: 'MissionDetail',
+        meta: { title: '任务详情', activeMenu: '/smartdock/mission' }
       }
     ]
   },
@@ -178,51 +178,51 @@ export const constantRoutes: RouteRecordRaw[] = [
     children: [
       {
         path: ':source/:subjectId',
-        component: () => import('@/views/dcs/profile/detail.vue'),
-        name: 'DcsProfileDetail',
+        component: () => import('@/views/smartdock/profile/detail.vue'),
+        name: 'ProfileDetail',
         meta: { title: '画像详情', activeMenu: '/insight/profile' }
       }
     ]
   },
   // 2026-10-20 菜单 IA：画像域迁入「画像与分析」，旧地址重定向兜底
   // （对端批 8 E2E 若仍用旧地址也不会 404）
-  { path: '/dcs/profile', redirect: '/insight/profile', hidden: true },
+  { path: '/profile', redirect: '/insight/profile', hidden: true },
   // 2026-10-27 画像方向第一批: 工作室/RFM/分群收进「引擎与运维」折叠组, 旧址(含 insight 前缀)兜底到新址
-  { path: '/dcs/profile-studio', redirect: '/insight/engine-ops/profile-studio', hidden: true },
+  { path: '/profile-studio', redirect: '/insight/engine-ops/profile-studio', hidden: true },
   { path: '/insight/profile-studio', redirect: '/insight/engine-ops/profile-studio', hidden: true },
-  { path: '/dcs/profile-rfm', redirect: '/insight/engine-ops/profile-rfm', hidden: true },
+  { path: '/profile-rfm', redirect: '/insight/engine-ops/profile-rfm', hidden: true },
   { path: '/insight/profile-rfm', redirect: '/insight/engine-ops/profile-rfm', hidden: true },
-  { path: '/dcs/profile-segments', redirect: '/insight/engine-ops/profile-segments', hidden: true },
+  { path: '/profile-segments', redirect: '/insight/engine-ops/profile-segments', hidden: true },
   { path: '/insight/profile-segments', redirect: '/insight/engine-ops/profile-segments', hidden: true },
   // 低分复核并入画像页抽屉; 数据运维/引擎健康/引擎管理三页合一为「引擎运维」(tab 深链)
-  { path: '/dcs/profile-review', redirect: '/insight/profile?review=1', hidden: true },
+  { path: '/profile-review', redirect: '/insight/profile?review=1', hidden: true },
   { path: '/insight/profile-review', redirect: '/insight/profile?review=1', hidden: true },
   { path: '/insight/profile-ops', redirect: '/insight/engine-ops/profile-ops', hidden: true },
   { path: '/insight/profile-health', redirect: '/insight/engine-ops/profile-ops?tab=health', hidden: true },
   { path: '/insight/engine-admin', redirect: '/insight/engine-ops/profile-ops?tab=admin', hidden: true },
   // 第二批补: 合规中心旧地址兜底(第一批挪折叠组时漏配)
   { path: '/insight/compliance', redirect: '/insight/engine-ops/compliance', hidden: true },
-  { path: '/dcs/profile-analytics', redirect: '/insight/profile-analytics', hidden: true },
+  { path: '/profile-analytics', redirect: '/insight/profile-analytics', hidden: true },
   {
-    path: '/dcs/profile-detail/:source/:subjectId',
+    path: '/profile-detail/:source/:subjectId',
     redirect: (to) => ({ path: `/insight/profile-detail/${to.params.source}/${to.params.subjectId}`, query: to.query }),
     hidden: true
   },
   {
-    path: '/dcs/review-task',
+    path: '/review-task',
     component: Layout,
     hidden: true,
     children: [
       {
         path: '',
-        component: () => import('@/views/dcs/audit/index.vue'),
-        name: 'DcsDirectReviewTask',
+        component: () => import('@/views/smartdock/audit/index.vue'),
+        name: 'DirectReviewTask',
         meta: { title: '审核事项' }
       }
     ]
   },
-  // 注: 工作台 (/dcs/workbench) 已改由后端菜单驱动 (sys_menu menu_id=9009),
-  //     见 backend/script/sql/postgres/postgres_ry_dcs_menu.sql
+  // 注: 工作台 (/workbench) 已改由后端菜单驱动 (sys_menu menu_id=9009),
+  //     见 backend/script/sql/baseline/02_reference.sql（sys_menu 权限基线）
 
   // 菜单IA重组批2（2026-10-16）：租户钱包/钱包流水/充值订单 三菜单合并为「账户与账单」，
   // 旧收藏/通知深链地址兜底跳转（对应 sys_menu 9067/9068/9096，页面本体由后端菜单驱动）

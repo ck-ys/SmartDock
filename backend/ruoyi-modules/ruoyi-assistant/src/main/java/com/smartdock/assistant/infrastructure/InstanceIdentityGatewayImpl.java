@@ -1,7 +1,7 @@
 package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.InstanceIdentityGateway;
-import com.smartdock.assistant.legacy.core.AssistantInstanceContext;
+import com.smartdock.assistant.engine.core.AssistantInstanceContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

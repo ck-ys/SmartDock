@@ -1,0 +1,596 @@
+<template>
+  <div v-if="allowed" class="auto-ws">
+    <main class="auto-main">
+      <!-- 批 A Q3/Q4：不出面包屑、不出「返回」——这块本来就渲染在工作台主区里，浏览器后退回列表 -->
+      <div class="auto-head">
+        <div>
+          <h1>{{ isNew ? '新建自动化' : row?.title || '编辑自动化' }}</h1>
+          <p>{{ isNew ? '建好后到点会自动跑' : `已跑 ${row?.runCount ?? 0} 次 · 成功 ${row?.successCount ?? 0} 次` }}</p>
+        </div>
+      </div>
+
+      <!-- Q4 案1：设置 / 历史 两个页签——历史从 320px 窄栏抬成整页视野 -->
+      <div class="ag-tabs" role="tablist" aria-label="自动化详情">
+        <button type="button" role="tab" :aria-selected="tab === 'set'" :class="{ on: tab === 'set' }" @click="tab = 'set'">设置</button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="tab === 'hist'"
+          :class="{ on: tab === 'hist' }"
+          :disabled="isNew"
+          :title="isNew ? '创建并跑过之后，这里能看到每次的结果' : undefined"
+          @click="tab = 'hist'"
+        >历史</button>
+      </div>
+
+      <div v-if="!isNew && loading" class="auto-empty">正在读取…</div>
+      <div v-else-if="!isNew && failed" class="auto-empty">
+        <b>这条自动化没读出来</b>
+        <p>它可能已被删除，或你没有查看权限。</p>
+        <button class="btn-ghost" type="button" @click="goList">返回列表</button>
+      </div>
+
+      <!-- ============ 设置页签：任务标题 / 调度 / 指令 三段（+外部工具，能力不倒退） ============ -->
+      <section v-else-if="tab === 'set'" class="edit-card" aria-label="自动化设置">
+        <div class="field">
+          <label for="auto-title">任务标题</label>
+          <el-input id="auto-title" v-model="form.title" maxlength="60" show-word-limit placeholder="例如：每周一 9 点的逾期清单" />
+        </div>
+
+        <div class="field">
+          <label for="auto-time">调度</label>
+          <div class="sched-row">
+            <div class="seg" role="group" aria-label="频率">
+              <button
+                type="button"
+                :class="{ on: form.scheduleType === 'DAILY' }"
+                :aria-pressed="form.scheduleType === 'DAILY'"
+                @click="setType('DAILY')"
+              >每天</button>
+              <button
+                type="button"
+                :class="{ on: form.scheduleType === 'WEEKLY' }"
+                :aria-pressed="form.scheduleType === 'WEEKLY'"
+                @click="setType('WEEKLY')"
+              >每周</button>
+            </div>
+            <!-- id/aria-label 会透传到内层 input（EP 的 picker 是 inheritAttrs:false + v-bind="attrs"） -->
+            <el-time-picker
+              id="auto-time"
+              v-model="form.scheduleTime"
+              format="HH:mm"
+              value-format="HH:mm"
+              :clearable="false"
+              aria-label="运行时间"
+              placeholder="09:00"
+              style="width: 116px"
+            />
+            <span class="field-hint" style="margin: 0">北京时间</span>
+          </div>
+          <div v-if="form.scheduleType === 'WEEKLY'" class="day-chips" style="margin-top: 10px">
+            <button
+              v-for="d in week"
+              :key="d.value"
+              class="day-chip"
+              :class="{ on: form.weekdays.includes(d.value) }"
+              type="button"
+              :aria-pressed="form.weekdays.includes(d.value)"
+              @click="toggleDay(d.value)"
+            >
+              {{ d.label }}
+            </button>
+          </div>
+          <div class="preview-box">
+            <template v-if="preview.length">
+              <b>接下来 {{ preview.length }} 次：</b>
+              <!-- 一条一个 nowrap，换行只发生在日期之间，不把「2026-11-10 09:00」劈成两半 -->
+              <span class="pv-times">
+                <span v-for="t in preview" :key="t" class="pv-time">{{ t }}</span>
+              </span>
+            </template>
+            <template v-else>选好时间后这里会列出接下来 5 次。</template>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="auto-prompt">指令</label>
+          <el-input
+            id="auto-prompt"
+            v-model="form.prompt"
+            type="textarea"
+            :rows="7"
+            maxlength="2000"
+            show-word-limit
+            placeholder="写一句人话，例如：把上周还没提交的人列出来，按截止日排序，标出超期天数。"
+          />
+          <p class="field-hint">到点后模型会自己挑合适的技能和只读工具；写操作一律不执行。</p>
+        </div>
+
+        <div class="field">
+          <label>能用的外部工具</label>
+          <p class="field-hint">
+            默认一个都不挂；勾上才挂，而且只挂只读服务。挂了外部工具的自动化，运行失败不会被连续失败自动停用（外部服务抖动不算你的错）。
+          </p>
+          <div v-if="mcpOptions.length" class="mcp-picks">
+            <label
+              v-for="m in mcpOptions"
+              :key="m.serverName"
+              class="mcp-pick"
+              :class="{ on: form.mcpServers.includes(m.serverName) }"
+            >
+              <input
+                type="checkbox"
+                :checked="form.mcpServers.includes(m.serverName)"
+                @change="toggleMcp(m.serverName)"
+              />
+              <span class="mcp-pick-n">{{ m.displayName }}</span>
+              <span class="mcp-pick-st">{{ m.statusText }}</span>
+              <span class="mcp-pick-d">{{ m.tools.length ? m.tools.join('、') : '还没调用过，工具名用过才出现' }}</span>
+            </label>
+          </div>
+          <p v-else-if="mcpFailed" class="field-hint">
+            外部服务清单没加载出来（网络或权限问题），<button class="mcp-retry" type="button" @click="loadMcpOptions">重试</button>
+          </p>
+          <p v-else class="field-hint">平台还没有开放只读外部服务。</p>
+        </div>
+
+        <div class="edit-actions">
+          <button class="btn-primary" type="button" :disabled="saving || !valid" @click="save">
+            {{ saving ? '保存中…' : isNew ? '创建' : '保存修改' }}
+          </button>
+          <!-- 按钮置灰时得说清缺什么，否则用户只看到一个点不动的按钮 -->
+          <span v-if="invalidHint" class="edit-hint">{{ invalidHint }}</span>
+          <button v-if="!isNew" class="btn-ghost" type="button" :disabled="running" @click="runNow">
+            {{ running ? '已提交…' : '立即运行一次' }}
+          </button>
+          <span class="sp"></span>
+          <button v-if="!isNew" class="btn-ghost btn-danger" type="button" @click="remove">删除</button>
+          <button class="btn-ghost" type="button" @click="goList">返回</button>
+        </div>
+        <!-- Q4 案1：底部只读说明——当前用哪个模型、只读工具、写操作要确认；不在这里换模型
+             （避免和会话级模型选择打架）。模型名 = model-choice 真值，拉不到就写「按租户配置」。 -->
+        <p class="model-line">模型 {{ modelName || '按租户配置' }} · 只读工具 · 写操作需确认</p>
+        <p class="edit-footnote">失败不自动重试；连续 3 次失败会自动停用，改好再手动打开。每人最多 5 条。</p>
+      </section>
+
+      <!-- ============ 历史页签：这条任务跑过的每一次（时间/结果/耗时/失败原因/跳会话） ============ -->
+      <section v-else-if="tab === 'hist'" class="hist-page" aria-label="运行历史">
+        <div v-if="runs.length === 0" class="auto-empty">还没跑过。开启后到点会在这里留痕。</div>
+        <div v-else class="run-list">
+          <div v-for="r in runs" :key="r.id" class="hist-full-row">
+            <div class="hf-when">
+              <span class="run-time">{{ r.scheduledFor }}</span>
+              <span v-if="r.triggerType === 'MANUAL'" class="hf-manual">手动</span>
+            </div>
+            <span class="run-status" :class="statusTone(r.status)" :title="r.status === 'MISSED' ? '服务当时停了超过 6 小时，这一次没跑' : undefined">
+              {{ statusText(r.status) }}
+            </span>
+            <span v-if="r.status === 'SUCCESS' && r.durationMs != null" class="run-time">{{ durationText(r.durationMs) }}</span>
+            <span v-else class="run-time hf-dash">—</span>
+            <span class="hf-reason">
+              <template v-if="r.status === 'FAILED' && r.error">{{ r.error }}</template>
+              <template v-else-if="r.summary">{{ r.summary }}</template>
+            </span>
+            <!-- 失败在建会话之前时 conversationId 为空，threadId 也指不到东西 -->
+            <button v-if="r.threadId && r.conversationId != null" class="run-link" type="button" @click="openThread(r.threadId)">
+              查看会话
+            </button>
+          </div>
+        </div>
+        <p class="edit-footnote">最多显示最近 20 次。</p>
+      </section>
+    </main>
+  </div>
+  <div v-else class="auto-blocked" aria-hidden="true">
+    <!-- 未授权时只留这个真实元素兜底：注释不能和元素做根节点的兄弟——那会编译成 Fragment，
+         路由过渡收不到 afterLeave，离开本页整页白屏（2026-11-05 设置页同款 P0；题6 of 14） -->
+  </div>
+</template>
+
+<script setup lang="ts">
+/**
+ * 自动化新建/编辑（批 A Q4 · 2026-11-14 拍板案1）：「设置 / 历史」两个页签。
+ * 设置=任务标题/调度/指令三段（外部工具保留——能力不倒退）+底部只读模型行；
+ * 历史=这条任务跑过的每一次（时间/结果/耗时/失败原因/跳会话，最近 20 条，
+ * 沿用既有 GET /automations/{id}/runs，本批不加分页不动后端）。
+ * 渲染在工作台主区槽内（Q3），不出面包屑；?tpl= 携带模板 key 预填（列表页模板四卡入口）。
+ */
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { useUserStore } from '@/store/modules/user';
+import { getAssistantModelChoice } from '@/api/smartdock/assistant';
+import {
+  createAutomation,
+  deleteAutomation,
+  getAutomation,
+  listAutomationRuns,
+  listAutomations,
+  previewSchedule,
+  runAutomation,
+  updateAutomation,
+  type AutomationRow,
+  type AutomationRunRow
+} from '@/api/smartdock/assistant/automation';
+import { listAssistantMcpMembers, type AssistantMcpMemberRow } from '@/api/smartdock/assistant';
+import { templateByKey } from './templates';
+
+const route = useRoute();
+const router = useRouter();
+const userStore = useUserStore();
+
+const MAX_PER_USER = 5;
+
+const week = [
+  { label: '一', value: 1 },
+  { label: '二', value: 2 },
+  { label: '三', value: 3 },
+  { label: '四', value: 4 },
+  { label: '五', value: 5 },
+  { label: '六', value: 6 },
+  { label: '日', value: 7 }
+];
+
+const id = computed(() => String(route.params.id ?? 'new'));
+const isNew = computed(() => id.value === 'new');
+const tab = ref<'set' | 'hist'>('set');
+
+const form = reactive({
+  title: '',
+  prompt: '',
+  scheduleType: 'DAILY' as 'DAILY' | 'WEEKLY',
+  scheduleTime: '09:00',
+  weekdays: [1] as number[],
+  /** 只读外部服务白名单（默认空=一个不挂；题3 乙 三条硬规矩①） */
+  mcpServers: [] as string[]
+});
+const mcpOptions = ref<AssistantMcpMemberRow[]>([]);
+/** 三审 P2：清单加载失败不能伪装成「平台没有服务」——分开记，文案各说各的 */
+const mcpFailed = ref(false);
+function toggleMcp(name: string) {
+  const i = form.mcpServers.indexOf(name);
+  if (i >= 0) form.mcpServers.splice(i, 1);
+  else form.mcpServers.push(name);
+}
+
+/** Q4 底部只读模型行：真值来自 model-choice（默认模型名）；拉不到就说「按租户配置」，不编名字 */
+const modelName = ref('');
+async function loadModelName() {
+  try {
+    const res = (await getAssistantModelChoice()) as unknown as { data?: { defaultModelName?: string } };
+    modelName.value = (res?.data?.defaultModelName ?? '').trim();
+  } catch {
+    modelName.value = '';
+  }
+}
+
+const row = ref<AutomationRow | null>(null);
+const runs = ref<AutomationRunRow[]>([]);
+const preview = ref<string[]>([]);
+const loading = ref(false);
+const failed = ref(false);
+const saving = ref(false);
+const running = ref(false);
+
+const perms = computed(() => userStore.permissions);
+/** 三审 P2：运行侧对「管理员限定」服务会直接跳过（McpPilotService 按角色闸），
+ *  成员勾了也永远挂不上——列表里直接不给他看，别让用户存一条永远不生效的勾选。
+ *  判定与设置页 isAdminLevel 同口径（权限串优先，角色名兜底），避免只认 superadmin 误伤租户管理员 */
+const isAdminUser = computed(
+  () =>
+    perms.value.includes('*:*:*') ||
+    perms.value.includes('smartdock:assistant:config') ||
+    perms.value.includes('smartdock:assistant:audit:query') ||
+    userStore.roles.includes('superadmin') ||
+    userStore.roles.includes('admin')
+);
+const allowed = computed(
+  () => perms.value.includes('*:*:*') || (perms.value.includes('agentws:workspace:use') && perms.value.includes('smartdock:assistant:automation'))
+);
+
+const valid = computed(() => !invalidHint.value);
+
+/** 置灰原因（按钮旁边直接写出来，不让人猜） */
+const invalidHint = computed(() => {
+  if (!form.title.trim()) return '先起个名字';
+  if (!form.prompt.trim()) return '写一句要它做什么';
+  if (!form.scheduleTime) return '选一个运行时间';
+  if (form.scheduleType === 'WEEKLY' && form.weekdays.length === 0) return '至少选一天';
+  return '';
+});
+
+function setType(t: 'DAILY' | 'WEEKLY') {
+  form.scheduleType = t;
+}
+
+function toggleDay(d: number) {
+  const i = form.weekdays.indexOf(d);
+  if (i >= 0) form.weekdays.splice(i, 1);
+  else form.weekdays.push(d);
+}
+
+function weekdayParam(): string {
+  return [...form.weekdays].sort((a, b) => a - b).join(',');
+}
+
+let previewTimer: ReturnType<typeof setTimeout> | null = null;
+function schedulePreview() {
+  if (previewTimer) clearTimeout(previewTimer);
+  previewTimer = setTimeout(async () => {
+    if (!form.scheduleTime) {
+      preview.value = [];
+      return;
+    }
+    if (form.scheduleType === 'WEEKLY' && form.weekdays.length === 0) {
+      preview.value = [];
+      return;
+    }
+    try {
+      const res = await previewSchedule({
+        scheduleType: form.scheduleType,
+        scheduleTime: form.scheduleTime,
+        weekdays: form.scheduleType === 'WEEKLY' ? weekdayParam() : undefined
+      });
+      preview.value = ((res as unknown as { data?: string[] })?.data ?? []) as string[];
+    } catch {
+      preview.value = [];
+    }
+  }, 250);
+}
+
+watch(() => [form.scheduleType, form.scheduleTime, form.weekdays.join(',')], schedulePreview);
+
+function statusText(s: string): string {
+  if (s === 'SUCCESS') return '成功';
+  if (s === 'FAILED') return '失败';
+  if (s === 'MISSED') return '错过';
+  if (s === 'RUNNING') return '运行中';
+  return s;
+}
+function statusTone(s: string): string {
+  if (s === 'SUCCESS') return 'ok';
+  if (s === 'FAILED') return 'bad';
+  if (s === 'MISSED') return 'warn';
+  if (s === 'RUNNING') return 'live';
+  return '';
+}
+function durationText(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`;
+}
+
+/** 只读外部服务选项：只留只读、未停用的行——可写服务永不进自动化；
+ *  管理员限定行对非管理员不展示（运行侧会跳过，勾了也是空勾） */
+async function loadMcpOptions() {
+  try {
+    const res = (await listAssistantMcpMembers()) as unknown as { data?: AssistantMcpMemberRow[] };
+    mcpOptions.value = (res?.data ?? []).filter(
+      (m) => m.readOnly === '1' && m.status !== 'off' && (isAdminUser.value || m.whoCanUse !== '管理员')
+    );
+    mcpFailed.value = false;
+  } catch {
+    mcpOptions.value = [];
+    mcpFailed.value = true;
+  }
+}
+
+function goList() {
+  router.push('/agent/automation');
+}
+
+function openThread(threadId: string | null) {
+  if (!threadId) return;
+  router.push({ path: '/agent', query: { thread: threadId } });
+}
+
+/** 批 A Q3：模板预填——/agent/automation/new?tpl=weekly 带 title/prompt/调度进表单 */
+function applyTemplate() {
+  const tpl = templateByKey(route.query.tpl);
+  if (!tpl) return;
+  form.title = tpl.title;
+  form.prompt = tpl.prompt;
+  form.scheduleType = tpl.scheduleType;
+  form.scheduleTime = tpl.scheduleTime;
+  if (tpl.scheduleType === 'WEEKLY' && tpl.weekdays.length) {
+    form.weekdays = [...tpl.weekdays];
+  }
+}
+
+async function load() {
+  if (isNew.value) {
+    row.value = null;
+    runs.value = [];
+    applyTemplate();
+    schedulePreview();
+    await checkQuota();
+    return;
+  }
+  loading.value = true;
+  failed.value = false;
+  try {
+    const res = await getAutomation(id.value);
+    const data = (res as unknown as { data?: AutomationRow })?.data;
+    if (!data) throw new Error('empty');
+    if (data.builtin === '1') {
+      ElMessage.info('内置项只能开关，不能编辑');
+      goList();
+      return;
+    }
+    row.value = data;
+    form.title = data.title;
+    form.prompt = data.prompt;
+    form.scheduleType = data.scheduleType === 'WEEKLY' ? 'WEEKLY' : 'DAILY';
+    form.scheduleTime = data.scheduleTime || '09:00';
+    form.weekdays = (data.weekdays || '1')
+      .split(',')
+      .map((v) => Number(v))
+      .filter((v) => v >= 1 && v <= 7);
+    form.mcpServers = (data.mcpServers || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (form.weekdays.length === 0) form.weekdays = [1];
+    await loadRuns();
+  } catch {
+    failed.value = true;
+  } finally {
+    loading.value = false;
+  }
+}
+
+/**
+ * 上限预检：直接打开 /agent/automation/new 会绕过列表页的按钮置灰。
+ * 读不到就交给服务端兜底（保存时返回 400 并提示），这里不挡人。
+ */
+async function checkQuota() {
+  try {
+    const res = await listAutomations();
+    const list = ((res as unknown as { data?: AutomationRow[] })?.data ?? []) as AutomationRow[];
+    if (list.filter((r) => r.builtin !== '1').length >= MAX_PER_USER) {
+      ElMessage.warning(`每人最多 ${MAX_PER_USER} 条自动化，先删掉一条再建`);
+      goList();
+    }
+  } catch {
+    // 交给服务端校验
+  }
+}
+
+async function loadRuns() {
+  if (isNew.value) return;
+  const res = await listAutomationRuns(id.value, 20);
+  runs.value = ((res as unknown as { data?: AutomationRunRow[] })?.data ?? []) as AutomationRunRow[];
+}
+
+async function save() {
+  if (!valid.value || saving.value) return;
+  saving.value = true;
+  const payload = {
+    title: form.title.trim(),
+    prompt: form.prompt.trim(),
+    scheduleType: form.scheduleType,
+    scheduleTime: form.scheduleTime,
+    weekdays: form.scheduleType === 'WEEKLY' ? weekdayParam() : undefined,
+    // 只读外部服务：没勾就传空串（后端清洗成 null，与默认不挂一致）
+    mcpServers: form.mcpServers.length ? form.mcpServers.join(',') : ''
+  };
+  try {
+    const res = isNew.value ? await createAutomation(payload) : await updateAutomation(id.value, payload);
+    const data = (res as unknown as { data?: AutomationRow })?.data;
+    ElMessage.success(isNew.value ? '已创建，到点会自动跑' : '已保存');
+    if (isNew.value && data?.id != null) {
+      router.replace({ path: `/agent/automation/${data.id}` });
+      row.value = data;
+      await loadRuns();
+    } else if (data) {
+      row.value = data;
+    }
+  } catch {
+    // 拦截器统一提示
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function runNow() {
+  if (running.value) return;
+  running.value = true;
+  try {
+    await runAutomation(id.value);
+    ElMessage.success('已开始运行，跑完会发站内通知');
+    await loadRuns();
+    tab.value = 'hist';
+    startPoll();
+  } catch {
+    // 拦截器统一提示
+  } finally {
+    running.value = false;
+  }
+}
+
+/**
+ * 运行中每 5s 刷一次历史；跑完自动停并回读一次计数。
+ * 只回读 runCount/successCount，不碰表单——用户可能正在改提示词。
+ */
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollFails = 0;
+function startPoll() {
+  if (pollTimer) return;
+  pollFails = 0;
+  pollTimer = setInterval(async () => {
+    // 批A三审 P1：loadRuns 没 try/catch——一次 5xx 就是每 5s 一个未处理 rejection；
+    // 连错 3 次直接停轮询（页面还有手动刷新），别无限打
+    try {
+      await loadRuns();
+      pollFails = 0;
+    } catch {
+      if (++pollFails >= 3) {
+        stopPoll();
+        return;
+      }
+      return;
+    }
+    if (runs.value.some((r) => r.status === 'RUNNING')) return;
+    stopPoll();
+    if (isNew.value) return;
+    try {
+      const res = await getAutomation(id.value);
+      const data = (res as unknown as { data?: AutomationRow })?.data;
+      if (data) row.value = data;
+    } catch {
+      // 计数刷新失败不影响页面
+    }
+  }, 5000);
+}
+function stopPoll() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+async function remove() {
+  if (!row.value) return;
+  try {
+    await ElMessageBox.confirm(`删除「${row.value.title}」？删除后不再到点运行，已有的运行记录也一并隐藏。`, '删除自动化', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    });
+  } catch {
+    return;
+  }
+  try {
+    await deleteAutomation(id.value);
+    ElMessage.success('已删除');
+    goList();
+  } catch {
+    // 拦截器统一提示
+  }
+}
+
+onMounted(async () => {
+  void loadMcpOptions();
+  void loadModelName();
+  if (!allowed.value) {
+    router.replace('/403');
+    return;
+  }
+  await load();
+  // 进页面时若还有在跑的（刷新页面/从通知回来），继续追到结束
+  if (runs.value.some((r) => r.status === 'RUNNING')) {
+    tab.value = 'hist';
+    startPoll();
+  }
+});
+
+onBeforeUnmount(() => {
+  if (previewTimer) clearTimeout(previewTimer);
+  stopPoll();
+});
+</script>
+
+<style lang="scss" scoped>
+@use '@/assets/styles/dcs-agent-automation.scss';
+</style>

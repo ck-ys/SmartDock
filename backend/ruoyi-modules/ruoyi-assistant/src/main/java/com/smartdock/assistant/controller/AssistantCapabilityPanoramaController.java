@@ -3,10 +3,10 @@ package com.smartdock.assistant.controller;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.core.AssistantAgentFactory;
-import com.smartdock.assistant.legacy.core.PromptAssets;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.engine.core.AssistantAgentFactory;
+import com.smartdock.assistant.engine.core.PromptAssets;
+import com.smartdock.assistant.engine.core.ToolRegistry;
+import com.smartdock.assistant.service.AssistantConfigService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.web.core.BaseController;
@@ -25,7 +25,7 @@ import java.util.Map;
  */
 @Tag(name = "助手能力全景", description = "工具清单/系统提示词/租户开关只读展示（管理页数据源）")
 @RestController
-@RequestMapping("/dcs/assistant/capability")
+@RequestMapping("/assistant/capability")
 @RequiredArgsConstructor
 public class AssistantCapabilityPanoramaController extends BaseController {
 
@@ -55,13 +55,13 @@ public class AssistantCapabilityPanoramaController extends BaseController {
     }
 
     /**
-     * 能力全景（管理页；perm=dcs:assistant:config 与 /admin/stats 同源）。
-     * 四席审查回修（dspro P1-1/glm53 P2-2，2026-10-11）：原 OR(dcs:ai:query, dcs:assistant:use)
+     * 能力全景（管理页；perm=smartdock:assistant:config 与 /admin/stats 同源）。
+     * 四席审查回修（dspro P1-1/glm53 P2-2，2026-10-11）：原 OR(smartdock:ai:query, smartdock:assistant:use)
      * 把系统提示词全文+租户日预算开放给了全体助手用户（含成员）——唯一消费方是管理页
      * （路由本身要求 config），收紧到 config；工具行按分类+名称排序（SPECS 组内 Set.of
      * 迭代序随 JVM 重启漂移，dspro P2-4）。
      */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping("/panorama")
     public R<PanoramaVo> panorama() {
         String tenantId = LoginHelper.getTenantId();
@@ -89,7 +89,7 @@ public class AssistantCapabilityPanoramaController extends BaseController {
         tools.sort(java.util.Comparator.comparing(PanoramaTool::category).thenComparing(PanoramaTool::displayName));
         // 业务批7 Q9：技能目录（SkillAssets 进程内缓存；注入方式说明与 R1 设计口径一致）
         List<PanoramaSkill> skills = new ArrayList<>();
-        for (com.smartdock.assistant.legacy.core.SkillAssets.LoadedSkill sk : com.smartdock.assistant.legacy.core.SkillAssets.skills()) {
+        for (com.smartdock.assistant.engine.core.SkillAssets.LoadedSkill sk : com.smartdock.assistant.engine.core.SkillAssets.skills()) {
             skills.add(new PanoramaSkill(sk.id(), sk.name(), sk.description(), sk.minRole(),
                 "会话中 ➕ 面板选中才注入：仅选中会话按轮生效，未选中不产生额外消耗", sk.body()));
         }
@@ -101,7 +101,7 @@ public class AssistantCapabilityPanoramaController extends BaseController {
         Integer window = null;
         Integer maxOutput = null;
         try {
-            com.smartdock.domain.DcsAiConfig def = modelFactory.resolveConfig(tenantId);
+            com.smartdock.domain.AiConfig def = modelFactory.resolveConfig(tenantId);
             window = def.getContextWindow();
             maxOutput = def.getMaxTokens();
         } catch (Exception e) {
@@ -117,7 +117,7 @@ public class AssistantCapabilityPanoramaController extends BaseController {
                 "memoryEnabled", memoryOn,
                 "dailyRoundLimitPerUser", cfg.dailyRoundLimitPerUser(),
                 "dailyBudgetAmount", cfg.dailyBudgetAmount(),
-                "compactionTriggerTokens", com.smartdock.assistant.legacy.core.AssistantCompactionPolicy
+                "compactionTriggerTokens", com.smartdock.assistant.engine.core.AssistantCompactionPolicy
                     .deriveTriggerTokens(window, maxOutput))));
     }
 }

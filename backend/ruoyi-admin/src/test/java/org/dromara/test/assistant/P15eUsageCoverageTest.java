@@ -22,8 +22,8 @@ import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.memory.compaction.ConversationCompactor;
 import io.agentscope.harness.agent.middleware.CompactionMiddleware;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -67,7 +67,7 @@ class P15eUsageCoverageTest {
     private static final Path OUT = Path.of("target", "p15e");
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
     @BeforeAll
     static void ensureOutDir() throws Exception {
@@ -120,7 +120,7 @@ class P15eUsageCoverageTest {
         }
     }
 
-    private Model buildRawModel(DcsAiConfig cfg) {
+    private Model buildRawModel(AiConfig cfg) {
         return OpenAIChatModel.builder()
             .baseUrl(cfg.getBaseUrl()).apiKey(cfg.getApiKey()).modelName(cfg.getModelName())
             .formatter(new DeepSeekFormatter()).build();
@@ -155,12 +155,12 @@ class P15eUsageCoverageTest {
     /** A+F：主对话经装饰器可采集；P1 形态（无压缩/记忆中间件）下后三类零调用 */
     @Test
     void mainCallCapturedAndLatterThreeZeroWithoutMiddlewares() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         UsageRecordingModel recorder = new UsageRecordingModel(buildRawModel(cfg), "main");
         ReActAgent agent = ReActAgent.builder()
             .name("p15e-main-agent")
-            .sysPrompt("你是 DCS 数据采集系统的工作助手。用一句话中文回答。不要使用任何工具。")
+            .sysPrompt("你是 SmartDock的工作助手。用一句话中文回答。不要使用任何工具。")
             .model(recorder)
             .maxIters(2)
             .build();
@@ -182,7 +182,7 @@ class P15eUsageCoverageTest {
     /** B：压缩摘要（ConversationCompactor 直调）经装饰器捕获 */
     @Test
     void compactionSummaryCaptured(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         io.agentscope.harness.agent.filesystem.local.LocalFilesystem localFs =
             new io.agentscope.harness.agent.filesystem.local.LocalFilesystem(dir);
@@ -211,7 +211,7 @@ class P15eUsageCoverageTest {
     /** C：记忆 flush（MemoryFlushManager.flushMemories）经装饰器捕获 */
     @Test
     void memoryFlushCaptured(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         io.agentscope.harness.agent.filesystem.local.LocalFilesystem localFs =
             new io.agentscope.harness.agent.filesystem.local.LocalFilesystem(dir);
@@ -234,7 +234,7 @@ class P15eUsageCoverageTest {
     /** D：记忆固化（MemoryConsolidator.consolidate）经装饰器捕获（空工作区可能 noop——如实记录） */
     @Test
     void memoryConsolidateCapturedOrNoop(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         io.agentscope.harness.agent.filesystem.local.LocalFilesystem localFs =
             new io.agentscope.harness.agent.filesystem.local.LocalFilesystem(dir);
@@ -264,7 +264,7 @@ class P15eUsageCoverageTest {
     /** E：盲区实证——压缩真实触发时装饰器调用量 > middleware onModelCall 命中数（X-02 运行时复证） */
     @Test
     void middlewareBlindSpotProvenWhenCompactionFires(@org.junit.jupiter.api.io.TempDir Path dir) throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         io.agentscope.harness.agent.filesystem.local.LocalFilesystem localFs =
             new io.agentscope.harness.agent.filesystem.local.LocalFilesystem(dir);
@@ -274,7 +274,7 @@ class P15eUsageCoverageTest {
             SpyMiddleware spy = new SpyMiddleware();
             ReActAgent agent = ReActAgent.builder()
                 .name("p15e-blind-agent")
-                .sysPrompt("你是 DCS 数据采集系统的工作助手。用简洁中文回答。不要使用任何工具。")
+                .sysPrompt("你是 SmartDock的工作助手。用简洁中文回答。不要使用任何工具。")
                 .model(recorder)
                 .middleware(new CompactionMiddleware(wm, recorder,
                     // 触发阈值压到 300：sysPrompt+1 轮长回答即稳超——压缩必须确定性触发

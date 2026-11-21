@@ -1,8 +1,8 @@
 package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.TenantConfigGateway;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConfig;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.domain.model.AssistantConfig;
+import com.smartdock.assistant.service.AssistantConfigService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -68,9 +68,9 @@ class TenantConfigGatewayPinUnitTest {
     @Test
     void digestEnabledTenantIds只给ID不给配置行() {
         AssistantConfigService svc = mock(AssistantConfigService.class);
-        DcsAssistantConfig a = new DcsAssistantConfig();
+        AssistantConfig a = new AssistantConfig();
         a.setTenantId("000000");
-        DcsAssistantConfig b = new DcsAssistantConfig();
+        AssistantConfig b = new AssistantConfig();
         b.setTenantId("880001");
         when(svc.digestEnabledTenants()).thenReturn(List.of(a, b));
 
@@ -87,10 +87,10 @@ class TenantConfigGatewayPinUnitTest {
 
         new TenantConfigGatewayImpl(svc).setDigestEnabled(TENANT, true);
 
-        org.mockito.ArgumentCaptor<DcsAssistantConfig> cap =
-            org.mockito.ArgumentCaptor.forClass(DcsAssistantConfig.class);
+        org.mockito.ArgumentCaptor<AssistantConfig> cap =
+            org.mockito.ArgumentCaptor.forClass(AssistantConfig.class);
         verify(svc).update(cap.capture());
-        DcsAssistantConfig saved = cap.getValue();
+        AssistantConfig saved = cap.getValue();
         assertEquals(TENANT, saved.getTenantId(), "新落的一行必须带上租户 ID");
         assertEquals("1", saved.getDigestEnabled());
     }
@@ -98,7 +98,7 @@ class TenantConfigGatewayPinUnitTest {
     @Test
     void setDigestEnabled有行时改原行不另起一行() {
         AssistantConfigService svc = mock(AssistantConfigService.class);
-        DcsAssistantConfig existing = new DcsAssistantConfig();
+        AssistantConfig existing = new AssistantConfig();
         existing.setTenantId(TENANT);
         existing.setAssistantName("已有名字");
         when(svc.raw(TENANT)).thenReturn(existing);

@@ -6,10 +6,10 @@ import io.agentscope.core.message.Msg;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.domain.gateway.ReadOnlyAgentGateway;
 import com.smartdock.assistant.domain.gateway.TenantConfigGateway;
-import com.smartdock.assistant.domain.model.DcsAutomation;
-import com.smartdock.assistant.domain.model.DcsAutomationRun;
-import com.smartdock.assistant.mapper.DcsAutomationMapper;
-import com.smartdock.assistant.mapper.DcsAutomationRunMapper;
+import com.smartdock.assistant.domain.model.Automation;
+import com.smartdock.assistant.domain.model.AutomationRun;
+import com.smartdock.assistant.mapper.AutomationMapper;
+import com.smartdock.assistant.mapper.AutomationRunMapper;
 import com.smartdock.assistant.infrastructure.AssistantAdmissionGate;
 import com.smartdock.assistant.infrastructure.AssistantDailyQuota;
 import org.dromara.common.core.domain.model.LoginUser;
@@ -51,8 +51,8 @@ public class AutomationRunner {
     private static final int MAX_SUMMARY_CHARS = 300;
     private static final Duration RUN_TIMEOUT = Duration.ofMinutes(10);
 
-    private final DcsAutomationMapper automationMapper;
-    private final DcsAutomationRunMapper runMapper;
+    private final AutomationMapper automationMapper;
+    private final AutomationRunMapper runMapper;
     /** 7C-1：run 台账（首绑 / 登记 / 终态） */
     private final RunLedgerService runLedgerService;
     /** 7C-1：消息写（user / assistant 落库） */
@@ -71,8 +71,8 @@ public class AutomationRunner {
     private final ISysPermissionService permissionService;
     private final Executor executor;
 
-    public AutomationRunner(DcsAutomationMapper automationMapper,
-                            DcsAutomationRunMapper runMapper,
+    public AutomationRunner(AutomationMapper automationMapper,
+                            AutomationRunMapper runMapper,
                             RunLedgerService runLedgerService,
                             MessageWriteService messageWriteService,
                             ReadOnlyAgentGateway agentGateway,
@@ -132,7 +132,7 @@ public class AutomationRunner {
     // ---------------------------------------------------------------- 主流程
 
     private void execute(String tenantId, Long runId) {
-        DcsAutomationRun run = runMapper.selectOne(tenantId, runId);
+        AutomationRun run = runMapper.selectOne(tenantId, runId);
         if (run == null || !"RUNNING".equals(run.getStatus())) {
             // 已被超时收口（或已删）：直接退出，不再烧一次模型调用
             return;
@@ -141,7 +141,7 @@ public class AutomationRunner {
         // sweepStale 判超时，真跑完的成功结果又因「只从 RUNNING 迁出」被静默丢弃）
         long started = System.currentTimeMillis();
         runMapper.touchStarted(runId, now());
-        DcsAutomation automation = automationMapper.selectOne(tenantId, run.getAutomationId());
+        Automation automation = automationMapper.selectOne(tenantId, run.getAutomationId());
         if (automation == null || "1".equals(automation.getDelFlag())) {
             fail(tenantId, runId, null, "这条自动化已被删除", true);
             return;
@@ -280,11 +280,11 @@ public class AutomationRunner {
      *                     的自动化推到自动停用
      */
     private void fail(String tenantId, Long runId, Long conversationId, String reason, boolean countFailure) {
-        DcsAutomationRun run = runMapper.selectOne(tenantId, runId);
+        AutomationRun run = runMapper.selectOne(tenantId, runId);
         if (run == null) {
             return;
         }
-        DcsAutomation automation = automationMapper.selectOne(tenantId, run.getAutomationId());
+        Automation automation = automationMapper.selectOne(tenantId, run.getAutomationId());
         String safe = reason == null || reason.isBlank() ? "运行失败（系统错误）" : reason;
         int elapsedMs = run.getStartedAt() == null ? 0
             : (int) Math.max(0, Duration.between(run.getStartedAt(), now()).toMillis());
@@ -331,7 +331,7 @@ public class AutomationRunner {
             throw new ServiceException("创建人账号已停用，自动化无法执行");
         }
         Set<String> perms = permissionService.getMenuPermission(userId);
-        if (!perms.contains("*:*:*") && !perms.contains("dcs:assistant:use")) {
+        if (!perms.contains("*:*:*") && !perms.contains("smartdock:assistant:use")) {
             throw new ServiceException("创建人已没有使用 AI 助手的权限，自动化无法执行");
         }
         LoginUser user = new LoginUser();
@@ -356,7 +356,7 @@ public class AutomationRunner {
 
     // ---------------------------------------------------------------- 文案
 
-    private String promptOf(DcsAutomation a) {
+    private String promptOf(Automation a) {
         return "【自动化】" + a.getTitle() + "\n"
             + "现在是 " + now().format(HUMAN) + "（北京时间）。\n"
             + "请只用只读查询工具完成下面这件事：不要请求人工确认，不要尝试新增、修改或删除任何数据。\n"

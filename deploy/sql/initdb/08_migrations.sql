@@ -1,7 +1,10 @@
--- 后置增量：baseline 之后的所有迁移，按文件名日期序合并（原文，未改一字）
--- 基线 01..07 是某次从线上库导出的快照；batch10 之后的表（analytics_rebuild_log /
--- analytics_replay_task / analytics_visitor_first_seen / profile_event_archive 等）只在迁移里，
--- 所以全新安装必须把这一份也跑完，否则代码里的 Mapper 会报表不存在。
+-- 后置增量：baseline 之后的所有迁移，按文件名日期序合并。
+-- 批 9（2026-11-21）起两处口径变化：
+--   ① baseline 01..07 已是全量新世界结构（含分析中心/画像/自动化/记忆等全部表），
+--      本文件在全新库上预期全部幂等 no-op，仅为「增量留档 + 存量核对」保留；
+--   ② 历史迁移里的 dcs_ 前缀表名/权限串已随批 9 统一改写为新名（原文见 git 历史，
+--      b9 提交 diff 可逐行对照），保证「新 baseline + 本文件」重放自洽。
+-- 存量旧库（表名仍带 dcs_ 前缀）升级不走本文件，走 2026-11-21_b9_strip_dcs_prefix.sql。
 
 -- ===================== 2026-10-19_analytics_center.sql =====================
 -- =====================================================================
@@ -152,7 +155,7 @@ ON CONFLICT DO NOTHING;
 
 -- 菜单与权限
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark) VALUES
-(11986, '数据分析', 9000, 6, 'profile-analytics', 'dcs/profile/analytics', '', '1', '0', 'C', '0', '0', 'analytics:center:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '流量/页面/漏斗/留存/访问明细/采集'),
+(11986, '数据分析', 9000, 6, 'profile-analytics', 'smartdock/profile/analytics', '', '1', '0', 'C', '0', '0', 'analytics:center:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '流量/页面/漏斗/留存/访问明细/采集'),
 (11987, '数据分析编辑', 11986, 14, '', NULL, NULL, '1', '0', 'F', '1', '0', 'analytics:center:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '重建汇总/导入/漏斗维护')
 ON CONFLICT DO NOTHING;
 
@@ -445,9 +448,9 @@ INSERT INTO public.sys_menu
     (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache,
      menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (11980, '画像 RFM', 9000, 3, 'profile-rfm', 'dcs/profile/rfm', '', '1', '0', 'C', '0', '0', 'profile:model:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, 'RFM/通用评分模型'),
-    (11981, '画像分群', 9000, 4, 'profile-segments', 'dcs/profile/segments', '', '1', '0', 'C', '0', '0', 'profile:segment:query', 'peoples', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '动态/静态标签分群'),
-    (11982, '低分复核', 9000, 5, 'profile-review', 'dcs/profile/review', '', '1', '0', 'C', '0', '0', 'profile:review:query', 'validCode', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '低分主体复核队列'),
+    (11980, '画像 RFM', 9000, 3, 'profile-rfm', 'smartdock/profile/rfm', '', '1', '0', 'C', '0', '0', 'profile:model:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, 'RFM/通用评分模型'),
+    (11981, '画像分群', 9000, 4, 'profile-segments', 'smartdock/profile/segments', '', '1', '0', 'C', '0', '0', 'profile:segment:query', 'peoples', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '动态/静态标签分群'),
+    (11982, '低分复核', 9000, 5, 'profile-review', 'smartdock/profile/review', '', '1', '0', 'C', '0', '0', 'profile:review:query', 'validCode', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '低分主体复核队列'),
     (11983, '画像模型编辑', 9070, 11, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:model:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新建/编辑/运行评分模型'),
     (11984, '画像分群编辑', 9070, 12, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:segment:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新建/编辑/评估/导入分群'),
     (11985, '低分复核处理', 9070, 13, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:review:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '确认/驳回低分复核')
@@ -655,7 +658,7 @@ INSERT INTO public.sys_menu
 VALUES
     (11977, '画像维度编辑', 9070, 9, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:dimension:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新增/修改/停用评分维度'),
     (11978, '画像规则编辑', 9070, 10, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:rule:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '创建/编辑/发布/归档评分规则'),
-    (11979, '画像工作室', 9000, 2, 'profile-studio', 'dcs/profile/studio', '', '1', '0', 'C', '0', '0', 'profile:score:query', 'edit', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '维度/权重/覆盖度治理')
+    (11979, '画像工作室', 9000, 2, 'profile-studio', 'smartdock/profile/studio', '', '1', '0', 'C', '0', '0', 'profile:score:query', 'edit', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '维度/权重/覆盖度治理')
 ON CONFLICT (menu_id) DO NOTHING;
 
 INSERT INTO public.sys_role_menu (role_id, menu_id) VALUES
@@ -673,12 +676,12 @@ COMMIT;
 BEGIN;
 
 -- Q6：助手对外称呼（空=平台默认「SmartDock 小助手」；管理台可改，读侧两级默认合并）
-ALTER TABLE public.dcs_assistant_config
+ALTER TABLE public.assistant_config
     ADD COLUMN IF NOT EXISTS assistant_name character varying(50);
 
 -- Q9：MiniMax 预置切国内站——文档域名白名单补 api.minimax.cn 与 platform.minimax.cn
 -- （枚举 baseUrl 已改 https://api.minimax.cn/v1，官方文档现行端点；与 baseline/02_reference 同值）
-INSERT INTO public.dcs_ai_doc_domain (domain_id, tenant_id, domain, provider, remark, enabled, create_dept, create_by, create_time, update_by, update_time, del_flag) VALUES
+INSERT INTO public.ai_doc_domain (domain_id, tenant_id, domain, provider, remark, enabled, create_dept, create_by, create_time, update_by, update_time, del_flag) VALUES
     (2110200000000000001, '000000', 'api.minimax.cn', 'MINIMAX', 'MiniMax 国内站 API（快刀批 Q9）', '1', 103, 1, '2026-10-20 12:00:00', NULL, NULL, '0'),
     (2110200000000000002, '000000', 'platform.minimax.cn', 'MINIMAX', 'MiniMax 国内站开放平台（快刀批 Q9）', '1', 103, 1, '2026-10-20 12:00:00', NULL, NULL, '0')
 ON CONFLICT (domain_id) DO NOTHING;
@@ -686,7 +689,7 @@ ON CONFLICT (domain_id) DO NOTHING;
 -- Q9：MiniMax-M3.1-Flash 人民币价格种子（默认模型升级的计费配套；CNY 计价是硬约束，
 -- 计费链 CNY 闸会过滤非 CNY 行——官方价 ¥1 / ¥0.1（缓存）/ ¥4 每百万 token；
 -- 与 baseline/02_reference 同值）
-INSERT INTO public.dcs_ai_model_price (price_id, tenant_id, provider, model_name, currency, input_price_per_million, cached_input_price_per_million, output_price_per_million, source_url, enabled, remark, create_dept, create_by, create_time, update_by, update_time, del_flag, pricing_region, pricing_tier_code, input_token_min, input_token_max, billing_formula, pricing_schema_json, source_updated_at) VALUES
+INSERT INTO public.ai_model_price (price_id, tenant_id, provider, model_name, currency, input_price_per_million, cached_input_price_per_million, output_price_per_million, source_url, enabled, remark, create_dept, create_by, create_time, update_by, update_time, del_flag, pricing_region, pricing_tier_code, input_token_min, input_token_max, billing_formula, pricing_schema_json, source_updated_at) VALUES
     (900000000000003105, '000000', 'MINIMAX', 'MiniMax-M3.1-Flash', 'CNY', 1.000000, 0.100000, 4.000000, 'https://platform.minimax.cn/docs/guides/pricing', '1', 'MiniMax 国内站定价种子（快刀批 Q9）；人民币计价是硬约束——计费链 CNY 闸会过滤非 CNY 行', NULL, NULL, '2026-10-20 12:00:00', NULL, NULL, '0', NULL, 'DEFAULT', NULL, NULL, 'INPUT_OUTPUT_PER_MILLION', NULL, NULL)
 ON CONFLICT (price_id) DO NOTHING;
 
@@ -802,11 +805,11 @@ WHERE s.model_id = m.model_id AND s.model_type IS NULL;
 -- ---------------------------------------------------------------- 菜单(批10 C.1)
 -- 数据运维(C): 回放任务 + 保留期配置 + 身份合并记录
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
-SELECT 12001, '数据运维', 12000, 7, 'profile-ops', 'dcs/profile/ops', '', '1', '0', 'C', '0', '0', 'profile:replay:query', 'time-range', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '事件回放/数据保留期/身份合并与拆分'
+SELECT 12001, '数据运维', 12000, 7, 'profile-ops', 'smartdock/profile/ops', '', '1', '0', 'C', '0', '0', 'profile:replay:query', 'time-range', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '事件回放/数据保留期/身份合并与拆分'
 WHERE NOT EXISTS (SELECT 1 FROM public.sys_menu WHERE menu_id = 12001);
 
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
-SELECT 12002, '引擎健康', 12000, 8, 'profile-health', 'dcs/profile/health', '', '1', '0', 'C', '0', '0', 'profile:health:query', 'monitor', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '四指标/越线告警/重建耗时趋势'
+SELECT 12002, '引擎健康', 12000, 8, 'profile-health', 'smartdock/profile/health', '', '1', '0', 'C', '0', '0', 'profile:health:query', 'monitor', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '四指标/越线告警/重建耗时趋势'
 WHERE NOT EXISTS (SELECT 1 FROM public.sys_menu WHERE menu_id = 12002);
 
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
@@ -947,7 +950,7 @@ INSERT INTO public.sys_menu
   (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache,
    menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 VALUES
-  (12010, '合规中心', 12000, 7, 'compliance', 'dcs/profile/compliance', NULL, '1', '0',
+  (12010, '合规中心', 12000, 7, 'compliance', 'smartdock/profile/compliance', NULL, '1', '0',
    'C', '0', '0', 'profile:deletion:query', 'lock', 103, 1, '2026-10-20 00:00:00',
    '批11：PII 字段清单 / 主体删除向导 / 导出审计'),
   (12011, '删除-执行', 12010, 1, '', NULL, NULL, '1', '0',
@@ -1202,51 +1205,51 @@ WHERE NOT EXISTS (SELECT 1 FROM public.sys_menu WHERE menu_id = 11991);
 -- 演示库仅超管使用触达能力, 不给 user001 授权(双视角验收用)
 
 -- ===================== 2026-10-21_assistant_tool_gate.sql =====================
--- 2026-10-21 批1 Q1=B（开关矩阵）：dcs_assistant_config 新增 tool_gate 列
+-- 2026-10-21 批1 Q1=B（开关矩阵）：assistant_config 新增 tool_gate 列
 -- 存租户级工具档位覆盖 JSON（工具名→off/member/admin），空=全部按内置门槛。
 -- text 存 JSON 字符串（避开 jsonb ::cast 写入链），读侧 AssistantConfigService.parseToolGate 容错解析。
 -- 幂等可重跑。
 
-ALTER TABLE public.dcs_assistant_config ADD COLUMN IF NOT EXISTS tool_gate text;
+ALTER TABLE public.assistant_config ADD COLUMN IF NOT EXISTS tool_gate text;
 
 -- ===================== 2026-10-21_key_mgmt_provider_default_base_url.sql =====================
 -- 2026-10-21 批1 钥匙管理：标准厂商空 base_url 补官方默认地址
 -- 背景：批0 实证——空 base_url 的配置行会让运行时静默回退框架默认 api.openai.com
--- （本网络被 DNS 污染=30s 建连超时）。后端已改为保存时自动补齐（DcsAiProvider.defaultBaseUrl，
+-- （本网络被 DNS 污染=30s 建连超时）。后端已改为保存时自动补齐（AiProvider.defaultBaseUrl，
 -- updateAccess/addKey/upsert 三处同口径），本迁移修复存量空地址行。
--- 口径：与后端枚举 DcsAiProvider 完全一致；CUSTOM 厂商不补（必须手填）。
+-- 口径：与后端枚举 AiProvider 完全一致；CUSTOM 厂商不补（必须手填）。
 -- 幂等可重跑：仅命中空地址行，补过即不再命中。
 
-UPDATE dcs_ai_config SET base_url = 'https://api.openai.com/v1'          WHERE provider = 'OPENAI'          AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://api.deepseek.com/v1'       WHERE provider = 'DEEPSEEK'        AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1' WHERE provider = 'QWEN'          AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://open.bigmodel.cn/api/paas/v4'              WHERE provider = 'ZHIPU'         AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://api.moonshot.ai/v1'        WHERE provider = 'KIMI'            AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://qianfan.baidubce.com/v2'   WHERE provider = 'BAIDU_QIANFAN'   AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://api.hunyuan.cloud.tencent.com/v1'           WHERE provider = 'TENCENT_HUNYUAN' AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://spark-api-open.xf-yun.com/v1'              WHERE provider = 'XFYUN_SPARK'   AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://api.minimax.cn/v1'         WHERE provider = 'MINIMAX'        AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://api.siliconflow.cn/v1'     WHERE provider = 'SILICONFLOW'    AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://opencode.ai/zen/go/v1'     WHERE provider = 'OPENCODE'       AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://api.stepfun.com/v1'        WHERE provider = 'STEPFUN'        AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_config SET base_url = 'https://openrouter.ai/api/v1'      WHERE provider = 'OPENROUTER'     AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://api.openai.com/v1'          WHERE provider = 'OPENAI'          AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://api.deepseek.com/v1'       WHERE provider = 'DEEPSEEK'        AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1' WHERE provider = 'QWEN'          AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://open.bigmodel.cn/api/paas/v4'              WHERE provider = 'ZHIPU'         AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://api.moonshot.ai/v1'        WHERE provider = 'KIMI'            AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://qianfan.baidubce.com/v2'   WHERE provider = 'BAIDU_QIANFAN'   AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://api.hunyuan.cloud.tencent.com/v1'           WHERE provider = 'TENCENT_HUNYUAN' AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://spark-api-open.xf-yun.com/v1'              WHERE provider = 'XFYUN_SPARK'   AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://api.minimax.cn/v1'         WHERE provider = 'MINIMAX'        AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://api.siliconflow.cn/v1'     WHERE provider = 'SILICONFLOW'    AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://opencode.ai/zen/go/v1'     WHERE provider = 'OPENCODE'       AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://api.stepfun.com/v1'        WHERE provider = 'STEPFUN'        AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_config SET base_url = 'https://openrouter.ai/api/v1'      WHERE provider = 'OPENROUTER'     AND COALESCE(trim(base_url), '') = '';
 
-UPDATE dcs_ai_provider_access SET base_url = 'https://api.openai.com/v1'          WHERE provider = 'OPENAI'          AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://api.deepseek.com/v1'       WHERE provider = 'DEEPSEEK'        AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1' WHERE provider = 'QWEN'          AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://open.bigmodel.cn/api/paas/v4'              WHERE provider = 'ZHIPU'         AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://api.moonshot.ai/v1'        WHERE provider = 'KIMI'            AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://qianfan.baidubce.com/v2'   WHERE provider = 'BAIDU_QIANFAN'   AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://api.hunyuan.cloud.tencent.com/v1'           WHERE provider = 'TENCENT_HUNYUAN' AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://spark-api-open.xf-yun.com/v1'              WHERE provider = 'XFYUN_SPARK'   AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://api.minimax.cn/v1'         WHERE provider = 'MINIMAX'        AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://api.siliconflow.cn/v1'     WHERE provider = 'SILICONFLOW'    AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://opencode.ai/zen/go/v1'     WHERE provider = 'OPENCODE'       AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://api.stepfun.com/v1'        WHERE provider = 'STEPFUN'        AND COALESCE(trim(base_url), '') = '';
-UPDATE dcs_ai_provider_access SET base_url = 'https://openrouter.ai/api/v1'      WHERE provider = 'OPENROUTER'     AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://api.openai.com/v1'          WHERE provider = 'OPENAI'          AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://api.deepseek.com/v1'       WHERE provider = 'DEEPSEEK'        AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://dashscope.aliyuncs.com/compatible-mode/v1' WHERE provider = 'QWEN'          AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://open.bigmodel.cn/api/paas/v4'              WHERE provider = 'ZHIPU'         AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://api.moonshot.ai/v1'        WHERE provider = 'KIMI'            AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://qianfan.baidubce.com/v2'   WHERE provider = 'BAIDU_QIANFAN'   AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://api.hunyuan.cloud.tencent.com/v1'           WHERE provider = 'TENCENT_HUNYUAN' AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://spark-api-open.xf-yun.com/v1'              WHERE provider = 'XFYUN_SPARK'   AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://api.minimax.cn/v1'         WHERE provider = 'MINIMAX'        AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://api.siliconflow.cn/v1'     WHERE provider = 'SILICONFLOW'    AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://opencode.ai/zen/go/v1'     WHERE provider = 'OPENCODE'       AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://api.stepfun.com/v1'        WHERE provider = 'STEPFUN'        AND COALESCE(trim(base_url), '') = '';
+UPDATE ai_provider_access SET base_url = 'https://openrouter.ai/api/v1'      WHERE provider = 'OPENROUTER'     AND COALESCE(trim(base_url), '') = '';
 
 -- ===================== 2026-10-21_mcp_pilot_tables.sql =====================
--- 2026-10-21 批2 Q2=A（MCP 试点包）：dcs_mcp_server / dcs_mcp_call_log 两表（可重复执行）
+-- 2026-10-21 批2 Q2=A（MCP 试点包）：mcp_server / mcp_call_log 两表（可重复执行）
 
 -- =====================================================================
 -- 批2 Q2=A（MCP 试点包，2026-10-21）：外部 MCP 服务注册 + 调用审计两表
@@ -1255,7 +1258,7 @@ UPDATE dcs_ai_provider_access SET base_url = 'https://openrouter.ai/api/v1'     
 -- =====================================================================
 
 -- MCP 服务注册表（管理台「外部工具」页签维护；STDIO/STREAMABLE_HTTP/SSE 三传输）
-CREATE TABLE IF NOT EXISTS public.dcs_mcp_server (
+CREATE TABLE IF NOT EXISTS public.mcp_server (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     server_name character varying(50) NOT NULL,
@@ -1273,17 +1276,17 @@ CREATE TABLE IF NOT EXISTS public.dcs_mcp_server (
     create_time timestamp without time zone,
     update_by bigint,
     update_time timestamp without time zone,
-    CONSTRAINT pk_dcs_mcp_server PRIMARY KEY (id),
+    CONSTRAINT pk_mcp_server PRIMARY KEY (id),
     -- 试点物理删（审计表留痕），不引入逻辑删避免同名重建撞键
-    CONSTRAINT uk_dcs_mcp_server_name UNIQUE (server_name, tenant_id),
-    CONSTRAINT ck_dcs_mcp_transport CHECK (transport_type IN ('STDIO', 'STREAMABLE_HTTP', 'SSE')),
-    CONSTRAINT ck_dcs_mcp_readonly CHECK (read_only = '1'),
-    CONSTRAINT ck_dcs_mcp_enabled CHECK (enabled IN ('0', '1'))
+    CONSTRAINT uk_mcp_server_name UNIQUE (server_name, tenant_id),
+    CONSTRAINT ck_mcp_transport CHECK (transport_type IN ('STDIO', 'STREAMABLE_HTTP', 'SSE')),
+    CONSTRAINT ck_mcp_readonly CHECK (read_only = '1'),
+    CONSTRAINT ck_mcp_enabled CHECK (enabled IN ('0', '1'))
 );
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_server_tenant ON public.dcs_mcp_server (tenant_id, enabled);
+CREATE INDEX IF NOT EXISTS idx_mcp_server_tenant ON public.mcp_server (tenant_id, enabled);
 
 -- MCP 工具调用审计（挂载/每次真实调用两态都落账：MOUNT_OK/MOUNT_ERROR/CALL_OK/CALL_ERROR/RATE_LIMITED）
-CREATE TABLE IF NOT EXISTS public.dcs_mcp_call_log (
+CREATE TABLE IF NOT EXISTS public.mcp_call_log (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     user_id bigint,
@@ -1294,19 +1297,19 @@ CREATE TABLE IF NOT EXISTS public.dcs_mcp_call_log (
     duration_ms integer,
     error_msg character varying(500),
     create_time timestamp without time zone,
-    CONSTRAINT pk_dcs_mcp_call_log PRIMARY KEY (id),
-    CONSTRAINT ck_dcs_mcp_call_action CHECK (action IN ('MOUNT_OK', 'MOUNT_ERROR', 'CALL_OK', 'CALL_ERROR', 'RATE_LIMITED')),
-    CONSTRAINT ck_dcs_mcp_call_status CHECK (status IN ('0', '1'))
+    CONSTRAINT pk_mcp_call_log PRIMARY KEY (id),
+    CONSTRAINT ck_mcp_call_action CHECK (action IN ('MOUNT_OK', 'MOUNT_ERROR', 'CALL_OK', 'CALL_ERROR', 'RATE_LIMITED')),
+    CONSTRAINT ck_mcp_call_status CHECK (status IN ('0', '1'))
 );
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_tenant_time ON public.dcs_mcp_call_log (tenant_id, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_mcp_call_tenant_time ON public.mcp_call_log (tenant_id, create_time DESC);
 
 -- ===================== 2026-10-22_assistant_compaction.sql =====================
 -- 批A-2（2026-10-22 拍板 Q9-A）：自动压缩记录表（链式审计）
--- 背景：压缩目前只落 dcs_assistant_message 的 system 分隔条，无法审计「压了几次、
+-- 背景：压缩目前只落 assistant_message 的 system 分隔条，无法审计「压了几次、
 --       每次前后多少、上一条是谁」。本表一行一次压缩，prev_id 指向上一条同会话记录。
 -- 可重复执行（幂等）。
 
-CREATE TABLE IF NOT EXISTS public.dcs_assistant_compaction (
+CREATE TABLE IF NOT EXISTS public.assistant_compaction (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     conversation_id bigint NOT NULL,
@@ -1322,29 +1325,29 @@ CREATE TABLE IF NOT EXISTS public.dcs_assistant_compaction (
     reason character varying(64),
     prev_id bigint,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT dcs_assistant_compaction_pk PRIMARY KEY (id)
+    CONSTRAINT assistant_compaction_pk PRIMARY KEY (id)
 );
 
 -- 已建表环境补列（Q9-A：摘要正文 + 原因；幂等）
-ALTER TABLE public.dcs_assistant_compaction ADD COLUMN IF NOT EXISTS summary text;
-ALTER TABLE public.dcs_assistant_compaction ADD COLUMN IF NOT EXISTS reason character varying(64);
+ALTER TABLE public.assistant_compaction ADD COLUMN IF NOT EXISTS summary text;
+ALTER TABLE public.assistant_compaction ADD COLUMN IF NOT EXISTS reason character varying(64);
 
-CREATE INDEX IF NOT EXISTS idx_dcs_asst_comp_conv
-    ON public.dcs_assistant_compaction (tenant_id, conversation_id, id);
+CREATE INDEX IF NOT EXISTS idx_asst_comp_conv
+    ON public.assistant_compaction (tenant_id, conversation_id, id);
 
 -- 二审 P2：保留期清理按 create_time 过滤分批删——补时间索引（幂等）
-CREATE INDEX IF NOT EXISTS idx_dcs_asst_comp_time
-    ON public.dcs_assistant_compaction (create_time);
+CREATE INDEX IF NOT EXISTS idx_asst_comp_time
+    ON public.assistant_compaction (create_time);
 
 -- ===================== 2026-10-22_mcp_calllog_index_retention.sql =====================
 -- G4-#5（2026-10-22）：MCP 调用审计表补服务维度索引
 -- 背景：管理页审计查询按 server_name 等值 + create_time DESC 分页；现有唯一索引
--- idx_dcs_mcp_call_tenant_time 首列是 tenant_id——超管全量路径用不上、服务过滤路径
+-- idx_mcp_call_tenant_time 首列是 tenant_id——超管全量路径用不上、服务过滤路径
 -- 首列缺失退化顺序扫描。本索引与该查询模式精确匹配。
 -- 可重复执行（幂等）；保留期清理（90 天）由后端定时任务实现，无需 DDL。
 
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_server_time
-    ON public.dcs_mcp_call_log (server_name, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_mcp_call_server_time
+    ON public.mcp_call_log (server_name, create_time DESC);
 
 -- ===================== 2026-10-22_mcp_calllog_retention_index.sql =====================
 -- G4 三审回修（2026-10-22）：审计保留期清理的支撑索引
@@ -1352,18 +1355,18 @@ CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_server_time
 -- 索引前导列分别是 tenant_id / server_name，create_time 无前导索引 → 每批顺序扫
 -- （dspro/dsflash 双席共识 P2）。本索引专供清理路径；可重复执行。
 
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_create_time
-    ON public.dcs_mcp_call_log (create_time);
+CREATE INDEX IF NOT EXISTS idx_mcp_call_create_time
+    ON public.mcp_call_log (create_time);
 
 -- ===================== 2026-10-22_mcp_elicit_audit_action.sql =====================
--- G3 三审回修（双席共识 P0）：dcs_mcp_call_log.action CHECK 约束补 ELICIT_* 五值
+-- G3 三审回修（双席共识 P0）：mcp_call_log.action CHECK 约束补 ELICIT_* 五值
 -- 背景：G3-A1 elicitation 反问桥写入 ELICIT_ASK/ACCEPT/DECLINE/CANCEL/TIMEOUT 审计，
 -- 原五值约束 100% 拒收（异常被 audit() 静默吞掉，审计账本零落库）。
 -- 可重复执行（幂等）：DROP IF EXISTS + ADD。
 
-ALTER TABLE public.dcs_mcp_call_log DROP CONSTRAINT IF EXISTS ck_dcs_mcp_call_action;
+ALTER TABLE public.mcp_call_log DROP CONSTRAINT IF EXISTS ck_mcp_call_action;
 
-ALTER TABLE public.dcs_mcp_call_log ADD CONSTRAINT ck_dcs_mcp_call_action CHECK (
+ALTER TABLE public.mcp_call_log ADD CONSTRAINT ck_mcp_call_action CHECK (
     action IN ('MOUNT_OK', 'MOUNT_ERROR', 'CALL_OK', 'CALL_ERROR', 'RATE_LIMITED',
                'ELICIT_ASK', 'ELICIT_ACCEPT', 'ELICIT_DECLINE', 'ELICIT_CANCEL', 'ELICIT_TIMEOUT')
 );
@@ -1371,7 +1374,7 @@ ALTER TABLE public.dcs_mcp_call_log ADD CONSTRAINT ck_dcs_mcp_call_action CHECK 
 -- ===================== 2026-10-22_support_changelog_menu.sql =====================
 -- 2026-10-22：修复「系统支持」白屏——补回迁移漏搬的「更新日志」子菜单
 -- 背景：开源迁移基线只搬了顶级目录 9180，未搬子菜单 9160（git 全历史无 9160 记录），
---       前端 views/dcs/changelog 与首页「全部日志 →」入口仍在，访问 /support 无子路由 → 白屏。
+--       前端 views/smartdock/changelog 与首页「全部日志 →」入口仍在，访问 /support 无子路由 → 白屏。
 -- 口径：更新日志为纯前端静态页（无后端接口）；与母仓差异——反馈中心未迁移（本仓无对应页面），
 --       可见范围改为全体登录角色（首页对所有角色展示入口）。
 -- 可重复执行（幂等）：菜单 ON CONFLICT DO UPDATE 校正，授权 DO NOTHING。
@@ -1381,7 +1384,7 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (9160, '更新日志', 9180, 1, 'changelog', 'dcs/changelog/index', '',
+    (9160, '更新日志', 9180, 1, 'changelog', 'smartdock/changelog/index', '',
      '1', '0', 'C', '0', '0', '', 'log',
      103, 1, now(), NULL, NULL, '系统版本迭代记录(纯前端静态页, 全体登录角色可见)')
 ON CONFLICT (menu_id) DO UPDATE SET
@@ -1416,28 +1419,28 @@ DROP TABLE IF EXISTS public.analytics_collect_log;
 -- ===================== 2026-10-23_n1_api_format_price_source.sql =====================
 -- N1 批（2026-10-23）：接口格式三选一 + 价格来源标记（可重复执行）
 -- Q5-A：老配置/老钥匙默认 CHAT_COMPLETIONS，行为不变
-ALTER TABLE public.dcs_ai_config
+ALTER TABLE public.ai_config
     ADD COLUMN IF NOT EXISTS api_format character varying(24) DEFAULT 'CHAT_COMPLETIONS'::character varying NOT NULL;
 
-ALTER TABLE public.dcs_ai_provider_access
+ALTER TABLE public.ai_provider_access
     ADD COLUMN IF NOT EXISTS api_format character varying(24) DEFAULT 'CHAT_COMPLETIONS'::character varying NOT NULL;
 
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dcs_ai_config_api_format') THEN
-        ALTER TABLE public.dcs_ai_config
-            ADD CONSTRAINT ck_dcs_ai_config_api_format
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_ai_config_api_format') THEN
+        ALTER TABLE public.ai_config
+            ADD CONSTRAINT ck_ai_config_api_format
             CHECK (api_format IN ('CHAT_COMPLETIONS', 'ANTHROPIC_MESSAGES', 'RESPONSES'));
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dcs_ai_provider_access_api_format') THEN
-        ALTER TABLE public.dcs_ai_provider_access
-            ADD CONSTRAINT ck_dcs_ai_provider_access_api_format
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_ai_provider_access_api_format') THEN
+        ALTER TABLE public.ai_provider_access
+            ADD CONSTRAINT ck_ai_provider_access_api_format
             CHECK (api_format IN ('CHAT_COMPLETIONS', 'ANTHROPIC_MESSAGES', 'RESPONSES'));
     END IF;
 END $$;
 
 -- Q6-A：价格行来源与手工覆盖标记（models.dev 同步不覆盖人工价）
-ALTER TABLE public.dcs_ai_model_price
+ALTER TABLE public.ai_model_price
     ADD COLUMN IF NOT EXISTS price_source character varying(16) DEFAULT 'MANUAL'::character varying NOT NULL;
 
 -- manual_override 首建时把存量行一并锁住：迁移前的价格全是人工维护的，
@@ -1446,33 +1449,33 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM information_schema.columns
-         WHERE table_schema = 'public' AND table_name = 'dcs_ai_model_price' AND column_name = 'manual_override'
+         WHERE table_schema = 'public' AND table_name = 'ai_model_price' AND column_name = 'manual_override'
     ) THEN
-        ALTER TABLE public.dcs_ai_model_price
+        ALTER TABLE public.ai_model_price
             ADD COLUMN manual_override character(1) DEFAULT '0'::bpchar NOT NULL;
-        UPDATE public.dcs_ai_model_price SET manual_override = '1';
+        UPDATE public.ai_model_price SET manual_override = '1';
     END IF;
 END $$;
 
-ALTER TABLE public.dcs_ai_model_price
+ALTER TABLE public.ai_model_price
     ADD COLUMN IF NOT EXISTS last_synced_at timestamp without time zone;
 
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dcs_ai_model_price_source') THEN
-        ALTER TABLE public.dcs_ai_model_price
-            ADD CONSTRAINT ck_dcs_ai_model_price_source
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_ai_model_price_source') THEN
+        ALTER TABLE public.ai_model_price
+            ADD CONSTRAINT ck_ai_model_price_source
             CHECK (price_source IN ('MANUAL', 'MODELS_DEV', 'IMPORT'));
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dcs_ai_model_price_manual_override') THEN
-        ALTER TABLE public.dcs_ai_model_price
-            ADD CONSTRAINT ck_dcs_ai_model_price_manual_override
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_ai_model_price_manual_override') THEN
+        ALTER TABLE public.ai_model_price
+            ADD CONSTRAINT ck_ai_model_price_manual_override
             CHECK (manual_override IN ('0', '1'));
     END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_dcs_ai_model_price_source
-    ON public.dcs_ai_model_price (tenant_id, price_source)
+CREATE INDEX IF NOT EXISTS idx_ai_model_price_source
+    ON public.ai_model_price (tenant_id, price_source)
     WHERE del_flag = '0';
 
 -- ===================== 2026-10-23_n3_announcement_feedback_changelog.sql =====================
@@ -1506,11 +1509,11 @@ CREATE INDEX IF NOT EXISTS idx_sys_notice_read_user
     ON public.sys_notice_read (tenant_id, user_id);
 
 -- ===== 3. 站内通知支持跳转链接 =====
-ALTER TABLE public.dcs_notice ADD COLUMN IF NOT EXISTS ref_url character varying(500);
-COMMENT ON COLUMN public.dcs_notice.ref_url IS '点击通知跳转的前端路由（可空）';
+ALTER TABLE public.notice ADD COLUMN IF NOT EXISTS ref_url character varying(500);
+COMMENT ON COLUMN public.notice.ref_url IS '点击通知跳转的前端路由（可空）';
 
 -- ===== 4. 反馈中心 =====
-CREATE TABLE IF NOT EXISTS public.dcs_feedback (
+CREATE TABLE IF NOT EXISTS public.feedback (
     feedback_id   bigint NOT NULL,
     tenant_id     character varying(20) NOT NULL DEFAULT '000000'::character varying,
     title         character varying(200) NOT NULL,
@@ -1530,19 +1533,19 @@ CREATE TABLE IF NOT EXISTS public.dcs_feedback (
     update_by     bigint,
     update_time   timestamp(6) without time zone,
     del_flag      char(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_dcs_feedback PRIMARY KEY (feedback_id),
-    CONSTRAINT ck_dcs_feedback_type CHECK (feedback_type::text = ANY (ARRAY['BUG','EXPERIENCE','SUGGEST','OTHER']::text[])),
-    CONSTRAINT ck_dcs_feedback_status CHECK (status::text = ANY (ARRAY['PENDING','PROCESSING','RESOLVED','CLOSED']::text[]))
+    CONSTRAINT pk_feedback PRIMARY KEY (feedback_id),
+    CONSTRAINT ck_feedback_type CHECK (feedback_type::text = ANY (ARRAY['BUG','EXPERIENCE','SUGGEST','OTHER']::text[])),
+    CONSTRAINT ck_feedback_status CHECK (status::text = ANY (ARRAY['PENDING','PROCESSING','RESOLVED','CLOSED']::text[]))
 );
 
-COMMENT ON TABLE public.dcs_feedback IS '产品反馈（单表；最近一次处理意见覆盖式存储）';
-COMMENT ON COLUMN public.dcs_feedback.feedback_type IS 'BUG=缺陷 EXPERIENCE=体验 SUGGEST=建议 OTHER=其它';
-COMMENT ON COLUMN public.dcs_feedback.context_json IS '提交时自动采集的页面/浏览器/版本上下文（JSON）';
+COMMENT ON TABLE public.feedback IS '产品反馈（单表；最近一次处理意见覆盖式存储）';
+COMMENT ON COLUMN public.feedback.feedback_type IS 'BUG=缺陷 EXPERIENCE=体验 SUGGEST=建议 OTHER=其它';
+COMMENT ON COLUMN public.feedback.context_json IS '提交时自动采集的页面/浏览器/版本上下文（JSON）';
 
-CREATE INDEX IF NOT EXISTS idx_dcs_feedback_status ON public.dcs_feedback (status);
-CREATE INDEX IF NOT EXISTS idx_dcs_feedback_create_by ON public.dcs_feedback (create_by);
-CREATE INDEX IF NOT EXISTS idx_dcs_feedback_tenant_status
-    ON public.dcs_feedback (tenant_id, status, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_feedback_status ON public.feedback (status);
+CREATE INDEX IF NOT EXISTS idx_feedback_create_by ON public.feedback (create_by);
+CREATE INDEX IF NOT EXISTS idx_feedback_tenant_status
+    ON public.feedback (tenant_id, status, create_time DESC);
 
 -- ===== 5. 更新日志（全局表，已在 tenant.excludes） =====
 CREATE TABLE IF NOT EXISTS public.dcs_changelog (
@@ -1559,8 +1562,8 @@ CREATE TABLE IF NOT EXISTS public.dcs_changelog (
     update_by      bigint,
     update_time    timestamp(6) without time zone,
     del_flag       char(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_dcs_changelog PRIMARY KEY (log_id),
-    CONSTRAINT ck_dcs_changelog_status CHECK (status::text = ANY (ARRAY['0','1']::text[]))
+    CONSTRAINT pk_changelog PRIMARY KEY (log_id),
+    CONSTRAINT ck_changelog_status CHECK (status::text = ANY (ARRAY['0','1']::text[]))
 );
 
 COMMENT ON TABLE public.dcs_changelog IS '更新日志（全局；visible 由 target_tenants 名单控制）';
@@ -1568,9 +1571,9 @@ COMMENT ON COLUMN public.dcs_changelog.items IS '条目 JSON：[{"type":"new|opt
 COMMENT ON COLUMN public.dcs_changelog.target_tenants IS '推送租户名单 JSON：["000000",...]';
 COMMENT ON COLUMN public.dcs_changelog.status IS '0=草稿 1=已发布';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_changelog_version
+CREATE UNIQUE INDEX IF NOT EXISTS uk_changelog_version
     ON public.dcs_changelog (version) WHERE (del_flag = '0'::bpchar);
-CREATE INDEX IF NOT EXISTS idx_dcs_changelog_status_publish
+CREATE INDEX IF NOT EXISTS idx_changelog_status_publish
     ON public.dcs_changelog (status, publish_time DESC);
 
 -- ===== 6. 菜单与权限 =====
@@ -1580,8 +1583,8 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (9150, '公告', 9180, 0, 'announcement', 'dcs/announcement/index', '',
-     '1', '0', 'C', '0', '0', 'dcs:announcement:list', 'message',
+    (9150, '公告', 9180, 0, 'announcement', 'smartdock/announcement/index', '',
+     '1', '0', 'C', '0', '0', 'smartdock:announcement:list', 'message',
      103, 1, now(), NULL, NULL, '公告卡片流与文章页（全体登录角色）')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id, path = EXCLUDED.path, component = EXCLUDED.component,
@@ -1589,7 +1592,7 @@ ON CONFLICT (menu_id) DO UPDATE SET
     perms = EXCLUDED.perms, remark = EXCLUDED.remark, update_time = now();
 
 -- 6.2 更新日志：补列表权限 + 四个按钮
-UPDATE public.sys_menu SET perms = 'dcs:changelog:list', remark = '系统版本迭代记录（数据库驱动）', update_time = now()
+UPDATE public.sys_menu SET perms = 'smartdock:changelog:list', remark = '系统版本迭代记录（数据库驱动）', update_time = now()
  WHERE menu_id = 9160;
 
 INSERT INTO public.sys_menu
@@ -1597,10 +1600,10 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (9161, '日志查询', 9160, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:query', '#', 103, 1, now(), NULL, NULL, ''),
-    (9162, '版本新增', 9160, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:add', '#', 103, 1, now(), NULL, NULL, ''),
-    (9163, '版本编辑', 9160, 3, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:edit', '#', 103, 1, now(), NULL, NULL, ''),
-    (9164, '版本删除', 9160, 4, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:changelog:remove', '#', 103, 1, now(), NULL, NULL, '')
+    (9161, '日志查询', 9160, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:query', '#', 103, 1, now(), NULL, NULL, ''),
+    (9162, '版本新增', 9160, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:add', '#', 103, 1, now(), NULL, NULL, ''),
+    (9163, '版本编辑', 9160, 3, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:edit', '#', 103, 1, now(), NULL, NULL, ''),
+    (9164, '版本删除', 9160, 4, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:changelog:remove', '#', 103, 1, now(), NULL, NULL, '')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id, perms = EXCLUDED.perms, visible = EXCLUDED.visible,
     status = EXCLUDED.status, update_time = now();
@@ -1611,11 +1614,11 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (9170, '反馈中心', 9180, 2, 'feedback', 'dcs/feedback/index', '',
-     '1', '0', 'C', '0', '0', 'dcs:feedback:list', 'email',
+    (9170, '反馈中心', 9180, 2, 'feedback', 'smartdock/feedback/index', '',
+     '1', '0', 'C', '0', '0', 'smartdock:feedback:list', 'email',
      103, 1, now(), NULL, NULL, '产品反馈管理（租户管理员与超管）'),
-    (9171, '反馈查询', 9170, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:feedback:query', '#', 103, 1, now(), NULL, NULL, ''),
-    (9172, '反馈处理', 9170, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'dcs:feedback:handle', '#', 103, 1, now(), NULL, NULL, '')
+    (9171, '反馈查询', 9170, 1, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:feedback:query', '#', 103, 1, now(), NULL, NULL, ''),
+    (9172, '反馈处理', 9170, 2, '', NULL, '', '1', '0', 'F', '0', '0', 'smartdock:feedback:handle', '#', 103, 1, now(), NULL, NULL, '')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id, path = EXCLUDED.path, component = EXCLUDED.component,
     menu_type = EXCLUDED.menu_type, visible = EXCLUDED.visible, status = EXCLUDED.status,
@@ -1938,7 +1941,7 @@ SELECT 1, 11988 WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu WHERE role_
 -- 2026-10-26 助手三页批一 P0-2 菜单调整 DDL
 -- 内容: AI助手记忆菜单 11928 从顶级隐藏挪入「AI 助手」目录(11930)下并翻显
 -- 说明: parent_id 0→11930、path 'assistant-memory'→'memory'(完整路由 /ai/memory)、visible '1'→'0'(显示);
---       component 保持 dcs/assistant/memory/index 不变;
+--       component 保持 smartdock/assistant/memory/index 不变;
 --       sys_role_menu 无需处理——baseline/04_role_menu.sql 已有 role 5(成员)/6(租户管理员) 对 11928 的绑定
 -- 可重复执行: UPDATE 幂等, 重复跑结果不变
 -- 回退: UPDATE public.sys_menu SET parent_id = 0, path = 'assistant-memory', visible = '1' WHERE menu_id = 11928;
@@ -1976,7 +1979,7 @@ ALTER TABLE public.analytics_rebuild_log
 BEGIN;
 
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
-SELECT 11989, '引擎管理', 12000, 9, 'engine-admin', 'dcs/profile/admin', '', '1', '0', 'C', '0', '0', 'profile:engine:query', 'setting', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '画像引擎运维: 重算/协议/Schema/灌数(写操作复用 11971-11976 按钮位)'
+SELECT 11989, '引擎管理', 12000, 9, 'engine-admin', 'smartdock/profile/admin', '', '1', '0', 'C', '0', '0', 'profile:engine:query', 'setting', 103, 1, '2026-10-26 00:00:00', NULL, NULL, '画像引擎运维: 重算/协议/Schema/灌数(写操作复用 11971-11976 按钮位)'
 WHERE NOT EXISTS (SELECT 1 FROM public.sys_menu WHERE menu_id = 11989);
 
 INSERT INTO public.sys_role_menu (role_id, menu_id)
@@ -2589,12 +2592,12 @@ END $$;
 COMMIT;
 
 -- ===================== 2026-10-28_skill_pg_5b.sql =====================
--- 5b 批（2026-10-28 拍板）：技能内容在线层 dcs_assistant_skill
+-- 5b 批（2026-10-28 拍板）：技能内容在线层 assistant_skill
 -- 可重复执行（IF NOT EXISTS / IF NOT EXISTS 约束 DO 块 / 存在性守卫 INSERT）；与 baseline 01_schema.sql 同步维护。
 -- 语义：tenant_id='000000' 行=全局基线；租户行同 skill_id 覆盖全局行。
 -- 无触发词列（题7 甲拍板：description=模型触发唯一依据）。
 
-CREATE TABLE IF NOT EXISTS public.dcs_assistant_skill (
+CREATE TABLE IF NOT EXISTS public.assistant_skill (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     skill_id character varying(64) NOT NULL,
@@ -2611,21 +2614,21 @@ CREATE TABLE IF NOT EXISTS public.dcs_assistant_skill (
 
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'dcs_assistant_skill_pk') THEN
-        ALTER TABLE public.dcs_assistant_skill ADD CONSTRAINT dcs_assistant_skill_pk PRIMARY KEY (id);
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'assistant_skill_pk') THEN
+        ALTER TABLE public.assistant_skill ADD CONSTRAINT assistant_skill_pk PRIMARY KEY (id);
     END IF;
 END $$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_assistant_skill_tenant
-    ON public.dcs_assistant_skill (tenant_id, skill_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_assistant_skill_tenant
+    ON public.assistant_skill (tenant_id, skill_id);
 
 -- 权限串按钮挂「AI 助手管理」（menu_id=11927，02_reference.sql 实测）；角色 6=租户管理员
 INSERT INTO sys_menu (menu_id, menu_name, parent_id, order_num, path, component, is_frame, is_cache,
     menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
 SELECT 12040, '助手技能编辑', 11927, 10, '', NULL, 1, 0, 'F', '0', '0',
-    'dcs:assistant:skill:edit', '#', 103, 1, CURRENT_TIMESTAMP, 1, NULL,
+    'smartdock:assistant:skill:edit', '#', 103, 1, CURRENT_TIMESTAMP, 1, NULL,
     '5b 批：管理台在线编辑技能内容（题5 甲·独立权限串）'
-WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 12040 OR perms = 'dcs:assistant:skill:edit');
+WHERE NOT EXISTS (SELECT 1 FROM sys_menu WHERE menu_id = 12040 OR perms = 'smartdock:assistant:skill:edit');
 
 -- 权限串授权不做自动绑定（三审 dsflash P1-5 回修）：角色 6（租户管理员）在基线里连宿主菜单
 -- 11927 都没有，自动授 12040 只会造出「能盲写、不能读、看不到页面」的半授权；
@@ -2656,7 +2659,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.dcs_assistant_conversation_title_bak_20261030 AS
 SELECT id, tenant_id, thread_id, title, update_time
-  FROM public.dcs_assistant_conversation
+  FROM public.assistant_conversation
  WHERE title IS NOT NULL
    AND (btrim(title) LIKE '{"%'
         OR btrim(title) LIKE '[{%'
@@ -2664,7 +2667,7 @@ SELECT id, tenant_id, thread_id, title, update_time
 
 INSERT INTO public.dcs_assistant_conversation_title_bak_20261030 (id, tenant_id, thread_id, title, update_time)
 SELECT c.id, c.tenant_id, c.thread_id, c.title, c.update_time
-  FROM public.dcs_assistant_conversation c
+  FROM public.assistant_conversation c
  WHERE c.title IS NOT NULL
    AND (btrim(c.title) LIKE '{"%'
         OR btrim(c.title) LIKE '[{%'
@@ -2675,7 +2678,7 @@ SELECT c.id, c.tenant_id, c.thread_id, c.title, c.update_time
           WHERE b.id = c.id
             AND b.title IS NOT DISTINCT FROM c.title);
 
-UPDATE public.dcs_assistant_conversation
+UPDATE public.assistant_conversation
    SET title = NULL
  WHERE title IS NOT NULL
    AND (btrim(title) LIKE '{"%'
@@ -2710,20 +2713,20 @@ DELETE FROM public.sys_notice_read r
 -- 形状：按 (tenant_id, skill_id) 唯一，一技一行；内置技能没有在线行也能统计。
 -- 可重复执行：IF NOT EXISTS 建表/索引；upsert 由应用侧 ON CONFLICT 完成。
 
-CREATE TABLE IF NOT EXISTS public.dcs_assistant_skill_usage (
+CREATE TABLE IF NOT EXISTS public.assistant_skill_usage (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     skill_id character varying(64) NOT NULL,
     use_count bigint DEFAULT 0 NOT NULL,
     last_used_at timestamp without time zone,
     update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT dcs_assistant_skill_usage_pk PRIMARY KEY (id)
+    CONSTRAINT assistant_skill_usage_pk PRIMARY KEY (id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_assistant_skill_usage_tenant
-    ON public.dcs_assistant_skill_usage (tenant_id, skill_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_assistant_skill_usage_tenant
+    ON public.assistant_skill_usage (tenant_id, skill_id);
 
-COMMENT ON TABLE public.dcs_assistant_skill_usage IS '助手技能使用统计（题2 案3）：一技一行，use_count=成功取用次数，last_used_at=最近一次';
+COMMENT ON TABLE public.assistant_skill_usage IS '助手技能使用统计（题2 案3）：一技一行，use_count=成功取用次数，last_used_at=最近一次';
 
 -- ===================== 2026-10-31_assistant_title_backup_idempotent.sql =====================
 -- 2026-10-31 题9：把「先备份再置 NULL」补成真正幂等的备份
@@ -2739,12 +2742,12 @@ COMMENT ON TABLE public.dcs_assistant_skill_usage IS '助手技能使用统计�
 
 CREATE TABLE IF NOT EXISTS public.dcs_assistant_conversation_title_bak_20261030 AS
 SELECT id, tenant_id, thread_id, title, update_time
-  FROM public.dcs_assistant_conversation
+  FROM public.assistant_conversation
  WHERE false;
 
 INSERT INTO public.dcs_assistant_conversation_title_bak_20261030 (id, tenant_id, thread_id, title, update_time)
 SELECT c.id, c.tenant_id, c.thread_id, c.title, c.update_time
-  FROM public.dcs_assistant_conversation c
+  FROM public.assistant_conversation c
  WHERE c.title IS NOT NULL
    AND (btrim(c.title) LIKE '{"%'
         OR btrim(c.title) LIKE '[{%'
@@ -2755,7 +2758,7 @@ SELECT c.id, c.tenant_id, c.thread_id, c.title, c.update_time
           WHERE b.id = c.id
             AND b.title IS NOT DISTINCT FROM c.title);
 
-UPDATE public.dcs_assistant_conversation
+UPDATE public.assistant_conversation
    SET title = NULL
  WHERE title IS NOT NULL
    AND (btrim(title) LIKE '{"%'
@@ -2763,22 +2766,22 @@ UPDATE public.dcs_assistant_conversation
         OR title ~* '"title"\s*:');
 
 -- ===================== 2026-11-01_assistant_action_audit.sql =====================
--- 2026-11-01 三批③ 写操作审计：dcs_assistant_action 补 release_mode + 审计独立页菜单
+-- 2026-11-01 三批③ 写操作审计：assistant_action 补 release_mode + 审计独立页菜单
 -- 内容: ①动作账本补 release_mode 列（confirm=确认卡放行 / once=同类已确认 / auto=全自动 /
 --       allow=平台放行；REJECTED 行为空——拒绝行没有放行动作）
 --       ②「写操作审计」独立菜单（menu_id=11936，挂「AI 助手」目录 11930 下 order 3，
---       path=assistant-audit，component=dcs/assistant/audit/index，perms=dcs:assistant:audit:query）
+--       path=assistant-audit，component=smartdock/assistant/audit/index，perms=smartdock:assistant:audit:query）
 -- 幂等: 列 ADD COLUMN IF NOT EXISTS；菜单 ON CONFLICT (menu_id) DO UPDATE 校正
 --       （照 2026-10-22_support_changelog_menu.sql:11-28 范式——该文件头注记载的正是
 --       「迁移漏菜单→页面无路由白屏」同型事故，存量环境跑迁移即得菜单，杜绝复发）
 -- 角色绑定: sys_role_menu 不在 SQL 里绑角色（超管天然可见，租户管理员按现角色授权流程手工挂）
--- 回退: ALTER TABLE public.dcs_assistant_action DROP COLUMN IF EXISTS release_mode;
+-- 回退: ALTER TABLE public.assistant_action DROP COLUMN IF EXISTS release_mode;
 --       DELETE FROM public.sys_menu WHERE menu_id = 11936;
 
-ALTER TABLE public.dcs_assistant_action
+ALTER TABLE public.assistant_action
     ADD COLUMN IF NOT EXISTS release_mode character varying(16);
 
-COMMENT ON COLUMN public.dcs_assistant_action.release_mode
+COMMENT ON COLUMN public.assistant_action.release_mode
     IS '放行方式(confirm=确认卡放行/once=同类已确认/auto=全自动/allow=平台放行; REJECTED行为空)';
 
 INSERT INTO public.sys_menu
@@ -2786,8 +2789,8 @@ INSERT INTO public.sys_menu
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (11936, '写操作审计', 11930, 3, 'assistant-audit', 'dcs/assistant/audit/index', '',
-     '1', '0', 'C', '0', '0', 'dcs:assistant:audit:query', 'search',
+    (11936, '写操作审计', 11930, 3, 'assistant-audit', 'smartdock/assistant/audit/index', '',
+     '1', '0', 'C', '0', '0', 'smartdock:assistant:audit:query', 'search',
      103, 1, now(), NULL, NULL, '助手写操作审计(动作账本四维查询/CSV导出, 不含工具参数)')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id,
@@ -2802,22 +2805,22 @@ ON CONFLICT (menu_id) DO UPDATE SET
     update_time = now();
 
 -- ===================== 2026-11-01_assistant_action_revoke.sql =====================
--- 2026-11-01 三批④ 全自动完成通知+撤回：dcs_assistant_action 补撤回留痕两列
+-- 2026-11-01 三批④ 全自动完成通知+撤回：assistant_action 补撤回留痕两列
 -- 内容: 撤回成功后账本行 status=REVOKED，并记 revoked_by（撤回人）/ revoked_at（撤回时刻）
 --       ——审计页（三批③ 11936 菜单）按 status=REVOKED 可见撤回行；本迁移只加列不改存量数据
 -- 幂等: ADD COLUMN IF NOT EXISTS 可重复执行（存量环境跑两遍无副作用）
--- 回退: ALTER TABLE public.dcs_assistant_action
+-- 回退: ALTER TABLE public.assistant_action
 --         DROP COLUMN IF EXISTS revoked_by, DROP COLUMN IF EXISTS revoked_at;
 --       （回退前先把 status='REVOKED' 的行视为无效态处理——REVOKED 无旧值可还原，回退即丢撤回留痕）
 
-ALTER TABLE public.dcs_assistant_action
+ALTER TABLE public.assistant_action
     ADD COLUMN IF NOT EXISTS revoked_by bigint,
     ADD COLUMN IF NOT EXISTS revoked_at timestamp without time zone;
 
-COMMENT ON COLUMN public.dcs_assistant_action.revoked_by
+COMMENT ON COLUMN public.assistant_action.revoked_by
     IS '撤回人user_id(status=REVOKED时非空; 与账本行user_id同源=本人撤自己的)';
 
-COMMENT ON COLUMN public.dcs_assistant_action.revoked_at
+COMMENT ON COLUMN public.assistant_action.revoked_at
     IS '撤回时刻(status=REVOKED时非空)';
 
 -- ===================== 2026-11-01_assistant_attachment_owner.sql =====================
@@ -2825,33 +2828,33 @@ COMMENT ON COLUMN public.dcs_assistant_action.revoked_at
 -- 没有归属时，另一台实例启动/巡检会把本机排队中的 PENDING 行一起认领，
 -- 两边各解析一遍；迟到的任务还会把 PARSED 翻回 PARSING / 覆盖成 FAILED。
 -- parse_owner=认领实例 id；markParsing/finish* 都带 owner 守卫，谁认领谁回写。
-ALTER TABLE public.dcs_assistant_attachment
+ALTER TABLE public.assistant_attachment
     ADD COLUMN IF NOT EXISTS parse_owner character varying(64);
 
-COMMENT ON COLUMN public.dcs_assistant_attachment.parse_owner IS
+COMMENT ON COLUMN public.assistant_attachment.parse_owner IS
     '解析认领实例 id（多实例防重复解析；空=未认领）';
 
 -- ===================== 2026-11-01_assistant_run_owner.sql =====================
 -- 多实例批 3：run 归属实例与末次事件时间
 -- 幂等：可重复执行（IF NOT EXISTS）
-ALTER TABLE public.dcs_assistant_run
+ALTER TABLE public.assistant_run
     ADD COLUMN IF NOT EXISTS owner_instance character varying(128);
 
-ALTER TABLE public.dcs_assistant_run
+ALTER TABLE public.assistant_run
     ADD COLUMN IF NOT EXISTS last_event_at timestamp without time zone;
 
 -- 收割候选查询用 COALESCE(last_event_at, create_time)，表达式索引才对得上
 -- （二审回修：不建 (status,last_event_at) 单列索引——没有任何查询命中它，只增写放大；
---   已部署环境若跑过旧版迁移，另执行 DROP INDEX IF EXISTS idx_dcs_asst_run_status_last_event）
-CREATE INDEX IF NOT EXISTS idx_dcs_asst_run_status_event_ref
-    ON public.dcs_assistant_run USING btree (status, COALESCE(last_event_at, create_time));
+--   已部署环境若跑过旧版迁移，另执行 DROP INDEX IF EXISTS idx_asst_run_status_last_event）
+CREATE INDEX IF NOT EXISTS idx_asst_run_status_event_ref
+    ON public.assistant_run USING btree (status, COALESCE(last_event_at, create_time));
 
-DROP INDEX IF EXISTS public.idx_dcs_asst_run_status_last_event;
+DROP INDEX IF EXISTS public.idx_asst_run_status_last_event;
 
 -- ===================== 2026-11-02_smallfix_retire_invite_button.sql =====================
 -- 小修包批(2026-11-02, 剩余工作板回执「全按推荐」题6): 摘除邀请注册死入口。
 -- 背景: 菜单 9181(system:user:invite) 自 2026-09-26 挂出, 后端接口从未实现
--- (/dcs/inviteLink/** 全仓无 Controller), 用户点了没有任何响应——最伤信任的一类问题。
+-- (/inviteLink/** 全仓无 Controller), 用户点了没有任何响应——最伤信任的一类问题。
 -- 拍板: 摘按钮; 补实现属大活, 需要时另立批次。
 -- 伴随代码改动: 前端用户管理页按钮/弹窗与 api/system/inviteLink 目录已删,
 -- 所以本迁移只需清菜单与角色关联。可重复执行。
@@ -2865,27 +2868,27 @@ COMMIT;
 
 -- ===================== 2026-11-03_agent_rework.sql =====================
 -- 2026-11-03 批3.5·题5（拍板：全按推荐）：技能使用统计加「人」维度。
--- 背景：dcs_assistant_skill_usage 原先按 (tenant_id, skill_id) 一技一行（单位级），撑不住
+-- 背景：assistant_skill_usage 原先按 (tenant_id, skill_id) 一技一行（单位级），撑不住
 --       工作台「能做什么 · 你最近用过」的按人取数；本迁移补 user_id 并换唯一键。
 -- 口径：历史单位级行落 user_id=0（不再新增）；管理页统计改为按技能 SUM 聚合（口径=全单位合计，不变）。
 -- 可重复执行：ADD COLUMN IF NOT EXISTS / DROP INDEX IF EXISTS / CREATE UNIQUE INDEX IF NOT EXISTS。
 
-ALTER TABLE public.dcs_assistant_skill_usage
+ALTER TABLE public.assistant_skill_usage
     ADD COLUMN IF NOT EXISTS user_id bigint NOT NULL DEFAULT 0;
 
-DROP INDEX IF EXISTS uk_dcs_assistant_skill_usage_tenant;
+DROP INDEX IF EXISTS uk_assistant_skill_usage_tenant;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_assistant_skill_usage_tenant_user
-    ON public.dcs_assistant_skill_usage (tenant_id, user_id, skill_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_assistant_skill_usage_tenant_user
+    ON public.assistant_skill_usage (tenant_id, user_id, skill_id);
 
-COMMENT ON COLUMN public.dcs_assistant_skill_usage.user_id IS '使用人（雪花 userId；批3.5·题5 加列，历史单位级行=0）';
-COMMENT ON CONSTRAINT dcs_assistant_skill_usage_pk ON public.dcs_assistant_skill_usage IS 'PRIMARY KEY (id)';
+COMMENT ON COLUMN public.assistant_skill_usage.user_id IS '使用人（雪花 userId；批3.5·题5 加列，历史单位级行=0）';
+COMMENT ON CONSTRAINT assistant_skill_usage_pk ON public.assistant_skill_usage IS 'PRIMARY KEY (id)';
 
 -- ===================== 2026-11-03_agent_workspace_menu.sql =====================
 -- 批3（2026-11-03）：智能体工作台入口权限 agentws:workspace:use
 -- 背景：工作台 /agent 是「独立分区」——前端 constantRoutes 直挂（不套业务壳层，自带 264 左栏），
 --       因此这里只用按钮行(menu_type=F)下发权限串，不生成动态路由（避免同组件在业务壳内再注册一份）。
--- 权限语义：能进智能体工作台。会话页/助理接口仍各自校验 dcs:assistant:use（本行不放宽任何数据面）。
+-- 权限语义：能进智能体工作台。会话页/助理接口仍各自校验 smartdock:assistant:use（本行不放宽任何数据面）。
 -- 授权：按「已绑 AI 助手会话 11920 的角色」派生（默认 5/6 + 存量自定义/多租户角色），
 --       与工作台的 11920 入口同口径；超管走 *:*:* 不需要绑定。
 -- 可重复执行：存在性守卫 INSERT。
@@ -2910,10 +2913,10 @@ WHERE rm.menu_id = 11920
 -- ===================== 2026-11-05_agent_settings_audit.sql =====================
 -- 2026-11-05 工作台设置页·审计分节授权（拍板 A3 / 题5 乙）
 -- 背景：智能体工作台的「设置」改成独立页后，审计从设置页进（只读，复用
---       /dcs/assistant/action/audit/* 现有接口与数据）。业务系统里的「写操作审计」
+--       /assistant/action/audit/* 现有接口与数据）。业务系统里的「写操作审计」
 --       11936 保持原样、保持 0 角色绑定——不给 admin 绑 11936，避免业务侧栏多出菜单。
 -- 做法：新增 1 条 F 型权限行 12061（menu_type=F，path 空，不生成动态路由），perms 复用
---       dcs:assistant:audit:query；再显式授给 role_key IN ('admin','tenant_admin')。
+--       smartdock:assistant:audit:query；再显式授给 role_key IN ('admin','tenant_admin')。
 -- 边界：成员角色 5 不得获得（本脚本只按 role_key 选，天然不含 member）；
 --       file_reviewer 等其它角色也不授。超管走 *:*:* 不需要绑定。
 -- 幂等：菜单 ON CONFLICT (menu_id) DO UPDATE；角色绑定 NOT EXISTS。
@@ -2926,7 +2929,7 @@ INSERT INTO public.sys_menu
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
     (12061, '工作台审计查看', 11930, 11, '', NULL, NULL,
-     '1', '0', 'F', '0', '0', 'dcs:assistant:audit:query', '#',
+     '1', '0', 'F', '0', '0', 'smartdock:assistant:audit:query', '#',
      103, 1, now(), NULL, NULL, '工作台设置页审计分节(只读; 仅授 admin/tenant_admin, 不生成路由)')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id,
@@ -2953,15 +2956,15 @@ WHERE r.role_key IN ('admin', 'tenant_admin')
 -- 2026-11-05 自动化批（拍板 题0 甲 / 题1 乙 / 题2 甲 / 题3 甲 / 题4 乙 / 题5 甲 / 题6 甲 / 题7 乙 / 题8 甲）
 -- 内容: ①dcs_automation 用户自建「到点替你跑一件事」（一句话 + 每天/每周几 + 开关）
 --       ②dcs_automation_run 运行记录（计划时刻 / 状态 / 耗时 / 会话）
---       ③F 型权限行 12062 dcs:assistant:automation（不生成动态路由，只作权限载体）
+--       ③F 型权限行 12062 smartdock:assistant:automation（不生成动态路由，只作权限载体）
 -- 边界: 每人 5 条自建（服务端硬校验）；内置每日摘要为 builtin='1'（租户级 user_id=0），
 --       只能开关、不能改提示词/删除，由服务首次列列表时懒建。
 -- 幂等: 建表/索引 IF NOT EXISTS；菜单 ON CONFLICT (menu_id) DO UPDATE；角色绑定 NOT EXISTS。
--- 回退: DROP TABLE IF EXISTS public.dcs_automation_run; DROP TABLE IF EXISTS public.dcs_automation;
+-- 回退: DROP TABLE IF EXISTS public.automation_run; DROP TABLE IF EXISTS public.automation;
 --       DELETE FROM public.sys_role_menu WHERE menu_id = 12062;
 --       DELETE FROM public.sys_menu WHERE menu_id = 12062;
 
-CREATE TABLE IF NOT EXISTS public.dcs_automation (
+CREATE TABLE IF NOT EXISTS public.automation (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -2983,12 +2986,12 @@ CREATE TABLE IF NOT EXISTS public.dcs_automation (
     update_by bigint,
     update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     del_flag character(1) DEFAULT '0'::bpchar NOT NULL,
-    CONSTRAINT pk_dcs_automation PRIMARY KEY (id),
-    CONSTRAINT ck_dcs_automation_enabled CHECK (((enabled)::text = ANY ((ARRAY['0'::character varying, '1'::character varying])::text[]))),
-    CONSTRAINT ck_dcs_automation_schedule CHECK (((schedule_type)::text = ANY ((ARRAY['DAILY'::character varying, 'WEEKLY'::character varying, 'BUILTIN'::character varying])::text[])))
+    CONSTRAINT pk_automation PRIMARY KEY (id),
+    CONSTRAINT ck_automation_enabled CHECK (((enabled)::text = ANY ((ARRAY['0'::character varying, '1'::character varying])::text[]))),
+    CONSTRAINT ck_automation_schedule CHECK (((schedule_type)::text = ANY ((ARRAY['DAILY'::character varying, 'WEEKLY'::character varying, 'BUILTIN'::character varying])::text[])))
 );
 
-CREATE TABLE IF NOT EXISTS public.dcs_automation_run (
+CREATE TABLE IF NOT EXISTS public.automation_run (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     automation_id bigint NOT NULL,
@@ -3004,45 +3007,45 @@ CREATE TABLE IF NOT EXISTS public.dcs_automation_run (
     started_at timestamp without time zone,
     finished_at timestamp without time zone,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT pk_dcs_automation_run PRIMARY KEY (id)
+    CONSTRAINT pk_automation_run PRIMARY KEY (id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_dcs_automation_user
-    ON public.dcs_automation USING btree (tenant_id, user_id, del_flag, create_time DESC);
-CREATE INDEX IF NOT EXISTS idx_dcs_automation_due
-    ON public.dcs_automation USING btree (next_run_at)
+CREATE INDEX IF NOT EXISTS idx_automation_user
+    ON public.automation USING btree (tenant_id, user_id, del_flag, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_automation_due
+    ON public.automation USING btree (next_run_at)
     WHERE ((enabled = '1'::bpchar) AND (del_flag = '0'::bpchar) AND (next_run_at IS NOT NULL));
-CREATE INDEX IF NOT EXISTS idx_dcs_automation_run_auto
-    ON public.dcs_automation_run USING btree (tenant_id, automation_id, scheduled_for DESC);
-CREATE INDEX IF NOT EXISTS idx_dcs_automation_run_user
-    ON public.dcs_automation_run USING btree (tenant_id, user_id, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_automation_run_auto
+    ON public.automation_run USING btree (tenant_id, automation_id, scheduled_for DESC);
+CREATE INDEX IF NOT EXISTS idx_automation_run_user
+    ON public.automation_run USING btree (tenant_id, user_id, create_time DESC);
 -- 同一条自动化的同一计划时刻只落一行（多实例/重扫去重）
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_automation_run_slot
-    ON public.dcs_automation_run USING btree (automation_id, scheduled_for)
+CREATE UNIQUE INDEX IF NOT EXISTS uk_automation_run_slot
+    ON public.automation_run USING btree (automation_id, scheduled_for)
     WHERE ((trigger_type)::text = 'SCHEDULE'::text);
 -- 同一条自动化同时只允许一个 RUNNING（进程崩溃由扫描器按超时收口，见 AutomationScanJob）
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_automation_run_running
-    ON public.dcs_automation_run USING btree (automation_id)
+CREATE UNIQUE INDEX IF NOT EXISTS uk_automation_run_running
+    ON public.automation_run USING btree (automation_id)
     WHERE ((status)::text = 'RUNNING'::text);
 -- 每个租户一条内置项（首次列列表时懒建，幂等靠这条唯一索引）
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_automation_builtin
-    ON public.dcs_automation USING btree (tenant_id)
+CREATE UNIQUE INDEX IF NOT EXISTS uk_automation_builtin
+    ON public.automation USING btree (tenant_id)
     WHERE ((builtin)::text = '1'::text);
 
-COMMENT ON TABLE public.dcs_automation IS '用户自建自动化（到点跑一轮只读 AI 任务；builtin=1 为系统内置项）';
-COMMENT ON COLUMN public.dcs_automation.schedule_time IS '每天/每周的执行时刻 HH:mm（时区见 time_zone，当前固定 Asia/Shanghai）';
-COMMENT ON COLUMN public.dcs_automation.weekdays IS '每周几，ISO 1-7 逗号分隔（1=周一）';
-COMMENT ON COLUMN public.dcs_automation.next_run_at IS '下次计划时刻；扫描器认领时先推进此列再执行';
-COMMENT ON TABLE public.dcs_automation_run IS '自动化运行记录（一次执行一行；scheduled_for=计划时刻）';
+COMMENT ON TABLE public.automation IS '用户自建自动化（到点跑一轮只读 AI 任务；builtin=1 为系统内置项）';
+COMMENT ON COLUMN public.automation.schedule_time IS '每天/每周的执行时刻 HH:mm（时区见 time_zone，当前固定 Asia/Shanghai）';
+COMMENT ON COLUMN public.automation.weekdays IS '每周几，ISO 1-7 逗号分隔（1=周一）';
+COMMENT ON COLUMN public.automation.next_run_at IS '下次计划时刻；扫描器认领时先推进此列再执行';
+COMMENT ON TABLE public.automation_run IS '自动化运行记录（一次执行一行；scheduled_for=计划时刻）';
 
--- 权限载体：F 型行不生成动态路由，只把 dcs:assistant:automation 发到角色权限集
+-- 权限载体：F 型行不生成动态路由，只把 smartdock:assistant:automation 发到角色权限集
 INSERT INTO public.sys_menu
     (menu_id, menu_name, parent_id, order_num, path, component, query_param,
      is_frame, is_cache, menu_type, visible, status, perms, icon,
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
     (12062, '自动化任务', 11930, 12, '', NULL, NULL,
-     '1', '0', 'F', '0', '0', 'dcs:assistant:automation', '#',
+     '1', '0', 'F', '0', '0', 'smartdock:assistant:automation', '#',
      103, 1, now(), NULL, NULL, '自动化一级页/新建/开关/立即运行权限载体(不生成动态路由)')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id,
@@ -3067,8 +3070,416 @@ WHERE rm.menu_id = 11920
 -- ===================== 2026-11-06_automation_mcp_servers.sql =====================
 -- 2026-11-06 旧板题 3 乙：自动化可显式勾选「只读外部服务」（MCP 只读）
 -- 默认 NULL/空 = 一个都不挂（与改造前行为一致）；挂载面二次过滤 read_only='1'
-ALTER TABLE public.dcs_automation
+ALTER TABLE public.automation
     ADD COLUMN IF NOT EXISTS mcp_servers character varying(500);
 
-COMMENT ON COLUMN public.dcs_automation.mcp_servers IS
+COMMENT ON COLUMN public.automation.mcp_servers IS
     '只读外部服务白名单（逗号分隔的 MCP serverName）；空=不挂任何外部工具';
+
+-- ===================== 2026-11-11_assistant_run_issue.sql =====================
+-- 2026-11-11 拍板 Q1-3：「这轮为什么没回答」问题表 assistant_run_issue
+-- 可重复执行（IF NOT EXISTS）；与 baseline/01_schema.sql 尾部同构。
+-- 保留 90 天（清理由 service/PurgeService.retentionSweep 编排；批 7C-2 前在 AssistantConversationService），统计索引留给后续按原因聚合。
+
+CREATE TABLE IF NOT EXISTS public.assistant_run_issue (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    user_id bigint NOT NULL,
+    conversation_id bigint,
+    thread_id character varying(128),
+    run_id character varying(128) NOT NULL,
+    message_id bigint,
+    code character varying(16) NOT NULL,
+    detail character varying(512),
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_assistant_run_issue PRIMARY KEY (id),
+    CONSTRAINT ck_asst_issue_code CHECK (code::text = ANY (ARRAY['empty','rate','quota','timeout','auth','other']::text[]))
+);
+
+CREATE INDEX IF NOT EXISTS idx_asst_issue_conv ON public.assistant_run_issue USING btree (tenant_id, user_id, conversation_id);
+CREATE INDEX IF NOT EXISTS idx_asst_issue_stats ON public.assistant_run_issue USING btree (tenant_id, code, create_time);
+-- 终审 P1（2026-11-11）：run_id 唯一约束——「同 run 只落一条」的 DB 兜底。
+-- 两条写入路（终态闸门 / doOnError 捕获）当前互斥靠的是框架行为，升级即可能叠行；这里锁死。
+-- 已按旧版执行过的库：先删普通索引再建唯一（表新无重复行，安全）。
+DROP INDEX IF EXISTS public.idx_asst_issue_run;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_asst_issue_run ON public.assistant_run_issue USING btree (run_id);
+
+-- ===================== 2026-11-12_assistant_memory_v2.sql =====================
+-- 2026-11-12 拍板（ckys3 解锁板 v8.2 题7~题10，全部按★案1）：
+-- 题7 记忆页可用性：类型 / 出处 / 编辑 / 条数
+-- 题8 同主题覆盖：旧条留痕（SUPERSEDED + superseded_by）
+-- 题10 生命周期：个人开关表 + 90 天未用归档（last_used_at / status）
+-- 可重复执行（IF NOT EXISTS / 幂等 DEFAULT）；与 baseline/01_schema.sql 同步。
+
+ALTER TABLE public.assistant_memory
+    ADD COLUMN IF NOT EXISTS memory_type character varying(20) DEFAULT 'user'::character varying NOT NULL,
+    ADD COLUMN IF NOT EXISTS conversation_id bigint,
+    ADD COLUMN IF NOT EXISTS topic_key character varying(40),
+    ADD COLUMN IF NOT EXISTS status character varying(16) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    ADD COLUMN IF NOT EXISTS superseded_by bigint,
+    ADD COLUMN IF NOT EXISTS last_used_at timestamp without time zone,
+    ADD COLUMN IF NOT EXISTS archived_at timestamp without time zone;
+
+-- 存量行回填：状态/类型默认值已由 DEFAULT 覆盖；topic_key 留空（下次保存同主题时再判）
+UPDATE public.assistant_memory SET status = 'ACTIVE' WHERE status IS NULL;
+
+-- 存量类型回填（一次，语义对齐）：ADD COLUMN 的 DEFAULT 把老行一律标成 user，
+-- 但「出差/例会」这类应落 project/team。只动「从没被编辑过」（update_time IS NULL）的行
+-- ——重跑安全：用户手改类型后 update_time 有值，不会被再次覆盖。
+UPDATE public.assistant_memory SET memory_type = CASE
+    WHEN content ~ '王工|张工|李工|赵工|刘工|同事|同学|主管|领导|负责人|对接人|经理' THEN 'team'
+    WHEN content ~ '项目|出差|行程|周会|例会|会议|任务|截止|上线|部署|版本|迭代|需求|工单|排期' THEN 'project'
+    WHEN content ~ '叫我|称呼|以后都|默认|偏好|喜欢|不喜欢|不要|别用|习惯|回复|回答|语气|风格' THEN 'user'
+    ELSE 'reference'
+END
+WHERE update_time IS NULL AND del_flag = '0';
+
+-- 存量 topic_key 回填（题8 同主题覆盖要对老数据生效：老行 topic_key 为空时
+-- 「以后叫我老周」→「以后叫我老王」会并存两条互相矛盾的记忆）。
+-- 规则与 AssistantMemoryFacts.TOPIC_RULES 同序同源；只补空值，重跑安全。
+UPDATE public.assistant_memory SET topic_key = CASE
+    WHEN content ~ '叫我|称呼|喊我|我的名字|名字叫' THEN 'call:name'
+    WHEN content ~ '用中文|用英文|说中文|说英文|语言|英文回答|中文回答' THEN 'reply:lang'
+    WHEN content ~ '催办|默认提醒|默认时间|提醒我' THEN 'remind:default'
+    WHEN content ~ '时区|工作日|上班时间|下班时间|工作时间|作息' THEN 'time:zone'
+END
+WHERE topic_key IS NULL AND del_flag = '0'
+  AND content ~ '叫我|称呼|喊我|我的名字|名字叫|用中文|用英文|说中文|说英文|语言|英文回答|中文回答|催办|默认提醒|默认时间|提醒我|时区|工作日|上班时间|下班时间|工作时间|作息';
+
+-- 清单/容量/归档扫描共用索引（租户+属主+状态）
+CREATE INDEX IF NOT EXISTS idx_asst_memory_user_status
+    ON public.assistant_memory USING btree (tenant_id, user_id, status);
+-- 归档扫描（只扫 ACTIVE 且 last_used_at 早于阈值）
+CREATE INDEX IF NOT EXISTS idx_asst_memory_used
+    ON public.assistant_memory USING btree (status, last_used_at);
+
+-- 题10 案1：个人开关（租户级 memory_enabled 之外的用户级开关；与运算，租户关=全关）
+CREATE TABLE IF NOT EXISTS public.assistant_memory_pref (
+    id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    user_id bigint NOT NULL,
+    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_time timestamp without time zone,
+    CONSTRAINT pk_assistant_memory_pref PRIMARY KEY (id),
+    CONSTRAINT uk_asst_memory_pref UNIQUE (tenant_id, user_id)
+);
+
+-- ===================== 2026-11-13_remove_member_manage_perms.sql =====================
+-- 2026-11-13 题 6（P1-15 越权）：把「成员 member」误授的管理类权限收回来。
+--
+-- 现象：sys_role_menu 给 role_key='member' 挂了「系统管理」整族 76 项绑定（含 system:user:*），
+--       普通用户 user001 打开 /system/user 时工具栏「新增/修改/删除/更多」全部渲染，
+--       列表接口返回 200（total:0），只有详情接口被后端拦住。
+--
+-- 治法：纯数据修复——删掉 member 在「系统管理」菜单子树下的全部绑定。
+--       日常权限（任务中心、系统支持、AI 助手）不动；超管 / 租户管理员 / 文件审核员不动。
+--       代码零改动：前端 v-hasPermi 门牌机制本身是好的，收回门牌按钮自然消失。
+--
+-- 可重复执行：按当前菜单树与角色键重新计算，重复跑只会删除「仍存在」的多余绑定，不报错。
+WITH RECURSIVE manage_tree AS (
+  SELECT menu_id FROM sys_menu WHERE menu_id = 1 AND parent_id = 0
+  UNION ALL
+  SELECT m.menu_id FROM sys_menu m JOIN manage_tree t ON m.parent_id = t.menu_id
+)
+DELETE FROM sys_role_menu
+WHERE role_id IN (SELECT role_id FROM sys_role WHERE role_key = 'member' AND del_flag = '0')
+  AND menu_id IN (SELECT menu_id FROM manage_tree);
+
+-- ===================== 2026-11-15_assistant_user_pref.sql =====================
+-- 2026-11-15 批C Q8 案1（2026-11-13 待办板已拍 · 12 题全按推荐）：
+-- 「常规偏好」七行（发送键 / 流式输出 / 明细展开 / 失败重试 / 动效强度 / 字号 / 5 分钟自动继续）
+-- 以前只存浏览器 localStorage（键带 userId），换电脑、换浏览器就回默认。
+-- 本表把这一层按人入库；localStorage 降级成离线兜底（断网时仍能读写，联网后以最后一次保存为准）。
+-- 可重复执行（IF NOT EXISTS）；与 baseline/01_schema.sql 同步。
+
+CREATE TABLE IF NOT EXISTS public.assistant_user_pref (
+    id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    user_id bigint NOT NULL,
+    send_key character varying(16) DEFAULT 'enter'::character varying NOT NULL,
+    stream_output character(1) DEFAULT '1'::bpchar NOT NULL,
+    tools_open character(1) DEFAULT '0'::bpchar NOT NULL,
+    auto_retry character(1) DEFAULT '1'::bpchar NOT NULL,
+    motion character varying(16) DEFAULT 'system'::character varying NOT NULL,
+    answer_size character varying(16) DEFAULT 'standard'::character varying NOT NULL,
+    ask_auto_continue character(1) DEFAULT '1'::bpchar NOT NULL,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_time timestamp without time zone,
+    CONSTRAINT pk_assistant_user_pref PRIMARY KEY (id),
+    CONSTRAINT uk_asst_user_pref UNIQUE (tenant_id, user_id)
+);
+
+COMMENT ON TABLE public.assistant_user_pref IS '助手常规偏好（按人）；缺行=全部默认值';
+
+-- 兜底：CREATE TABLE IF NOT EXISTS 遇到「表已存在但缺唯一键」时会整句跳过，UPSERT 的 ON CONFLICT 就匹配不到。
+-- 只在缺唯一约束时才补一条唯一索引（正常环境不加第二个重复索引）；ON CONFLICT (tenant_id, user_id) 可匹配唯一索引。
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.assistant_user_pref'::regclass AND contype = 'u'
+    ) THEN
+        CREATE UNIQUE INDEX IF NOT EXISTS uk_asst_user_pref_uidx
+            ON public.assistant_user_pref (tenant_id, user_id);
+    END IF;
+END $$;
+
+-- ===================== 2026-11-20_memory_active_topic_unique.sql =====================
+-- 批 7 前置 STEP 1（05C 题 3 案 1，D1，2026-11-20 拍板 Q1-1/Q2-1/Q3-1；多审回修 v2）：
+-- 同一（租户,人,主题）只能一条生效中记忆。
+--
+-- 病根：saveReturningId 原先「预读主题清单 → 插入 → 覆盖旧条」三步无事务包裹，
+-- 并发保存同主题会留下两条 ACTIVE（批 6 二轮多审登记：D1，事务注解挡不住——
+-- 读与写之间没有栅栏，两个事务都能通过「预读时没看见对方」）。
+-- 修法三件套（代码侧已在 AssistantMemoryTurnService / AssistantMemoryService 落地）：
+--   ① 本文件：库层部分唯一索引（最终栅栏，应用侧漏防也能拦住）；
+--   ② 保存口「先腾位后插入」同一事务（TransactionTemplate，REQUIRES_NEW）；
+--   ③ 撞唯一索引时重读主题清单重试（上限 3 轮）。
+-- 可重复执行（幂等去重 + IF NOT EXISTS）；与 baseline/01_schema.sql 同步。
+--
+-- 执行约定（多审席2/席3/席4 一致）：
+--   · 整文件单事务 + SHARE ROW EXCLUSIVE 锁——去重与建索引之间不留「再写入重复行」的窗口，
+--     建索引期间阻塞写入、不阻塞查询；锁前设 lock_timeout=3s，等不到锁快速失败重试，
+--     避免被一个卡住的长写事务拖成记忆表写入无限期冻结（二轮席3）；
+--   · 低峰/停写执行；滚动部署先摘旧节点（索引建好后旧版节点保存同主题会直接撞 23505 且不重试）；
+--   · 顺序照 docs/deploy.md 的「数据库先升级再放流量」。
+--   · 执行方式：psql 直接执行（默认 autocommit）。禁止 -1/--single-transaction——文件自带
+--     BEGIN/COMMIT，外层事务会被文件内 COMMIT 提前提交，后半段失败回滚不到前半段（二轮席3 实测）；
+--     单串多语句执行（如 node pg 一次 query 全文）中途失败会把连接留在 aborted 事务（后续全 25P02），
+--     执行器出错请显式 ROLLBACK 或弃连接。
+--   · 缺索引时后端会拒绝启动（AssistantMemoryFenceStartupCheck），漏跑会被当场拦下。
+
+BEGIN;
+
+-- 锁等待上限（仅本事务内生效）：等不到锁就快速失败，别排长队
+SET LOCAL lock_timeout = '3s';
+
+-- 先锁表再动手：SHARE ROW EXCLUSIVE 阻塞其它写入（允许查询）——
+-- 否则「去重提交 → 建索引」之间还有窗口塞进新的重复行，建索引会失败中断迁移
+LOCK TABLE public.assistant_memory IN SHARE ROW EXCLUSIVE MODE;
+
+-- 存量去重（幂等，重跑为 0 行）：同 (租户,人,主题) 多条 ACTIVE 只留一条——
+-- 保留口径 = COALESCE(update_time, create_time) 最新的（多审席2：max(id) ≠ 最后保存，
+-- 行内编辑是原地 UPDATE 不改 id，用 id 会把「编辑过的低 id 行」错杀成 SUPERSEDED），
+-- 并列时取 id 大的；其余转 SUPERSEDED 并指向保留条——与保存口「新条覆盖旧条」同语义。
+-- 去重不改写 update_time（二轮席3）：它是保留口径的依据列，改写会给「日后把行恢复 ACTIVE 再重跑」
+-- 埋翻转/断链坑；留痕用 update_by。
+WITH dup AS (
+    SELECT id, user_id,
+           FIRST_VALUE(id) OVER (
+               PARTITION BY tenant_id, user_id, topic_key
+               ORDER BY COALESCE(update_time, create_time) DESC NULLS LAST, id DESC
+           ) AS keep_id
+    FROM public.assistant_memory
+    WHERE status = 'ACTIVE' AND topic_key IS NOT NULL AND del_flag = '0'
+)
+UPDATE public.assistant_memory m
+SET status = 'SUPERSEDED', superseded_by = d.keep_id,
+    update_by = d.user_id
+FROM dup d
+WHERE m.id = d.id AND m.id <> d.keep_id;
+
+-- 栅栏本体：生效中条目按 (租户,人,主题) 唯一。
+-- topic_key 为空的普通记忆不受限（PG 唯一索引里 NULL 互不相等）；归档/被覆盖条目天然豁免。
+CREATE UNIQUE INDEX IF NOT EXISTS uk_asst_memory_active_topic
+    ON public.assistant_memory USING btree (tenant_id, user_id, topic_key)
+    WHERE status = 'ACTIVE' AND topic_key IS NOT NULL AND del_flag = '0';
+
+COMMIT;
+
+-- ===================== 2026-11-20_memory_pref_constraints.sql =====================
+-- 批 7 前置 D1 多审 P1（席3，2026-11-20；二轮席3 加固）：assistant_memory_pref 补主键 + 唯一键。
+--
+-- 病根：该表在 2026-11-12_assistant_memory_v2.sql 里带约束建表，但 baseline/01_schema.sql
+-- 的同款 CREATE TABLE 漏抄了两条约束——全新环境只跑 baseline 时表没有主键/唯一键，
+-- 开关判定的 UPSERT（ON CONFLICT (tenant_id, user_id)）会 42P10 直接 500（席3 TEMP 表实测）。
+-- 与 baseline/01_schema.sql 同步补齐；可重复执行（按名幂等 + 唯一索引按列集幂等）。
+-- 失败面（二轮席3 实测）：id 重复 → 23505、id 有 NULL → 23502（列类型不影响——varchar 也能建主键）。
+-- 预检：select count(*) from public.assistant_memory_pref where id is null;  非 0 先补值再跑。
+-- 后端启动自检（AssistantMemoryFenceStartupCheck）会顺带校验本表唯一键，漏跑会被当场拦下。
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.assistant_memory_pref'::regclass
+          AND conname = 'pk_assistant_memory_pref'
+    ) THEN
+        ALTER TABLE public.assistant_memory_pref
+            ADD CONSTRAINT pk_assistant_memory_pref PRIMARY KEY (id);
+    END IF;
+    -- 唯一键判定看「列集合」不看约束大类（二轮席3）：表上若已建了别的列的唯一约束，
+    -- contype='u' 会误判已就绪而跳过，(tenant_id,user_id) 的 UPSERT 仍 42P10
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'assistant_memory_pref'
+          AND indexdef LIKE 'CREATE UNIQUE INDEX%'
+          AND indexdef LIKE '%(tenant_id, user_id)%'
+    ) THEN
+        -- 补唯一索引即可被 ON CONFLICT (tenant_id, user_id) 匹配
+        -- （约束形态与索引形态二者居一即可；避免给已有唯一键的环境加重复索引）
+        CREATE UNIQUE INDEX IF NOT EXISTS uk_asst_memory_pref_uidx
+            ON public.assistant_memory_pref (tenant_id, user_id);
+    END IF;
+END $$;
+
+-- ===================== 2026-11-21_b9_strip_dcs_prefix.sql =====================
+-- 20261121_b9_strip_dcs_prefix.sql
+-- 批 9A: 去 dcs 前缀硬切(存量环境)。新环境直接用 baseline, 不跑本文件。
+-- 幂等: 全部带 IF EXISTS/条件守卫; 重复执行不报错。
+-- 白名单(表名不改): dcs_changelog(公告式更新日志表) / dcs_mid(另一 schema) / dcs_assistant_conversation_title_bak_*(备份表)
+--   白名单只锁表名; 其约束/索引/序列仍按前缀归一(pk_dcs_changelog→pk_changelog 恰与新 baseline 命名一致)
+
+BEGIN;
+
+-- ── 1) 表改名 (60 张) ──
+ALTER TABLE IF EXISTS agentscope.dcs_p0_probe_audit RENAME TO p0_probe_audit;
+ALTER TABLE IF EXISTS agentscope.dcs_p0_probe_ledger RENAME TO p0_probe_ledger;
+ALTER TABLE IF EXISTS agentscope.dcs_p0_probe_run_registry RENAME TO p0_probe_run_registry;
+ALTER TABLE IF EXISTS agentscope.dcs_p0_probe_usage RENAME TO p0_probe_usage;
+ALTER TABLE IF EXISTS agentscope.dcs_p0_probe_wallet RENAME TO p0_probe_wallet;
+ALTER TABLE IF EXISTS public.dcs_ai_config RENAME TO ai_config;
+ALTER TABLE IF EXISTS public.dcs_ai_credit_ledger RENAME TO ai_credit_ledger;
+ALTER TABLE IF EXISTS public.dcs_ai_credit_plan RENAME TO ai_credit_plan;
+ALTER TABLE IF EXISTS public.dcs_ai_credit_subscription RENAME TO ai_credit_subscription;
+ALTER TABLE IF EXISTS public.dcs_ai_doc_domain RENAME TO ai_doc_domain;
+ALTER TABLE IF EXISTS public.dcs_ai_model_capability RENAME TO ai_model_capability;
+ALTER TABLE IF EXISTS public.dcs_ai_model_health RENAME TO ai_model_health;
+ALTER TABLE IF EXISTS public.dcs_ai_model_price RENAME TO ai_model_price;
+ALTER TABLE IF EXISTS public.dcs_ai_provider_access RENAME TO ai_provider_access;
+ALTER TABLE IF EXISTS public.dcs_ai_usage RENAME TO ai_usage;
+ALTER TABLE IF EXISTS public.dcs_assistant_action RENAME TO assistant_action;
+ALTER TABLE IF EXISTS public.dcs_assistant_announcement RENAME TO assistant_announcement;
+ALTER TABLE IF EXISTS public.dcs_assistant_attachment RENAME TO assistant_attachment;
+ALTER TABLE IF EXISTS public.dcs_assistant_compaction RENAME TO assistant_compaction;
+ALTER TABLE IF EXISTS public.dcs_assistant_config RENAME TO assistant_config;
+ALTER TABLE IF EXISTS public.dcs_assistant_conversation RENAME TO assistant_conversation;
+ALTER TABLE IF EXISTS public.dcs_assistant_favorite RENAME TO assistant_favorite;
+ALTER TABLE IF EXISTS public.dcs_assistant_feedback RENAME TO assistant_feedback;
+ALTER TABLE IF EXISTS public.dcs_assistant_memory RENAME TO assistant_memory;
+ALTER TABLE IF EXISTS public.dcs_assistant_memory_pref RENAME TO assistant_memory_pref;
+ALTER TABLE IF EXISTS public.dcs_assistant_message RENAME TO assistant_message;
+ALTER TABLE IF EXISTS public.dcs_assistant_model_setting RENAME TO assistant_model_setting;
+ALTER TABLE IF EXISTS public.dcs_assistant_run RENAME TO assistant_run;
+ALTER TABLE IF EXISTS public.dcs_assistant_run_issue RENAME TO assistant_run_issue;
+ALTER TABLE IF EXISTS public.dcs_assistant_skill RENAME TO assistant_skill;
+ALTER TABLE IF EXISTS public.dcs_assistant_skill_usage RENAME TO assistant_skill_usage;
+ALTER TABLE IF EXISTS public.dcs_assistant_user_pref RENAME TO assistant_user_pref;
+ALTER TABLE IF EXISTS public.dcs_assistant_user_quota RENAME TO assistant_user_quota;
+ALTER TABLE IF EXISTS public.dcs_audit RENAME TO audit;
+ALTER TABLE IF EXISTS public.dcs_automation RENAME TO automation;
+ALTER TABLE IF EXISTS public.dcs_automation_run RENAME TO automation_run;
+ALTER TABLE IF EXISTS public.dcs_captcha_log RENAME TO captcha_log;
+ALTER TABLE IF EXISTS public.dcs_feedback RENAME TO feedback;
+ALTER TABLE IF EXISTS public.dcs_file_guard_log RENAME TO file_guard_log;
+ALTER TABLE IF EXISTS public.dcs_file_review RENAME TO file_review;
+ALTER TABLE IF EXISTS public.dcs_file_review_config RENAME TO file_review_config;
+ALTER TABLE IF EXISTS public.dcs_mcp_call_log RENAME TO mcp_call_log;
+ALTER TABLE IF EXISTS public.dcs_mcp_server RENAME TO mcp_server;
+ALTER TABLE IF EXISTS public.dcs_notice RENAME TO notice;
+ALTER TABLE IF EXISTS public.dcs_profile_review RENAME TO profile_review;
+ALTER TABLE IF EXISTS public.dcs_risk_action RENAME TO risk_action;
+ALTER TABLE IF EXISTS public.dcs_risk_event RENAME TO risk_event;
+ALTER TABLE IF EXISTS public.dcs_risk_rule RENAME TO risk_rule;
+ALTER TABLE IF EXISTS public.dcs_risk_whitelist RENAME TO risk_whitelist;
+ALTER TABLE IF EXISTS public.dcs_sensitive_word RENAME TO sensitive_word;
+ALTER TABLE IF EXISTS public.dcs_service_charge_rule RENAME TO service_charge_rule;
+ALTER TABLE IF EXISTS public.dcs_submission RENAME TO submission;
+ALTER TABLE IF EXISTS public.dcs_task RENAME TO task;
+ALTER TABLE IF EXISTS public.dcs_task_field RENAME TO task_field;
+ALTER TABLE IF EXISTS public.dcs_tenant_billing_mode RENAME TO tenant_billing_mode;
+ALTER TABLE IF EXISTS public.dcs_tenant_wallet RENAME TO tenant_wallet;
+ALTER TABLE IF EXISTS public.dcs_tenant_wallet_ledger RENAME TO tenant_wallet_ledger;
+ALTER TABLE IF EXISTS public.dcs_wallet_alert_state RENAME TO wallet_alert_state;
+ALTER TABLE IF EXISTS public.dcs_wallet_payment_order RENAME TO wallet_payment_order;
+ALTER TABLE IF EXISTS public.dcs_word_fp_feedback RENAME TO word_fp_feedback;
+
+-- ── 1b) 特例: 旧表 profile_review(原 dcs_profile_review) 的历史索引名带 queue 字样,
+--      直译会与新表 profile_review_queue 的同名索引相撞, 贴表名改为 idx_profile_review
+--      (R1 并发席 P2-1: 源/目标双侧守卫——目标名已占用时跳过, 不让 42710 把整份事务回滚)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_dcs_profile_review_queue')
+     AND NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_profile_review') THEN
+    ALTER INDEX public.idx_dcs_profile_review_queue RENAME TO idx_profile_review;
+  END IF;
+END $$;
+
+-- ── 2) 约束改名(动态循环: 显式命名 + PG 自动 {table}_pkey; 撞名跳过保幂等) ──
+DO $$
+DECLARE r record; newn text;
+BEGIN
+  FOR r IN SELECT c.conrelid::regclass AS tbl, c.conname
+           FROM pg_constraint c JOIN pg_class cc ON cc.oid = c.conrelid
+                JOIN pg_namespace n ON n.oid = cc.relnamespace
+           WHERE n.nspname IN ('public', 'agentscope') AND c.conname LIKE 'dcs\_%' LOOP
+    newn := substring(r.conname from 5);
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = newn AND conrelid = r.tbl) THEN
+      EXECUTE format('ALTER TABLE %s RENAME CONSTRAINT %I TO %I', r.tbl, r.conname, newn);
+    END IF;
+  END LOOP;
+  FOR r IN SELECT c.conrelid::regclass AS tbl, c.conname
+           FROM pg_constraint c JOIN pg_class cc ON cc.oid = c.conrelid
+                JOIN pg_namespace n ON n.oid = cc.relnamespace
+           WHERE n.nspname = 'public' AND c.conname LIKE '%\_dcs\_%' LOOP
+    newn := replace(r.conname, '_dcs_', '_');
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = newn AND conrelid = r.tbl) THEN
+      EXECUTE format('ALTER TABLE %s RENAME CONSTRAINT %I TO %I', r.tbl, r.conname, newn);
+    END IF;
+  END LOOP;
+END $$;
+
+-- ── 3) 索引改名(约束自有索引随约束走, 这里收独立索引; 撞名跳过) ──
+DO $$
+DECLARE r record; newn text;
+BEGIN
+  FOR r IN SELECT schemaname, indexname FROM pg_indexes WHERE schemaname IN ('public', 'agentscope')
+           AND (indexname LIKE 'dcs\_%' OR indexname LIKE 'idx\_dcs\_%' OR indexname LIKE 'uk\_dcs\_%') LOOP
+    newn := CASE WHEN r.indexname LIKE 'dcs\_%' THEN substring(r.indexname from 5)
+                 ELSE replace(r.indexname, '_dcs_', '_') END;
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = r.schemaname AND indexname = newn) THEN
+      EXECUTE format('ALTER INDEX %I.%I RENAME TO %I', r.schemaname, r.indexname, newn);
+    END IF;
+  END LOOP;
+END $$;
+
+-- ── 3b) 序列改名(R1 并发席 P2-2: RENAME TABLE 不带走属主序列, 实测残留
+--      dcs_ai_usage_usage_id_seq / dcs_p0_probe_*_id_seq; 撞名跳过) ──
+DO $$
+DECLARE r record; newn text;
+BEGIN
+  FOR r IN SELECT n.nspname AS schemaname, c.relname AS seqname
+           FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE c.relkind = 'S' AND n.nspname IN ('public', 'agentscope') AND c.relname LIKE 'dcs\_%' LOOP
+    newn := substring(r.seqname from 5);
+    IF NOT EXISTS (SELECT 1 FROM pg_class cc JOIN pg_namespace nn ON nn.oid = cc.relnamespace
+                   WHERE cc.relname = newn AND nn.nspname = r.schemaname) THEN
+      EXECUTE format('ALTER SEQUENCE %I.%I RENAME TO %I', r.schemaname, r.seqname, newn);
+    END IF;
+  END LOOP;
+END $$;
+
+-- ── 4) sys_menu: 权限串/组件路径/目录路由 ──
+UPDATE sys_menu SET perms = 'smartdock:' || substring(perms from 5) WHERE perms LIKE 'dcs:%';
+UPDATE sys_menu SET component = 'smartdock/' || substring(component from 5) WHERE component LIKE 'dcs/%';
+UPDATE sys_menu SET path = 'smartdock' WHERE path = 'dcs';
+
+-- ── 5) sys_config: 配置键(同租户已存在去前缀键时跳过该行, 防 uk_sys_config_tenant_key 撞键回滚整单;
+--      R1 并发席 P2-4) ──
+UPDATE sys_config t SET config_key = substring(t.config_key from 5)
+WHERE t.config_key LIKE 'dcs.%'
+  AND NOT EXISTS (SELECT 1 FROM sys_config n
+                  WHERE n.tenant_id = t.tenant_id AND n.config_key = substring(t.config_key from 5)
+                    AND n.config_id <> t.config_id);
+
+-- ── 6) sys_dict_type / sys_dict_data: 字典类型键(与代码 useDict 同步改名) ──
+UPDATE sys_dict_type t SET dict_type = substring(t.dict_type from 5)
+WHERE t.dict_type LIKE 'dcs\_%'
+  AND NOT EXISTS (SELECT 1 FROM sys_dict_type n
+                  WHERE n.tenant_id = t.tenant_id AND n.dict_type = substring(t.dict_type from 5)
+                    AND n.dict_id <> t.dict_id);
+UPDATE sys_dict_data t SET dict_type = substring(t.dict_type from 5) WHERE t.dict_type LIKE 'dcs\_%';
+
+COMMIT;
+

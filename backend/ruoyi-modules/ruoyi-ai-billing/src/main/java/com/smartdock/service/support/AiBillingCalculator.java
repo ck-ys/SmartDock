@@ -1,8 +1,8 @@
 package com.smartdock.service.support;
 
 import cn.hutool.core.util.StrUtil;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.DcsAiModelPrice;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.AiModelPrice;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -26,7 +26,7 @@ public class AiBillingCalculator {
     /**
      * 计算 AI 调用费用: 按官方 Token 计费(区分缓存/未缓存输入与输出)或按次计费, 失败返回 0。
      */
-    public Result calculate(DcsAiConfig config, DcsAiModelPrice price, AiTokenUsageSnapshot usage, boolean success) {
+    public Result calculate(AiConfig config, AiModelPrice price, AiTokenUsageSnapshot usage, boolean success) {
         if (!success) {
             return zero(config, price);
         }
@@ -60,7 +60,7 @@ public class AiBillingCalculator {
     }
 
     /** 业务批4 Q4-A：OFFICIAL_PLUS_FEE 模式判定（billing_mode 精确匹配，空值不进此支） */
-    private boolean isOfficialPlusFee(DcsAiConfig config) {
+    private boolean isOfficialPlusFee(AiConfig config) {
         return config != null && BILLING_MODE_OFFICIAL_PLUS_FEE.equals(config.getBillingMode());
     }
 
@@ -74,7 +74,7 @@ public class AiBillingCalculator {
      * 计入；价格行非 CNY（探测/体检路径可绕过 CNY 闸）时官方部分记 0 只收服务费（与
      * recordTransactional 非 CNY 拒扣同向），snapshot 留 officialSkipped 痕供对账。
      */
-    private Result officialPlusFee(DcsAiConfig config, DcsAiModelPrice price, AiTokenUsageSnapshot usage) {
+    private Result officialPlusFee(AiConfig config, AiModelPrice price, AiTokenUsageSnapshot usage) {
         BigDecimal fee = resolveUnitPrice(config);
         BigDecimal base = BigDecimal.ZERO;
         String snapshot = "{\"mode\":\"OFFICIAL_PLUS_FEE\"}";
@@ -104,7 +104,7 @@ public class AiBillingCalculator {
         );
     }
 
-    private boolean shouldUseOfficial(DcsAiConfig config, DcsAiModelPrice price, AiTokenUsageSnapshot usage) {
+    private boolean shouldUseOfficial(AiConfig config, AiModelPrice price, AiTokenUsageSnapshot usage) {
         return config != null
             && BILLING_MODE_OFFICIAL_TOKEN.equals(StrUtil.blankToDefault(config.getBillingMode(), BILLING_MODE_OFFICIAL_TOKEN))
             && price != null
@@ -112,7 +112,7 @@ public class AiBillingCalculator {
             && usage.hasTokenUsage();
     }
 
-    private Result fixed(DcsAiConfig config) {
+    private Result fixed(AiConfig config) {
         BigDecimal unitPrice = resolveUnitPrice(config);
         return new Result(
             BILLING_MODE_FIXED_PER_CALL,
@@ -126,27 +126,27 @@ public class AiBillingCalculator {
         );
     }
 
-    private Result zero(DcsAiConfig config, DcsAiModelPrice price) {
+    private Result zero(AiConfig config, AiModelPrice price) {
         String mode = config == null ? BILLING_MODE_FIXED_PER_CALL : StrUtil.blankToDefault(config.getBillingMode(), BILLING_MODE_FIXED_PER_CALL);
         String currency = price == null ? "CNY" : StrUtil.blankToDefault(price.getCurrency(), "USD");
         return new Result(mode, currency, null, BigDecimal.ZERO, serviceFeeRate(config), BigDecimal.ZERO, BigDecimal.ZERO, "{}");
     }
 
-    private BigDecimal resolveUnitPrice(DcsAiConfig config) {
+    private BigDecimal resolveUnitPrice(AiConfig config) {
         if (config != null && config.getUnitPricePerCall() != null && config.getUnitPricePerCall().compareTo(BigDecimal.ZERO) >= 0) {
             return config.getUnitPricePerCall();
         }
         return DEFAULT_UNIT_PRICE;
     }
 
-    private BigDecimal serviceFeeRate(DcsAiConfig config) {
+    private BigDecimal serviceFeeRate(AiConfig config) {
         if (config == null || config.getServiceFeeRate() == null || config.getServiceFeeRate().compareTo(BigDecimal.ZERO) < 0) {
             return BigDecimal.ZERO;
         }
         return config.getServiceFeeRate();
     }
 
-    private BigDecimal cachedPrice(DcsAiModelPrice price) {
+    private BigDecimal cachedPrice(AiModelPrice price) {
         if (price.getCachedInputPricePerMillion() != null && price.getCachedInputPricePerMillion().compareTo(BigDecimal.ZERO) >= 0) {
             return price.getCachedInputPricePerMillion();
         }
@@ -172,7 +172,7 @@ public class AiBillingCalculator {
         return value == null ? 0 : Math.max(value, 0);
     }
 
-    private String pricingSnapshot(DcsAiModelPrice price) {
+    private String pricingSnapshot(AiModelPrice price) {
         return "{"
             + "\"provider\":\"" + safe(price.getProvider()) + "\","
             + "\"modelName\":\"" + safe(price.getModelName()) + "\","

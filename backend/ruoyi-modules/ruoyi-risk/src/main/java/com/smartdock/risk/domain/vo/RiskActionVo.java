@@ -7,7 +7,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 风控处置记录展示对象(对应表 dcs_risk_action)。
+ * 风控处置记录展示对象(对应表 risk_action)。
  *
  * <p><b>何时生成</b>: 当 {@link com.smartdock.risk.service.RiskScoreService#assess} 评估等级达到
  * L3/L4 时, 由 {@link com.smartdock.risk.service.RiskActionService#syncAssessment} 创建对应处置记录

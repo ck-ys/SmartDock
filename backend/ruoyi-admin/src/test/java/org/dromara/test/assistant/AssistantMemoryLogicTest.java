@@ -123,12 +123,12 @@ class AssistantMemoryLogicTest {
     @Test
     @DisplayName("回合账本按 threadId 会合：取走即清、跨会话不串、count=0 清残留")
     void turnLedger() {
-        com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger ledger =
-            new com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger();
+        com.smartdock.assistant.engine.core.AssistantMemoryTurnLedger ledger =
+            new com.smartdock.assistant.engine.core.AssistantMemoryTurnLedger();
         // 注入统计 + 覆盖事件同会话会合
         ledger.recordInjected("th-a", 2, 46);
         ledger.recordSuperseded("th-a", "以后叫我老周", "以后叫我老王");
-        com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger.TurnMemory mem = ledger.take("th-a");
+        com.smartdock.assistant.engine.core.AssistantMemoryTurnLedger.TurnMemory mem = ledger.take("th-a");
         assertNotNull(mem);
         assertEquals(2, mem.injected().count());
         assertEquals(46, mem.injected().chars());

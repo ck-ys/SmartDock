@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { myNotices, markNoticeRead } from '@/api/dcs/core/notice';
+import { myNotices, markNoticeRead } from '@/api/smartdock/core/notice';
 import { useNoticeStore } from './notice';
 
-vi.mock('@/api/dcs/core/notice', () => ({
+vi.mock('@/api/smartdock/core/notice', () => ({
   myNotices: vi.fn(),
   markNoticeRead: vi.fn(() => Promise.resolve())
 }));

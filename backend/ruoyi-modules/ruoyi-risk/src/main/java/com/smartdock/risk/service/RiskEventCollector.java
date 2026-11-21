@@ -5,14 +5,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.tenant.helper.TenantHelper;
-import com.smartdock.risk.config.DcsRolloutProperties;
-import com.smartdock.risk.domain.DcsRiskEvent;
-import com.smartdock.risk.domain.DcsRiskRule;
-import com.smartdock.risk.domain.DcsRiskWhitelist;
+import com.smartdock.risk.config.RolloutProperties;
+import com.smartdock.risk.domain.RiskEvent;
+import com.smartdock.risk.domain.RiskRule;
+import com.smartdock.risk.domain.RiskWhitelist;
 import com.smartdock.risk.domain.bo.RiskEventCommand;
-import com.smartdock.risk.mapper.DcsRiskEventMapper;
-import com.smartdock.risk.mapper.DcsRiskRuleMapper;
-import com.smartdock.risk.mapper.DcsRiskWhitelistMapper;
+import com.smartdock.risk.mapper.RiskEventMapper;
+import com.smartdock.risk.mapper.RiskRuleMapper;
+import com.smartdock.risk.mapper.RiskWhitelistMapper;
 import com.smartdock.risk.support.RiskBehaviorSink;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +24,7 @@ import java.util.Date;
  * 风险事件采集器(统一入口)。
  *
  * <p><b>核心职责</b>: 把分散在系统各处的风险事件(敏感词命中/举报/登录失败/高频接口/异常上传)
- * 统一记录到 dcs_risk_event 表, 供后续 RiskScoreService 算分。</p>
+ * 统一记录到 risk_event 表, 供后续 RiskScoreService 算分。</p>
  *
  * <p><b>白名单</b>: 调用方传入的 userId/ip 若在白名单内, 直接 return 不记录。</p>
  *
@@ -38,16 +38,16 @@ import java.util.Date;
 public class RiskEventCollector {
 
     /** 风险事件 Mapper(统一落库) */
-    private final DcsRiskEventMapper eventMapper;
+    private final RiskEventMapper eventMapper;
     /** 风险规则 Mapper(匹配事件类型) */
-    private final DcsRiskRuleMapper ruleMapper;
+    private final RiskRuleMapper ruleMapper;
     /** 风控白名单 Mapper(命中则跳过) */
-    private final DcsRiskWhitelistMapper whitelistMapper;
+    private final RiskWhitelistMapper whitelistMapper;
     /** 行为埋点：风控事件落库后同步写一条 RISK 行为到 RFM 流水 */
     private final RiskBehaviorSink behaviorEventService;
 
     @Autowired(required = false)
-    private DcsRolloutProperties rolloutProperties;
+    private RolloutProperties rolloutProperties;
 
     /**
      * 异步记录一条风险事件(白名单/幂等键去重 + 同步落 RISK 行为埋点); 失败不影响业务主流程。
@@ -72,8 +72,8 @@ public class RiskEventCollector {
 
     private void recordInTenant(RiskEventCommand command) {
         if (command.idempotencyKey() != null && !command.idempotencyKey().isBlank()) {
-            Long duplicateCount = eventMapper.selectCount(new LambdaQueryWrapper<DcsRiskEvent>()
-                .eq(DcsRiskEvent::getIdempotencyKey, command.idempotencyKey()));
+            Long duplicateCount = eventMapper.selectCount(new LambdaQueryWrapper<RiskEvent>()
+                .eq(RiskEvent::getIdempotencyKey, command.idempotencyKey()));
             if (duplicateCount != null && duplicateCount > 0) {
                 log.info("[RiskEvent] idempotent skip tenant={} type={} trace={}",
                     command.tenantId(), command.eventType(), traceId(command.idempotencyKey()));
@@ -86,9 +86,9 @@ public class RiskEventCollector {
                 command.tenantId(), command.eventType(), command.userId(), command.source(), command.refId());
             return;
         }
-        DcsRiskRule rule = ruleMapper.selectOne(new LambdaQueryWrapper<DcsRiskRule>()
-            .eq(DcsRiskRule::getEventType, command.eventType())
-            .eq(DcsRiskRule::getEnabled, "1")
+        RiskRule rule = ruleMapper.selectOne(new LambdaQueryWrapper<RiskRule>()
+            .eq(RiskRule::getEventType, command.eventType())
+            .eq(RiskRule::getEnabled, "1")
             .last("LIMIT 1"));
         if (rule == null) {
             log.debug("[RiskEvent] no enabled rule tenant={} type={} source={} ref={}",
@@ -96,7 +96,7 @@ public class RiskEventCollector {
             return;
         }
         Date now = new Date();
-        DcsRiskEvent event = new DcsRiskEvent();
+        RiskEvent event = new RiskEvent();
         event.setTenantId(command.tenantId());
         event.setUserId(command.userId());
         event.setIp(command.ip());
@@ -143,10 +143,10 @@ public class RiskEventCollector {
      */
     public boolean isWhitelisted(String listType, String value) {
         if (value == null || value.isBlank()) return false;
-        Long cnt = whitelistMapper.selectCount(new LambdaQueryWrapper<DcsRiskWhitelist>()
-            .eq(DcsRiskWhitelist::getListType, listType)
-            .eq(DcsRiskWhitelist::getValue, value)
-            .eq(DcsRiskWhitelist::getEnabled, "1"));
+        Long cnt = whitelistMapper.selectCount(new LambdaQueryWrapper<RiskWhitelist>()
+            .eq(RiskWhitelist::getListType, listType)
+            .eq(RiskWhitelist::getValue, value)
+            .eq(RiskWhitelist::getEnabled, "1"));
         return cnt != null && cnt > 0;
     }
 

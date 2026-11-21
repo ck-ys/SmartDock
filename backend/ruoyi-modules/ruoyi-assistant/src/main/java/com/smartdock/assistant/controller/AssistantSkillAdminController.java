@@ -3,10 +3,10 @@ package com.smartdock.assistant.controller;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.core.DatabaseSkillRepository;
-import com.smartdock.assistant.legacy.core.SkillCacheBroadcaster;
-import com.smartdock.assistant.legacy.core.SkillAssets;
-import com.smartdock.assistant.domain.model.DcsAssistantSkill;
+import com.smartdock.assistant.engine.core.DatabaseSkillRepository;
+import com.smartdock.assistant.engine.core.SkillCacheBroadcaster;
+import com.smartdock.assistant.engine.core.SkillAssets;
+import com.smartdock.assistant.domain.model.AssistantSkill;
 import com.smartdock.assistant.mapper.AssistantSkillMapper;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
@@ -30,14 +30,14 @@ import java.util.Map;
 /**
  * 技能在线层管理端点（5b 批，题4 乙/题5 甲）：列表/详情/保存/删除（=恢复内置）。
  *
- * <p>写权限独立串 {@code dcs:assistant:skill:edit}（超管默认有，租户管理员按需勾——
+ * <p>写权限独立串 {@code smartdock:assistant:skill:edit}（超管默认有，租户管理员按需勾——
  * 敏感级与「改租户预算」不同权）。保存四防呆：①对内置覆写最低角色只升不降；②同租户
  * 名称唯一（覆写同名内置=允许）；③正文 ≤2 万字＋一句话说明 ≤1024；④写后即时失效缓存
  * ＋Redis 广播（题3=乙）。删除在线行=下层（内置/目录）自动露出，恢复出厂无损。</p>
  */
 @Tag(name = "助手技能管理", description = "技能在线层：列表/详情/保存/删除")
 @RestController
-@RequestMapping("/dcs/assistant/skill")
+@RequestMapping("/assistant/skill")
 @RequiredArgsConstructor
 public class AssistantSkillAdminController extends BaseController {
 
@@ -68,19 +68,19 @@ public class AssistantSkillAdminController extends BaseController {
     }
 
     /** 管理列表：生效技能（三层叠加后）∪ 停用行（管理台要看得见停用的），带来源徽章与内置档 */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping("/list")
     public R<List<Map<String, Object>>> list() {
         String tenantId = currentTenant();
-        Map<String, DcsAssistantSkill> dbRows = indexBySkillId(skillMapper.selectAllForTenant(tenantId));
+        Map<String, AssistantSkill> dbRows = indexBySkillId(skillMapper.selectAllForTenant(tenantId));
         // 题2 案3：一次取全租户统计，逐行补 useCount/lastUsedAt（没有统计=0/null）
         Map<String, Map<String, Object>> usage = skillUsageService.usageOf(tenantId);
         List<Map<String, Object>> out = new ArrayList<>();
         java.util.Set<String> seen = new java.util.HashSet<>();
         for (SkillAssets.LoadedSkill s : SkillAssets.skills(tenantId)) {
             Map<String, Object> row = baseRow(s);
-            DcsAssistantSkill mine = rowFor(dbRows, tenantId, s.id());
-            DcsAssistantSkill global = rowFor(dbRows, DatabaseSkillRepository.GLOBAL_TENANT, s.id());
+            AssistantSkill mine = rowFor(dbRows, tenantId, s.id());
+            AssistantSkill global = rowFor(dbRows, DatabaseSkillRepository.GLOBAL_TENANT, s.id());
             boolean hasBuiltin = !builtinMinRoleName(s.id()).isEmpty();
             String source;
             if (mine != null) {
@@ -98,7 +98,7 @@ public class AssistantSkillAdminController extends BaseController {
         }
         // 停用行：不在生效视图里（disabled=1 把技能整体藏了），管理台单独补出
         for (String key : dbRows.keySet()) {
-            DcsAssistantSkill r = dbRows.get(key);
+            AssistantSkill r = dbRows.get(key);
             if (r.getDisabled() == null || r.getDisabled() == 0 || !key.startsWith(tenantId + ":")
                 || seen.contains(r.getSkillId())) {
                 continue;
@@ -117,14 +117,14 @@ public class AssistantSkillAdminController extends BaseController {
     }
 
     /** 详情：生效内容（merged）+ 本租户在线行（编辑回填用）+ 内置基线（恢复预览用） */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @GetMapping("/{skillId}")
     public R<Map<String, Object>> detail(@PathVariable String skillId) {
         String tenantId = currentTenant();
         SkillAssets.LoadedSkill eff = findEffective(skillId, tenantId);
         if (eff == null) {
             // 停用行不在生效视图（遮罩语义），管理台编辑停用技能时仍要给回填
-            for (DcsAssistantSkill r : skillMapper.selectAllForTenant(tenantId)) {
+            for (AssistantSkill r : skillMapper.selectAllForTenant(tenantId)) {
                 if (r.getSkillId() != null && r.getSkillId().equals(skillId)
                     && r.getDisabled() != null && r.getDisabled() == 1) {
                     eff = new SkillAssets.LoadedSkill(r.getSkillId(),
@@ -143,8 +143,8 @@ public class AssistantSkillAdminController extends BaseController {
         Map<String, Object> out = baseRow(eff);
         out.put("source", "builtin");
         out.put("builtinMinRole", builtinMinRoleName(skillId));
-        DcsAssistantSkill mine = skillMapper.selectOne(new LambdaQueryWrapper<DcsAssistantSkill>()
-            .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
+        AssistantSkill mine = skillMapper.selectOne(new LambdaQueryWrapper<AssistantSkill>()
+            .eq(AssistantSkill::getTenantId, tenantId).eq(AssistantSkill::getSkillId, skillId));
         if (mine != null) {
             out.put("online", mine);
             boolean hasBuiltin = !builtinMinRoleName(skillId).isEmpty();
@@ -163,8 +163,8 @@ public class AssistantSkillAdminController extends BaseController {
      */
     @Log(title = "助手技能", businessType = BusinessType.UPDATE)
     @PostMapping("/save")
-    @SaCheckPermission("dcs:assistant:skill:edit")
-    public R<Void> save(@RequestBody DcsAssistantSkill body) {
+    @SaCheckPermission("smartdock:assistant:skill:edit")
+    public R<Void> save(@RequestBody AssistantSkill body) {
         String tenantId = currentTenant();
         Long userId = LoginHelper.getUserId();
         String skillId = body.getSkillId() == null ? null : body.getSkillId().trim();
@@ -203,10 +203,10 @@ public class AssistantSkillAdminController extends BaseController {
             }
         }
         // 同租户唯一（覆写同名内置=允许——覆写正是本表主路径；同租户撞已有在线行已被 exists 判定接走）
-        DcsAssistantSkill exists = skillMapper.selectOne(new LambdaQueryWrapper<DcsAssistantSkill>()
-            .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
+        AssistantSkill exists = skillMapper.selectOne(new LambdaQueryWrapper<AssistantSkill>()
+            .eq(AssistantSkill::getTenantId, tenantId).eq(AssistantSkill::getSkillId, skillId));
         boolean isNew = exists == null;
-        DcsAssistantSkill row = isNew ? new DcsAssistantSkill() : exists;
+        AssistantSkill row = isNew ? new AssistantSkill() : exists;
         row.setTenantId(tenantId);
         row.setSkillId(skillId);
         row.setDisplayName(body.getDisplayName());
@@ -239,11 +239,11 @@ public class AssistantSkillAdminController extends BaseController {
     /** 删除在线行：内置技能=恢复出厂原文；在线新增技能=彻底删除（铁律#21：DELETE→POST） */
     @Log(title = "助手技能", businessType = BusinessType.DELETE)
     @PostMapping("/{skillId}")
-    @SaCheckPermission("dcs:assistant:skill:edit")
+    @SaCheckPermission("smartdock:assistant:skill:edit")
     public R<Void> delete(@PathVariable String skillId) {
         String tenantId = currentTenant();
-        int deleted = skillMapper.delete(new LambdaQueryWrapper<DcsAssistantSkill>()
-            .eq(DcsAssistantSkill::getTenantId, tenantId).eq(DcsAssistantSkill::getSkillId, skillId));
+        int deleted = skillMapper.delete(new LambdaQueryWrapper<AssistantSkill>()
+            .eq(AssistantSkill::getTenantId, tenantId).eq(AssistantSkill::getSkillId, skillId));
         if (deleted > 0) {
             SkillCacheBroadcaster.publishReload(tenantId);
             // 三审回修（dsflash P2-12）：文案按有没有内置基线分流（纯在线技能删除后无内置可恢复）
@@ -293,15 +293,15 @@ public class AssistantSkillAdminController extends BaseController {
         return "";
     }
 
-    private Map<String, DcsAssistantSkill> indexBySkillId(List<DcsAssistantSkill> rows) {
-        Map<String, DcsAssistantSkill> out = new LinkedHashMap<>();
-        for (DcsAssistantSkill r : rows) {
+    private Map<String, AssistantSkill> indexBySkillId(List<AssistantSkill> rows) {
+        Map<String, AssistantSkill> out = new LinkedHashMap<>();
+        for (AssistantSkill r : rows) {
             out.put(r.getTenantId() + ":" + r.getSkillId(), r);
         }
         return out;
     }
 
-    private DcsAssistantSkill rowFor(Map<String, DcsAssistantSkill> idx, String tenantId, String skillId) {
+    private AssistantSkill rowFor(Map<String, AssistantSkill> idx, String tenantId, String skillId) {
         return idx.get(tenantId + ":" + skillId);
     }
 }

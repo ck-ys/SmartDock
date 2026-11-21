@@ -4,9 +4,9 @@ import com.baomidou.lock.annotation.Lock4j;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.domain.DcsAiCreditSubscription;
-import com.smartdock.mapper.DcsAiCreditSubscriptionMapper;
-import com.smartdock.service.IDcsAiCreditService;
+import com.smartdock.domain.AiCreditSubscription;
+import com.smartdock.mapper.AiCreditSubscriptionMapper;
+import com.smartdock.service.IAiCreditService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Lazy;
@@ -64,8 +64,8 @@ public class CreditAlertScheduler {
     private static final DateTimeFormatter MONTH_KEY = DateTimeFormatter.ofPattern("yyyyMM");
     private static final DateTimeFormatter CN_DATE = DateTimeFormatter.ofPattern("M月d日");
 
-    private final DcsAiCreditSubscriptionMapper subscriptionMapper;
-    private final IDcsAiCreditService creditService;
+    private final AiCreditSubscriptionMapper subscriptionMapper;
+    private final IAiCreditService creditService;
     private final WalletAlertService walletAlertService;
 
     /** 自身代理(@Lazy 破循环依赖)：启动补跑与 09:10 tick 共用同一把 @Lock4j，与钱包侧同配方 */
@@ -115,13 +115,13 @@ public class CreditAlertScheduler {
         // 窗口上界多留 1 天余量(按日历天判 daysLeft, 时间部分不参与)
         Date windowEnd = Date.from(LocalDate.now(BEIJING).plusDays(EXPIRING_WINDOW_DAYS + 1)
             .atStartOfDay(BEIJING).toInstant());
-        List<DcsAiCreditSubscription> subs = subscriptionMapper.selectList(
-            new LambdaQueryWrapper<DcsAiCreditSubscription>()
-                .eq(DcsAiCreditSubscription::getStatus, "1")
-                .le(DcsAiCreditSubscription::getEndTime, windowEnd));
+        List<AiCreditSubscription> subs = subscriptionMapper.selectList(
+            new LambdaQueryWrapper<AiCreditSubscription>()
+                .eq(AiCreditSubscription::getStatus, "1")
+                .le(AiCreditSubscription::getEndTime, windowEnd));
         int alerted = 0;
         LocalDate today = LocalDate.now(BEIJING);
-        for (DcsAiCreditSubscription sub : subs) {
+        for (AiCreditSubscription sub : subs) {
             try {
                 LocalDate endDate = LocalDate.ofInstant(sub.getEndTime().toInstant(), BEIJING);
                 long daysLeft = java.time.temporal.ChronoUnit.DAYS.between(today, endDate);
@@ -149,7 +149,7 @@ public class CreditAlertScheduler {
         return null;
     }
 
-    private void publishExpiryAlert(DcsAiCreditSubscription sub, String phase, long daysLeft, LocalDate endDate) {
+    private void publishExpiryAlert(AiCreditSubscription sub, String phase, long daysLeft, LocalDate endDate) {
         String endCn = endDate.format(CN_DATE);
         String title;
         String content;
@@ -184,18 +184,18 @@ public class CreditAlertScheduler {
      */
     private int alertCreditPools() {
         Date now = new Date();
-        List<DcsAiCreditSubscription> active = subscriptionMapper.selectList(
-            new LambdaQueryWrapper<DcsAiCreditSubscription>()
-                .eq(DcsAiCreditSubscription::getStatus, "1")
-                .gt(DcsAiCreditSubscription::getEndTime, now));
+        List<AiCreditSubscription> active = subscriptionMapper.selectList(
+            new LambdaQueryWrapper<AiCreditSubscription>()
+                .eq(AiCreditSubscription::getStatus, "1")
+                .gt(AiCreditSubscription::getEndTime, now));
         int alerted = 0;
-        for (DcsAiCreditSubscription sub : active) {
+        for (AiCreditSubscription sub : active) {
             String tenantId = sub.getTenantId();
             try {
                 if (!"CREDIT".equals(creditService.consumeMode(tenantId))) {
                     continue;
                 }
-                IDcsAiCreditService.CreditSummary s = creditService.summary(tenantId);
+                IAiCreditService.CreditSummary s = creditService.summary(tenantId);
                 if (s == null || !s.subscribed()) {
                     continue;
                 }

@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue';
-import { listProfileSources } from '@/api/dcs/core/profile';
+import { listProfileSources } from '@/api/smartdock/core/profile';
 
 /**
  * 批2 列源单源化: 全部画像/分析页的「数据源」下拉共用一份后端清单

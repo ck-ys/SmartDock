@@ -29,7 +29,7 @@ SET LOCAL lock_timeout = '3s';
 
 -- 先锁表再动手：SHARE ROW EXCLUSIVE 阻塞其它写入（允许查询）——
 -- 否则「去重提交 → 建索引」之间还有窗口塞进新的重复行，建索引会失败中断迁移
-LOCK TABLE public.dcs_assistant_memory IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE public.assistant_memory IN SHARE ROW EXCLUSIVE MODE;
 
 -- 存量去重（幂等，重跑为 0 行）：同 (租户,人,主题) 多条 ACTIVE 只留一条——
 -- 保留口径 = COALESCE(update_time, create_time) 最新的（多审席2：max(id) ≠ 最后保存，
@@ -43,10 +43,10 @@ WITH dup AS (
                PARTITION BY tenant_id, user_id, topic_key
                ORDER BY COALESCE(update_time, create_time) DESC NULLS LAST, id DESC
            ) AS keep_id
-    FROM public.dcs_assistant_memory
+    FROM public.assistant_memory
     WHERE status = 'ACTIVE' AND topic_key IS NOT NULL AND del_flag = '0'
 )
-UPDATE public.dcs_assistant_memory m
+UPDATE public.assistant_memory m
 SET status = 'SUPERSEDED', superseded_by = d.keep_id,
     update_by = d.user_id
 FROM dup d
@@ -54,8 +54,8 @@ WHERE m.id = d.id AND m.id <> d.keep_id;
 
 -- 栅栏本体：生效中条目按 (租户,人,主题) 唯一。
 -- topic_key 为空的普通记忆不受限（PG 唯一索引里 NULL 互不相等）；归档/被覆盖条目天然豁免。
-CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_asst_memory_active_topic
-    ON public.dcs_assistant_memory USING btree (tenant_id, user_id, topic_key)
+CREATE UNIQUE INDEX IF NOT EXISTS uk_asst_memory_active_topic
+    ON public.assistant_memory USING btree (tenant_id, user_id, topic_key)
     WHERE status = 'ACTIVE' AND topic_key IS NOT NULL AND del_flag = '0';
 
 COMMIT;

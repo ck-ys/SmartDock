@@ -34,7 +34,7 @@ public class PageQuery implements Serializable {
     // ⚠️ DCS 踩过的坑:
     //   - orderByColumn/isAsc 只对 MP 自动分页(selectVoPage/IPage)生效
     //   - DCS 自定义 SQL(missionList/groupedList/todoList)需手动传 orderBySql + 白名单防注入
-    //     见 DcsMissionServiceImpl.buildQueryWrapper / DcsTraceServiceImpl.listMyTodo
+    //     见 TaskServiceImpl.buildQueryWrapper / TraceServiceImpl.listMyTodo
     //   - 前端传排序字段不要加 priority 前缀, 否则 SQL 注入白名单匹配不上
     // 安全边界: escapeOrderBySql 拦截非字母/数字/下划线/逗号的字符(防 SQL 注入)
     // 扩展点: 如需复杂排序(计算列/表达式), 不要走 PageQuery, 自行在 Mapper XML 拼 ORDER BY

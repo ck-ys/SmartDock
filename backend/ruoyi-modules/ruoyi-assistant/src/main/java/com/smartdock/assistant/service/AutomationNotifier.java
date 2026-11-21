@@ -1,10 +1,10 @@
 package com.smartdock.assistant.service;
 
-import com.smartdock.dcs.domain.DcsNotice;
-import com.smartdock.dcs.service.DcsNoticeService;
+import com.smartdock.mission.domain.Notice;
+import com.smartdock.mission.service.NoticeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.domain.model.DcsAutomation;
+import com.smartdock.assistant.domain.model.Automation;
 import org.springframework.stereotype.Component;
 
 /**
@@ -21,14 +21,14 @@ public class AutomationNotifier {
     private static final int TITLE_LIMIT = 40;
     private static final int EXCERPT_LIMIT = 200;
 
-    private final DcsNoticeService noticeService;
+    private final NoticeService noticeService;
 
     /** 跑完了：正文摘一段结果，ref_url 直达结果会话 */
-    public void success(DcsAutomation a, Long runId, String threadId, String answer) {
+    public void success(Automation a, Long runId, String threadId, String answer) {
         String title = "自动化「" + truncate(a.getTitle(), TITLE_LIMIT) + "」跑完了";
         String content = excerpt(answer) + "\n点开查看完整结果。";
         try {
-            noticeService.notifyIdem(a.getTenantId(), a.getUserId(), DcsNotice.TYPE_AUTOMATION, title, content,
+            noticeService.notifyIdem(a.getTenantId(), a.getUserId(), Notice.TYPE_AUTOMATION, title, content,
                 null, "automation-run:" + runId, "/agent?thread=" + threadId);
         } catch (Exception e) {
             log.warn("[Automation] 成功通知发送失败 run={}: {}", runId, e.toString());
@@ -36,12 +36,12 @@ public class AutomationNotifier {
     }
 
     /** 失败了：正文说原因，ref_url 回自动化页手动重跑 */
-    public void failure(DcsAutomation a, Long runId, String reason, boolean disabled) {
+    public void failure(Automation a, Long runId, String reason, boolean disabled) {
         String title = "自动化「" + truncate(a.getTitle(), TITLE_LIMIT) + "」运行失败";
         String content = reason + "\n可以到自动化页手动重跑。"
             + (disabled ? "\n已连续失败 " + AutomationSchedule.FAILURE_LIMIT + " 次，这条自动化已自动停用。" : "");
         try {
-            noticeService.notifyIdem(a.getTenantId(), a.getUserId(), DcsNotice.TYPE_AUTOMATION, title, content,
+            noticeService.notifyIdem(a.getTenantId(), a.getUserId(), Notice.TYPE_AUTOMATION, title, content,
                 null, "automation-run:" + runId, "/agent/automation/" + a.getId());
         } catch (Exception e) {
             log.warn("[Automation] 失败通知发送失败 run={}: {}", runId, e.toString());

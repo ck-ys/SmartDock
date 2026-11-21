@@ -4,13 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.smartdock.assistant.domain.gateway.ToolCatalogGateway;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
-import com.smartdock.assistant.domain.model.DcsMcpCallLog;
-import com.smartdock.assistant.domain.model.DcsMcpServer;
-import com.smartdock.assistant.mapper.DcsMcpCallLogMapper;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.engine.core.ToolRegistry;
+import com.smartdock.assistant.domain.model.McpCallLog;
+import com.smartdock.assistant.domain.model.McpServer;
+import com.smartdock.assistant.mapper.McpCallLogMapper;
+import com.smartdock.assistant.service.AssistantConfigService;
 import com.smartdock.assistant.service.McpServerConfigService;
-import com.smartdock.assistant.legacy.tools.WebSearchTools;
+import com.smartdock.assistant.engine.tools.WebSearchTools;
 import org.dromara.common.core.service.ConfigService;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.tenant.helper.TenantHelper;
@@ -40,7 +40,7 @@ public class ToolCatalogGatewayImpl implements ToolCatalogGateway {
     /** 租户系统配置（联网搜索 key 的读取口；与建会话时 WebSearchTools 同一来源） */
     private final ConfigService configService;
     private final McpServerConfigService mcpServerConfigService;
-    private final DcsMcpCallLogMapper callLogMapper;
+    private final McpCallLogMapper callLogMapper;
 
     @Override
     public TenantGate tenantGate(String tenantId) {
@@ -88,7 +88,7 @@ public class ToolCatalogGatewayImpl implements ToolCatalogGateway {
     @Override
     public List<McpServerView> mcpServers() {
         List<McpServerView> out = new ArrayList<>();
-        for (DcsMcpServer s : TenantHelper.ignore(mcpServerConfigService::listAll)) {
+        for (McpServer s : TenantHelper.ignore(mcpServerConfigService::listAll)) {
             out.add(new McpServerView(s.getServerName(), s.getDisplayName(), s.getRemark(),
                 s.getEnabled(), s.getReadOnly()));
         }
@@ -104,7 +104,7 @@ public class ToolCatalogGatewayImpl implements ToolCatalogGateway {
             return counts;
         }
         try {
-            List<Map<String, Object>> maps = callLogMapper.selectMaps(new QueryWrapper<DcsMcpCallLog>()
+            List<Map<String, Object>> maps = callLogMapper.selectMaps(new QueryWrapper<McpCallLog>()
                 .select("server_name", "count(*) as cnt")
                 .eq("tenant_id", tenantId)
                 .notIn("action", MOUNT_ACTIONS)

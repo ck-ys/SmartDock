@@ -53,9 +53,9 @@ router.beforeEach(async (to) => {
         // 换账号弹回无权页面修复(2026-09-29): 消费 401 重登留下的 redirect 归属章——登录者与章主人
         // 不同人说明换了账号, redirect 作废落首页; 同人重登回原页、深链直达(无章)不受影响。章一次性, 消费即清。
         // 必须在 addRoute 之后判定: 跳首页重放时动态路由与侧边栏菜单须已就绪, 否则白屏空菜单
-        const redirectOwner = sessionStorage.getItem('dcs:login-redirect-owner');
+        const redirectOwner = sessionStorage.getItem('login-redirect-owner');
         if (redirectOwner !== null) {
-          sessionStorage.removeItem('dcs:login-redirect-owner');
+          sessionStorage.removeItem('login-redirect-owner');
           if (String(useUserStore().userId || '') !== redirectOwner) {
             return { path: '/', replace: true };
           }

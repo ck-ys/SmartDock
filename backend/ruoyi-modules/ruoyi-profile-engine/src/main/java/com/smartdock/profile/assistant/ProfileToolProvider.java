@@ -142,7 +142,7 @@ public class ProfileToolProvider implements BizToolProvider {
     @Override
     public BizToolResult execute(BizToolCall call) {
         // 三审 dspro P2-1/dsflash P2: 空租户必须 fail-closed——插件见空租户会整条 SQL 不注入租户条件(越权开口),
-        // 旧 dcs 实现与 DcsToolProvider 均有此门, 迁移时丢了, 现补回
+        // 旧 dcs 实现与 ToolProvider 均有此门, 迁移时丢了, 现补回
         if (call.getTenantId() == null || call.getTenantId().isBlank()) {
             return BizToolResult.fail("缺少租户上下文, 无法执行画像工具");
         }

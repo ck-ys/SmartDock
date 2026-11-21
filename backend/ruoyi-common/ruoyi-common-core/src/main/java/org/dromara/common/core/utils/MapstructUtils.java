@@ -22,7 +22,7 @@ public class MapstructUtils {
 
     // ===== DCS 调用指南 =====
     // DCS 引用频次: 10+ 个文件
-    // 典型用法: DCS BO→Entity→VO 转换(如 DcsMissionBo→DcsMission→DcsMissionVo); convert(source, TargetClass.class) 是核心方法; 需要 mapper 接口标注 @AutoMapper/@AutoMappers
+    // 典型用法: DCS BO→Entity→VO 转换(如 TaskBo→Task→TaskVo); convert(source, TargetClass.class) 是核心方法; 需要 mapper 接口标注 @AutoMapper/@AutoMappers
     // 扩展点: 新增 DCS 实体转换在对应 BO/VO 上加 @AutoMapper(target=...) 注解即可自动注册到 Converter
     // ===== DCS 调用指南 结束 =====
 

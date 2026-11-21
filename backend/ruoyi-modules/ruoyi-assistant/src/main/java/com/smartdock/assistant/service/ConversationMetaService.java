@@ -1,7 +1,7 @@
 package com.smartdock.assistant.service;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantConversation;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.exception.ServiceException;
@@ -24,14 +24,14 @@ public class ConversationMetaService {
 
     /** 本人归档会话（软通道：status=ARCHIVED） */
     public void archiveConversation(String tenantId, Long userId, Long conversationId) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
+        AssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
         if (conv == null) {
             throw new ServiceException("会话不存在或无权访问", 403);
         }
-        conversationMapper.update(null, new LambdaUpdateWrapper<DcsAssistantConversation>()
-            .eq(DcsAssistantConversation::getTenantId, tenantId)
-            .eq(DcsAssistantConversation::getId, conversationId)
-            .set(DcsAssistantConversation::getStatus, "ARCHIVED"));
+        conversationMapper.update(null, new LambdaUpdateWrapper<AssistantConversation>()
+            .eq(AssistantConversation::getTenantId, tenantId)
+            .eq(AssistantConversation::getId, conversationId)
+            .set(AssistantConversation::getStatus, "ARCHIVED"));
     }
 
     /** 本人重命名会话（批D P2-7：PATCH title；title 列 varchar(200) 已有，零 DDL） */
@@ -40,25 +40,25 @@ public class ConversationMetaService {
         if (safe.isEmpty() || safe.length() > 60) {
             throw new ServiceException("标题须为 1-60 个字符", 400);
         }
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
+        AssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
         if (conv == null) {
             throw new ServiceException("会话不存在或无权访问", 403);
         }
-        conversationMapper.update(null, new LambdaUpdateWrapper<DcsAssistantConversation>()
-            .eq(DcsAssistantConversation::getTenantId, tenantId)
-            .eq(DcsAssistantConversation::getId, conversationId)
-            .set(DcsAssistantConversation::getTitle, safe));
+        conversationMapper.update(null, new LambdaUpdateWrapper<AssistantConversation>()
+            .eq(AssistantConversation::getTenantId, tenantId)
+            .eq(AssistantConversation::getId, conversationId)
+            .set(AssistantConversation::getTitle, safe));
     }
 
     /** 恢复已归档会话（批D：status=ARCHIVED→ACTIVE） */
     public void restoreConversation(String tenantId, Long userId, Long conversationId) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
+        AssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
         if (conv == null) {
             throw new ServiceException("会话不存在或无权访问", 403);
         }
-        conversationMapper.update(null, new LambdaUpdateWrapper<DcsAssistantConversation>()
-            .eq(DcsAssistantConversation::getTenantId, tenantId)
-            .eq(DcsAssistantConversation::getId, conversationId)
-            .set(DcsAssistantConversation::getStatus, "ACTIVE"));
+        conversationMapper.update(null, new LambdaUpdateWrapper<AssistantConversation>()
+            .eq(AssistantConversation::getTenantId, tenantId)
+            .eq(AssistantConversation::getId, conversationId)
+            .set(AssistantConversation::getStatus, "ACTIVE"));
     }
 }

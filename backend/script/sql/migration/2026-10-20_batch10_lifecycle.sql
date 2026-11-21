@@ -107,11 +107,11 @@ WHERE s.model_id = m.model_id AND s.model_type IS NULL;
 -- ---------------------------------------------------------------- 菜单(批10 C.1)
 -- 数据运维(C): 回放任务 + 保留期配置 + 身份合并记录
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
-SELECT 12001, '数据运维', 12000, 7, 'profile-ops', 'dcs/profile/ops', '', '1', '0', 'C', '0', '0', 'profile:replay:query', 'time-range', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '事件回放/数据保留期/身份合并与拆分'
+SELECT 12001, '数据运维', 12000, 7, 'profile-ops', 'smartdock/profile/ops', '', '1', '0', 'C', '0', '0', 'profile:replay:query', 'time-range', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '事件回放/数据保留期/身份合并与拆分'
 WHERE NOT EXISTS (SELECT 1 FROM public.sys_menu WHERE menu_id = 12001);
 
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
-SELECT 12002, '引擎健康', 12000, 8, 'profile-health', 'dcs/profile/health', '', '1', '0', 'C', '0', '0', 'profile:health:query', 'monitor', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '四指标/越线告警/重建耗时趋势'
+SELECT 12002, '引擎健康', 12000, 8, 'profile-health', 'smartdock/profile/health', '', '1', '0', 'C', '0', '0', 'profile:health:query', 'monitor', 103, 1, '2026-10-20 00:00:00', NULL, NULL, '四指标/越线告警/重建耗时趋势'
 WHERE NOT EXISTS (SELECT 1 FROM public.sys_menu WHERE menu_id = 12002);
 
 INSERT INTO public.sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)

@@ -6,12 +6,12 @@ import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.tenant.helper.TenantHelper;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.DcsAiModelHealth;
-import com.smartdock.domain.vo.DcsAiTestResultVo;
-import com.smartdock.mapper.DcsAiConfigMapper;
-import com.smartdock.mapper.DcsAiModelHealthMapper;
-import com.smartdock.service.IDcsAiConfigService;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.AiModelHealth;
+import com.smartdock.domain.vo.AiTestResultVo;
+import com.smartdock.mapper.AiConfigMapper;
+import com.smartdock.mapper.AiModelHealthMapper;
+import com.smartdock.service.IAiConfigService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -29,7 +29,7 @@ import java.util.Set;
  * 模型定时巡检（AI 缺口批 Q9，拍板全A，2026-10-14）。
  *
  * <p>每日 04:00（与钥匙余额刷新 04:30 错峰）探活各租户「在用模型」，结果滚动落到
- * {@code dcs_ai_model_health}（每 tenant×config 一行），管理端模型列表读最新行显示健康徽标。
+ * {@code ai_model_health}（每 tenant×config 一行），管理端模型列表读最新行显示健康徽标。
  * 连续 {@link #ALERT_STREAK_DAYS} 天 FAIL → 站内信 MODEL_HEALTH_DOWN（复用批1
  * publishCreditAlert 同款 outbox 管道，键 modelHealthDown:{tenant}:{config}:{yyyyMM} 每模型
  * 每月一告——恢复后连败清零，下一轮再连败跨月自然重报）。</p>
@@ -68,9 +68,9 @@ public class ModelHealthScheduler {
 
     private static final DateTimeFormatter MONTH_KEY = DateTimeFormatter.ofPattern("yyyyMM");
 
-    private final DcsAiModelHealthMapper healthMapper;
-    private final DcsAiConfigMapper aiConfigMapper;
-    private final IDcsAiConfigService aiConfigService;
+    private final AiModelHealthMapper healthMapper;
+    private final AiConfigMapper aiConfigMapper;
+    private final IAiConfigService aiConfigService;
     private final WalletAlertService walletAlertService;
 
     /** 每日 04:00 巡检(与余额刷新 04:30 错峰) */
@@ -158,26 +158,26 @@ public class ModelHealthScheduler {
      * 停用/不存在的配置跳过不建档（徽标只对可切换的行有意义）。
      */
     private boolean probeOne(String tenantId, Long configId) {
-        DcsAiTestResultVo result = aiConfigService.patrolProbe(configId);
+        AiTestResultVo result = aiConfigService.patrolProbe(configId);
         if (result == null) {
             return false;
         }
         boolean ok = Boolean.TRUE.equals(result.getSuccess());
         // 冗余显示列：探活与取显示名各查一次同 PK 行，代价可忽略
-        DcsAiConfig config = TenantHelper.ignore(() -> aiConfigMapper.selectById(configId));
+        AiConfig config = TenantHelper.ignore(() -> aiConfigMapper.selectById(configId));
         String provider = config == null ? null : config.getProvider();
         String modelName = config == null ? null : config.getModelName();
 
-        DcsAiModelHealth prev = healthMapper.selectOne(new LambdaQueryWrapper<DcsAiModelHealth>()
-            .eq(DcsAiModelHealth::getTenantId, tenantId)
-            .eq(DcsAiModelHealth::getConfigId, configId));
+        AiModelHealth prev = healthMapper.selectOne(new LambdaQueryWrapper<AiModelHealth>()
+            .eq(AiModelHealth::getTenantId, tenantId)
+            .eq(AiModelHealth::getConfigId, configId));
         Date now = new Date();
         int streak = nextStreak(ok, prev == null ? null : prev.getFailStreak());
         String detail = StrUtil.maxLength(StrUtil.blankToDefault(result.getMessage(), ok ? "连接成功" : "连接失败"), DETAIL_MAX);
         Integer latency = result.getLatencyMs() == null ? null : result.getLatencyMs().intValue();
 
         if (prev == null) {
-            DcsAiModelHealth row = new DcsAiModelHealth();
+            AiModelHealth row = new AiModelHealth();
             row.setId(com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());
             row.setTenantId(tenantId);
             row.setConfigId(configId);

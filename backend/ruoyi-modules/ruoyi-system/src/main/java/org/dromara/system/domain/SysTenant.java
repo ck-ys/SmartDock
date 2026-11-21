@@ -100,7 +100,7 @@ public class SysTenant extends BaseEntity {
      * 不再在"修改租户"弹窗暴露；本列与判定逻辑全部保留，属"备而未用"能力。
      * 修改租户表单提交时此字段由后端回填值原样回传，不会误清。
      * 启用方式：恢复 tenant/index.vue 中被注释的 el-form-item，或运维直接 UPDATE 本列。
-     * 消费方：DcsMissionServiceImpl#responsibilityEnabledFor / DcsReviewTaskController 配置端点。</p>
+     * 消费方：本类 responsibilityEnabledFor / 审核配置端点（批9 前名为 DcsMissionServiceImpl/DcsReviewTaskController）。</p>
      */
     private String responsibilityEnabled;
 

@@ -30,8 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("local")
 class AssistantMcpEndpointContractTest {
 
-    private static final String MCP = "/dcs/assistant/mcp";
-    private static final String GATE = "/dcs/assistant/toolgate";
+    private static final String MCP = "/assistant/mcp";
+    private static final String GATE = "/assistant/toolgate";
 
     private static void assertClassMapping(Class<?> c, String expected) {
         RequestMapping rm = c.getAnnotation(RequestMapping.class);
@@ -68,12 +68,12 @@ class AssistantMcpEndpointContractTest {
         Class<?> c = AssistantMcpController.class;
         assertClassMapping(c, MCP);
 
-        assertEndpoint(c, "memberList", GetMapping.class, "/member-list", "dcs:assistant:use");
-        assertEndpoint(c, "list", GetMapping.class, "/list", "dcs:assistant:config");
-        assertEndpoint(c, "save", PostMapping.class, "/save", "dcs:assistant:config");
-        assertEndpoint(c, "toggle", PostMapping.class, "/toggle", "dcs:assistant:config");
-        assertEndpoint(c, "delete", PostMapping.class, "/delete", "dcs:assistant:config");
-        assertEndpoint(c, "callLog", GetMapping.class, "/calllog", "dcs:assistant:config");
+        assertEndpoint(c, "memberList", GetMapping.class, "/member-list", "smartdock:assistant:use");
+        assertEndpoint(c, "list", GetMapping.class, "/list", "smartdock:assistant:config");
+        assertEndpoint(c, "save", PostMapping.class, "/save", "smartdock:assistant:config");
+        assertEndpoint(c, "toggle", PostMapping.class, "/toggle", "smartdock:assistant:config");
+        assertEndpoint(c, "delete", PostMapping.class, "/delete", "smartdock:assistant:config");
+        assertEndpoint(c, "callLog", GetMapping.class, "/calllog", "smartdock:assistant:config");
     }
 
     @Test
@@ -81,8 +81,8 @@ class AssistantMcpEndpointContractTest {
         Class<?> c = AssistantToolGateController.class;
         assertClassMapping(c, GATE);
 
-        assertEndpoint(c, "view", GetMapping.class, "", "dcs:assistant:config");
-        assertEndpoint(c, "save", PostMapping.class, "", "dcs:assistant:config");
+        assertEndpoint(c, "view", GetMapping.class, "", "smartdock:assistant:config");
+        assertEndpoint(c, "save", PostMapping.class, "", "smartdock:assistant:config");
     }
 
     /** 端点总数固定 8：新增/删除 handler 必须同步改上面的契约表 */

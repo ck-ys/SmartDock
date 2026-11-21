@@ -3,7 +3,7 @@ package com.smartdock.ai;
 /**
  * AI 服务门面（2026-09-24 拍板 Q3:B，二期 AiGateway 一期落地）。
  *
- * <p>dcs 等消费模块<b>只认本窗口</b>，不直接注入 DcsAiChatClientFactory/IDcsAiConfigService 等
+ * <p>dcs 等消费模块<b>只认本窗口</b>，不直接注入 AiChatClientFactory/IAiConfigService 等
  * ai-billing 内部零件——车间内部（模型组装/重试/计费/扣钱包）随便改，消费方零感知。
  * 当前客户 dcs 一家；第二个消费模块出现时按真实需求扩展窗口形状。</p>
  *
@@ -22,7 +22,7 @@ public interface AiGateway {
      * 后台默认槽优先，槽未设/失效回退接口默认（★→最近可用）。
      *
      * @throws org.dromara.common.core.exception.ServiceException 当前租户未启用 CHAT 配置时
-     *         （沿袭 IDcsAiConfigService.resolveEnabledConfig 原语义, 直接传播）
+     *         （沿袭 IAiConfigService.resolveEnabledConfig 原语义, 直接传播）
      */
     AiChatResult chat(AiChatCommand command);
 
@@ -50,7 +50,7 @@ public interface AiGateway {
         PROFILE_DIAGNOSE,
         /** 画像向量嵌入(ProfileEmbeddingService) */
         PROFILE_EMBEDDING,
-        /** 表单 AI 字段生成(DcsAiFieldServiceImpl) */
+        /** 表单 AI 字段生成(批9 前实现名 DcsAiFieldServiceImpl) */
         FIELD_GENERATE
     }
 

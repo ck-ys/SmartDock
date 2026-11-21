@@ -1,7 +1,7 @@
 package com.smartdock.assistant.service;
 
-import com.smartdock.assistant.domain.model.DcsAssistantMemory;
-import com.smartdock.assistant.domain.model.DcsAssistantMemoryPref;
+import com.smartdock.assistant.domain.model.AssistantMemory;
+import com.smartdock.assistant.domain.model.AssistantMemoryPref;
 import com.smartdock.assistant.domain.model.DigestResult;
 import com.smartdock.assistant.mapper.AssistantMemoryMapper;
 import com.smartdock.assistant.mapper.AssistantMemoryPrefMapper;
@@ -26,8 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * 助手长期记忆存储服务（批 6 题 2 案 1，2026-11-20 按表归属从 556 行旧服务拆出）。
  *
- * <p><b>边界</b>：只碰记忆自有两张表（{@code dcs_assistant_memory} /
- * {@code dcs_assistant_memory_pref}）——清单/搜索/行内编辑/删除/开关/归档/导出/清空，
+ * <p><b>边界</b>：只碰记忆自有两张表（{@code assistant_memory} /
+ * {@code assistant_memory_pref}）——清单/搜索/行内编辑/删除/开关/归档/导出/清空，
  * 以及按问题相关性取数的注入摘要（30s 进程内缓存）。</p>
  *
  * <p><b>为什么摘要在这里</b>：缓存失效点 6 处（save / remove / edit / 开关 / 清空 / 归档），
@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * remove/edit/开关/清空/归档 5 处都会变成新根→legacy，直接踩门禁第 8 条。</p>
  *
  * <p>写路径（save / saveReturningId / 回合统计）因要碰会话表与回合台账，留在
- * {@link com.smartdock.assistant.legacy.service.AssistantMemoryTurnService}；
+ * {@link com.smartdock.assistant.service.AssistantMemoryTurnService}；
  * 判定与打分等纯函数在 {@link AssistantMemoryFacts}。</p>
  *
  * <p>缓存口径：进程内 30s TTL（写后立即失效本进程；多节点部署下其它节点最迟 30s 过期——
@@ -67,13 +67,13 @@ public class AssistantMemoryService {
     private final AtomicLong archiveEpoch = new AtomicLong();
 
     /** 生效中清单（新→旧；题7 主列表） */
-    public List<DcsAssistantMemory> listForUser(String tenantId, Long userId) {
+    public List<AssistantMemory> listForUser(String tenantId, Long userId) {
         return memoryMapper.listByUserStatus(tenantId, userId, AssistantMemoryFacts.ST_ACTIVE);
     }
 
     /** 历史清单（题7/题8：被替代 + 已归档，合并按 id 倒序） */
-    public List<DcsAssistantMemory> listHistory(String tenantId, Long userId) {
-        List<DcsAssistantMemory> out = new ArrayList<>();
+    public List<AssistantMemory> listHistory(String tenantId, Long userId) {
+        List<AssistantMemory> out = new ArrayList<>();
         out.addAll(memoryMapper.listByUserStatus(tenantId, userId, AssistantMemoryFacts.ST_SUPERSEDED));
         out.addAll(memoryMapper.listByUserStatus(tenantId, userId, AssistantMemoryFacts.ST_ARCHIVED));
         out.sort((a, b) -> Long.compare(b.getId(), a.getId()));
@@ -117,7 +117,7 @@ public class AssistantMemoryService {
         if (content.length() > AssistantMemoryFacts.MAX_CONTENT) {
             content = content.substring(0, AssistantMemoryFacts.MAX_CONTENT);
         }
-        DcsAssistantMemory row = memoryMapper.selectById(id);
+        AssistantMemory row = memoryMapper.selectById(id);
         if (row == null || !tenantId.equals(row.getTenantId()) || !userId.equals(row.getUserId())) {
             return false;
         }
@@ -205,17 +205,17 @@ public class AssistantMemoryService {
         if (!isUserEnabled(tenantId, userId)) {
             return null;
         }
-        List<DcsAssistantMemory> rows = memoryMapper.listByUserStatus(
+        List<AssistantMemory> rows = memoryMapper.listByUserStatus(
             tenantId, userId, AssistantMemoryFacts.ST_ACTIVE);
         if (rows.isEmpty()) {
             return null;
         }
-        List<DcsAssistantMemory> ranked;
+        List<AssistantMemory> ranked;
         if (question == null || question.isBlank()) {
             ranked = rows; // 无问题上下文：保持旧口径（新→旧）
         } else {
             List<Scored> scored = new ArrayList<>();
-            for (DcsAssistantMemory r : rows) {
+            for (AssistantMemory r : rows) {
                 int s = AssistantMemoryFacts.scoreOf(r.getContent(), question);
                 if (s > 0) {
                     scored.add(new Scored(r, s));
@@ -237,7 +237,7 @@ public class AssistantMemoryService {
 
         List<String> contents = new ArrayList<>();
         List<Long> rankedIds = new ArrayList<>();
-        for (DcsAssistantMemory r : ranked) {
+        for (AssistantMemory r : ranked) {
             contents.add(r.getContent());
             rankedIds.add(r.getId());
         }
@@ -246,7 +246,7 @@ public class AssistantMemoryService {
 
     /** 本人开关（题10）：缺行=默认开启；租户总闸在装配期判，不在这里 */
     public boolean isUserEnabled(String tenantId, Long userId) {
-        DcsAssistantMemoryPref pref = prefMapper.selectOwn(tenantId, userId);
+        AssistantMemoryPref pref = prefMapper.selectOwn(tenantId, userId);
         return pref == null || !"0".equals(pref.getEnabled());
     }
 
@@ -330,12 +330,12 @@ public class AssistantMemoryService {
     }
 
     /** 导出用（题10）：全部条目按 id 倒序（含状态） */
-    public List<DcsAssistantMemory> exportRows(String tenantId, Long userId) {
-        List<DcsAssistantMemory> rows = new ArrayList<>(memoryMapper.listByUser(tenantId, userId));
+    public List<AssistantMemory> exportRows(String tenantId, Long userId) {
+        List<AssistantMemory> rows = new ArrayList<>(memoryMapper.listByUser(tenantId, userId));
         rows.sort((a, b) -> Long.compare(b.getId(), a.getId()));
         return rows.isEmpty() ? Collections.emptyList() : rows;
     }
 
-    private record Scored(DcsAssistantMemory row, int score) {
+    private record Scored(AssistantMemory row, int score) {
     }
 }

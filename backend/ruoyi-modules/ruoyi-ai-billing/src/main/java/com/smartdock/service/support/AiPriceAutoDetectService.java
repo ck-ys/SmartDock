@@ -9,11 +9,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.json.utils.JsonUtils;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.DcsAiDocDomain;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.AiDocDomain;
 import com.smartdock.domain.vo.AiPriceDetectResult;
-import com.smartdock.mapper.DcsAiConfigMapper;
-import com.smartdock.mapper.DcsAiDocDomainMapper;
+import com.smartdock.mapper.AiConfigMapper;
+import com.smartdock.mapper.AiDocDomainMapper;
 import org.springframework.stereotype.Component;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
  *   <li>SSRF 校验: URL host 必须命中预置厂商文档域名白名单</li>
  *   <li>HTTP 抓取 → cleanHtmlTag → 截断 8000 字</li>
  *   <li>正则匹配常见价格模式(命中输入+输出则直接返回)</li>
- *   <li>AI 回退: 调 DcsAiChatClientFactory 提取 JSON 价格(PRICE_DETECT 不扣钱包)</li>
+ *   <li>AI 回退: 调 AiChatClientFactory 提取 JSON 价格(PRICE_DETECT 不扣钱包)</li>
  * </ol>
  *
  * @author smartdock
@@ -57,13 +57,13 @@ public class AiPriceAutoDetectService {
     private static final BigDecimal ONE_MILLION = BigDecimal.valueOf(1_000_000);
 
     /** AI 聊天客户端工厂(正则失败时 AI 回退提取价格) */
-    private final DcsAiChatClientFactory chatClientFactory;
+    private final AiChatClientFactory chatClientFactory;
     /** AI 配置 Mapper(回写识别到的价格) */
-    private final DcsAiConfigMapper aiConfigMapper;
+    private final AiConfigMapper aiConfigMapper;
     /** AI 配置服务(J 批七审回修: AI 提取选模型统一走单点解析器, 不再跨租户直查) */
-    private final com.smartdock.service.IDcsAiConfigService aiConfigService;
+    private final com.smartdock.service.IAiConfigService aiConfigService;
     /** 文档域名白名单 Mapper(SSRF 校验来源) */
-    private final DcsAiDocDomainMapper docDomainMapper;
+    private final AiDocDomainMapper docDomainMapper;
 
     /**
      * 智能识别模型计费参数。
@@ -372,12 +372,12 @@ public class AiPriceAutoDetectService {
      * 从 DB 加载启用的白名单域名列表。
      */
     private List<String> loadAllowedDomains() {
-        List<DcsAiDocDomain> rows = docDomainMapper.selectList(
-            new LambdaQueryWrapper<DcsAiDocDomain>()
-                .eq(DcsAiDocDomain::getEnabled, "1")
-                .eq(DcsAiDocDomain::getDelFlag, "0"));
+        List<AiDocDomain> rows = docDomainMapper.selectList(
+            new LambdaQueryWrapper<AiDocDomain>()
+                .eq(AiDocDomain::getEnabled, "1")
+                .eq(AiDocDomain::getDelFlag, "0"));
         return rows.stream()
-            .map(DcsAiDocDomain::getDomain)
+            .map(AiDocDomain::getDomain)
             .filter(StrUtil::isNotBlank)
             .map(String::toLowerCase)
             .toList();
@@ -482,7 +482,7 @@ public class AiPriceAutoDetectService {
             // J 批七审回修(Explore 席 P1): 原跨租户任取启用行(无租户/use_type/CNY 闸三缺)——
             // 违反多租户隔离且可能选到 EMBEDDING 行或美元模型。统一走单点解析器取当前租户
             // 的 CHAT 配置; 无配置/闸不过(均抛 ServiceException)由下方 catch 统一降级跳过
-            DcsAiConfig config = aiConfigService.resolveEnabledConfig(
+            AiConfig config = aiConfigService.resolveEnabledConfig(
                 org.dromara.common.tenant.helper.TenantHelper.getTenantId(), "CHAT");
             if (config == null) {
                 log.warn("[PriceDetect] 无可用 AI 配置, 跳过 AI 提取");

@@ -12,8 +12,8 @@ import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -78,7 +78,7 @@ class P06AguiSseTest {
     TestRestTemplate rest;
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
     @Autowired
     AguiAgentRegistry registry;
@@ -93,10 +93,10 @@ class P06AguiSseTest {
         String token = loginAsTestUser();
         try {
         // ① 注册探针 agent（流式模型——SSE 增量帧的前提）
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg, "978311 DeepSeek 配置应存在");
         ReActAgent agent = ReActAgent.builder()
-            .sysPrompt("你是 DCS 数据采集系统的工作助手。无论用户问什么，都用恰好约600字的中文段落作答，"
+            .sysPrompt("你是 SmartDock的工作助手。无论用户问什么，都用恰好约600字的中文段落作答，"
                 + "分四段，每段以『第X段』开头。不要使用任何工具。")
             .model(OpenAIChatModel.builder()
                 .baseUrl(cfg.getBaseUrl()).apiKey(cfg.getApiKey()).modelName(cfg.getModelName())
@@ -247,10 +247,10 @@ class P06AguiSseTest {
      */
     @Test
     void modelLevelStreamingCadence() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         ReActAgent agent = ReActAgent.builder()
-            .sysPrompt("你是 DCS 数据采集系统的工作助手。无论用户问什么，都用恰好约600字的中文段落作答，"
+            .sysPrompt("你是 SmartDock的工作助手。无论用户问什么，都用恰好约600字的中文段落作答，"
                 + "分四段，每段以『第X段』开头。不要使用任何工具。")
             .model(OpenAIChatModel.builder()
                 .baseUrl(cfg.getBaseUrl()).apiKey(cfg.getApiKey()).modelName(cfg.getModelName())

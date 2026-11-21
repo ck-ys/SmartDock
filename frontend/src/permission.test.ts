@@ -33,8 +33,8 @@ describe('global router guard (return-style navigation)', () => {
   it('redirects unauthenticated protected access to login keeping the redirect target', async () => {
     mocks.getToken.mockReturnValue(null);
     const guard = registeredGuard();
-    const result = await guard({ path: '/dcs/mission', fullPath: '/dcs/mission?tab=1', meta: {} }, {});
-    expect(result).toBe(`/login?redirect=${encodeURIComponent('/dcs/mission?tab=1')}`);
+    const result = await guard({ path: '/smartdock/mission', fullPath: '/smartdock/mission?tab=1', meta: {} }, {});
+    expect(result).toBe(`/login?redirect=${encodeURIComponent('/smartdock/mission?tab=1')}`);
   });
 
   it('allows whitelist paths without a token', async () => {
@@ -62,7 +62,7 @@ describe('global router guard (return-style navigation)', () => {
 
   it('没有工作台权限的存量角色同样直达会话页', async () => {
     mocks.getToken.mockReturnValue('token');
-    mocks.userStore.permissions = ['dcs:assistant:use'];
+    mocks.userStore.permissions = ['smartdock:assistant:use'];
     const guard = registeredGuard();
     expect(await guard({ path: '/ai/assistant', fullPath: '/ai/assistant', query: {}, meta: {}, matched: [] }, {})).toBe(true);
   });

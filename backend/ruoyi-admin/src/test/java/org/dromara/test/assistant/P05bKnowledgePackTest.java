@@ -8,8 +8,8 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,12 +40,12 @@ class P05bKnowledgePackTest {
 
     private static final long CONFIG_ID = 9100000000003L;
     private static final Path PACK = Path.of("document", "evidence", "assistant-p0", "05b-knowledge-pack.md");
-    private static final String BASE_PROMPT = "你是 DCS 数据采集系统的工作助手，回答用简洁中文。";
+    private static final String BASE_PROMPT = "你是 SmartDock的工作助手，回答用简洁中文。";
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
-    private ReActAgent buildAgent(DcsAiConfig cfg, String sysPrompt) {
+    private ReActAgent buildAgent(AiConfig cfg, String sysPrompt) {
         return ReActAgent.builder()
             .sysPrompt(sysPrompt)
             .model(OpenAIChatModel.builder()
@@ -57,7 +57,7 @@ class P05bKnowledgePackTest {
 
     private record CallResult(String text, int inputTokens, int cachedTokens) {}
 
-    private CallResult call(DcsAiConfig cfg, String sysPrompt, String userMsg, String sessionId) {
+    private CallResult call(AiConfig cfg, String sysPrompt, String userMsg, String sessionId) {
         ReActAgent agent = buildAgent(cfg, sysPrompt);
         RuntimeContext rc = RuntimeContext.builder().userId("t:978311:p05b").sessionId(sessionId).build();
         Msg reply = agent.call(List.of(Msg.builderForRole(MsgRole.USER).textContent(userMsg).build()), rc)
@@ -73,7 +73,7 @@ class P05bKnowledgePackTest {
     /** 体积 + 缓存：三连小调（基线 → 带包 → 带包重复） */
     @Test
     void packTokenSizeAndCacheHit() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         String pack = Files.readString(PACK, StandardCharsets.UTF_8);
         System.out.println("[P05b] 样包字符数 = " + pack.length());
@@ -99,7 +99,7 @@ class P05bKnowledgePackTest {
     /** 必答题（R-10）：带包回答 7 题，锚点命中 ≥8/9 */
     @Test
     void quizWithPackHitsAnswerAnchors() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         String pack = Files.readString(PACK, StandardCharsets.UTF_8);
         String withPack = pack + "\n\n" + BASE_PROMPT;

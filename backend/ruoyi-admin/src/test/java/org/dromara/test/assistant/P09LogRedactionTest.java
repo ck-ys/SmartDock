@@ -7,8 +7,8 @@ import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -49,7 +49,7 @@ class P09LogRedactionTest {
     private static final long CONFIG_ID = 9100000000003L;
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
     /** 窗口从类加载起算（覆盖 Spring 启动日志 + 模型调用日志——进程内调用无 HTTP，启动期才是主要写入源） */
     static Instant windowStart;
@@ -61,8 +61,8 @@ class P09LogRedactionTest {
 
     @Test
     void piiAndApiKeyNeverReachLogs() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
-        assertNotNull(cfg, "dcs_ai_config 应有 " + CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        assertNotNull(cfg, "ai_config 应有 " + CONFIG_ID);
         assertEquals("978311", cfg.getTenantId());
         String apiKey = cfg.getApiKey();
         assertNotNull(apiKey, "apiKey 应已解密为明文（内存中）");
@@ -75,7 +75,7 @@ class P09LogRedactionTest {
             + "）问『追加类任务勾选多条提交后每条记录会怎样？』，请用一句话回答。";
 
         ReActAgent agent = ReActAgent.builder()
-            .sysPrompt("你是 DCS 数据采集系统的工作助手，回答用简洁中文。")
+            .sysPrompt("你是 SmartDock的工作助手，回答用简洁中文。")
             .model(OpenAIChatModel.builder()
                 .baseUrl(cfg.getBaseUrl()).apiKey(apiKey).modelName(cfg.getModelName())
                 .stream(false).formatter(new DeepSeekFormatter()).build())

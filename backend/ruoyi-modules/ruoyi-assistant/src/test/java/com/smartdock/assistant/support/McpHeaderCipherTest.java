@@ -1,6 +1,6 @@
 package com.smartdock.assistant.support;
 
-import com.smartdock.assistant.domain.model.DcsMcpServer;
+import com.smartdock.assistant.domain.model.McpServer;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.encrypt.core.EncryptorManager;
 import org.junit.jupiter.api.Tag;
@@ -74,7 +74,7 @@ class McpHeaderCipherTest {
     @Test
     void headerKeysOfReturnsKeyNamesOnlyNeverValues() {
         McpHeaderCipher c = cipherWithManager(KEY);
-        DcsMcpServer row = new DcsMcpServer();
+        McpServer row = new McpServer();
         row.setServerName("demo");
         row.setHeaders(c.encrypt("{\"X-A\":\"secret-a\",\"Authorization\":\"Bearer topsecret\"}"));
 
@@ -88,11 +88,11 @@ class McpHeaderCipherTest {
         McpHeaderCipher c = cipherWithManager(KEY);
         assertThat(c.headerKeysOf(null)).as("null 行不得 NPE").isEmpty();
 
-        DcsMcpServer empty = new DcsMcpServer();
+        McpServer empty = new McpServer();
         empty.setHeaders("{}");
         assertThat(c.headerKeysOf(empty)).isEmpty();
 
-        DcsMcpServer bad = new DcsMcpServer();
+        McpServer bad = new McpServer();
         bad.setServerName("bad_row");
         bad.setHeaders("not-json");
         assertThat(c.headerKeysOf(bad)).as("单行坏数据只降级该行").isEqualTo("(解析失败)");
@@ -109,7 +109,7 @@ class McpHeaderCipherTest {
             .isInstanceOf(ServiceException.class)
             .hasMessageContaining("无法读取 MCP 请求头");
         // 列表接口：解密失败降级，不 500 整个清单
-        DcsMcpServer row = new DcsMcpServer();
+        McpServer row = new McpServer();
         row.setHeaders("ENC_xxx");
         assertThat(c.headerKeysOf(row)).isEqualTo("(解析失败)");
     }

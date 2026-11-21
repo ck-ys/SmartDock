@@ -9,8 +9,8 @@ import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.RepeatedTest;
@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * P0-T1 探针：DeepSeek 多轮工具调用稳定性（真实付费调用，实测①）。
  * <p>判据（计划 Task 1）：</p>
  * <ul>
- *   <li>Step1/2：ReActAgent（dcs_ai_config 9100000000003 的 DeepSeek 配置，apiKey 由 MyBatis 加密拦截器
+ *   <li>Step1/2：ReActAgent（ai_config 9100000000003 的 DeepSeek 配置，apiKey 由 MyBatis 加密拦截器
  *       自动解密）+ 2 个固定 @Tool，5 轮对话，每轮断言 tool call 计数增加且最终文本非空；@RepeatedTest(3)
  *       = 稳定性 3/3（失败语义记录：超时/格式错/工具缺失）；</li>
  *   <li>Step3：每轮 ChatUsage 累积打印（对账计费预算假设：单回合 3-8 次模型调用）；</li>
@@ -49,7 +49,7 @@ class P01ModelToolLoopTest {
     private static final long CONFIG_ID = 9100000000003L;
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
     /** 工具调用计数器（断言"每轮都出现 tool call"的锚点） */
     static final AtomicInteger TODO_CALLS = new AtomicInteger();
@@ -82,20 +82,20 @@ class P01ModelToolLoopTest {
         }
     }
 
-    private DcsAiConfig loadDeepSeekConfig() {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
-        assertNotNull(cfg, "dcs_ai_config 应有 " + CONFIG_ID + "（批0 已建）");
+    private AiConfig loadDeepSeekConfig() {
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        assertNotNull(cfg, "ai_config 应有 " + CONFIG_ID + "（批0 已建）");
         assertEquals("978311", cfg.getTenantId(), "测试租户专用配置");
         assertEquals("1", cfg.getEnabled());
         assertNotNull(cfg.getApiKey(), "apiKey 应由 MyBatis 加密拦截器自动解密为明文");
         return cfg;
     }
 
-    private ReActAgent buildAgent(DcsAiConfig cfg) {
+    private ReActAgent buildAgent(AiConfig cfg) {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(new ProbeTools());
         return ReActAgent.builder()
-            .sysPrompt("你是 DCS 数据采集系统的工作助手。回答用户问题前必须调用工具获取真实数据，"
+            .sysPrompt("你是 SmartDock的工作助手。回答用户问题前必须调用工具获取真实数据，"
                 + "禁止凭空编造任务与数字。回答用简洁中文。")
             .model(OpenAIChatModel.builder()
                 .baseUrl(cfg.getBaseUrl())
@@ -112,7 +112,7 @@ class P01ModelToolLoopTest {
     /** Step1+2+3：5 轮对话 × 3 遍（稳定性 3/3） */
     @RepeatedTest(value = 3, name = "第{currentRepetition}遍/共{totalRepetitions}")
     void fiveRoundToolLoop() {
-        DcsAiConfig cfg = loadDeepSeekConfig();
+        AiConfig cfg = loadDeepSeekConfig();
         ReActAgent agent = buildAgent(cfg);
         RuntimeContext rc = RuntimeContext.builder()
             .userId("t:978311:p0-probe").sessionId("p01-" + Instant.now().toEpochMilli()).build();

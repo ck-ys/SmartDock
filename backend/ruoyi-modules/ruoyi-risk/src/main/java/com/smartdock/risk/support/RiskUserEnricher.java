@@ -2,8 +2,8 @@ package com.smartdock.risk.support;
 
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.service.UserService;
-import com.smartdock.risk.domain.DcsRiskEvent;
-import com.smartdock.risk.domain.vo.DcsRiskEventVo;
+import com.smartdock.risk.domain.RiskEvent;
+import com.smartdock.risk.domain.vo.RiskEventVo;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Component;
 
@@ -34,9 +34,9 @@ public class RiskUserEnricher {
      * @param e 风险事件实体，可为 null
      * @return 带 userName/nickName 的 VO；入参为 null 时返回 null
      */
-    public DcsRiskEventVo enrichEventVo(DcsRiskEvent e) {
+    public RiskEventVo enrichEventVo(RiskEvent e) {
         if (e == null) return null;
-        DcsRiskEventVo vo = new DcsRiskEventVo();
+        RiskEventVo vo = new RiskEventVo();
         BeanUtils.copyProperties(e, vo);
         fillUserName(e.getUserId(), vo::setUserName, vo::setNickName);
         return vo;
@@ -45,9 +45,9 @@ public class RiskUserEnricher {
     /**
      * 批量把事件实体转为 VO（逐个补用户名）。大盘/事件流水行数有限，逐个查可接受。
      */
-    public List<DcsRiskEventVo> enrichEventVo(List<DcsRiskEvent> events) {
-        List<DcsRiskEventVo> list = new ArrayList<>(events.size());
-        for (DcsRiskEvent e : events) {
+    public List<RiskEventVo> enrichEventVo(List<RiskEvent> events) {
+        List<RiskEventVo> list = new ArrayList<>(events.size());
+        for (RiskEvent e : events) {
             list.add(enrichEventVo(e));
         }
         return list;

@@ -12,10 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
 import com.smartdock.common.text.HumanText;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.DcsAiModelPrice;
-import com.smartdock.service.IDcsAiCreditService;
-import com.smartdock.service.IDcsAiModelPriceService;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.AiModelPrice;
+import com.smartdock.service.IAiCreditService;
+import com.smartdock.service.IAiModelPriceService;
 import com.smartdock.service.support.AiBillingService;
 import com.smartdock.service.support.AiTokenUsageSnapshot;
 import com.smartdock.service.support.TenantWalletService;
@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *   <li><b>不缓冲流</b>: doOnNext 只聚合 usage 与回显字符数, 响应 token 逐个透传;
  *       doFinally 同步落账(计费三写事务化, 见 AiBillingService#recordTransactional)。</li>
  *   <li><b>服务端序号</b>: 本装饰器实例(=一个会话 agent)AtomicLong 自增, 幂等键
- *       "ai-assistant:{tenant}:{configId}:{seq}"。六审勘误(dspro P1-3): 键含 instanceId
+ *       "ai-smartdock:assistant:{tenant}:{configId}:{seq}"。六审勘误(dspro P1-3): 键含 instanceId
  *       ⇒ 实际防的是「同一订阅内重复触发 doFinally」; 跨订阅/agent 重建会生成新键,
  *       重放将双记——known limitation, 勿再把本注释当跨订阅幂等保障读。</li>
  *   <li><b>前置余额闸</b>: 每次调用前查可用余额, 低于单回合门槛直接 Flux.error 友好话术,
@@ -66,7 +66,7 @@ public class BillingModelDecorator implements Model {
     private static final int EST_OUTPUT_FLOOR = 256;
 
     /** 欠费地板价 Redis 键前缀(glm53 P2-2: 事后不足免扣的租户, 下回合门槛抬到欠额×10, 余额充够自动放行) */
-    private static final String FLOOR_KEY_PREFIX = "dcs:assistant:billing:floor:";
+    private static final String FLOOR_KEY_PREFIX = "smartdock:assistant:billing:floor:";
 
     /** 地板价上限(元): 欠费抬门槛的封顶, 防异常大单把租户永久锁死 */
     private static final BigDecimal FLOOR_CAP = new BigDecimal("1.00");
@@ -75,12 +75,12 @@ public class BillingModelDecorator implements Model {
     private static final java.time.Duration FLOOR_TTL = java.time.Duration.ofDays(7);
 
     private final Model delegate;
-    private final DcsAiConfig config;
+    private final AiConfig config;
     private final Long userId;
     private final AiBillingService billingService;
     private final TenantWalletService walletService;
     /** 模型价格服务(前置闸动态门槛: 按当前价估算本回合成本) */
-    private final IDcsAiModelPriceService priceService;
+    private final IAiModelPriceService priceService;
     /** 装饰器实例雪花号(每会话 agent 一个): 幂等键的实例段——seq 只在本实例内递增,
      * 没有实例段时新会话首笔(seq=1)会撞历史会话同键被重放短路=免费(坑73, E2E 实证) */
     private final long instanceId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
@@ -97,7 +97,7 @@ public class BillingModelDecorator implements Model {
     private String sceneTag = "";
 
     /** R5 积分模式（2026-10-13）：null=钱包计费（原路径零改动）；主链注入后订阅租户走积分前置闸+积分落账 */
-    private IDcsAiCreditService creditService;
+    private IAiCreditService creditService;
 
     /** 2026-11-11 Q2-2 补丁：模型失败侧落问题行用（null=侧车/单测，不落） */
     private RunLedgerService runLedgerService;
@@ -119,7 +119,7 @@ public class BillingModelDecorator implements Model {
     }
 
     /** R5：链式注入积分服务（AssistantAgentFactory 主链；侧车/单测不传=钱包计费） */
-    public BillingModelDecorator creditService(IDcsAiCreditService svc) {
+    public BillingModelDecorator creditService(IAiCreditService svc) {
         this.creditService = svc;
         return this;
     }
@@ -136,17 +136,17 @@ public class BillingModelDecorator implements Model {
         return this;
     }
 
-    public BillingModelDecorator(Model delegate, DcsAiConfig config, Long userId,
+    public BillingModelDecorator(Model delegate, AiConfig config, Long userId,
                                  AiBillingService billingService, TenantWalletService walletService,
-                                 IDcsAiModelPriceService priceService, AssistantCostLedger costLedger) {
+                                 IAiModelPriceService priceService, AssistantCostLedger costLedger) {
         this(delegate, config, userId, billingService, walletService, priceService, costLedger, null);
     }
 
     /** 批6-#2 扩参：threadKey=会话 threadId（在飞收割判别键，主链注入；侧车/单测走七参
      *  重载传 null=跳过标记——侧车不登记 run，不在收割判别域内） */
-    public BillingModelDecorator(Model delegate, DcsAiConfig config, Long userId,
+    public BillingModelDecorator(Model delegate, AiConfig config, Long userId,
                                  AiBillingService billingService, TenantWalletService walletService,
-                                 IDcsAiModelPriceService priceService, AssistantCostLedger costLedger,
+                                 IAiModelPriceService priceService, AssistantCostLedger costLedger,
                                  String threadKey) {
         this.delegate = delegate;
         this.config = config;
@@ -236,7 +236,7 @@ public class BillingModelDecorator implements Model {
                 // 业务批8 Q2：乘模型积分倍率（flash×2/旗舰×5 等，NULL=1）——重模型每回合吃更多积分
                 long estCredits = Math.max(1, estimate.movePointRight(2)
                     .multiply(creditMultiplier(config)).setScale(0, RoundingMode.CEILING).longValue());
-                IDcsAiCreditService.GateResult gate = creditService.preGate(config.getTenantId(), estCredits);
+                IAiCreditService.GateResult gate = creditService.preGate(config.getTenantId(), estCredits);
                 if (gate.blocked()) {
                     log.warn("[AssistantBilling] 积分前置拦截: 租户 {} 估算 {} 积分",
                         config.getTenantId(), estCredits);
@@ -372,7 +372,7 @@ public class BillingModelDecorator implements Model {
             + (threadKey != null && threadKey.length() >= 8
                 ? ":th" + threadKey.substring(threadKey.length() - 8) : "")
             + (estimated ? "|est" : "");
-        String idempotencyKey = "ai-assistant:" + config.getTenantId() + ":" + config.getConfigId()
+        String idempotencyKey = "ai-smartdock:assistant:" + config.getTenantId() + ":" + config.getConfigId()
             + ":" + instanceId + ":" + seq;
         // 六审回修（dspro P1-1/k3 P1-1 续）：取整口径与闸统一——付费调用最低 1 积分无条件落账
         // （原 rawCredits>0 才扣，真实成本 <0.005 元被 HALF_UP 抹 0 = 闸按 1 积分拦、落账 0 积分免单）；
@@ -385,7 +385,7 @@ public class BillingModelDecorator implements Model {
         // Q9（2026-10-15 拍板A，ZCode 同构）：主链真实回传才进会话级命中聚合——估算/侧车/
         // 失败行不计（与状态卡口径一致）；口径=缓存读÷总输入（input 已含 cached，不重复加）
         if (!estimated && !failed && threadKey != null && !threadKey.isBlank()) {
-            com.smartdock.assistant.legacy.core.AssistantCacheHitHolder.record(threadKey,
+            com.smartdock.assistant.engine.core.AssistantCacheHitHolder.record(threadKey,
                 snapshot.promptTokens(), snapshot.cachedPromptTokens());
         }
         try {
@@ -425,7 +425,7 @@ public class BillingModelDecorator implements Model {
         // 批E E4: 本笔折算金额累计进回合账(enricher RUN_FINISHED 前取走发 cost_meta)。
         // runId 来自流线程 ThreadLocal——record 落在非流线程时为 null, 角标缺省无害降级
         try {
-            String runId = com.smartdock.assistant.legacy.core.AssistantRunContext.currentRunId();
+            String runId = com.smartdock.assistant.engine.core.AssistantRunContext.currentRunId();
             if (runId != null && !runId.isBlank()) {
                 costLedger.accumulate(runId, snapshot.totalTokens(), priceOf(snapshot));
                 // 批B B1（glm53 P1-1 回修）：末次调用快照（覆写 last-wins）供消息表
@@ -450,7 +450,7 @@ public class BillingModelDecorator implements Model {
      */
     private BigDecimal priceOf(AiTokenUsageSnapshot snapshot) {
         try {
-            DcsAiModelPrice price = priceService.findEffectivePrice(
+            AiModelPrice price = priceService.findEffectivePrice(
                 config.getTenantId(), config.getProvider(), config.getModelName());
             // 业务批4 Q4-A：官方价＋服务费模式=官方折算＋每次服务费（镜像 AiBillingCalculator#officialPlusFee）
             if (isOfficialPlusFee()) {
@@ -466,7 +466,7 @@ public class BillingModelDecorator implements Model {
     }
 
     /** 官方 token 折算（输入+输出，cached 折扣忽略）：入参不全时返回 0，由调用方决定兜底口径 */
-    private BigDecimal tokenCostOf(DcsAiModelPrice price, AiTokenUsageSnapshot snapshot) {
+    private BigDecimal tokenCostOf(AiModelPrice price, AiTokenUsageSnapshot snapshot) {
         if (price == null || snapshot == null || !snapshot.hasTokenUsage()) {
             return BigDecimal.ZERO;
         }
@@ -487,7 +487,7 @@ public class BillingModelDecorator implements Model {
 
     /** 官方 token 计费模式 ∧ 有价行（与 AiBillingCalculator#shouldUseOfficial 的前两判同源；
      *  usage 判定属调用后真值, 估算路径（事前）按有 usage 假设走 token 口径） */
-    private boolean officialPricing(DcsAiModelPrice price) {
+    private boolean officialPricing(AiModelPrice price) {
         String mode = config.getBillingMode();
         if (mode == null || mode.isBlank()) {
             mode = "OFFICIAL_TOKEN";
@@ -538,7 +538,7 @@ public class BillingModelDecorator implements Model {
      * 业务批8 Q2：模型积分倍率（前置闸与落账两处共用，口径必须一致；NULL/非正数=1）。
      * 种子：免费×1 / flash×2 / 中档×2~3 / 旗舰×4~6。
      */
-    private BigDecimal creditMultiplier(DcsAiConfig cfg) {
+    private BigDecimal creditMultiplier(AiConfig cfg) {
         BigDecimal m = cfg.getCreditMultiplier();
         return (m == null || m.signum() <= 0) ? BigDecimal.ONE : m;
     }
@@ -550,7 +550,7 @@ public class BillingModelDecorator implements Model {
      */
     private BigDecimal estimateTurnCost(int promptChars) {
         try {
-            DcsAiModelPrice price = priceService.findEffectivePrice(
+            AiModelPrice price = priceService.findEffectivePrice(
                 config.getTenantId(), config.getProvider(), config.getModelName());
             // 业务批4 Q4-A：官方价＋服务费——门槛估算也要含每次服务费（防「估 0 实收服务费」跳变；
             // 价格行缺失时官方部分为 0、只剩服务费，与实扣的 fee-only 兜底同口径）
@@ -567,7 +567,7 @@ public class BillingModelDecorator implements Model {
     }
 
     /** 按价行估算回合官方成本（prompt 字符×系数 + 输出下限 256）；无价行返回 0 */
-    private BigDecimal estimateTokenCost(DcsAiModelPrice price, int promptChars) {
+    private BigDecimal estimateTokenCost(AiModelPrice price, int promptChars) {
         if (price == null) {
             return BigDecimal.ZERO;
         }

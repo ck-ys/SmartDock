@@ -13,8 +13,8 @@ import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,7 +85,7 @@ class P15aAguiGuardTest {
     TestRestTemplate rest;
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
     @Autowired
     AguiAgentRegistry registry;
@@ -225,10 +225,10 @@ class P15aAguiGuardTest {
     /** Step5-顺带：emit-token-usage=true → SSE 帧流含 token_usage 事件（真实模型 ×1） */
     @Test
     void emitTokenUsageFrameAppearsWhenEnabled() throws Exception {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg, "978311 DeepSeek 配置应存在");
         ReActAgent agent = ReActAgent.builder()
-            .sysPrompt("你是 DCS 数据采集系统的工作助手。用一句话中文回答。不要使用任何工具。")
+            .sysPrompt("你是 SmartDock的工作助手。用一句话中文回答。不要使用任何工具。")
             .model(OpenAIChatModel.builder()
                 .baseUrl(cfg.getBaseUrl()).apiKey(cfg.getApiKey()).modelName(cfg.getModelName())
                 .stream(true).formatter(new DeepSeekFormatter()).build())

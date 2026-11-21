@@ -21,31 +21,31 @@ import org.springframework.web.bind.annotation.RestController;
  * @author smartdock
  */
 @RestController
-@RequestMapping("/dcs/announcement")
+@RequestMapping("/announcement")
 @RequiredArgsConstructor
 public class SysNoticePortalController extends BaseController {
 
     private final SysNoticePortalService portalService;
 
-    @SaCheckPermission("dcs:announcement:list")
+    @SaCheckPermission("smartdock:announcement:list")
     @GetMapping("/list")
     public TableDataInfo<SysNotice> list(PageQuery pq, @RequestParam(required = false) String readFlag) {
         return portalService.list(pq, readFlag);
     }
 
-    @SaCheckPermission("dcs:announcement:list")
+    @SaCheckPermission("smartdock:announcement:list")
     @GetMapping("/unread-count")
     public R<Long> unreadCount() {
         return R.ok(portalService.unreadCount());
     }
 
-    @SaCheckPermission("dcs:announcement:list")
+    @SaCheckPermission("smartdock:announcement:list")
     @GetMapping("/{noticeId}")
     public R<SysNotice> detail(@PathVariable Long noticeId) {
         return R.ok(portalService.detail(noticeId));
     }
 
-    @SaCheckPermission("dcs:announcement:list")
+    @SaCheckPermission("smartdock:announcement:list")
     @PostMapping("/{noticeId}/read")
     public R<Void> read(@PathVariable Long noticeId) {
         portalService.markRead(noticeId);

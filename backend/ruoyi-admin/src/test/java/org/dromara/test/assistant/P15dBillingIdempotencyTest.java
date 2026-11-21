@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * P0-T15d 探针：计费幂等并发（实测⑮之四，安全五连测卡4，零模型成本，真 PG）。
  * <p>X-01 边界修订（计划 Task 15 Step4）：**不写正式 wallet/ledger/usage 业务表**——
- * 用 agentscope schema 下 dcs_p0_probe_* 探针三表+审计表，等价复刻 **spec §9 目标态**
+ * 用 agentscope schema 下 p0_probe_* 探针三表+审计表，等价复刻 **spec §9 目标态**
  * record() 幂等语义（runId:seq 锚点 + usage/ledger 同事务 + 唯一索引；现状代码=usageId
  * 单据级无事务的差距由 T16 列入一站前置改造清单，本探针不复刻现状）。</p>
  * <p>判据：</p>
@@ -53,7 +53,7 @@ class P15dBillingIdempotencyTest {
 
     @BeforeAll
     static void note() {
-        System.out.println("[P15d] 探针表=agentscope.dcs_p0_probe_{wallet,ledger,usage,audit}（不碰正式业务表）");
+        System.out.println("[P15d] 探针表=agentscope.p0_probe_{wallet,ledger,usage,audit}（不碰正式业务表）");
     }
 
     @AfterAll
@@ -76,7 +76,7 @@ class P15dBillingIdempotencyTest {
             }
             int u, l;
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO agentscope.dcs_p0_probe_usage"
+                    "INSERT INTO agentscope.p0_probe_usage"
                     + " (idempotency_key, user_key, run_id, seq, tokens_in, tokens_out, unit_price, amount)"
                     + " VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (idempotency_key) DO NOTHING")) {
                 ps.setString(1, anchor);
@@ -90,7 +90,7 @@ class P15dBillingIdempotencyTest {
                 u = ps.executeUpdate();
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO agentscope.dcs_p0_probe_ledger"
+                    "INSERT INTO agentscope.p0_probe_ledger"
                     + " (idempotency_key, user_key, run_id, seq, amount, direction)"
                     + " VALUES (?,?,?,?,?,'OUT') ON CONFLICT (idempotency_key) DO NOTHING")) {
                 ps.setString(1, anchor);
@@ -105,7 +105,7 @@ class P15dBillingIdempotencyTest {
                 return "REPLAY";
             }
             try (PreparedStatement ps = conn.prepareStatement(
-                    "UPDATE agentscope.dcs_p0_probe_wallet SET balance = balance - ? WHERE user_key = ?")) {
+                    "UPDATE agentscope.p0_probe_wallet SET balance = balance - ? WHERE user_key = ?")) {
                 ps.setBigDecimal(1, amount);
                 ps.setString(2, USER_KEY);
                 ps.executeUpdate();
@@ -124,7 +124,7 @@ class P15dBillingIdempotencyTest {
     private String registerRunId(Connection conn, String runId, String userKey) throws SQLException {
         int reg;
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO agentscope.dcs_p0_probe_run_registry (run_id, user_key)"
+                "INSERT INTO agentscope.p0_probe_run_registry (run_id, user_key)"
                 + " VALUES (?, ?) ON CONFLICT (run_id) DO NOTHING")) {
             ps.setString(1, runId);
             ps.setString(2, userKey);
@@ -135,7 +135,7 @@ class P15dBillingIdempotencyTest {
         }
         String owner;
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT user_key FROM agentscope.dcs_p0_probe_run_registry WHERE run_id = ?")) {
+                "SELECT user_key FROM agentscope.p0_probe_run_registry WHERE run_id = ?")) {
             ps.setString(1, runId);
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();
@@ -149,7 +149,7 @@ class P15dBillingIdempotencyTest {
     private void auditReplay(String anchor, String detail) throws SQLException {
         try (Connection c = ds.getConnection();
              PreparedStatement ps = c.prepareStatement(
-                 "INSERT INTO agentscope.dcs_p0_probe_audit (event, idempotency_key, user_key, detail)"
+                 "INSERT INTO agentscope.p0_probe_audit (event, idempotency_key, user_key, detail)"
                  + " VALUES ('REPLAY_REJECTED', ?, ?, ?)")) {
             ps.setString(1, anchor);
             ps.setString(2, USER_KEY);
@@ -174,7 +174,7 @@ class P15dBillingIdempotencyTest {
     private BigDecimal walletBalance() throws SQLException {
         try (Connection c = ds.getConnection();
              PreparedStatement ps = c.prepareStatement(
-                 "SELECT balance FROM agentscope.dcs_p0_probe_wallet WHERE user_key = ?")) {
+                 "SELECT balance FROM agentscope.p0_probe_wallet WHERE user_key = ?")) {
             ps.setString(1, USER_KEY);
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();
@@ -187,40 +187,40 @@ class P15dBillingIdempotencyTest {
     void fiftyConcurrentRoundsReconcileThreeWaysAndReplaysRejected() throws Exception {
         // 建表（幂等）+ 行级清零 + 播种钱包
         try (Connection c = ds.getConnection(); java.sql.Statement st = c.createStatement()) {
-            st.execute("CREATE TABLE IF NOT EXISTS agentscope.dcs_p0_probe_wallet ("
+            st.execute("CREATE TABLE IF NOT EXISTS agentscope.p0_probe_wallet ("
                 + "user_key varchar(64) PRIMARY KEY, balance numeric(14,6) NOT NULL)");
             // 坑68 实证修正：钱包 4 位小数会逐行舍入 6 位精度的 ledger 金额（0.017550→0.0175，
             // 三方对账失真）——生产三表必须同精度。探针表就地升 6 位（幂等）。
-            st.execute("ALTER TABLE agentscope.dcs_p0_probe_wallet"
+            st.execute("ALTER TABLE agentscope.p0_probe_wallet"
                 + " ALTER COLUMN balance TYPE numeric(14,6)");
-            st.execute("CREATE TABLE IF NOT EXISTS agentscope.dcs_p0_probe_ledger ("
+            st.execute("CREATE TABLE IF NOT EXISTS agentscope.p0_probe_ledger ("
                 + "id bigserial PRIMARY KEY, idempotency_key varchar(128) NOT NULL UNIQUE, "
                 + "user_key varchar(64) NOT NULL, run_id varchar(64) NOT NULL, seq int NOT NULL, "
                 + "amount numeric(14,6) NOT NULL, direction varchar(3) NOT NULL, "
                 + "created_at timestamptz NOT NULL DEFAULT now())");
-            st.execute("CREATE TABLE IF NOT EXISTS agentscope.dcs_p0_probe_usage ("
+            st.execute("CREATE TABLE IF NOT EXISTS agentscope.p0_probe_usage ("
                 + "id bigserial PRIMARY KEY, idempotency_key varchar(128) NOT NULL UNIQUE, "
                 + "user_key varchar(64) NOT NULL, run_id varchar(64) NOT NULL, seq int NOT NULL, "
                 + "tokens_in int NOT NULL, tokens_out int NOT NULL, unit_price numeric(14,8) NOT NULL, "
                 + "amount numeric(14,6) NOT NULL, created_at timestamptz NOT NULL DEFAULT now())");
-            st.execute("CREATE TABLE IF NOT EXISTS agentscope.dcs_p0_probe_audit ("
+            st.execute("CREATE TABLE IF NOT EXISTS agentscope.p0_probe_audit ("
                 + "id bigserial PRIMARY KEY, event varchar(32) NOT NULL, "
                 + "idempotency_key varchar(128), user_key varchar(64), detail text, "
                 + "created_at timestamptz NOT NULL DEFAULT now())");
             // 旧表补列（四审 k3 加 user_key 维度；IF NOT EXISTS 不改已建表——幂等 ALTER）
-            st.execute("ALTER TABLE agentscope.dcs_p0_probe_audit"
+            st.execute("ALTER TABLE agentscope.p0_probe_audit"
                 + " ADD COLUMN IF NOT EXISTS user_key varchar(64)");
             // 三审 k3 P0-3：spec §9 三件套① runId 服务端登记制——首见落库绑定 user，复用须归属匹配
-            st.execute("CREATE TABLE IF NOT EXISTS agentscope.dcs_p0_probe_run_registry ("
+            st.execute("CREATE TABLE IF NOT EXISTS agentscope.p0_probe_run_registry ("
                 + "run_id varchar(64) PRIMARY KEY, user_key varchar(64) NOT NULL, "
                 + "created_at timestamptz NOT NULL DEFAULT now())");
-            for (String t : List.of("dcs_p0_probe_wallet", "dcs_p0_probe_ledger", "dcs_p0_probe_usage")) {
+            for (String t : List.of("p0_probe_wallet", "p0_probe_ledger", "p0_probe_usage")) {
                 st.execute("DELETE FROM agentscope." + t
-                    + (t.equals("dcs_p0_probe_wallet") ? "" : " WHERE user_key = '" + USER_KEY + "'"));
+                    + (t.equals("p0_probe_wallet") ? "" : " WHERE user_key = '" + USER_KEY + "'"));
             }
             // audit 表无 user_key 列——按幂等锚点前缀清（与本测试 RUN_ID 绑定）
-            st.execute("DELETE FROM agentscope.dcs_p0_probe_audit WHERE idempotency_key LIKE 'assistant:978311:" + RUN_ID + ":%'");
-            st.execute("INSERT INTO agentscope.dcs_p0_probe_wallet (user_key, balance) VALUES ('"
+            st.execute("DELETE FROM agentscope.p0_probe_audit WHERE idempotency_key LIKE 'assistant:978311:" + RUN_ID + ":%'");
+            st.execute("INSERT INTO agentscope.p0_probe_wallet (user_key, balance) VALUES ('"
                 + USER_KEY + "', " + WALLET_SEED.toPlainString() + ")");
         }
 
@@ -310,8 +310,8 @@ class P15dBillingIdempotencyTest {
         }
 
         // ===== 三方对账（spec §13：Σledger OUT = Σusage 金额 = 钱包扣减额；逐行 tokens×单价）=====
-        BigDecimal sumLedger = sum("dcs_p0_probe_ledger");
-        BigDecimal sumUsage = sum("dcs_p0_probe_usage");
+        BigDecimal sumLedger = sum("p0_probe_ledger");
+        BigDecimal sumUsage = sum("p0_probe_usage");
         BigDecimal walletDelta = WALLET_SEED.subtract(walletBalance());
         BigDecimal expected = BigDecimal.ZERO;
         for (int i = 1; i <= n; i++) {
@@ -342,7 +342,7 @@ class P15dBillingIdempotencyTest {
         int audits;
         try (Connection c = ds.getConnection();
              PreparedStatement ps = c.prepareStatement(
-                 "SELECT COUNT(*) FROM agentscope.dcs_p0_probe_audit WHERE event = 'REPLAY_REJECTED'"
+                 "SELECT COUNT(*) FROM agentscope.p0_probe_audit WHERE event = 'REPLAY_REJECTED'"
                  + " AND idempotency_key LIKE 'assistant:978311:" + RUN_ID + ":%'");
              ResultSet rs = ps.executeQuery()) {
             rs.next();
@@ -353,11 +353,11 @@ class P15dBillingIdempotencyTest {
 
         // 三审修正：行级清空从"仅运行前"补成"断言后也清"——探针行不留库（表结构仍留 T16 diff 处置）
         try (Connection c = ds.getConnection(); java.sql.Statement st = c.createStatement()) {
-            for (String t : List.of("dcs_p0_probe_wallet", "dcs_p0_probe_ledger", "dcs_p0_probe_usage")) {
+            for (String t : List.of("p0_probe_wallet", "p0_probe_ledger", "p0_probe_usage")) {
                 st.execute("DELETE FROM agentscope." + t
-                    + (t.equals("dcs_p0_probe_wallet") ? "" : " WHERE user_key = '" + USER_KEY + "'"));
+                    + (t.equals("p0_probe_wallet") ? "" : " WHERE user_key = '" + USER_KEY + "'"));
             }
-            st.execute("DELETE FROM agentscope.dcs_p0_probe_audit WHERE idempotency_key LIKE 'assistant:978311:" + RUN_ID + ":%'");
+            st.execute("DELETE FROM agentscope.p0_probe_audit WHERE idempotency_key LIKE 'assistant:978311:" + RUN_ID + ":%'");
         }
         System.out.println("[P15d] 断言后行级清空完成（库中探针行归零）");
     }

@@ -46,7 +46,7 @@ class G5QuotaTest {
         if (ks != null && !ks.isEmpty()) {
             RedisUtils.deleteObject(ks);
         }
-        exec("DELETE FROM dcs_tenant_wallet_ledger WHERE wallet_id=" + FAKE_WALLET);
+        exec("DELETE FROM tenant_wallet_ledger WHERE wallet_id=" + FAKE_WALLET);
     }
 
     @Test
@@ -74,7 +74,7 @@ class G5QuotaTest {
     void budgetGateReadsLedgerTruth() throws Exception {
         String today = LocalDate.now(ZoneId.of("Asia/Shanghai")).format(DAY);
         // 今日扣费 100 元（伪钱包分区, 不碰真实流水链；amount 恒正+direction OUT 为账本真身口径）
-        exec("INSERT INTO dcs_tenant_wallet_ledger (ledger_id, wallet_id, tenant_id, service_code, biz_type,"
+        exec("INSERT INTO tenant_wallet_ledger (ledger_id, wallet_id, tenant_id, service_code, biz_type,"
             + " biz_id, direction, amount, currency, balance_before, balance_after, idempotency_key, del_flag, create_time)"
             + " VALUES (" + (System.nanoTime() % 100000000L + 2100000000000000000L) + ", " + FAKE_WALLET
             + ", '" + TENANT + "', 'AI_ASSISTANT_CHAT', 'DEDUCT', 1, 'OUT', 100, 'CNY', 100, 0,"

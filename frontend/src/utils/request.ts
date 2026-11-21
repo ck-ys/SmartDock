@@ -174,7 +174,7 @@ service.interceptors.response.use(
               // 保留的 userId 恰好等于"401 发生时的登录者", 归属章才有效; 勿在 logout 里顺手清 userId,
               // 否则章盖不出来, 换人保护退化为无章(深链语义)
               const uid = useUserStore().userId;
-              if (uid) sessionStorage.setItem('dcs:login-redirect-owner', String(uid));
+              if (uid) sessionStorage.setItem('login-redirect-owner', String(uid));
             } catch (e) {
               // storage 不可用时退化为无章(等同深链语义), 不阻断退出流程
             }

@@ -12,11 +12,11 @@ import java.io.Serializable;
  * AI 助手用户额度覆盖（业务批3-③ #16，2026-10-12）。
  *
  * <p>单人维度的回合/联网次数上限覆盖 + 禁用开关；无行=该用户跟随租户默认
- * （dcs_assistant_config 的 daily_round_limit_per_user / 批④的 websearch_limit_per_user）。
+ * （assistant_config 的 daily_round_limit_per_user / 批④的 websearch_limit_per_user）。
  * (tenant_id, user_id) 唯一——一名用户至多一行事实行，重复操作=更新。</p>
  */
 @Data
-@TableName("dcs_assistant_user_quota")
+@TableName("assistant_user_quota")
 public class AssistantUserQuota implements Serializable {
 
     @Serial

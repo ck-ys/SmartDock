@@ -24,7 +24,7 @@ import java.util.Set;
  */
 @Data
 @Component
-@ConfigurationProperties(prefix = "dcs.wallet.reconcile")
+@ConfigurationProperties(prefix = "wallet.reconcile")
 public class WalletReconcileProperties {
 
     /** 已知余额差额基线(钱包ID→差额): 差额与基线一致静默, 漂移(含方向)上报; 未登记钱包非零差额即上报 */

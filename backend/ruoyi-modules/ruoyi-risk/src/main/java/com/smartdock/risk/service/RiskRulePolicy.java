@@ -1,7 +1,7 @@
 package com.smartdock.risk.service;
 
 import org.dromara.common.core.exception.ServiceException;
-import com.smartdock.risk.domain.DcsRiskRule;
+import com.smartdock.risk.domain.RiskRule;
 import org.springframework.stereotype.Component;
 
 import java.util.regex.Pattern;
@@ -16,7 +16,7 @@ public class RiskRulePolicy {
     public static final String SCOPE_GLOBAL = "GLOBAL";
     private static final Pattern EVENT_TYPE_PATTERN = Pattern.compile("[A-Z][A-Z0-9_]{0,39}");
 
-    public void prepareCreate(DcsRiskRule rule) {
+    public void prepareCreate(RiskRule rule) {
         if (SCOPE_GLOBAL.equals(rule.getRuleScope())) {
             throw new ServiceException("全局规则由系统初始化，不能手工新增");
         }
@@ -26,7 +26,7 @@ public class RiskRulePolicy {
         validate(rule);
     }
 
-    public void prepareUpdate(DcsRiskRule rule, DcsRiskRule existing) {
+    public void prepareUpdate(RiskRule rule, RiskRule existing) {
         if (existing == null) {
             throw new ServiceException("风控规则不存在");
         }
@@ -39,7 +39,7 @@ public class RiskRulePolicy {
         validate(rule);
     }
 
-    public void assertDeletable(DcsRiskRule rule) {
+    public void assertDeletable(RiskRule rule) {
         if (rule == null) {
             throw new ServiceException("风控规则不存在");
         }
@@ -48,7 +48,7 @@ public class RiskRulePolicy {
         }
     }
 
-    private void validate(DcsRiskRule rule) {
+    private void validate(RiskRule rule) {
         if (rule.getEventType() == null || !EVENT_TYPE_PATTERN.matcher(rule.getEventType()).matches()) {
             throw new ServiceException("事件类型必须由大写字母、数字或下划线组成，且不超过 40 个字符");
         }
@@ -80,7 +80,7 @@ public class RiskRulePolicy {
         return value != null && value >= 1 && value <= 100;
     }
 
-    private void clearClientControlledFields(DcsRiskRule rule) {
+    private void clearClientControlledFields(RiskRule rule) {
         rule.setTenantId(null);
         rule.setCreateDept(null);
         rule.setCreateBy(null);

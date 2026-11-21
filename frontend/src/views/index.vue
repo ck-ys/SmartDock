@@ -96,7 +96,7 @@
         </ul>
         <footer class="ov-panel__foot">
           <button type="button" class="ov-link" @click="go('/insight/profile')">用户画像 →</button>
-          <button type="button" class="ov-link" @click="go('/dcs/todo')">任务中心 →</button>
+          <button type="button" class="ov-link" @click="go('/smartdock/todo')">任务中心 →</button>
         </footer>
       </section>
     </div>
@@ -123,15 +123,15 @@
         </header>
         <ul class="ov-rows">
           <li>
-            <button type="button" class="k" @click="go('/dcs/todo')">待我完成</button>
+            <button type="button" class="k" @click="go('/smartdock/todo')">待我完成</button>
             <span class="v">{{ statNum('todo') }}</span>
           </li>
           <li>
-            <button type="button" class="k" @click="go('/dcs/todo')">已提交待审</button>
+            <button type="button" class="k" @click="go('/smartdock/todo')">已提交待审</button>
             <span class="v">{{ statNum('pendingAudit') }}</span>
           </li>
           <li>
-            <button type="button" class="k" @click="go('/dcs/notice')">未读消息</button>
+            <button type="button" class="k" @click="go('/notice')">未读消息</button>
             <span class="v">{{ statNum('unreadNotices') }}</span>
           </li>
         </ul>
@@ -161,12 +161,12 @@
 
 <script setup name="Index" lang="ts">
 import { Refresh } from '@element-plus/icons-vue';
-import { getAnalyticsOverview, getAnalyticsTrend, type AnalyticsOverview, type AnalyticsTrendPoint } from '@/api/dcs/core/analytics';
-import { getOverview, type ProfileOverview } from '@/api/dcs/core/profile';
-import { statsOverview, type DcsStatsOverview } from '@/api/dcs/core/task';
-import { getAssistantStatus } from '@/api/dcs/assistant';
-import { listChangelog } from '@/api/dcs/changelog';
-import type { ChangelogRow } from '@/api/dcs/changelog/types';
+import { getAnalyticsOverview, getAnalyticsTrend, type AnalyticsOverview, type AnalyticsTrendPoint } from '@/api/smartdock/core/analytics';
+import { getOverview, type ProfileOverview } from '@/api/smartdock/core/profile';
+import { statsOverview, type StatsOverview } from '@/api/smartdock/core/task';
+import { getAssistantStatus } from '@/api/smartdock/assistant';
+import { listChangelog } from '@/api/smartdock/changelog';
+import type { ChangelogRow } from '@/api/smartdock/changelog/types';
 import { checkPermi } from '@/utils/permission';
 import { autoPickSource, useSourceEmpty, useSourceOptions } from '@/composables/useProfileSources';
 import { useWindowSize } from '@vueuse/core';
@@ -174,7 +174,7 @@ import { useWindowSize } from '@vueuse/core';
 const router = useRouter();
 const { width: viewportWidth } = useWindowSize();
 
-const stats = ref<DcsStatsOverview | null>(null);
+const stats = ref<StatsOverview | null>(null);
 const statsError = ref(false);
 const profile = ref<ProfileOverview | null>(null);
 const profileError = ref(false);
@@ -206,7 +206,7 @@ const canProfile = computed(() => checkPermi(['profile:score:query']));
 const canAnalytics = computed(() => checkPermi(['analytics:center:query']));
 const canReview = computed(() => checkPermi(['profile:review:query']));
 /** 首页直问是发 window 事件给壳层助手抽屉；没这个权限抽屉不会接，卡片摆出来就是死按钮 */
-const canAsk = computed(() => checkPermi(['dcs:assistant:use']));
+const canAsk = computed(() => checkPermi(['smartdock:assistant:use']));
 // 2026-10-30 题1：按钮数字跟复核队列走（抽屉里排几条就显示几），不再拿低分人数冒充
 const reviewCount = computed(() => Number(profile.value?.pendingReviewCount ?? 0));
 
@@ -362,7 +362,7 @@ function ask(text?: string) {
     ElMessage.warning('管理员还没配置 AI 模型，配好即可用');
     return;
   }
-  window.dispatchEvent(new CustomEvent('dcs:assistant-ask', { detail: { q } }));
+  window.dispatchEvent(new CustomEvent('assistant-ask', { detail: { q } }));
   askText.value = '';
 }
 

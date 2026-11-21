@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.dromara.common.core.exception.ServiceException;
-import com.smartdock.risk.domain.DcsRiskAction;
-import com.smartdock.risk.mapper.DcsRiskActionMapper;
+import com.smartdock.risk.domain.RiskAction;
+import com.smartdock.risk.mapper.RiskActionMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -29,14 +29,14 @@ class RiskActionServiceUnitTest {
     static void initTableInfo() {
         TableInfoHelper.initTableInfo(
             new MapperBuilderAssistant(new MybatisConfiguration(), "risk-action-service"),
-            DcsRiskAction.class);
+            RiskAction.class);
     }
 
     @Test
     void releasedDecisionSuppressesSameOrLowerRiskUntilOriginalExpiry() {
-        DcsRiskActionMapper mapper = mock(DcsRiskActionMapper.class);
+        RiskActionMapper mapper = mock(RiskActionMapper.class);
         RiskActionService service = new RiskActionService(mapper, new RiskActionPolicy());
-        DcsRiskAction released = action("RELEASED", "DISMISSED");
+        RiskAction released = action("RELEASED", "DISMISSED");
         released.setActionId(9L);
         released.setRiskScore(80);
         released.setSourceTrack("USER");
@@ -44,37 +44,37 @@ class RiskActionServiceUnitTest {
         when(mapper.update(any(), any())).thenReturn(0);
         when(mapper.selectOne(any())).thenReturn(null, released);
 
-        DcsRiskAction result = service.syncAssessment("200001",
+        RiskAction result = service.syncAssessment("200001",
             assessment(7L, 80, RiskScoreService.LEVEL_L4, "USER"), "test");
 
         assertThat(result).isNull();
-        verify(mapper, never()).insert(any(DcsRiskAction.class));
+        verify(mapper, never()).insert(any(RiskAction.class));
     }
 
     @Test
     void higherNewRiskCanRecreateActionAfterManualRelease() {
-        DcsRiskActionMapper mapper = mock(DcsRiskActionMapper.class);
+        RiskActionMapper mapper = mock(RiskActionMapper.class);
         RiskActionService service = new RiskActionService(mapper, new RiskActionPolicy());
-        DcsRiskAction released = action("RELEASED", "DISMISSED");
+        RiskAction released = action("RELEASED", "DISMISSED");
         released.setRiskScore(80);
         released.setSourceTrack("USER");
         released.setExpireTime(new Date(System.currentTimeMillis() + 60_000));
         when(mapper.update(any(), any())).thenReturn(0);
         when(mapper.selectOne(any())).thenReturn(null, released);
-        when(mapper.insert(any(DcsRiskAction.class))).thenReturn(1);
+        when(mapper.insert(any(RiskAction.class))).thenReturn(1);
 
-        DcsRiskAction result = service.syncAssessment("200001",
+        RiskAction result = service.syncAssessment("200001",
             assessment(7L, 90, RiskScoreService.LEVEL_L4, "USER"), "test");
 
         assertThat(result).isNotNull();
-        verify(mapper, times(1)).insert(any(DcsRiskAction.class));
+        verify(mapper, times(1)).insert(any(RiskAction.class));
     }
 
     @Test
     void dismissReviewUsesOneAtomicUpdateAndReleasesActiveAction() {
-        DcsRiskActionMapper mapper = mock(DcsRiskActionMapper.class);
+        RiskActionMapper mapper = mock(RiskActionMapper.class);
         RiskActionService service = new RiskActionService(mapper, new RiskActionPolicy());
-        DcsRiskAction pending = action("ACTIVE", "PENDING");
+        RiskAction pending = action("ACTIVE", "PENDING");
         when(mapper.update(any(), any())).thenReturn(0, 1);
         when(mapper.selectOne(any())).thenReturn(pending);
 
@@ -85,7 +85,7 @@ class RiskActionServiceUnitTest {
 
     @Test
     void missingTenantScopedActionCannotBeReviewed() {
-        DcsRiskActionMapper mapper = mock(DcsRiskActionMapper.class);
+        RiskActionMapper mapper = mock(RiskActionMapper.class);
         RiskActionService service = new RiskActionService(mapper, new RiskActionPolicy());
         when(mapper.update(any(), any())).thenReturn(0);
         when(mapper.selectOne(any())).thenReturn(null);
@@ -95,8 +95,8 @@ class RiskActionServiceUnitTest {
             .hasMessageContaining("不属于当前租户");
     }
 
-    private DcsRiskAction action(String status, String reviewStatus) {
-        DcsRiskAction action = new DcsRiskAction();
+    private RiskAction action(String status, String reviewStatus) {
+        RiskAction action = new RiskAction();
         action.setActionId(9L);
         action.setTenantId("200001");
         action.setUserId(7L);

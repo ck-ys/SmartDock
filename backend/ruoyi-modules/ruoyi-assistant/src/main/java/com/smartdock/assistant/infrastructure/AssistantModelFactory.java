@@ -1,7 +1,7 @@
 package com.smartdock.assistant.infrastructure;
 
 import cn.hutool.crypto.digest.DigestUtil;
-import com.smartdock.assistant.legacy.factory.HeaderDecoratedTransport;
+import com.smartdock.assistant.engine.factory.HeaderDecoratedTransport;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.transport.HttpTransport;
@@ -12,7 +12,7 @@ import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.ai.AiNotConfiguredException;
-import com.smartdock.domain.DcsAiConfig;
+import com.smartdock.domain.AiConfig;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -20,12 +20,12 @@ import java.util.Map;
 /**
  * 助手模型工厂（批A Task A1，P1 计划 2026-10-03）。
  *
- * <p>职责：按租户解析 dcs_ai_config 启用行并构建 AgentScope OpenAI 兼容流式模型。
+ * <p>职责：按租户解析 ai_config 启用行并构建 AgentScope OpenAI 兼容流式模型。
  * 配置行四个参数逐项透传（前置#11 兜底件）：temperature/maxTokens 走 {@link GenerateOptions}，
  * contextWindow 走 {@code contextWindowSize}（越界保护用），apiKey 经 MyBatis 加密插件查出即解密。</p>
  *
  * <p>口径纪律（J 批一期 2026-10-08；批3 Q11 扩链）：配置解析委托
- * {@code IDcsAiConfigService} 单点族（resolveConfigById / resolveEnabledConfig，CNY 闸同源），
+ * {@code IAiConfigService} 单点族（resolveConfigById / resolveEnabledConfig，CNY 闸同源），
  * 本类不再自带查询——此前 configId 升序与单发路 updateTime 倒序各查各的，同租户多条启用时两路选不同行。
  * 批3 起优先级链=助手默认槽→接口默认★→最近可用行（详见 {@link #resolveConfig}）。
  * 无可用行抛 {@link AiNotConfiguredException} 禁静默回退平台侧
@@ -40,7 +40,7 @@ public class AssistantModelFactory {
     private static final int DEFAULT_CONTEXT_WINDOW = 128000;
 
     /** OPENCODE Go 网关官方要求的自报客户端标识（docs/go：勿用通用 SDK 名） */
-    private static final String SELF_UA = "dcs-assistant/1.0";
+    private static final String SELF_UA = "smartdock-assistant/1.0";
 
     /**
      * OPENCODE 底层传输层共享单例（三审 P2-1）：每 (user,thread) 建 agent 各 new 一个 OkHttpTransport
@@ -64,7 +64,7 @@ public class AssistantModelFactory {
     }
 
     /**
-     * goal 加固 H2：把 dcs_ai_config.timeout_seconds 映射到 transport 超时族。
+     * goal 加固 H2：把 ai_config.timeout_seconds 映射到 transport 超时族。
      * 语义对齐探测端（整请求超时）：connect 取 min(30,t) 防长超时配置把建连也拖长，
      * read/response/streamIdle=t（流式档=帧间停滞上限，深思考模型推理增量持续到达即不断）。
      * 下限 5s 对齐探测端 Math.max(5,t)，防误配 1s 把正常请求秒断。
@@ -93,18 +93,18 @@ public class AssistantModelFactory {
     }
 
     /** J 批一期：配置解析委托单点解析器（本类不再自带查询+CNY 闸） */
-    private final com.smartdock.service.IDcsAiConfigService aiConfigService;
+    private final com.smartdock.service.IAiConfigService aiConfigService;
 
     /** 稳流① Q8③：轻快侧车思考可关判定（能力目录查询） */
-    private final com.smartdock.assistant.legacy.service.CapabilityService capabilityService;
+    private final com.smartdock.assistant.service.CapabilityService capabilityService;
     /** 批3 Q11：助手默认槽（AI 助手管理页设置，优先于接口默认星标） */
-    private final com.smartdock.assistant.legacy.service.AssistantModelSettingService modelSettingService;
+    private final com.smartdock.assistant.service.AssistantModelSettingService modelSettingService;
     /** 题5 案1（2026-10-31）：自选模型回退默认链时给对话落一条提示（不再静默换模型） */
-    private final com.smartdock.assistant.legacy.core.AssistantModelDegradeSignal degradeSignal;
+    private final com.smartdock.assistant.engine.core.AssistantModelDegradeSignal degradeSignal;
 
     /**
      * 按租户解析生效 CHAT 配置行（批3 Q11 优先级链）：
-     * 助手默认槽（dcs_assistant_model_setting 指向行，须仍可用+过 CNY 闸）
+     * 助手默认槽（assistant_model_setting 指向行，须仍可用+过 CNY 闸）
      * → 接口默认解析器 {@code resolveEnabledConfig}（★默认行→最近可用行+同源 CNY 闸）。
      *
      * <p>助手默认槽失效（指向行被停用/删除/价格被改非 CNY）=静默回退接口默认并 warn 留痕
@@ -115,7 +115,7 @@ public class AssistantModelFactory {
      * @return 生效配置行
      * @throws AiNotConfiguredException 全链无可用配置或 CNY 闸不过
      */
-    public DcsAiConfig resolveConfig(String tenantId) {
+    public AiConfig resolveConfig(String tenantId) {
         Long settingConfigId = modelSettingService.findAssistantDefaultConfigId(tenantId);
         if (settingConfigId != null) {
             try {
@@ -166,9 +166,9 @@ public class AssistantModelFactory {
      * 这类模型时两侧车同命，属配置面问题不归护栏管）。判定经能力目录 tierValues 含
      * none/off/disabled 之一=可关；NONE（无思考能力）天然可关；目录不可达放宽放行（不因护栏误伤）。</p>
      */
-    public DcsAiConfig resolveLightweightConfig(String tenantId) {
+    public AiConfig resolveLightweightConfig(String tenantId) {
         try {
-            DcsAiConfig cheap = aiConfigService.resolveCheapestEnabledConfig(tenantId, "CHAT");
+            AiConfig cheap = aiConfigService.resolveCheapestEnabledConfig(tenantId, "CHAT");
             if (cheap != null && thinkingDismissible(tenantId, cheap)) {
                 return cheap;
             }
@@ -188,9 +188,9 @@ public class AssistantModelFactory {
      * none/off/disabled（大小写不敏感）=可关；其余（如 low~max 全开档）=不可关。
      * 能力目录异常=放宽放行（护栏不因目录不可达误伤侧车）。
      */
-    private boolean thinkingDismissible(String tenantId, DcsAiConfig cfg) {
+    private boolean thinkingDismissible(String tenantId, AiConfig cfg) {
         try {
-            com.smartdock.assistant.legacy.service.CapabilityService.CapabilityVo cap =
+            com.smartdock.assistant.service.CapabilityService.CapabilityVo cap =
                 capabilityService.matchCapability(tenantId, cfg.getProvider(), cfg.getModelName());
             if (cap == null || cap.getTierKind() == null || "NONE".equals(cap.getTierKind())) {
                 return true;
@@ -206,9 +206,9 @@ public class AssistantModelFactory {
         }
     }
 
-    public DcsAiConfig resolveConfigWithUserChoice(String tenantId, String threadId) {
+    public AiConfig resolveConfigWithUserChoice(String tenantId, String threadId) {
         if (threadId != null) {
-            Long picked = com.smartdock.assistant.legacy.core.AssistantModelChoiceHolder.get(threadId);
+            Long picked = com.smartdock.assistant.engine.core.AssistantModelChoiceHolder.get(threadId);
             if (picked != null) {
                 // 题5 案1：三条回退路径都留人话原因，回退完成后落一条对话提示（不再静默换模型）
                 String fallbackReason = null;
@@ -232,7 +232,7 @@ public class AssistantModelFactory {
                         }
                     }
                 }
-                DcsAiConfig fallback = resolveConfig(tenantId);
+                AiConfig fallback = resolveConfig(tenantId);
                 degradeSignal.submit(threadId,
                     fallbackReason + "，本回合改用「" + modelLabel(fallback) + "」回答");
                 return fallback;
@@ -242,7 +242,7 @@ public class AssistantModelFactory {
     }
 
     /** 降级提示里的模型显示名（模型名优先，空则配置号兜底——绝不显示 null） */
-    public static String modelLabel(DcsAiConfig cfg) {
+    public static String modelLabel(AiConfig cfg) {
         if (cfg == null) {
             return "默认模型";
         }
@@ -256,7 +256,7 @@ public class AssistantModelFactory {
      * @param cfg 启用配置行
      * @return OpenAI 兼容流式模型
      */
-    public Model buildModel(DcsAiConfig cfg) {
+    public Model buildModel(AiConfig cfg) {
         return buildModel(cfg, null);
     }
 
@@ -267,7 +267,7 @@ public class AssistantModelFactory {
      * @param threadId 会话线程 ID（OPENCODE Go 网关的 x-opencode-session 用——每会话稳定
      *                 利于服务端路由与 prompt 缓存；其它厂商忽略该参数）
      */
-    public Model buildModel(DcsAiConfig cfg, String threadId) {
+    public Model buildModel(AiConfig cfg, String threadId) {
         // Q5 防线：Anthropic/Responses 格式尚未接入对话主链，用明确人话拒绝——
         // 否则 OpenAI 客户端会把请求发到 Anthropic 地址, 用户只看到厂商 404
         if (cfg.getApiFormat() != null
@@ -323,7 +323,7 @@ public class AssistantModelFactory {
      * 超长值被网关 4xx；哈希后恒为定长 ASCII，且租户前缀防跨租户共享网关会话路由/prompt 缓存。
      * 哈希对同一 thread 恒等——「每会话稳定」的网关路由语义不受影响。</p>
      */
-    private static String gatewaySessionOf(DcsAiConfig cfg, String threadId) {
+    private static String gatewaySessionOf(AiConfig cfg, String threadId) {
         String raw = threadId == null || threadId.isBlank() ? "sessionless" : threadId;
         return "dcs-" + cfg.getTenantId() + "-" + DigestUtil.sha256Hex(raw).substring(0, 24);
     }

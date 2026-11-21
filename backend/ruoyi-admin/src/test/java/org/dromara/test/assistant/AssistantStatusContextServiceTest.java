@@ -5,12 +5,12 @@ import com.smartdock.assistant.domain.gateway.PromptCatalogGateway;
 import com.smartdock.assistant.domain.model.DigestResult;
 import com.smartdock.assistant.domain.vo.ContextBreakdownVo;
 import com.smartdock.assistant.infrastructure.AssistantModelFactory;
-import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
+import com.smartdock.assistant.engine.core.MemoryInjectModelDecorator;
 import com.smartdock.assistant.query.AssistantStatusContextService;
 import com.smartdock.assistant.service.AssistantMemoryService;
 import com.smartdock.assistant.service.AssistantSkillVisibilityService;
 import com.smartdock.assistant.support.ContextBreakdownEstimator;
-import com.smartdock.domain.DcsAiConfig;
+import com.smartdock.domain.AiConfig;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -98,7 +98,7 @@ class AssistantStatusContextServiceTest {
             when(f.resolveConfigWithUserChoice(anyString(), any())).thenThrow(new IllegalStateException("模型未配置"));
             return f;
         }
-        DcsAiConfig cfg = new DcsAiConfig();
+        AiConfig cfg = new AiConfig();
         cfg.setContextWindow(window);
         when(f.resolveConfigWithUserChoice(anyString(), any())).thenReturn(cfg);
         return f;

@@ -12,8 +12,8 @@ import java.util.List;
  * 钱包对账巡检 Mapper(批C 2026-09-24): 三项只读检查的自定义聚合 SQL。
  *
  * <p>钱包/流水表同属跨租户管理(定时线程无租户上下文), 与
- * {@link DcsTenantWalletMapper} 一致关闭租户拦截器; SQL 在
- * resources/mapper/dcs/WalletReconcileMapper.xml。</p>
+ * {@link TenantWalletMapper} 一致关闭租户拦截器; SQL 在
+ * resources/mapper/WalletReconcileMapper.xml。</p>
  *
  * @author smartdock
  */

@@ -3,32 +3,32 @@ package com.smartdock.ai;
 import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.domain.DcsAiConfig;
+import com.smartdock.domain.AiConfig;
 import com.smartdock.mapper.AssistantBackendDefaultMapper;
-import com.smartdock.service.IDcsAiConfigService;
-import com.smartdock.service.support.DcsAiChatClientFactory;
-import com.smartdock.service.support.DcsAiChatClientFactory.CallOverrides;
+import com.smartdock.service.IAiConfigService;
+import com.smartdock.service.support.AiChatClientFactory;
+import com.smartdock.service.support.AiChatClientFactory.CallOverrides;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 /**
  * AI 服务门面实现（2026-09-24 拍板 Q3:B；J 批一期 2026-10-08 两路解析统一走单点解析器）。
  *
- * <p>唯一允许注入 {@link DcsAiChatClientFactory} 的业务入口（车间内部化）；
+ * <p>唯一允许注入 {@link AiChatClientFactory} 的业务入口（车间内部化）；
  * 计费/重试/扣钱包链路全部留在工厂内不动，门面只做：配置解析 + 委托 + 元数据回执。</p>
  *
  * <p>配置解析（业务反馈批1015c Q1 拍板A）：后台链（本门面全部调用方=画像诊断/字段生成/
- * 评分/规则推荐）走 {@link IDcsAiConfigService#resolveBackendConfig}（后台默认槽
+ * 评分/规则推荐）走 {@link IAiConfigService#resolveBackendConfig}（后台默认槽
  * →接口默认★→最近可用，槽失效静默回退，存量租户零迁移兼容）。
  * HTTP 路透传 ServiceException（原语义，调用方按该类型降级）；MQ 显式租户路转译
  * {@link AiNotConfiguredException}（AiScoreEnhancer 捕获降级）。</p>
  *
  * <p>业务反馈 #14 追加 Q6-A（2026-10-16）：后台槽调用参数（思考档/最大输出）在配置解析
- * 后从 dcs_assistant_model_setting 槽行读取（跨模块只读 mapper），思考档经
+ * 后从 assistant_model_setting 槽行读取（跨模块只读 mapper），思考档经
  * {@link AiCapabilityPort}（assistant 模块实现）翻译成 reasoning_effort 后与最大输出
  * 一并作为 {@link CallOverrides} 传入工厂——槽参数只在实际解析到的模型 == 槽指向时
  * 生效（槽失效回退 ★ 的行不吃旧槽参数）。槽参数缺省（空槽/无行/无端口实现）时行为
- * 与改造前完全一致（沿用 dcs_ai_config 行的 max_tokens/reasoning_effort）。</p>
+ * 与改造前完全一致（沿用 ai_config 行的 max_tokens/reasoning_effort）。</p>
  *
  * @author smartdock
  */
@@ -40,10 +40,10 @@ public class AiGatewayImpl implements AiGateway {
     private static final String USE_TYPE_EMBEDDING = "EMBEDDING";
 
     /** AI 配置服务(单点解析器入口) */
-    private final IDcsAiConfigService aiConfigService;
+    private final IAiConfigService aiConfigService;
     /** AI 客户端工厂(模型调用/重试/计费/扣钱包, 仅本类注入) */
-    private final DcsAiChatClientFactory factory;
-    /** 后台槽参数只读(dcs_assistant_model_setting, 跨模块直查) */
+    private final AiChatClientFactory factory;
+    /** 后台槽参数只读(assistant_model_setting, 跨模块直查) */
     private final AssistantBackendDefaultMapper backendDefaultMapper;
     /** 模型能力端口(assistant 模块实现; 缺实现=不注入思考参数, billing 单测上下文防线) */
     private final ObjectProvider<AiCapabilityPort> capabilityPort;
@@ -51,7 +51,7 @@ public class AiGatewayImpl implements AiGateway {
     @Override
     public AiChatResult chat(AiChatCommand command) {
         // 无配置时 service 抛 ServiceException(原语义直接传播, 各调用方行为不变)
-        DcsAiConfig config = aiConfigService.resolveBackendConfig();
+        AiConfig config = aiConfigService.resolveBackendConfig();
         return doChat(config, command);
     }
 
@@ -61,7 +61,7 @@ public class AiGatewayImpl implements AiGateway {
         // AiScoreEnhancer 按本异常类型降级，ServiceException 转译保留捕获语义。
         // glm53 七审 P1-2：catch 只包解析一行——doChat 运行期故障（余额不足/超时/空返回
         // 也抛 ServiceException）不得误标"配置不可用"，否则真实根因从降级日志里消失
-        final DcsAiConfig config;
+        final AiConfig config;
         try {
             config = aiConfigService.resolveBackendConfig(tenantId);
         } catch (org.dromara.common.core.exception.ServiceException e) {
@@ -72,12 +72,12 @@ public class AiGatewayImpl implements AiGateway {
 
     @Override
     public float[] embed(String text, Integer dimensions, Caller caller) {
-        DcsAiConfig config = aiConfigService.currentTenantEnabledConfig(USE_TYPE_EMBEDDING);
+        AiConfig config = aiConfigService.currentTenantEnabledConfig(USE_TYPE_EMBEDDING);
         return factory.callEmbedding(config, text, dimensions, caller.name());
     }
 
     /** 委托工厂调用并组装元数据回执(门面内部计时, 调用方免样板; Q6-A 槽参数在此注入)。 */
-    private AiChatResult doChat(DcsAiConfig config, AiChatCommand command) {
+    private AiChatResult doChat(AiConfig config, AiChatCommand command) {
         long start = System.currentTimeMillis();
         String content = factory.call(config, command.prompt(), command.forceJson(),
             command.caller().name(), resolveSlotOverrides(config));
@@ -90,7 +90,7 @@ public class AiGatewayImpl implements AiGateway {
      * 槽失效回退(★→最近可用)的行不吃旧槽参数, 防换模型后旧档位错配。
      * 任一子步骤异常都降级为"不覆盖"——参数是锦上添花, 不能反噬调用主链。
      */
-    private CallOverrides resolveSlotOverrides(DcsAiConfig config) {
+    private CallOverrides resolveSlotOverrides(AiConfig config) {
         try {
             AssistantBackendDefaultMapper.BackendCallParams params =
                 backendDefaultMapper.findBackendCallParams(config.getTenantId());
@@ -109,7 +109,7 @@ public class AiGatewayImpl implements AiGateway {
                 AiCapabilityPort port = capabilityPort.getIfAvailable();
                 if (port != null) {
                     // null=该档不注入(BALANCED/NONE/SWITCH 无通道)——空串显式清空,
-                    // 覆盖 dcs_ai_config 行可能配置的 reasoning_effort(槽语义优先)
+                    // 覆盖 ai_config 行可能配置的 reasoning_effort(槽语义优先)
                     String resolved = port.resolveBackendReasoningEffort(
                         config.getTenantId(), config.getProvider(), config.getModelName(),
                         params.thinkingTier());

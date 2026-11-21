@@ -1,6 +1,6 @@
 package com.smartdock.assistant.service;
 
-import com.smartdock.assistant.domain.model.DcsMcpServer;
+import com.smartdock.assistant.domain.model.McpServer;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -35,8 +35,8 @@ class McpServerConfigServiceWhitelistTest {
         ReflectionTestUtils.setField(svc, "allowedHttpHosts", "");
     }
 
-    private static DcsMcpServer stdio(String command, String argsJson) {
-        DcsMcpServer r = new DcsMcpServer();
+    private static McpServer stdio(String command, String argsJson) {
+        McpServer r = new McpServer();
         r.setServerName("demo_stdio");
         r.setTransportType("STDIO");
         r.setCommand(command);
@@ -44,8 +44,8 @@ class McpServerConfigServiceWhitelistTest {
         return r;
     }
 
-    private static DcsMcpServer http(String url) {
-        DcsMcpServer r = new DcsMcpServer();
+    private static McpServer http(String url) {
+        McpServer r = new McpServer();
         r.setServerName("demo_http");
         r.setTransportType("STREAMABLE_HTTP");
         r.setUrl(url);
@@ -120,7 +120,7 @@ class McpServerConfigServiceWhitelistTest {
 
     @Test
     void unknownTransportRejected() {
-        DcsMcpServer r = http("http://localhost/x");
+        McpServer r = http("http://localhost/x");
         r.setTransportType("WEBSOCKET");
         assertThatThrownBy(() -> svc.normalizeAndValidate(r))
             .hasMessageContaining("传输类型只支持");
@@ -128,14 +128,14 @@ class McpServerConfigServiceWhitelistTest {
 
     @Test
     void headersValidatedAndRejectedOnStdio() {
-        DcsMcpServer badHeader = http("http://localhost/x");
+        McpServer badHeader = http("http://localhost/x");
         badHeader.setHeaders("{\"a b\":\"1\"}");
         assertThatThrownBy(() -> svc.normalizeAndValidate(badHeader))
             .hasMessageContaining("header 键名");
 
         // STDIO 分支里 headers 校验在目录校验之后——先把目录配好，确保测的是 headers 规则本身
         ReflectionTestUtils.setField(svc, "allowedDirs", Path.of(".").toAbsolutePath().toString());
-        DcsMcpServer stdioWithHeader = stdio("node", "[]");
+        McpServer stdioWithHeader = stdio("node", "[]");
         stdioWithHeader.setHeaders("{\"X-A\":\"1\"}");
         assertThatThrownBy(() -> svc.normalizeAndValidate(stdioWithHeader))
             .hasMessageContaining("STDIO 行不支持请求头");
@@ -144,7 +144,7 @@ class McpServerConfigServiceWhitelistTest {
     @Test
     void defaultsAndOppositeTransportFieldsCleared() {
         // HTTP 行：清掉 command/args（防脏数据带进挂载侧），enabled 缺省 0
-        DcsMcpServer r = http("http://localhost:19999/sse");
+        McpServer r = http("http://localhost:19999/sse");
         r.setCommand("node");
         r.setArgs("[\"x\"]");
         svc.normalizeAndValidate(r);
@@ -154,7 +154,7 @@ class McpServerConfigServiceWhitelistTest {
 
         // STDIO 行：清掉 url；显式 enabled 保持不动
         ReflectionTestUtils.setField(svc, "allowedDirs", Path.of(".").toAbsolutePath().toString());
-        DcsMcpServer s = stdio("node", "[]");
+        McpServer s = stdio("node", "[]");
         s.setUrl("http://localhost/x");
         s.setEnabled("1");
         svc.normalizeAndValidate(s);

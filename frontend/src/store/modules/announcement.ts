@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia';
 import { reactive } from 'vue';
-import { announcementUnreadCount } from '@/api/dcs/announcement';
+import { announcementUnreadCount } from '@/api/smartdock/announcement';
 
 /**
  * 公告未读角标（N3 2026-10-23）。
  *
- * 与消息铃铛（dcs_notice）是两套口径：这里只统计「公告」页签下未读的已发布公告。
+ * 与消息铃铛（notice）是两套口径：这里只统计「公告」页签下未读的已发布公告。
  * 单飞 + 序号守卫：冷启动顶栏与公告页会并发刷，本地标读后旧快照不得覆盖新数字。
  */
 export const useAnnouncementStore = defineStore('announcement', () => {

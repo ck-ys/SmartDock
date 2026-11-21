@@ -98,7 +98,7 @@
         <!-- B1 查询工具：直用 DCS 服务（待办链），此前经 ai-billing 传递、现显式声明 -->
         <dependency>
             <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-dcs</artifactId>
+            <artifactId>ruoyi-mission</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 2026-11-05 自动化批：无人值守执行按创建人账号重建登录快照（状态/权限现查） -->
@@ -106,12 +106,12 @@
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-system</artifactId>
         </dependency>
-        <!-- 最小生产装配(T12)：DcsAiConfig 实体+Mapper（TenantHelper 经本件传递引入） -->
+        <!-- 最小生产装配(T12)：AiConfig 实体+Mapper（TenantHelper 经本件传递引入） -->
         <dependency>
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-ai-billing</artifactId>
         </dependency>
-        <!-- G4-#1：DcsMcpServer.headers @EncryptField 加解密（ai-billing 传递可达，
+        <!-- G4-#1：McpServer.headers @EncryptField 加解密（ai-billing 传递可达，
              显式声明防未来 ai-billing 裁撤本依赖时静默断链） -->
         <dependency>
             <groupId>org.dromara</groupId>

@@ -1,12 +1,12 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.core.AssistantModelChoiceHolder;
+import com.smartdock.assistant.engine.core.AssistantModelChoiceHolder;
 import com.smartdock.assistant.infrastructure.AssistantModelFactory;
-import com.smartdock.assistant.legacy.service.AssistantModelSettingService;
+import com.smartdock.assistant.service.AssistantModelSettingService;
 import org.dromara.common.core.exception.ServiceException;
 import com.smartdock.ai.AiNotConfiguredException;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.service.IDcsAiConfigService;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.service.IAiConfigService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
  * 助手模型解析优先级链单测（批3 Q11，2026-10-09；纯 mock 不连库）。
  *
  * <p>判据（Review Focus ④ 空槽回退）：
- * 助手默认槽（dcs_assistant_model_setting）→「上次成功行」→ 接口默认解析器（★→最近可用）；
+ * 助手默认槽（assistant_model_setting）→「上次成功行」→ 接口默认解析器（★→最近可用）；
  * 槽空/槽失效（指向行停用、跨租户、CNY 闸不过）=静默回退接口默认，不抛不 null；
  * 链尾仍无可用行才抛 AiNotConfiguredException（禁静默回退平台侧红线）。</p>
  *
@@ -37,10 +37,10 @@ import static org.mockito.Mockito.when;
 @Tag("dev")
 class J2AssistantModelChainTest {
 
-    private final IDcsAiConfigService aiConfigService = mock(IDcsAiConfigService.class);
+    private final IAiConfigService aiConfigService = mock(IAiConfigService.class);
     private final AssistantModelSettingService settingService = mock(AssistantModelSettingService.class);
     private final AssistantModelFactory factory = new AssistantModelFactory(aiConfigService, null, settingService,
-        new com.smartdock.assistant.legacy.core.AssistantModelDegradeSignal());
+        new com.smartdock.assistant.engine.core.AssistantModelDegradeSignal());
 
     /** Mockito 包装类型默认 0：显式置「无上次成功行」，让各用例落在自己声明的链段上 */
     @org.junit.jupiter.api.BeforeEach
@@ -52,7 +52,7 @@ class J2AssistantModelChainTest {
     @Test
     void assistantDefaultSlotWins() {
         when(settingService.findAssistantDefaultConfigId("997301")).thenReturn(42L);
-        DcsAiConfig preferred = new DcsAiConfig();
+        AiConfig preferred = new AiConfig();
         preferred.setModelName("deepseek-v4-flash");
         when(aiConfigService.resolveConfigById("997301", 42L)).thenReturn(preferred);
         assertSame(preferred, factory.resolveConfig("997301"));
@@ -65,7 +65,7 @@ class J2AssistantModelChainTest {
         when(settingService.findAssistantDefaultConfigId("997302")).thenReturn(43L);
         when(aiConfigService.resolveConfigById("997302", 43L))
             .thenThrow(new ServiceException("指定的 AI 模型配置已停用"));
-        DcsAiConfig fallback = new DcsAiConfig();
+        AiConfig fallback = new AiConfig();
         fallback.setModelName("longcat-2.5");
         when(aiConfigService.resolveEnabledConfig("997302", "CHAT")).thenReturn(fallback);
         assertSame(fallback, factory.resolveConfig("997302"), "槽失效必须回退接口默认而非抛错");
@@ -76,7 +76,7 @@ class J2AssistantModelChainTest {
     @Test
     void emptySlotGoesStraightToInterfaceDefault() {
         when(settingService.findAssistantDefaultConfigId("997303")).thenReturn(null);
-        DcsAiConfig fallback = new DcsAiConfig();
+        AiConfig fallback = new AiConfig();
         when(aiConfigService.resolveEnabledConfig("997303", "CHAT")).thenReturn(fallback);
         assertSame(fallback, factory.resolveConfig("997303"));
         verify(aiConfigService, never()).resolveConfigById(anyString(), anyLong());
@@ -113,7 +113,7 @@ class J2AssistantModelChainTest {
     void userChoiceWinsOverAssistantDefault() {
         AssistantModelChoiceHolder.set("t-b7a", 77L);
         when(settingService.allowUserSwitch("997306")).thenReturn(true);
-        DcsAiConfig picked = new DcsAiConfig();
+        AiConfig picked = new AiConfig();
         picked.setModelName("glm-5.3");
         when(aiConfigService.resolveConfigById("997306", 77L)).thenReturn(picked);
         assertSame(picked, factory.resolveConfigWithUserChoice("997306", "t-b7a"));
@@ -126,7 +126,7 @@ class J2AssistantModelChainTest {
         AssistantModelChoiceHolder.set("t-b7b", 78L);
         when(settingService.allowUserSwitch("997307")).thenReturn(false);
         when(settingService.findAssistantDefaultConfigId("997307")).thenReturn(null);
-        DcsAiConfig fallback = new DcsAiConfig();
+        AiConfig fallback = new AiConfig();
         when(aiConfigService.resolveEnabledConfig("997307", "CHAT")).thenReturn(fallback);
         assertSame(fallback, factory.resolveConfigWithUserChoice("997307", "t-b7b"));
         verify(aiConfigService, never()).resolveConfigById("997307", 78L);
@@ -140,7 +140,7 @@ class J2AssistantModelChainTest {
         when(aiConfigService.resolveConfigById("997308", 79L))
             .thenThrow(new ServiceException("指定的 AI 模型配置已停用"));
         when(settingService.findAssistantDefaultConfigId("997308")).thenReturn(null);
-        DcsAiConfig fallback = new DcsAiConfig();
+        AiConfig fallback = new AiConfig();
         when(aiConfigService.resolveEnabledConfig("997308", "CHAT")).thenReturn(fallback);
         assertSame(fallback, factory.resolveConfigWithUserChoice("997308", "t-b7c"),
             "用户所选失效必须回退默认链而非抛错");
@@ -151,7 +151,7 @@ class J2AssistantModelChainTest {
     @Test
     void noChoiceSkipsUserSegment() {
         when(settingService.findAssistantDefaultConfigId("997309")).thenReturn(null);
-        DcsAiConfig fallback = new DcsAiConfig();
+        AiConfig fallback = new AiConfig();
         when(aiConfigService.resolveEnabledConfig("997309", "CHAT")).thenReturn(fallback);
         assertSame(fallback, factory.resolveConfigWithUserChoice("997309", "t-b7d"));
         verify(settingService, never()).allowUserSwitch(anyString());

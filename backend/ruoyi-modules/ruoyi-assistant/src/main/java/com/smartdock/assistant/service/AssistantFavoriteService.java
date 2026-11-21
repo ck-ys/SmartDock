@@ -1,7 +1,7 @@
 package com.smartdock.assistant.service;
 
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.domain.model.DcsAssistantFavorite;
+import com.smartdock.assistant.domain.model.AssistantFavorite;
 import com.smartdock.assistant.mapper.AssistantFavoriteMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
@@ -20,7 +20,7 @@ public class AssistantFavoriteService {
 
     /** 上限（与前端 favStore MAX 一致；改=前后端同步） */
     public static final int MAX = 6;
-    /** 内容上限（=dcs_assistant_favorite.content 列宽） */
+    /** 内容上限（=assistant_favorite.content 列宽） */
     public static final int MAX_LEN = 200;
 
     private final AssistantFavoriteMapper favoriteMapper;
@@ -28,7 +28,7 @@ public class AssistantFavoriteService {
     /** 用户收藏清单（新→旧） */
     public List<String> list(String tenantId, Long userId) {
         return favoriteMapper.listByUser(tenantId, userId)
-            .stream().map(DcsAssistantFavorite::getContent).toList();
+            .stream().map(AssistantFavorite::getContent).toList();
     }
 
     /** 新增（去重+上限 6+长度校验；返回最新清单，前端免二次拉取） */
@@ -40,14 +40,14 @@ public class AssistantFavoriteService {
         if (t.length() > MAX_LEN) {
             throw new ServiceException("收藏内容超过 " + MAX_LEN + " 字，换短一点的问法吧");
         }
-        List<DcsAssistantFavorite> cur = favoriteMapper.listByUser(tenantId, userId);
+        List<AssistantFavorite> cur = favoriteMapper.listByUser(tenantId, userId);
         if (cur.size() >= MAX) {
             throw new ServiceException("最多收藏 " + MAX + " 条，先删一条再收");
         }
         if (cur.stream().anyMatch(f -> f.getContent().equals(t))) {
-            return cur.stream().map(DcsAssistantFavorite::getContent).toList();
+            return cur.stream().map(AssistantFavorite::getContent).toList();
         }
-        DcsAssistantFavorite row = new DcsAssistantFavorite();
+        AssistantFavorite row = new AssistantFavorite();
         row.setTenantId(tenantId);
         row.setUserId(userId);
         row.setContent(t);

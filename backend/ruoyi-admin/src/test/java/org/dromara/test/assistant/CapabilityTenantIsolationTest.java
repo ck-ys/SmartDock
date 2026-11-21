@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.service.CapabilityService;
-import com.smartdock.assistant.legacy.service.CapabilityService.CapabilityVo;
+import com.smartdock.assistant.service.CapabilityService;
+import com.smartdock.assistant.service.CapabilityService.CapabilityVo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -44,12 +44,12 @@ class CapabilityTenantIsolationTest {
     @BeforeEach
     void seedFixtures() throws Exception {
         cleanFixtures();
-        exec("INSERT INTO dcs_ai_model_capability (id, tenant_id, provider, model_pattern, tier_kind,"
+        exec("INSERT INTO ai_model_capability (id, tenant_id, provider, model_pattern, tier_kind,"
             + " tier_values, semantic_map, source, rule_order) VALUES ("
             + "9199150000000001, '000000', 'ZZCAPISO', '^zz-seed-.*$', 'TIERS',"
             + " '[\"low\",\"high\",\"max\"]', '{\"FAST\":\"low\",\"BALANCED\":\"high\",\"DEEP\":\"max\"}',"
             + " 'SEED', 50)");
-        exec("INSERT INTO dcs_ai_model_capability (id, tenant_id, provider, model_pattern, tier_kind,"
+        exec("INSERT INTO ai_model_capability (id, tenant_id, provider, model_pattern, tier_kind,"
             + " tier_values, semantic_map, source, rule_order) VALUES ("
             + "9199150000000002, '000000', 'ZZCAPISO', '^zz-leak-.*$', 'SWITCH',"
             + " '[\"disabled\",\"enabled\"]', '{\"FAST\":\"disabled\",\"BALANCED\":\"enabled\",\"DEEP\":\"enabled\"}',"
@@ -58,7 +58,7 @@ class CapabilityTenantIsolationTest {
 
     @AfterEach
     void cleanFixtures() throws Exception {
-        exec("DELETE FROM dcs_ai_model_capability WHERE provider='ZZCAPISO'");
+        exec("DELETE FROM ai_model_capability WHERE provider='ZZCAPISO'");
     }
 
     /** ①SEED 共享不受收紧影响：其它租户仍命中 000000 的 SEED 行 */

@@ -4,11 +4,11 @@ import cn.hutool.core.util.StrUtil;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.domain.DcsFileReview;
-import com.smartdock.domain.DcsFileReviewConfig;
+import com.smartdock.domain.FileReview;
+import com.smartdock.domain.FileReviewConfig;
 import com.smartdock.enums.FileReviewCategory;
-import com.smartdock.mapper.DcsFileReviewMapper;
-import com.smartdock.service.IDcsFileReviewConfigService;
+import com.smartdock.mapper.FileReviewMapper;
+import com.smartdock.service.IFileReviewConfigService;
 import org.dromara.system.event.OssFileUploadedEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -37,8 +37,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OssUploadedEventListener {
 
-    private final IDcsFileReviewConfigService configService;
-    private final DcsFileReviewMapper reviewMapper;
+    private final IFileReviewConfigService configService;
+    private final FileReviewMapper reviewMapper;
 
     /**
      * 上传建单：决定该文件是否进入待审队列并回写 reviewStatus。
@@ -48,7 +48,7 @@ public class OssUploadedEventListener {
         // ⓪ file-guard 强制进审：优先级最高——无视配置开关/管理员豁免/类目勾选
         //    （安全层保护下载者，与内容审核的豁免是两回事）
         if (StrUtil.isNotBlank(e.getGuardReason())) {
-            DcsFileReview guardReview = buildReview(e, "PENDING");
+            FileReview guardReview = buildReview(e, "PENDING");
             guardReview.setGuardReason(e.getGuardReason());
             reviewMapper.insert(guardReview);
             e.setReviewStatus("PENDING");
@@ -56,14 +56,14 @@ public class OssUploadedEventListener {
         }
         // ⓪.5 反馈截图/助手附件豁免：受众=本人+管理员，免人工审但必须留痕（EXEMPT）。
         //    bizSource 是客户端可伪造参数，纯 SKIPPED 零留痕会让伪造未审文件被再引用传播——
-        //    闸门对陌生人拦（DcsFileReviewGateImpl），留痕字段事后可追查。
+        //    闸门对陌生人拦（FileReviewGateImpl），留痕字段事后可追查。
         if ("FEEDBACK".equals(e.getBizSource()) || "ASSISTANT".equals(e.getBizSource())) {
             reviewMapper.insert(buildReview(e, "EXEMPT"));
             e.setReviewStatus("SKIPPED");
             return;
         }
         // ① 功能整体关闭（查无行/开关!='1'）→ 不建单直通（关开关只影响新上传，存量单仍可审）
-        DcsFileReviewConfig cfg = configService.getEffective();
+        FileReviewConfig cfg = configService.getEffective();
         if (!"1".equals(cfg.getEnabled())) {
             e.setReviewStatus("SKIPPED");
             return;
@@ -85,8 +85,8 @@ public class OssUploadedEventListener {
     }
 
     /** 组装审核单（昵称取不到时空串兜底——本监听器异常会把整笔上传回滚，判空防 NPE） */
-    private DcsFileReview buildReview(OssFileUploadedEvent e, String status) {
-        DcsFileReview review = new DcsFileReview();
+    private FileReview buildReview(OssFileUploadedEvent e, String status) {
+        FileReview review = new FileReview();
         review.setOssId(e.getOssId());
         review.setFileName(e.getOriginalName());
         review.setFileCategory(FileReviewCategory.classify(e.getSuffix()).name());

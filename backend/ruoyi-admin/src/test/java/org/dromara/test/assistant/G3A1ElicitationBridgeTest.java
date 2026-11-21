@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
 import io.modelcontextprotocol.spec.McpSchema;
-import com.smartdock.assistant.legacy.core.AssistantElicitationBridge;
+import com.smartdock.assistant.engine.core.AssistantElicitationBridge;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

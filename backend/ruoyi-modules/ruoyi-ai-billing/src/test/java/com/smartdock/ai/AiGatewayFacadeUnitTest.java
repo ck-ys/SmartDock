@@ -4,11 +4,11 @@ import org.dromara.common.core.exception.ServiceException;
 import com.smartdock.ai.AiGateway.AiChatCommand;
 import com.smartdock.ai.AiGateway.AiChatResult;
 import com.smartdock.ai.AiGateway.Caller;
-import com.smartdock.domain.DcsAiConfig;
+import com.smartdock.domain.AiConfig;
 import com.smartdock.mapper.AssistantBackendDefaultMapper;
-import com.smartdock.service.IDcsAiConfigService;
-import com.smartdock.service.support.DcsAiChatClientFactory;
-import com.smartdock.service.support.DcsAiChatClientFactory.CallOverrides;
+import com.smartdock.service.IAiConfigService;
+import com.smartdock.service.support.AiChatClientFactory;
+import com.smartdock.service.support.AiChatClientFactory.CallOverrides;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
  * ③ embed 走 EMBEDDING 配置并携带 caller(计费归属行为锁)。
  *
  * <p>J 批一期起 MQ 直查 mapper 已删, 两路径统一走单点解析器
- * (查询形状锁随迁至 DcsAiConfigQueryShapeUnitTest, 本类不再锁形状)。
+ * (查询形状锁随迁至 AiConfigQueryShapeUnitTest, 本类不再锁形状)。
  * 批1015c Q1 起 CHAT 两路径改走 resolveBackendConfig（后台默认槽→单点解析器，
  * 槽逻辑在 service 实测, 本类只锁门面委托契约）；EMBEDDING 仍 currentTenantEnabledConfig。</p>
  *
@@ -38,9 +38,9 @@ import static org.mockito.Mockito.when;
 class AiGatewayFacadeUnitTest {
 
     @Mock
-    private IDcsAiConfigService aiConfigService;
+    private IAiConfigService aiConfigService;
     @Mock
-    private DcsAiChatClientFactory factory;
+    private AiChatClientFactory factory;
     @Mock
     private AssistantBackendDefaultMapper backendDefaultMapper;
     @Mock
@@ -50,8 +50,8 @@ class AiGatewayFacadeUnitTest {
         return new AiGatewayImpl(aiConfigService, factory, backendDefaultMapper, capabilityPort);
     }
 
-    private DcsAiConfig config(String tenantId, String provider, String model) {
-        DcsAiConfig c = new DcsAiConfig();
+    private AiConfig config(String tenantId, String provider, String model) {
+        AiConfig c = new AiConfig();
         c.setConfigId(1L);
         c.setTenantId(tenantId);
         c.setProvider(provider);
@@ -64,7 +64,7 @@ class AiGatewayFacadeUnitTest {
     @Test
     @Tag("dev")
     void chatDelegatesVerbatimAndMapsResultMeta() {
-        DcsAiConfig cfg = config("000000", "deepseek", "deepseek-chat");
+        AiConfig cfg = config("000000", "deepseek", "deepseek-chat");
         when(aiConfigService.resolveBackendConfig()).thenReturn(cfg);
         when(factory.call(cfg, "写一首诗", true, "SCORE_RULE_RECOMMEND", null)).thenReturn("{\"poem\":\"...\"}");
 
@@ -106,7 +106,7 @@ class AiGatewayFacadeUnitTest {
     @Test
     @Tag("dev")
     void chatForTenantResolvesViaSinglePointResolverAndDelegates() {
-        DcsAiConfig cfg = config("900001", "openai", "gpt-4o-mini");
+        AiConfig cfg = config("900001", "openai", "gpt-4o-mini");
         when(aiConfigService.resolveBackendConfig("900001")).thenReturn(cfg);
         when(factory.call(cfg, "算分", true, "SCORE_ENHANCE", null)).thenReturn("ok");
 
@@ -121,7 +121,7 @@ class AiGatewayFacadeUnitTest {
     @Tag("dev")
     void slotParamsInjectWhenConfigMatchesSlot() {
         // Q6-A: 槽指向==解析到的模型 → tier 经端口翻译成 reasoning_effort, maxTokens 直传
-        DcsAiConfig cfg = config("000000", "deepseek", "deepseek-v4-pro");
+        AiConfig cfg = config("000000", "deepseek", "deepseek-v4-pro");
         cfg.setConfigId(42L);
         when(aiConfigService.resolveBackendConfig()).thenReturn(cfg);
         when(backendDefaultMapper.findBackendCallParams("000000"))
@@ -141,7 +141,7 @@ class AiGatewayFacadeUnitTest {
     @Tag("dev")
     void slotParamsIgnoredWhenConfigFallsBackToStar() {
         // Q6-A: 槽指向≠实际解析到的模型(槽失效回退★) → 不吃旧槽参数, 覆盖=null=存量行为
-        DcsAiConfig cfg = config("000000", "openai", "gpt-4o-mini");
+        AiConfig cfg = config("000000", "openai", "gpt-4o-mini");
         cfg.setConfigId(7L);
         when(aiConfigService.resolveBackendConfig("000000")).thenReturn(cfg);
         when(backendDefaultMapper.findBackendCallParams("000000"))
@@ -157,7 +157,7 @@ class AiGatewayFacadeUnitTest {
     @Tag("dev")
     void embedUsesEmbeddingConfigAndCarriesCaller() {
         // caller 行为锁: 门面强制携带 PROFILE_EMBEDDING(与旧三参重载的默认值一致, 计费口径不变)
-        DcsAiConfig cfg = config("000000", "openai", "text-embedding-3-small");
+        AiConfig cfg = config("000000", "openai", "text-embedding-3-small");
         when(aiConfigService.currentTenantEnabledConfig("EMBEDDING")).thenReturn(cfg);
         float[] vector = new float[]{0.1f, 0.2f};
         when(factory.callEmbedding(cfg, "画像文本", 1024, "PROFILE_EMBEDDING")).thenReturn(vector);

@@ -4,8 +4,8 @@ import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.tool.Toolkit;
 import com.smartdock.assistant.support.AssistantWebSearchHolder;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.engine.core.ToolRegistry;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -54,7 +54,7 @@ class ToolRegistryGuardTest {
         org.mockito.Mockito.mock(org.dromara.common.core.service.ConfigService.class);
 
     static {
-        org.mockito.Mockito.when(KEY_CONFIG.getConfigValue(com.smartdock.assistant.legacy.tools.WebSearchTools.CONFIG_KEY))
+        org.mockito.Mockito.when(KEY_CONFIG.getConfigValue(com.smartdock.assistant.engine.tools.WebSearchTools.CONFIG_KEY))
             .thenReturn("sk-guard-test");
     }
 
@@ -147,12 +147,12 @@ class ToolRegistryGuardTest {
      *  权限门共用本方法——null 拒 / 裸 * 与 *:*:* 通配放行 / 精确串才比对。 */
     @Test
     void wildcardOrContainsSemantics() {
-        assertTrue(ToolRegistry.wildcardOrContains(java.util.Set.of("*:*:*"), "dcs:task:add"), "*:*:* 超管真实形态放行");
-        assertTrue(ToolRegistry.wildcardOrContains(java.util.Set.of("*"), "dcs:task:add"), "裸 * 放行");
-        assertTrue(ToolRegistry.wildcardOrContains(java.util.Set.of("dcs:task:add"), "dcs:task:add"), "精确串放行");
-        assertFalse(ToolRegistry.wildcardOrContains(java.util.Set.of("dcs:task:list"), "dcs:task:add"), "无 add 且非通配拒");
-        assertFalse(ToolRegistry.wildcardOrContains(null, "dcs:task:add"), "null 拒");
-        assertFalse(ToolRegistry.wildcardOrContains(java.util.Set.of(), "dcs:task:add"), "空集拒");
+        assertTrue(ToolRegistry.wildcardOrContains(java.util.Set.of("*:*:*"), "smartdock:task:add"), "*:*:* 超管真实形态放行");
+        assertTrue(ToolRegistry.wildcardOrContains(java.util.Set.of("*"), "smartdock:task:add"), "裸 * 放行");
+        assertTrue(ToolRegistry.wildcardOrContains(java.util.Set.of("smartdock:task:add"), "smartdock:task:add"), "精确串放行");
+        assertFalse(ToolRegistry.wildcardOrContains(java.util.Set.of("smartdock:task:list"), "smartdock:task:add"), "无 add 且非通配拒");
+        assertFalse(ToolRegistry.wildcardOrContains(null, "smartdock:task:add"), "null 拒");
+        assertFalse(ToolRegistry.wildcardOrContains(java.util.Set.of(), "smartdock:task:add"), "空集拒");
     }
 
     /** ③权限口径守卫：平台工具全 ALLOW（坑71 回归防线；ASK 型确认卡工具只在 SPI 侧注册）。 */

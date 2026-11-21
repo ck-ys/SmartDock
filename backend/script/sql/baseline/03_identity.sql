@@ -48,5 +48,5 @@ VALUES
   (4, '000000', 'qcloud', 'XXXXXXXXXXXXXXX',     'XXXXXXXXXXXXXXX',     'ruoyi',      '', 'cos.ap-beijing.myqcloud.com', '', '0', '', '1', '0', NULL, 103, 1, now());
 
 -- 租户主钱包: 零余额起步（充值/赠送后变动）
-INSERT INTO dcs_tenant_wallet (wallet_id, tenant_id, wallet_type, parent_wallet_id, balance_amount, frozen_amount, currency, status, low_balance_threshold, negative_allowed, remark, version, create_dept, create_by, create_time, del_flag)
+INSERT INTO tenant_wallet (wallet_id, tenant_id, wallet_type, parent_wallet_id, balance_amount, frozen_amount, currency, status, low_balance_threshold, negative_allowed, remark, version, create_dept, create_by, create_time, del_flag)
 VALUES (900000000000004001, '000000', 'MAIN', NULL, 0, 0, 'CNY', 'ACTIVE', 1, 0, '基线初始化', 0, 103, 1, now(), '0');

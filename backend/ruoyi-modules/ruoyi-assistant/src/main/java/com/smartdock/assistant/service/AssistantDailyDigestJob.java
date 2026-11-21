@@ -1,13 +1,13 @@
 package com.smartdock.assistant.service;
 
 import com.baomidou.lock.annotation.Lock4j;
-import com.smartdock.dcs.domain.DcsNotice;
-import com.smartdock.dcs.domain.DcsSubmission;
-import com.smartdock.dcs.domain.DcsTask;
-import com.smartdock.dcs.mapper.DcsTaskMapper;
-import com.smartdock.dcs.mapper.DcsUserLookupMapper;
-import com.smartdock.dcs.service.DcsNoticeService;
-import com.smartdock.dcs.service.DcsSubmissionService;
+import com.smartdock.mission.domain.Notice;
+import com.smartdock.mission.domain.Submission;
+import com.smartdock.mission.domain.Task;
+import com.smartdock.mission.mapper.TaskMapper;
+import com.smartdock.mission.mapper.UserLookupMapper;
+import com.smartdock.mission.service.NoticeService;
+import com.smartdock.mission.service.SubmissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.domain.gateway.TenantConfigGateway;
@@ -51,10 +51,10 @@ public class AssistantDailyDigestJob {
     /** 批 8B 红桥：摘要开关租户清单只拿 ID，legacy 配置行不进门 */
     private final TenantConfigGateway tenantConfig;
     private final AssistantAutomationService automationService;
-    private final DcsTaskMapper taskMapper;
-    private final DcsSubmissionService submissionService;
-    private final DcsNoticeService noticeService;
-    private final DcsUserLookupMapper userLookupMapper;
+    private final TaskMapper taskMapper;
+    private final SubmissionService submissionService;
+    private final NoticeService noticeService;
+    private final UserLookupMapper userLookupMapper;
 
     @Lock4j(keys = {"'assistant-daily-digest'"})
     @Scheduled(cron = "0 0 8 * * ?")
@@ -92,10 +92,10 @@ public class AssistantDailyDigestJob {
 
     /** 单租户: 按 COLLECTING 任务聚合出每个发布人的未交摘要; 返回发出的通知数 */
     int pushTenant(String tenantId) {
-        List<DcsTask> tasks = taskMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DcsTask>()
-                .eq(DcsTask::getStatus, DcsTask.STATUS_COLLECTING)
-                .orderByAsc(DcsTask::getDeadline)
+        List<Task> tasks = taskMapper.selectList(
+            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Task>()
+                .eq(Task::getStatus, Task.STATUS_COLLECTING)
+                .orderByAsc(Task::getDeadline)
                 .last("LIMIT " + (MAX_TASKS_PER_TENANT + 1)));
         // 审查席 P2：多取 1 条判真截断——超 100 时日志明说，不静默吞掉第 101 个以后的未交
         boolean overCap = tasks.size() > MAX_TASKS_PER_TENANT;
@@ -108,7 +108,7 @@ public class AssistantDailyDigestJob {
         }
         // 发布人 → (任务, 未交成员) 列表
         Map<Long, List<Map<String, Object>>> byPublisher = new LinkedHashMap<>();
-        for (DcsTask task : tasks) {
+        for (Task task : tasks) {
             List<Long> unsubmitted = unsubmittedOf(task);
             if (unsubmitted.isEmpty()) {
                 continue;
@@ -144,7 +144,7 @@ public class AssistantDailyDigestJob {
         int used = 0;
         int dropped = 0;
         for (Map<String, Object> row : rows) {
-            DcsTask task = (DcsTask) row.get("task");
+            Task task = (Task) row.get("task");
             @SuppressWarnings("unchecked")
             List<Long> unsubmitted = (List<Long>) row.get("unsubmitted");
             String line = describeTask(task.getTitle(), task.getDeadline(), today,
@@ -162,12 +162,12 @@ public class AssistantDailyDigestJob {
         String title = "今日未交摘要（" + rows.size() + " 个任务）";
         String content = String.join("\n", lines);
         // 显式传租户：调度线程没登录态，靠上下文兜底在单租户部署里会抛「缺少租户上下文」
-        return noticeService.notifyIdem(tenantId, publisher, DcsNotice.TYPE_TASK_DIGEST, title, content, null,
+        return noticeService.notifyIdem(tenantId, publisher, Notice.TYPE_TASK_DIGEST, title, content, null,
             dedupKey(tenantId, publisher, today));
     }
 
     /** 任务没有「已交」提交的目标成员（被退回待重提=没交） */
-    private List<Long> unsubmittedOf(DcsTask task) {
+    private List<Long> unsubmittedOf(Task task) {
         List<Long> out = new ArrayList<>();
         for (Long uid : task.assigneeList()) {
             var latest = submissionService.latestOf(task.getId(), uid);
@@ -192,9 +192,9 @@ public class AssistantDailyDigestJob {
 
     // ---------------------------------------------------------------- 纯函数（单测锚点）
 
-    /** 已交口径: 提交在途待审或已通过都算交了; 无提交/被退回=没交（状态串用 DcsSubmission 常量，防改名静默漂移） */
+    /** 已交口径: 提交在途待审或已通过都算交了; 无提交/被退回=没交（状态串用 Submission 常量，防改名静默漂移） */
     static boolean countsAsSubmitted(String latestStatus) {
-        return DcsSubmission.STATUS_PENDING_AUDIT.equals(latestStatus) || DcsSubmission.STATUS_APPROVED.equals(latestStatus);
+        return Submission.STATUS_PENDING_AUDIT.equals(latestStatus) || Submission.STATUS_APPROVED.equals(latestStatus);
     }
 
     /** 幂等键: 同一租户同一发布人同一天只落一条（防锁漂移重跑重复推送） */

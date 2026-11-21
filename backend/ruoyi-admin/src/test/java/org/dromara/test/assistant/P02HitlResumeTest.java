@@ -16,8 +16,8 @@ import io.agentscope.core.tool.Tool;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.extensions.model.openai.OpenAIChatModel;
 import io.agentscope.extensions.model.openai.compat.deepseek.DeepSeekFormatter;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.mapper.DcsAiConfigMapper;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.mapper.AiConfigMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +52,7 @@ class P02HitlResumeTest {
     private static final long CONFIG_ID = 9100000000003L;
 
     @Autowired
-    DcsAiConfigMapper aiConfigMapper;
+    AiConfigMapper aiConfigMapper;
 
     /** 催办写工具（HITL 标的） */
     static class RemindTools {
@@ -71,7 +71,7 @@ class P02HitlResumeTest {
         }
     }
 
-    private Model buildModel(DcsAiConfig cfg) {
+    private Model buildModel(AiConfig cfg) {
         return OpenAIChatModel.builder()
             .baseUrl(cfg.getBaseUrl()).apiKey(cfg.getApiKey()).modelName(cfg.getModelName())
             .stream(false).formatter(new DeepSeekFormatter()).build();
@@ -84,7 +84,7 @@ class P02HitlResumeTest {
      */
     @Test
     void hitlInterruptAndResume() {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
 
         PermissionContextState permission = PermissionContextState.builder()
@@ -169,7 +169,7 @@ class P02HitlResumeTest {
     /** Step2 反例：恢复时改 args 一个字段（editedArgs 模拟）→ 记录框架行为（预期照单全收，坐实防篡改必要性） */
     @Test
     void resumeWithTamperedArgsRecordsFrameworkBehavior() {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         assertNotNull(cfg);
         PermissionContextState permission = PermissionContextState.builder()
             .addAskRule("*", new PermissionRule("act_remind", "", PermissionBehavior.ASK, "p0-probe"))
@@ -299,7 +299,7 @@ class P02HitlResumeTest {
 
     /** Step3 共用：带 PG 持久 stateStore 的 agent（T11 装配配方复用） */
     private ReActAgent buildPersistedAgent() {
-        DcsAiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
+        AiConfig cfg = aiConfigMapper.selectById(CONFIG_ID);
         PermissionContextState permission = PermissionContextState.builder()
             .addAskRule("*", new PermissionRule("act_remind", "", PermissionBehavior.ASK, "p0-probe"))
             .build();

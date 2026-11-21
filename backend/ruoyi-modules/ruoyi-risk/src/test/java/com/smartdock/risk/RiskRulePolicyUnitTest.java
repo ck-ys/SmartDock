@@ -1,6 +1,6 @@
 package com.smartdock.risk;
 
-import com.smartdock.risk.domain.DcsRiskRule;
+import com.smartdock.risk.domain.RiskRule;
 import com.smartdock.risk.service.RiskRulePolicy;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -17,8 +17,8 @@ class RiskRulePolicyUnitTest {
 
     @Test
     void preservesGlobalIdentityAndZeroWeightOnUpdate() {
-        DcsRiskRule existing = rule("GLOBAL", "GLOBAL", 0, 20, 40, 60, 80);
-        DcsRiskRule update = rule("TAMPERED", "EVENT", 9, 10, 30, 50, 70);
+        RiskRule existing = rule("GLOBAL", "GLOBAL", 0, 20, 40, 60, 80);
+        RiskRule update = rule("TAMPERED", "EVENT", 9, 10, 30, 50, 70);
 
         policy.prepareUpdate(update, existing);
 
@@ -29,7 +29,7 @@ class RiskRulePolicyUnitTest {
 
     @Test
     void rejectsThresholdsThatAreNotStrictlyIncreasing() {
-        DcsRiskRule update = rule("LOGIN_FAIL", "EVENT", 3, 20, 20, 60, 80);
+        RiskRule update = rule("LOGIN_FAIL", "EVENT", 3, 20, 20, 60, 80);
 
         assertThatThrownBy(() -> policy.prepareUpdate(update, update))
             .hasMessageContaining("L1 < L2 < L3 < L4");
@@ -37,7 +37,7 @@ class RiskRulePolicyUnitTest {
 
     @Test
     void rejectsCreatingAnotherGlobalRule() {
-        DcsRiskRule create = rule("OTHER_GLOBAL", "GLOBAL", 0, 20, 40, 60, 80);
+        RiskRule create = rule("OTHER_GLOBAL", "GLOBAL", 0, 20, 40, 60, 80);
 
         assertThatThrownBy(() -> policy.prepareCreate(create))
             .hasMessageContaining("全局规则由系统初始化");
@@ -45,7 +45,7 @@ class RiskRulePolicyUnitTest {
 
     @Test
     void rejectsDeletingTheGlobalRule() {
-        DcsRiskRule global = rule("GLOBAL", "GLOBAL", 0, 20, 40, 60, 80);
+        RiskRule global = rule("GLOBAL", "GLOBAL", 0, 20, 40, 60, 80);
 
         assertThatThrownBy(() -> policy.assertDeletable(global))
             .hasMessageContaining("全局聚合规则不能删除");
@@ -53,7 +53,7 @@ class RiskRulePolicyUnitTest {
 
     @Test
     void clearsClientControlledIdentityAndAuditFieldsOnCreate() {
-        DcsRiskRule create = rule("LOGIN_FAIL", "EVENT", 3, 20, 40, 60, 80);
+        RiskRule create = rule("LOGIN_FAIL", "EVENT", 3, 20, 40, 60, 80);
         create.setRuleId(99L);
         create.setTenantId("forged");
         create.setCreateDept(91L);
@@ -75,8 +75,8 @@ class RiskRulePolicyUnitTest {
 
     @Test
     void clearsClientControlledTenantAndCreationAuditFieldsOnUpdate() {
-        DcsRiskRule existing = rule("LOGIN_FAIL", "EVENT", 3, 20, 40, 60, 80);
-        DcsRiskRule update = rule("TAMPERED", "GLOBAL", 4, 10, 30, 50, 70);
+        RiskRule existing = rule("LOGIN_FAIL", "EVENT", 3, 20, 40, 60, 80);
+        RiskRule update = rule("TAMPERED", "GLOBAL", 4, 10, 30, 50, 70);
         update.setTenantId("forged");
         update.setCreateDept(91L);
         update.setCreateBy(92L);
@@ -92,17 +92,17 @@ class RiskRulePolicyUnitTest {
 
     @Test
     void rejectsInvalidEventTypeAndOversizedDescription() {
-        DcsRiskRule invalidType = rule("login-fail", "EVENT", 3, 20, 40, 60, 80);
+        RiskRule invalidType = rule("login-fail", "EVENT", 3, 20, 40, 60, 80);
         assertThatThrownBy(() -> policy.prepareCreate(invalidType))
             .hasMessageContaining("大写字母");
 
-        DcsRiskRule oversizedDescription = rule("LOGIN_FAIL", "EVENT", 3, 20, 40, 60, 80);
+        RiskRule oversizedDescription = rule("LOGIN_FAIL", "EVENT", 3, 20, 40, 60, 80);
         oversizedDescription.setDescription("x".repeat(201));
         assertThatThrownBy(() -> policy.prepareCreate(oversizedDescription))
             .hasMessageContaining("200");
     }
 
-    private DcsRiskRule rule(
+    private RiskRule rule(
         String eventType,
         String scope,
         int weight,
@@ -111,7 +111,7 @@ class RiskRulePolicyUnitTest {
         int thresholdL3,
         int thresholdL4
     ) {
-        DcsRiskRule rule = new DcsRiskRule();
+        RiskRule rule = new RiskRule();
         rule.setEventType(eventType);
         rule.setRuleScope(scope);
         rule.setWeight(weight);

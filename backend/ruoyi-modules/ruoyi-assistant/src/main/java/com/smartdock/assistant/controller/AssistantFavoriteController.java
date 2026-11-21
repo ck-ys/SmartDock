@@ -24,7 +24,7 @@ import java.util.List;
  */
 @Tag(name = "助手常用问句收藏", description = "用户级收藏落库，换设备/换浏览器 chips 同步")
 @RestController
-@RequestMapping("/dcs/assistant/favorite")
+@RequestMapping("/assistant/favorite")
 @RequiredArgsConstructor
 public class AssistantFavoriteController extends BaseController {
 
@@ -39,21 +39,21 @@ public class AssistantFavoriteController extends BaseController {
     }
 
     /** 用户收藏清单（新→旧） */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @GetMapping("/list")
     public R<List<String>> list() {
         return R.ok(favoriteService.list(LoginHelper.getTenantId(), LoginHelper.getUserId()));
     }
 
     /** 新增收藏（上限 6；返回最新清单） */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @PostMapping("/add")
     public R<List<String>> add(@RequestBody ContentBo bo) {
         return R.ok(favoriteService.add(LoginHelper.getTenantId(), LoginHelper.getUserId(), bo.getContent()));
     }
 
     /** 删除收藏（返回最新清单） */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @PostMapping("/remove")
     public R<List<String>> remove(@RequestBody ContentBo bo) {
         return R.ok(favoriteService.remove(LoginHelper.getTenantId(), LoginHelper.getUserId(), bo.getContent()));

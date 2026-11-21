@@ -3,7 +3,7 @@ package com.smartdock.assistant.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.domain.model.DcsAssistantMemory;
+import com.smartdock.assistant.domain.model.AssistantMemory;
 import com.smartdock.assistant.service.AssistantMemoryService;
 import com.smartdock.assistant.support.AssistantMemoryFacts;
 import org.dromara.common.core.domain.R;
@@ -24,32 +24,32 @@ import java.util.Map;
 /**
  * AI 助手记忆页接口（二站④ AU-53，2026-10-08；ckys3 解锁板题7~题10 扩，2026-11-12）：
  * 本人长期记忆可查、可改、可删、可导出、可清空，并可单独开关。
- * 权限=dcs:assistant:memory:manage（菜单 11922，全员分配——端点内只操作本人数据）。
+ * 权限=smartdock:assistant:memory:manage（菜单 11922，全员分配——端点内只操作本人数据）。
  */
 @Tag(name = "助手长期记忆", description = "本人长期记忆可查可改可删可导出")
 @RestController
-@RequestMapping("/dcs/assistant/memory")
+@RequestMapping("/assistant/memory")
 @RequiredArgsConstructor
 public class AssistantMemoryController extends BaseController {
 
     private final AssistantMemoryService memoryService;
 
     /** 我的记忆清单（生效中，新→旧） */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @GetMapping("/list")
-    public R<List<DcsAssistantMemory>> list() {
+    public R<List<AssistantMemory>> list() {
         return R.ok(memoryService.listForUser(LoginHelper.getTenantId(), LoginHelper.getUserId()));
     }
 
     /** 历史清单（题7/题8/题10：被同主题替代 + 90 天归档；新→旧） */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @GetMapping("/history")
-    public R<List<DcsAssistantMemory>> history() {
+    public R<List<AssistantMemory>> history() {
         return R.ok(memoryService.listHistory(LoginHelper.getTenantId(), LoginHelper.getUserId()));
     }
 
     /** 条数用量（题7「3 / 50 条」） */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @GetMapping("/usage")
     public R<Map<String, Integer>> usage() {
         String tenantId = LoginHelper.getTenantId();
@@ -61,7 +61,7 @@ public class AssistantMemoryController extends BaseController {
 
     /** 行内编辑（题7）：与保存口同闸（长度+脱敏+去重+属主谓词）。
      *  isSaveRequestData=false：body 是用户原文（可能含 PII），审计日志只记操作不记正文。 */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @Log(title = "AI助手-编辑记忆", businessType = BusinessType.UPDATE, isSaveRequestData = false)
     @PostMapping("/{id}/edit")
     public R<Void> edit(@PathVariable Long id, @RequestBody Map<String, String> body) {
@@ -71,7 +71,7 @@ public class AssistantMemoryController extends BaseController {
     }
 
     /** 个人开关读取（题10） */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @GetMapping("/pref")
     public R<Map<String, Boolean>> pref() {
         boolean enabled = memoryService.isUserEnabled(LoginHelper.getTenantId(), LoginHelper.getUserId());
@@ -79,7 +79,7 @@ public class AssistantMemoryController extends BaseController {
     }
 
     /** 个人开关（题10）：与租户总闸与运算，租户关=全关 */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @Log(title = "AI助手-记忆开关", businessType = BusinessType.UPDATE)
     @PostMapping("/pref")
     public R<Map<String, Boolean>> setPref(@RequestBody Map<String, Boolean> body) {
@@ -89,14 +89,14 @@ public class AssistantMemoryController extends BaseController {
     }
 
     /** 导出本人全部记忆（题10：含历史/归档；前端存 JSON 文件） */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @GetMapping("/export")
-    public R<List<DcsAssistantMemory>> export() {
+    public R<List<AssistantMemory>> export() {
         return R.ok(memoryService.exportRows(LoginHelper.getTenantId(), LoginHelper.getUserId()));
     }
 
     /** 清空本人全部记忆（题10：含历史；二次确认在前端） */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @Log(title = "AI助手-清空记忆", businessType = BusinessType.DELETE)
     @PostMapping("/clear")
     public R<Map<String, Integer>> clear() {
@@ -105,7 +105,7 @@ public class AssistantMemoryController extends BaseController {
     }
 
     /** 删除一条我的记忆（属主谓词在 SQL，删他人=0 行）；铁律#21：DELETE→POST 保持路径（2026-10-16 批17 Q4，前端已同步） */
-    @SaCheckPermission("dcs:assistant:memory:manage")
+    @SaCheckPermission("smartdock:assistant:memory:manage")
     @Log(title = "AI助手-删除记忆", businessType = BusinessType.DELETE)
     @PostMapping("/{id}")
     public R<Void> remove(@PathVariable Long id) {

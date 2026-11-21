@@ -28,7 +28,7 @@
         </template>
       </el-dropdown>
       <!-- 方案一：顶栏只留 5 个——搜索 / 消息 / 外观 / 全屏 / 头像。
-           租户搬左上品牌行，反馈回头像菜单，语言/字号/主题收进外观抽屉（见 DcsAppearanceDrawer） -->
+           租户搬左上品牌行，反馈回头像菜单，语言/字号/主题收进外观抽屉（见 AppearanceDrawer） -->
       <button v-if="appStore.device !== 'mobile'" type="button" class="nav-search" aria-label="搜索页面" @click="openPalette">
         <svg-icon class="nav-search__icon" icon-class="search" />
         <span class="nav-search__label">搜索页面…</span>
@@ -69,15 +69,15 @@
 
       <!-- 头像：与左下用户行共用同一份账号菜单 -->
       <div class="avatar-container">
-        <dcs-user-menu @layout="setLayout" @feedback="requestFeedback">
+        <UserMenu @layout="setLayout" @feedback="requestFeedback">
           <div class="right-menu-item hover-effect avatar-wrapper">
             <img :src="userStore.avatar" class="user-avatar" />
             <el-icon><caret-bottom /></el-icon>
           </div>
-        </dcs-user-menu>
+        </UserMenu>
       </div>
     </div>
-    <dcs-appearance-drawer ref="appearanceDrawerRef" />
+    <AppearanceDrawer ref="appearanceDrawerRef" />
   </div>
 </template>
 
@@ -88,9 +88,9 @@ import { useSettingsStore } from '@/store/modules/settings';
 import { useNoticeStore } from '@/store/modules/notice';
 import { useAnnouncementStore } from '@/store/modules/announcement';
 import notice from './notice/index.vue';
-import DcsAppearanceDrawer from '@/components/DcsAppearanceDrawer/index.vue';
-import DcsUserMenu from '@/components/DcsUserMenu/index.vue';
-import IconSpan from '@/components/DcsAssistant/IconSpan.vue';
+import AppearanceDrawer from '@/components/AppearanceDrawer/index.vue';
+import UserMenu from '@/components/UserMenu/index.vue';
+import IconSpan from '@/components/Assistant/IconSpan.vue';
 import { ElMessage } from 'element-plus';
 import { NavTypeEnum } from '@/enums/NavTypeEnum';
 import Logo from '@/layout/components/Sidebar/Logo.vue';
@@ -140,10 +140,10 @@ const showLogo = computed(() => settingsStore.sidebarLogo);
 // 搜索入口：桌面是一条假输入框，点击开命令面板；徽标按平台显示 ⌘K / Ctrl K
 const isMac = /mac/i.test(navigator.platform);
 const shortcutLabel = isMac ? '⌘ K' : 'Ctrl K';
-const openPalette = () => window.dispatchEvent(new Event('dcs:open-palette'));
+const openPalette = () => window.dispatchEvent(new Event('open-palette'));
 
 // 交互三件 ②：外观抽屉（主题 + 密度 + 语言 + 字号）
-const appearanceDrawerRef = ref<InstanceType<typeof DcsAppearanceDrawer>>();
+const appearanceDrawerRef = ref<InstanceType<typeof AppearanceDrawer>>();
 const openAppearance = () => appearanceDrawerRef.value?.open();
 
 const toggleSideBar = () => {

@@ -1,9 +1,9 @@
 -- 2026-11-05 工作台设置页·审计分节授权（拍板 A3 / 题5 乙）
 -- 背景：智能体工作台的「设置」改成独立页后，审计从设置页进（只读，复用
---       /dcs/assistant/action/audit/* 现有接口与数据）。业务系统里的「写操作审计」
+--       /assistant/action/audit/* 现有接口与数据）。业务系统里的「写操作审计」
 --       11936 保持原样、保持 0 角色绑定——不给 admin 绑 11936，避免业务侧栏多出菜单。
 -- 做法：新增 1 条 F 型权限行 12061（menu_type=F，path 空，不生成动态路由），perms 复用
---       dcs:assistant:audit:query；再显式授给 role_key IN ('admin','tenant_admin')。
+--       smartdock:assistant:audit:query；再显式授给 role_key IN ('admin','tenant_admin')。
 -- 边界：成员角色 5 不得获得（本脚本只按 role_key 选，天然不含 member）；
 --       file_reviewer 等其它角色也不授。超管走 *:*:* 不需要绑定。
 -- 幂等：菜单 ON CONFLICT (menu_id) DO UPDATE；角色绑定 NOT EXISTS。
@@ -16,7 +16,7 @@ INSERT INTO public.sys_menu
      create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
     (12061, '工作台审计查看', 11930, 11, '', NULL, NULL,
-     '1', '0', 'F', '0', '0', 'dcs:assistant:audit:query', '#',
+     '1', '0', 'F', '0', '0', 'smartdock:assistant:audit:query', '#',
      103, 1, now(), NULL, NULL, '工作台设置页审计分节(只读; 仅授 admin/tenant_admin, 不生成路由)')
 ON CONFLICT (menu_id) DO UPDATE SET
     parent_id = EXCLUDED.parent_id,

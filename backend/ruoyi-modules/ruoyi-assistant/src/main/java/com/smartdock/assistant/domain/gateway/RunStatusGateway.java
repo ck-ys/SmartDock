@@ -5,7 +5,7 @@ import java.util.Set;
 /**
  * run 在途状态读口（批 7 · 7B，2026-11-20 拍板 Q3 ★ 案 1）。
  *
- * <p>存在理由：会话列表要回填「生成中」标志，而 RUNNING 数据在 {@code dcs_assistant_run}
+ * <p>存在理由：会话列表要回填「生成中」标志，而 RUNNING 数据在 {@code assistant_run}
  * 表。建接口时该表的 Mapper 还在 legacy，新根 query 服务按规则 8 不许 import legacy，
  * 故把这一条读取收成接口放新根、实现落 infrastructure（跨线桥）。</p>
  *

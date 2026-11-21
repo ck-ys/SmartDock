@@ -26,10 +26,10 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: dcs_ai_config; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_config; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_config (
+CREATE TABLE public.ai_config (
     config_id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     provider character varying(32) NOT NULL,
@@ -57,16 +57,16 @@ CREATE TABLE public.dcs_ai_config (
     use_type character varying(16) DEFAULT 'CHAT'::character varying NOT NULL,
     is_default character(1),
     credit_multiplier numeric(6,2) DEFAULT 1 NOT NULL,
-    CONSTRAINT ck_dcs_ai_config_api_format CHECK (((api_format)::text = ANY (ARRAY[('CHAT_COMPLETIONS'::character varying)::text, ('ANTHROPIC_MESSAGES'::character varying)::text, ('RESPONSES'::character varying)::text]))),
-    CONSTRAINT ck_dcs_ai_config_use_type CHECK (((use_type)::text = ANY (ARRAY[('CHAT'::character varying)::text, ('EMBEDDING'::character varying)::text])))
+    CONSTRAINT ck_ai_config_api_format CHECK (((api_format)::text = ANY (ARRAY[('CHAT_COMPLETIONS'::character varying)::text, ('ANTHROPIC_MESSAGES'::character varying)::text, ('RESPONSES'::character varying)::text]))),
+    CONSTRAINT ck_ai_config_use_type CHECK (((use_type)::text = ANY (ARRAY[('CHAT'::character varying)::text, ('EMBEDDING'::character varying)::text])))
 );
 
 
 --
--- Name: dcs_ai_credit_ledger; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_credit_ledger; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_credit_ledger (
+CREATE TABLE public.ai_credit_ledger (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     biz_type character varying(20) NOT NULL,
@@ -82,10 +82,10 @@ CREATE TABLE public.dcs_ai_credit_ledger (
 
 
 --
--- Name: dcs_ai_credit_plan; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_credit_plan; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_credit_plan (
+CREATE TABLE public.ai_credit_plan (
     id bigint NOT NULL,
     plan_code character varying(40) NOT NULL,
     kind character varying(20) DEFAULT 'SUBSCRIBE'::character varying NOT NULL,
@@ -104,10 +104,10 @@ CREATE TABLE public.dcs_ai_credit_plan (
 
 
 --
--- Name: dcs_ai_credit_subscription; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_credit_subscription; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_credit_subscription (
+CREATE TABLE public.ai_credit_subscription (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     plan_id bigint NOT NULL,
@@ -122,10 +122,10 @@ CREATE TABLE public.dcs_ai_credit_subscription (
 
 
 --
--- Name: dcs_ai_doc_domain; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_doc_domain; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_doc_domain (
+CREATE TABLE public.ai_doc_domain (
     domain_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     domain character varying(255) NOT NULL,
@@ -142,10 +142,10 @@ CREATE TABLE public.dcs_ai_doc_domain (
 
 
 --
--- Name: dcs_ai_model_capability; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_model_capability; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_model_capability (
+CREATE TABLE public.ai_model_capability (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     provider character varying(64) NOT NULL,
@@ -170,10 +170,10 @@ CREATE TABLE public.dcs_ai_model_capability (
 
 
 --
--- Name: dcs_ai_model_health; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_model_health; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_model_health (
+CREATE TABLE public.ai_model_health (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     config_id bigint NOT NULL,
@@ -189,10 +189,10 @@ CREATE TABLE public.dcs_ai_model_health (
 
 
 --
--- Name: dcs_ai_model_price; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_model_price; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_model_price (
+CREATE TABLE public.ai_model_price (
     price_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     provider character varying(32) NOT NULL,
@@ -220,16 +220,16 @@ CREATE TABLE public.dcs_ai_model_price (
     price_source character varying(16) DEFAULT 'MANUAL'::character varying NOT NULL,
     manual_override character(1) DEFAULT '0'::bpchar NOT NULL,
     last_synced_at timestamp without time zone,
-    CONSTRAINT ck_dcs_ai_model_price_manual_override CHECK ((manual_override = ANY (ARRAY['0'::bpchar, '1'::bpchar]))),
-    CONSTRAINT ck_dcs_ai_model_price_source CHECK (((price_source)::text = ANY (ARRAY[('MANUAL'::character varying)::text, ('MODELS_DEV'::character varying)::text, ('IMPORT'::character varying)::text])))
+    CONSTRAINT ck_ai_model_price_manual_override CHECK ((manual_override = ANY (ARRAY['0'::bpchar, '1'::bpchar]))),
+    CONSTRAINT ck_ai_model_price_source CHECK (((price_source)::text = ANY (ARRAY[('MANUAL'::character varying)::text, ('MODELS_DEV'::character varying)::text, ('IMPORT'::character varying)::text])))
 );
 
 
 --
--- Name: dcs_ai_provider_access; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_provider_access; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_provider_access (
+CREATE TABLE public.ai_provider_access (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     provider character varying(32) NOT NULL,
@@ -250,15 +250,15 @@ CREATE TABLE public.dcs_ai_provider_access (
     balance_currency character varying(8),
     balance_checked_at timestamp without time zone,
     balance_status character varying(16),
-    CONSTRAINT ck_dcs_ai_provider_access_api_format CHECK (((api_format)::text = ANY (ARRAY[('CHAT_COMPLETIONS'::character varying)::text, ('ANTHROPIC_MESSAGES'::character varying)::text, ('RESPONSES'::character varying)::text])))
+    CONSTRAINT ck_ai_provider_access_api_format CHECK (((api_format)::text = ANY (ARRAY[('CHAT_COMPLETIONS'::character varying)::text, ('ANTHROPIC_MESSAGES'::character varying)::text, ('RESPONSES'::character varying)::text])))
 );
 
 
 --
--- Name: dcs_ai_usage; Type: TABLE; Schema: public; Owner: -
+-- Name: ai_usage; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_ai_usage (
+CREATE TABLE public.ai_usage (
     usage_id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     config_id bigint NOT NULL,
@@ -293,11 +293,11 @@ CREATE TABLE public.dcs_ai_usage (
 
 
 --
--- Name: dcs_ai_usage_usage_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: ai_usage_usage_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
-ALTER TABLE public.dcs_ai_usage ALTER COLUMN usage_id ADD GENERATED BY DEFAULT AS IDENTITY (
-    SEQUENCE NAME public.dcs_ai_usage_usage_id_seq
+ALTER TABLE public.ai_usage ALTER COLUMN usage_id ADD GENERATED BY DEFAULT AS IDENTITY (
+    SEQUENCE NAME public.ai_usage_usage_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -307,10 +307,10 @@ ALTER TABLE public.dcs_ai_usage ALTER COLUMN usage_id ADD GENERATED BY DEFAULT A
 
 
 --
--- Name: dcs_assistant_action; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_action; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_action (
+CREATE TABLE public.assistant_action (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -330,10 +330,10 @@ CREATE TABLE public.dcs_assistant_action (
 
 
 --
--- Name: dcs_assistant_announcement; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_announcement; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_announcement (
+CREATE TABLE public.assistant_announcement (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     title character varying(120) NOT NULL,
@@ -348,10 +348,10 @@ CREATE TABLE public.dcs_assistant_announcement (
 
 
 --
--- Name: dcs_assistant_attachment; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_attachment; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_attachment (
+CREATE TABLE public.assistant_attachment (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     thread_id character varying(128) NOT NULL,
@@ -375,10 +375,10 @@ CREATE TABLE public.dcs_assistant_attachment (
 
 
 --
--- Name: dcs_assistant_config; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_config; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_config (
+CREATE TABLE public.assistant_config (
     tenant_id character varying(20) NOT NULL,
     enabled character(1) DEFAULT '0'::bpchar NOT NULL,
     daily_round_limit_per_user integer DEFAULT 50 NOT NULL,
@@ -398,10 +398,10 @@ CREATE TABLE public.dcs_assistant_config (
 
 
 --
--- Name: dcs_assistant_conversation; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_conversation; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_conversation (
+CREATE TABLE public.assistant_conversation (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -420,10 +420,10 @@ CREATE TABLE public.dcs_assistant_conversation (
 
 
 --
--- Name: dcs_assistant_favorite; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_favorite; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_favorite (
+CREATE TABLE public.assistant_favorite (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     user_id bigint NOT NULL,
@@ -438,10 +438,10 @@ CREATE TABLE public.dcs_assistant_favorite (
 
 
 --
--- Name: dcs_assistant_feedback; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_feedback; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_feedback (
+CREATE TABLE public.assistant_feedback (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -453,15 +453,22 @@ CREATE TABLE public.dcs_assistant_feedback (
 
 
 --
--- Name: dcs_assistant_memory; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_memory; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_memory (
+CREATE TABLE public.assistant_memory (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     user_id bigint NOT NULL,
     content character varying(200) NOT NULL,
     source character varying(20) DEFAULT 'AI'::character varying NOT NULL,
+    memory_type character varying(20) DEFAULT 'user'::character varying NOT NULL,
+    conversation_id bigint,
+    topic_key character varying(40),
+    status character varying(16) DEFAULT 'ACTIVE'::character varying NOT NULL,
+    superseded_by bigint,
+    last_used_at timestamp without time zone,
+    archived_at timestamp without time zone,
     create_dept bigint,
     create_by bigint,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
@@ -472,10 +479,26 @@ CREATE TABLE public.dcs_assistant_memory (
 
 
 --
--- Name: dcs_assistant_message; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_memory_pref; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_message (
+CREATE TABLE public.assistant_memory_pref (
+    id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    user_id bigint NOT NULL,
+    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_time timestamp without time zone,
+    CONSTRAINT pk_assistant_memory_pref PRIMARY KEY (id),
+    CONSTRAINT uk_asst_memory_pref UNIQUE (tenant_id, user_id)
+);
+
+
+--
+-- Name: assistant_message; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.assistant_message (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     conversation_id bigint NOT NULL,
@@ -492,11 +515,11 @@ CREATE TABLE public.dcs_assistant_message (
 
 
 --
--- Name: dcs_assistant_compaction; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_compaction; Type: TABLE; Schema: public; Owner: -
 -- 批A-2（2026-10-22 拍板 Q9-A）：自动压缩记录（链式审计，prev_id 指向上一条同会话记录）
 --
 
-CREATE TABLE public.dcs_assistant_compaction (
+CREATE TABLE public.assistant_compaction (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     conversation_id bigint NOT NULL,
@@ -516,36 +539,36 @@ CREATE TABLE public.dcs_assistant_compaction (
 
 
 --
--- Name: dcs_assistant_compaction_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_compaction_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_compaction
-    ADD CONSTRAINT dcs_assistant_compaction_pk PRIMARY KEY (id);
-
-
---
--- Name: idx_dcs_asst_comp_conv; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_dcs_asst_comp_conv ON public.dcs_assistant_compaction (tenant_id, conversation_id, id);
+ALTER TABLE ONLY public.assistant_compaction
+    ADD CONSTRAINT assistant_compaction_pk PRIMARY KEY (id);
 
 
 --
--- Name: idx_dcs_asst_comp_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_comp_conv; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_asst_comp_conv ON public.assistant_compaction (tenant_id, conversation_id, id);
+
+
+--
+-- Name: idx_asst_comp_time; Type: INDEX; Schema: public; Owner: -
 -- 二审 P2：保留期清理按 create_time 过滤分批删——缺索引则每日 job 全表顺序扫描
 --
 
-CREATE INDEX idx_dcs_asst_comp_time ON public.dcs_assistant_compaction (create_time);
+CREATE INDEX idx_asst_comp_time ON public.assistant_compaction (create_time);
 
 
 --
--- Name: dcs_assistant_skill; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_skill; Type: TABLE; Schema: public; Owner: -
 -- 5b 批（2026-10-28 拍板）：技能内容在线层——000000=全局基线行，租户行覆盖同 skill_id；
 -- 与 jar 内置/config/skills 的关系见 AssistantSkillSource 三层叠加（题2 甲）。
 -- 无触发词列（题7 甲：一句话说明 description 是模型触发唯一依据）。
 --
 
-CREATE TABLE public.dcs_assistant_skill (
+CREATE TABLE public.assistant_skill (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     skill_id character varying(64) NOT NULL,
@@ -562,29 +585,29 @@ CREATE TABLE public.dcs_assistant_skill (
 
 
 --
--- Name: dcs_assistant_skill_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_skill_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_skill
-    ADD CONSTRAINT dcs_assistant_skill_pk PRIMARY KEY (id);
-
-
---
--- Name: uk_dcs_assistant_skill_tenant; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_assistant_skill_tenant ON public.dcs_assistant_skill (tenant_id, skill_id);
+ALTER TABLE ONLY public.assistant_skill
+    ADD CONSTRAINT assistant_skill_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_skill_usage; Type: TABLE; Schema: public; Owner: -
+-- Name: uk_assistant_skill_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_assistant_skill_tenant ON public.assistant_skill (tenant_id, skill_id);
+
+
+--
+-- Name: assistant_skill_usage; Type: TABLE; Schema: public; Owner: -
 -- 题2 案3（2026-10-31 拍板）：技能使用统计——只记「用了几次 / 最近一次用」，
 -- 批3.5·题5（2026-11-03）加人维度：键=(tenant_id, user_id, skill_id)，历史单位级行=0。
--- 内置技能没有在线行也能统计（不依赖 dcs_assistant_skill）；
+-- 内置技能没有在线行也能统计（不依赖 assistant_skill）；
 -- 不存逐次调用明细（题2 案3 明确不做归档/扫描）。
 --
 
-CREATE TABLE public.dcs_assistant_skill_usage (
+CREATE TABLE public.assistant_skill_usage (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL DEFAULT 0,
@@ -596,25 +619,25 @@ CREATE TABLE public.dcs_assistant_skill_usage (
 
 
 --
--- Name: dcs_assistant_skill_usage_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_skill_usage_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_skill_usage
-    ADD CONSTRAINT dcs_assistant_skill_usage_pk PRIMARY KEY (id);
-
-
---
--- Name: uk_dcs_assistant_skill_usage_tenant_user; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_assistant_skill_usage_tenant_user ON public.dcs_assistant_skill_usage (tenant_id, user_id, skill_id);
+ALTER TABLE ONLY public.assistant_skill_usage
+    ADD CONSTRAINT assistant_skill_usage_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_model_setting; Type: TABLE; Schema: public; Owner: -
+-- Name: uk_assistant_skill_usage_tenant_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_model_setting (
+CREATE UNIQUE INDEX uk_assistant_skill_usage_tenant_user ON public.assistant_skill_usage (tenant_id, user_id, skill_id);
+
+
+--
+-- Name: assistant_model_setting; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.assistant_model_setting (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     assistant_default_config_id bigint NOT NULL,
@@ -633,10 +656,10 @@ CREATE TABLE public.dcs_assistant_model_setting (
 
 
 --
--- Name: dcs_assistant_run; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_run; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_run (
+CREATE TABLE public.assistant_run (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -652,10 +675,10 @@ CREATE TABLE public.dcs_assistant_run (
 
 
 --
--- Name: dcs_assistant_user_quota; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_user_quota; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_assistant_user_quota (
+CREATE TABLE public.assistant_user_quota (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -671,10 +694,34 @@ CREATE TABLE public.dcs_assistant_user_quota (
 
 
 --
--- Name: dcs_audit; Type: TABLE; Schema: public; Owner: -
+-- Name: assistant_user_pref; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_audit (
+-- 助手「常规偏好」按人入库（批C Q8 案1，2026-11-15）：这七行以前只存浏览器 localStorage，
+-- 换电脑/换浏览器就回默认。缺行=全部默认值（不预插行）。
+CREATE TABLE public.assistant_user_pref (
+    id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    user_id bigint NOT NULL,
+    send_key character varying(16) DEFAULT 'enter'::character varying NOT NULL,
+    stream_output character(1) DEFAULT '1'::bpchar NOT NULL,
+    tools_open character(1) DEFAULT '0'::bpchar NOT NULL,
+    auto_retry character(1) DEFAULT '1'::bpchar NOT NULL,
+    motion character varying(16) DEFAULT 'system'::character varying NOT NULL,
+    answer_size character varying(16) DEFAULT 'standard'::character varying NOT NULL,
+    ask_auto_continue character(1) DEFAULT '1'::bpchar NOT NULL,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_time timestamp without time zone,
+    CONSTRAINT pk_assistant_user_pref PRIMARY KEY (id),
+    CONSTRAINT uk_asst_user_pref UNIQUE (tenant_id, user_id)
+);
+
+
+--
+-- Name: audit; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     submission_id bigint NOT NULL,
@@ -683,18 +730,18 @@ CREATE TABLE public.dcs_audit (
     decision character varying(10) NOT NULL,
     comment character varying(500),
     create_time timestamp without time zone,
-    CONSTRAINT ck_dcs_audit_decision CHECK (((decision)::text = ANY ((ARRAY['PASS'::character varying, 'REJECT'::character varying])::text[])))
+    CONSTRAINT ck_audit_decision CHECK (((decision)::text = ANY ((ARRAY['PASS'::character varying, 'REJECT'::character varying])::text[])))
 );
 
 
 --
--- Name: dcs_automation; Type: TABLE; Schema: public; Owner: -
+-- Name: automation; Type: TABLE; Schema: public; Owner: -
 -- 2026-11-05 自动化批（拍板 题0 甲/题1 乙/题4 乙）：用户自建「到点替你跑一件事」。
 -- 一条行 = 一句话任务 + 日程 + 开关；执行身份 = 创建人 user_id（审计记本人）。
 -- builtin='1' 为系统内置项（每日摘要，租户级 user_id=0）：只能开关，不能改提示词/删除。
 --
 
-CREATE TABLE public.dcs_automation (
+CREATE TABLE public.automation (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -717,18 +764,18 @@ CREATE TABLE public.dcs_automation (
     update_by bigint,
     update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     del_flag character(1) DEFAULT '0'::bpchar NOT NULL,
-    CONSTRAINT ck_dcs_automation_enabled CHECK (((enabled)::text = ANY ((ARRAY['0'::character varying, '1'::character varying])::text[]))),
-    CONSTRAINT ck_dcs_automation_schedule CHECK (((schedule_type)::text = ANY ((ARRAY['DAILY'::character varying, 'WEEKLY'::character varying, 'BUILTIN'::character varying])::text[])))
+    CONSTRAINT ck_automation_enabled CHECK (((enabled)::text = ANY ((ARRAY['0'::character varying, '1'::character varying])::text[]))),
+    CONSTRAINT ck_automation_schedule CHECK (((schedule_type)::text = ANY ((ARRAY['DAILY'::character varying, 'WEEKLY'::character varying, 'BUILTIN'::character varying])::text[])))
 );
 
 
 --
--- Name: dcs_automation_run; Type: TABLE; Schema: public; Owner: -
+-- Name: automation_run; Type: TABLE; Schema: public; Owner: -
 -- 运行记录：一次执行一行；scheduled_for=计划时刻（补跑窗口判 MISSED 的依据）。
 -- 同一条自动化的同一计划时刻只能落一行（部分唯一索引），多实例/重扫天然不重复。
 --
 
-CREATE TABLE public.dcs_automation_run (
+CREATE TABLE public.automation_run (
     id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     automation_id bigint NOT NULL,
@@ -748,10 +795,10 @@ CREATE TABLE public.dcs_automation_run (
 
 
 --
--- Name: dcs_captcha_log; Type: TABLE; Schema: public; Owner: -
+-- Name: captcha_log; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_captcha_log (
+CREATE TABLE public.captcha_log (
     log_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying,
     token character varying(64) NOT NULL,
@@ -773,10 +820,10 @@ CREATE TABLE public.dcs_captcha_log (
 
 
 --
--- Name: dcs_file_guard_log; Type: TABLE; Schema: public; Owner: -
+-- Name: file_guard_log; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_file_guard_log (
+CREATE TABLE public.file_guard_log (
     log_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     user_id bigint,
@@ -796,10 +843,10 @@ CREATE TABLE public.dcs_file_guard_log (
 
 
 --
--- Name: dcs_file_review; Type: TABLE; Schema: public; Owner: -
+-- Name: file_review; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_file_review (
+CREATE TABLE public.file_review (
     review_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     oss_id bigint NOT NULL,
@@ -821,15 +868,15 @@ CREATE TABLE public.dcs_file_review (
     update_by bigint,
     update_time timestamp without time zone,
     guard_reason character varying(500),
-    CONSTRAINT ck_dcs_file_review_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text, ('EXEMPT'::character varying)::text])))
+    CONSTRAINT ck_file_review_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text, ('EXEMPT'::character varying)::text])))
 );
 
 
 --
--- Name: dcs_file_review_config; Type: TABLE; Schema: public; Owner: -
+-- Name: file_review_config; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_file_review_config (
+CREATE TABLE public.file_review_config (
     config_id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     enabled character(1) DEFAULT '0'::bpchar NOT NULL,
@@ -846,10 +893,10 @@ CREATE TABLE public.dcs_file_review_config (
 
 
 --
--- Name: dcs_notice; Type: TABLE; Schema: public; Owner: -
+-- Name: notice; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_notice (
+CREATE TABLE public.notice (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     user_id bigint NOT NULL,
@@ -865,10 +912,10 @@ CREATE TABLE public.dcs_notice (
 
 
 --
--- Name: dcs_profile_review; Type: TABLE; Schema: public; Owner: -
+-- Name: profile_review; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_profile_review (
+CREATE TABLE public.profile_review (
     review_id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -886,16 +933,16 @@ CREATE TABLE public.dcs_profile_review (
     create_time timestamp without time zone DEFAULT now(),
     update_by bigint,
     update_time timestamp without time zone,
-    CONSTRAINT ck_dcs_profile_review_level CHECK (((profile_risk_level)::text = 'HIGH'::text)),
-    CONSTRAINT ck_dcs_profile_review_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('CONFIRMED'::character varying)::text, ('DISMISSED'::character varying)::text, ('SUPERSEDED'::character varying)::text])))
+    CONSTRAINT ck_profile_review_level CHECK (((profile_risk_level)::text = 'HIGH'::text)),
+    CONSTRAINT ck_profile_review_status CHECK (((status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('CONFIRMED'::character varying)::text, ('DISMISSED'::character varying)::text, ('SUPERSEDED'::character varying)::text])))
 );
 
 
 --
--- Name: dcs_risk_action; Type: TABLE; Schema: public; Owner: -
+-- Name: risk_action; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_risk_action (
+CREATE TABLE public.risk_action (
     action_id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL,
     user_id bigint NOT NULL,
@@ -922,18 +969,18 @@ CREATE TABLE public.dcs_risk_action (
     create_time timestamp without time zone DEFAULT now(),
     update_by bigint,
     update_time timestamp without time zone,
-    CONSTRAINT ck_dcs_risk_action_level CHECK ((risk_level = ANY (ARRAY[3, 4]))),
-    CONSTRAINT ck_dcs_risk_action_review CHECK (((review_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('CONFIRMED'::character varying)::text, ('DISMISSED'::character varying)::text]))),
-    CONSTRAINT ck_dcs_risk_action_status CHECK (((status)::text = ANY (ARRAY[('ACTIVE'::character varying)::text, ('EXPIRED'::character varying)::text, ('RELEASED'::character varying)::text]))),
-    CONSTRAINT ck_dcs_risk_action_type CHECK (((action_type)::text = ANY (ARRAY[('ENHANCED_VERIFICATION'::character varying)::text, ('TEMP_FREEZE'::character varying)::text])))
+    CONSTRAINT ck_risk_action_level CHECK ((risk_level = ANY (ARRAY[3, 4]))),
+    CONSTRAINT ck_risk_action_review CHECK (((review_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('CONFIRMED'::character varying)::text, ('DISMISSED'::character varying)::text]))),
+    CONSTRAINT ck_risk_action_status CHECK (((status)::text = ANY (ARRAY[('ACTIVE'::character varying)::text, ('EXPIRED'::character varying)::text, ('RELEASED'::character varying)::text]))),
+    CONSTRAINT ck_risk_action_type CHECK (((action_type)::text = ANY (ARRAY[('ENHANCED_VERIFICATION'::character varying)::text, ('TEMP_FREEZE'::character varying)::text])))
 );
 
 
 --
--- Name: dcs_risk_event; Type: TABLE; Schema: public; Owner: -
+-- Name: risk_event; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_risk_event (
+CREATE TABLE public.risk_event (
     event_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying,
     user_id bigint,
@@ -957,10 +1004,10 @@ CREATE TABLE public.dcs_risk_event (
 
 
 --
--- Name: dcs_risk_rule; Type: TABLE; Schema: public; Owner: -
+-- Name: risk_rule; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_risk_rule (
+CREATE TABLE public.risk_rule (
     rule_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying,
     event_type character varying(40) NOT NULL,
@@ -982,10 +1029,10 @@ CREATE TABLE public.dcs_risk_rule (
 
 
 --
--- Name: dcs_risk_whitelist; Type: TABLE; Schema: public; Owner: -
+-- Name: risk_whitelist; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_risk_whitelist (
+CREATE TABLE public.risk_whitelist (
     whitelist_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying,
     list_type character varying(20) NOT NULL,
@@ -1001,10 +1048,10 @@ CREATE TABLE public.dcs_risk_whitelist (
 
 
 --
--- Name: dcs_sensitive_word; Type: TABLE; Schema: public; Owner: -
+-- Name: sensitive_word; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_sensitive_word (
+CREATE TABLE public.sensitive_word (
     word_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     word_text character varying(100) NOT NULL,
@@ -1024,10 +1071,10 @@ CREATE TABLE public.dcs_sensitive_word (
 
 
 --
--- Name: dcs_service_charge_rule; Type: TABLE; Schema: public; Owner: -
+-- Name: service_charge_rule; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_service_charge_rule (
+CREATE TABLE public.service_charge_rule (
     rule_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     service_code character varying(64) NOT NULL,
@@ -1050,10 +1097,10 @@ CREATE TABLE public.dcs_service_charge_rule (
 
 
 --
--- Name: dcs_submission; Type: TABLE; Schema: public; Owner: -
+-- Name: submission; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_submission (
+CREATE TABLE public.submission (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     task_id bigint NOT NULL,
@@ -1064,15 +1111,15 @@ CREATE TABLE public.dcs_submission (
     submitted_at timestamp without time zone,
     audited_at timestamp without time zone,
     create_time timestamp without time zone,
-    CONSTRAINT ck_dcs_submission_status CHECK (((status)::text = ANY ((ARRAY['PENDING_AUDIT'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[])))
+    CONSTRAINT ck_submission_status CHECK (((status)::text = ANY ((ARRAY['PENDING_AUDIT'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[])))
 );
 
 
 --
--- Name: dcs_task; Type: TABLE; Schema: public; Owner: -
+-- Name: task; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_task (
+CREATE TABLE public.task (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     title character varying(128) NOT NULL,
@@ -1089,16 +1136,16 @@ CREATE TABLE public.dcs_task (
     create_time timestamp without time zone,
     update_by bigint,
     update_time timestamp without time zone,
-    CONSTRAINT ck_dcs_task_audit_mode CHECK (((audit_mode)::text = ANY ((ARRAY['PUBLISHER'::character varying, 'ASSIGNED'::character varying])::text[]))),
-    CONSTRAINT ck_dcs_task_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'COLLECTING'::character varying, 'CLOSED'::character varying])::text[])))
+    CONSTRAINT ck_task_audit_mode CHECK (((audit_mode)::text = ANY ((ARRAY['PUBLISHER'::character varying, 'ASSIGNED'::character varying])::text[]))),
+    CONSTRAINT ck_task_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'COLLECTING'::character varying, 'CLOSED'::character varying])::text[])))
 );
 
 
 --
--- Name: dcs_task_field; Type: TABLE; Schema: public; Owner: -
+-- Name: task_field; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_task_field (
+CREATE TABLE public.task_field (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     task_id bigint NOT NULL,
@@ -1113,23 +1160,23 @@ CREATE TABLE public.dcs_task_field (
 
 
 --
--- Name: dcs_tenant_billing_mode; Type: TABLE; Schema: public; Owner: -
+-- Name: tenant_billing_mode; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_tenant_billing_mode (
+CREATE TABLE public.tenant_billing_mode (
     tenant_id character varying(20) NOT NULL,
     consume_mode character varying(10) DEFAULT 'WALLET'::character varying NOT NULL,
     update_by bigint,
     update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT dcs_tenant_billing_mode_ck CHECK (((consume_mode)::text = ANY (ARRAY[('WALLET'::character varying)::text, ('CREDIT'::character varying)::text])))
+    CONSTRAINT tenant_billing_mode_ck CHECK (((consume_mode)::text = ANY (ARRAY[('WALLET'::character varying)::text, ('CREDIT'::character varying)::text])))
 );
 
 
 --
--- Name: dcs_tenant_wallet; Type: TABLE; Schema: public; Owner: -
+-- Name: tenant_wallet; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_tenant_wallet (
+CREATE TABLE public.tenant_wallet (
     wallet_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     wallet_type character varying(8) DEFAULT 'MAIN'::character varying NOT NULL,
@@ -1152,10 +1199,10 @@ CREATE TABLE public.dcs_tenant_wallet (
 
 
 --
--- Name: dcs_tenant_wallet_ledger; Type: TABLE; Schema: public; Owner: -
+-- Name: tenant_wallet_ledger; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_tenant_wallet_ledger (
+CREATE TABLE public.tenant_wallet_ledger (
     ledger_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     wallet_id bigint NOT NULL,
@@ -1180,10 +1227,10 @@ CREATE TABLE public.dcs_tenant_wallet_ledger (
 
 
 --
--- Name: dcs_wallet_alert_state; Type: TABLE; Schema: public; Owner: -
+-- Name: wallet_alert_state; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_wallet_alert_state (
+CREATE TABLE public.wallet_alert_state (
     alert_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     wallet_id bigint NOT NULL,
@@ -1200,10 +1247,10 @@ CREATE TABLE public.dcs_wallet_alert_state (
 
 
 --
--- Name: dcs_wallet_payment_order; Type: TABLE; Schema: public; Owner: -
+-- Name: wallet_payment_order; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_wallet_payment_order (
+CREATE TABLE public.wallet_payment_order (
     order_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     wallet_id bigint NOT NULL,
@@ -1227,10 +1274,10 @@ CREATE TABLE public.dcs_wallet_payment_order (
 
 
 --
--- Name: dcs_word_fp_feedback; Type: TABLE; Schema: public; Owner: -
+-- Name: word_fp_feedback; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.dcs_word_fp_feedback (
+CREATE TABLE public.word_fp_feedback (
     feedback_id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     word_text character varying(100) NOT NULL,
@@ -2386,387 +2433,387 @@ CREATE TABLE public.sys_user_role (
 
 
 --
--- Name: dcs_ai_config dcs_ai_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_config ai_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_config
-    ADD CONSTRAINT dcs_ai_config_pkey PRIMARY KEY (config_id);
+ALTER TABLE ONLY public.ai_config
+    ADD CONSTRAINT ai_config_pkey PRIMARY KEY (config_id);
 
 
 --
--- Name: dcs_ai_credit_ledger dcs_ai_credit_ledger_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_credit_ledger ai_credit_ledger_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_credit_ledger
-    ADD CONSTRAINT dcs_ai_credit_ledger_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_credit_ledger
+    ADD CONSTRAINT ai_credit_ledger_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_ai_credit_plan dcs_ai_credit_plan_code_uk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_credit_plan ai_credit_plan_code_uk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_credit_plan
-    ADD CONSTRAINT dcs_ai_credit_plan_code_uk UNIQUE (plan_code);
+ALTER TABLE ONLY public.ai_credit_plan
+    ADD CONSTRAINT ai_credit_plan_code_uk UNIQUE (plan_code);
 
 
 --
--- Name: dcs_ai_credit_plan dcs_ai_credit_plan_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_credit_plan ai_credit_plan_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_credit_plan
-    ADD CONSTRAINT dcs_ai_credit_plan_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_credit_plan
+    ADD CONSTRAINT ai_credit_plan_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_ai_credit_subscription dcs_ai_credit_subscription_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_credit_subscription ai_credit_subscription_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_credit_subscription
-    ADD CONSTRAINT dcs_ai_credit_subscription_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_credit_subscription
+    ADD CONSTRAINT ai_credit_subscription_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_action dcs_assistant_action_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_action assistant_action_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_action
-    ADD CONSTRAINT dcs_assistant_action_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_action
+    ADD CONSTRAINT assistant_action_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_attachment dcs_assistant_attachment_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_attachment assistant_attachment_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_attachment
-    ADD CONSTRAINT dcs_assistant_attachment_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_attachment
+    ADD CONSTRAINT assistant_attachment_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_attachment dcs_assistant_attachment_uk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_attachment assistant_attachment_uk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_attachment
-    ADD CONSTRAINT dcs_assistant_attachment_uk UNIQUE (tenant_id, thread_id, oss_id);
+ALTER TABLE ONLY public.assistant_attachment
+    ADD CONSTRAINT assistant_attachment_uk UNIQUE (tenant_id, thread_id, oss_id);
 
 
 --
--- Name: dcs_assistant_config dcs_assistant_config_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_config assistant_config_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_config
-    ADD CONSTRAINT dcs_assistant_config_pk PRIMARY KEY (tenant_id);
+ALTER TABLE ONLY public.assistant_config
+    ADD CONSTRAINT assistant_config_pk PRIMARY KEY (tenant_id);
 
 
 --
--- Name: dcs_assistant_conversation dcs_assistant_conversation_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_conversation assistant_conversation_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_conversation
-    ADD CONSTRAINT dcs_assistant_conversation_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_conversation
+    ADD CONSTRAINT assistant_conversation_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_feedback dcs_assistant_feedback_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_feedback assistant_feedback_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_feedback
-    ADD CONSTRAINT dcs_assistant_feedback_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_feedback
+    ADD CONSTRAINT assistant_feedback_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_memory dcs_assistant_memory_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_memory assistant_memory_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_memory
-    ADD CONSTRAINT dcs_assistant_memory_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_memory
+    ADD CONSTRAINT assistant_memory_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_message dcs_assistant_message_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_message assistant_message_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_message
-    ADD CONSTRAINT dcs_assistant_message_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_message
+    ADD CONSTRAINT assistant_message_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_run dcs_assistant_run_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_run assistant_run_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_run
-    ADD CONSTRAINT dcs_assistant_run_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_run
+    ADD CONSTRAINT assistant_run_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_user_quota dcs_assistant_user_quota_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_user_quota assistant_user_quota_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_user_quota
-    ADD CONSTRAINT dcs_assistant_user_quota_pk PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_user_quota
+    ADD CONSTRAINT assistant_user_quota_pk PRIMARY KEY (id);
 
 
 --
--- Name: dcs_file_guard_log dcs_file_guard_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: file_guard_log file_guard_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_file_guard_log
-    ADD CONSTRAINT dcs_file_guard_log_pkey PRIMARY KEY (log_id);
+ALTER TABLE ONLY public.file_guard_log
+    ADD CONSTRAINT file_guard_log_pkey PRIMARY KEY (log_id);
 
 
 --
--- Name: dcs_file_review_config dcs_file_review_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: file_review_config file_review_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_file_review_config
-    ADD CONSTRAINT dcs_file_review_config_pkey PRIMARY KEY (config_id);
+ALTER TABLE ONLY public.file_review_config
+    ADD CONSTRAINT file_review_config_pkey PRIMARY KEY (config_id);
 
 
 --
--- Name: dcs_file_review dcs_file_review_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: file_review file_review_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_file_review
-    ADD CONSTRAINT dcs_file_review_pkey PRIMARY KEY (review_id);
+ALTER TABLE ONLY public.file_review
+    ADD CONSTRAINT file_review_pkey PRIMARY KEY (review_id);
 
 
 --
--- Name: dcs_tenant_billing_mode dcs_tenant_billing_mode_pk; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: tenant_billing_mode tenant_billing_mode_pk; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_tenant_billing_mode
-    ADD CONSTRAINT dcs_tenant_billing_mode_pk PRIMARY KEY (tenant_id);
+ALTER TABLE ONLY public.tenant_billing_mode
+    ADD CONSTRAINT tenant_billing_mode_pk PRIMARY KEY (tenant_id);
 
 
 --
--- Name: dcs_word_fp_feedback dcs_word_fp_feedback_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: word_fp_feedback word_fp_feedback_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_word_fp_feedback
-    ADD CONSTRAINT dcs_word_fp_feedback_pkey PRIMARY KEY (feedback_id);
+ALTER TABLE ONLY public.word_fp_feedback
+    ADD CONSTRAINT word_fp_feedback_pkey PRIMARY KEY (feedback_id);
 
 
 --
--- Name: dcs_ai_doc_domain pk_dcs_ai_doc_domain; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_doc_domain pk_ai_doc_domain; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_doc_domain
-    ADD CONSTRAINT pk_dcs_ai_doc_domain PRIMARY KEY (domain_id);
+ALTER TABLE ONLY public.ai_doc_domain
+    ADD CONSTRAINT pk_ai_doc_domain PRIMARY KEY (domain_id);
 
 
 --
--- Name: dcs_ai_model_capability pk_dcs_ai_model_capability; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_model_capability pk_ai_model_capability; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_model_capability
-    ADD CONSTRAINT pk_dcs_ai_model_capability PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_model_capability
+    ADD CONSTRAINT pk_ai_model_capability PRIMARY KEY (id);
 
 
 --
--- Name: dcs_ai_model_health pk_dcs_ai_model_health; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_model_health pk_ai_model_health; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_model_health
-    ADD CONSTRAINT pk_dcs_ai_model_health PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_model_health
+    ADD CONSTRAINT pk_ai_model_health PRIMARY KEY (id);
 
 
 --
--- Name: dcs_ai_model_price pk_dcs_ai_model_price; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_model_price pk_ai_model_price; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_model_price
-    ADD CONSTRAINT pk_dcs_ai_model_price PRIMARY KEY (price_id);
+ALTER TABLE ONLY public.ai_model_price
+    ADD CONSTRAINT pk_ai_model_price PRIMARY KEY (price_id);
 
 
 --
--- Name: dcs_ai_provider_access pk_dcs_ai_provider_access; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_provider_access pk_ai_provider_access; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_provider_access
-    ADD CONSTRAINT pk_dcs_ai_provider_access PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_provider_access
+    ADD CONSTRAINT pk_ai_provider_access PRIMARY KEY (id);
 
 
 --
--- Name: dcs_ai_usage pk_dcs_ai_usage; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_usage pk_ai_usage; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_usage
-    ADD CONSTRAINT pk_dcs_ai_usage PRIMARY KEY (usage_id);
+ALTER TABLE ONLY public.ai_usage
+    ADD CONSTRAINT pk_ai_usage PRIMARY KEY (usage_id);
 
 
 --
--- Name: dcs_assistant_announcement pk_dcs_assistant_announcement; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_announcement pk_assistant_announcement; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_announcement
-    ADD CONSTRAINT pk_dcs_assistant_announcement PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_announcement
+    ADD CONSTRAINT pk_assistant_announcement PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_favorite pk_dcs_assistant_favorite; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_favorite pk_assistant_favorite; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_favorite
-    ADD CONSTRAINT pk_dcs_assistant_favorite PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_favorite
+    ADD CONSTRAINT pk_assistant_favorite PRIMARY KEY (id);
 
 
 --
--- Name: dcs_assistant_model_setting pk_dcs_assistant_model_setting; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_model_setting pk_assistant_model_setting; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_model_setting
-    ADD CONSTRAINT pk_dcs_assistant_model_setting PRIMARY KEY (id);
+ALTER TABLE ONLY public.assistant_model_setting
+    ADD CONSTRAINT pk_assistant_model_setting PRIMARY KEY (id);
 
 
 --
--- Name: dcs_audit pk_dcs_audit; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: audit pk_audit; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_audit
-    ADD CONSTRAINT pk_dcs_audit PRIMARY KEY (id);
+ALTER TABLE ONLY public.audit
+    ADD CONSTRAINT pk_audit PRIMARY KEY (id);
 
 
 --
--- Name: dcs_automation pk_dcs_automation; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: automation pk_automation; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_automation
-    ADD CONSTRAINT pk_dcs_automation PRIMARY KEY (id);
+ALTER TABLE ONLY public.automation
+    ADD CONSTRAINT pk_automation PRIMARY KEY (id);
 
 
 --
--- Name: dcs_automation_run pk_dcs_automation_run; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: automation_run pk_automation_run; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_automation_run
-    ADD CONSTRAINT pk_dcs_automation_run PRIMARY KEY (id);
+ALTER TABLE ONLY public.automation_run
+    ADD CONSTRAINT pk_automation_run PRIMARY KEY (id);
 
 
 --
--- Name: dcs_captcha_log pk_dcs_captcha_log; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: captcha_log pk_captcha_log; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_captcha_log
-    ADD CONSTRAINT pk_dcs_captcha_log PRIMARY KEY (log_id);
+ALTER TABLE ONLY public.captcha_log
+    ADD CONSTRAINT pk_captcha_log PRIMARY KEY (log_id);
 
 
 --
--- Name: dcs_notice pk_dcs_notice; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: notice pk_notice; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_notice
-    ADD CONSTRAINT pk_dcs_notice PRIMARY KEY (id);
+ALTER TABLE ONLY public.notice
+    ADD CONSTRAINT pk_notice PRIMARY KEY (id);
 
 
 --
--- Name: dcs_profile_review pk_dcs_profile_review; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: profile_review pk_profile_review; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_profile_review
-    ADD CONSTRAINT pk_dcs_profile_review PRIMARY KEY (review_id);
+ALTER TABLE ONLY public.profile_review
+    ADD CONSTRAINT pk_profile_review PRIMARY KEY (review_id);
 
 
 --
--- Name: dcs_risk_action pk_dcs_risk_action; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: risk_action pk_risk_action; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_risk_action
-    ADD CONSTRAINT pk_dcs_risk_action PRIMARY KEY (action_id);
+ALTER TABLE ONLY public.risk_action
+    ADD CONSTRAINT pk_risk_action PRIMARY KEY (action_id);
 
 
 --
--- Name: dcs_risk_event pk_dcs_risk_event; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: risk_event pk_risk_event; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_risk_event
-    ADD CONSTRAINT pk_dcs_risk_event PRIMARY KEY (event_id);
+ALTER TABLE ONLY public.risk_event
+    ADD CONSTRAINT pk_risk_event PRIMARY KEY (event_id);
 
 
 --
--- Name: dcs_risk_rule pk_dcs_risk_rule; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: risk_rule pk_risk_rule; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_risk_rule
-    ADD CONSTRAINT pk_dcs_risk_rule PRIMARY KEY (rule_id);
+ALTER TABLE ONLY public.risk_rule
+    ADD CONSTRAINT pk_risk_rule PRIMARY KEY (rule_id);
 
 
 --
--- Name: dcs_risk_whitelist pk_dcs_risk_whitelist; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: risk_whitelist pk_risk_whitelist; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_risk_whitelist
-    ADD CONSTRAINT pk_dcs_risk_whitelist PRIMARY KEY (whitelist_id);
+ALTER TABLE ONLY public.risk_whitelist
+    ADD CONSTRAINT pk_risk_whitelist PRIMARY KEY (whitelist_id);
 
 
 --
--- Name: dcs_sensitive_word pk_dcs_sensitive_word; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: sensitive_word pk_sensitive_word; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_sensitive_word
-    ADD CONSTRAINT pk_dcs_sensitive_word PRIMARY KEY (word_id);
+ALTER TABLE ONLY public.sensitive_word
+    ADD CONSTRAINT pk_sensitive_word PRIMARY KEY (word_id);
 
 
 --
--- Name: dcs_service_charge_rule pk_dcs_service_charge_rule; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: service_charge_rule pk_service_charge_rule; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_service_charge_rule
-    ADD CONSTRAINT pk_dcs_service_charge_rule PRIMARY KEY (rule_id);
+ALTER TABLE ONLY public.service_charge_rule
+    ADD CONSTRAINT pk_service_charge_rule PRIMARY KEY (rule_id);
 
 
 --
--- Name: dcs_submission pk_dcs_submission; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: submission pk_submission; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_submission
-    ADD CONSTRAINT pk_dcs_submission PRIMARY KEY (id);
+ALTER TABLE ONLY public.submission
+    ADD CONSTRAINT pk_submission PRIMARY KEY (id);
 
 
 --
--- Name: dcs_task pk_dcs_task; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: task pk_task; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_task
-    ADD CONSTRAINT pk_dcs_task PRIMARY KEY (id);
+ALTER TABLE ONLY public.task
+    ADD CONSTRAINT pk_task PRIMARY KEY (id);
 
 
 --
--- Name: dcs_task_field pk_dcs_task_field; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: task_field pk_task_field; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_task_field
-    ADD CONSTRAINT pk_dcs_task_field PRIMARY KEY (id);
+ALTER TABLE ONLY public.task_field
+    ADD CONSTRAINT pk_task_field PRIMARY KEY (id);
 
 
 --
--- Name: dcs_tenant_wallet pk_dcs_tenant_wallet; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: tenant_wallet pk_tenant_wallet; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_tenant_wallet
-    ADD CONSTRAINT pk_dcs_tenant_wallet PRIMARY KEY (wallet_id);
+ALTER TABLE ONLY public.tenant_wallet
+    ADD CONSTRAINT pk_tenant_wallet PRIMARY KEY (wallet_id);
 
 
 --
--- Name: dcs_tenant_wallet_ledger pk_dcs_tenant_wallet_ledger; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: tenant_wallet_ledger pk_tenant_wallet_ledger; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_tenant_wallet_ledger
-    ADD CONSTRAINT pk_dcs_tenant_wallet_ledger PRIMARY KEY (ledger_id);
+ALTER TABLE ONLY public.tenant_wallet_ledger
+    ADD CONSTRAINT pk_tenant_wallet_ledger PRIMARY KEY (ledger_id);
 
 
 --
--- Name: dcs_wallet_alert_state pk_dcs_wallet_alert_state; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: wallet_alert_state pk_wallet_alert_state; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_wallet_alert_state
-    ADD CONSTRAINT pk_dcs_wallet_alert_state PRIMARY KEY (alert_id);
+ALTER TABLE ONLY public.wallet_alert_state
+    ADD CONSTRAINT pk_wallet_alert_state PRIMARY KEY (alert_id);
 
 
 --
--- Name: dcs_wallet_payment_order pk_dcs_wallet_payment_order; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: wallet_payment_order pk_wallet_payment_order; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_wallet_payment_order
-    ADD CONSTRAINT pk_dcs_wallet_payment_order PRIMARY KEY (order_id);
+ALTER TABLE ONLY public.wallet_payment_order
+    ADD CONSTRAINT pk_wallet_payment_order PRIMARY KEY (order_id);
 
 
 --
@@ -2986,51 +3033,51 @@ ALTER TABLE ONLY public.sys_user_role
 
 
 --
--- Name: dcs_ai_model_capability uk_dcs_ai_cap; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: ai_model_capability uk_ai_cap; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_ai_model_capability
-    ADD CONSTRAINT uk_dcs_ai_cap UNIQUE (tenant_id, provider, model_pattern);
-
-
---
--- Name: dcs_assistant_action uk_dcs_asst_act_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dcs_assistant_action
-    ADD CONSTRAINT uk_dcs_asst_act_key UNIQUE (idempotency_key);
+ALTER TABLE ONLY public.ai_model_capability
+    ADD CONSTRAINT uk_ai_cap UNIQUE (tenant_id, provider, model_pattern);
 
 
 --
--- Name: dcs_assistant_favorite uk_dcs_asst_fav; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_action uk_asst_act_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_favorite
-    ADD CONSTRAINT uk_dcs_asst_fav UNIQUE (tenant_id, user_id, content);
-
-
---
--- Name: dcs_assistant_model_setting uk_dcs_asst_model_setting; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.dcs_assistant_model_setting
-    ADD CONSTRAINT uk_dcs_asst_model_setting UNIQUE (tenant_id);
+ALTER TABLE ONLY public.assistant_action
+    ADD CONSTRAINT uk_asst_act_key UNIQUE (idempotency_key);
 
 
 --
--- Name: dcs_assistant_run uk_dcs_asst_run_runid; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_favorite uk_asst_fav; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_run
-    ADD CONSTRAINT uk_dcs_asst_run_runid UNIQUE (run_id);
+ALTER TABLE ONLY public.assistant_favorite
+    ADD CONSTRAINT uk_asst_fav UNIQUE (tenant_id, user_id, content);
 
 
 --
--- Name: dcs_assistant_user_quota uk_dcs_asst_user_quota; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: assistant_model_setting uk_asst_model_setting; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_assistant_user_quota
-    ADD CONSTRAINT uk_dcs_asst_user_quota UNIQUE (tenant_id, user_id);
+ALTER TABLE ONLY public.assistant_model_setting
+    ADD CONSTRAINT uk_asst_model_setting UNIQUE (tenant_id);
+
+
+--
+-- Name: assistant_run uk_asst_run_runid; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.assistant_run
+    ADD CONSTRAINT uk_asst_run_runid UNIQUE (run_id);
+
+
+--
+-- Name: assistant_user_quota uk_asst_user_quota; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.assistant_user_quota
+    ADD CONSTRAINT uk_asst_user_quota UNIQUE (tenant_id, user_id);
 
 
 --
@@ -3055,348 +3102,369 @@ CREATE INDEX idx_profile_subject_xsrc
 
 
 --
--- Name: dcs_file_review_config uq_dcs_file_review_config_tenant; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: file_review_config uq_file_review_config_tenant; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_file_review_config
-    ADD CONSTRAINT uq_dcs_file_review_config_tenant UNIQUE (tenant_id);
+ALTER TABLE ONLY public.file_review_config
+    ADD CONSTRAINT uq_file_review_config_tenant UNIQUE (tenant_id);
 
 
 --
--- Name: dcs_file_review uq_dcs_file_review_oss; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: file_review uq_file_review_oss; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.dcs_file_review
-    ADD CONSTRAINT uq_dcs_file_review_oss UNIQUE (oss_id);
+ALTER TABLE ONLY public.file_review
+    ADD CONSTRAINT uq_file_review_oss UNIQUE (oss_id);
 
 
 --
 -- Name: idx_assist_att_thread; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_assist_att_thread ON public.dcs_assistant_attachment USING btree (tenant_id, thread_id);
+CREATE INDEX idx_assist_att_thread ON public.assistant_attachment USING btree (tenant_id, thread_id);
 
 
 --
 -- Name: idx_assist_att_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_assist_att_user ON public.dcs_assistant_attachment USING btree (user_id);
+CREATE INDEX idx_assist_att_user ON public.assistant_attachment USING btree (user_id);
 
 
 --
 -- Name: idx_captcha_token; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_captcha_token ON public.dcs_captcha_log USING btree (token);
+CREATE INDEX idx_captcha_token ON public.captcha_log USING btree (token);
 
 
 --
 -- Name: idx_captcha_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_captcha_user ON public.dcs_captcha_log USING btree (user_id, created_time);
+CREATE INDEX idx_captcha_user ON public.captcha_log USING btree (user_id, created_time);
 
 
 --
 -- Name: idx_credit_ledger_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_credit_ledger_tenant ON public.dcs_ai_credit_ledger USING btree (tenant_id, biz_type, create_time);
+CREATE INDEX idx_credit_ledger_tenant ON public.ai_credit_ledger USING btree (tenant_id, biz_type, create_time);
 
 
 --
 -- Name: idx_credit_ledger_tenant_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_credit_ledger_tenant_user ON public.dcs_ai_credit_ledger USING btree (tenant_id, create_by, create_time);
+CREATE INDEX idx_credit_ledger_tenant_user ON public.ai_credit_ledger USING btree (tenant_id, create_by, create_time);
 
 
 --
 -- Name: idx_credit_sub_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_credit_sub_tenant ON public.dcs_ai_credit_subscription USING btree (tenant_id, status, end_time);
+CREATE INDEX idx_credit_sub_tenant ON public.ai_credit_subscription USING btree (tenant_id, status, end_time);
 
 
 --
--- Name: idx_dcs_ai_config_tenant_enabled; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_config_tenant_enabled; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_config_tenant_enabled ON public.dcs_ai_config USING btree (tenant_id, enabled);
+CREATE INDEX idx_ai_config_tenant_enabled ON public.ai_config USING btree (tenant_id, enabled);
 
 
 --
--- Name: idx_dcs_ai_model_health_check_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_model_health_check_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_model_health_check_time ON public.dcs_ai_model_health USING btree (check_time);
+CREATE INDEX idx_ai_model_health_check_time ON public.ai_model_health USING btree (check_time);
 
 
 --
--- Name: idx_dcs_ai_model_price_lookup; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_model_price_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_model_price_lookup ON public.dcs_ai_model_price USING btree (tenant_id, provider, model_name, enabled) WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_ai_model_price_lookup ON public.ai_model_price USING btree (tenant_id, provider, model_name, enabled) WHERE (del_flag = '0'::bpchar);
 
 
 --
--- Name: idx_dcs_ai_model_price_source; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_model_price_source; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_model_price_source ON public.dcs_ai_model_price USING btree (tenant_id, price_source) WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_ai_model_price_source ON public.ai_model_price USING btree (tenant_id, price_source) WHERE (del_flag = '0'::bpchar);
 
 
 --
--- Name: idx_dcs_ai_provider_access_tp; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_provider_access_tp; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_provider_access_tp ON public.dcs_ai_provider_access USING btree (tenant_id, provider) WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_ai_provider_access_tp ON public.ai_provider_access USING btree (tenant_id, provider) WHERE (del_flag = '0'::bpchar);
 
 
 --
--- Name: idx_dcs_ai_usage_caller_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_usage_caller_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_usage_caller_time ON public.dcs_ai_usage USING btree (tenant_id, caller, create_time DESC);
+CREATE INDEX idx_ai_usage_caller_time ON public.ai_usage USING btree (tenant_id, caller, create_time DESC);
 
 
 --
--- Name: idx_dcs_ai_usage_config_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_usage_config_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_usage_config_time ON public.dcs_ai_usage USING btree (config_id, create_time DESC);
+CREATE INDEX idx_ai_usage_config_time ON public.ai_usage USING btree (config_id, create_time DESC);
 
 
 --
--- Name: idx_dcs_ai_usage_tenant_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_ai_usage_tenant_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_ai_usage_tenant_time ON public.dcs_ai_usage USING btree (tenant_id, create_time DESC);
+CREATE INDEX idx_ai_usage_tenant_time ON public.ai_usage USING btree (tenant_id, create_time DESC);
 
 
 --
--- Name: idx_dcs_assist_ann_tenant_active; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_assist_ann_tenant_active; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_assist_ann_tenant_active ON public.dcs_assistant_announcement USING btree (tenant_id, status, publish_time DESC);
+CREATE INDEX idx_assist_ann_tenant_active ON public.assistant_announcement USING btree (tenant_id, status, publish_time DESC);
 
 
 --
--- Name: idx_dcs_asst_act_run; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_act_run; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_act_run ON public.dcs_assistant_action USING btree (tenant_id, run_id);
+CREATE INDEX idx_asst_act_run ON public.assistant_action USING btree (tenant_id, run_id);
 
 
 --
--- Name: idx_dcs_asst_conv_list; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_conv_list; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_conv_list ON public.dcs_assistant_conversation USING btree (tenant_id, user_id, last_message_time DESC);
+CREATE INDEX idx_asst_conv_list ON public.assistant_conversation USING btree (tenant_id, user_id, last_message_time DESC);
 
 
 --
--- Name: idx_dcs_asst_fav_user; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_fav_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_fav_user ON public.dcs_assistant_favorite USING btree (tenant_id, user_id);
+CREATE INDEX idx_asst_fav_user ON public.assistant_favorite USING btree (tenant_id, user_id);
 
 
 --
--- Name: idx_dcs_asst_fb_msg; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_fb_msg; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_fb_msg ON public.dcs_assistant_feedback USING btree (tenant_id, message_id);
+CREATE INDEX idx_asst_fb_msg ON public.assistant_feedback USING btree (tenant_id, message_id);
 
 
 --
--- Name: idx_dcs_asst_mem_user; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_mem_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_mem_user ON public.dcs_assistant_memory USING btree (tenant_id, user_id);
+CREATE INDEX idx_asst_mem_user ON public.assistant_memory USING btree (tenant_id, user_id);
 
+--
+-- Name: idx_asst_memory_user_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_asst_memory_user_status ON public.assistant_memory USING btree (tenant_id, user_id, status);
+
+
+--
+-- Name: idx_asst_memory_used; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_asst_memory_used ON public.assistant_memory USING btree (status, last_used_at);
+
+
+--
+-- Name: uk_asst_memory_active_topic; Type: INDEX; Schema: public; Owner: -
+--
+
+-- D1（批 7 前置 STEP 1）：同一（租户,人,主题）只能一条生效中；topic_key 为空不受限
+CREATE UNIQUE INDEX uk_asst_memory_active_topic ON public.assistant_memory USING btree (tenant_id, user_id, topic_key) WHERE status = 'ACTIVE' AND topic_key IS NOT NULL AND del_flag = '0';
+
 
 --
--- Name: idx_dcs_asst_msg_conv; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_msg_conv; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_msg_conv ON public.dcs_assistant_message USING btree (tenant_id, conversation_id, id);
+CREATE INDEX idx_asst_msg_conv ON public.assistant_message USING btree (tenant_id, conversation_id, id);
 
 
 --
--- Name: idx_dcs_asst_run_thread; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_run_thread; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_run_thread ON public.dcs_assistant_run USING btree (tenant_id, thread_id);
+CREATE INDEX idx_asst_run_thread ON public.assistant_run USING btree (tenant_id, thread_id);
 
 
 --
--- Name: idx_dcs_asst_run_user_status; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_run_user_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_run_user_status ON public.dcs_assistant_run USING btree (tenant_id, user_id, status);
+CREATE INDEX idx_asst_run_user_status ON public.assistant_run USING btree (tenant_id, user_id, status);
 
 
 --
--- Name: idx_dcs_asst_run_status_event_ref; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_asst_run_status_event_ref; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_asst_run_status_event_ref ON public.dcs_assistant_run USING btree (status, COALESCE(last_event_at, create_time));
+CREATE INDEX idx_asst_run_status_event_ref ON public.assistant_run USING btree (status, COALESCE(last_event_at, create_time));
 
 
 --
--- Name: idx_dcs_audit_submission; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_audit_submission; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_audit_submission ON public.dcs_audit USING btree (submission_id);
+CREATE INDEX idx_audit_submission ON public.audit USING btree (submission_id);
 
 
 --
--- Name: idx_dcs_audit_task; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_audit_task; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_audit_task ON public.dcs_audit USING btree (task_id);
+CREATE INDEX idx_audit_task ON public.audit USING btree (task_id);
 
 
 --
--- Name: idx_dcs_automation_due; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_automation_due; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_automation_due ON public.dcs_automation USING btree (next_run_at) WHERE ((enabled = '1'::bpchar) AND (del_flag = '0'::bpchar) AND (next_run_at IS NOT NULL));
+CREATE INDEX idx_automation_due ON public.automation USING btree (next_run_at) WHERE ((enabled = '1'::bpchar) AND (del_flag = '0'::bpchar) AND (next_run_at IS NOT NULL));
 
 
 --
--- Name: idx_dcs_automation_run_auto; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_automation_run_auto; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_automation_run_auto ON public.dcs_automation_run USING btree (tenant_id, automation_id, scheduled_for DESC);
+CREATE INDEX idx_automation_run_auto ON public.automation_run USING btree (tenant_id, automation_id, scheduled_for DESC);
 
 
 --
--- Name: idx_dcs_automation_run_user; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_automation_run_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_automation_run_user ON public.dcs_automation_run USING btree (tenant_id, user_id, create_time DESC);
+CREATE INDEX idx_automation_run_user ON public.automation_run USING btree (tenant_id, user_id, create_time DESC);
 
 
 --
--- Name: idx_dcs_automation_user; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_automation_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_automation_user ON public.dcs_automation USING btree (tenant_id, user_id, del_flag, create_time DESC);
+CREATE INDEX idx_automation_user ON public.automation USING btree (tenant_id, user_id, del_flag, create_time DESC);
 
 
 --
--- Name: idx_dcs_file_guard_log_disposition; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_file_guard_log_disposition; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_file_guard_log_disposition ON public.dcs_file_guard_log USING btree (disposition);
+CREATE INDEX idx_file_guard_log_disposition ON public.file_guard_log USING btree (disposition);
 
 
 --
--- Name: idx_dcs_file_guard_log_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_file_guard_log_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_file_guard_log_time ON public.dcs_file_guard_log USING btree (create_time);
+CREATE INDEX idx_file_guard_log_time ON public.file_guard_log USING btree (create_time);
 
 
 --
--- Name: idx_dcs_file_review_reviewer; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_file_review_reviewer; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_file_review_reviewer ON public.dcs_file_review USING btree (tenant_id, reviewer_id, review_time DESC);
+CREATE INDEX idx_file_review_reviewer ON public.file_review USING btree (tenant_id, reviewer_id, review_time DESC);
 
 
 --
--- Name: idx_dcs_file_review_tenant_status; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_file_review_tenant_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_file_review_tenant_status ON public.dcs_file_review USING btree (tenant_id, status, create_time DESC);
+CREATE INDEX idx_file_review_tenant_status ON public.file_review USING btree (tenant_id, status, create_time DESC);
 
 
 --
--- Name: idx_dcs_notice_user; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_notice_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_notice_user ON public.dcs_notice USING btree (tenant_id, user_id, read_flag);
+CREATE INDEX idx_notice_user ON public.notice USING btree (tenant_id, user_id, read_flag);
 
 
 --
--- Name: idx_dcs_profile_review_queue; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_profile_review; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_profile_review_queue ON public.dcs_profile_review USING btree (tenant_id, status, create_time DESC);
+CREATE INDEX idx_profile_review ON public.profile_review USING btree (tenant_id, status, create_time DESC);
 
 
 --
--- Name: idx_dcs_risk_action_queue; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_risk_action_queue; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_risk_action_queue ON public.dcs_risk_action USING btree (tenant_id, status, start_time DESC);
+CREATE INDEX idx_risk_action_queue ON public.risk_action USING btree (tenant_id, status, start_time DESC);
 
 
 --
--- Name: idx_dcs_sensitive_word_enabled; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_sensitive_word_enabled; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_sensitive_word_enabled ON public.dcs_sensitive_word USING btree (tenant_id, enabled, action) WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_sensitive_word_enabled ON public.sensitive_word USING btree (tenant_id, enabled, action) WHERE (del_flag = '0'::bpchar);
 
 
 --
--- Name: idx_dcs_submission_status; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_submission_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_submission_status ON public.dcs_submission USING btree (tenant_id, status);
+CREATE INDEX idx_submission_status ON public.submission USING btree (tenant_id, status);
 
 
 --
--- Name: idx_dcs_submission_task_user; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_submission_task_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_submission_task_user ON public.dcs_submission USING btree (task_id, submitter_user_id, version);
+CREATE INDEX idx_submission_task_user ON public.submission USING btree (task_id, submitter_user_id, version);
 
 
 --
--- Name: idx_dcs_task_field_task; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_task_field_task; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_task_field_task ON public.dcs_task_field USING btree (task_id);
+CREATE INDEX idx_task_field_task ON public.task_field USING btree (task_id);
 
 
 --
--- Name: idx_dcs_task_publish_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_task_publish_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_task_publish_time ON public.dcs_task USING btree (publish_time);
+CREATE INDEX idx_task_publish_time ON public.task USING btree (publish_time);
 
 
 --
--- Name: idx_dcs_task_publisher; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_task_publisher; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_task_publisher ON public.dcs_task USING btree (tenant_id, publisher_user_id);
+CREATE INDEX idx_task_publisher ON public.task USING btree (tenant_id, publisher_user_id);
 
 
 --
--- Name: idx_dcs_task_tenant_status; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_task_tenant_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_task_tenant_status ON public.dcs_task USING btree (tenant_id, status);
+CREATE INDEX idx_task_tenant_status ON public.task USING btree (tenant_id, status);
 
 
 --
--- Name: idx_dcs_word_fp_detail; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_word_fp_detail; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_word_fp_detail ON public.dcs_word_fp_feedback USING btree (detail_id);
+CREATE INDEX idx_word_fp_detail ON public.word_fp_feedback USING btree (detail_id);
 
 
 --
--- Name: idx_dcs_word_fp_time; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_word_fp_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dcs_word_fp_time ON public.dcs_word_fp_feedback USING btree (create_time);
+CREATE INDEX idx_word_fp_time ON public.word_fp_feedback USING btree (create_time);
 
 
 --
@@ -3542,28 +3610,28 @@ CREATE UNIQUE INDEX uk_profile_rule_draft ON public.profile_score_rule USING btr
 -- Name: idx_risk_event_ip_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_risk_event_ip_time ON public.dcs_risk_event USING btree (ip, created_time);
+CREATE INDEX idx_risk_event_ip_time ON public.risk_event USING btree (ip, created_time);
 
 
 --
 -- Name: idx_risk_event_type_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_risk_event_type_time ON public.dcs_risk_event USING btree (event_type, created_time);
+CREATE INDEX idx_risk_event_type_time ON public.risk_event USING btree (event_type, created_time);
 
 
 --
 -- Name: idx_risk_event_user_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_risk_event_user_time ON public.dcs_risk_event USING btree (user_id, created_time);
+CREATE INDEX idx_risk_event_user_time ON public.risk_event USING btree (user_id, created_time);
 
 
 --
 -- Name: idx_risk_wl_type_value; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_risk_wl_type_value ON public.dcs_risk_whitelist USING btree (list_type, value);
+CREATE INDEX idx_risk_wl_type_value ON public.risk_whitelist USING btree (list_type, value);
 
 
 --
@@ -3626,28 +3694,28 @@ CREATE INDEX idx_sys_user_username ON public.sys_user USING btree (user_name);
 -- Name: idx_tenant_wallet_tenant_type; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_tenant_wallet_tenant_type ON public.dcs_tenant_wallet USING btree (tenant_id, wallet_type, status) WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_tenant_wallet_tenant_type ON public.tenant_wallet USING btree (tenant_id, wallet_type, status) WHERE (del_flag = '0'::bpchar);
 
 
 --
 -- Name: idx_wallet_ledger_tenant_service; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_wallet_ledger_tenant_service ON public.dcs_tenant_wallet_ledger USING btree (tenant_id, service_code, create_time);
+CREATE INDEX idx_wallet_ledger_tenant_service ON public.tenant_wallet_ledger USING btree (tenant_id, service_code, create_time);
 
 
 --
 -- Name: idx_wallet_ledger_wallet_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_wallet_ledger_wallet_time ON public.dcs_tenant_wallet_ledger USING btree (wallet_id, create_time);
+CREATE INDEX idx_wallet_ledger_wallet_time ON public.tenant_wallet_ledger USING btree (wallet_id, create_time);
 
 
 --
 -- Name: idx_wallet_payment_order_tenant_time; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_wallet_payment_order_tenant_time ON public.dcs_wallet_payment_order USING btree (tenant_id, create_time);
+CREATE INDEX idx_wallet_payment_order_tenant_time ON public.wallet_payment_order USING btree (tenant_id, create_time);
 
 
 --
@@ -3661,154 +3729,154 @@ CREATE UNIQUE INDEX sys_dict_type_index1 ON public.sys_dict_type USING btree (te
 -- Name: uk_credit_ledger_idem; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_credit_ledger_idem ON public.dcs_ai_credit_ledger USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
+CREATE UNIQUE INDEX uk_credit_ledger_idem ON public.ai_credit_ledger USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
 
 
 --
 -- Name: uk_credit_sub_active; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_credit_sub_active ON public.dcs_ai_credit_subscription USING btree (tenant_id) WHERE (status = '1'::bpchar);
+CREATE UNIQUE INDEX uk_credit_sub_active ON public.ai_credit_subscription USING btree (tenant_id) WHERE (status = '1'::bpchar);
 
 
 --
--- Name: uk_dcs_ai_config_tenant_default; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_ai_config_tenant_default; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_ai_config_tenant_default ON public.dcs_ai_config USING btree (tenant_id, use_type) WHERE ((is_default = '1'::bpchar) AND (del_flag = '0'::bpchar));
-
-
---
--- Name: uk_dcs_ai_config_tenant_model; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_ai_config_tenant_model ON public.dcs_ai_config USING btree (tenant_id, provider, model_name) WHERE (del_flag = '0'::bpchar);
+CREATE UNIQUE INDEX uk_ai_config_tenant_default ON public.ai_config USING btree (tenant_id, use_type) WHERE ((is_default = '1'::bpchar) AND (del_flag = '0'::bpchar));
 
 
 --
--- Name: uk_dcs_ai_doc_domain; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_ai_config_tenant_model; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_ai_doc_domain ON public.dcs_ai_doc_domain USING btree (tenant_id, domain) WHERE (del_flag = '0'::bpchar);
-
-
---
--- Name: uk_dcs_ai_model_health_tenant_config; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_ai_model_health_tenant_config ON public.dcs_ai_model_health USING btree (tenant_id, config_id);
+CREATE UNIQUE INDEX uk_ai_config_tenant_model ON public.ai_config USING btree (tenant_id, provider, model_name) WHERE (del_flag = '0'::bpchar);
 
 
 --
--- Name: uk_dcs_ai_model_price_model; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_ai_doc_domain; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_ai_model_price_model ON public.dcs_ai_model_price USING btree (tenant_id, provider, model_name) WHERE (del_flag = '0'::bpchar);
-
-
---
--- Name: uk_dcs_asst_conv_thread; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_asst_conv_thread ON public.dcs_assistant_conversation USING btree (tenant_id, thread_id);
+CREATE UNIQUE INDEX uk_ai_doc_domain ON public.ai_doc_domain USING btree (tenant_id, domain) WHERE (del_flag = '0'::bpchar);
 
 
 --
--- Name: uk_dcs_automation_run_running; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_ai_model_health_tenant_config; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_automation_run_running ON public.dcs_automation_run USING btree (automation_id) WHERE ((status)::text = 'RUNNING'::text);
-
-
---
--- Name: uk_dcs_automation_builtin; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_automation_builtin ON public.dcs_automation USING btree (tenant_id) WHERE ((builtin)::text = '1'::text);
+CREATE UNIQUE INDEX uk_ai_model_health_tenant_config ON public.ai_model_health USING btree (tenant_id, config_id);
 
 
 --
--- Name: uk_dcs_automation_run_slot; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_ai_model_price_model; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_automation_run_slot ON public.dcs_automation_run USING btree (automation_id, scheduled_for) WHERE ((trigger_type)::text = 'SCHEDULE'::text);
-
-
---
--- Name: uk_dcs_notice_dedup; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_notice_dedup ON public.dcs_notice USING btree (tenant_id, user_id, dedup_key) WHERE (dedup_key IS NOT NULL);
+CREATE UNIQUE INDEX uk_ai_model_price_model ON public.ai_model_price USING btree (tenant_id, provider, model_name) WHERE (del_flag = '0'::bpchar);
 
 
 --
--- Name: uk_dcs_profile_review_pending_user; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_asst_conv_thread; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_profile_review_pending_user ON public.dcs_profile_review USING btree (tenant_id, user_id) WHERE ((status)::text = 'PENDING'::text);
-
-
---
--- Name: uk_dcs_risk_action_active_user; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_risk_action_active_user ON public.dcs_risk_action USING btree (tenant_id, user_id, action_type) WHERE ((status)::text = 'ACTIVE'::text);
+CREATE UNIQUE INDEX uk_asst_conv_thread ON public.assistant_conversation USING btree (tenant_id, thread_id);
 
 
 --
--- Name: uk_dcs_risk_event_idempotency; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_automation_run_running; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_risk_event_idempotency ON public.dcs_risk_event USING btree (tenant_id, idempotency_key) WHERE (idempotency_key IS NOT NULL);
-
-
---
--- Name: uk_dcs_risk_global_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_risk_global_rule ON public.dcs_risk_rule USING btree (tenant_id) WHERE (((rule_scope)::text = 'GLOBAL'::text) AND (enabled = '1'::bpchar));
+CREATE UNIQUE INDEX uk_automation_run_running ON public.automation_run USING btree (automation_id) WHERE ((status)::text = 'RUNNING'::text);
 
 
 --
--- Name: uk_dcs_risk_rule_event; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_automation_builtin; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_risk_rule_event ON public.dcs_risk_rule USING btree (tenant_id, event_type) WHERE ((rule_scope)::text = 'EVENT'::text);
-
-
---
--- Name: uk_dcs_risk_whitelist_item; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_risk_whitelist_item ON public.dcs_risk_whitelist USING btree (tenant_id, list_type, value);
+CREATE UNIQUE INDEX uk_automation_builtin ON public.automation USING btree (tenant_id) WHERE ((builtin)::text = '1'::text);
 
 
 --
--- Name: uk_dcs_sensitive_word_text; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_automation_run_slot; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_sensitive_word_text ON public.dcs_sensitive_word USING btree (tenant_id, word_text) WHERE (del_flag = '0'::bpchar);
-
-
---
--- Name: uk_dcs_submission_task_ver; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX uk_dcs_submission_task_ver ON public.dcs_submission USING btree (tenant_id, task_id, submitter_user_id, version);
+CREATE UNIQUE INDEX uk_automation_run_slot ON public.automation_run USING btree (automation_id, scheduled_for) WHERE ((trigger_type)::text = 'SCHEDULE'::text);
 
 
 --
--- Name: uk_dcs_task_field_code; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_notice_dedup; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_task_field_code ON public.dcs_task_field USING btree (task_id, field_code);
+CREATE UNIQUE INDEX uk_notice_dedup ON public.notice USING btree (tenant_id, user_id, dedup_key) WHERE (dedup_key IS NOT NULL);
 
 
 --
--- Name: uk_dcs_word_fp_detail_word; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_profile_review_pending_user; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_dcs_word_fp_detail_word ON public.dcs_word_fp_feedback USING btree (detail_id, word_text);
+CREATE UNIQUE INDEX uk_profile_review_pending_user ON public.profile_review USING btree (tenant_id, user_id) WHERE ((status)::text = 'PENDING'::text);
+
+
+--
+-- Name: uk_risk_action_active_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_risk_action_active_user ON public.risk_action USING btree (tenant_id, user_id, action_type) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
+-- Name: uk_risk_event_idempotency; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_risk_event_idempotency ON public.risk_event USING btree (tenant_id, idempotency_key) WHERE (idempotency_key IS NOT NULL);
+
+
+--
+-- Name: uk_risk_global_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_risk_global_rule ON public.risk_rule USING btree (tenant_id) WHERE (((rule_scope)::text = 'GLOBAL'::text) AND (enabled = '1'::bpchar));
+
+
+--
+-- Name: uk_risk_rule_event; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_risk_rule_event ON public.risk_rule USING btree (tenant_id, event_type) WHERE ((rule_scope)::text = 'EVENT'::text);
+
+
+--
+-- Name: uk_risk_whitelist_item; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_risk_whitelist_item ON public.risk_whitelist USING btree (tenant_id, list_type, value);
+
+
+--
+-- Name: uk_sensitive_word_text; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_sensitive_word_text ON public.sensitive_word USING btree (tenant_id, word_text) WHERE (del_flag = '0'::bpchar);
+
+
+--
+-- Name: uk_submission_task_ver; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_submission_task_ver ON public.submission USING btree (tenant_id, task_id, submitter_user_id, version);
+
+
+--
+-- Name: uk_task_field_code; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_task_field_code ON public.task_field USING btree (task_id, field_code);
+
+
+--
+-- Name: uk_word_fp_detail_word; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_word_fp_detail_word ON public.word_fp_feedback USING btree (detail_id, word_text);
 
 
 --
@@ -3829,7 +3897,7 @@ CREATE UNIQUE INDEX uk_profile_score_dimension ON public.profile_score_dimension
 -- Name: uk_service_charge_rule_tenant_code; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_service_charge_rule_tenant_code ON public.dcs_service_charge_rule USING btree (tenant_id, service_code) WHERE (del_flag = '0'::bpchar);
+CREATE UNIQUE INDEX uk_service_charge_rule_tenant_code ON public.service_charge_rule USING btree (tenant_id, service_code) WHERE (del_flag = '0'::bpchar);
 
 
 --
@@ -3867,28 +3935,28 @@ CREATE UNIQUE INDEX uk_sys_user_tenant_name ON public.sys_user USING btree (tena
 -- Name: uk_tenant_wallet_main; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_tenant_wallet_main ON public.dcs_tenant_wallet USING btree (tenant_id, wallet_type) WHERE (((wallet_type)::text = 'MAIN'::text) AND (del_flag = '0'::bpchar));
+CREATE UNIQUE INDEX uk_tenant_wallet_main ON public.tenant_wallet USING btree (tenant_id, wallet_type) WHERE (((wallet_type)::text = 'MAIN'::text) AND (del_flag = '0'::bpchar));
 
 
 --
 -- Name: uk_wallet_alert_state_wallet_type; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_wallet_alert_state_wallet_type ON public.dcs_wallet_alert_state USING btree (wallet_id, alert_type) WHERE (del_flag = '0'::bpchar);
+CREATE UNIQUE INDEX uk_wallet_alert_state_wallet_type ON public.wallet_alert_state USING btree (wallet_id, alert_type) WHERE (del_flag = '0'::bpchar);
 
 
 --
 -- Name: uk_wallet_ledger_idempotency; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_wallet_ledger_idempotency ON public.dcs_tenant_wallet_ledger USING btree (idempotency_key) WHERE (del_flag = '0'::bpchar);
+CREATE UNIQUE INDEX uk_wallet_ledger_idempotency ON public.tenant_wallet_ledger USING btree (idempotency_key) WHERE (del_flag = '0'::bpchar);
 
 
 --
 -- Name: uk_wallet_payment_order_no; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_wallet_payment_order_no ON public.dcs_wallet_payment_order USING btree (order_no) WHERE (del_flag = '0'::bpchar);
+CREATE UNIQUE INDEX uk_wallet_payment_order_no ON public.wallet_payment_order USING btree (order_no) WHERE (del_flag = '0'::bpchar);
 
 
 --
@@ -3965,10 +4033,10 @@ CREATE TABLE agentscope.agentscope_store (
 
 
 --
--- Name: dcs_p0_probe_audit; Type: TABLE; Schema: agentscope; Owner: -
+-- Name: p0_probe_audit; Type: TABLE; Schema: agentscope; Owner: -
 --
 
-CREATE TABLE agentscope.dcs_p0_probe_audit (
+CREATE TABLE agentscope.p0_probe_audit (
     id bigint NOT NULL,
     event character varying(32) NOT NULL,
     idempotency_key character varying(128),
@@ -3979,10 +4047,10 @@ CREATE TABLE agentscope.dcs_p0_probe_audit (
 
 
 --
--- Name: dcs_p0_probe_audit_id_seq; Type: SEQUENCE; Schema: agentscope; Owner: -
+-- Name: p0_probe_audit_id_seq; Type: SEQUENCE; Schema: agentscope; Owner: -
 --
 
-CREATE SEQUENCE agentscope.dcs_p0_probe_audit_id_seq
+CREATE SEQUENCE agentscope.p0_probe_audit_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -3991,17 +4059,17 @@ CREATE SEQUENCE agentscope.dcs_p0_probe_audit_id_seq
 
 
 --
--- Name: dcs_p0_probe_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: agentscope; Owner: -
+-- Name: p0_probe_audit_id_seq; Type: SEQUENCE OWNED BY; Schema: agentscope; Owner: -
 --
 
-ALTER SEQUENCE agentscope.dcs_p0_probe_audit_id_seq OWNED BY agentscope.dcs_p0_probe_audit.id;
+ALTER SEQUENCE agentscope.p0_probe_audit_id_seq OWNED BY agentscope.p0_probe_audit.id;
 
 
 --
--- Name: dcs_p0_probe_ledger; Type: TABLE; Schema: agentscope; Owner: -
+-- Name: p0_probe_ledger; Type: TABLE; Schema: agentscope; Owner: -
 --
 
-CREATE TABLE agentscope.dcs_p0_probe_ledger (
+CREATE TABLE agentscope.p0_probe_ledger (
     id bigint NOT NULL,
     idempotency_key character varying(128) NOT NULL,
     user_key character varying(64) NOT NULL,
@@ -4014,10 +4082,10 @@ CREATE TABLE agentscope.dcs_p0_probe_ledger (
 
 
 --
--- Name: dcs_p0_probe_ledger_id_seq; Type: SEQUENCE; Schema: agentscope; Owner: -
+-- Name: p0_probe_ledger_id_seq; Type: SEQUENCE; Schema: agentscope; Owner: -
 --
 
-CREATE SEQUENCE agentscope.dcs_p0_probe_ledger_id_seq
+CREATE SEQUENCE agentscope.p0_probe_ledger_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -4026,17 +4094,17 @@ CREATE SEQUENCE agentscope.dcs_p0_probe_ledger_id_seq
 
 
 --
--- Name: dcs_p0_probe_ledger_id_seq; Type: SEQUENCE OWNED BY; Schema: agentscope; Owner: -
+-- Name: p0_probe_ledger_id_seq; Type: SEQUENCE OWNED BY; Schema: agentscope; Owner: -
 --
 
-ALTER SEQUENCE agentscope.dcs_p0_probe_ledger_id_seq OWNED BY agentscope.dcs_p0_probe_ledger.id;
+ALTER SEQUENCE agentscope.p0_probe_ledger_id_seq OWNED BY agentscope.p0_probe_ledger.id;
 
 
 --
--- Name: dcs_p0_probe_run_registry; Type: TABLE; Schema: agentscope; Owner: -
+-- Name: p0_probe_run_registry; Type: TABLE; Schema: agentscope; Owner: -
 --
 
-CREATE TABLE agentscope.dcs_p0_probe_run_registry (
+CREATE TABLE agentscope.p0_probe_run_registry (
     run_id character varying(64) NOT NULL,
     user_key character varying(64) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
@@ -4044,10 +4112,10 @@ CREATE TABLE agentscope.dcs_p0_probe_run_registry (
 
 
 --
--- Name: dcs_p0_probe_usage; Type: TABLE; Schema: agentscope; Owner: -
+-- Name: p0_probe_usage; Type: TABLE; Schema: agentscope; Owner: -
 --
 
-CREATE TABLE agentscope.dcs_p0_probe_usage (
+CREATE TABLE agentscope.p0_probe_usage (
     id bigint NOT NULL,
     idempotency_key character varying(128) NOT NULL,
     user_key character varying(64) NOT NULL,
@@ -4062,10 +4130,10 @@ CREATE TABLE agentscope.dcs_p0_probe_usage (
 
 
 --
--- Name: dcs_p0_probe_usage_id_seq; Type: SEQUENCE; Schema: agentscope; Owner: -
+-- Name: p0_probe_usage_id_seq; Type: SEQUENCE; Schema: agentscope; Owner: -
 --
 
-CREATE SEQUENCE agentscope.dcs_p0_probe_usage_id_seq
+CREATE SEQUENCE agentscope.p0_probe_usage_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -4074,41 +4142,41 @@ CREATE SEQUENCE agentscope.dcs_p0_probe_usage_id_seq
 
 
 --
--- Name: dcs_p0_probe_usage_id_seq; Type: SEQUENCE OWNED BY; Schema: agentscope; Owner: -
+-- Name: p0_probe_usage_id_seq; Type: SEQUENCE OWNED BY; Schema: agentscope; Owner: -
 --
 
-ALTER SEQUENCE agentscope.dcs_p0_probe_usage_id_seq OWNED BY agentscope.dcs_p0_probe_usage.id;
+ALTER SEQUENCE agentscope.p0_probe_usage_id_seq OWNED BY agentscope.p0_probe_usage.id;
 
 
 --
--- Name: dcs_p0_probe_wallet; Type: TABLE; Schema: agentscope; Owner: -
+-- Name: p0_probe_wallet; Type: TABLE; Schema: agentscope; Owner: -
 --
 
-CREATE TABLE agentscope.dcs_p0_probe_wallet (
+CREATE TABLE agentscope.p0_probe_wallet (
     user_key character varying(64) NOT NULL,
     balance numeric(14,6) NOT NULL
 );
 
 
 --
--- Name: dcs_p0_probe_audit id; Type: DEFAULT; Schema: agentscope; Owner: -
+-- Name: p0_probe_audit id; Type: DEFAULT; Schema: agentscope; Owner: -
 --
 
-ALTER TABLE ONLY agentscope.dcs_p0_probe_audit ALTER COLUMN id SET DEFAULT nextval('agentscope.dcs_p0_probe_audit_id_seq'::regclass);
-
-
---
--- Name: dcs_p0_probe_ledger id; Type: DEFAULT; Schema: agentscope; Owner: -
---
-
-ALTER TABLE ONLY agentscope.dcs_p0_probe_ledger ALTER COLUMN id SET DEFAULT nextval('agentscope.dcs_p0_probe_ledger_id_seq'::regclass);
+ALTER TABLE ONLY agentscope.p0_probe_audit ALTER COLUMN id SET DEFAULT nextval('agentscope.p0_probe_audit_id_seq'::regclass);
 
 
 --
--- Name: dcs_p0_probe_usage id; Type: DEFAULT; Schema: agentscope; Owner: -
+-- Name: p0_probe_ledger id; Type: DEFAULT; Schema: agentscope; Owner: -
 --
 
-ALTER TABLE ONLY agentscope.dcs_p0_probe_usage ALTER COLUMN id SET DEFAULT nextval('agentscope.dcs_p0_probe_usage_id_seq'::regclass);
+ALTER TABLE ONLY agentscope.p0_probe_ledger ALTER COLUMN id SET DEFAULT nextval('agentscope.p0_probe_ledger_id_seq'::regclass);
+
+
+--
+-- Name: p0_probe_usage id; Type: DEFAULT; Schema: agentscope; Owner: -
+--
+
+ALTER TABLE ONLY agentscope.p0_probe_usage ALTER COLUMN id SET DEFAULT nextval('agentscope.p0_probe_usage_id_seq'::regclass);
 
 
 --
@@ -4136,59 +4204,59 @@ ALTER TABLE ONLY agentscope.agentscope_store
 
 
 --
--- Name: dcs_p0_probe_audit dcs_p0_probe_audit_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
+-- Name: p0_probe_audit p0_probe_audit_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
 --
 
-ALTER TABLE ONLY agentscope.dcs_p0_probe_audit
-    ADD CONSTRAINT dcs_p0_probe_audit_pkey PRIMARY KEY (id);
-
-
---
--- Name: dcs_p0_probe_ledger dcs_p0_probe_ledger_idempotency_key_key; Type: CONSTRAINT; Schema: agentscope; Owner: -
---
-
-ALTER TABLE ONLY agentscope.dcs_p0_probe_ledger
-    ADD CONSTRAINT dcs_p0_probe_ledger_idempotency_key_key UNIQUE (idempotency_key);
+ALTER TABLE ONLY agentscope.p0_probe_audit
+    ADD CONSTRAINT p0_probe_audit_pkey PRIMARY KEY (id);
 
 
 --
--- Name: dcs_p0_probe_ledger dcs_p0_probe_ledger_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
+-- Name: p0_probe_ledger p0_probe_ledger_idempotency_key_key; Type: CONSTRAINT; Schema: agentscope; Owner: -
 --
 
-ALTER TABLE ONLY agentscope.dcs_p0_probe_ledger
-    ADD CONSTRAINT dcs_p0_probe_ledger_pkey PRIMARY KEY (id);
-
-
---
--- Name: dcs_p0_probe_run_registry dcs_p0_probe_run_registry_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
---
-
-ALTER TABLE ONLY agentscope.dcs_p0_probe_run_registry
-    ADD CONSTRAINT dcs_p0_probe_run_registry_pkey PRIMARY KEY (run_id);
+ALTER TABLE ONLY agentscope.p0_probe_ledger
+    ADD CONSTRAINT p0_probe_ledger_idempotency_key_key UNIQUE (idempotency_key);
 
 
 --
--- Name: dcs_p0_probe_usage dcs_p0_probe_usage_idempotency_key_key; Type: CONSTRAINT; Schema: agentscope; Owner: -
+-- Name: p0_probe_ledger p0_probe_ledger_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
 --
 
-ALTER TABLE ONLY agentscope.dcs_p0_probe_usage
-    ADD CONSTRAINT dcs_p0_probe_usage_idempotency_key_key UNIQUE (idempotency_key);
-
-
---
--- Name: dcs_p0_probe_usage dcs_p0_probe_usage_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
---
-
-ALTER TABLE ONLY agentscope.dcs_p0_probe_usage
-    ADD CONSTRAINT dcs_p0_probe_usage_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY agentscope.p0_probe_ledger
+    ADD CONSTRAINT p0_probe_ledger_pkey PRIMARY KEY (id);
 
 
 --
--- Name: dcs_p0_probe_wallet dcs_p0_probe_wallet_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
+-- Name: p0_probe_run_registry p0_probe_run_registry_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
 --
 
-ALTER TABLE ONLY agentscope.dcs_p0_probe_wallet
-    ADD CONSTRAINT dcs_p0_probe_wallet_pkey PRIMARY KEY (user_key);
+ALTER TABLE ONLY agentscope.p0_probe_run_registry
+    ADD CONSTRAINT p0_probe_run_registry_pkey PRIMARY KEY (run_id);
+
+
+--
+-- Name: p0_probe_usage p0_probe_usage_idempotency_key_key; Type: CONSTRAINT; Schema: agentscope; Owner: -
+--
+
+ALTER TABLE ONLY agentscope.p0_probe_usage
+    ADD CONSTRAINT p0_probe_usage_idempotency_key_key UNIQUE (idempotency_key);
+
+
+--
+-- Name: p0_probe_usage p0_probe_usage_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
+--
+
+ALTER TABLE ONLY agentscope.p0_probe_usage
+    ADD CONSTRAINT p0_probe_usage_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: p0_probe_wallet p0_probe_wallet_pkey; Type: CONSTRAINT; Schema: agentscope; Owner: -
+--
+
+ALTER TABLE ONLY agentscope.p0_probe_wallet
+    ADD CONSTRAINT p0_probe_wallet_pkey PRIMARY KEY (user_key);
 
 
 --
@@ -4290,7 +4358,7 @@ CREATE INDEX IF NOT EXISTS idx_profile_export_time
 -- =====================================================================
 
 -- MCP 服务注册表（管理台「外部工具」页签维护；STDIO/STREAMABLE_HTTP/SSE 三传输）
-CREATE TABLE IF NOT EXISTS public.dcs_mcp_server (
+CREATE TABLE IF NOT EXISTS public.mcp_server (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     server_name character varying(50) NOT NULL,
@@ -4308,17 +4376,17 @@ CREATE TABLE IF NOT EXISTS public.dcs_mcp_server (
     create_time timestamp without time zone,
     update_by bigint,
     update_time timestamp without time zone,
-    CONSTRAINT pk_dcs_mcp_server PRIMARY KEY (id),
+    CONSTRAINT pk_mcp_server PRIMARY KEY (id),
     -- 试点物理删（审计表留痕），不引入逻辑删避免同名重建撞键
-    CONSTRAINT uk_dcs_mcp_server_name UNIQUE (server_name, tenant_id),
-    CONSTRAINT ck_dcs_mcp_transport CHECK (transport_type IN ('STDIO', 'STREAMABLE_HTTP', 'SSE')),
-    CONSTRAINT ck_dcs_mcp_readonly CHECK (read_only = '1'),
-    CONSTRAINT ck_dcs_mcp_enabled CHECK (enabled IN ('0', '1'))
+    CONSTRAINT uk_mcp_server_name UNIQUE (server_name, tenant_id),
+    CONSTRAINT ck_mcp_transport CHECK (transport_type IN ('STDIO', 'STREAMABLE_HTTP', 'SSE')),
+    CONSTRAINT ck_mcp_readonly CHECK (read_only = '1'),
+    CONSTRAINT ck_mcp_enabled CHECK (enabled IN ('0', '1'))
 );
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_server_tenant ON public.dcs_mcp_server (tenant_id, enabled);
+CREATE INDEX IF NOT EXISTS idx_mcp_server_tenant ON public.mcp_server (tenant_id, enabled);
 
 -- MCP 工具调用审计（挂载/每次真实调用两态都落账：MOUNT_OK/MOUNT_ERROR/CALL_OK/CALL_ERROR/RATE_LIMITED）
-CREATE TABLE IF NOT EXISTS public.dcs_mcp_call_log (
+CREATE TABLE IF NOT EXISTS public.mcp_call_log (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     user_id bigint,
@@ -4329,16 +4397,16 @@ CREATE TABLE IF NOT EXISTS public.dcs_mcp_call_log (
     duration_ms integer,
     error_msg character varying(500),
     create_time timestamp without time zone,
-    CONSTRAINT pk_dcs_mcp_call_log PRIMARY KEY (id),
+    CONSTRAINT pk_mcp_call_log PRIMARY KEY (id),
     -- G3 三审回修（双席共识 P0）：原五值约束拒收全部 ELICIT_* 审计（elicitation 反问五态）
-    CONSTRAINT ck_dcs_mcp_call_action CHECK (action IN ('MOUNT_OK', 'MOUNT_ERROR', 'CALL_OK', 'CALL_ERROR', 'RATE_LIMITED', 'ELICIT_ASK', 'ELICIT_ACCEPT', 'ELICIT_DECLINE', 'ELICIT_CANCEL', 'ELICIT_TIMEOUT')),
-    CONSTRAINT ck_dcs_mcp_call_status CHECK (status IN ('0', '1'))
+    CONSTRAINT ck_mcp_call_action CHECK (action IN ('MOUNT_OK', 'MOUNT_ERROR', 'CALL_OK', 'CALL_ERROR', 'RATE_LIMITED', 'ELICIT_ASK', 'ELICIT_ACCEPT', 'ELICIT_DECLINE', 'ELICIT_CANCEL', 'ELICIT_TIMEOUT')),
+    CONSTRAINT ck_mcp_call_status CHECK (status IN ('0', '1'))
 );
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_tenant_time ON public.dcs_mcp_call_log (tenant_id, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_mcp_call_tenant_time ON public.mcp_call_log (tenant_id, create_time DESC);
 -- G4-#5：服务维度过滤（管理页审计按 server_name 查询）+ 超管全量路径（无 tenant 条件）
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_server_time ON public.dcs_mcp_call_log (server_name, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_mcp_call_server_time ON public.mcp_call_log (server_name, create_time DESC);
 -- G4 三审回修：保留期清理路径（WHERE create_time < cutoff）专用
-CREATE INDEX IF NOT EXISTS idx_dcs_mcp_call_create_time ON public.dcs_mcp_call_log (create_time);
+CREATE INDEX IF NOT EXISTS idx_mcp_call_create_time ON public.mcp_call_log (create_time);
 
 -- ===== 2026-10-23 N3：公告已读 / 反馈中心 / 更新日志 =====
 
@@ -4353,7 +4421,7 @@ CREATE TABLE public.sys_notice_read (
 CREATE INDEX idx_sys_notice_portal ON public.sys_notice USING btree (tenant_id, status, is_top DESC, publish_time DESC);
 CREATE INDEX idx_sys_notice_read_user ON public.sys_notice_read USING btree (tenant_id, user_id);
 
-CREATE TABLE public.dcs_feedback (
+CREATE TABLE public.feedback (
     feedback_id bigint NOT NULL,
     tenant_id character varying(20) NOT NULL DEFAULT '000000'::character varying,
     title character varying(200) NOT NULL,
@@ -4373,14 +4441,14 @@ CREATE TABLE public.dcs_feedback (
     update_by bigint,
     update_time timestamp(6) without time zone,
     del_flag character(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_dcs_feedback PRIMARY KEY (feedback_id),
-    CONSTRAINT ck_dcs_feedback_type CHECK (feedback_type::text = ANY (ARRAY['BUG','EXPERIENCE','SUGGEST','OTHER']::text[])),
-    CONSTRAINT ck_dcs_feedback_status CHECK (status::text = ANY (ARRAY['PENDING','PROCESSING','RESOLVED','CLOSED']::text[]))
+    CONSTRAINT pk_feedback PRIMARY KEY (feedback_id),
+    CONSTRAINT ck_feedback_type CHECK (feedback_type::text = ANY (ARRAY['BUG','EXPERIENCE','SUGGEST','OTHER']::text[])),
+    CONSTRAINT ck_feedback_status CHECK (status::text = ANY (ARRAY['PENDING','PROCESSING','RESOLVED','CLOSED']::text[]))
 );
 
-CREATE INDEX idx_dcs_feedback_status ON public.dcs_feedback USING btree (status);
-CREATE INDEX idx_dcs_feedback_create_by ON public.dcs_feedback USING btree (create_by);
-CREATE INDEX idx_dcs_feedback_tenant_status ON public.dcs_feedback USING btree (tenant_id, status, create_time DESC);
+CREATE INDEX idx_feedback_status ON public.feedback USING btree (status);
+CREATE INDEX idx_feedback_create_by ON public.feedback USING btree (create_by);
+CREATE INDEX idx_feedback_tenant_status ON public.feedback USING btree (tenant_id, status, create_time DESC);
 
 CREATE TABLE public.dcs_changelog (
     log_id bigint NOT NULL,
@@ -4396,9 +4464,34 @@ CREATE TABLE public.dcs_changelog (
     update_by bigint,
     update_time timestamp(6) without time zone,
     del_flag character(1) DEFAULT '0'::bpchar,
-    CONSTRAINT pk_dcs_changelog PRIMARY KEY (log_id),
-    CONSTRAINT ck_dcs_changelog_status CHECK (status::text = ANY (ARRAY['0','1']::text[]))
+    CONSTRAINT pk_changelog PRIMARY KEY (log_id),
+    CONSTRAINT ck_changelog_status CHECK (status::text = ANY (ARRAY['0','1']::text[]))
 );
 
-CREATE UNIQUE INDEX uk_dcs_changelog_version ON public.dcs_changelog USING btree (version) WHERE (del_flag = '0'::bpchar);
-CREATE INDEX idx_dcs_changelog_status_publish ON public.dcs_changelog USING btree (status, publish_time DESC);
+CREATE UNIQUE INDEX uk_changelog_version ON public.dcs_changelog USING btree (version) WHERE (del_flag = '0'::bpchar);
+CREATE INDEX idx_changelog_status_publish ON public.dcs_changelog USING btree (status, publish_time DESC);
+
+
+-- Name: assistant_run_issue; Type: TABLE; Schema: public; Owner: -
+-- 2026-11-11 拍板 Q1-3（「这轮为什么没回答」问题表）：一轮至多一条，终态写成功才落；
+-- message_id 指向该轮用户提问行（历史回放挂靠锚点）；detail=脱敏后服务商原文（Q2-2）；
+-- 保留 90 天（消息表为 180 天，issue 表更短），(tenant_id, code, create_time) 给后续按原因统计（Q1 拍板留的口子）。
+CREATE TABLE public.assistant_run_issue (
+    id bigint NOT NULL,
+    tenant_id character varying(20) NOT NULL,
+    user_id bigint NOT NULL,
+    conversation_id bigint,
+    thread_id character varying(128),
+    run_id character varying(128) NOT NULL,
+    message_id bigint,
+    code character varying(16) NOT NULL,
+    detail character varying(512),
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_assistant_run_issue PRIMARY KEY (id),
+    CONSTRAINT ck_asst_issue_code CHECK (code::text = ANY (ARRAY['empty','rate','quota','timeout','auth','other']::text[]))
+);
+
+CREATE INDEX idx_asst_issue_conv ON public.assistant_run_issue USING btree (tenant_id, user_id, conversation_id);
+CREATE INDEX idx_asst_issue_stats ON public.assistant_run_issue USING btree (tenant_id, code, create_time);
+-- run_id 唯一（终审 P1）：「同 run 只落一条」的 DB 兜底，插入侧配 ON CONFLICT DO NOTHING
+CREATE UNIQUE INDEX uk_asst_issue_run ON public.assistant_run_issue USING btree (run_id);

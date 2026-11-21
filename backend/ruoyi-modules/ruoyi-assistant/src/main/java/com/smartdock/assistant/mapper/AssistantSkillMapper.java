@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.annotation.InterceptorIgnore;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import com.smartdock.assistant.domain.model.DcsAssistantSkill;
+import com.smartdock.assistant.domain.model.AssistantSkill;
 
 import java.util.List;
 
@@ -15,7 +15,7 @@ import java.util.List;
  * 必须手写——禁租户插件注入，SQL 自带租户条件（仓根 AGENTS 多租户铁律）。</p>
  */
 @InterceptorIgnore(tenantLine = "true")
-public interface AssistantSkillMapper extends BaseMapper<DcsAssistantSkill> {
+public interface AssistantSkillMapper extends BaseMapper<AssistantSkill> {
 
     /**
      * 管理列表/装载共用：全局基线＋本租户全部行（含停用行）。生效/停用分拣与
@@ -23,7 +23,7 @@ public interface AssistantSkillMapper extends BaseMapper<DcsAssistantSkill> {
      * 旧的 disabled=0 过滤版 selectEffective 已删（三审 dsflash P2-4 死 SQL；
      * 它正是「停用被下层顶回」P0 的根因载体，留着易被误用）。
      */
-    @Select("SELECT * FROM dcs_assistant_skill WHERE tenant_id IN ('000000', #{tenantId})"
+    @Select("SELECT * FROM assistant_skill WHERE tenant_id IN ('000000', #{tenantId})"
         + " ORDER BY skill_id, tenant_id")
-    List<DcsAssistantSkill> selectAllForTenant(@Param("tenantId") String tenantId);
+    List<AssistantSkill> selectAllForTenant(@Param("tenantId") String tenantId);
 }

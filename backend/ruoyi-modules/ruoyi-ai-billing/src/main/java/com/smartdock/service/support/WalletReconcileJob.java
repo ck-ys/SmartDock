@@ -38,7 +38,7 @@ import java.util.Set;
  *
  * <p>告警链: 差异 → {@link WalletAlertService#publishReconcileAlert}(事务内) →
  * WalletAlertEvent(WALLET_RECONCILE_MISMATCH) → dcs 侧 WalletAlertNoticeAdapter 同步翻译 →
- * 站内信风险分组。该字面量被 DcsNoticeMapper.xml/DcsNoticeServiceImpl/前端 noticePresentation
+ * 站内信风险分组。该字面量被 NoticeMapper.xml/NoticeServiceImpl/前端 noticePresentation
  * 硬编码过滤, 禁改字。未处理差异每晚重复告警(有意设计, 对账守卫不静默)。</p>
  *
  * @author smartdock
@@ -57,7 +57,7 @@ public class WalletReconcileJob {
 
     /**
      * 每晚 02:30 对账巡检(失败只记日志, 不抛出——定时线程抛异常只会刷屏)。
-     * 批2 拍板 Q6:A: @Lock4j 跨节点互斥(范式同 DcsNoticeOutboxRetryScanner), 防多实例双跑双告警。
+     * 批2 拍板 Q6:A: @Lock4j 跨节点互斥(范式同 NoticeOutboxRetryScanner), 防多实例双跑双告警。
      */
     @Scheduled(cron = "0 30 2 * * ?")
     @Lock4j(keys = {"'wallet-reconcile-job'"})

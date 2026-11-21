@@ -24,7 +24,7 @@ INSERT INTO sys_role_menu (role_id, menu_id) VALUES
   (5, 11960),
   (5, 11961);
 
--- role 6 租户管理员(全审 glm53 P1: 补 dcs:task:add/edit/publish 三按钮 11963/11964/11965,
+-- role 6 租户管理员(全审 glm53 P1: 补 smartdock:task:add/edit/publish 三按钮 11963/11964/11965,
 -- 否则租户管理员的发布人主流程整体 403)
 INSERT INTO sys_role_menu (role_id, menu_id) VALUES
   (6, 1),

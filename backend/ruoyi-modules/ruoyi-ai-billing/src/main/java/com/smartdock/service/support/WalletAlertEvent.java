@@ -10,12 +10,12 @@ import java.util.Map;
  *
  * <p>设计约束:
  * <ul>
- *   <li><b>不继承 DcsNoticeEvent</b>——ai-billing 模块禁止反向依赖 dcs 的通知事件,
- *       且继承会导致 dcs 侧 DcsNoticeListener 按类型兼容匹配到两次(outbox 无业务级去重 = 管理员收双份);</li>
+ *   <li><b>不继承 NoticeEvent</b>——ai-billing 模块禁止反向依赖 dcs 的通知事件,
+ *       且继承会导致 dcs 侧 NoticeListener 按类型兼容匹配到两次(outbox 无业务级去重 = 管理员收双份);</li>
  *   <li>dcs 侧 {@code WalletAlertNoticeAdapter} 以<b>同步 @EventListener</b> 在同事务内翻译成
- *       DcsNoticeEvent 进通知管道(BEFORE_COMMIT 落 outbox), 语义与拆分前完全等价;</li>
- *   <li>noticeType 字面量(WALLET_LOW_BALANCE/WALLET_EXHAUSTED)被 DcsNoticeMapper.xml 与
- *       DcsNoticeServiceImpl 硬编码过滤, <b>禁止改字</b>, 否则告警从"风险分组"页静默消失。</li>
+ *       NoticeEvent 进通知管道(BEFORE_COMMIT 落 outbox), 语义与拆分前完全等价;</li>
+ *   <li>noticeType 字面量(WALLET_LOW_BALANCE/WALLET_EXHAUSTED)被 NoticeMapper.xml 与
+ *       NoticeServiceImpl 硬编码过滤, <b>禁止改字</b>, 否则告警从"风险分组"页静默消失。</li>
  * </ul></p>
  *
  * @author smartdock

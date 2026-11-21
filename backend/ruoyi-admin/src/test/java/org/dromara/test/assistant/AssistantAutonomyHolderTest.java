@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.core.AssistantAutonomyHolder;
+import com.smartdock.assistant.engine.core.AssistantAutonomyHolder;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -34,25 +34,25 @@ class AssistantAutonomyHolderTest {
     @Test
     void alwaysNeverAutoAllowsEvenIfApproved() {
         AssistantAutonomyHolder.set("q9-t2", "always");
-        AssistantAutonomyHolder.rememberApproved("q9-t2", "dcs_remind_create");
-        assertFalse(AssistantAutonomyHolder.autoAllows("q9-t2", "dcs_remind_create"), "每次都问=永远不自动放行");
+        AssistantAutonomyHolder.rememberApproved("q9-t2", "remind_create");
+        assertFalse(AssistantAutonomyHolder.autoAllows("q9-t2", "remind_create"), "每次都问=永远不自动放行");
     }
 
     @Test
     void onceOnlyAutoAllowsSameToolAfterApproval() {
         AssistantAutonomyHolder.set("q9-t3", "once");
-        assertFalse(AssistantAutonomyHolder.autoAllows("q9-t3", "dcs_remind_create"), "没确认过=仍要问");
-        AssistantAutonomyHolder.rememberApproved("q9-t3", "dcs_remind_create");
-        assertTrue(AssistantAutonomyHolder.autoAllows("q9-t3", "dcs_remind_create"), "同类确认过=下一轮放行");
-        assertFalse(AssistantAutonomyHolder.autoAllows("q9-t3", "dcs_task_create"), "按工具名记键，别的写工具仍要问");
+        assertFalse(AssistantAutonomyHolder.autoAllows("q9-t3", "remind_create"), "没确认过=仍要问");
+        AssistantAutonomyHolder.rememberApproved("q9-t3", "remind_create");
+        assertTrue(AssistantAutonomyHolder.autoAllows("q9-t3", "remind_create"), "同类确认过=下一轮放行");
+        assertFalse(AssistantAutonomyHolder.autoAllows("q9-t3", "task_create"), "按工具名记键，别的写工具仍要问");
     }
 
     @Test
     void autoAllowsEveryWriteTool() {
         AssistantAutonomyHolder.set("q9-t4", "auto");
-        assertTrue(AssistantAutonomyHolder.autoAllows("q9-t4", "dcs_remind_create"));
-        assertTrue(AssistantAutonomyHolder.autoAllows("q9-t4", "dcs_task_create"));
-        assertFalse(AssistantAutonomyHolder.autoAllows(null, "dcs_task_create"), "无会话不自动放行");
+        assertTrue(AssistantAutonomyHolder.autoAllows("q9-t4", "remind_create"));
+        assertTrue(AssistantAutonomyHolder.autoAllows("q9-t4", "task_create"));
+        assertFalse(AssistantAutonomyHolder.autoAllows(null, "task_create"), "无会话不自动放行");
     }
 
     /** 题9 三席回修 P1：once 档确认一次后必须触发缓存重建（否则规则停在 ASK，「同类只问一次」刷新即退化） */
@@ -61,11 +61,11 @@ class AssistantAutonomyHolderTest {
         AssistantAutonomyHolder.set("q9-t6", "once");
         AssistantAutonomyHolder.markBuilt("q9-t6", AssistantAutonomyHolder.ONCE);
         assertFalse(AssistantAutonomyHolder.needsRebuild("q9-t6"), "刚建好不重建");
-        AssistantAutonomyHolder.rememberApproved("q9-t6", "dcs_remind_create");
+        AssistantAutonomyHolder.rememberApproved("q9-t6", "remind_create");
         assertTrue(AssistantAutonomyHolder.needsRebuild("q9-t6"), "批准一次就要重算权限规则（档位没变也一样）");
         AssistantAutonomyHolder.markBuilt("q9-t6", AssistantAutonomyHolder.ONCE);
         assertFalse(AssistantAutonomyHolder.needsRebuild("q9-t6"), "重建后基准对齐");
-        AssistantAutonomyHolder.rememberApproved("q9-t6", "dcs_task_create");
+        AssistantAutonomyHolder.rememberApproved("q9-t6", "task_create");
         assertTrue(AssistantAutonomyHolder.needsRebuild("q9-t6"), "再批准另一个工具同样要重建");
     }
 

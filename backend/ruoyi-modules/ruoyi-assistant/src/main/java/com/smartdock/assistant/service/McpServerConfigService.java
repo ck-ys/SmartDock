@@ -1,8 +1,8 @@
 package com.smartdock.assistant.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.smartdock.assistant.domain.model.DcsMcpServer;
-import com.smartdock.assistant.mapper.DcsMcpServerMapper;
+import com.smartdock.assistant.domain.model.McpServer;
+import com.smartdock.assistant.mapper.McpServerMapper;
 import com.smartdock.assistant.support.McpHeaderCipher;
 import com.smartdock.assistant.support.McpToolFacts;
 import lombok.RequiredArgsConstructor;
@@ -55,30 +55,30 @@ public class McpServerConfigService {
     @Value("${smartdock.mcp.allowed-http-hosts:localhost,127.0.0.1}")
     private String allowedHttpHosts;
 
-    private final DcsMcpServerMapper serverMapper;
+    private final McpServerMapper serverMapper;
     private final McpHeaderCipher headerCipher;
 
     /** 管理清单：全部服务行（按更新时间倒序） */
-    public List<DcsMcpServer> listAll() {
-        return serverMapper.selectList(new LambdaQueryWrapper<DcsMcpServer>()
-            .orderByDesc(DcsMcpServer::getUpdateTime));
+    public List<McpServer> listAll() {
+        return serverMapper.selectList(new LambdaQueryWrapper<McpServer>()
+            .orderByDesc(McpServer::getUpdateTime));
     }
 
     /** G4-#4：全部服务名（工具闸 mcp: 键校验用；平台级表，跨租户读） */
     public Set<String> allServerNames() {
         return TenantHelper.ignore(() -> serverMapper.selectList(
-                new LambdaQueryWrapper<DcsMcpServer>()
-                    .select(DcsMcpServer::getServerName))
-            .stream().map(DcsMcpServer::getServerName).collect(Collectors.toSet()));
+                new LambdaQueryWrapper<McpServer>()
+                    .select(McpServer::getServerName))
+            .stream().map(McpServer::getServerName).collect(Collectors.toSet()));
     }
 
     /** 回显键名（解密后取，值永不出库到前端）——实现收在加密件 */
-    public String headerKeysOf(DcsMcpServer row) {
+    public String headerKeysOf(McpServer row) {
         return headerCipher.headerKeysOf(row);
     }
 
     /** 新增/编辑：白名单校验（命令/脚本目录/host/请求头）全在这——controller 只管鉴权与审计 */
-    public void save(DcsMcpServer row) {
+    public void save(McpServer row) {
         if (row.getServerName() == null || !NAME_PATTERN.matcher(row.getServerName()).matches()) {
             throw new ServiceException("服务名限 3-30 位小写字母/数字/下划线，且以字母开头");
         }
@@ -115,7 +115,7 @@ public class McpServerConfigService {
         if (!"0".equals(enabled) && !"1".equals(enabled)) {
             throw new ServiceException("enabled 只支持 0/1");
         }
-        DcsMcpServer patch = new DcsMcpServer();
+        McpServer patch = new McpServer();
         patch.setId(id);
         patch.setEnabled(enabled);
         patch.setUpdateTime(new Date());
@@ -130,7 +130,7 @@ public class McpServerConfigService {
     }
 
     /** 白名单校验单点（只被 save 调用） */
-    void normalizeAndValidate(DcsMcpServer row) {
+    void normalizeAndValidate(McpServer row) {
         String t = row.getTransportType();
         if ("STDIO".equals(t)) {
             if (!ALLOWED_COMMANDS.contains(row.getCommand() == null ? "" : row.getCommand())) {

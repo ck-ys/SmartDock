@@ -1,6 +1,6 @@
 package org.dromara.web.adapter;
 
-import com.smartdock.dcs.service.DcsNoticeService;
+import com.smartdock.mission.service.NoticeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.service.support.WalletAlertEvent;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
  *
  * <p>旧仓消费者随 com.smartdock 退役。ai-billing 只发布 {@link WalletAlertEvent}
  * （低余额/耗尽/对账差异/订阅到期族），本适配器在 admin 组合根把它翻译成
- * {@code DcsNoticeService.notify}，余额告警链路恢复闭环。</p>
+ * {@code NoticeService.notify}，余额告警链路恢复闭环。</p>
  *
  * <p><b>相位红线（继承旧合同#9）</b>：必须同步 {@code @EventListener}（同线程同事务），
  * 禁止 @Async / @TransactionalEventListener——异步翻译 = 调度事务已提交、告警静默丢失。
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>频次闸（批4 回修，三审并案 P1）</b>：businessDedupKey 逐字透传给
  * notifyIdem——积分告警族（周/月/一次频次）与对账告警无状态表，键就是唯一节流器，
- * 丢弃即日轰。低余额链键为 null，走源侧 dcs_wallet_alert_state 日历天判重，不受影响。</p>
+ * 丢弃即日轰。低余额链键为 null，走源侧 wallet_alert_state 日历天判重，不受影响。</p>
  *
  * <p>字段口径：noticeType/title/content 逐字透传；refUrl/extra 丢弃（微核心通知模型极简，
  * 无跳转列，登记批5 通知中心接线时评估）。</p>
@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class WalletAlertNoticeAdapter {
 
-    private final DcsNoticeService noticeService;
+    private final NoticeService noticeService;
 
     @EventListener
     public void onWalletAlert(WalletAlertEvent event) {

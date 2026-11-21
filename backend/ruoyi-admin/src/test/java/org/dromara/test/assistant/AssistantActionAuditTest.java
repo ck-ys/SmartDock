@@ -1,10 +1,10 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.core.AssistantActionLedgerHook;
-import com.smartdock.assistant.legacy.core.AssistantReleaseMode;
-import com.smartdock.assistant.legacy.core.AssistantRunContext;
-import com.smartdock.assistant.legacy.core.ProviderToolRegistry;
-import com.smartdock.assistant.legacy.service.AssistantActionService;
+import com.smartdock.assistant.engine.core.AssistantActionLedgerHook;
+import com.smartdock.assistant.engine.core.AssistantReleaseMode;
+import com.smartdock.assistant.engine.core.AssistantRunContext;
+import com.smartdock.assistant.engine.core.ProviderToolRegistry;
+import com.smartdock.assistant.service.AssistantActionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -70,13 +70,13 @@ class AssistantActionAuditTest {
             public void finish(Long rowId, boolean ok, String summary, Long refId) {
             }
         };
-        // 放行集只含 dcs_create_task（auto 快照）；save_memory 不在集合但按平台放行记 allow
+        // 放行集只含 create_task（auto 快照）；save_memory 不在集合但按平台放行记 allow
         ProviderToolRegistry.AuditScope scope =
-            new ProviderToolRegistry.AuditScope(Set.of("dcs_create_task"), Set.of("dcs_create_task"));
+            new ProviderToolRegistry.AuditScope(Set.of("create_task"), Set.of("create_task"));
         AssistantActionLedgerHook hook = new AssistantActionLedgerHook(port, "000000", 7L, "th-audit", scope);
 
         assertEquals(Long.valueOf(101L), hook.open("save_memory", "{\"content\":\"称呼我为小林\"}"));
-        assertEquals(Long.valueOf(101L), hook.open("dcs_create_task", "{\"title\":\"t\"}"));
+        assertEquals(Long.valueOf(101L), hook.open("create_task", "{\"title\":\"t\"}"));
         assertEquals(2, keys.size());
         assertNotEquals(keys.get(0), keys.get(1));
         assertEquals(AssistantReleaseMode.ALLOW, modes.get(0), "save_memory=平台放行（不在放行集也 allow）");
@@ -100,7 +100,7 @@ class AssistantActionAuditTest {
         };
         AssistantActionLedgerHook hook = new AssistantActionLedgerHook(bomb, "000000", 7L, "th-audit",
             new ProviderToolRegistry.AuditScope(Set.of(), Set.of()));
-        assertNull(hook.open("dcs_create_task", "{}"), "open 抛异常→null（不炸工具执行）");
+        assertNull(hook.open("create_task", "{}"), "open 抛异常→null（不炸工具执行）");
         hook.finish(101L, true, "执行完成", null); // finish 抛异常也不外传
         hook.finish(null, true, "执行完成", null); // rowId=null no-op
     }

@@ -1,8 +1,8 @@
 package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.TenantConfigGateway;
-import com.smartdock.assistant.legacy.domain.DcsAssistantConfig;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
+import com.smartdock.assistant.domain.model.AssistantConfig;
+import com.smartdock.assistant.service.AssistantConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -38,16 +38,16 @@ public class TenantConfigGatewayImpl implements TenantConfigGateway {
     @Override
     public List<String> digestEnabledTenantIds() {
         return configService.digestEnabledTenants().stream()
-            .map(DcsAssistantConfig::getTenantId)
+            .map(AssistantConfig::getTenantId)
             .toList();
     }
 
     @Override
     public void setDigestEnabled(String tenantId, boolean enabled) {
         // 原 toggleBuiltin 内联舞步（批 8B 前 Service:172-178）原样搬来：无行先落一行
-        DcsAssistantConfig cfg = configService.raw(tenantId);
+        AssistantConfig cfg = configService.raw(tenantId);
         if (cfg == null) {
-            cfg = new DcsAssistantConfig();
+            cfg = new AssistantConfig();
             cfg.setTenantId(tenantId);
         }
         cfg.setDigestEnabled(enabled ? "1" : "0");

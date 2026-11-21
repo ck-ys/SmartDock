@@ -1,8 +1,8 @@
 package org.dromara.test.adapter;
 
-import com.smartdock.dcs.service.DcsNoticeService;
+import com.smartdock.mission.service.NoticeService;
 import org.dromara.common.tenant.helper.TenantHelper;
-import com.smartdock.domain.DcsFileReview;
+import com.smartdock.domain.FileReview;
 import com.smartdock.service.support.FileReviewNoticeEvent;
 import org.dromara.web.adapter.FileReviewNoticeAdapter;
 import org.junit.jupiter.api.Tag;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.verify;
 @Tag("local")
 class FileReviewNoticeAdapterTest {
 
-    private final DcsNoticeService noticeService = mock(DcsNoticeService.class);
+    private final NoticeService noticeService = mock(NoticeService.class);
     private final FileReviewNoticeAdapter adapter = new FileReviewNoticeAdapter(noticeService);
 
     private static MockedStatic<TenantHelper> tenantPassThrough() {
@@ -44,8 +44,8 @@ class FileReviewNoticeAdapterTest {
         return t;
     }
 
-    private static DcsFileReview review(String tenantId, Long uploaderId) {
-        DcsFileReview r = new DcsFileReview();
+    private static FileReview review(String tenantId, Long uploaderId) {
+        FileReview r = new FileReview();
         r.setReviewId(11L);
         r.setFileName("统计表.xlsx");
         r.setMissionId(22L);
@@ -82,7 +82,7 @@ class FileReviewNoticeAdapterTest {
 
     @Test
     void nullFileNameFallsBackToUnnamed() {
-        DcsFileReview r = review("000000", 9L);
+        FileReview r = review("000000", 9L);
         r.setFileName(null);
         try (MockedStatic<TenantHelper> ignored = tenantPassThrough()) {
             adapter.onFileReviewRejected(new FileReviewNoticeEvent(r, "x"));

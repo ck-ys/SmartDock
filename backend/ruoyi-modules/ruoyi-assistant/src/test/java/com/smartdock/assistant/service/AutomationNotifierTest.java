@@ -21,7 +21,7 @@ class AutomationNotifierTest {
 
     @Test
     void plainFlattensMarkdownLinks() {
-        assertThat(AutomationNotifier.plain("见 [办公用品领用登记](/dcs/mission/detail/1)"))
+        assertThat(AutomationNotifier.plain("见 [办公用品领用登记](/smartdock/mission/detail/1)"))
             .isEqualTo("见 办公用品领用登记");
         assertThat(AutomationNotifier.plain("![图](/a.png)")).isEqualTo("");
     }

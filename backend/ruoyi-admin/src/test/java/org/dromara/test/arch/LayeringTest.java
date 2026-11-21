@@ -54,7 +54,7 @@ class LayeringTest {
     void Controller不许直接摸Mapper() throws IOException {
         Map<String, Set<String>> actual = dependencies(
             LayeringTest::isMapper,
-            "com.smartdock.assistant.legacy.controller", "com.smartdock.assistant.controller");
+            "com.smartdock.assistant.controller");
         assertNoNew("controllerMapper", actual, "Controller 直接依赖 Mapper（把查询下沉到 Service）");
     }
 
@@ -62,7 +62,7 @@ class LayeringTest {
     void Controller不许借别的模块的Service() throws IOException {
         Map<String, Set<String>> actual = dependencies(
             LayeringTest::isForeignService,
-            "com.smartdock.assistant.legacy.controller", "com.smartdock.assistant.controller");
+            "com.smartdock.assistant.controller");
         assertNoNew("controllerForeignService", actual, "Controller 依赖助手模块以外的 Service（走本模块 Service 或适配器）");
     }
 
@@ -118,7 +118,7 @@ class LayeringTest {
     private static boolean isController(JavaClass c) {
         String pkg = c.getPackageName();
         return c.getSimpleName().endsWith("Controller")
-            && ("com.smartdock.assistant.legacy.controller".equals(pkg) || "com.smartdock.assistant.controller".equals(pkg));
+            && "com.smartdock.assistant.controller".equals(pkg);
     }
 
     private static boolean isMapper(JavaClass c) {

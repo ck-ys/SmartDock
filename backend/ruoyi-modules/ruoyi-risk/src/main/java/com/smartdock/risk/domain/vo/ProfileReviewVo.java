@@ -7,7 +7,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 用户画像人工复核记录展示对象(对应表 dcs_profile_review)。
+ * 用户画像人工复核记录展示对象(对应表 profile_review)。
  *
  * <p><b>何时生成</b>: 评分规则算出画像风险等级达到阈值时, 系统自动生成一条 PENDING 复核记录,
  * 由安全管理员人工给出最终结论(CONFIRMED/DISMISSED), 用于在自动评分之上叠加人工裁决。</p>

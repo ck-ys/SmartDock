@@ -6,7 +6,7 @@ import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.model.Model;
 import com.smartdock.assistant.infrastructure.BillingModelDecorator;
 import org.dromara.common.core.exception.ServiceException;
-import com.smartdock.domain.DcsAiConfig;
+import com.smartdock.domain.AiConfig;
 import com.smartdock.domain.bo.WalletOperationBo;
 import com.smartdock.service.support.AiBillingService;
 import com.smartdock.service.support.AiTokenUsageSnapshot;
@@ -66,7 +66,7 @@ class D1BillingTest {
     @Autowired
     AiBillingService billingService;
     @Autowired
-    com.smartdock.service.IDcsAiModelPriceService priceService;
+    com.smartdock.service.IAiModelPriceService priceService;
     @Autowired
     DataSource ds;
 
@@ -78,8 +78,8 @@ class D1BillingTest {
 
     // ========== 辅助 ==========
 
-    private DcsAiConfig chatConfig(Long configId) {
-        DcsAiConfig cfg = new DcsAiConfig();
+    private AiConfig chatConfig(Long configId) {
+        AiConfig cfg = new AiConfig();
         cfg.setConfigId(configId);
         cfg.setTenantId(TENANT);
         cfg.setProvider("DEEPSEEK");
@@ -93,7 +93,7 @@ class D1BillingTest {
     private BigDecimal costPerCall() throws Exception {
         if (costPerCall == null) {
             List<Map<String, Object>> rows = query(
-                "SELECT input_price_per_million, output_price_per_million FROM dcs_ai_model_price"
+                "SELECT input_price_per_million, output_price_per_million FROM ai_model_price"
                     + " WHERE model_name='deepseek-v4-flash' AND currency='CNY' AND enabled='1' AND del_flag='0'");
             assertEquals(1, rows.size(), "v4-flash CNY 价格行应恰一条");
             Map<String, Object> row = rows.get(0);
@@ -105,12 +105,12 @@ class D1BillingTest {
     }
 
     private Long walletId() throws Exception {
-        return queryForLong("SELECT wallet_id FROM dcs_tenant_wallet WHERE tenant_id=? AND wallet_type='MAIN' AND del_flag='0'", TENANT);
+        return queryForLong("SELECT wallet_id FROM tenant_wallet WHERE tenant_id=? AND wallet_type='MAIN' AND del_flag='0'", TENANT);
     }
 
     private BigDecimal balance() throws Exception {
         walletService.getOrCreateMainWallet(TENANT);
-        return queryForDecimal("SELECT balance_amount FROM dcs_tenant_wallet WHERE wallet_id=?", walletId());
+        return queryForDecimal("SELECT balance_amount FROM tenant_wallet WHERE wallet_id=?", walletId());
     }
 
     private Long queryForLong(String sql, Object... params) throws Exception {
@@ -208,15 +208,15 @@ class D1BillingTest {
         assertEquals(before.subtract(costPerCall().multiply(BigDecimal.valueOf(threads))).setScale(4, RoundingMode.HALF_UP),
             after.setScale(4, RoundingMode.HALF_UP), "钱包扣减=50×单笔期望值 精确值");
         Long ledgerCount = queryForLong(
-            "SELECT COUNT(*) FROM dcs_tenant_wallet_ledger WHERE idempotency_key LIKE ?", RUN_KEY + ":c%");
+            "SELECT COUNT(*) FROM tenant_wallet_ledger WHERE idempotency_key LIKE ?", RUN_KEY + ":c%");
         Long usageCount = queryForLong(
-            "SELECT COUNT(*) FROM dcs_ai_usage WHERE scene LIKE ? AND caller='ASSISTANT_CHAT'", RUN_KEY + ":conc:%");
+            "SELECT COUNT(*) FROM ai_usage WHERE scene LIKE ? AND caller='ASSISTANT_CHAT'", RUN_KEY + ":conc:%");
         assertEquals(50L, ledgerCount, "流水恰 50 条");
         assertEquals(50L, usageCount, "单据恰 50 条且全部挂上流水");
         // 坑68: 逐行同精度(round4 == ledger.amount)
         List<Map<String, Object>> rows = query(
-            "SELECT u.usage_id, ROUND(u.cost_amount,4) AS cost4, l.amount FROM dcs_ai_usage u"
-                + " JOIN dcs_tenant_wallet_ledger l ON l.biz_id=u.usage_id WHERE u.scene LIKE ?", RUN_KEY + ":conc:%");
+            "SELECT u.usage_id, ROUND(u.cost_amount,4) AS cost4, l.amount FROM ai_usage u"
+                + " JOIN tenant_wallet_ledger l ON l.biz_id=u.usage_id WHERE u.scene LIKE ?", RUN_KEY + ":conc:%");
         assertEquals(50, rows.size());
         for (Map<String, Object> row : rows) {
             assertEquals(0, ((BigDecimal) row.get("cost4")).compareTo((BigDecimal) row.get("amount")),
@@ -226,7 +226,7 @@ class D1BillingTest {
         Long chainBreaks = queryForLong(
             "SELECT COUNT(*) FROM (SELECT balance_before,"
                 + " LAG(balance_after) OVER (PARTITION BY wallet_id ORDER BY ledger_id) AS prev_after"
-                + " FROM dcs_tenant_wallet_ledger WHERE del_flag='0' AND wallet_id=?) t"
+                + " FROM tenant_wallet_ledger WHERE del_flag='0' AND wallet_id=?) t"
                 + " WHERE prev_after IS NOT NULL AND balance_before <> prev_after", walletId());
         assertEquals(0L, chainBreaks, "条件扣减路径流水链零断裂");
     }
@@ -267,9 +267,9 @@ class D1BillingTest {
         assertEquals(before.subtract(costPerCall()).setScale(4, RoundingMode.HALF_UP), after.setScale(4, RoundingMode.HALF_UP),
             "双击只扣一笔单笔期望值");
         Long ledgerCount = queryForLong(
-            "SELECT COUNT(*) FROM dcs_tenant_wallet_ledger WHERE idempotency_key=?", key);
+            "SELECT COUNT(*) FROM tenant_wallet_ledger WHERE idempotency_key=?", key);
         Long usageCount = queryForLong(
-            "SELECT COUNT(*) FROM dcs_ai_usage WHERE scene=? AND caller='ASSISTANT_CHAT'", RUN_KEY + ":double");
+            "SELECT COUNT(*) FROM ai_usage WHERE scene=? AND caller='ASSISTANT_CHAT'", RUN_KEY + ":double");
         assertEquals(1L, ledgerCount, "同键并发只产生一条流水");
         assertEquals(1L, usageCount, "同键并发只产生一条单据(败者整事务回滚)");
         CONSUMED.accumulateAndGet(costPerCall(), BigDecimal::add);
@@ -296,7 +296,7 @@ class D1BillingTest {
         assertEquals(before.subtract(costPerCall()).setScale(4, RoundingMode.HALF_UP),
             balance().setScale(4, RoundingMode.HALF_UP), "重放/篡改不动余额");
         Long usageCount = queryForLong(
-            "SELECT COUNT(*) FROM dcs_ai_usage WHERE scene=? AND caller='ASSISTANT_CHAT'", RUN_KEY + ":replay");
+            "SELECT COUNT(*) FROM ai_usage WHERE scene=? AND caller='ASSISTANT_CHAT'", RUN_KEY + ":replay");
         assertEquals(1L, usageCount, "重放不重复插单");
         CONSUMED.accumulateAndGet(costPerCall(), BigDecimal::add);
     }
@@ -314,13 +314,13 @@ class D1BillingTest {
             5L, true, null, 1L, key);
         assertNotNull(usageId);
         List<Map<String, Object>> rows = query(
-            "SELECT wallet_ledger_id, pricing_snapshot FROM dcs_ai_usage WHERE usage_id=?", usageId);
+            "SELECT wallet_ledger_id, pricing_snapshot FROM ai_usage WHERE usage_id=?", usageId);
         assertEquals(1, rows.size());
         assertNull(rows.get(0).get("wallet_ledger_id"), "欠费单不挂流水");
         assertTrue(String.valueOf(rows.get(0).get("pricing_snapshot")).contains("\"walletDeducted\":false"),
             "打免扣标记(对账④识别): " + rows.get(0).get("pricing_snapshot"));
         Long ledgerCount = queryForLong(
-            "SELECT COUNT(*) FROM dcs_tenant_wallet_ledger WHERE idempotency_key=?", key);
+            "SELECT COUNT(*) FROM tenant_wallet_ledger WHERE idempotency_key=?", key);
         assertEquals(0L, ledgerCount, "无流水");
         assertEquals(before.setScale(4, RoundingMode.HALF_UP), balance().setScale(4, RoundingMode.HALF_UP),
             "欠费拦截不动余额(条件更新原子性)");
@@ -335,7 +335,7 @@ class D1BillingTest {
     @Test
     void decoratorEstimatesWhenUsageMissing() throws Exception {
         BigDecimal before = balance();
-        DcsAiConfig cfg = chatConfig(System.nanoTime()); // 每轮唯一 configId → 幂等键不撞历史轮
+        AiConfig cfg = chatConfig(System.nanoTime()); // 每轮唯一 configId → 幂等键不撞历史轮
         AtomicInteger delegateCalls = new AtomicInteger();
         Model stub = new Model() {
             @Override
@@ -365,14 +365,14 @@ class D1BillingTest {
         assertEquals(1, delegateCalls.get());
         List<Map<String, Object>> rows = query(
             "SELECT prompt_tokens, completion_tokens, cost_amount, wallet_ledger_id, scene"
-                + " FROM dcs_ai_usage WHERE config_id=? AND caller='ASSISTANT_CHAT'", cfg.getConfigId());
+                + " FROM ai_usage WHERE config_id=? AND caller='ASSISTANT_CHAT'", cfg.getConfigId());
         assertEquals(1, rows.size(), "估算兜底也必须落一条单据(防免费用)");
         assertTrue(((Number) rows.get(0).get("prompt_tokens")).intValue() >= 1, "估算 prompt≥1");
         assertTrue(((Number) rows.get(0).get("completion_tokens")).intValue() >= 256, "估算 completion 兜底下限 256");
         assertNotNull(rows.get(0).get("wallet_ledger_id"), "估算计费真实扣款");
         BigDecimal ledgerAmount = queryForDecimal(
-            "SELECT amount FROM dcs_tenant_wallet_ledger WHERE idempotency_key LIKE ?",
-            "ai-assistant:" + TENANT + ":" + cfg.getConfigId() + ":%:1");
+            "SELECT amount FROM tenant_wallet_ledger WHERE idempotency_key LIKE ?",
+            "ai-smartdock:assistant:" + TENANT + ":" + cfg.getConfigId() + ":%:1");
         assertNotNull(ledgerAmount, "装饰器幂等键落流水");
         assertEquals(((BigDecimal) rows.get(0).get("cost_amount")).setScale(4, RoundingMode.HALF_UP),
             ledgerAmount.setScale(4, RoundingMode.HALF_UP), "估算金额同精度入账");
@@ -390,7 +390,7 @@ class D1BillingTest {
                 + " COUNT(*) FILTER (WHERE u.wallet_ledger_id IS NULL"
                 + "   AND COALESCE(u.pricing_snapshot, '') NOT LIKE '%\"walletDeducted\":false%'"
                 + "   AND ROUND(u.cost_amount, 4) > 0) AS deduct_missing"
-                + " FROM dcs_ai_usage u WHERE u.caller='ASSISTANT_CHAT' AND u.success='1'"
+                + " FROM ai_usage u WHERE u.caller='ASSISTANT_CHAT' AND u.success='1'"
                 + " GROUP BY u.tenant_id");
         for (Map<String, Object> row : rows) {
             assertEquals(0L, ((Number) row.get("deduct_missing")).longValue(),
@@ -409,7 +409,7 @@ class D1BillingTest {
         org.junit.jupiter.api.Assumptions.assumeTrue(stale.isEmpty(), "前置清残留后应无地板键");
 
         // —— 场景A: 上游流错误(模拟模型商 5xx/断流) ——
-        DcsAiConfig cfgA = chatConfig(System.nanoTime());
+        AiConfig cfgA = chatConfig(System.nanoTime());
         Model errStub = new Model() {
             @Override
             public reactor.core.publisher.Flux<ChatResponse> stream(List<io.agentscope.core.message.Msg> messages,
@@ -439,7 +439,7 @@ class D1BillingTest {
         assertTrue(floorKeysOfTenant().isEmpty(), "上游故障回合不得抬全租户地板价: " + floorKeysOfTenant());
 
         // —— 场景B: 正常完成但天价账单扣不动(真欠费) → 照抬 ——
-        DcsAiConfig cfgB = chatConfig(System.nanoTime());
+        AiConfig cfgB = chatConfig(System.nanoTime());
         Model okStub = new Model() {
             @Override
             public reactor.core.publisher.Flux<ChatResponse> stream(List<io.agentscope.core.message.Msg> messages,
@@ -468,8 +468,8 @@ class D1BillingTest {
         assertEquals(1, raised.size(), "真欠费回合应抬地板价");
         // 万一余额真扣动了(地板不抬, 测试会红), 把流水计入回填防漂移
         BigDecimal ledgerAmount = queryForDecimal(
-            "SELECT amount FROM dcs_tenant_wallet_ledger WHERE idempotency_key LIKE ?",
-            "ai-assistant:" + TENANT + ":" + cfgB.getConfigId() + ":%:1");
+            "SELECT amount FROM tenant_wallet_ledger WHERE idempotency_key LIKE ?",
+            "ai-smartdock:assistant:" + TENANT + ":" + cfgB.getConfigId() + ":%:1");
         if (ledgerAmount != null) {
             CONSUMED.accumulateAndGet(ledgerAmount, BigDecimal::add);
         }
@@ -480,7 +480,7 @@ class D1BillingTest {
     private java.util.List<String> floorKeysOfTenant() {
         java.util.List<String> keys = new ArrayList<>();
         org.dromara.common.redis.utils.RedisUtils.getClient().getKeys()
-            .getKeysStreamByPattern("*dcs:assistant:billing:floor*")
+            .getKeysStreamByPattern("*assistant:billing:floor*")
             .forEach(k -> {
                 if (k.contains(TENANT)) {
                     keys.add(k);
@@ -500,7 +500,7 @@ class D1BillingTest {
      */
     @Test
     void preGateBlocksBeforeModelCall() throws Exception {
-        DcsAiConfig cfg = chatConfig(System.nanoTime());
+        AiConfig cfg = chatConfig(System.nanoTime());
         cfg.setTenantId("999999"); // 无钱包租户
         AtomicInteger delegateCalls = new AtomicInteger();
         Model stub = new Model() {
@@ -529,7 +529,7 @@ class D1BillingTest {
         assertTrue(ex.getMessage().contains("额度不足"), "友好话术: " + ex.getMessage());
         assertEquals(0, delegateCalls.get(), "拦截发生在模型调用前(零成本)");
         Long usageCount = queryForLong(
-            "SELECT COUNT(*) FROM dcs_ai_usage WHERE tenant_id='999999' AND caller='ASSISTANT_CHAT'");
+            "SELECT COUNT(*) FROM ai_usage WHERE tenant_id='999999' AND caller='ASSISTANT_CHAT'");
         assertEquals(0L, usageCount, "拦截不产生任何计费单据");
     }
 }

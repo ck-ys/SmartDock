@@ -2,7 +2,7 @@ package com.smartdock.assistant.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.smartdock.assistant.domain.gateway.MessageOwnershipGateway;
-import com.smartdock.assistant.domain.model.DcsAssistantFeedback;
+import com.smartdock.assistant.domain.model.AssistantFeedback;
 import com.smartdock.assistant.mapper.AssistantFeedbackMapper;
 import com.smartdock.assistant.support.AssistantPiiFilter;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +42,7 @@ public class AssistantFeedbackService {
             throw new ServiceException("只能评价自己会话中的消息", 403);
         }
         if (feedbackMapper.selectRecentDuplicate(tenantId, userId, messageId, rating) != null) {
-            log.debug("[dcs-assistant] 反馈幂等命中（10s 窗内重复），跳过入库: user={} msg={} {}", userId, messageId, rating);
+            log.debug("[smartdock-assistant] 反馈幂等命中（10s 窗内重复），跳过入库: user={} msg={} {}", userId, messageId, rating);
             return;
         }
         if (note != null) {
@@ -52,7 +52,7 @@ public class AssistantFeedbackService {
                 note = note.substring(0, 500);
             }
         }
-        DcsAssistantFeedback row = new DcsAssistantFeedback();
+        AssistantFeedback row = new AssistantFeedback();
         row.setId(IdWorker.getId());
         row.setTenantId(tenantId);
         row.setUserId(userId);
@@ -116,8 +116,8 @@ public class AssistantFeedbackService {
         return out;
     }
 
-    /** 管理端反馈列表（feedback:query 权限，租户内全量） */
-    public List<DcsAssistantFeedback> listForTenant(String tenantId, int limit, int offset) {
+    /** 管理端反馈列表（smartdock:feedback:query 权限，租户内全量） */
+    public List<AssistantFeedback> listForTenant(String tenantId, int limit, int offset) {
         return feedbackMapper.selectPage(tenantId, limit, offset);
     }
 

@@ -14,7 +14,7 @@ import java.util.concurrent.locks.LockSupport;
  *
  * <p>口径：显示值=后端按当前生效价折算的元值（拍板2 A+「后端元值，前端禁自算价格」）；
  * 账本流水仍是唯一真源，角标仅提示性展示（ReAct 多笔模型调用累计）。
- * runId 侧来自 {@link com.smartdock.assistant.legacy.core.AssistantRunContext}（流线程 ThreadLocal，
+ * runId 侧来自 {@link com.smartdock.assistant.engine.core.AssistantRunContext}（流线程 ThreadLocal，
  * 装饰器 record 落在同流线程时可达；异步线程错过=角标缺省，无害降级）。</p>
  */
 @Component

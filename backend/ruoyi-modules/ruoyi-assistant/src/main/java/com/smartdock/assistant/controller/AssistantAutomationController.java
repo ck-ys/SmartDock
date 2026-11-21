@@ -28,17 +28,17 @@ import java.util.Map;
  * AI 助手自动化端点（2026-11-05 拍板 题7 乙）。
  *
  * <p>可见性：只看自己的自建项 + 本租户内置项；内置项开关走管理权限
- * {@code dcs:assistant:config}（成员看到卡片但开关不可点）。</p>
+ * {@code smartdock:assistant:config}（成员看到卡片但开关不可点）。</p>
  */
 @Tag(name = "助手自动化", description = "到点跑一轮只读 AI 任务：列表/新建/编辑/开关/立即运行/运行历史")
 @RestController
-@RequestMapping("/dcs/assistant/automations")
+@RequestMapping("/assistant/automations")
 @RequiredArgsConstructor
 public class AssistantAutomationController extends BaseController {
 
     private final AssistantAutomationService automationService;
 
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @GetMapping
     public R<List<AutomationVo>> list(@RequestParam(required = false) String filter) {
         return R.ok(automationService.list(LoginHelper.getTenantId(), LoginHelper.getUserId(),
@@ -46,7 +46,7 @@ public class AssistantAutomationController extends BaseController {
     }
 
     /** 未来 5 次预览（新建/编辑页日程卡；不落库） */
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @GetMapping("/preview")
     public R<List<String>> preview(@RequestParam String scheduleType,
                                    @RequestParam String scheduleTime,
@@ -55,41 +55,41 @@ public class AssistantAutomationController extends BaseController {
     }
 
     /** 最近运行（跨本人自建项 + 内置摘要） */
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @GetMapping("/runs/recent")
     public R<List<AutomationRunVo>> recentRuns(@RequestParam(defaultValue = "5") int limit) {
         return R.ok(automationService.recentRuns(LoginHelper.getTenantId(), LoginHelper.getUserId(), limit));
     }
 
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @GetMapping("/{id}")
     public R<AutomationVo> detail(@PathVariable Long id) {
         return R.ok(automationService.detail(LoginHelper.getTenantId(), LoginHelper.getUserId(),
             id, canManageBuiltin()));
     }
 
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @GetMapping("/{id}/runs")
     public R<List<AutomationRunVo>> runs(@PathVariable Long id,
                                          @RequestParam(defaultValue = "10") int limit) {
         return R.ok(automationService.runs(LoginHelper.getTenantId(), LoginHelper.getUserId(), id, limit));
     }
 
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @Log(title = "AI助手-自动化", businessType = BusinessType.INSERT)
     @PostMapping
     public R<AutomationVo> create(@RequestBody AutomationBo bo) {
         return R.ok(automationService.create(LoginHelper.getTenantId(), LoginHelper.getUserId(), bo));
     }
 
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @Log(title = "AI助手-自动化", businessType = BusinessType.UPDATE)
     @PostMapping("/{id}")
     public R<AutomationVo> update(@PathVariable Long id, @RequestBody AutomationBo bo) {
         return R.ok(automationService.update(LoginHelper.getTenantId(), LoginHelper.getUserId(), id, bo));
     }
 
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @Log(title = "AI助手-自动化", businessType = BusinessType.UPDATE)
     @PostMapping("/{id}/toggle")
     public R<AutomationVo> toggle(@PathVariable Long id, @RequestBody Map<String, Object> body) {
@@ -97,7 +97,7 @@ public class AssistantAutomationController extends BaseController {
         return R.ok(automationService.toggle(LoginHelper.getTenantId(), LoginHelper.getUserId(), id, enabled));
     }
 
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @Log(title = "AI助手-自动化", businessType = BusinessType.DELETE)
     @PostMapping("/{id}/delete")
     public R<Void> delete(@PathVariable Long id) {
@@ -106,7 +106,7 @@ public class AssistantAutomationController extends BaseController {
     }
 
     /** 立即运行一次（题6 甲：失败不自动重试，手动重跑走这里） */
-    @SaCheckPermission("dcs:assistant:automation")
+    @SaCheckPermission("smartdock:assistant:automation")
     @Log(title = "AI助手-自动化", businessType = BusinessType.OTHER)
     @PostMapping("/{id}/run")
     public R<Map<String, Object>> run(@PathVariable Long id) {
@@ -115,7 +115,7 @@ public class AssistantAutomationController extends BaseController {
     }
 
     /** 内置每日摘要开关（写租户 digest_enabled） */
-    @SaCheckPermission("dcs:assistant:config")
+    @SaCheckPermission("smartdock:assistant:config")
     @Log(title = "AI助手-自动化", businessType = BusinessType.UPDATE)
     @PostMapping("/builtin/toggle")
     public R<AutomationVo> toggleBuiltin(@RequestBody Map<String, Object> body) {
@@ -130,6 +130,6 @@ public class AssistantAutomationController extends BaseController {
             return false;
         }
         return user.getMenuPermission().contains("*:*:*")
-            || user.getMenuPermission().contains("dcs:assistant:config");
+            || user.getMenuPermission().contains("smartdock:assistant:config");
     }
 }

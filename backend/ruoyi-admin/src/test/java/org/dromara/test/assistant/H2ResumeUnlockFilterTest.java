@@ -2,12 +2,12 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartdock.assistant.legacy.core.AssistantResumeUnlockFilter;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.engine.core.AssistantResumeUnlockFilter;
+import com.smartdock.assistant.domain.model.AssistantConversation;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
-import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache;
-import com.smartdock.assistant.legacy.persist.AssistantPendingInterruptCache.PendingInterrupt;
-import com.smartdock.assistant.legacy.persist.AssistantRunRecorder;
+import com.smartdock.assistant.engine.persist.AssistantPendingInterruptCache;
+import com.smartdock.assistant.engine.persist.AssistantPendingInterruptCache.PendingInterrupt;
+import com.smartdock.assistant.engine.persist.AssistantRunRecorder;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.junit.jupiter.api.BeforeAll;
@@ -56,7 +56,7 @@ class H2ResumeUnlockFilterTest {
     /**
      * RedisUtils 静态初始化块(SpringUtils.getBean(RedissonClient.class))无 Spring 上下文会炸，
      * static mock 前先给 Hutool SpringUtil 注入返回 mock RedissonClient 的假上下文
-     * （DcsMissionComboMatrixUnitTest 同款配方）。
+     * （批9 前名为 DcsMissionComboMatrixUnitTest，该测试已随任务矩阵功能下线；同款配方见本类 setUp）。
      */
     @BeforeAll
     static void primeSpringContext() {
@@ -80,8 +80,8 @@ class H2ResumeUnlockFilterTest {
     }
 
     /** 会话属主行（thread 首绑=用户 1@000000） */
-    private DcsAssistantConversation ownerConv(long userId) {
-        DcsAssistantConversation conv = new DcsAssistantConversation();
+    private AssistantConversation ownerConv(long userId) {
+        AssistantConversation conv = new AssistantConversation();
         conv.setTenantId("000000");
         conv.setUserId(userId);
         conv.setThreadId(TH);
@@ -104,7 +104,7 @@ class H2ResumeUnlockFilterTest {
     private MockHttpServletRequest postNoAuth(String body) {
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.setMethod("POST");
-        req.setRequestURI("/agui/run/dcs-assistant");
+        req.setRequestURI("/agui/run/smartdock-assistant");
         req.setContentType("application/json");
         req.setContent(body.getBytes(StandardCharsets.UTF_8));
         return req;
@@ -254,7 +254,7 @@ class H2ResumeUnlockFilterTest {
         // GET → 直通原对象
         MockHttpServletRequest get = new MockHttpServletRequest();
         get.setMethod("GET");
-        get.setRequestURI("/agui/run/dcs-assistant");
+        get.setRequestURI("/agui/run/smartdock-assistant");
         MockFilterChain chain = new MockFilterChain();
         filter.doFilter(get, new MockHttpServletResponse(), chain);
         assertSame(get, chain.getRequest(), "非 POST 不进过滤逻辑");

@@ -11,7 +11,7 @@ import java.util.Map;
  * system 侧通过 {@code ObjectProvider<FileReviewGate>} 可空注入：file-security 模块未装配时
  * 所有调用点按"无审核"直通，行为与功能上线前完全一致（合同#14 默认关）。</p>
  *
- * <p>实现方注意：判定只查 dcs_file_review（UNIQUE(oss_id) 索引），
+ * <p>实现方注意：判定只查 file_review（UNIQUE(oss_id) 索引），
  * 严禁把判定结果写入 SYS_OSS 30 天缓存（合同#3）。</p>
  *
  * @author smartdock

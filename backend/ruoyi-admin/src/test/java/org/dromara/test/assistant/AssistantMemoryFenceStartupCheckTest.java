@@ -21,12 +21,12 @@ import static org.mockito.Mockito.when;
 @Tag("local")
 class AssistantMemoryFenceStartupCheckTest {
 
-    /** 双查询桩：按 SQL 内容分流——栅栏查 uk_dcs_asst_memory_active_topic，pref 查表名 */
+    /** 双查询桩：按 SQL 内容分流——栅栏查 uk_asst_memory_active_topic，pref 查表名 */
     private static JdbcTemplate jt(Integer fenceCount, Integer prefCount) {
         JdbcTemplate t = mock(JdbcTemplate.class);
         when(t.queryForObject(anyString(), eq(Integer.class))).thenAnswer(inv -> {
             String sql = inv.getArgument(0, String.class);
-            if (sql.contains("uk_dcs_asst_memory_active_topic")) {
+            if (sql.contains("uk_asst_memory_active_topic")) {
                 return fenceCount;
             }
             return prefCount;
@@ -38,7 +38,7 @@ class AssistantMemoryFenceStartupCheckTest {
     void refusesStartupWhenFenceIndexMissing() {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
             () -> new AssistantMemoryFenceStartupCheck(jt(0, 1)).check());
-        assertTrue(ex.getMessage().contains("uk_dcs_asst_memory_active_topic"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("uk_asst_memory_active_topic"), ex.getMessage());
         assertTrue(ex.getMessage().contains("2026-11-20_memory_active_topic_unique.sql"),
             "提示里要指到迁移文件: " + ex.getMessage());
     }
@@ -54,7 +54,7 @@ class AssistantMemoryFenceStartupCheckTest {
     void refusesStartupWhenPrefUniqueMissing() {
         IllegalStateException ex = assertThrows(IllegalStateException.class,
             () -> new AssistantMemoryFenceStartupCheck(jt(1, 0)).check());
-        assertTrue(ex.getMessage().contains("dcs_assistant_memory_pref"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("assistant_memory_pref"), ex.getMessage());
         assertTrue(ex.getMessage().contains("2026-11-20_memory_pref_constraints.sql"),
             "提示里要指到 pref 迁移文件: " + ex.getMessage());
     }

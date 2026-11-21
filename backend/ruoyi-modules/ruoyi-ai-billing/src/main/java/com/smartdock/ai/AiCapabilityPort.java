@@ -18,13 +18,13 @@ public interface AiCapabilityPort {
      * 语义思考档 → 当前模型的 reasoning_effort 原生值。
      *
      * @param tenantId     租户（能力目录有租户 MANUAL 覆盖行）
-     * @param provider     厂商（dcs_ai_config.provider）
+     * @param provider     厂商（ai_config.provider）
      * @param modelName    模型名
      * @param semanticTier 语义键 FAST/BALANCED/DEEP（存储原值）
      * @return 原生 reasoning_effort 值；null=该档无注入参数（BALANCED 档/能力 NONE/
      *         SWITCH 型模型——Spring AI 无 thinking.type 通道）。注意消费方约定（见
      *         AiGatewayImpl.resolveSlotOverrides）：槽已选档时 null 被翻译成空串=
-     *         显式清空 dcs_ai_config 行的 reasoning_effort（槽语义优先，画像链思考
+     *         显式清空 ai_config 行的 reasoning_effort（槽语义优先，画像链思考
      *         参数完全由槽档决定，不回退行配置）
      */
     String resolveBackendReasoningEffort(String tenantId, String provider, String modelName, String semanticTier);

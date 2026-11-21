@@ -28,7 +28,7 @@ public interface AiUsageAnalysisMapper {
         SELECT to_char(create_time, 'YYYY-MM-DD') AS day,
                COUNT(*) AS calls,
                COALESCE(SUM(cost_amount), 0) AS cost
-          FROM dcs_ai_usage
+          FROM ai_usage
          WHERE tenant_id = #{tenantId}
            AND create_time >= #{begin}
            AND create_time < #{endExcl}
@@ -42,7 +42,7 @@ public interface AiUsageAnalysisMapper {
     @Select("""
         SELECT provider, model_name, COUNT(*) AS calls,
                COALESCE(SUM(cost_amount), 0) AS cost
-          FROM dcs_ai_usage
+          FROM ai_usage
          WHERE tenant_id = #{tenantId}
            AND create_time >= #{begin}
            AND create_time < #{endExcl}
@@ -60,7 +60,7 @@ public interface AiUsageAnalysisMapper {
                COALESCE(d.dept_name, '未分配部门') AS dept_name,
                COUNT(*) AS calls,
                COALESCE(SUM(u.cost_amount), 0) AS cost
-          FROM dcs_ai_usage u
+          FROM ai_usage u
           LEFT JOIN sys_user s ON s.user_id = u.operator_id
           LEFT JOIN sys_dept d ON d.dept_id = s.dept_id
          WHERE u.tenant_id = #{tenantId}
@@ -78,7 +78,7 @@ public interface AiUsageAnalysisMapper {
         SELECT COALESCE(d.dept_name, '未分配部门') AS dept_name,
                COUNT(*) AS calls,
                COALESCE(SUM(u.cost_amount), 0) AS cost
-          FROM dcs_ai_usage u
+          FROM ai_usage u
           LEFT JOIN sys_user s ON s.user_id = u.operator_id
           LEFT JOIN sys_dept d ON d.dept_id = s.dept_id
          WHERE u.tenant_id = #{tenantId}
@@ -97,7 +97,7 @@ public interface AiUsageAnalysisMapper {
                COUNT(*) FILTER (WHERE success = '1') AS success_calls,
                COALESCE(AVG(latency_ms), 0) AS avg_latency_ms,
                COALESCE(SUM(cost_amount), 0) AS cost
-          FROM dcs_ai_usage
+          FROM ai_usage
          WHERE tenant_id = #{tenantId}
            AND create_time >= #{begin}
            AND create_time < #{endExcl}
@@ -113,7 +113,7 @@ public interface AiUsageAnalysisMapper {
                COUNT(*) FILTER (WHERE success = '1') AS success_calls,
                COALESCE(AVG(latency_ms), 0) AS avg_latency_ms,
                COALESCE(SUM(cost_amount), 0) AS cost
-          FROM dcs_ai_usage
+          FROM ai_usage
          WHERE tenant_id = #{tenantId}
            AND create_time >= #{begin}
            AND create_time < #{endExcl}

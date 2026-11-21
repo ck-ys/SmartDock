@@ -1,7 +1,7 @@
 package com.smartdock.service.support;
 
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.DcsAiModelPrice;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.AiModelPrice;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -14,12 +14,12 @@ class AiBillingCalculatorUnitTest {
     @Test
     @Tag("dev")
     void officialTokenBillingIncludesCachedInputOutputAndServiceFee() {
-        DcsAiConfig config = new DcsAiConfig();
+        AiConfig config = new AiConfig();
         config.setBillingMode(AiBillingCalculator.BILLING_MODE_OFFICIAL_TOKEN);
         config.setUnitPricePerCall(new BigDecimal("0.0100"));
         config.setServiceFeeRate(new BigDecimal("10.00"));
 
-        DcsAiModelPrice price = new DcsAiModelPrice();
+        AiModelPrice price = new AiModelPrice();
         price.setProvider("OPENAI");
         price.setModelName("gpt-test");
         price.setCurrency("USD");
@@ -43,7 +43,7 @@ class AiBillingCalculatorUnitTest {
     @Test
     @Tag("dev")
     void missingTokenUsageFallsBackToFixedPerCall() {
-        DcsAiConfig config = new DcsAiConfig();
+        AiConfig config = new AiConfig();
         config.setBillingMode(AiBillingCalculator.BILLING_MODE_OFFICIAL_TOKEN);
         config.setUnitPricePerCall(new BigDecimal("0.0123"));
         config.setServiceFeeRate(new BigDecimal("25.00"));

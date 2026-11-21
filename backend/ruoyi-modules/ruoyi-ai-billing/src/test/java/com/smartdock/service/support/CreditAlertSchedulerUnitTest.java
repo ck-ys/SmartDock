@@ -1,8 +1,8 @@
 package com.smartdock.service.support;
 
-import com.smartdock.domain.DcsAiCreditSubscription;
-import com.smartdock.mapper.DcsAiCreditSubscriptionMapper;
-import com.smartdock.service.IDcsAiCreditService;
+import com.smartdock.domain.AiCreditSubscription;
+import com.smartdock.mapper.AiCreditSubscriptionMapper;
+import com.smartdock.service.IAiCreditService;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,9 +39,9 @@ class CreditAlertSchedulerUnitTest {
     private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
 
     @Mock
-    private DcsAiCreditSubscriptionMapper subscriptionMapper;
+    private AiCreditSubscriptionMapper subscriptionMapper;
     @Mock
-    private IDcsAiCreditService creditService;
+    private IAiCreditService creditService;
     @Mock
     private WalletAlertService walletAlertService;
 
@@ -53,8 +53,8 @@ class CreditAlertSchedulerUnitTest {
         return Date.from(d.atStartOfDay(BEIJING).toInstant());
     }
 
-    private static DcsAiCreditSubscription sub(long id, String tenantId, LocalDate endDate) {
-        DcsAiCreditSubscription s = new DcsAiCreditSubscription();
+    private static AiCreditSubscription sub(long id, String tenantId, LocalDate endDate) {
+        AiCreditSubscription s = new AiCreditSubscription();
         s.setId(id);
         s.setTenantId(tenantId);
         s.setPlanCode("STD");
@@ -65,10 +65,10 @@ class CreditAlertSchedulerUnitTest {
         return s;
     }
 
-    private static IDcsAiCreditService.CreditSummary summary(long weeklyUsed, long weeklyCap,
+    private static IAiCreditService.CreditSummary summary(long weeklyUsed, long weeklyCap,
                                                              long tankBalance, Date weekStart) {
         // 业务反馈批1015b Q12：CreditSummary 加 totalQuota/termUsed 两尾参（总额展示口径，预警调度不消费 → 0 占位）
-        return new IDcsAiCreditService.CreditSummary(true, "STD", "标准档",
+        return new IAiCreditService.CreditSummary(true, "STD", "标准档",
             atDate(LocalDate.now(BEIJING).plusDays(20)), weeklyUsed, weeklyCap, 0, 100, 5,
             tankBalance, weekStart, null, weeklyUsed, weeklyUsed, 0, 0);
     }
@@ -87,7 +87,7 @@ class CreditAlertSchedulerUnitTest {
     @Test
     @Tag("dev")
     void 即将到期_每订阅一次_键与文案落位() {
-        DcsAiCreditSubscription s = sub(123L, "T1", LocalDate.now(BEIJING).plusDays(2));
+        AiCreditSubscription s = sub(123L, "T1", LocalDate.now(BEIJING).plusDays(2));
         when(subscriptionMapper.selectList(any()))
             .thenReturn(List.of(s))
             .thenReturn(Collections.emptyList()); // 第二次查询(活跃池扫描)为空
@@ -100,7 +100,7 @@ class CreditAlertSchedulerUnitTest {
     @Test
     @Tag("dev")
     void 今日到期与已过期共用一键_每订阅至多两告() {
-        DcsAiCreditSubscription today = sub(200L, "T1", LocalDate.now(BEIJING));
+        AiCreditSubscription today = sub(200L, "T1", LocalDate.now(BEIJING));
         when(subscriptionMapper.selectList(any()))
             .thenReturn(List.of(today))
             .thenReturn(Collections.emptyList());
@@ -108,7 +108,7 @@ class CreditAlertSchedulerUnitTest {
         verify(walletAlertService).publishCreditAlert(eq("T1"), eq("CREDIT_SUBSCRIPTION_EXPIRING"),
             eq("AI 积分套餐今日到期"), anyString(), anyString(), any(), eq("creditSubExpired:200"));
 
-        DcsAiCreditSubscription past = sub(201L, "T1", LocalDate.now(BEIJING).minusDays(4));
+        AiCreditSubscription past = sub(201L, "T1", LocalDate.now(BEIJING).minusDays(4));
         org.mockito.Mockito.clearInvocations(walletAlertService);
         when(subscriptionMapper.selectList(any()))
             .thenReturn(List.of(past))
@@ -122,7 +122,7 @@ class CreditAlertSchedulerUnitTest {
     @Tag("dev")
     void 周池用完_每周一告_键含weekStart() {
         LocalDate weekStart = LocalDate.now(BEIJING).minusDays(3);
-        DcsAiCreditSubscription s = sub(300L, "T9", LocalDate.now(BEIJING).plusDays(20));
+        AiCreditSubscription s = sub(300L, "T9", LocalDate.now(BEIJING).plusDays(20));
         when(subscriptionMapper.selectList(any()))
             .thenReturn(Collections.emptyList()) // 到期扫描为空
             .thenReturn(List.of(s));
@@ -138,7 +138,7 @@ class CreditAlertSchedulerUnitTest {
     @Test
     @Tag("dev")
     void 钱包模式跳过_积分余量不告() {
-        DcsAiCreditSubscription s = sub(301L, "T9", LocalDate.now(BEIJING).plusDays(20));
+        AiCreditSubscription s = sub(301L, "T9", LocalDate.now(BEIJING).plusDays(20));
         when(subscriptionMapper.selectList(any()))
             .thenReturn(Collections.emptyList())
             .thenReturn(List.of(s));
@@ -150,7 +150,7 @@ class CreditAlertSchedulerUnitTest {
     @Test
     @Tag("dev")
     void 加油包将罄_每月一告_充足或有周池余额不告() {
-        DcsAiCreditSubscription s = sub(302L, "T9", LocalDate.now(BEIJING).plusDays(20));
+        AiCreditSubscription s = sub(302L, "T9", LocalDate.now(BEIJING).plusDays(20));
         when(subscriptionMapper.selectList(any()))
             .thenReturn(Collections.emptyList())
             .thenReturn(List.of(s));
@@ -173,8 +173,8 @@ class CreditAlertSchedulerUnitTest {
     @Test
     @Tag("dev")
     void 单租户失败不断扫_其余租户照告() {
-        DcsAiCreditSubscription bad = sub(400L, "T_BAD", LocalDate.now(BEIJING).plusDays(20));
-        DcsAiCreditSubscription good = sub(401L, "T_OK", LocalDate.now(BEIJING).plusDays(20));
+        AiCreditSubscription bad = sub(400L, "T_BAD", LocalDate.now(BEIJING).plusDays(20));
+        AiCreditSubscription good = sub(401L, "T_OK", LocalDate.now(BEIJING).plusDays(20));
         when(subscriptionMapper.selectList(any()))
             .thenReturn(Collections.emptyList())
             .thenReturn(List.of(bad, good));

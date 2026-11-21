@@ -18,7 +18,7 @@
 :root {
   /* 页面节奏与字阶 */
   --dcs-page-head-size: 20px; // .ui-page-head 标题（契约 §2.2 页题 20）
-  --dcs-font-page: 20px; // 共用页头 DcsOperationsPageHeader 标题（契约 §2.2）
+  --dcs-font-page: 20px; // 共用页头 OperationsPageHeader 标题（契约 §2.2）
   --dcs-kpi-size: 26px; // KPI 数字（契约 24-28 取中值）
   --dcs-kpi-weight: 600; // KPI 字重
 
@@ -435,7 +435,7 @@ html.density-compact {
 }
 
 /* ============================ 共用页头细节补偿 ============================ */
-/* DcsOperationsPageHeader 结构不动（18+ 处共用），只在本文件补：
+/* OperationsPageHeader 结构不动（18+ 处共用），只在本文件补：
     eyebrow 12/400 faint、标题 20/600、副题 13/muted 且不再限宽；
     KPI 带已在上面与 `.ui-kpi-strip` 合并成同一套口径。 */
 .dcs-ops-header__eyebrow {

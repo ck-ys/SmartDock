@@ -4,7 +4,7 @@
 -- 本表把这一层按人入库；localStorage 降级成离线兜底（断网时仍能读写，联网后以最后一次保存为准）。
 -- 可重复执行（IF NOT EXISTS）；与 baseline/01_schema.sql 同步。
 
-CREATE TABLE IF NOT EXISTS public.dcs_assistant_user_pref (
+CREATE TABLE IF NOT EXISTS public.assistant_user_pref (
     id bigint NOT NULL,
     tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
     user_id bigint NOT NULL,
@@ -17,11 +17,11 @@ CREATE TABLE IF NOT EXISTS public.dcs_assistant_user_pref (
     ask_auto_continue character(1) DEFAULT '1'::bpchar NOT NULL,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     update_time timestamp without time zone,
-    CONSTRAINT pk_dcs_assistant_user_pref PRIMARY KEY (id),
-    CONSTRAINT uk_dcs_asst_user_pref UNIQUE (tenant_id, user_id)
+    CONSTRAINT pk_assistant_user_pref PRIMARY KEY (id),
+    CONSTRAINT uk_asst_user_pref UNIQUE (tenant_id, user_id)
 );
 
-COMMENT ON TABLE public.dcs_assistant_user_pref IS '助手常规偏好（按人）；缺行=全部默认值';
+COMMENT ON TABLE public.assistant_user_pref IS '助手常规偏好（按人）；缺行=全部默认值';
 
 -- 兜底：CREATE TABLE IF NOT EXISTS 遇到「表已存在但缺唯一键」时会整句跳过，UPSERT 的 ON CONFLICT 就匹配不到。
 -- 只在缺唯一约束时才补一条唯一索引（正常环境不加第二个重复索引）；ON CONFLICT (tenant_id, user_id) 可匹配唯一索引。
@@ -29,9 +29,9 @@ DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint
-        WHERE conrelid = 'public.dcs_assistant_user_pref'::regclass AND contype = 'u'
+        WHERE conrelid = 'public.assistant_user_pref'::regclass AND contype = 'u'
     ) THEN
-        CREATE UNIQUE INDEX IF NOT EXISTS uk_dcs_asst_user_pref_uidx
-            ON public.dcs_assistant_user_pref (tenant_id, user_id);
+        CREATE UNIQUE INDEX IF NOT EXISTS uk_asst_user_pref_uidx
+            ON public.assistant_user_pref (tenant_id, user_id);
     END IF;
 END $$;

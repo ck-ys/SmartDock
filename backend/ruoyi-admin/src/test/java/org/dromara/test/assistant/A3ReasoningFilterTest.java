@@ -2,8 +2,8 @@ package org.dromara.test.assistant;
 
 import io.agentscope.core.agui.event.AguiEvent;
 import io.agentscope.core.agui.event.AguiEventType;
-import com.smartdock.assistant.legacy.core.AssistantEventEnricher;
-import com.smartdock.assistant.legacy.core.AssistantReasoningGate;
+import com.smartdock.assistant.engine.core.AssistantEventEnricher;
+import com.smartdock.assistant.engine.core.AssistantReasoningGate;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

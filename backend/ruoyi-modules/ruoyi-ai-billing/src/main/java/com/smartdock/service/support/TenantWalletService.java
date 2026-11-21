@@ -11,19 +11,19 @@ import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.domain.DcsServiceChargeRule;
-import com.smartdock.domain.DcsTenantWallet;
-import com.smartdock.domain.DcsTenantWalletLedger;
-import com.smartdock.domain.DcsWalletAlertState;
+import com.smartdock.domain.ServiceChargeRule;
+import com.smartdock.domain.TenantWallet;
+import com.smartdock.domain.TenantWalletLedger;
+import com.smartdock.domain.WalletAlertState;
 import com.smartdock.domain.bo.WalletOperationBo;
-import com.smartdock.domain.vo.DcsServiceChargeRuleVo;
-import com.smartdock.domain.vo.DcsTenantWalletLedgerVo;
-import com.smartdock.domain.vo.DcsTenantWalletVo;
+import com.smartdock.domain.vo.ServiceChargeRuleVo;
+import com.smartdock.domain.vo.TenantWalletLedgerVo;
+import com.smartdock.domain.vo.TenantWalletVo;
 import com.smartdock.domain.vo.FallbackDecision;
-import com.smartdock.mapper.DcsServiceChargeRuleMapper;
-import com.smartdock.mapper.DcsTenantWalletLedgerMapper;
-import com.smartdock.mapper.DcsTenantWalletMapper;
-import com.smartdock.mapper.DcsWalletAlertStateMapper;
+import com.smartdock.mapper.ServiceChargeRuleMapper;
+import com.smartdock.mapper.TenantWalletLedgerMapper;
+import com.smartdock.mapper.TenantWalletMapper;
+import com.smartdock.mapper.WalletAlertStateMapper;
 import org.springframework.stereotype.Service;
 import com.smartdock.common.text.HumanText;
 import org.springframework.transaction.annotation.Propagation;
@@ -57,31 +57,31 @@ public class TenantWalletService {
     private static final BigDecimal GIFT_AMOUNT = new BigDecimal("10.0000");
 
     /** 租户钱包账户 Mapper(余额/冻结) */
-    private final DcsTenantWalletMapper walletMapper;
+    private final TenantWalletMapper walletMapper;
     /** 钱包流水账 Mapper(充值/扣费/冻结记录) */
-    private final DcsTenantWalletLedgerMapper ledgerMapper;
+    private final TenantWalletLedgerMapper ledgerMapper;
     /** 服务计费规则 Mapper(按类型匹配扣费策略) */
-    private final DcsServiceChargeRuleMapper ruleMapper;
+    private final ServiceChargeRuleMapper ruleMapper;
     /** 钱包告警状态 Mapper(低余额/告警去重) */
-    private final DcsWalletAlertStateMapper alertStateMapper;
+    private final WalletAlertStateMapper alertStateMapper;
 
     // ========== 查询 ==========
 
     /**
      * 分页查询租户钱包(可选按租户过滤), 自动填充可用余额。
      */
-    public TableDataInfo<DcsTenantWalletVo> queryPageList(PageQuery pageQuery, String tenantId) {
+    public TableDataInfo<TenantWalletVo> queryPageList(PageQuery pageQuery, String tenantId) {
         // 深扫回修(2026-10-16 P0-2): 本表 Mapper 关闭租户拦截器, 非超管强制收窄本租户——
-        // 持 dcs:wallet:list 的租户侧角色不传 tenantId 也不能拉全平台钱包(与 walletSummary 同口径)
+        // 持 smartdock:wallet:list 的租户侧角色不传 tenantId 也不能拉全平台钱包(与 walletSummary 同口径)
         String scopeTenantId = scopeTenantId(tenantId);
-        LambdaQueryWrapper<DcsTenantWallet> wrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<TenantWallet> wrapper = new LambdaQueryWrapper<>();
         if (StrUtil.isNotBlank(scopeTenantId)) {
-            wrapper.eq(DcsTenantWallet::getTenantId, scopeTenantId);
+            wrapper.eq(TenantWallet::getTenantId, scopeTenantId);
         } else if (!LoginHelper.isSuperAdmin()) {
             return TableDataInfo.build(new Page<>());
         }
-        wrapper.orderByDesc(DcsTenantWallet::getCreateTime);
-        Page<DcsTenantWalletVo> page = walletMapper.selectVoPage(pageQuery.build(), wrapper);
+        wrapper.orderByDesc(TenantWallet::getCreateTime);
+        Page<TenantWalletVo> page = walletMapper.selectVoPage(pageQuery.build(), wrapper);
         page.getRecords().forEach(this::fillAvailable);
         return TableDataInfo.build(page);
     }
@@ -95,9 +95,9 @@ public class TenantWalletService {
      */
     public Map<String, Object> walletSummary(String tenantId) {
         String scopeTenantId = scopeTenantId(tenantId);
-        LambdaQueryWrapper<DcsTenantWallet> wrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<TenantWallet> wrapper = new LambdaQueryWrapper<>();
         if (StrUtil.isNotBlank(scopeTenantId)) {
-            wrapper.eq(DcsTenantWallet::getTenantId, scopeTenantId);
+            wrapper.eq(TenantWallet::getTenantId, scopeTenantId);
         } else if (!LoginHelper.isSuperAdmin()) {
             // 深扫回修(P1-3 fail-closed): 非超管且登录上下文取不到租户ID(异常路径)时,
             // 禁止退化为全平台聚合——返回空汇总而非放大权限
@@ -109,12 +109,12 @@ public class TenantWalletService {
             empty.put("abnormal", 0L);
             return empty;
         }
-        List<DcsTenantWallet> all = walletMapper.selectList(wrapper);
+        List<TenantWallet> all = walletMapper.selectList(wrapper);
         BigDecimal balance = BigDecimal.ZERO;
         BigDecimal frozen = BigDecimal.ZERO;
         long belowThreshold = 0;
         long abnormal = 0;
-        for (DcsTenantWallet w : all) {
+        for (TenantWallet w : all) {
             BigDecimal bal = w.getBalanceAmount() == null ? BigDecimal.ZERO : w.getBalanceAmount();
             BigDecimal frz = w.getFrozenAmount() == null ? BigDecimal.ZERO : w.getFrozenAmount();
             balance = balance.add(bal);
@@ -139,8 +139,8 @@ public class TenantWalletService {
     /**
      * 按主键查询钱包, 不存在抛 ServiceException, 并填充可用余额。
      */
-    public DcsTenantWalletVo queryById(Long walletId) {
-        DcsTenantWalletVo vo = walletMapper.selectVoById(walletId);
+    public TenantWalletVo queryById(Long walletId) {
+        TenantWalletVo vo = walletMapper.selectVoById(walletId);
         if (vo == null) {
             throw new ServiceException("钱包不存在");
         }
@@ -153,7 +153,7 @@ public class TenantWalletService {
     /**
      * 计算并回填可用余额(余额 - 冻结), 保留 4 位小数。
      */
-    private void fillAvailable(DcsTenantWalletVo vo) {
+    private void fillAvailable(TenantWalletVo vo) {
         if (vo == null || vo.getBalanceAmount() == null) {
             return;
         }
@@ -167,13 +167,13 @@ public class TenantWalletService {
      * 获取或创建租户主钱包(幂等)。
      */
     @Transactional(rollbackFor = Exception.class)
-    public DcsTenantWallet getOrCreateMainWallet(String tenantId) {
+    public TenantWallet getOrCreateMainWallet(String tenantId) {
         String resolved = StrUtil.blankToDefault(tenantId, GLOBAL_TENANT_ID);
-        DcsTenantWallet wallet = findMainWallet(resolved);
+        TenantWallet wallet = findMainWallet(resolved);
         if (wallet != null) {
             return wallet;
         }
-        wallet = new DcsTenantWallet();
+        wallet = new TenantWallet();
         wallet.setTenantId(resolved);
         wallet.setWalletType("MAIN");
         wallet.setBalanceAmount(BigDecimal.ZERO);
@@ -196,20 +196,20 @@ public class TenantWalletService {
     /**
      * 按租户查询主钱包(不存在返回 null)。
      */
-    private DcsTenantWallet findMainWallet(String tenantId) {
-        return walletMapper.selectOne(new LambdaQueryWrapper<DcsTenantWallet>()
-            .eq(DcsTenantWallet::getTenantId, tenantId)
-            .eq(DcsTenantWallet::getWalletType, "MAIN")
-            .eq(DcsTenantWallet::getDelFlag, "0"));
+    private TenantWallet findMainWallet(String tenantId) {
+        return walletMapper.selectOne(new LambdaQueryWrapper<TenantWallet>()
+            .eq(TenantWallet::getTenantId, tenantId)
+            .eq(TenantWallet::getWalletType, "MAIN")
+            .eq(TenantWallet::getDelFlag, "0"));
     }
 
     /**
      * 为指定租户初始化主钱包(幂等, 供 Controller 调用)。
      */
     @Transactional(rollbackFor = Exception.class)
-    public DcsTenantWalletVo initMainWallet(String tenantId) {
-        DcsTenantWallet wallet = getOrCreateMainWallet(tenantId);
-        DcsTenantWalletVo vo = MapstructUtils.convert(wallet, DcsTenantWalletVo.class);
+    public TenantWalletVo initMainWallet(String tenantId) {
+        TenantWallet wallet = getOrCreateMainWallet(tenantId);
+        TenantWalletVo vo = MapstructUtils.convert(wallet, TenantWalletVo.class);
         fillAvailable(vo);
         return vo;
     }
@@ -220,8 +220,8 @@ public class TenantWalletService {
      * 管理员手动充值(幂等键缺省时按钱包+时间戳生成)。
      */
     @Transactional(rollbackFor = Exception.class)
-    public DcsTenantWalletVo manualRecharge(Long walletId, WalletOperationBo bo) {
-        DcsTenantWallet wallet = loadAndCheck(walletId);
+    public TenantWalletVo manualRecharge(Long walletId, WalletOperationBo bo) {
+        TenantWallet wallet = loadAndCheck(walletId);
         String idempotencyKey = StrUtil.blankToDefault(bo.getIdempotencyKey(),
             "recharge:" + walletId + ":" + System.currentTimeMillis());
         doRecharge(wallet, bo.getAmount(), "RECHARGE", bo.getReason(), idempotencyKey, safeOperatorId());
@@ -232,8 +232,8 @@ public class TenantWalletService {
      * 管理员手动扣减(ADJUST 类型, 幂等键缺省时按钱包+时间戳生成)。
      */
     @Transactional(rollbackFor = Exception.class)
-    public DcsTenantWalletVo manualDeduct(Long walletId, WalletOperationBo bo) {
-        DcsTenantWallet wallet = loadAndCheck(walletId);
+    public TenantWalletVo manualDeduct(Long walletId, WalletOperationBo bo) {
+        TenantWallet wallet = loadAndCheck(walletId);
         String idempotencyKey = StrUtil.blankToDefault(bo.getIdempotencyKey(),
             "deduct:" + walletId + ":" + System.currentTimeMillis());
         doDeduct(wallet, bo.getAmount(), "ADJUST", null, null, bo.getReason(), idempotencyKey, safeOperatorId());
@@ -244,11 +244,11 @@ public class TenantWalletService {
      * 更新钱包低余额阈值。
      */
     @Transactional(rollbackFor = Exception.class)
-    public DcsTenantWalletVo updateThreshold(Long walletId, BigDecimal threshold) {
+    public TenantWalletVo updateThreshold(Long walletId, BigDecimal threshold) {
         loadAndCheck(walletId); // 深扫回修(P0-2): 归属校验(非超管拒绝跨租户)
-        walletMapper.update(null, new LambdaUpdateWrapper<DcsTenantWallet>()
-            .eq(DcsTenantWallet::getWalletId, walletId)
-            .set(DcsTenantWallet::getLowBalanceThreshold, threshold));
+        walletMapper.update(null, new LambdaUpdateWrapper<TenantWallet>()
+            .eq(TenantWallet::getWalletId, walletId)
+            .set(TenantWallet::getLowBalanceThreshold, threshold));
         return queryById(walletId);
     }
 
@@ -256,14 +256,14 @@ public class TenantWalletService {
      * 更新钱包状态(ACTIVE/FROZEN/DISABLED), 非法状态抛 ServiceException。
      */
     @Transactional(rollbackFor = Exception.class)
-    public DcsTenantWalletVo updateStatus(Long walletId, String status) {
+    public TenantWalletVo updateStatus(Long walletId, String status) {
         if (!STATUS_ACTIVE.equals(status) && !STATUS_FROZEN.equals(status) && !"DISABLED".equals(status)) {
             throw new ServiceException("非法钱包状态: " + status);
         }
         loadAndCheck(walletId); // 深扫回修(P0-2): 归属校验(非超管拒绝跨租户)
-        walletMapper.update(null, new LambdaUpdateWrapper<DcsTenantWallet>()
-            .eq(DcsTenantWallet::getWalletId, walletId)
-            .set(DcsTenantWallet::getStatus, status));
+        walletMapper.update(null, new LambdaUpdateWrapper<TenantWallet>()
+            .eq(TenantWallet::getWalletId, walletId)
+            .set(TenantWallet::getStatus, status));
         return queryById(walletId);
     }
 
@@ -289,14 +289,14 @@ public class TenantWalletService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }
-        DcsTenantWallet wallet = getOrCreateMainWallet(tenantId);
+        TenantWallet wallet = getOrCreateMainWallet(tenantId);
         // 幂等: 已存在同 key 流水则不重复扣
-        DcsTenantWalletLedger existing = findLedgerByIdempotency(idempotencyKey);
+        TenantWalletLedger existing = findLedgerByIdempotency(idempotencyKey);
         if (existing != null) {
             return existing.getLedgerId();
         }
         doDeduct(wallet, amount, "DEDUCT", bizId, serviceCode, "AI调用扣费", idempotencyKey, safeOperatorId());
-        DcsTenantWalletLedger ledger = findLedgerByIdempotency(idempotencyKey);
+        TenantWalletLedger ledger = findLedgerByIdempotency(idempotencyKey);
         return ledger == null ? null : ledger.getLedgerId();
     }
 
@@ -324,8 +324,8 @@ public class TenantWalletService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }
-        DcsTenantWallet wallet = getOrCreateMainWallet(tenantId);
-        DcsTenantWalletLedger existing = findLedgerByIdempotency(idempotencyKey);
+        TenantWallet wallet = getOrCreateMainWallet(tenantId);
+        TenantWalletLedger existing = findLedgerByIdempotency(idempotencyKey);
         if (existing != null) {
             // 迟到竞态防护(glm53 P2): 键已被他笔占用时不得把新 usage 挂上别人的流水
             // (对账④会金额不平误报); 助手键恒带本次 usageId, 命中即异常回滚
@@ -335,7 +335,7 @@ public class TenantWalletService {
             return existing.getLedgerId();
         }
         doDeductConditional(wallet, amount, bizId, serviceCode, idempotencyKey);
-        DcsTenantWalletLedger ledger = findLedgerByIdempotency(idempotencyKey);
+        TenantWalletLedger ledger = findLedgerByIdempotency(idempotencyKey);
         return ledger == null ? null : ledger.getLedgerId();
     }
 
@@ -347,7 +347,7 @@ public class TenantWalletService {
         if (StrUtil.isBlank(idempotencyKey)) {
             return null;
         }
-        DcsTenantWalletLedger ledger = findLedgerByIdempotency(idempotencyKey);
+        TenantWalletLedger ledger = findLedgerByIdempotency(idempotencyKey);
         return ledger == null ? null : ledger.getBizId();
     }
 
@@ -355,7 +355,7 @@ public class TenantWalletService {
      * 查询租户可用余额(余额-冻结, 无钱包按 0 计), 供助手调用前置余额提示(批D D1-⑤)。
      */
     public BigDecimal availableBalanceOf(String tenantId) {
-        DcsTenantWallet wallet = findMainWallet(StrUtil.blankToDefault(tenantId, GLOBAL_TENANT_ID));
+        TenantWallet wallet = findMainWallet(StrUtil.blankToDefault(tenantId, GLOBAL_TENANT_ID));
         if (wallet == null) {
             return BigDecimal.ZERO;
         }
@@ -374,8 +374,8 @@ public class TenantWalletService {
      * @return FallbackDecision
      */
     public FallbackDecision checkSufficientOrFallback(String tenantId, String serviceCode, BigDecimal estimatedCost) {
-        DcsServiceChargeRule rule = findRule(tenantId, serviceCode);
-        DcsTenantWallet wallet = findMainWallet(StrUtil.blankToDefault(tenantId, GLOBAL_TENANT_ID));
+        ServiceChargeRule rule = findRule(tenantId, serviceCode);
+        TenantWallet wallet = findMainWallet(StrUtil.blankToDefault(tenantId, GLOBAL_TENANT_ID));
 
         // 无钱包: 按规则兜底
         if (wallet == null) {
@@ -398,7 +398,7 @@ public class TenantWalletService {
     /**
      * 按计费规则的 fallback 策略(算法降级/免费/管理员放行/默认阻断)生成兜底决策。
      */
-    private FallbackDecision decideByRule(DcsServiceChargeRule rule, String reason) {
+    private FallbackDecision decideByRule(ServiceChargeRule rule, String reason) {
         if (rule == null) {
             return FallbackDecision.block(reason + ", 请充值");
         }
@@ -414,13 +414,13 @@ public class TenantWalletService {
     /**
      * 查询启用的计费规则(租户级优先于全局兜底)。
      */
-    private DcsServiceChargeRule findRule(String tenantId, String serviceCode) {
+    private ServiceChargeRule findRule(String tenantId, String serviceCode) {
         String resolved = StrUtil.blankToDefault(tenantId, GLOBAL_TENANT_ID);
-        List<DcsServiceChargeRule> rules = ruleMapper.selectList(new LambdaQueryWrapper<DcsServiceChargeRule>()
-            .in(DcsServiceChargeRule::getTenantId, resolved, GLOBAL_TENANT_ID)
-            .eq(DcsServiceChargeRule::getServiceCode, serviceCode)
-            .eq(DcsServiceChargeRule::getEnabled, "1")
-            .eq(DcsServiceChargeRule::getDelFlag, "0"));
+        List<ServiceChargeRule> rules = ruleMapper.selectList(new LambdaQueryWrapper<ServiceChargeRule>()
+            .in(ServiceChargeRule::getTenantId, resolved, GLOBAL_TENANT_ID)
+            .eq(ServiceChargeRule::getServiceCode, serviceCode)
+            .eq(ServiceChargeRule::getEnabled, "1")
+            .eq(ServiceChargeRule::getDelFlag, "0"));
         // 租户级优先于全局
         return rules.stream()
             .min((a, b) -> {
@@ -436,24 +436,24 @@ public class TenantWalletService {
     /**
      * 分页查询计费规则(可选按租户/服务码过滤), 按 sortOrder 升序。
      */
-    public TableDataInfo<DcsServiceChargeRuleVo> rulePageList(PageQuery pageQuery, String tenantId, String serviceCode) {
-        LambdaQueryWrapper<DcsServiceChargeRule> wrapper = new LambdaQueryWrapper<>();
+    public TableDataInfo<ServiceChargeRuleVo> rulePageList(PageQuery pageQuery, String tenantId, String serviceCode) {
+        LambdaQueryWrapper<ServiceChargeRule> wrapper = new LambdaQueryWrapper<>();
         if (StrUtil.isNotBlank(tenantId)) {
-            wrapper.eq(DcsServiceChargeRule::getTenantId, tenantId);
+            wrapper.eq(ServiceChargeRule::getTenantId, tenantId);
         }
         if (StrUtil.isNotBlank(serviceCode)) {
-            wrapper.eq(DcsServiceChargeRule::getServiceCode, serviceCode);
+            wrapper.eq(ServiceChargeRule::getServiceCode, serviceCode);
         }
-        wrapper.orderByAsc(DcsServiceChargeRule::getSortOrder);
-        Page<DcsServiceChargeRuleVo> page = ruleMapper.selectVoPage(pageQuery.build(), wrapper);
+        wrapper.orderByAsc(ServiceChargeRule::getSortOrder);
+        Page<ServiceChargeRuleVo> page = ruleMapper.selectVoPage(pageQuery.build(), wrapper);
         return TableDataInfo.build(page);
     }
 
     /**
      * 按主键查询计费规则, 不存在抛 ServiceException。
      */
-    public DcsServiceChargeRuleVo ruleById(Long ruleId) {
-        DcsServiceChargeRuleVo vo = ruleMapper.selectVoById(ruleId);
+    public ServiceChargeRuleVo ruleById(Long ruleId) {
+        ServiceChargeRuleVo vo = ruleMapper.selectVoById(ruleId);
         if (vo == null) {
             throw new ServiceException("计费规则不存在");
         }
@@ -464,7 +464,7 @@ public class TenantWalletService {
      * 新增计费规则(规范化字段后入库), 返回主键。
      */
     @Transactional(rollbackFor = Exception.class)
-    public Long ruleInsert(DcsServiceChargeRule entity) {
+    public Long ruleInsert(ServiceChargeRule entity) {
         normalizeRule(entity);
         ruleMapper.insert(entity);
         return entity.getRuleId();
@@ -474,7 +474,7 @@ public class TenantWalletService {
      * 更新计费规则(规范化字段后更新)。
      */
     @Transactional(rollbackFor = Exception.class)
-    public Boolean ruleUpdate(DcsServiceChargeRule entity) {
+    public Boolean ruleUpdate(ServiceChargeRule entity) {
         normalizeRule(entity);
         return ruleMapper.updateById(entity) > 0;
     }
@@ -490,7 +490,7 @@ public class TenantWalletService {
     /**
      * 规范化计费规则字段(补默认租户/服务码/扣费模式/兜底策略/启用标记)。
      */
-    private void normalizeRule(DcsServiceChargeRule entity) {
+    private void normalizeRule(ServiceChargeRule entity) {
         entity.setTenantId(StrUtil.blankToDefault(entity.getTenantId(), GLOBAL_TENANT_ID));
         entity.setServiceCode(StrUtil.trim(entity.getServiceCode()));
         entity.setWalletScope(StrUtil.blankToDefault(entity.getWalletScope(), "MAIN"));
@@ -504,7 +504,7 @@ public class TenantWalletService {
     /**
      * 执行充值: 更新余额并写入 IN 方向流水。
      */
-    private void doRecharge(DcsTenantWallet wallet, BigDecimal amount, String serviceCode,
+    private void doRecharge(TenantWallet wallet, BigDecimal amount, String serviceCode,
                             String reason, String idempotencyKey, Long operatorId) {
         BigDecimal before = wallet.getBalanceAmount();
         BigDecimal after = before.add(amount);
@@ -518,7 +518,7 @@ public class TenantWalletService {
      *
      * @param bizId 关联业务单据ID(AI 扣费=usage_id; 手工调账传 null) —— glm53 终审 P1(2026-09-24)接线
      */
-    private void doDeduct(DcsTenantWallet wallet, BigDecimal amount, String bizType, Long bizId,
+    private void doDeduct(TenantWallet wallet, BigDecimal amount, String bizType, Long bizId,
                           String serviceCode, String reason, String idempotencyKey, Long operatorId) {
         BigDecimal before = wallet.getBalanceAmount();
         BigDecimal frozen = wallet.getFrozenAmount() == null ? BigDecimal.ZERO : wallet.getFrozenAmount();
@@ -536,13 +536,13 @@ public class TenantWalletService {
     /**
      * 乐观锁更新余额。
      */
-    private void updateBalance(DcsTenantWallet wallet, BigDecimal newBalance) {
+    private void updateBalance(TenantWallet wallet, BigDecimal newBalance) {
         int version = wallet.getVersion() == null ? 0 : wallet.getVersion();
-        int affected = walletMapper.update(null, new LambdaUpdateWrapper<DcsTenantWallet>()
-            .eq(DcsTenantWallet::getWalletId, wallet.getWalletId())
-            .eq(DcsTenantWallet::getVersion, version)
-            .set(DcsTenantWallet::getBalanceAmount, newBalance)
-            .set(DcsTenantWallet::getVersion, version + 1));
+        int affected = walletMapper.update(null, new LambdaUpdateWrapper<TenantWallet>()
+            .eq(TenantWallet::getWalletId, wallet.getWalletId())
+            .eq(TenantWallet::getVersion, version)
+            .set(TenantWallet::getBalanceAmount, newBalance)
+            .set(TenantWallet::getVersion, version + 1));
         if (affected == 0) {
             throw new ServiceException("钱包余额更新失败(并发冲突), 请重试");
         }
@@ -556,7 +556,7 @@ public class TenantWalletService {
      * <p>流水期初不取扣减前的快照读(并发下会陈旧), 而是扣减后同事务回读余额反推
      * (after + amount)——行锁未释放前的回读必为本事务结果, 链式流水天然连续。</p>
      */
-    private void doDeductConditional(DcsTenantWallet wallet, BigDecimal amount, Long bizId,
+    private void doDeductConditional(TenantWallet wallet, BigDecimal amount, Long bizId,
                                      String serviceCode, String idempotencyKey) {
         int affected = walletMapper.conditionalDeduct(wallet.getWalletId(), amount);
         if (affected == 0) {
@@ -564,7 +564,7 @@ public class TenantWalletService {
             throw new ServiceException("AI 助手额度不足，当前可用余额 " + HumanText.money(available)
                 + " 元，请联系管理员充值后再试");
         }
-        DcsTenantWallet fresh = walletMapper.selectById(wallet.getWalletId());
+        TenantWallet fresh = walletMapper.selectById(wallet.getWalletId());
         BigDecimal after = fresh.getBalanceAmount().setScale(4, RoundingMode.HALF_UP);
         BigDecimal before = after.add(amount);
         insertLedger(wallet, "DEDUCT", bizId, serviceCode, DIRECTION_OUT, amount,
@@ -574,10 +574,10 @@ public class TenantWalletService {
     /**
      * 组装并写入一条钱包流水(reason 写入 extraJson)。
      */
-    private void insertLedger(DcsTenantWallet wallet, String bizType, Long bizId, String serviceCode,
+    private void insertLedger(TenantWallet wallet, String bizType, Long bizId, String serviceCode,
                               String direction, BigDecimal amount, BigDecimal before, BigDecimal after,
                               String idempotencyKey, Long operatorId, String reason) {
-        DcsTenantWalletLedger ledger = new DcsTenantWalletLedger();
+        TenantWalletLedger ledger = new TenantWalletLedger();
         ledger.setTenantId(wallet.getTenantId());
         ledger.setWalletId(wallet.getWalletId());
         ledger.setBizType(bizType);
@@ -599,21 +599,21 @@ public class TenantWalletService {
     /**
      * 按幂等键查询已存在流水(用于去重)。
      */
-    private DcsTenantWalletLedger findLedgerByIdempotency(String idempotencyKey) {
+    private TenantWalletLedger findLedgerByIdempotency(String idempotencyKey) {
         if (StrUtil.isBlank(idempotencyKey)) {
             return null;
         }
-        return ledgerMapper.selectOne(new LambdaQueryWrapper<DcsTenantWalletLedger>()
-            .eq(DcsTenantWalletLedger::getIdempotencyKey, idempotencyKey)
-            .eq(DcsTenantWalletLedger::getDelFlag, "0"));
+        return ledgerMapper.selectOne(new LambdaQueryWrapper<TenantWalletLedger>()
+            .eq(TenantWalletLedger::getIdempotencyKey, idempotencyKey)
+            .eq(TenantWalletLedger::getDelFlag, "0"));
     }
 
     /**
      * 按主键加载钱包实体, 不存在抛 ServiceException。
      * 深扫回修(P0-2): 归属校验收口在此——充值/扣减/阈值/状态等按 walletId 的操作全走这里。
      */
-    private DcsTenantWallet loadAndCheck(Long walletId) {
-        DcsTenantWallet wallet = walletMapper.selectById(walletId);
+    private TenantWallet loadAndCheck(Long walletId) {
+        TenantWallet wallet = walletMapper.selectById(walletId);
         if (wallet == null) {
             throw new ServiceException("钱包不存在");
         }

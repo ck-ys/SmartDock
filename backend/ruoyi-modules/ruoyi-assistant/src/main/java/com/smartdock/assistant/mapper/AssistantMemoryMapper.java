@@ -6,7 +6,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
-import com.smartdock.assistant.domain.model.DcsAssistantMemory;
+import com.smartdock.assistant.domain.model.AssistantMemory;
 
 import java.util.Date;
 import java.util.List;
@@ -21,42 +21,42 @@ import java.util.List;
  * tenant_id+user_id 双谓词（属主越权=影响 0 行）。</p>
  */
 @InterceptorIgnore(tenantLine = "true")
-public interface AssistantMemoryMapper extends BaseMapper<DcsAssistantMemory> {
+public interface AssistantMemoryMapper extends BaseMapper<AssistantMemory> {
 
     /** 用户记忆清单（新→旧；属主+租户双谓词） */
-    @Select("SELECT * FROM dcs_assistant_memory WHERE tenant_id=#{tenantId}"
+    @Select("SELECT * FROM assistant_memory WHERE tenant_id=#{tenantId}"
         + " AND user_id=#{userId} AND del_flag='0' ORDER BY id DESC")
-    List<DcsAssistantMemory> listByUser(@Param("tenantId") String tenantId,
+    List<AssistantMemory> listByUser(@Param("tenantId") String tenantId,
                                         @Param("userId") Long userId);
 
     /** 按状态取清单（题7/题10：ACTIVE 主列表；SUPERSEDED/ARCHIVED 历史区） */
-    @Select("SELECT * FROM dcs_assistant_memory WHERE tenant_id=#{tenantId}"
+    @Select("SELECT * FROM assistant_memory WHERE tenant_id=#{tenantId}"
         + " AND user_id=#{userId} AND del_flag='0' AND status=#{status} ORDER BY id DESC")
-    List<DcsAssistantMemory> listByUserStatus(@Param("tenantId") String tenantId,
+    List<AssistantMemory> listByUserStatus(@Param("tenantId") String tenantId,
                                               @Param("userId") Long userId,
                                               @Param("status") String status);
 
     /** 生效中条数（容量闸+记忆页条数用量；只算 ACTIVE） */
-    @Select("SELECT COUNT(*) FROM dcs_assistant_memory WHERE tenant_id=#{tenantId}"
+    @Select("SELECT COUNT(*) FROM assistant_memory WHERE tenant_id=#{tenantId}"
         + " AND user_id=#{userId} AND del_flag='0' AND status='ACTIVE'")
     int countByUser(@Param("tenantId") String tenantId, @Param("userId") Long userId);
 
     /** 按内容精确查重（同内容幂等不双落） */
-    @Select("SELECT COUNT(*) FROM dcs_assistant_memory WHERE tenant_id=#{tenantId}"
+    @Select("SELECT COUNT(*) FROM assistant_memory WHERE tenant_id=#{tenantId}"
         + " AND user_id=#{userId} AND content=#{content} AND del_flag='0' AND status='ACTIVE'")
     int countByContent(@Param("tenantId") String tenantId, @Param("userId") Long userId,
                        @Param("content") String content);
 
     /** 同主题的生效中条目（题8：命中则被新条覆盖；可能多条→全归档） */
-    @Select("SELECT * FROM dcs_assistant_memory WHERE tenant_id=#{tenantId}"
+    @Select("SELECT * FROM assistant_memory WHERE tenant_id=#{tenantId}"
         + " AND user_id=#{userId} AND topic_key=#{topicKey} AND del_flag='0' AND status='ACTIVE'")
-    List<DcsAssistantMemory> listActiveByTopic(@Param("tenantId") String tenantId,
+    List<AssistantMemory> listActiveByTopic(@Param("tenantId") String tenantId,
                                                @Param("userId") Long userId,
                                                @Param("topicKey") String topicKey);
 
     /** 本人改一条（题7 行内编辑；属主+租户双谓词，改他人=0 行）。
      *  内容/类型/主题键一条 UPDATE 写完——分两段写会留下「内容新、主题旧」的中间态。 */
-    @Update("UPDATE dcs_assistant_memory SET content=#{content},"
+    @Update("UPDATE assistant_memory SET content=#{content},"
         + " memory_type=#{memoryType,jdbcType=VARCHAR}, topic_key=#{topicKey,jdbcType=VARCHAR},"
         + " update_by=#{userId}, update_time=#{updateTime}"
         + " WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND id=#{id} AND del_flag='0'")
@@ -73,7 +73,7 @@ public interface AssistantMemoryMapper extends BaseMapper<DcsAssistantMemory> {
      * rowCount 仍为 1，会记出假「已覆盖」并把 ARCHIVED 翻回 SUPERSEDED；带上后陈旧轮
      * 返回 0 行，调用方据此不进 overwritten/台账。</p>
      */
-    @Update("UPDATE dcs_assistant_memory SET status='SUPERSEDED', superseded_by=#{newId},"
+    @Update("UPDATE assistant_memory SET status='SUPERSEDED', superseded_by=#{newId},"
         + " update_by=#{userId}, update_time=#{updateTime}"
         + " WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND id=#{id} AND del_flag='0'"
         + " AND status='ACTIVE'")
@@ -82,7 +82,7 @@ public interface AssistantMemoryMapper extends BaseMapper<DcsAssistantMemory> {
                      @Param("updateTime") Date updateTime);
 
     /** 注入命中后回写 last_used_at（题10：归档判据；只动 ACTIVE 行） */
-    @Update("<script>UPDATE dcs_assistant_memory SET last_used_at=#{now}"
+    @Update("<script>UPDATE assistant_memory SET last_used_at=#{now}"
         + " WHERE tenant_id=#{tenantId} AND user_id=#{userId} AND status='ACTIVE' AND id IN"
         + " <foreach collection='ids' item='i' open='(' separator=',' close=')'>#{i}</foreach>"
         + "</script>")
@@ -95,17 +95,17 @@ public interface AssistantMemoryMapper extends BaseMapper<DcsAssistantMemory> {
      * <p>只归档 last_used_at 非空且早于阈值的 ACTIVE 行——从未被注入过的条目不按创建时间
      * 误伤（拍板页口径：不是按创建时间）。归档不删数据，可恢复。</p>
      */
-    @Update("UPDATE dcs_assistant_memory SET status='ARCHIVED', archived_at=#{now}"
+    @Update("UPDATE assistant_memory SET status='ARCHIVED', archived_at=#{now}"
         + " WHERE status='ACTIVE' AND del_flag='0' AND last_used_at IS NOT NULL"
         + " AND last_used_at < #{before}")
     int archiveStale(@Param("before") Date before, @Param("now") Date now);
 
     /** 清空本人全部（题10：含归档/历史；物理删——用户明确要求「想重来能清空」） */
-    @Delete("DELETE FROM dcs_assistant_memory WHERE tenant_id=#{tenantId} AND user_id=#{userId}")
+    @Delete("DELETE FROM assistant_memory WHERE tenant_id=#{tenantId} AND user_id=#{userId}")
     int clearAllOwn(@Param("tenantId") String tenantId, @Param("userId") Long userId);
 
     /** 本人删单条（属主+租户双谓词；物理删——记忆无审计追责诉求，量级小） */
-    @Delete("DELETE FROM dcs_assistant_memory WHERE tenant_id=#{tenantId}"
+    @Delete("DELETE FROM assistant_memory WHERE tenant_id=#{tenantId}"
         + " AND user_id=#{userId} AND id=#{id}")
     int deleteOwn(@Param("tenantId") String tenantId, @Param("userId") Long userId,
                   @Param("id") Long id);

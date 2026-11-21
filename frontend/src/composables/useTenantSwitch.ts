@@ -33,13 +33,13 @@ let loadedFor = '';
 // 监听 storage 跨页事件，发现镜像被别页改过就提示刷新（本页自己写镜像不触发）
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (e: StorageEvent) => {
-    // 镜像键形如 dcs:dynamic-tenant:<userId>，只响应当前登录用户的事件；
+    // 镜像键形如 dynamic-tenant:<userId>，只响应当前登录用户的事件；
     // 别页切回默认单位是 removeItem（newValue 为 null）同样算"被切走"，也要提醒
     const key = String(e.key || '');
-    if (!key.startsWith('dcs:dynamic-tenant:') || (e.newValue == null && e.oldValue == null)) {
+    if (!key.startsWith('dynamic-tenant:') || (e.newValue == null && e.oldValue == null)) {
       return;
     }
-    const keyUserId = key.split(':')[2] || '';
+    const keyUserId = key.split(':')[1] || '';
     let myUserId = '';
     try {
       myUserId = String(useUserStore().userId || '');
@@ -171,7 +171,7 @@ export const useTenantSwitch = () => {
     // 清完之后各页 ensureSources() 重拉，拿到的是新单位的真实源。
     invalidateSources();
     // 题3-⑤ 广播切换单位：侧栏待审徽标等立即拉新单位数据（原来最长等 60s 轮询）
-    window.dispatchEvent(new Event('dcs:tenant-changed'));
+    window.dispatchEvent(new Event('tenant-changed'));
     try {
       await router.push('/');
       await proxy?.$tab.closeAllPage();

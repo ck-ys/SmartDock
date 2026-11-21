@@ -67,7 +67,7 @@ done
 ## 说明
 
 - 所有机构、人员、联系方式均为**合成演示数据**；OSS 密钥为占位符。
-- AI 供应商接入（`dcs_ai_provider_access` / `dcs_ai_config`）**不含种子**——装好后在
+- AI 供应商接入（`ai_provider_access` / `ai_config`）**不含种子**——装好后在
   「AI 配置」页录入自己的 API Key；联网搜索 Key 走 `sys_config` 同样装后配置。
 - 应用启动对库的额外要求：`agentscope` schema（01 内已建）。
 - 本基线是**结构快照**，不是最终形态：装完必须再跑 `../migration/`（见开头 ⚠），

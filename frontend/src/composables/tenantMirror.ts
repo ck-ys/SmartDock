@@ -11,7 +11,7 @@ import { dynamicTenant } from '@/api/system/tenant';
  *
  * 本文件不依赖 Vue 实例与 pinia，permission.ts / user store / useTenantSwitch 都能安全调用。
  */
-const KEY = 'dcs:dynamic-tenant';
+const KEY = 'dynamic-tenant';
 
 export const tenantMirrorKey = (userId: string) => `${KEY}:${userId}`;
 

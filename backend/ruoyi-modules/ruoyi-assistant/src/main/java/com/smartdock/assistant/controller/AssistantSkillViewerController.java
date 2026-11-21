@@ -4,9 +4,9 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import com.smartdock.assistant.service.AssistantSkillVisibilityService;
-import com.smartdock.assistant.legacy.core.SkillAssets;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.engine.core.SkillAssets;
+import com.smartdock.assistant.service.AssistantConfigService;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.common.web.core.BaseController;
@@ -21,16 +21,16 @@ import java.util.Map;
 /**
  * 工作台设置页·技能详情只读端点（2026-11-05 拍板 A3 / 题2 丙）。
  *
- * <p>为什么不复用 {@code /dcs/assistant/skill/{skillId}}：那是管理端点（perm=config），
- * 成员 403。工作台设置页按 A′ 让成员也能看技能，所以这里与 {@code /dcs/assistant/skills}
- * 同权限（{@code dcs:assistant:use}）、同角色＋工具开关门禁——看得见目录才看得见详情。</p>
+ * <p>为什么不复用 {@code /assistant/skill/{skillId}}：那是管理端点（perm=config），
+ * 成员 403。工作台设置页按 A′ 让成员也能看技能，所以这里与 {@code /assistant/skills}
+ * 同权限（{@code smartdock:assistant:use}）、同角色＋工具开关门禁——看得见目录才看得见详情。</p>
  *
  * <p>只读：不写库、不改缓存；正文只回给「当前角色本来就能用」的技能，不会因为猜 id
  * 看到提权技能的内容。返回体不含任何密钥/配置，正文=随应用打包的技能说明书原文。</p>
  */
 @Tag(name = "助手技能详情", description = "工作台设置页只读技能详情（成员可读）")
 @RestController
-@RequestMapping("/dcs/assistant/skills")
+@RequestMapping("/assistant/skills")
 @RequiredArgsConstructor
 public class AssistantSkillViewerController extends BaseController {
 
@@ -39,7 +39,7 @@ public class AssistantSkillViewerController extends BaseController {
     private final AssistantSkillVisibilityService skillVisibility;
 
     /** 详情：目录里能看见的技能才回正文；看不见与不存在同一句话（不泄露存在性） */
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @GetMapping("/{skillId}")
     public R<Map<String, Object>> detail(@PathVariable String skillId) {
         if (skillId == null || !skillId.matches("[a-z0-9][a-z0-9-]{0,63}")) {

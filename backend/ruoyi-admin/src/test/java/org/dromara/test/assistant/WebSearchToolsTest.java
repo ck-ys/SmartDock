@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cn.hutool.core.lang.Dict;
 import com.smartdock.assistant.support.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
-import com.smartdock.assistant.legacy.tools.WebSearchTools;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
+import com.smartdock.assistant.engine.tools.WebSearchTools;
 
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.core.service.ConfigService;

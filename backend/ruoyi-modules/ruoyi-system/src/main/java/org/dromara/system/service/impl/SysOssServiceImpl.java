@@ -73,10 +73,10 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
     /** 同步事件发布器：事务内发布 OssFileUploadedEvent，dcs 监听器同事务建审核单 */
     private final ApplicationEventPublisher eventPublisher;
 
-    /** 文件审核闸门（实现方在 ruoyi-dcs；可空注入，dcs 未装配时按无审核直通，合同#5） */
+    /** 文件审核闸门（实现方在 ruoyi-mission；可空注入，dcs 未装配时按无审核直通，合同#5） */
     private final ObjectProvider<FileReviewGate> fileReviewGateProvider;
 
-    /** 文件安全检测器（file-guard 批二；实现方在 ruoyi-dcs，可空注入=未装配时上传零变化） */
+    /** 文件安全检测器（file-guard 批二；实现方在 ruoyi-mission，可空注入=未装配时上传零变化） */
     private final ObjectProvider<FileGuardChecker> fileGuardCheckerProvider;
 
     /**

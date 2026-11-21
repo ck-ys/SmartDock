@@ -1,7 +1,7 @@
 package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.RunStatusGateway;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantConversation;
 import com.smartdock.assistant.mapper.AssistantRunMapper;
 import com.smartdock.assistant.query.ConversationQueryService;
 import org.junit.jupiter.api.Tag;
@@ -65,9 +65,9 @@ class RunStatusGatewayPinUnitTest {
 
     @Test
     void 回填只把命中行标为生成中() {
-        DcsAssistantConversation hit = new DcsAssistantConversation();
+        AssistantConversation hit = new AssistantConversation();
         hit.setThreadId("t-1");
-        DcsAssistantConversation miss = new DcsAssistantConversation();
+        AssistantConversation miss = new AssistantConversation();
         miss.setThreadId("t-2");
 
         RunStatusGateway gateway = (tenantId, userId) -> Set.of("t-1");
@@ -81,7 +81,7 @@ class RunStatusGatewayPinUnitTest {
 
     @Test
     void 无在途轮时一行都不改() {
-        DcsAssistantConversation a = new DcsAssistantConversation();
+        AssistantConversation a = new AssistantConversation();
         a.setThreadId("t-1");
 
         RunStatusGateway none = (tenantId, userId) -> Set.of();

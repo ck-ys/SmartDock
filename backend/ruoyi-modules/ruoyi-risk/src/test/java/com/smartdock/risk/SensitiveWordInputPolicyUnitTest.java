@@ -1,7 +1,7 @@
 package com.smartdock.risk;
 
-import com.smartdock.risk.domain.DcsSensitiveWord;
-import com.smartdock.risk.domain.bo.DcsSensitiveWordBo;
+import com.smartdock.risk.domain.SensitiveWord;
+import com.smartdock.risk.domain.bo.SensitiveWordBo;
 import com.smartdock.risk.service.SensitiveWordInputPolicy;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -19,7 +19,7 @@ class SensitiveWordInputPolicyUnitTest {
 
     @Test
     void preparesCustomWordCreateWithoutTrustingIdentityOrAuditFields() {
-        DcsSensitiveWordBo bo = word("  test word  ", " mask ");
+        SensitiveWordBo bo = word("  test word  ", " mask ");
         bo.setWordId(99L);
         bo.setTenantId("forged");
         bo.setBuiltin("1");
@@ -39,9 +39,9 @@ class SensitiveWordInputPolicyUnitTest {
 
     @Test
     void preservesBuiltinIdentityOnUpdate() {
-        DcsSensitiveWordBo bo = word("system word", "BLOCK");
+        SensitiveWordBo bo = word("system word", "BLOCK");
         bo.setBuiltin("0");
-        DcsSensitiveWord existing = new DcsSensitiveWord();
+        SensitiveWord existing = new SensitiveWord();
         existing.setBuiltin("1");
 
         policy.prepareUpdate(bo, "240152", existing);
@@ -55,7 +55,7 @@ class SensitiveWordInputPolicyUnitTest {
         assertThatThrownBy(() -> policy.prepareCreate(word("word", "ALLOW"), "240152"))
             .hasMessageContaining("MASK/BLOCK/REVIEW");
 
-        DcsSensitiveWordBo invalidEnabled = word("word", "MASK");
+        SensitiveWordBo invalidEnabled = word("word", "MASK");
         invalidEnabled.setEnabled("yes");
         assertThatThrownBy(() -> policy.prepareCreate(invalidEnabled, "240152"))
             .hasMessageContaining("0 或 1");
@@ -66,15 +66,15 @@ class SensitiveWordInputPolicyUnitTest {
 
     @Test
     void rejectsDeletingBuiltinWords() {
-        DcsSensitiveWord builtin = new DcsSensitiveWord();
+        SensitiveWord builtin = new SensitiveWord();
         builtin.setBuiltin("1");
 
         assertThatThrownBy(() -> policy.assertDeletable(List.of(builtin)))
             .hasMessageContaining("内置敏感词不允许删除");
     }
 
-    private DcsSensitiveWordBo word(String text, String action) {
-        DcsSensitiveWordBo bo = new DcsSensitiveWordBo();
+    private SensitiveWordBo word(String text, String action) {
+        SensitiveWordBo bo = new SensitiveWordBo();
         bo.setWordText(text);
         bo.setCategory(" GENERAL ");
         bo.setAction(action);

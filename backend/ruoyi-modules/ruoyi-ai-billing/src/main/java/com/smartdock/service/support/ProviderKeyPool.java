@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.tenant.helper.TenantHelper;
-import com.smartdock.domain.DcsAiProviderAccess;
-import com.smartdock.mapper.DcsAiProviderAccessMapper;
+import com.smartdock.domain.AiProviderAccess;
+import com.smartdock.mapper.AiProviderAccessMapper;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -50,7 +50,7 @@ public class ProviderKeyPool {
     /** 「刚确认零余额」的判定窗口（毫秒）：快照超出窗口不再据此跳过 */
     static final long ZERO_BALANCE_TRUST_MS = 24 * 60 * 60 * 1000L;
 
-    private final DcsAiProviderAccessMapper accessMapper;
+    private final AiProviderAccessMapper accessMapper;
 
     /** 每 (tenantId|provider) 一池：轮询序号 + 各钥匙冷却截止 + 最后 pick 的钥匙 */
     private final ConcurrentHashMap<String, PoolState> pools = new ConcurrentHashMap<>();
@@ -69,19 +69,19 @@ public class ProviderKeyPool {
      * 运行时取钥（hydrate 调用）：轮询挑一把可用钥匙。
      * 池空（无 enabled 行/查询失败）返回 null——调用方回退旧行为（首行/行内列）。
      */
-    public DcsAiProviderAccess pick(String tenantId, String provider) {
-        List<DcsAiProviderAccess> keys = enabledKeys(tenantId, provider);
+    public AiProviderAccess pick(String tenantId, String provider) {
+        List<AiProviderAccess> keys = enabledKeys(tenantId, provider);
         if (keys.isEmpty()) {
             return null;
         }
         PoolState pool = pools.computeIfAbsent(poolKey(tenantId, provider), k -> new PoolState());
         long now = System.currentTimeMillis();
         // 零余额跳过判定先算好（每把独立判龄）
-        DcsAiProviderAccess picked = null;
+        AiProviderAccess picked = null;
         int n = keys.size();
         int start = (int) (pool.seq.getAndIncrement() % n);
         for (int i = 0; i < n; i++) {
-            DcsAiProviderAccess cand = keys.get((start + i) % n);
+            AiProviderAccess cand = keys.get((start + i) % n);
             Long cd = pool.cooldownUntil.get(cand.getId());
             if (cd != null) {
                 if (cd > now) {
@@ -106,7 +106,7 @@ public class ProviderKeyPool {
     }
 
     /** 快照新鲜且为零 → 选路跳过（仅 OK 状态才信；FAILED/老快照不跳防误伤） */
-    private static boolean isFreshZeroBalance(DcsAiProviderAccess key, long now) {
+    private static boolean isFreshZeroBalance(AiProviderAccess key, long now) {
         if (!"OK".equals(key.getBalanceStatus()) || key.getBalanceCheckedAt() == null) {
             return false;
         }
@@ -195,14 +195,14 @@ public class ProviderKeyPool {
 
     /** enabled 行按 id 升序（主钥匙=id 最小；轮询序稳定）。查询失败返回空表（回退旧行为）。
      *  拷贝后再滤——MyBatis 返回可变 List 但别依赖它（测试桩 List.of 不可变，removeIf 必炸） */
-    private List<DcsAiProviderAccess> enabledKeys(String tenantId, String provider) {
+    private List<AiProviderAccess> enabledKeys(String tenantId, String provider) {
         try {
-            List<DcsAiProviderAccess> rows = TenantHelper.ignore(() ->
-                accessMapper.selectList(new LambdaQueryWrapper<DcsAiProviderAccess>()
-                    .eq(DcsAiProviderAccess::getTenantId, tenantId)
-                    .eq(DcsAiProviderAccess::getProvider, provider)
-                    .orderByAsc(DcsAiProviderAccess::getId)));
-            List<DcsAiProviderAccess> copy = new java.util.ArrayList<>(rows);
+            List<AiProviderAccess> rows = TenantHelper.ignore(() ->
+                accessMapper.selectList(new LambdaQueryWrapper<AiProviderAccess>()
+                    .eq(AiProviderAccess::getTenantId, tenantId)
+                    .eq(AiProviderAccess::getProvider, provider)
+                    .orderByAsc(AiProviderAccess::getId)));
+            List<AiProviderAccess> copy = new java.util.ArrayList<>(rows);
             copy.removeIf(k -> "0".equals(k.getEnabled()));
             return copy;
         } catch (Exception e) {
@@ -213,19 +213,19 @@ public class ProviderKeyPool {
     }
 
     /** 主钥匙（enabled 按 id 升序第一行；无 enabled 行取 id 最小行）——探测类端点取钥口径 */
-    public DcsAiProviderAccess primaryKey(String tenantId, String provider) {
-        List<DcsAiProviderAccess> rows;
+    public AiProviderAccess primaryKey(String tenantId, String provider) {
+        List<AiProviderAccess> rows;
         try {
             rows = TenantHelper.ignore(() ->
-                accessMapper.selectList(new LambdaQueryWrapper<DcsAiProviderAccess>()
-                    .eq(DcsAiProviderAccess::getTenantId, tenantId)
-                    .eq(DcsAiProviderAccess::getProvider, provider)
-                    .orderByAsc(DcsAiProviderAccess::getId)));
+                accessMapper.selectList(new LambdaQueryWrapper<AiProviderAccess>()
+                    .eq(AiProviderAccess::getTenantId, tenantId)
+                    .eq(AiProviderAccess::getProvider, provider)
+                    .orderByAsc(AiProviderAccess::getId)));
         } catch (Exception e) {
             return null;
         }
         return rows.stream()
-            .min(Comparator.comparing(DcsAiProviderAccess::getId))
+            .min(Comparator.comparing(AiProviderAccess::getId))
             .orElse(null);
     }
 

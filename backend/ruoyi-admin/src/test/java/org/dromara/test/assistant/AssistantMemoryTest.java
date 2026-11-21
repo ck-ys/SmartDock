@@ -2,13 +2,13 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartdock.assistant.domain.model.DcsAssistantMemory;
-import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
-import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
+import com.smartdock.assistant.domain.model.AssistantMemory;
+import com.smartdock.assistant.engine.core.AssistantMemoryTurnLedger;
+import com.smartdock.assistant.engine.core.MemoryInjectModelDecorator;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
-import com.smartdock.assistant.legacy.service.AssistantMemoryTurnService;
-import com.smartdock.assistant.legacy.tools.MemoryTools;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.service.AssistantMemoryTurnService;
+import com.smartdock.assistant.engine.tools.MemoryTools;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
 import com.smartdock.assistant.mapper.AssistantMemoryMapper;
 import com.smartdock.assistant.mapper.AssistantMemoryPrefMapper;
 import com.smartdock.assistant.service.AssistantMemoryService;
@@ -107,12 +107,12 @@ class AssistantMemoryTest {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
-        List<DcsAssistantMemory> stored = new ArrayList<>();
-        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> {
+        List<AssistantMemory> stored = new ArrayList<>();
+        when(mapper.insert(any(AssistantMemory.class))).thenAnswer(inv -> {
             stored.add(inv.getArgument(0));
             return 1;
         });
-        List<DcsAssistantMemory> rows = new ArrayList<>();
+        List<AssistantMemory> rows = new ArrayList<>();
         when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(rows);
 
         AssistantMemoryService svc = newSvc(mapper);
@@ -161,7 +161,7 @@ class AssistantMemoryTest {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(0);
-        when(mapper.insert(any(DcsAssistantMemory.class))).thenReturn(1);
+        when(mapper.insert(any(AssistantMemory.class))).thenReturn(1);
         MemoryTools tool = new MemoryTools(new ToolIdentity(7L, "000000", ToolIdentity.LEVEL_MEMBER, null),
             newTurn(mapper, newSvc(mapper)));
         JsonNode j = MAPPER.readTree(tool.saveMemory("称呼我为小林"));
@@ -194,7 +194,7 @@ class AssistantMemoryTest {
     @Test
     void decoratorAppendsSystemMemoryWhenPresent() {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
-        DcsAssistantMemory row = new DcsAssistantMemory();
+        AssistantMemory row = new AssistantMemory();
         row.setContent("称呼我为小林");
         row.setId(11L);
         when(mapper.listByUserStatus(eq("000000"), eq(7L), anyString())).thenReturn(List.of(row));
@@ -250,10 +250,10 @@ class AssistantMemoryTest {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(0);
-        List<DcsAssistantMemory> rows = new ArrayList<>();
-        List<DcsAssistantMemory> stored = new ArrayList<>();
+        List<AssistantMemory> rows = new ArrayList<>();
+        List<AssistantMemory> stored = new ArrayList<>();
         when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(rows);
-        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> {
+        when(mapper.insert(any(AssistantMemory.class))).thenAnswer(inv -> {
             stored.add(inv.getArgument(0));
             return 1;
         });
@@ -273,7 +273,7 @@ class AssistantMemoryTest {
     @Test
     void editRejectsForeignRowWithoutAnyWrite() {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
-        DcsAssistantMemory other = new DcsAssistantMemory();
+        AssistantMemory other = new AssistantMemory();
         other.setId(5L);
         other.setTenantId("000000");
         other.setUserId(2L);
@@ -293,8 +293,8 @@ class AssistantMemoryTest {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(0);
-        List<DcsAssistantMemory> stored = new ArrayList<>();
-        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> {
+        List<AssistantMemory> stored = new ArrayList<>();
+        when(mapper.insert(any(AssistantMemory.class))).thenAnswer(inv -> {
             stored.add(inv.getArgument(0));
             return 1;
         });
@@ -316,8 +316,8 @@ class AssistantMemoryTest {
     @Test
     void digestCacheDoesNotMixUpHashCollidingQuestions() {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
-        DcsAssistantMemory a = row(1L, "Aa");
-        DcsAssistantMemory b = row(2L, "BB");
+        AssistantMemory a = row(1L, "Aa");
+        AssistantMemory b = row(2L, "BB");
         when(mapper.listByUserStatus(anyString(), anyLong(), anyString())).thenReturn(List.of(a, b));
 
         AssistantMemoryService svc = newSvc(mapper);
@@ -354,7 +354,7 @@ class AssistantMemoryTest {
     @Test
     void editRejectsSameUserInOtherTenant() {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
-        DcsAssistantMemory otherTenant = row(8L, "别的租户");
+        AssistantMemory otherTenant = row(8L, "别的租户");
         otherTenant.setTenantId("000001");
         when(mapper.selectById(8L)).thenReturn(otherTenant);
 
@@ -387,8 +387,8 @@ class AssistantMemoryTest {
         }
     }
 
-    private static DcsAssistantMemory row(Long id, String content) {
-        DcsAssistantMemory r = new DcsAssistantMemory();
+    private static AssistantMemory row(Long id, String content) {
+        AssistantMemory r = new AssistantMemory();
         r.setId(id);
         r.setTenantId("000000");
         r.setUserId(1L);

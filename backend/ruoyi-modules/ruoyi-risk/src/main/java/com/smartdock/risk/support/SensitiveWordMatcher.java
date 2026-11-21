@@ -154,7 +154,7 @@ public class SensitiveWordMatcher {
 
     /**
      * 词规则: word=词面, action=MASK/BLOCK/REVIEW, scene=生效场景标记(CHAT/FORM/FILE 或 ALL)。
-     * 匹配器本身不按场景过滤——场景过滤在规则装载层(DcsSensitiveWordFilterService.loadRules)完成;
+     * 匹配器本身不按场景过滤——场景过滤在规则装载层(SensitiveWordFilterService.loadRules)完成;
      * scene 仅作为装载层的标记随规则携带, 便于调用方区分来源。
      */
     public record WordRule(String word, String action, String scene) {

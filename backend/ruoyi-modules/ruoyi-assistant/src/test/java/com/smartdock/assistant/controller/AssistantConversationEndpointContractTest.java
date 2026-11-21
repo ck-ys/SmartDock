@@ -1,7 +1,7 @@
 package com.smartdock.assistant.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
-import com.smartdock.assistant.legacy.controller.AssistantConversationController;
+import com.smartdock.assistant.controller.AssistantConversationController;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.junit.jupiter.api.Tag;
@@ -33,8 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("local")
 class AssistantConversationEndpointContractTest {
 
-    private static final String BASE = "/dcs/assistant";
-    private static final String USE = "dcs:assistant:use";
+    private static final String BASE = "/assistant";
+    private static final String USE = "smartdock:assistant:use";
 
     private static void assertClassMapping(Class<?> c, String expected) {
         RequestMapping rm = c.getAnnotation(RequestMapping.class);

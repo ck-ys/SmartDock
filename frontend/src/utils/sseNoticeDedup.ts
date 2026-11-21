@@ -7,7 +7,7 @@ type DurableNoticeIdentity = {
   businessDedupKey?: string | null;
 };
 
-export const shouldDisplayDcsNotice = (notice: DurableNoticeIdentity, now = Date.now()): boolean => {
+export const shouldDisplayNotice = (notice: DurableNoticeIdentity, now = Date.now()): boolean => {
   for (const [key, timestamp] of recentDeliveries) {
     if (now - timestamp > NOTICE_TTL_MS) recentDeliveries.delete(key);
   }
@@ -25,4 +25,4 @@ export const shouldDisplayDcsNotice = (notice: DurableNoticeIdentity, now = Date
   return true;
 };
 
-export const resetDcsNoticeDedupForTest = () => recentDeliveries.clear();
+export const resetNoticeDedupForTest = () => recentDeliveries.clear();

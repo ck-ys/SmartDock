@@ -4,7 +4,7 @@ import io.agentscope.core.memory.InMemoryMemory;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.spring.boot.agui.common.AguiProperties;
-import com.smartdock.assistant.legacy.core.AssistantReasoningGate;
+import com.smartdock.assistant.engine.core.AssistantReasoningGate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -69,8 +69,8 @@ class A3StoreAssemblyTest {
         assertFalse(aguiProperties.isInterruptOnDisconnect(), "断线不中断（HITL 恢复链前提）");
         assertTrue(aguiProperties.isEmitTokenUsage(), "token 用量事件=批D 计费数据源");
         assertEquals(60, aguiProperties.getSessionTimeoutMinutes(), "会话超时 60 分钟");
-        assertEquals("dcs-assistant", aguiProperties.getDefaultAgentId(),
-            "默认 agent 钉死 dcs-assistant");
+        assertEquals("smartdock-assistant", aguiProperties.getDefaultAgentId(),
+            "默认 agent 钉死 smartdock-assistant");
     }
 
     @Test

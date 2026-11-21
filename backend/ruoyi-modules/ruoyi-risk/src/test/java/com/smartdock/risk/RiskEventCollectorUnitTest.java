@@ -1,11 +1,11 @@
 package com.smartdock.risk;
 
-import com.smartdock.risk.domain.DcsRiskEvent;
-import com.smartdock.risk.domain.DcsRiskRule;
+import com.smartdock.risk.domain.RiskEvent;
+import com.smartdock.risk.domain.RiskRule;
 import com.smartdock.risk.domain.bo.RiskEventCommand;
-import com.smartdock.risk.mapper.DcsRiskEventMapper;
-import com.smartdock.risk.mapper.DcsRiskRuleMapper;
-import com.smartdock.risk.mapper.DcsRiskWhitelistMapper;
+import com.smartdock.risk.mapper.RiskEventMapper;
+import com.smartdock.risk.mapper.RiskRuleMapper;
+import com.smartdock.risk.mapper.RiskWhitelistMapper;
 import com.smartdock.risk.service.RiskEventCollector;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,10 +26,10 @@ class RiskEventCollectorUnitTest {
 
     @Test
     void recordsExplicitTenantAndIdempotencyKey() {
-        DcsRiskEventMapper eventMapper = mock(DcsRiskEventMapper.class);
-        DcsRiskRuleMapper ruleMapper = mock(DcsRiskRuleMapper.class);
-        DcsRiskWhitelistMapper whitelistMapper = mock(DcsRiskWhitelistMapper.class);
-        DcsRiskRule rule = new DcsRiskRule();
+        RiskEventMapper eventMapper = mock(RiskEventMapper.class);
+        RiskRuleMapper ruleMapper = mock(RiskRuleMapper.class);
+        RiskWhitelistMapper whitelistMapper = mock(RiskWhitelistMapper.class);
+        RiskRule rule = new RiskRule();
         rule.setWeight(2);
         when(ruleMapper.selectOne(any())).thenReturn(rule);
         when(whitelistMapper.selectCount(any())).thenReturn(0L);
@@ -52,7 +52,7 @@ class RiskEventCollectorUnitTest {
             null
         ));
 
-        ArgumentCaptor<DcsRiskEvent> captor = ArgumentCaptor.forClass(DcsRiskEvent.class);
+        ArgumentCaptor<RiskEvent> captor = ArgumentCaptor.forClass(RiskEvent.class);
         verify(eventMapper).insert(captor.capture());
         assertThat(captor.getValue().getTenantId()).isEqualTo("200001");
         assertThat(captor.getValue().getIdempotencyKey()).isEqualTo("chat:99:client-1");
@@ -61,10 +61,10 @@ class RiskEventCollectorUnitTest {
 
     @Test
     void normalizesBlankIdempotencyKeyToNull() {
-        DcsRiskEventMapper eventMapper = mock(DcsRiskEventMapper.class);
-        DcsRiskRuleMapper ruleMapper = mock(DcsRiskRuleMapper.class);
-        DcsRiskWhitelistMapper whitelistMapper = mock(DcsRiskWhitelistMapper.class);
-        DcsRiskRule rule = new DcsRiskRule();
+        RiskEventMapper eventMapper = mock(RiskEventMapper.class);
+        RiskRuleMapper ruleMapper = mock(RiskRuleMapper.class);
+        RiskWhitelistMapper whitelistMapper = mock(RiskWhitelistMapper.class);
+        RiskRule rule = new RiskRule();
         rule.setWeight(2);
         when(ruleMapper.selectOne(any())).thenReturn(rule);
         when(whitelistMapper.selectCount(any())).thenReturn(0L);
@@ -84,7 +84,7 @@ class RiskEventCollectorUnitTest {
             null
         ));
 
-        ArgumentCaptor<DcsRiskEvent> captor = ArgumentCaptor.forClass(DcsRiskEvent.class);
+        ArgumentCaptor<RiskEvent> captor = ArgumentCaptor.forClass(RiskEvent.class);
         verify(eventMapper).insert(captor.capture());
         assertThat(captor.getValue().getIdempotencyKey()).isNull();
     }
@@ -127,9 +127,9 @@ class RiskEventCollectorUnitTest {
 
     @Test
     void ignoresDuplicateIdempotencyKey() {
-        DcsRiskEventMapper eventMapper = mock(DcsRiskEventMapper.class);
-        DcsRiskRuleMapper ruleMapper = mock(DcsRiskRuleMapper.class);
-        DcsRiskWhitelistMapper whitelistMapper = mock(DcsRiskWhitelistMapper.class);
+        RiskEventMapper eventMapper = mock(RiskEventMapper.class);
+        RiskRuleMapper ruleMapper = mock(RiskRuleMapper.class);
+        RiskWhitelistMapper whitelistMapper = mock(RiskWhitelistMapper.class);
         when(whitelistMapper.selectCount(any())).thenReturn(0L);
         when(eventMapper.selectCount(any())).thenReturn(1L);
         RiskEventCollector collector = new RiskEventCollector(eventMapper, ruleMapper, whitelistMapper, mock(com.smartdock.risk.support.RiskBehaviorSink.class));
@@ -148,7 +148,7 @@ class RiskEventCollectorUnitTest {
             null
         ));
 
-        verify(eventMapper, never()).insert(any(DcsRiskEvent.class));
+        verify(eventMapper, never()).insert(any(RiskEvent.class));
         verify(ruleMapper, never()).selectOne(any());
     }
 }

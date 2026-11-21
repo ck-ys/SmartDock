@@ -38,7 +38,7 @@ class WalletReconcileJobUnitTest {
 
     private static final Long SEED_WALLET = 900000000000004001L;
 
-    /** 开发库基线(与 application-dev.yml dcs.wallet.reconcile 一致) */
+    /** 开发库基线(与 application-dev.yml wallet.reconcile 一致) */
     private static final Map<Long, BigDecimal> DEV_BALANCE_DIFFS =
         Map.of(SEED_WALLET, new BigDecimal("0.0001"));
     private static final Set<Long> DEV_CHAIN_BREAK_IDS =

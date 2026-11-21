@@ -74,7 +74,7 @@ class Batch7cContractGuardTest {
     @Test
     void legacy会话服务必须已被删除() {
         Path legacy = assistantMain()
-            .resolve("com/smartdock/assistant/legacy/service/AssistantConversationService.java");
+            .resolve("com/smartdock/assistant/service/AssistantConversationService.java");
         assertThat(legacy)
             .as("7C-2 已把 legacy 会话壳整个删除（清人→PurgeService、压缩记录/TODO→MessageWriteService、"
                 + "账单/TODO 读→ConversationQueryService）。谁再把这个文件加回来，等于重建第二套写路径。")

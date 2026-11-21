@@ -18,7 +18,7 @@
       </template>
       <el-empty v-else description="暂无消息" />
     </div>
-    <div class="foot-box foot-announcement" v-hasPermi="['dcs:announcement:list']" @click="goAnnouncement">
+    <div class="foot-box foot-announcement" v-hasPermi="['smartdock:announcement:list']" @click="goAnnouncement">
       <svg-icon icon-class="notification" class="foot-icon" />
       <span>公告</span>
       <span v-if="announcementUnread > 0" class="foot-badge">{{ announcementUnread > 99 ? '99+' : announcementUnread }} 条未读</span>
@@ -59,7 +59,7 @@ const onNewsClick = async (item: NoticeItem) => {
 };
 
 const goNoticeCenter = () => {
-  router.push('/dcs/notice');
+  router.push('/notice');
 };
 
 onMounted(() => {

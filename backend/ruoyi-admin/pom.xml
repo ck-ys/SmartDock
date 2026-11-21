@@ -54,7 +54,7 @@
 
         <dependency>
             <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-dcs</artifactId>
+            <artifactId>ruoyi-mission</artifactId>
         </dependency>
 
         <!-- 2026-09-23 风控模块化: 显式直依(虽然经 dcs 传递可达), admin 残留的跨域测试直接引用 risk 类 -->
@@ -81,7 +81,7 @@
             <artifactId>ruoyi-file-security</artifactId>
         </dependency>
 
-        <!-- 2026-10-18 批1: 画像引擎(零业务依赖内核), dcs/assistant 后续经它取分数 -->
+        <!-- 2026-10-18 批1: 画像引擎(零业务依赖内核), smartdock/assistant 后续经它取分数 -->
         <dependency>
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-profile-engine</artifactId>

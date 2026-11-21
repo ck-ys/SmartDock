@@ -17,7 +17,7 @@ import java.util.Map;
 /**
  * 用户额度管理 Service（业务批3-③ #16，2026-10-12）。
  *
- * <p>三层合成口径：单人覆盖行（本表）&gt; 租户默认（dcs_assistant_config）——
+ * <p>三层合成口径：单人覆盖行（本表）&gt; 租户默认（assistant_config）——
  * {@link #effectiveLimits} 是「单人生效限额」的底层合成（额度页/管理页展示口径）；
  * 运行链拦截一律走 {@link #billingAwareLimits}（resolver 拦截链、status 端点、联网
  * 工具三消费方，订阅态感知）。禁用闸=覆盖行 disabled='1' 时该用户全部助手请求被拒（人话 429）。</p>
@@ -28,11 +28,11 @@ import java.util.Map;
 public class AssistantUserQuotaService {
 
     private final AssistantUserQuotaMapper quotaMapper;
-    private final com.smartdock.assistant.legacy.service.AssistantConfigService configService;
+    private final com.smartdock.assistant.service.AssistantConfigService configService;
     private final AssistantDailyQuota dailyQuota;
     private final com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota;
     /** 业务批7 Q1：订阅态判定+套餐联网档位（积分服务在 billing 模块，跨模块 DI 与 BillingModelDecorator 同源） */
-    private final com.smartdock.service.IDcsAiCreditService creditService;
+    private final com.smartdock.service.IAiCreditService creditService;
 
     /** 单人生效限额（展示+拦截共用；disabled=true 时 limits 仍返回供前端展示） */
     public record UserLimits(int roundLimit, int websearchLimit, boolean disabled) {
@@ -55,7 +55,7 @@ public class AssistantUserQuotaService {
         UserLimits ul = effectiveLimits(tenantId, userId);
         // dsflash P2-6：与 effectiveLimits 同款 fail-open——积分库闪断按钱包模式放行，
         // 不让三路消费方（resolver/status/websearch）跟着 500（宁可按默认放行不打断已过闸用户）
-        java.util.Optional<com.smartdock.domain.DcsAiCreditSubscription> sub;
+        java.util.Optional<com.smartdock.domain.AiCreditSubscription> sub;
         try {
             // 业务批8 Q7 丁口径收口（2026-10-14 用户反馈暴露）：锚点与计费链
             // BillingModelDecorator 对齐——读租户显式消费方式开关 consumeMode（返回
@@ -90,7 +90,7 @@ public class AssistantUserQuotaService {
      * 宁可按默认放行也不打断已过闸用户的请求）。额度页降级展示同口径。
      */
     public UserLimits effectiveLimits(String tenantId, Long userId) {
-        com.smartdock.assistant.legacy.service.AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
+        com.smartdock.assistant.service.AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
         AssistantUserQuota q = null;
         try {
             q = quotaMapper.selectOne(
@@ -102,7 +102,7 @@ public class AssistantUserQuotaService {
         }
         int round = (q != null && q.getRoundLimitOverride() != null)
             ? q.getRoundLimitOverride() : cfg.dailyRoundLimitPerUser();
-        // 联网列批④落地：单人覆盖 > 租户 dcs_assistant_config.websearch_limit_per_user（平台默认 20）
+        // 联网列批④落地：单人覆盖 > 租户 assistant_config.websearch_limit_per_user（平台默认 20）
         int websearch = (q != null && q.getWebsearchLimitOverride() != null)
             ? q.getWebsearchLimitOverride() : cfg.websearchLimitPerUser();
         boolean disabled = q != null && "1".equals(q.getDisabled());
@@ -187,7 +187,7 @@ public class AssistantUserQuotaService {
                 costMap.put(((Number) c.get("userid")).longValue(), c.get("monthcost"));
             }
         }
-        com.smartdock.assistant.legacy.service.AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
+        com.smartdock.assistant.service.AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
         for (Map<String, Object> r : raw) {
             Long uid = ((Number) r.get("userid")).longValue();

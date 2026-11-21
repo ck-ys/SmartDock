@@ -11,7 +11,7 @@ import java.util.List;
  *
  * @param blockHit  任一字段命中 BLOCK 级词
  * @param reviewHit 任一字段命中 REVIEW 级词
- * @param hitWord   代表命中词: BLOCK 级优先, 无则首个 REVIEW 级词; 无命中为 null(落 dcs_risk_event.hit_word 供大盘聚合)
+ * @param hitWord   代表命中词: BLOCK 级优先, 无则首个 REVIEW 级词; 无命中为 null(落 risk_event.hit_word 供大盘聚合)
  * @param hits      逐字段命中明细(字段路径/词/级别), 无命中为空列表
  */
 public record ContentModerationResult(

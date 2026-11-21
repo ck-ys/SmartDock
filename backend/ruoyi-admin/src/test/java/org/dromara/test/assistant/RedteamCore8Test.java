@@ -1,9 +1,9 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.security.AssistantInjectionFilter;
+import com.smartdock.assistant.engine.security.AssistantInjectionFilter;
 import com.smartdock.assistant.service.RunLedgerService;
 import com.smartdock.assistant.support.AssistantPiiFilter;
-import com.smartdock.assistant.legacy.service.AssistantActionService;
+import com.smartdock.assistant.service.AssistantActionService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

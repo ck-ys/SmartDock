@@ -2,7 +2,7 @@ package com.smartdock.risk.service;
 
 import cn.hutool.core.util.StrUtil;
 import org.dromara.common.core.exception.ServiceException;
-import com.smartdock.risk.domain.DcsRiskWhitelist;
+import com.smartdock.risk.domain.RiskWhitelist;
 import org.springframework.stereotype.Component;
 
 import java.net.Inet6Address;
@@ -18,7 +18,7 @@ public class RiskWhitelistPolicy {
     public static final String TYPE_IP = "IP";
     public static final String TYPE_USER = "USER";
 
-    public void prepareCreate(DcsRiskWhitelist entry) {
+    public void prepareCreate(RiskWhitelist entry) {
         entry.setWhitelistId(null);
         entry.setTenantId(null);
         entry.setCreateDept(null);

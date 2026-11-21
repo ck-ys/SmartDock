@@ -39,8 +39,8 @@ public class AssistantSkillVisibilityService {
         if (skillId == null || skillId.isBlank()) {
             return -1;
         }
-        String key = com.smartdock.assistant.legacy.core.AssistantSkillGateMiddleware.gateKey(skillId.trim());
-        return com.smartdock.assistant.legacy.core.ToolRegistry.effectiveMinRoleSingle(
+        String key = com.smartdock.assistant.engine.core.AssistantSkillGateMiddleware.gateKey(skillId.trim());
+        return com.smartdock.assistant.engine.core.ToolRegistry.effectiveMinRoleSingle(
             key, builtinMinRole, toolGate == null ? null : toolGate.get(key));
     }
 

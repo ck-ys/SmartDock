@@ -59,7 +59,7 @@ async function login(page) {
   await page.evaluate((uids) => {
     for (const id of uids) {
       try {
-        localStorage.setItem(`dcs:assistant:gateOk:${id}`, '1');
+        localStorage.setItem(`assistant:gateOk:${id}`, '1');
       } catch {
         /* 存储不可用就算了，askNewSession 还会兜底点按钮 */
       }

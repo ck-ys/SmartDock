@@ -66,7 +66,7 @@ ReActAgent agent = ReActAgent.builder()
     .stateStore(stateStore)
     .toolkit(toolkit)
     .permissionContext(pb.build())
-    .middleware(new DcsCompactionMiddleware(
+    .middleware(new AssistantCompactionMiddleware(
         workspaceManager, new CompactionSummaryModel(model),
         AssistantCompactionAssets.buildConfig(
             AssistantCompactionPolicy.deriveTriggerTokens(
@@ -128,7 +128,7 @@ ReActAgent agent = ReActAgent.builder()
 |---|---|
 | 会话状态 | `JdbcAgentStateStore` + `PostgresDialect`，表预建在 `agentscope` schema，`autoCreateTable=false` |
 | 连接隔离 | `SearchPathDataSource` 代理：借出连接时 `SET search_path TO agentscope, public`，归还前还原 |
-| 自动压缩 | `DcsCompactionMiddleware` 继承 `CompactionMiddleware`，租户阈值默认 **60000 token**，保留约 1/10（下限 2000） |
+| 自动压缩 | `AssistantCompactionMiddleware` 继承 `CompactionMiddleware`，租户阈值默认 **60000 token**，保留约 1/10（下限 2000） |
 | 压缩标记 | 压缩后向会话写入分隔条，前端可渲染「已压缩」状态；也可在会话管理页手动触发压缩 |
 | 恢复 | `enablePendingToolRecovery(true)` 处理无结果的 `tool_use`；启动时把悬挂的 `asking` 翻转为 `allowed` |
 | 会话缓存 | 每会话装配 agent；模型选择、联网开关、自选范围指纹变化时失效重建；技能与思考档逐请求读取，下一轮即生效 |

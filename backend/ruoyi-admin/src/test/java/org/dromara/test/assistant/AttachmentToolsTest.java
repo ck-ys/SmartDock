@@ -2,10 +2,10 @@ package org.dromara.test.assistant;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartdock.assistant.domain.model.DcsAssistantAttachment;
-import com.smartdock.assistant.legacy.service.AssistantAttachmentService;
-import com.smartdock.assistant.legacy.tools.AttachmentTools;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.domain.model.AssistantAttachment;
+import com.smartdock.assistant.service.AssistantAttachmentService;
+import com.smartdock.assistant.engine.tools.AttachmentTools;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -46,8 +46,8 @@ class AttachmentToolsTest {
         });
     }
 
-    private static DcsAssistantAttachment row(long id, String status, String text) {
-        DcsAssistantAttachment r = new DcsAssistantAttachment();
+    private static AssistantAttachment row(long id, String status, String text) {
+        AssistantAttachment r = new AssistantAttachment();
         r.setId(id);
         r.setFileName("成绩表.xlsx");
         r.setSuffix("xlsx");
@@ -108,7 +108,7 @@ class AttachmentToolsTest {
     /** FAILED 附件读正文 → 人话错误不喂文（parse_error 透传） */
     @Test
     void failedAttachmentReturnsFriendlyError() throws Exception {
-        DcsAssistantAttachment bad = row(101L, "FAILED", null);
+        AssistantAttachment bad = row(101L, "FAILED", null);
         bad.setParseError("文件较大（超过10MB）");
         when(service.listOwned(anyString(), anyLong(), anyString())).thenReturn(List.of(bad));
         Map<String, Object> r = call("t-1", "101");

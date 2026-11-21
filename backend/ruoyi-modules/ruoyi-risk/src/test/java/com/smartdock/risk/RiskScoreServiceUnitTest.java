@@ -1,9 +1,9 @@
 package com.smartdock.risk;
 
-import com.smartdock.risk.domain.DcsRiskRule;
+import com.smartdock.risk.domain.RiskRule;
 import com.smartdock.risk.domain.vo.RiskRuleScoreVo;
-import com.smartdock.risk.mapper.DcsRiskEventMapper;
-import com.smartdock.risk.mapper.DcsRiskRuleMapper;
+import com.smartdock.risk.mapper.RiskEventMapper;
+import com.smartdock.risk.mapper.RiskRuleMapper;
 import com.smartdock.risk.service.HybridRiskPolicy;
 import com.smartdock.risk.service.RiskScoreService;
 import org.junit.jupiter.api.Tag;
@@ -22,9 +22,9 @@ class RiskScoreServiceUnitTest {
 
     @Test
     void returnsEventRuleTrackWhenItsLevelIsHigher() {
-        DcsRiskEventMapper eventMapper = mock(DcsRiskEventMapper.class);
-        DcsRiskRuleMapper ruleMapper = mock(DcsRiskRuleMapper.class);
-        DcsRiskRule globalRule = globalRule();
+        RiskEventMapper eventMapper = mock(RiskEventMapper.class);
+        RiskRuleMapper ruleMapper = mock(RiskRuleMapper.class);
+        RiskRule globalRule = globalRule();
         when(ruleMapper.selectOne(any())).thenReturn(globalRule);
         when(eventMapper.eventRuleScores(7L, "127.0.0.1", "000000")).thenReturn(List.of(
             new RiskRuleScoreVo("LOGIN_FAIL", 65, 3),
@@ -46,8 +46,8 @@ class RiskScoreServiceUnitTest {
 
     @Test
     void returnsGlobalTrackWhenAggregateLevelIsHigher() {
-        DcsRiskEventMapper eventMapper = mock(DcsRiskEventMapper.class);
-        DcsRiskRuleMapper ruleMapper = mock(DcsRiskRuleMapper.class);
+        RiskEventMapper eventMapper = mock(RiskEventMapper.class);
+        RiskRuleMapper ruleMapper = mock(RiskRuleMapper.class);
         when(ruleMapper.selectOne(any())).thenReturn(globalRule());
         when(eventMapper.eventRuleScores(7L, "127.0.0.1", "000000")).thenReturn(List.of(
             new RiskRuleScoreVo("LOGIN_FAIL", 10, 0),
@@ -66,8 +66,8 @@ class RiskScoreServiceUnitTest {
 
     @Test
     void doesNotUseAnEventRuleAsGlobalFallback() {
-        DcsRiskEventMapper eventMapper = mock(DcsRiskEventMapper.class);
-        DcsRiskRuleMapper ruleMapper = mock(DcsRiskRuleMapper.class);
+        RiskEventMapper eventMapper = mock(RiskEventMapper.class);
+        RiskRuleMapper ruleMapper = mock(RiskRuleMapper.class);
         when(ruleMapper.selectOne(any())).thenReturn(null);
         when(eventMapper.eventRuleScores(7L, null, "000000")).thenReturn(List.of(
             new RiskRuleScoreVo("REPORTED", 40, 2)
@@ -81,12 +81,12 @@ class RiskScoreServiceUnitTest {
         assertThat(assessment.sourceTrack()).isEqualTo("RULE");
     }
 
-    private RiskScoreService service(DcsRiskEventMapper eventMapper, DcsRiskRuleMapper ruleMapper) {
+    private RiskScoreService service(RiskEventMapper eventMapper, RiskRuleMapper ruleMapper) {
         return new RiskScoreService(eventMapper, ruleMapper, new HybridRiskPolicy());
     }
 
-    private DcsRiskRule globalRule() {
-        DcsRiskRule rule = new DcsRiskRule();
+    private RiskRule globalRule() {
+        RiskRule rule = new RiskRule();
         rule.setRuleScope("GLOBAL");
         rule.setWindowMinutes(60);
         rule.setThresholdL1(20);

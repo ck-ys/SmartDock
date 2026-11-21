@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 本会话上下文构成（{@code GET /dcs/assistant/status/context} 的主体，批 7 · 7A，2026-11-20）。
+ * 本会话上下文构成（{@code GET /assistant/status/context} 的主体，批 7 · 7A，2026-11-20）。
  *
  * <p><b>纯搬移</b>：口径与 {@code AssistantStatusController#statusContext} 逐行一致——
  * 七段字符占比（0 段不下发）、memory 单列、discipline-urge 剔除、约 0% 剔除、低置信标注；

@@ -48,7 +48,7 @@ public interface BizToolProvider {
     /**
      * 撤回一次已执行成功的写操作（三批④, 2026-11-01）。
      *
-     * <p>refId=动作账本回执锚点（execute 成功时业务侧回填的业务行 id, 如 dcs_create_task
+     * <p>refId=动作账本回执锚点（execute 成功时业务侧回填的业务行 id, 如 create_task
      * 回填 taskId）；call 为撤回时刻重建的调用上下文——tenant/user 取自账本行归属
      * （tenant=建 agent 登录快照、user=本人）, threadId=账本行会话, 不是原执行的原始
      * 上下文, 实现只读身份三元组即可, args 恒为空。</p>

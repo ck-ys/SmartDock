@@ -55,9 +55,9 @@ class D1E2eReconcileTest {
         BigDecimal walletBefore = walletBalance();
         // 水位锚: 本轮对话前已存在的最大单据/流水 ID(一轮对话可产生多笔模型调用计费, 对账按"本轮新增集合")
         Long usageWatermark = queryForLong(
-            "SELECT COALESCE(MAX(usage_id),0) FROM dcs_ai_usage WHERE tenant_id='000000' AND caller='ASSISTANT_CHAT'");
+            "SELECT COALESCE(MAX(usage_id),0) FROM ai_usage WHERE tenant_id='000000' AND caller='ASSISTANT_CHAT'");
         Long ledgerWatermark = queryForLong(
-            "SELECT COALESCE(MAX(ledger_id),0) FROM dcs_tenant_wallet_ledger WHERE idempotency_key LIKE 'ai-assistant:000000:%'");
+            "SELECT COALESCE(MAX(ledger_id),0) FROM tenant_wallet_ledger WHERE idempotency_key LIKE 'ai-smartdock:assistant:000000:%'");
 
         // 第一轮: 闲聊问题(不触发工具, 最小 token 消耗)
         ChatResult r1 = chat(token, "d1-e2e-" + System.currentTimeMillis(), "用一句话介绍你自己");
@@ -72,7 +72,7 @@ class D1E2eReconcileTest {
         for (int i = 0; i < 40; i++) {
             Thread.sleep(500);
             newUsages = queryForLong(
-                "SELECT COUNT(*) FROM dcs_ai_usage WHERE tenant_id='000000' AND caller='ASSISTANT_CHAT' AND usage_id>" + usageWatermark);
+                "SELECT COUNT(*) FROM ai_usage WHERE tenant_id='000000' AND caller='ASSISTANT_CHAT' AND usage_id>" + usageWatermark);
             if (newUsages.equals(prev) && newUsages > 0) {
                 stable++;
                 if (stable >= 3) {
@@ -88,7 +88,7 @@ class D1E2eReconcileTest {
         BigDecimal walletAfter = walletBalance();
         List<Map<String, Object>> usages = query(
             "SELECT usage_id, scene, cost_amount, wallet_ledger_id, caller, billing_mode, currency, success"
-                + " FROM dcs_ai_usage WHERE tenant_id='000000' AND caller='ASSISTANT_CHAT' AND usage_id>" + usageWatermark);
+                + " FROM ai_usage WHERE tenant_id='000000' AND caller='ASSISTANT_CHAT' AND usage_id>" + usageWatermark);
         BigDecimal costSum = BigDecimal.ZERO;
         for (Map<String, Object> usage : usages) {
             assertEquals("OFFICIAL_TOKEN", usage.get("billing_mode"), "按官方 token 计费");
@@ -100,7 +100,7 @@ class D1E2eReconcileTest {
 
         List<Map<String, Object>> ledgers = query(
             "SELECT ledger_id, amount, service_code, biz_type, direction, biz_id, balance_before, balance_after"
-                + " FROM dcs_tenant_wallet_ledger WHERE idempotency_key LIKE 'ai-assistant:000000:%'"
+                + " FROM tenant_wallet_ledger WHERE idempotency_key LIKE 'ai-smartdock:assistant:000000:%'"
                 + " AND ledger_id>" + ledgerWatermark + " ORDER BY ledger_id");
         assertEquals(usages.size(), ledgers.size(), "本轮单据与流水逐笔对应(ReAct 循环可多笔)");
         BigDecimal ledgerSum = BigDecimal.ZERO;
@@ -114,8 +114,8 @@ class D1E2eReconcileTest {
         }
         // 坑68: 逐笔同精度
         List<Map<String, Object>> joined = query(
-            "SELECT ROUND(u.cost_amount,4) AS cost4, l.amount FROM dcs_ai_usage u"
-                + " JOIN dcs_tenant_wallet_ledger l ON l.biz_id=u.usage_id"
+            "SELECT ROUND(u.cost_amount,4) AS cost4, l.amount FROM ai_usage u"
+                + " JOIN tenant_wallet_ledger l ON l.biz_id=u.usage_id"
                 + " WHERE u.tenant_id='000000' AND u.caller='ASSISTANT_CHAT' AND u.usage_id>" + usageWatermark);
         for (Map<String, Object> row : joined) {
             assertEquals(0, ((BigDecimal) row.get("cost4")).compareTo((BigDecimal) row.get("amount")),
@@ -131,8 +131,8 @@ class D1E2eReconcileTest {
         Long breaks = queryForLong(
             "SELECT COUNT(*) FROM (SELECT balance_before,"
                 + " LAG(balance_after) OVER (PARTITION BY wallet_id ORDER BY ledger_id) AS prev_after"
-                + " FROM dcs_tenant_wallet_ledger WHERE del_flag='0' AND wallet_id=(SELECT wallet_id"
-                + " FROM dcs_tenant_wallet WHERE tenant_id='000000' AND wallet_type='MAIN' AND del_flag='0')) t"
+                + " FROM tenant_wallet_ledger WHERE del_flag='0' AND wallet_id=(SELECT wallet_id"
+                + " FROM tenant_wallet WHERE tenant_id='000000' AND wallet_type='MAIN' AND del_flag='0')) t"
                 + " WHERE prev_after IS NOT NULL AND balance_before <> prev_after");
         assertEquals(0L, breaks, "000000 钱包流水链零断裂");
 
@@ -173,7 +173,7 @@ class D1E2eReconcileTest {
         body.put("messages", List.of(msg));
         body.put("state", new LinkedHashMap<>());
         body.put("forwardedProps", new LinkedHashMap<>());
-        HttpURLConnection conn = (HttpURLConnection) new URL(BASE + "/agui/run/dcs-assistant").openConnection();
+        HttpURLConnection conn = (HttpURLConnection) new URL(BASE + "/agui/run/smartdock-assistant").openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("Authorization", "Bearer " + token);
@@ -211,7 +211,7 @@ class D1E2eReconcileTest {
 
     private BigDecimal walletBalance() throws Exception {
         try (Connection c = ds.getConnection(); PreparedStatement ps = c.prepareStatement(
-            "SELECT balance_amount FROM dcs_tenant_wallet WHERE tenant_id='000000'"
+            "SELECT balance_amount FROM tenant_wallet WHERE tenant_id='000000'"
                 + " AND wallet_type='MAIN' AND del_flag='0'"); ResultSet rs = ps.executeQuery()) {
             return rs.next() ? rs.getBigDecimal(1) : null;
         }

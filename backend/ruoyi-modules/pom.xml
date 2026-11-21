@@ -15,7 +15,7 @@
         <module>ruoyi-risk</module>
         <module>ruoyi-ai-billing</module>
         <module>ruoyi-file-security</module>
-        <module>ruoyi-dcs</module>
+        <module>ruoyi-mission</module>
         <module>ruoyi-assistant</module>
         <module>ruoyi-profile-engine</module>
         <module>ruoyi-assistant-spi</module>

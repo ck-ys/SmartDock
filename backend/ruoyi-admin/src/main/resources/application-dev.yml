@@ -4,13 +4,13 @@ captcha:
   enable: false
 
 --- # 风控2.0 内容机审(2026-09-22): dev 环境开观察模式(只记事件不拦截), 拦截开关保持 false
-dcs.rollout:
+rollout:
   content-moderation-enabled: true
   content-block-enabled: false
 
 --- # 钱包对账巡检基线(批1 2026-09-25, 拍板Q1:A"环境各管各的账"): 以下为开发库历史存量基线;
     # 交付环境(docker profile)不配置本段=零基线从零对账, 客户新装机首夜不再误报
-dcs.wallet.reconcile:
+wallet.reconcile:
   # 2026-07-09 种子充值遗留的已知余额差额(钱包900000000000004001), 差额漂移才算新差异
   balance-diffs:
     "900000000000004001": 0.0001

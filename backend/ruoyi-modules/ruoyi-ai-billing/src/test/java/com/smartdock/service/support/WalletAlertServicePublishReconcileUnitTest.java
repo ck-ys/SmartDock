@@ -1,6 +1,6 @@
 package com.smartdock.service.support;
 
-import com.smartdock.mapper.DcsWalletAlertStateMapper;
+import com.smartdock.mapper.WalletAlertStateMapper;
 import com.smartdock.mapper.WalletAlertRecipientMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ import static org.mockito.Mockito.when;
 class WalletAlertServicePublishReconcileUnitTest {
 
     @Mock
-    private DcsWalletAlertStateMapper alertStateMapper;
+    private WalletAlertStateMapper alertStateMapper;
     @Mock
     private ApplicationEventPublisher eventPublisher;
     @Mock

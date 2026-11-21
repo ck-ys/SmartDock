@@ -5,7 +5,7 @@ import java.io.Serial;
 /**
  * 指定租户未启用 AI 配置（{@link AiGateway#chatForTenant} 显式租户路径专用）。
  *
- * <p>与 HTTP 路径语义区分：HTTP 路径沿袭 IDcsAiConfigService.currentTenantEnabledConfig
+ * <p>与 HTTP 路径语义区分：HTTP 路径沿袭 IAiConfigService.currentTenantEnabledConfig
  * 直接抛通用 ServiceException；MQ 路径历史上是"查无配置→静默降级"，本异常让调用方
  * （如 AiScoreEnhancer）能精确捕获降级并保留原有日志文案。</p>
  *

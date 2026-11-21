@@ -12,7 +12,7 @@ import java.util.Map;
  */
 public interface ToolCatalogGateway {
 
-    /** 角色档位：与 {@code com.smartdock.assistant.legacy.tools.ToolIdentity} 同值；AssistantToolViewerUnitTest 钉死同步 */
+    /** 角色档位：与 {@code com.smartdock.assistant.engine.tools.ToolIdentity} 同值；AssistantToolViewerUnitTest 钉死同步 */
     int LEVEL_MEMBER = 0;
     int LEVEL_PUBLISHER = 1;
     int LEVEL_ADMIN = 2;

@@ -4,9 +4,9 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.smartdock.domain.DcsTenantWallet;
-import com.smartdock.domain.DcsWalletAlertState;
-import com.smartdock.mapper.DcsWalletAlertStateMapper;
+import com.smartdock.domain.TenantWallet;
+import com.smartdock.domain.WalletAlertState;
+import com.smartdock.mapper.WalletAlertStateMapper;
 import com.smartdock.common.text.HumanText;
 import com.smartdock.mapper.WalletAlertRecipientMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -24,7 +24,7 @@ import java.util.Map;
 
 /**
  * 钱包告警服务: 按日历天判重防重复 + WalletAlertEvent 域事件发布(2026-09-24 模块化拆分:
- * dcs 侧 WalletAlertNoticeAdapter 以同步 @EventListener 翻译成 DcsNoticeEvent 进通知管道;
+ * dcs 侧 WalletAlertNoticeAdapter 以同步 @EventListener 翻译成 NoticeEvent 进通知管道;
  * 批1 2026-09-25 拍板 Q4:B——24h 毫秒冷却改日历天判重+通知成功后才消耗当日配额)。
  *
  * @author smartdock
@@ -38,7 +38,7 @@ public class WalletAlertService {
     private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
 
     /** 钱包告警状态 Mapper(北京日历天判重幂等) */
-    private final DcsWalletAlertStateMapper alertStateMapper;
+    private final WalletAlertStateMapper alertStateMapper;
     /** Spring 事件发布器(发低余额通知) */
     private final ApplicationEventPublisher eventPublisher;
     /** 告警收件人解析 Mapper(批2 Q7-⑨: sys_user_role 真角色解析, 替代 userId≤2 约定) */
@@ -63,11 +63,11 @@ public class WalletAlertService {
      * @return true=今日配额已消耗(发了通知, 或无收件人静默跳过); false=今天已发过
      */
     @Transactional(rollbackFor = Exception.class)
-    public boolean tryAlert(DcsTenantWallet wallet, String alertType, BigDecimal threshold) {
-        DcsWalletAlertState existing = alertStateMapper.selectOne(new LambdaQueryWrapper<DcsWalletAlertState>()
-            .eq(DcsWalletAlertState::getWalletId, wallet.getWalletId())
-            .eq(DcsWalletAlertState::getAlertType, alertType)
-            .eq(DcsWalletAlertState::getDelFlag, "0"));
+    public boolean tryAlert(TenantWallet wallet, String alertType, BigDecimal threshold) {
+        WalletAlertState existing = alertStateMapper.selectOne(new LambdaQueryWrapper<WalletAlertState>()
+            .eq(WalletAlertState::getWalletId, wallet.getWalletId())
+            .eq(WalletAlertState::getAlertType, alertType)
+            .eq(WalletAlertState::getDelFlag, "0"));
         LocalDate today = LocalDate.now(BEIJING);
         if (existing != null && existing.getLastAlertTime() != null
             && LocalDate.ofInstant(existing.getLastAlertTime().toInstant(), BEIJING).equals(today)) {
@@ -77,7 +77,7 @@ public class WalletAlertService {
         sendWalletNotice(wallet, alertType, threshold);
         Date now = new Date();
         if (existing == null) {
-            DcsWalletAlertState state = new DcsWalletAlertState();
+            WalletAlertState state = new WalletAlertState();
             state.setTenantId(wallet.getTenantId());
             state.setWalletId(wallet.getWalletId());
             state.setAlertType(alertType);
@@ -101,7 +101,7 @@ public class WalletAlertService {
      * <p>批2 2026-09-25(拍板 Q7-⑨): 收件人改 sys_user_role 真角色解析; 无 admin 角色用户的租户
      * 降级平台超管接收(通知挂 000000+内容标注真实租户), 原"无人接收静默消耗配额"的黑洞关闭。</p>
      */
-    private void sendWalletNotice(DcsTenantWallet wallet, String alertType, BigDecimal threshold) {
+    private void sendWalletNotice(TenantWallet wallet, String alertType, BigDecimal threshold) {
         AlertRecipients recipients = resolveRecipients(wallet.getTenantId());
         BigDecimal available = wallet.getBalanceAmount().subtract(
             wallet.getFrozenAmount() == null ? BigDecimal.ZERO : wallet.getFrozenAmount())
@@ -128,7 +128,7 @@ public class WalletAlertService {
      * 发布钱包对账差异告警(批C 2026-09-24): 供 {@link WalletReconcileJob} 在扫出白名单外新差异后调用。
      *
      * <p>⚠️ 事务边界红线: 必须在事务内发布——dcs 侧 WalletAlertNoticeAdapter 同步翻译成
-     * DcsNoticeEvent 后由 BEFORE_COMMIT 相位监听落 outbox, 无事务 = 通知静默丢失
+     * NoticeEvent 后由 BEFORE_COMMIT 相位监听落 outbox, 无事务 = 通知静默丢失
      * (本方法自带 @Transactional 即为此而设, 调用方勿在事务外裸调)。</p>
      *
      * @param tenantId  差异所属租户

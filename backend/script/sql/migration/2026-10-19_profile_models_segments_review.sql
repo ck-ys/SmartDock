@@ -257,9 +257,9 @@ INSERT INTO public.sys_menu
     (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache,
      menu_type, visible, status, perms, icon, create_dept, create_by, create_time, update_by, update_time, remark)
 VALUES
-    (11980, '画像 RFM', 9000, 3, 'profile-rfm', 'dcs/profile/rfm', '', '1', '0', 'C', '0', '0', 'profile:model:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, 'RFM/通用评分模型'),
-    (11981, '画像分群', 9000, 4, 'profile-segments', 'dcs/profile/segments', '', '1', '0', 'C', '0', '0', 'profile:segment:query', 'peoples', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '动态/静态标签分群'),
-    (11982, '低分复核', 9000, 5, 'profile-review', 'dcs/profile/review', '', '1', '0', 'C', '0', '0', 'profile:review:query', 'validCode', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '低分主体复核队列'),
+    (11980, '画像 RFM', 9000, 3, 'profile-rfm', 'smartdock/profile/rfm', '', '1', '0', 'C', '0', '0', 'profile:model:query', 'chart', 103, 1, '2026-10-19 00:00:00', NULL, NULL, 'RFM/通用评分模型'),
+    (11981, '画像分群', 9000, 4, 'profile-segments', 'smartdock/profile/segments', '', '1', '0', 'C', '0', '0', 'profile:segment:query', 'peoples', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '动态/静态标签分群'),
+    (11982, '低分复核', 9000, 5, 'profile-review', 'smartdock/profile/review', '', '1', '0', 'C', '0', '0', 'profile:review:query', 'validCode', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '低分主体复核队列'),
     (11983, '画像模型编辑', 9070, 11, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:model:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新建/编辑/运行评分模型'),
     (11984, '画像分群编辑', 9070, 12, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:segment:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '新建/编辑/评估/导入分群'),
     (11985, '低分复核处理', 9070, 13, '', NULL, NULL, '1', '0', 'F', '1', '0', 'profile:review:edit', '#', 103, 1, '2026-10-19 00:00:00', NULL, NULL, '确认/驳回低分复核')

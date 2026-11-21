@@ -1,6 +1,6 @@
 package com.smartdock.assistant.service;
 
-import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.AssistantMessage;
 import com.smartdock.assistant.mapper.AssistantCompactionMapper;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.mapper.AssistantMessageMapper;
@@ -49,7 +49,7 @@ class MessageWriteServiceUnitTest {
     void user消息走明文通道不脱敏() {
         svc().appendUserMessage(TENANT, CONV, USER, "请联系 13800138000");
 
-        ArgumentCaptor<DcsAssistantMessage> cap = ArgumentCaptor.forClass(DcsAssistantMessage.class);
+        ArgumentCaptor<AssistantMessage> cap = ArgumentCaptor.forClass(AssistantMessage.class);
         verify(messageMapper).insert(cap.capture());
         assertEquals("请联系 13800138000", cap.getValue().getContent(), "user 侧是本人原文通道（X-08 明文例外）");
         assertEquals("user", cap.getValue().getRole());
@@ -64,7 +64,7 @@ class MessageWriteServiceUnitTest {
 
         svc().appendAssistantMessage(TENANT, CONV, USER, "手机 13800138000", "deepseek", "stop");
 
-        ArgumentCaptor<DcsAssistantMessage> cap = ArgumentCaptor.forClass(DcsAssistantMessage.class);
+        ArgumentCaptor<AssistantMessage> cap = ArgumentCaptor.forClass(AssistantMessage.class);
         verify(messageMapper).insert(cap.capture());
         assertEquals("手机 [手机号]", cap.getValue().getContent());
         assertEquals("assistant", cap.getValue().getRole());
@@ -73,8 +73,8 @@ class MessageWriteServiceUnitTest {
 
     @Test
     void assistant消息返回消息id供追问侧车回写() {
-        when(messageMapper.insert(any(DcsAssistantMessage.class))).thenAnswer(inv -> {
-            DcsAssistantMessage m = inv.getArgument(0);
+        when(messageMapper.insert(any(AssistantMessage.class))).thenAnswer(inv -> {
+            AssistantMessage m = inv.getArgument(0);
             assertNotNull(m.getId(), "插入前必须已生成雪花 id（否则追问侧车拿不到定位键）");
             return 1;
         });
@@ -109,7 +109,7 @@ class MessageWriteServiceUnitTest {
     void 分隔条行走system角色且不脱敏() {
         svc().appendSystemDivider(TENANT, CONV, USER, "{\"type\":\"compaction\",\"beforeTokens\":1}");
 
-        ArgumentCaptor<DcsAssistantMessage> cap = ArgumentCaptor.forClass(DcsAssistantMessage.class);
+        ArgumentCaptor<AssistantMessage> cap = ArgumentCaptor.forClass(AssistantMessage.class);
         verify(messageMapper).insert(cap.capture());
         assertEquals("system", cap.getValue().getRole(), "前端 rebuildFromHistory 按 role=system 渲染分隔条");
         assertNull(cap.getValue().getModel());

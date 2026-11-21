@@ -1,8 +1,8 @@
 package com.smartdock.service.support;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.smartdock.domain.DcsAiProviderAccess;
-import com.smartdock.mapper.DcsAiProviderAccessMapper;
+import com.smartdock.domain.AiProviderAccess;
+import com.smartdock.mapper.AiProviderAccessMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,14 +29,14 @@ import static org.mockito.Mockito.when;
 class ProviderKeyPoolUnitTest {
 
     @Mock
-    private DcsAiProviderAccessMapper accessMapper;
+    private AiProviderAccessMapper accessMapper;
 
     private ProviderKeyPool pool() {
         return new ProviderKeyPool(accessMapper);
     }
 
-    private static DcsAiProviderAccess key(long id, String enabled) {
-        DcsAiProviderAccess k = new DcsAiProviderAccess();
+    private static AiProviderAccess key(long id, String enabled) {
+        AiProviderAccess k = new AiProviderAccess();
         k.setId(id);
         k.setTenantId("T1");
         k.setProvider("SILICONFLOW");
@@ -46,7 +46,7 @@ class ProviderKeyPoolUnitTest {
         return k;
     }
 
-    private void stub(DcsAiProviderAccess... keys) {
+    private void stub(AiProviderAccess... keys) {
         when(accessMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(keys));
     }
 
@@ -122,11 +122,11 @@ class ProviderKeyPoolUnitTest {
     @Tag("dev")
     void 零余额跳过_仅新鲜OK快照_过期或FAILED不跳() {
         ProviderKeyPool p = pool();
-        DcsAiProviderAccess zero = key(1, "1");
+        AiProviderAccess zero = key(1, "1");
         zero.setBalanceStatus("OK");
         zero.setBalanceAmount(BigDecimal.ZERO);
         zero.setBalanceCheckedAt(new Date()); // 刚确认没钱 → 跳
-        DcsAiProviderAccess healthy = key(2, "1");
+        AiProviderAccess healthy = key(2, "1");
         stub(zero, healthy);
         assertThat(p.pick("T1", "SILICONFLOW").getId()).isEqualTo(2L);
 

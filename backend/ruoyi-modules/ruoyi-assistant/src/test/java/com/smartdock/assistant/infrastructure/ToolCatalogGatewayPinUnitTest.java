@@ -5,7 +5,7 @@ import com.smartdock.assistant.domain.gateway.ToolCatalogGateway.McpServerView;
 import com.smartdock.assistant.domain.gateway.ToolCatalogGateway.PlatformTool;
 import com.smartdock.assistant.domain.gateway.ToolCatalogGateway.TenantGate;
 import com.smartdock.assistant.service.ToolViewerService;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
+import com.smartdock.assistant.engine.core.ToolRegistry;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

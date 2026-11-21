@@ -2,9 +2,9 @@ package com.smartdock.assistant.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.smartdock.assistant.domain.gateway.InstanceIdentityGateway;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.domain.model.DcsAssistantRun;
-import com.smartdock.assistant.domain.model.DcsAssistantRunIssue;
+import com.smartdock.assistant.domain.model.AssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantRun;
+import com.smartdock.assistant.domain.model.AssistantRunIssue;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.mapper.AssistantMessageMapper;
 import com.smartdock.assistant.mapper.AssistantRunIssueMapper;
@@ -57,9 +57,9 @@ public class RunLedgerService {
      * 同 thread 异主 → 403（不区分"不存在"与"无权"——防探测）。
      */
     public Long ensureConversation(String tenantId, Long userId, String threadId, String title) {
-        DcsAssistantConversation exists = conversationMapper.selectByThread(tenantId, threadId);
+        AssistantConversation exists = conversationMapper.selectByThread(tenantId, threadId);
         if (exists == null) {
-            DcsAssistantConversation row = new DcsAssistantConversation();
+            AssistantConversation row = new AssistantConversation();
             row.setId(IdWorker.getId());
             row.setTenantId(tenantId);
             row.setUserId(userId);
@@ -89,7 +89,7 @@ public class RunLedgerService {
         if (runId == null || runId.isBlank()) {
             return true;
         }
-        DcsAssistantRun row = new DcsAssistantRun();
+        AssistantRun row = new AssistantRun();
         row.setId(IdWorker.getId());
         row.setTenantId(tenantId);
         row.setUserId(userId);
@@ -97,7 +97,7 @@ public class RunLedgerService {
         row.setRunId(runId);
         row.setOwnerInstance(instanceIdentity.currentInstanceId());
         int inserted = runMapper.insertIgnoreRun(row);
-        DcsAssistantRun bound = runMapper.selectByRunId(runId);
+        AssistantRun bound = runMapper.selectByRunId(runId);
         if (bound != null && (!bound.getUserId().equals(userId) || !bound.getTenantId().equals(tenantId))) {
             throw new ServiceException("请求不合法（runId 归属校验失败）", 403);
         }
@@ -153,7 +153,7 @@ public class RunLedgerService {
         return runMapper.finish(runId, status, endReason);
     }
 
-    public DcsAssistantRun runByRunId(String runId) {
+    public AssistantRun runByRunId(String runId) {
         return runMapper.selectByRunId(runId);
     }
 
@@ -163,24 +163,24 @@ public class RunLedgerService {
     }
 
     /** 悬挂 run 候选（retention job 每分钟调；调用方先过滤 owner 仍活着的行） */
-    public List<DcsAssistantRun> listStuckRuns(int minutes) {
+    public List<AssistantRun> listStuckRuns(int minutes) {
         return runMapper.selectStuck(minutes);
     }
 
     /** 条件迁移悬挂 run（只迁 RUNNING；迁移成功的行才返回，供退回合） */
-    public List<DcsAssistantRun> finalizeStuckRun(String tenantId, String runId) {
+    public List<AssistantRun> finalizeStuckRun(String tenantId, String runId) {
         return runMapper.finalizeStuck(tenantId, runId);
     }
 
     /** 业务批10 #2：RUNNING 超时行扫描（收割器零事件二扫；调用方按 lastEventAt 差集过滤） */
-    public List<DcsAssistantRun> listRunningOlderThan(int seconds) {
+    public List<AssistantRun> listRunningOlderThan(int seconds) {
         return runMapper.selectRunningOlderThan(seconds);
     }
 
     /** 批6-#2：失联收割——条件迁移 INTERRUPTED/'client-disconnect'，返回归属行供退回合
      *  （RETURNING 语义=与真实终态竞态时只有一方赢，防双退；m3 P1-1 回修补租户谓词——
      *  雪花 runId 全局唯一本无越权面，纵深防御与同 mapper 风格对齐） */
-    public List<DcsAssistantRun> finalizeStalledRun(String tenantId, String runId) {
+    public List<AssistantRun> finalizeStalledRun(String tenantId, String runId) {
         return runMapper.finalizeStalled(tenantId, runId);
     }
 
@@ -191,7 +191,7 @@ public class RunLedgerService {
      * RUNNING；非 RUNNING 返回 null（调用方跳过，不叠问题行）。
      */
     public String latestRunningRunIdOfThread(String tenantId, Long userId, String threadId) {
-        List<DcsAssistantRun> runs = runMapper.selectByThread(tenantId, threadId, userId, 1);
+        List<AssistantRun> runs = runMapper.selectByThread(tenantId, threadId, userId, 1);
         if (runs.isEmpty() || !"RUNNING".equals(runs.get(0).getStatus())) {
             return null;
         }
@@ -211,7 +211,7 @@ public class RunLedgerService {
             return;
         }
         try {
-            DcsAssistantRun run = runMapper.selectByRunId(runId);
+            AssistantRun run = runMapper.selectByRunId(runId);
             if (run == null) {
                 return;
             }
@@ -233,7 +233,7 @@ public class RunLedgerService {
             return;
         }
         try {
-            DcsAssistantRun run = runMapper.selectByRunId(runId);
+            AssistantRun run = runMapper.selectByRunId(runId);
             if (run == null || !"RUNNING".equals(run.getStatus())) {
                 return;
             }
@@ -243,8 +243,8 @@ public class RunLedgerService {
         }
     }
 
-    private void doInsertIssue(DcsAssistantRun run, String code, String rawDetail) {
-        DcsAssistantRunIssue row = new DcsAssistantRunIssue();
+    private void doInsertIssue(AssistantRun run, String code, String rawDetail) {
+        AssistantRunIssue row = new AssistantRunIssue();
         row.setId(IdWorker.getId());
         row.setTenantId(run.getTenantId());
         row.setUserId(run.getUserId());
@@ -256,7 +256,7 @@ public class RunLedgerService {
             detail = piiFilter.mask(detail, run.getTenantId());
         }
         row.setDetail(detail);
-        DcsAssistantConversation conv = conversationMapper.selectByThread(run.getTenantId(), run.getThreadId());
+        AssistantConversation conv = conversationMapper.selectByThread(run.getTenantId(), run.getThreadId());
         if (conv != null) {
             row.setConversationId(conv.getId());
             row.setMessageId(messageMapper.selectLatestUserMessageId(run.getTenantId(), conv.getId(), run.getUserId()));
@@ -265,13 +265,13 @@ public class RunLedgerService {
     }
 
     /** 历史回放：本会话全部问题行（按落库序；前端按 messageId 挂回对应回合） */
-    public List<DcsAssistantRunIssue> listRunIssues(String tenantId, Long userId, Long conversationId) {
+    public List<AssistantRunIssue> listRunIssues(String tenantId, Long userId, Long conversationId) {
         return issueMapper.selectByConversation(tenantId, userId, conversationId);
     }
 
     /** 活体：按 runId 取最新问题行（空回答卡延时拉取；归属由控制器校验） */
-    public DcsAssistantRunIssue latestRunIssue(String tenantId, Long userId, String runId) {
-        DcsAssistantRunIssue row = issueMapper.selectLatestByRunId(runId);
+    public AssistantRunIssue latestRunIssue(String tenantId, Long userId, String runId) {
+        AssistantRunIssue row = issueMapper.selectLatestByRunId(runId);
         if (row == null || !tenantId.equals(row.getTenantId()) || !userId.equals(row.getUserId())) {
             return null;
         }

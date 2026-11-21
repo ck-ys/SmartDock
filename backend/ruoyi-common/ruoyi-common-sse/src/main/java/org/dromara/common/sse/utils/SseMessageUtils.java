@@ -19,7 +19,7 @@ public class SseMessageUtils {
     // ===== DCS 调用指南 =====
     // DCS 引用频次: 3+ 个文件
     // 典型用法: DCS 实时通知推送给在线用户; sendMessage(userId, content) 单发; publishMessage(SseMessageDto) 按用户列表发; publishAll 群发
-    // ⚠️ DCS 踩过的坑: 用户离线时消息直接丢弃(SSE 非持久), 需配合 DcsNotice 持久通知表保证消息不丢; 受 sse.enabled 开关控制, 关闭后静默无效
+    // ⚠️ DCS 踩过的坑: 用户离线时消息直接丢弃(SSE 非持久), 需配合 Notice 持久通知表保证消息不丢; 受 sse.enabled 开关控制, 关闭后静默无效
     // ===== DCS 调用指南 结束 =====
 
     private final static Boolean SSE_ENABLE = SpringUtils.getProperty("sse.enabled", Boolean.class, true);

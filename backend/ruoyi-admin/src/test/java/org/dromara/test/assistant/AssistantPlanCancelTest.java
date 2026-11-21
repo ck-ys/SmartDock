@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.controller.AssistantConversationController;
-import com.smartdock.assistant.legacy.core.AssistantPlanSignal;
+import com.smartdock.assistant.controller.AssistantConversationController;
+import com.smartdock.assistant.engine.core.AssistantPlanSignal;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

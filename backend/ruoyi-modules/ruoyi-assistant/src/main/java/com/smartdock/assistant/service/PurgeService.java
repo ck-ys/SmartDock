@@ -84,22 +84,22 @@ public class PurgeService {
         return msgs + convs + runs + acts + atts + compacts + issues;
     }
 
-    /** dcs_assistant_compaction 是否已建表（同事务只读探测，异常按不存在处理） */
+    /** assistant_compaction 是否已建表（同事务只读探测，异常按不存在处理） */
     private boolean compactionTableExists() {
         try {
             Boolean ok = jdbcTemplate.queryForObject(
-                "SELECT to_regclass('public.dcs_assistant_compaction') IS NOT NULL", Boolean.class);
+                "SELECT to_regclass('public.assistant_compaction') IS NOT NULL", Boolean.class);
             return Boolean.TRUE.equals(ok);
         } catch (Exception e) {
             return false;
         }
     }
 
-    /** dcs_assistant_run_issue 是否已建表（同款先探表防御，见 compactionTableExists 注释） */
+    /** assistant_run_issue 是否已建表（同款先探表防御，见 compactionTableExists 注释） */
     private boolean issueTableExists() {
         try {
             Boolean ok = jdbcTemplate.queryForObject(
-                "SELECT to_regclass('public.dcs_assistant_run_issue') IS NOT NULL", Boolean.class);
+                "SELECT to_regclass('public.assistant_run_issue') IS NOT NULL", Boolean.class);
             return Boolean.TRUE.equals(ok);
         } catch (Exception e) {
             return false;

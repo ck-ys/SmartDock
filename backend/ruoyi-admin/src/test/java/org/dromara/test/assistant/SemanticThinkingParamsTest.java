@@ -1,8 +1,8 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.legacy.core.AssistantThinkingTierHolder;
-import com.smartdock.assistant.legacy.core.SemanticThinkingParams;
-import com.smartdock.assistant.legacy.service.CapabilityService.CapabilityVo;
+import com.smartdock.assistant.engine.core.AssistantThinkingTierHolder;
+import com.smartdock.assistant.engine.core.SemanticThinkingParams;
+import com.smartdock.assistant.service.CapabilityService.CapabilityVo;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 

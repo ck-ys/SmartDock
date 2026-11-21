@@ -1,0 +1,64 @@
+package com.smartdock.assistant.engine.core;
+
+import io.agentscope.core.agent.Agent;
+import io.agentscope.core.agent.RuntimeContext;
+import io.agentscope.core.agui.adapter.AguiAdapterConfig;
+import io.agentscope.core.agui.adapter.AguiAgentAdapter;
+import io.agentscope.core.agui.adapter.AguiAgentAdapterFactory;
+import io.agentscope.core.agui.event.AguiEvent;
+import io.agentscope.core.agui.model.RunAgentInput;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
+
+/**
+ * B 批题5「续看」桥接工厂：adapter 事件流改经 {@link AssistantRunStreamHub#bridge} 转发——
+ * 原链由汇自订阅驱动（HTTP 断连不再拆链杀死 agent），出网一律订汇热流（先重放后直播）。
+ *
+ * <p><b>为什么需要它（2026-10-27 活体实测定案）</b>：starter 的 MVC 订阅器在
+ * {@code sendEvent} 只捕获 IOException——断连后 Spring SseEmitter 状态机抛出的
+ * IllegalStateException 未捕获，BaseSubscriber 收到异常即取消整链，agent 静默死亡
+ * （run 终局诊断 INTERRUPTED|client-disconnect；{@code interrupt-on-disconnect: false}
+ * 只关掉了 onError 回调的主动中断，管不到这条拆链——与批6-#2 注释同族，2.0.4 未根治）。
+ * 本工厂从 {@code AguiAgentAdapterFactory} 扩展点（自动配置 ObjectProvider 让位）接管：
+ * agent 生成本体由汇驱动，与 HTTP 连接生死解耦。</p>
+ *
+ * <p><b>口径</b>：无 runId 的请求（协议外）不接管原样透传；同 runId 重入
+ * （断线重试/HITL resume 复用 runId）由 bridge 弃旧链换新汇。</p>
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class AssistantRefreshGuardAdapterFactory implements AguiAgentAdapterFactory {
+
+    private final AssistantRunStreamHub runStreamHub;
+    /** Q4 甲：反问卡即时推帧需要 thread→runId；Q1 甲：等待反问的 run 收割豁免也靠它 */
+    private final AssistantAskUserBridge askUserBridge;
+
+    /** 启动即见：桥接工厂是否真的接管（starter 自动配置让位给本 bean），未接管时
+     *  断连拆链静默回归——日志是唯一现场证据（深审回修补） */
+    @jakarta.annotation.PostConstruct
+    void logBridgeActive() {
+        log.info("[run-hub] bridge factory active——AguiAgentAdapterFactory 已由本件接管，断连不拆链生效");
+    }
+
+    @Override
+    public AguiAgentAdapter create(Agent agent, AguiAdapterConfig config) {
+        return new AguiAgentAdapter(agent, config) {
+            @Override
+            public Flux<AguiEvent> run(RunAgentInput input, RuntimeContext runtimeContext) {
+                Flux<AguiEvent> original = super.run(input, runtimeContext);
+                String runId = input == null ? null : input.getRunId();
+                if (runId == null || runId.isBlank()) {
+                    return original;
+                }
+                String threadId = input == null ? null : input.getThreadId();
+                askUserBridge.bindRun(threadId, runId);
+                // 注意：不能在这里 doFinally 解绑——断连只掉订阅者，run 仍在跑；
+                // thread→runId 留到下一轮覆盖即可（键按 thread 收敛，不会按 run 增长）
+                return runStreamHub.bridge(runId, original);
+            }
+        };
+    }
+}

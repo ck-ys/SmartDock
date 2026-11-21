@@ -1,9 +1,9 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.domain.model.DcsAssistantMemory;
-import com.smartdock.assistant.legacy.core.AssistantMemoryTurnLedger;
+import com.smartdock.assistant.domain.model.AssistantMemory;
+import com.smartdock.assistant.engine.core.AssistantMemoryTurnLedger;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
-import com.smartdock.assistant.legacy.service.AssistantMemoryTurnService;
+import com.smartdock.assistant.service.AssistantMemoryTurnService;
 import com.smartdock.assistant.mapper.AssistantMemoryMapper;
 import com.smartdock.assistant.mapper.AssistantMemoryPrefMapper;
 import com.smartdock.assistant.service.AssistantMemoryService;
@@ -94,8 +94,8 @@ class AssistantMemoryD1Test {
             tm);
     }
 
-    private static DcsAssistantMemory activeRow(long id, String content) {
-        DcsAssistantMemory r = new DcsAssistantMemory();
+    private static AssistantMemory activeRow(long id, String content) {
+        AssistantMemory r = new AssistantMemory();
         r.setId(id);
         r.setTenantId("000000");
         r.setUserId(1L);
@@ -111,13 +111,13 @@ class AssistantMemoryD1Test {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
-        DcsAssistantMemory winner = activeRow(900L, "以后叫我老王");
+        AssistantMemory winner = activeRow(900L, "以后叫我老王");
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY)))
             .thenReturn(List.of())         // 第一轮：预读时还没看见赢家
             .thenReturn(List.of(winner));  // 撞索引后重读：赢家的 ACTIVE 条已在
         when(mapper.supersedeOwn(anyString(), anyLong(), anyLong(), anyLong(), any(Date.class))).thenReturn(1);
-        when(mapper.insert(any(DcsAssistantMemory.class)))
-            .thenThrow(new DuplicateKeyException("uk_dcs_asst_memory_active_topic"))
+        when(mapper.insert(any(AssistantMemory.class)))
+            .thenThrow(new DuplicateKeyException("uk_asst_memory_active_topic"))
             .thenAnswer(inv -> 1);
 
         AssistantMemoryTurnLedger ledger = new AssistantMemoryTurnLedger();
@@ -126,7 +126,7 @@ class AssistantMemoryD1Test {
 
         assertTrue(out.message().startsWith("已记住"), "重试后应保存成功: " + out.message());
         assertNotNull(out.memoryId(), "落库行 id 应带回");
-        verify(mapper, times(2)).insert(any(DcsAssistantMemory.class));
+        verify(mapper, times(2)).insert(any(AssistantMemory.class));
         verify(mapper).supersedeOwn(eq("000000"), eq(1L), eq(900L), anyLong(), any(Date.class));
         assertEquals(List.of("以后叫我老王"), out.overwritten(), "赢家的旧条应进「记忆已更新」卡");
         AssistantMemoryTurnLedger.TurnMemory frame = ledger.take("th-race");
@@ -141,8 +141,8 @@ class AssistantMemoryD1Test {
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY))).thenReturn(List.of());
-        when(mapper.insert(any(DcsAssistantMemory.class)))
-            .thenThrow(new DuplicateKeyException("uk_dcs_asst_memory_active_topic"));
+        when(mapper.insert(any(AssistantMemory.class)))
+            .thenThrow(new DuplicateKeyException("uk_asst_memory_active_topic"));
 
         AssistantMemoryTurnService.SaveOutcome out =
             newTurn(mapper, newSvc(mapper)).saveReturningId("000000", 1L, TOPIC_CONTENT, null);
@@ -159,7 +159,7 @@ class AssistantMemoryD1Test {
         when(mapper.selectById(5L)).thenReturn(activeRow(5L, "以前叫我老周"));
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.updateOwnContent(anyString(), anyLong(), anyLong(), anyString(), any(), any(), any(Date.class)))
-            .thenThrow(new DuplicateKeyException("uk_dcs_asst_memory_active_topic"));
+            .thenThrow(new DuplicateKeyException("uk_asst_memory_active_topic"));
 
         assertFalse(newSvc(mapper).edit("000000", 1L, 5L, TOPIC_CONTENT),
             "主题键相撞应返回 false 而不是抛异常");
@@ -175,7 +175,7 @@ class AssistantMemoryD1Test {
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY)))
             .thenReturn(List.of(activeRow(700L, "以前叫我老王")));
         when(mapper.supersedeOwn(anyString(), anyLong(), anyLong(), anyLong(), any(Date.class))).thenReturn(1);
-        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> 1);
+        when(mapper.insert(any(AssistantMemory.class))).thenAnswer(inv -> 1);
 
         AssistantMemoryTurnService.SaveOutcome out =
             newTurn(mapper, newSvc(mapper)).saveReturningId("000000", 1L, TOPIC_CONTENT, null);
@@ -183,7 +183,7 @@ class AssistantMemoryD1Test {
         assertTrue(out.message().startsWith("已记住"));
         InOrder order = inOrder(mapper);
         order.verify(mapper).supersedeOwn(eq("000000"), eq(1L), eq(700L), anyLong(), any(Date.class));
-        order.verify(mapper).insert(any(DcsAssistantMemory.class));
+        order.verify(mapper).insert(any(AssistantMemory.class));
 
         ArgumentCaptor<Long> newId = ArgumentCaptor.forClass(Long.class);
         verify(mapper).supersedeOwn(anyString(), anyLong(), anyLong(), newId.capture(), any(Date.class));
@@ -201,13 +201,13 @@ class AssistantMemoryD1Test {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
-        DcsAssistantMemory oldActive = activeRow(800L, "以前叫我老王");
+        AssistantMemory oldActive = activeRow(800L, "以前叫我老王");
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY)))
             .thenReturn(List.of(oldActive))   // 第一轮：腾位成功，但插入撞索引 → 整轮回滚
             .thenReturn(List.of());           // 第二轮：重读为空 → 干净插入成功
         when(mapper.supersedeOwn(anyString(), anyLong(), eq(800L), anyLong(), any(Date.class))).thenReturn(1);
-        when(mapper.insert(any(DcsAssistantMemory.class)))
-            .thenThrow(new DuplicateKeyException("uk_dcs_asst_memory_active_topic"))
+        when(mapper.insert(any(AssistantMemory.class)))
+            .thenThrow(new DuplicateKeyException("uk_asst_memory_active_topic"))
             .thenAnswer(inv -> 1);
 
         AssistantMemoryTurnLedger ledger = new AssistantMemoryTurnLedger();
@@ -228,8 +228,8 @@ class AssistantMemoryD1Test {
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY))).thenReturn(List.of());
-        when(mapper.insert(any(DcsAssistantMemory.class)))
-            .thenThrow(new DuplicateKeyException("pk_dcs_assistant_memory"));
+        when(mapper.insert(any(AssistantMemory.class)))
+            .thenThrow(new DuplicateKeyException("pk_assistant_memory"));
 
         assertThrows(DuplicateKeyException.class,
             () -> newTurn(mapper, newSvc(mapper)).saveReturningId("000000", 1L, TOPIC_CONTENT, null),
@@ -246,13 +246,13 @@ class AssistantMemoryD1Test {
         AssistantMemoryMapper mapper = mock(AssistantMemoryMapper.class);
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
-        DcsAssistantMemory stale = activeRow(850L, "以前叫我老王");
+        AssistantMemory stale = activeRow(850L, "以前叫我老王");
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY)))
             .thenReturn(List.of(stale))   // 陈旧快照：这行已被赢家腾走
             .thenReturn(List.of());
         when(mapper.supersedeOwn(anyString(), anyLong(), eq(850L), anyLong(), any(Date.class))).thenReturn(0);
-        when(mapper.insert(any(DcsAssistantMemory.class)))
-            .thenThrow(new DuplicateKeyException("uk_dcs_asst_memory_active_topic"))
+        when(mapper.insert(any(AssistantMemory.class)))
+            .thenThrow(new DuplicateKeyException("uk_asst_memory_active_topic"))
             .thenAnswer(inv -> 1);
 
         AssistantMemoryTurnLedger ledger = new AssistantMemoryTurnLedger();
@@ -279,7 +279,7 @@ class AssistantMemoryD1Test {
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY)))
             .thenReturn(List.of(activeRow(860L, TOPIC_CONTENT)));
         when(mapper.supersedeOwn(anyString(), anyLong(), eq(860L), anyLong(), any(Date.class))).thenReturn(1);
-        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> 1);
+        when(mapper.insert(any(AssistantMemory.class))).thenAnswer(inv -> 1);
 
         AssistantMemoryTurnLedger ledger = new AssistantMemoryTurnLedger();
         AssistantMemoryTurnService.SaveOutcome out =
@@ -299,7 +299,7 @@ class AssistantMemoryD1Test {
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY))).thenReturn(List.of());
-        when(mapper.insert(any(DcsAssistantMemory.class)))
+        when(mapper.insert(any(AssistantMemory.class)))
             .thenThrow(new org.springframework.dao.CannotAcquireLockException("lock timeout"))
             .thenAnswer(inv -> 1);
 
@@ -308,7 +308,7 @@ class AssistantMemoryD1Test {
 
         assertTrue(out.message().startsWith("已记住"), "锁等待失败应换新事务重试成功: " + out.message());
         assertFalse(out.abandoned(), "成功轮不得标 abandoned");
-        verify(mapper, times(2)).insert(any(DcsAssistantMemory.class));
+        verify(mapper, times(2)).insert(any(AssistantMemory.class));
     }
 
     /** T9b（二轮席1 P2-2）：撞锁重试耗尽 → 放弃且 abandoned=true（动作审计记失败不记成功） */
@@ -318,7 +318,7 @@ class AssistantMemoryD1Test {
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY))).thenReturn(List.of());
-        when(mapper.insert(any(DcsAssistantMemory.class)))
+        when(mapper.insert(any(AssistantMemory.class)))
             .thenThrow(new org.springframework.dao.CannotAcquireLockException("lock timeout"));
 
         AssistantMemoryTurnService.SaveOutcome out =
@@ -335,7 +335,7 @@ class AssistantMemoryD1Test {
         when(mapper.countByContent(anyString(), anyLong(), anyString())).thenReturn(0);
         when(mapper.countByUser(anyString(), anyLong())).thenReturn(1);
         when(mapper.listActiveByTopic(anyString(), anyLong(), eq(TOPIC_KEY))).thenReturn(List.of());
-        when(mapper.insert(any(DcsAssistantMemory.class))).thenAnswer(inv -> 1);
+        when(mapper.insert(any(AssistantMemory.class))).thenAnswer(inv -> 1);
 
         org.springframework.transaction.PlatformTransactionManager tm = testTxManager();
         newTurn(mapper, newSvc(mapper), new AssistantMemoryTurnLedger(), tm)

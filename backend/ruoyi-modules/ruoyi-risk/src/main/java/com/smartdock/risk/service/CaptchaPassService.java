@@ -3,7 +3,7 @@ package com.smartdock.risk.service;
 import cn.hutool.core.util.IdUtil;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.exception.ServiceException;
-import com.smartdock.risk.config.DcsRolloutProperties;
+import com.smartdock.risk.config.RolloutProperties;
 import org.redisson.api.RBucket;
 import org.redisson.api.RedissonClient;
 import org.springframework.stereotype.Service;
@@ -22,13 +22,13 @@ public class CaptchaPassService {
 
     public static final int CHALLENGE_REQUIRED_CODE = 4601;
 
-    private static final String CACHE_PREFIX = "dcs:captcha:pass:";
+    private static final String CACHE_PREFIX = "smartdock:captcha:pass:";
     private static final Duration EXPIRE = Duration.ofMinutes(2);
 
     private final RedissonClient redissonClient;
 
     @Autowired(required = false)
-    private DcsRolloutProperties rolloutProperties;
+    private RolloutProperties rolloutProperties;
 
     public String issue(PassBinding binding, int verifiedLevel) {
         if (verifiedLevel < RiskScoreService.LEVEL_L1 || verifiedLevel > RiskScoreService.LEVEL_L4) {

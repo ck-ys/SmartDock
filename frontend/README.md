@@ -1,7 +1,7 @@
 # SmartDock Frontend
 
 Vue 3 + TypeScript + Element Plus + Vite 单页应用，与后端微核心契约一一对应
-（契约层在 [src/api/dcs/core/](src/api/dcs/core/)）。
+（契约层在 [src/api/smartdock/core/](src/api/smartdock/core/)）。
 
 ## 开发
 

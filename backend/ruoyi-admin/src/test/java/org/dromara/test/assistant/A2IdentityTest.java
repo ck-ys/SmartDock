@@ -3,8 +3,8 @@ package org.dromara.test.assistant;
 import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.agui.runtime.AguiRuntimeContextRequest;
-import com.smartdock.assistant.legacy.core.AssistantAgentFactory;
-import com.smartdock.assistant.legacy.core.AssistantRuntimeContextResolver;
+import com.smartdock.assistant.engine.core.AssistantAgentFactory;
+import com.smartdock.assistant.engine.core.AssistantRuntimeContextResolver;
 import org.dromara.common.core.domain.model.LoginUser;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.junit.jupiter.api.AfterAll;
@@ -84,7 +84,7 @@ class A2IdentityTest {
         return AguiRuntimeContextRequest.<Void>builder()
             .input(io.agentscope.core.agui.model.RunAgentInput.builder()
                 .runId("test-run-a2").threadId("thread-a2").build())
-            .method("POST").path("/agui/run/dcs-assistant")
+            .method("POST").path("/agui/run/smartdock-assistant")
             .headers(token == null ? Map.of() : Map.of("Authorization", List.of("Bearer " + token)))
             .build();
     }

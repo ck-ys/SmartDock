@@ -10,14 +10,14 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.domain.DcsAiConfig;
-import com.smartdock.domain.DcsAiModelPrice;
-import com.smartdock.domain.DcsAiUsage;
-import com.smartdock.domain.bo.DcsAiUsageQueryBo;
-import com.smartdock.domain.vo.DcsAiUsageVo;
-import com.smartdock.mapper.DcsAiCreditLedgerMapper;
-import com.smartdock.mapper.DcsAiUsageMapper;
-import com.smartdock.service.IDcsAiModelPriceService;
+import com.smartdock.domain.AiConfig;
+import com.smartdock.domain.AiModelPrice;
+import com.smartdock.domain.AiUsage;
+import com.smartdock.domain.bo.AiUsageQueryBo;
+import com.smartdock.domain.vo.AiUsageVo;
+import com.smartdock.mapper.AiCreditLedgerMapper;
+import com.smartdock.mapper.AiUsageMapper;
+import com.smartdock.service.IAiModelPriceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +31,7 @@ import java.util.Map;
 /**
  * AI 调用计费服务: 按调用次数 × 固定单价记录每次 AI 调用的消耗。
  *
- * <p>单价取自 {@link DcsAiConfig#getUnitPricePerCall()}, 默认 0.01 元。
+ * <p>单价取自 {@link AiConfig#getUnitPricePerCall()}, 默认 0.01 元。
  * MQ 线程无登录上下文时 tenantId 从 config 取, operatorId 为 null。</p>
  *
  * @author smartdock
@@ -42,15 +42,15 @@ import java.util.Map;
 public class AiBillingService {
 
     /** AI 用量流水 Mapper(记录每次调用消耗) */
-    private final DcsAiUsageMapper usageMapper;
+    private final AiUsageMapper usageMapper;
     /** 模型价格服务(取生效计费单价) */
-    private final IDcsAiModelPriceService modelPriceService;
+    private final IAiModelPriceService modelPriceService;
     /** 租户钱包服务(扣减 AI 消费额度) */
     private final TenantWalletService tenantWalletService;
     /** 积分流水 Mapper(R5 积分模式重放短路判定: 钱包流水不含该键) */
-    private final DcsAiCreditLedgerMapper creditLedgerMapper;
+    private final AiCreditLedgerMapper creditLedgerMapper;
     /** 积分服务(六审回修 dspro P0-1 方案A: 积分扣减并入 usage 同事务, 杜绝"单据在流水无"的静默免单) */
-    private final com.smartdock.service.IDcsAiCreditService creditService;
+    private final com.smartdock.service.IAiCreditService creditService;
     /** 计费计算器(内部构造,按 token/单价算金额) */
     private final AiBillingCalculator billingCalculator = new AiBillingCalculator();
 
@@ -64,7 +64,7 @@ public class AiBillingService {
      * @param success   是否成功
      * @param errorMsg  失败信息(成功为 null)
      */
-    public void record(DcsAiConfig config, String caller, String scene, long latencyMs,
+    public void record(AiConfig config, String caller, String scene, long latencyMs,
                        boolean success, String errorMsg) {
         record(config, caller, scene, null, latencyMs, success, errorMsg);
     }
@@ -74,12 +74,12 @@ public class AiBillingService {
      *
      * @param usageSnapshot Spring AI usage 元数据快照, 取不到时自动回退固定单价
      */
-    public void record(DcsAiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot, long latencyMs,
+    public void record(AiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot, long latencyMs,
                        boolean success, String errorMsg) {
         try {
-            DcsAiModelPrice price = modelPriceService.findEffectivePrice(config.getTenantId(), config.getProvider(), config.getModelName());
+            AiModelPrice price = modelPriceService.findEffectivePrice(config.getTenantId(), config.getProvider(), config.getModelName());
             AiBillingCalculator.Result billing = billingCalculator.calculate(config, price, usageSnapshot, success);
-            DcsAiUsage usage = new DcsAiUsage();
+            AiUsage usage = new AiUsage();
             // 预生成雪花主键: 供扣费幂等键与流水 bizId 绑定本次单据(q5 拍板A, 2026-09-24; 全局 ASSIGN_ID 下预置值不会被覆盖)
             usage.setUsageId(IdWorker.getId());
             usage.setTenantId(config.getTenantId());
@@ -153,7 +153,7 @@ public class AiBillingService {
      * @return usage 单据 ID(事务提交后供对账)
      */
     @Transactional(rollbackFor = Exception.class)
-    public Long recordTransactional(DcsAiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
+    public Long recordTransactional(AiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
                                     long latencyMs, boolean success, String errorMsg,
                                     Long operatorId, String idempotencyKey) {
         return doRecordTransactional(config, caller, scene, usageSnapshot, latencyMs, success, errorMsg,
@@ -175,7 +175,7 @@ public class AiBillingService {
      * 改查积分流水——同键已落过账返回 {@code null}（调用方跳过，不重复记 usage）。</p>
      */
     @Transactional(rollbackFor = Exception.class)
-    public Long recordTransactionalCredits(DcsAiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
+    public Long recordTransactionalCredits(AiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
                                            long latencyMs, boolean success, String errorMsg,
                                            Long operatorId, String idempotencyKey, Long creditsToCharge) {
         Long usageId = doRecordTransactional(config, caller, scene, usageSnapshot, latencyMs, success, errorMsg,
@@ -188,7 +188,7 @@ public class AiBillingService {
         return usageId;
     }
 
-    private Long doRecordTransactional(DcsAiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
+    private Long doRecordTransactional(AiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
                                        long latencyMs, boolean success, String errorMsg,
                                        Long operatorId, String idempotencyKey, boolean chargeWallet) {
         // 重放短路: 同键已落过账(usage+ledger 同事务成功)则直接返回原 usageId——
@@ -205,11 +205,11 @@ public class AiBillingService {
             log.info("[AiBilling] 幂等键重放短路, 沿用原单据: key={} usageId={}", idempotencyKey, replayed);
             return replayed;
         }
-        DcsAiModelPrice price = modelPriceService.findEffectivePrice(config.getTenantId(), config.getProvider(), config.getModelName());
+        AiModelPrice price = modelPriceService.findEffectivePrice(config.getTenantId(), config.getProvider(), config.getModelName());
         // G3(批G 1008)：不再强转 OFFICIAL_TOKEN——calculator 按 config.billingMode 原样分派，
         // FIXED_PER_CALL 走 fixed 分支=CNY 次价封顶，与装饰器估算/角标/免费档三处镜像
         AiBillingCalculator.Result billing = billingCalculator.calculate(config, price, usageSnapshot, success);
-        DcsAiUsage usage = new DcsAiUsage();
+        AiUsage usage = new AiUsage();
         usage.setUsageId(IdWorker.getId());
         usage.setTenantId(config.getTenantId());
         usage.setConfigId(config.getConfigId());
@@ -289,10 +289,10 @@ public class AiBillingService {
     /**
      * 查询当前租户 AI 消耗台账(分页)。
      */
-    public TableDataInfo<DcsAiUsageVo> usagePage(DcsAiUsageQueryBo bo, PageQuery pageQuery) {
+    public TableDataInfo<AiUsageVo> usagePage(AiUsageQueryBo bo, PageQuery pageQuery) {
         String tenantId = LoginHelper.getTenantId();
-        LambdaQueryWrapper<DcsAiUsage> lqw = usageWrapper(bo, tenantId);
-        com.baomidou.mybatisplus.extension.plugins.pagination.Page<DcsAiUsageVo> page = usageMapper.selectVoPage(pageQuery.build(), lqw);
+        LambdaQueryWrapper<AiUsage> lqw = usageWrapper(bo, tenantId);
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<AiUsageVo> page = usageMapper.selectVoPage(pageQuery.build(), lqw);
         return TableDataInfo.build(page);
     }
 
@@ -300,7 +300,7 @@ public class AiBillingService {
      * AI 缺口批 Q7（2026-10-14）：按当前筛选导出全量明细（与 usagePage 同构，无分页；
      * 上限 1 万行防呆——超限导出前 1 万行，管理台对账场景足够）。
      */
-    public java.util.List<DcsAiUsage> usageExportList(DcsAiUsageQueryBo bo) {
+    public java.util.List<AiUsage> usageExportList(AiUsageQueryBo bo) {
         return usageMapper.selectList(usageWrapper(bo, LoginHelper.getTenantId()).last("LIMIT 10000"));
     }
 
@@ -317,23 +317,23 @@ public class AiBillingService {
         return parsed;
     }
 
-    private LambdaQueryWrapper<DcsAiUsage> usageWrapper(DcsAiUsageQueryBo bo, String tenantId) {
-        LambdaQueryWrapper<DcsAiUsage> lqw = new LambdaQueryWrapper<DcsAiUsage>()
-            .eq(DcsAiUsage::getTenantId, tenantId)
-            .orderByDesc(DcsAiUsage::getCreateTime);
+    private LambdaQueryWrapper<AiUsage> usageWrapper(AiUsageQueryBo bo, String tenantId) {
+        LambdaQueryWrapper<AiUsage> lqw = new LambdaQueryWrapper<AiUsage>()
+            .eq(AiUsage::getTenantId, tenantId)
+            .orderByDesc(AiUsage::getCreateTime);
         if (bo != null) {
-            if (StrUtil.isNotBlank(bo.getCaller())) lqw.eq(DcsAiUsage::getCaller, bo.getCaller());
+            if (StrUtil.isNotBlank(bo.getCaller())) lqw.eq(AiUsage::getCaller, bo.getCaller());
             // 2026-10-31 题6：scene 是拼接串（如 assist:chat:seq1|sidecar:title），等值几乎筛不到；
             // 改成包含匹配，输入 sidecar 即可同时命中标题生成与追问建议。
-            if (StrUtil.isNotBlank(bo.getScene())) lqw.like(DcsAiUsage::getScene, bo.getScene());
-            if (bo.getConfigId() != null) lqw.eq(DcsAiUsage::getConfigId, bo.getConfigId());
+            if (StrUtil.isNotBlank(bo.getScene())) lqw.like(AiUsage::getScene, bo.getScene());
+            if (bo.getConfigId() != null) lqw.eq(AiUsage::getConfigId, bo.getConfigId());
             // 2026-10-30 题15：状态与时间范围（页面承诺「定位失败请求」，靠这两个条件才筛得出来）
-            if (StrUtil.isNotBlank(bo.getSuccess())) lqw.eq(DcsAiUsage::getSuccess, bo.getSuccess());
+            if (StrUtil.isNotBlank(bo.getSuccess())) lqw.eq(AiUsage::getSuccess, bo.getSuccess());
             java.util.Date begin = parseTime("beginTime", bo.getBeginTime());
             java.util.Date end = parseTime("endTime", bo.getEndTime());
-            if (begin != null) lqw.ge(DcsAiUsage::getCreateTime, begin);
+            if (begin != null) lqw.ge(AiUsage::getCreateTime, begin);
             // create_time 是带毫秒的 timestamp：按「秒」边界的 23:59:59 要补到 .999，否则漏掉最后一秒
-            if (end != null) lqw.le(DcsAiUsage::getCreateTime, new java.util.Date(end.getTime() + 999));
+            if (end != null) lqw.le(AiUsage::getCreateTime, new java.util.Date(end.getTime() + 999));
         }
         return lqw;
     }
@@ -343,19 +343,19 @@ public class AiBillingService {
      */
     public Map<String, Object> usageSummary() {
         String tenantId = LoginHelper.getTenantId();
-        java.util.List<DcsAiUsage> all = usageMapper.selectList(
-            new LambdaQueryWrapper<DcsAiUsage>().eq(DcsAiUsage::getTenantId, tenantId));
+        java.util.List<AiUsage> all = usageMapper.selectList(
+            new LambdaQueryWrapper<AiUsage>().eq(AiUsage::getTenantId, tenantId));
         long totalCalls = all.size();
         long successCalls = all.stream().filter(u -> "1".equals(u.getSuccess())).count();
         BigDecimal totalCost = all.stream()
-            .map(DcsAiUsage::getCostAmount)
+            .map(AiUsage::getCostAmount)
             .filter(java.util.Objects::nonNull)
             .reduce(BigDecimal.ZERO, BigDecimal::add)
             .setScale(4, RoundingMode.HALF_UP);
         // 按调用方分组
         Map<String, Long> byCaller = new LinkedHashMap<>();
         Map<String, BigDecimal> costByCaller = new LinkedHashMap<>();
-        for (DcsAiUsage u : all) {
+        for (AiUsage u : all) {
             String key = StrUtil.blankToDefault(u.getCaller(), "UNKNOWN");
             byCaller.merge(key, 1L, Long::sum);
             BigDecimal c = u.getCostAmount() == null ? BigDecimal.ZERO : u.getCostAmount();
@@ -365,7 +365,7 @@ public class AiBillingService {
         Map<String, BigDecimal> dailyCost = new LinkedHashMap<>();
         Date now = new Date();
         long sevenDaysAgo = now.getTime() - 7L * 24 * 3600 * 1000;
-        for (DcsAiUsage u : all) {
+        for (AiUsage u : all) {
             if (u.getCreateTime() != null && u.getCreateTime().getTime() >= sevenDaysAgo) {
                 String day = u.getCreateTime().toInstant().toString().substring(0, 10);
                 BigDecimal c = u.getCostAmount() == null ? BigDecimal.ZERO : u.getCostAmount();
@@ -399,7 +399,7 @@ public class AiBillingService {
         try {
             Date dayStart = cn.hutool.core.date.DateUtil.beginOfDay(new Date());
             List<Map<String, Object>> rows = usageMapper.selectMaps(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<DcsAiUsage>()
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<AiUsage>()
                     .select("COALESCE(SUM(cached_prompt_tokens),0) AS cached",
                         "COALESCE(SUM(prompt_tokens),0) AS prompt",
                         "COUNT(*) AS samples")

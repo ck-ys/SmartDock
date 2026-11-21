@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * 批 8B 红桥（2026-11-21 板 Q3 ★案1）：自动化/摘要内核搬进新四层后，
  * 租户助手配置仍住在 legacy（AssistantConfigService）——内核只许经本桥按语义取用，
- * legacy 类型（DcsAssistantConfig / EffectiveConfig）一律不得越过桥面。
+ * legacy 类型（AssistantConfig / EffectiveConfig）一律不得越过桥面。
  *
  * <p>五个方法对应内核原来的 7 处直连：assertOpen / dailyBudget（Runner 四道闸）、
  * digestEnabled（内置项状态）、digestEnabledTenantIds（08:00 摘要扫描，只给 ID 不给配置行）、

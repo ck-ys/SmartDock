@@ -9,11 +9,11 @@ import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.Model;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.ToolSchema;
-import com.smartdock.assistant.legacy.core.AssistantTodoSignal;
+import com.smartdock.assistant.engine.core.AssistantTodoSignal;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
-import com.smartdock.assistant.legacy.service.AssistantTitleService;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
-import com.smartdock.assistant.legacy.tools.TodoTools;
+import com.smartdock.assistant.service.AssistantTitleService;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
+import com.smartdock.assistant.engine.tools.TodoTools;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -228,12 +228,12 @@ class TodoAndTitleUnitTest {
     @Test
     @SuppressWarnings("unchecked")
     void enricherInjectsTodoCustomFrameAtHead() {
-        com.smartdock.assistant.legacy.core.AssistantTodoSignal signal = new com.smartdock.assistant.legacy.core.AssistantTodoSignal();
+        com.smartdock.assistant.engine.core.AssistantTodoSignal signal = new com.smartdock.assistant.engine.core.AssistantTodoSignal();
         signal.submit("th-1", List.of(
             new com.smartdock.assistant.domain.model.AssistantTodoItem("查未交名单", "completed", "high"),
             new com.smartdock.assistant.domain.model.AssistantTodoItem("发催办", "in_progress", "medium")));
-        com.smartdock.assistant.legacy.core.AssistantEventEnricher enricher =
-            new com.smartdock.assistant.legacy.core.AssistantEventEnricher(null, null, null, null, signal, null, null, null, null, null, null);
+        com.smartdock.assistant.engine.core.AssistantEventEnricher enricher =
+            new com.smartdock.assistant.engine.core.AssistantEventEnricher(null, null, null, null, signal, null, null, null, null, null, null);
         List<AguiEvent> events = List.of(new AguiEvent.TextMessageContent("th-1", "run-1", "m1", "推进中"));
         List<AguiEvent> out = enricher.enrich(null, events, ctx("th-1", "run-1"));
         assertEquals(2, out.size(), "原 1 帧+todo 帧=2");

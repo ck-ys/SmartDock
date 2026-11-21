@@ -5,12 +5,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.domain.bo.AutomationBo;
 import com.smartdock.assistant.domain.gateway.TenantConfigGateway;
-import com.smartdock.assistant.domain.model.DcsAutomation;
-import com.smartdock.assistant.domain.model.DcsAutomationRun;
+import com.smartdock.assistant.domain.model.Automation;
+import com.smartdock.assistant.domain.model.AutomationRun;
 import com.smartdock.assistant.domain.vo.AutomationRunVo;
 import com.smartdock.assistant.domain.vo.AutomationVo;
-import com.smartdock.assistant.mapper.DcsAutomationMapper;
-import com.smartdock.assistant.mapper.DcsAutomationRunMapper;
+import com.smartdock.assistant.mapper.AutomationMapper;
+import com.smartdock.assistant.mapper.AutomationRunMapper;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,8 +39,8 @@ public class AssistantAutomationService {
     private static final String BUILTIN_PROMPT =
         "（系统内置）每天 08:00 汇总还没交任务的人，推送给任务发布人。";
 
-    private final DcsAutomationMapper automationMapper;
-    private final DcsAutomationRunMapper runMapper;
+    private final AutomationMapper automationMapper;
+    private final AutomationRunMapper runMapper;
     /** 批 8B 红桥：租户助手配置经语义化桥面取用，legacy 类型不进门 */
     private final TenantConfigGateway tenantConfig;
     private final AutomationRunner runner;
@@ -51,9 +51,9 @@ public class AssistantAutomationService {
 
     public List<AutomationVo> list(String tenantId, Long userId, String filter, boolean canManageBuiltin) {
         ensureBuiltin(tenantId);
-        List<DcsAutomation> rows = automationMapper.selectVisible(tenantId, userId, normalizeFilter(filter));
+        List<Automation> rows = automationMapper.selectVisible(tenantId, userId, normalizeFilter(filter));
         List<AutomationVo> out = new ArrayList<>(rows.size());
-        for (DcsAutomation row : rows) {
+        for (Automation row : rows) {
             out.add(toVo(row, canManageBuiltin));
         }
         return out;
@@ -78,7 +78,7 @@ public class AssistantAutomationService {
     }
 
     public List<AutomationRunVo> runs(String tenantId, Long userId, Long id, int limit) {
-        DcsAutomation a = requireVisible(tenantId, userId, id);
+        Automation a = requireVisible(tenantId, userId, id);
         int safe = Math.min(Math.max(1, limit), 50);
         return runMapper.selectByAutomation(tenantId, a.getId(), safe).stream()
             .map(r -> toRunVo(r, a.getTitle())).toList();
@@ -101,7 +101,7 @@ public class AssistantAutomationService {
             throw new ServiceException("每人最多 " + AutomationSchedule.MAX_PER_USER
                 + " 条自动化，先删掉一条再建", 400);
         }
-        DcsAutomation a = new DcsAutomation();
+        Automation a = new Automation();
         a.setId(IdWorker.getId());
         a.setTenantId(tenantId);
         a.setUserId(userId);
@@ -124,7 +124,7 @@ public class AssistantAutomationService {
     @Transactional(rollbackFor = Exception.class)
     public AutomationVo update(String tenantId, Long userId, Long id, AutomationBo bo) {
         validateBo(bo);
-        DcsAutomation a = requireOwn(tenantId, userId, id);
+        Automation a = requireOwn(tenantId, userId, id);
         a.setTitle(bo.getTitle().trim());
         a.setPrompt(bo.getPrompt().trim());
         a.setScheduleType(bo.getScheduleType());
@@ -150,7 +150,7 @@ public class AssistantAutomationService {
     }
 
     public AutomationVo toggle(String tenantId, Long userId, Long id, boolean enabled) {
-        DcsAutomation a = requireOwn(tenantId, userId, id);
+        Automation a = requireOwn(tenantId, userId, id);
         LocalDateTime next = enabled
             ? AutomationSchedule.next(now(), a.getScheduleType(), a.getScheduleTime(), a.getWeekdays())
             : null;
@@ -165,7 +165,7 @@ public class AssistantAutomationService {
         if (!canManage) {
             throw new ServiceException("内置项由管理员开关", 403);
         }
-        DcsAutomation builtin = ensureBuiltin(tenantId);
+        Automation builtin = ensureBuiltin(tenantId);
         // 批 8B：raw→new→update 舞步整体搬进红桥 setDigestEnabled（无行先落一行默认配置再改）
         tenantConfig.setDigestEnabled(tenantId, enabled);
         automationMapper.toggleBuiltin(tenantId, userId, builtin.getId(), enabled ? "1" : "0");
@@ -174,12 +174,12 @@ public class AssistantAutomationService {
 
     /** 立即运行一次（题6 甲：失败不自动重试，手动重跑走这里） */
     public Long runNow(String tenantId, Long userId, Long id) {
-        DcsAutomation a = requireOwn(tenantId, userId, id);
+        Automation a = requireOwn(tenantId, userId, id);
         if (runMapper.countRunning(tenantId, a.getId()) > 0) {
             throw new ServiceException("这条自动化正在运行，稍等它跑完", 409);
         }
         LocalDateTime now = now();
-        DcsAutomationRun run = newRun(a, "MANUAL", now, now);
+        AutomationRun run = newRun(a, "MANUAL", now, now);
         if (runMapper.insertIgnore(run) == 0) {
             throw new ServiceException("这条自动化正在运行，稍等它跑完", 409);
         }
@@ -198,8 +198,8 @@ public class AssistantAutomationService {
      * 摘要本身仍由 {@code AssistantDailyDigestJob} 08:00 推送，这里只记账。
      */
     public void recordBuiltinRun(String tenantId, LocalDateTime scheduledFor, String summary) {
-        DcsAutomation builtin = ensureBuiltin(tenantId);
-        DcsAutomationRun run = newRun(builtin, "SCHEDULE", scheduledFor, scheduledFor);
+        Automation builtin = ensureBuiltin(tenantId);
+        AutomationRun run = newRun(builtin, "SCHEDULE", scheduledFor, scheduledFor);
         run.setUserId(0L);
         run.setThreadId(null);
         if (runMapper.insertIgnore(run) == 0) {
@@ -220,9 +220,9 @@ public class AssistantAutomationService {
     @Transactional(rollbackFor = Exception.class)
     public List<Claimed> claimDue() {
         LocalDateTime now = now();
-        List<DcsAutomation> due = automationMapper.claimDue(now, 50);
+        List<Automation> due = automationMapper.claimDue(now, 50);
         List<Claimed> out = new ArrayList<>();
-        for (DcsAutomation a : due) {
+        for (Automation a : due) {
             LocalDateTime slot = a.getNextRunAt();
             LocalDateTime base = slot.isBefore(now.minus(AutomationSchedule.CATCH_UP_WINDOW)) ? now : slot;
             LocalDateTime next = AutomationSchedule.next(base, a.getScheduleType(),
@@ -231,7 +231,7 @@ public class AssistantAutomationService {
 
             boolean tooLate = slot.plus(AutomationSchedule.CATCH_UP_WINDOW).isBefore(now);
             if (tooLate) {
-                DcsAutomationRun missed = newRun(a, "SCHEDULE", slot, null);
+                AutomationRun missed = newRun(a, "SCHEDULE", slot, null);
                 missed.setStatus("MISSED");
                 missed.setThreadId(null);
                 if (runMapper.insertIgnore(missed) > 0) {
@@ -241,7 +241,7 @@ public class AssistantAutomationService {
                 }
                 continue;
             }
-            DcsAutomationRun run = newRun(a, "SCHEDULE", slot, now);
+            AutomationRun run = newRun(a, "SCHEDULE", slot, now);
             if (runMapper.insertIgnore(run) > 0) {
                 automationMapper.markRun(a.getTenantId(), a.getId(), "RUNNING", run.getId(), now);
                 out.add(new Claimed(a.getTenantId(), run.getId()));
@@ -255,7 +255,7 @@ public class AssistantAutomationService {
         LocalDateTime now = now();
         LocalDateTime before = now.minus(AutomationSchedule.RUN_TIMEOUT);
         int swept = 0;
-        for (DcsAutomationRun run : runMapper.selectStale(before)) {
+        for (AutomationRun run : runMapper.selectStale(before)) {
             if (runMapper.failStale(run.getId(), now,
                 "运行超时（超过 15 分钟未结束，可能服务重启过）") == 0) {
                 continue;
@@ -265,7 +265,7 @@ public class AssistantAutomationService {
             automationMapper.markRun(run.getTenantId(), run.getAutomationId(), "FAILED", run.getId(), at);
             int failures = failurePolicy.record(run.getTenantId(), run.getAutomationId());
             // 收口也要发通知：否则「服务重启丢的那次」用户完全无感（题5 甲承诺结果一定进通知）
-            DcsAutomation automation = automationMapper.selectOne(run.getTenantId(), run.getAutomationId());
+            Automation automation = automationMapper.selectOne(run.getTenantId(), run.getAutomationId());
             if (automation != null && !"1".equals(automation.getDelFlag())) {
                 notifier.failure(automation, run.getId(),
                     "运行超时（超过 15 分钟未结束，可能服务重启过）",
@@ -277,12 +277,12 @@ public class AssistantAutomationService {
 
     // ---------------------------------------------------------------- 内部
 
-    private DcsAutomation ensureBuiltin(String tenantId) {
-        DcsAutomation exists = automationMapper.selectBuiltin(tenantId);
+    private Automation ensureBuiltin(String tenantId) {
+        Automation exists = automationMapper.selectBuiltin(tenantId);
         if (exists != null) {
             return exists;
         }
-        DcsAutomation a = new DcsAutomation();
+        Automation a = new Automation();
         a.setId(IdWorker.getId());
         a.setTenantId(tenantId);
         a.setUserId(0L);
@@ -295,8 +295,8 @@ public class AssistantAutomationService {
         return automationMapper.selectBuiltin(tenantId);
     }
 
-    private DcsAutomation requireVisible(String tenantId, Long userId, Long id) {
-        DcsAutomation a = automationMapper.selectOne(tenantId, id);
+    private Automation requireVisible(String tenantId, Long userId, Long id) {
+        Automation a = automationMapper.selectOne(tenantId, id);
         if (a == null) {
             throw new ServiceException("自动化不存在", 404);
         }
@@ -307,8 +307,8 @@ public class AssistantAutomationService {
         return a;
     }
 
-    private DcsAutomation requireOwn(String tenantId, Long userId, Long id) {
-        DcsAutomation a = requireVisible(tenantId, userId, id);
+    private Automation requireOwn(String tenantId, Long userId, Long id) {
+        Automation a = requireVisible(tenantId, userId, id);
         if ("1".equals(a.getBuiltin())) {
             throw new ServiceException("内置项只能开关，不能编辑或删除", 400);
         }
@@ -383,8 +383,8 @@ public class AssistantAutomationService {
         };
     }
 
-    private DcsAutomationRun newRun(DcsAutomation a, String trigger, LocalDateTime slot, LocalDateTime startedAt) {
-        DcsAutomationRun run = new DcsAutomationRun();
+    private AutomationRun newRun(Automation a, String trigger, LocalDateTime slot, LocalDateTime startedAt) {
+        AutomationRun run = new AutomationRun();
         run.setId(IdWorker.getId());
         run.setTenantId(a.getTenantId());
         run.setAutomationId(a.getId());
@@ -397,7 +397,7 @@ public class AssistantAutomationService {
         return run;
     }
 
-    private AutomationVo toVo(DcsAutomation a, boolean canManageBuiltin) {
+    private AutomationVo toVo(Automation a, boolean canManageBuiltin) {
         AutomationVo vo = new AutomationVo();
         vo.setId(a.getId());
         vo.setTitle(a.getTitle());
@@ -423,7 +423,7 @@ public class AssistantAutomationService {
         return vo;
     }
 
-    private AutomationRunVo toRunVo(DcsAutomationRun r, String title) {
+    private AutomationRunVo toRunVo(AutomationRun r, String title) {
         AutomationRunVo vo = new AutomationRunVo();
         vo.setId(r.getId());
         vo.setAutomationId(r.getAutomationId());

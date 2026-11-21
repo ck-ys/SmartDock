@@ -6,9 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
-import com.smartdock.risk.domain.DcsProfileReview;
+import com.smartdock.risk.domain.ProfileReview;
 import com.smartdock.risk.domain.vo.ProfileReviewAggregateVo;
-import com.smartdock.risk.mapper.DcsProfileReviewMapper;
+import com.smartdock.risk.mapper.ProfileReviewMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -38,12 +38,12 @@ class ProfileRiskReviewServiceUnitTest {
     static void initTableInfo() {
         TableInfoHelper.initTableInfo(
             new MapperBuilderAssistant(new MybatisConfiguration(), "profile-review-service"),
-            DcsProfileReview.class);
+            ProfileReview.class);
     }
 
     @Test
     void ensurePendingSkipsWhenLevelNotHighOrNullIds() {
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
 
         service.ensurePending("000000", 1L, 2L, "v1", "MEDIUM", "中风险");
@@ -55,15 +55,15 @@ class ProfileRiskReviewServiceUnitTest {
 
     @Test
     void ensurePendingUpsertsSinglePendingRowPerUser() {
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
         when(mapper.upsertPending(any())).thenReturn(1);
 
         service.ensurePending("000000", 42L, 100L, "v20260823", "HIGH", "  ");
 
-        ArgumentCaptor<DcsProfileReview> captor = ArgumentCaptor.forClass(DcsProfileReview.class);
+        ArgumentCaptor<ProfileReview> captor = ArgumentCaptor.forClass(ProfileReview.class);
         verify(mapper).upsertPending(captor.capture());
-        DcsProfileReview saved = captor.getValue();
+        ProfileReview saved = captor.getValue();
         assertThat(saved.getUserId()).isEqualTo(42L);
         assertThat(saved.getScoreId()).isEqualTo(100L);
         assertThat(saved.getStatus()).isEqualTo("PENDING");
@@ -74,7 +74,7 @@ class ProfileRiskReviewServiceUnitTest {
 
     @Test
     void countPendingDelegatesToDistinctUserCount() {
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
         when(mapper.countPendingUsers("000000")).thenReturn(7L);
 
@@ -83,7 +83,7 @@ class ProfileRiskReviewServiceUnitTest {
 
     @Test
     void pageAggregateSlicesFullListByPageQuery() {
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
         List<ProfileReviewAggregateVo> all = IntStream.rangeClosed(1, 5)
             .mapToObj(i -> new ProfileReviewAggregateVo()).toList();
@@ -100,7 +100,7 @@ class ProfileRiskReviewServiceUnitTest {
     @Test
     void pageAggregateToleratesMissingPaginationParams() {
         // 三审修正P1-1回归: GET 不传分页参数时 pageNum/pageSize 为 null, 不应 NPE
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
         List<ProfileReviewAggregateVo> all = IntStream.rangeClosed(1, 3)
             .mapToObj(i -> new ProfileReviewAggregateVo()).toList();
@@ -115,7 +115,7 @@ class ProfileRiskReviewServiceUnitTest {
 
     @Test
     void reviewAllForUserRejectsIllegalConclusionBeforeTouchingDb() {
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
 
         assertThatThrownBy(() -> service.reviewAllForUser("000000", 1L, 9L, "APPROVED", "理由"))
@@ -125,7 +125,7 @@ class ProfileRiskReviewServiceUnitTest {
 
     @Test
     void reviewAllForUserThrowsWhenNoPendingRows() {
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
         when(mapper.update(any(), any())).thenReturn(0);
 
@@ -136,7 +136,7 @@ class ProfileRiskReviewServiceUnitTest {
 
     @Test
     void reviewAllForUserReturnsAffectedRows() {
-        DcsProfileReviewMapper mapper = mock(DcsProfileReviewMapper.class);
+        ProfileReviewMapper mapper = mock(ProfileReviewMapper.class);
         ProfileRiskReviewService service = new ProfileRiskReviewService(mapper, new RiskActionPolicy());
         when(mapper.update(any(), any())).thenReturn(3);
 

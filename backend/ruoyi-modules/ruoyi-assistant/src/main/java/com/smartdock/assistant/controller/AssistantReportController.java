@@ -18,17 +18,17 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * 一键汇报导出端点（五需求批 R4b / Q7-A）：回答工具条「汇报」→ Word（结论+表格）
- * / Excel（表格明细）二进制流下载。perm 与对话同闸（dcs:assistant:use）——导出的
+ * / Excel（表格明细）二进制流下载。perm 与对话同闸（smartdock:assistant:use）——导出的
  * 就是当前用户自己会话里看到的内容，无跨用户数据面。
  */
 @RestController
-@RequestMapping("/dcs/assistant/report")
+@RequestMapping("/assistant/report")
 @RequiredArgsConstructor
 public class AssistantReportController extends BaseController {
 
     private final AssistantReportService reportService;
 
-    @SaCheckPermission("dcs:assistant:use")
+    @SaCheckPermission("smartdock:assistant:use")
     @PostMapping("/export")
     public ResponseEntity<byte[]> export(@RequestBody AssistantReportService.ReportBody body) {
         if (body == null || body.content() == null || body.content().isBlank()) {

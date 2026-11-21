@@ -1,7 +1,7 @@
 package org.dromara.test.adapter;
 
-import com.smartdock.dcs.domain.DcsTask;
-import com.smartdock.dcs.mapper.DcsTaskMapper;
+import com.smartdock.mission.domain.Task;
+import com.smartdock.mission.mapper.TaskMapper;
 import org.dromara.web.adapter.AdminMissionReviewProbe;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -23,14 +23,14 @@ import static org.mockito.Mockito.when;
 @Tag("dev")
 class AdminMissionReviewProbeTest {
 
-    private final DcsTaskMapper taskMapper = mock(DcsTaskMapper.class);
+    private final TaskMapper taskMapper = mock(TaskMapper.class);
     private final AdminMissionReviewProbe probe = new AdminMissionReviewProbe(taskMapper);
 
     @Test
     void collectingAssignedAuditorSeesTrue() {
-        DcsTask task = new DcsTask();
-        task.setStatus(DcsTask.STATUS_COLLECTING);
-        task.setAuditMode(DcsTask.AUDIT_ASSIGNED);
+        Task task = new Task();
+        task.setStatus(Task.STATUS_COLLECTING);
+        task.setAuditMode(Task.AUDIT_ASSIGNED);
         task.setAuditorUserIds("[9100000001, 9100000002]");
         when(taskMapper.selectOne(any())).thenReturn(task);
 
@@ -39,9 +39,9 @@ class AdminMissionReviewProbeTest {
 
     @Test
     void collectingPublisherDirectAuditorSeesTrue() {
-        DcsTask task = new DcsTask();
-        task.setStatus(DcsTask.STATUS_COLLECTING);
-        task.setAuditMode(DcsTask.AUDIT_PUBLISHER);
+        Task task = new Task();
+        task.setStatus(Task.STATUS_COLLECTING);
+        task.setAuditMode(Task.AUDIT_PUBLISHER);
         task.setPublisherUserId(1L);
         when(taskMapper.selectOne(any())).thenReturn(task);
 
@@ -51,9 +51,9 @@ class AdminMissionReviewProbeTest {
 
     @Test
     void strangerSeesFalseEvenWhenTaskCollecting() {
-        DcsTask task = new DcsTask();
-        task.setStatus(DcsTask.STATUS_COLLECTING);
-        task.setAuditMode(DcsTask.AUDIT_ASSIGNED);
+        Task task = new Task();
+        task.setStatus(Task.STATUS_COLLECTING);
+        task.setAuditMode(Task.AUDIT_ASSIGNED);
         task.setAuditorUserIds("[9100000001]");
         when(taskMapper.selectOne(any())).thenReturn(task);
 

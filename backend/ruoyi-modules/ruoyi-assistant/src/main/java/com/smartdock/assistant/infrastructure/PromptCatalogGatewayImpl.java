@@ -2,14 +2,14 @@ package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.PromptCatalogGateway;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.legacy.core.DateInjectModelDecorator;
-import com.smartdock.assistant.legacy.core.MemoryInjectModelDecorator;
-import com.smartdock.assistant.legacy.core.PromptAssets;
-import com.smartdock.assistant.legacy.core.AssistantSkillHolder;
-import com.smartdock.assistant.legacy.core.SkillAssets;
-import com.smartdock.assistant.legacy.core.ToolRegistry;
-import com.smartdock.assistant.legacy.service.AssistantConfigService;
-import com.smartdock.assistant.legacy.tools.ToolIdentity;
+import com.smartdock.assistant.engine.core.DateInjectModelDecorator;
+import com.smartdock.assistant.engine.core.MemoryInjectModelDecorator;
+import com.smartdock.assistant.engine.core.PromptAssets;
+import com.smartdock.assistant.engine.core.AssistantSkillHolder;
+import com.smartdock.assistant.engine.core.SkillAssets;
+import com.smartdock.assistant.engine.core.ToolRegistry;
+import com.smartdock.assistant.service.AssistantConfigService;
+import com.smartdock.assistant.engine.tools.ToolIdentity;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.springframework.stereotype.Component;
 

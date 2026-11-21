@@ -1,7 +1,7 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.domain.model.DcsAssistantAction;
-import com.smartdock.assistant.legacy.service.AssistantActionService;
+import com.smartdock.assistant.domain.model.AssistantAction;
+import com.smartdock.assistant.service.AssistantActionService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -74,7 +74,7 @@ class G3ActionTest {
         actionService.openExecution("987311", U1, RUN_KEY + "-run4", RUN_KEY + "-th4", "act_remind", "{}", key);
         actionService.markDone(actionService.openExecution(
             "987311", U1, RUN_KEY + "-run4", RUN_KEY + "-th4", "act_remind", "{}", key).row().getId(), "ok");
-        List<DcsAssistantAction> mine = actionService.listForUser("987311", U1, RUN_KEY + "-run4", null);
+        List<AssistantAction> mine = actionService.listForUser("987311", U1, RUN_KEY + "-run4", null);
         assertEquals(1, mine.size(), "按 runId 查本人账本");
         assertEquals(0, actionService.listForUser("987311", U2, RUN_KEY + "-run4", null).size(),
             "异主查不到（归属谓词）");

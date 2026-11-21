@@ -3,8 +3,8 @@ package com.smartdock.assistant.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartdock.assistant.domain.model.AssistantTodoItem;
-import com.smartdock.assistant.domain.model.DcsAssistantCompaction;
-import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.AssistantCompaction;
+import com.smartdock.assistant.domain.model.AssistantMessage;
 import com.smartdock.assistant.mapper.AssistantCompactionMapper;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.mapper.AssistantMessageMapper;
@@ -20,7 +20,7 @@ import java.util.List;
  * 会话消息写路径（批 7 · 7C-1，2026-11-20 拍板 Q3 ★ 案 1）。
  *
  * <p><b>纯搬移</b>：8 个方法与 {@code AssistantConversationService} 原同名方法逐行一致。
- * 只碰 {@code dcs_assistant_message} 一张表，外加落库后顺手 {@code touch} 会话行
+ * 只碰 {@code assistant_message} 一张表，外加落库后顺手 {@code touch} 会话行
  * （列表排序键 last_message_time，与消息插入同事务语义）。</p>
  *
  * <p><b>X-08 明文例外矩阵照旧</b>：user 消息=明文（本人原文通道）；assistant 消息与
@@ -33,7 +33,7 @@ import java.util.List;
  * ③ 清人与保留期清理归 {@link PurgeService}（7C-2）。</p>
  *
  * <p><b>7C-2 并入</b>：{@code appendCompactionRecord}（压缩审计行，落
- * {@code dcs_assistant_compaction}）。它与消息写入同属「一次回合里追加一行」，
+ * {@code assistant_compaction}）。它与消息写入同属「一次回合里追加一行」，
  * 调用方只有压缩中间件一处，放这里比单开一个类更省。</p>
  */
 @Slf4j
@@ -116,7 +116,7 @@ public class MessageWriteService {
                                        int beforeMessages, int afterMessages,
                                        String status, String reason, String summary) {
         try {
-            DcsAssistantCompaction rec = new DcsAssistantCompaction();
+            AssistantCompaction rec = new AssistantCompaction();
             rec.setId(IdWorker.getId());
             rec.setTenantId(tenantId);
             rec.setConversationId(conversationId);
@@ -195,7 +195,7 @@ public class MessageWriteService {
     private Long insertMessage(String tenantId, Long conversationId, Long userId,
                                String role, String content, String model, String endReason,
                                String toolSteps, Long totalTokens) {
-        DcsAssistantMessage msg = new DcsAssistantMessage();
+        AssistantMessage msg = new AssistantMessage();
         msg.setId(IdWorker.getId());
         msg.setTenantId(tenantId);
         msg.setConversationId(conversationId);

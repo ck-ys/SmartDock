@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.utils.ServletUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
-import com.smartdock.risk.config.DcsRolloutProperties;
+import com.smartdock.risk.config.RolloutProperties;
 import com.smartdock.risk.domain.bo.RiskEventCommand;
 import com.smartdock.risk.support.SensitiveWordMatcher;
 import org.springframework.stereotype.Service;
@@ -23,10 +23,10 @@ import java.util.Map;
  * 任务填写内容机审服务(风控2.0 批1, 2026-09-22)。
  *
  * <p><b>职责</b>: 任务填写主数据流(表单提交/追加/在线批量/Excel导入)的统一内容机审入口——
- * 对明细数据的文本字段做 FORM 场景词库匹配(复用 {@link DcsSensitiveWordFilterService}),
+ * 对明细数据的文本字段做 FORM 场景词库匹配(复用 {@link SensitiveWordFilterService}),
  * 命中即异步记 TASK_CONTENT_RISK 风险事件(只记分留痕不阻塞), 拒绝与否由调用方按灰度开关判定。</p>
  *
- * <p><b>灰度双开关</b>(dcs.rollout, 详见 {@link DcsRolloutProperties}):
+ * <p><b>灰度双开关</b>(rollout, 详见 {@link RolloutProperties}):
  * contentModerationEnabled(默认 false)=机审总开关, 关=完全放行不记事件;
  * contentBlockEnabled(默认 false)=BLOCK 拦截开关, 关=观察模式只记事件。
  * 上线节奏: 先开总开关观察误伤率, 业务确认后再开拦截——红线: 不影响正常用户。</p>
@@ -55,9 +55,9 @@ public class ContentModerationService {
     /** 机检标记值: 审核人判误报(命中说明保留, 误报计数聚合本值) */
     public static final String MACHINE_CHECK_FP = "FP";
 
-    private final DcsSensitiveWordFilterService wordFilterService;
+    private final SensitiveWordFilterService wordFilterService;
     private final RiskEventCollector riskEventCollector;
-    private final DcsRolloutProperties rollout;
+    private final RolloutProperties rollout;
 
     /**
      * 单行明细机审: 展平 itemMap 的全部文本叶子值逐字段匹配, 命中记事件并返回结论。

@@ -1,0 +1,204 @@
+package com.smartdock.mission.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.smartdock.mission.domain.Audit;
+import com.smartdock.mission.domain.Notice;
+import com.smartdock.mission.domain.Submission;
+import com.smartdock.mission.domain.Task;
+import com.smartdock.mission.mapper.AuditMapper;
+import com.smartdock.mission.mapper.SubmissionMapper;
+import com.smartdock.mission.mapper.TaskMapper;
+import com.smartdock.mission.statemachine.SubmissionStateMachine;
+import com.smartdock.mission.support.Jsons;
+import com.smartdock.profile.ProfileEventPublisher;
+import com.smartdock.profile.monitor.SelfMonitorEvents;
+import com.smartdock.profile.event.ProfileEventBo;
+import com.smartdock.profile.ProfileUids;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.mybatis.core.page.PageQuery;
+import org.dromara.common.mybatis.core.page.TableDataInfo;
+import org.dromara.common.satoken.utils.LoginHelper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+/**
+ * 审核服务: 待审列表 + 通过/退回。
+ *
+ * <p>事件翻译点③④: decide(PASS)→data.audit_passed、decide(REJECT)→data.audit_rejected。
+ * 审核主体(subjectId)=提交人——画像维度按提交人口径聚合。审核落状态 CAS 防并发双审。</p>
+ *
+ * @author smartdock
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuditService {
+
+    private final AuditMapper auditMapper;
+    private final SubmissionMapper submissionMapper;
+    private final TaskMapper taskMapper;
+    private final NoticeService noticeService;
+    private final ProfileEventPublisher eventPublisher;
+    private final com.smartdock.mission.support.SubjectNameResolver subjectNameResolver;
+
+    /** 待审列表: 我有权审的任务下的 PENDING_AUDIT 提交。
+     *  三审 dspro P2-9: 按 audit_mode 分支——PUBLISHER 只认我发布的, ASSIGNED 只认审核人含我
+     *  (原 or 条件让直审发布人看见 ASSIGNED 任务却无权审, 点审核必报错) */
+    public TableDataInfo<Submission> pending(PageQuery pq, Long me) {
+        List<Long> taskIds = taskMapper.selectList(new LambdaQueryWrapper<Task>()
+                // 全审回修: 含 CLOSED——关闭后仍要能看到存量待审清尾巴(decide 已放行)
+                .in(Task::getStatus, Task.STATUS_COLLECTING, Task.STATUS_CLOSED)
+                .and(w -> w
+                    // PUBLISHER 直审: 我发布的且未指定审核人
+                    .and(x -> x.eq(Task::getPublisherUserId, me)
+                        .eq(Task::getAuditMode, Task.AUDIT_PUBLISHER))
+                    // ASSIGNED 指定审核: 模式吻合且审核人列表含我
+                    // (全审 dspro P2: 原分支缺 audit_mode 谓词, PUBLISHER 任务带上历史 auditor 列表即污染队列)
+                    // 注意写法: 必须 .or(consumer)——E2E 实测 .or().and(consumer) 生成的是 AND 连接,
+                    // 两分支互斥导致待审队列恒空(回修E 发现)
+                    .or(x -> x.eq(Task::getAuditMode, Task.AUDIT_ASSIGNED)
+                        .apply("auditor_user_ids @> ({0}::jsonb)", Jsons.toJson(List.of(me))))))
+                .stream().map(Task::getId).collect(Collectors.toList());
+        if (taskIds.isEmpty()) {
+            return TableDataInfo.build(new Page<>(pq.getPageNum(), pq.getPageSize()));
+        }
+        Page<Submission> page = submissionMapper.selectPage(pq.build(), new LambdaQueryWrapper<Submission>()
+            .in(Submission::getTaskId, taskIds)
+            .eq(Submission::getStatus, Submission.STATUS_PENDING_AUDIT)
+            .orderByAsc(Submission::getSubmittedAt));
+        // 2026-10-30 题8：审核员要看「谁交的什么」，不是两串 19 位数字——
+        // 任务标题与提交人昵称在这里一次性回填（按页批量，不逐行查）
+        List<Submission> records = page.getRecords();
+        if (!records.isEmpty()) {
+            Map<Long, String> titles = taskMapper.selectBatchIds(
+                    records.stream().map(Submission::getTaskId).distinct().toList())
+                .stream().collect(Collectors.toMap(Task::getId, Task::getTitle, (a1, b1) -> a1));
+            Map<Long, String> names = subjectNameResolver.resolveBatch(
+                records.stream().map(Submission::getSubmitterUserId).filter(Objects::nonNull).distinct().toList());
+            for (Submission row : records) {
+                row.setTaskTitle(titles.get(row.getTaskId()));
+                row.setSubmitterName(names.get(row.getSubmitterUserId()));
+            }
+        }
+        return TableDataInfo.build(page);
+    }
+
+    /** 审核决定: PASS/REJECT(CAS 防并发; 事件 + 提交通知)。
+     *  三审 dspro P1-3: 加事务——CAS 与审核留痕/通知同生共死, 不再"状态已变但轨迹缺失" */
+    @Transactional(rollbackFor = Exception.class)
+    public void decide(Long submissionId, String decision, String comment, Long me) {
+        if (!Audit.DECISION_PASS.equals(decision) && !Audit.DECISION_REJECT.equals(decision)) {
+            throw new ServiceException("审核决定只认 PASS/REJECT");
+        }
+        Submission s = submissionMapper.selectById(submissionId);
+        if (s == null) {
+            throw new ServiceException("提交不存在");
+        }
+        Task task = taskMapper.selectById(s.getTaskId());
+        if (task == null) {
+            throw new ServiceException("任务不存在");
+        }
+        if (!task.auditorIs(me)) {
+            throw new ServiceException("你不是该任务的审核人");
+        }
+        // 全审回修(dspro P1, 覆盖三审 glm53 P1-2 拍板): close 与 submit 的在读-判-写窗口内可并发
+        // 造出「CLOSED 任务挂着 PENDING_AUDIT」——若此处硬拦, 该提交永久既不可审也不可重提。
+        // 口径改为: CLOSED 后仍可审存量待审(清理尾巴), 仅未发布(DRAFT)不可审。
+        if (Task.STATUS_DRAFT.equals(task.getStatus())) {
+            throw new ServiceException("任务未发布, 不可审核");
+        }
+        String to = Audit.DECISION_PASS.equals(decision)
+            ? Submission.STATUS_APPROVED : Submission.STATUS_REJECTED;
+        SubmissionStateMachine.transition(s.getStatus(), to);
+        if (submissionMapper.auditStatus(submissionId, to) == 0) {
+            throw new ServiceException("该提交已被审核, 请刷新");
+        }
+
+        Audit a = new Audit();
+        a.setId(IdWorker.getId());
+        a.setTenantId(s.getTenantId());
+        a.setSubmissionId(submissionId);
+        a.setTaskId(s.getTaskId());
+        a.setAuditorUserId(me);
+        a.setDecision(decision);
+        a.setComment(StringUtils.isBlank(comment) ? null : comment.substring(0, Math.min(500, comment.length())));
+        a.setCreateTime(new Date());
+        auditMapper.insert(a);
+
+        // 事件翻译点③④: 主体=提交人
+        String eventType = Audit.DECISION_PASS.equals(decision) ? SelfMonitorEvents.DATA_AUDIT_PASSED : SelfMonitorEvents.DATA_AUDIT_REJECTED;
+        Map<String, Object> props = new LinkedHashMap<>();
+        props.put("taskId", s.getTaskId());
+        props.put("submissionId", submissionId);
+        props.put("version", s.getVersion());
+        publishEvent(eventType, ProfileUids.uid("audit", decision.toLowerCase(), a.getId()),
+            s.getSubmitterUserId(), props);
+
+        // E 片审核岗归属修复: 审核是审核人做的动作——再记一条到审核人名下,
+        // 否则采用度/两步漏斗对审核岗系统性低估(审核全记在提交人头上)。
+        // 三席回修口径注: 审核人=提交人(自审)时同一动作会记两条事件(提交人侧结果+审核人侧动作),
+        // "使用次数"按事件数会计双份; 采用度取数已按 ACTED_OPERATIONS(只认本人动作)免疫人数层面的双计。
+        Map<String, Object> auditorProps = new LinkedHashMap<>();
+        auditorProps.put("taskId", s.getTaskId());
+        auditorProps.put("submissionId", submissionId);
+        auditorProps.put("decision", decision);
+        auditorProps.put("submitterUserId", s.getSubmitterUserId());
+        publishEvent(SelfMonitorEvents.DATA_AUDITED, ProfileUids.uid("audited", decision.toLowerCase(), a.getId()),
+            me, auditorProps);
+
+        String verdict = Audit.DECISION_PASS.equals(decision) ? "已通过" : "被退回";
+        noticeService.notify(s.getSubmitterUserId(), Notice.TYPE_AUDIT_RESULT,
+            "提交" + verdict + ": " + task.getTitle(),
+            "你的提交(v" + s.getVersion() + ")" + verdict
+                + (StringUtils.isBlank(comment) ? "" : ", 意见: " + comment), task.getId());
+    }
+
+    /** 某提交的审核轨迹(详情页用)。三审 dspro P1-5: 加任务级鉴权——
+     *  该任务审核人/发布人/提交本人三方可看, 其他持审核权限者不看跨任务评语 */
+    public List<Audit> trailOf(Long submissionId, Long me) {
+        Submission s = submissionMapper.selectById(submissionId);
+        if (s == null) {
+            throw new ServiceException("提交不存在");
+        }
+        Task t = taskMapper.selectById(s.getTaskId());
+        boolean allowed = t != null && (t.auditorIs(me)
+            || me.equals(t.getPublisherUserId())
+            || me.equals(s.getSubmitterUserId()));
+        if (!allowed) {
+            throw new ServiceException("无权查看该提交的审核轨迹");
+        }
+        return auditMapper.selectList(new LambdaQueryWrapper<Audit>()
+            .eq(Audit::getSubmissionId, submissionId)
+            .orderByAsc(Audit::getId));
+    }
+
+    private void publishEvent(String eventType, String eventUid, Long subjectUserId, Map<String, Object> props) {
+        ProfileEventBo e = new ProfileEventBo();
+        e.setSource(com.smartdock.profile.event.ProfileSources.UNIFIED);
+        e.setEventType(eventType);
+        e.setEventUid(eventUid);
+        e.setSubjectType("user");
+        e.setSubjectId(String.valueOf(subjectUserId));
+        e.setSubjectName(subjectNameResolver.resolve(subjectUserId));
+        e.setOccurredTime(new Date());
+        e.setProps(new LinkedHashMap<>(props));
+        try {
+            // 单源重构 C 片: 本产品站内操作属自监控白名单——静默发布, 不逐条触发打分/汇总
+            eventPublisher.publishQuiet(e);
+        } catch (Exception ex) {
+            log.warn("[Dcs] profile event failed type={} uid={}: {}", eventType, eventUid, ex.getMessage());
+        }
+    }
+}

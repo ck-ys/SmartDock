@@ -17,7 +17,7 @@ public interface ISysConfigService {
     // ===== DCS 调用指南 =====
     // DCS 引用频次: 1+ 个文件
     // 典型用法: DCS 读催办/通知策略配置等系统参数; selectConfigByKey(key) 带缓存(首次查 DB sys_config, 后续走 Redis 缓存); 改配置后需调 resetConfigCache() 刷新缓存
-    // 扩展点: DCS 业务参数建议统一走 sys_config 表 + 此接口读取, 避免散落在 properties 文件; 配置 key 加 dcs: 前缀命名隔离
+    // 扩展点: DCS 业务参数建议统一走 sys_config 表 + 此接口读取, 避免散落在 properties 文件; 配置 key 按域命名隔离(assistant.* / profile.* 等,批9 起无统一前缀)
     // ===== DCS 调用指南 结束 =====
 
     /**

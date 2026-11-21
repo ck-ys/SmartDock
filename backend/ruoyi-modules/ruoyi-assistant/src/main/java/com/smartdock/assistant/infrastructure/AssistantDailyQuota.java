@@ -77,7 +77,7 @@ public class AssistantDailyQuota {
     /**
      * 回合闸：原子 INCR+比限，超限抛话术异常（含恢复时点）。
      *
-     * @param limit 每用户每日回合上限（dcs_assistant_config 生效值）
+     * @param limit 每用户每日回合上限（assistant_config 生效值）
      */
     public void tryTurn(String tenantId, Long userId, int limit) {
         if (limit <= 0) {
@@ -135,7 +135,7 @@ public class AssistantDailyQuota {
 
     /**
      * 租户日预算闸：当日已消费 ≥ 预算 → 拒绝。
-     * <p>消费真值源=dcs_tenant_wallet_ledger 当日 SUM（AI_ASSISTANT_CHAT 服务码，
+     * <p>消费真值源=tenant_wallet_ledger 当日 SUM（AI_ASSISTANT_CHAT 服务码，
      * 日界 Asia/Shanghai）——不走 Redis 累计（计费落账在流结束 doFinally，Redis
      * 副本必然迟滞且浮点累计有漂移；账本直查零漂移，spec §11 Redis 口径的偏差登记）。
      * 读失败≠停服（回合闸已兜频次），放行+告警。</p>
@@ -155,7 +155,7 @@ public class AssistantDailyQuota {
                 org.dromara.common.redis.utils.RedisUtils.getCacheObject(cacheKey));
             if (used == null) {
                 used = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(SUM(amount), 0) FROM dcs_tenant_wallet_ledger"
+                    "SELECT COALESCE(SUM(amount), 0) FROM tenant_wallet_ledger"
                         + " WHERE tenant_id=? AND del_flag='0' AND service_code='AI_ASSISTANT_CHAT'"
                         + " AND direction='OUT' AND biz_type='DEDUCT'"
                         + " AND create_time >= ? AND create_time < ?",

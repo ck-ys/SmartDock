@@ -2,8 +2,8 @@ package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.ConversationReadGateway;
 import lombok.RequiredArgsConstructor;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.AssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantMessage;
 import com.smartdock.assistant.query.ConversationQueryService;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +27,7 @@ public class ConversationReadGatewayImpl implements ConversationReadGateway {
 
     @Override
     public ConversationRef conversationByThread(String tenantId, String threadId) {
-        DcsAssistantConversation conv = conversationQueryService.conversationByThread(tenantId, threadId);
+        AssistantConversation conv = conversationQueryService.conversationByThread(tenantId, threadId);
         return conv == null ? null : new ConversationRef(conv.getId(), conv.getUserId());
     }
 
@@ -37,10 +37,10 @@ public class ConversationReadGatewayImpl implements ConversationReadGateway {
         // 但 mapper 是 @Select 列表查询，MyBatis 只会返回空表不会返回 null——那是死代码，
         // 而且会把「假设发生 null」的异常吞成「消息桶 0」，比旧 controller 的 500 更宽。
         // 这里直接迭代，保持与旧代码同款吞异常宽度（真出 null 就在 <b>listMessagesTail</b> 的调用方 try 里落 0 并留 warn）。
-        List<DcsAssistantMessage> rows =
+        List<AssistantMessage> rows =
             conversationQueryService.listMessagesTail(tenantId, userId, conversationId, limit);
         List<MessageRef> out = new ArrayList<>(rows.size());
-        for (DcsAssistantMessage m : rows) {
+        for (AssistantMessage m : rows) {
             out.add(new MessageRef(m.getRole(), m.getContent(), m.getToolSteps()));
         }
         return out;

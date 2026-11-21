@@ -111,7 +111,7 @@ INSERT INTO public.sys_menu
   (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache,
    menu_type, visible, status, perms, icon, create_dept, create_by, create_time, remark)
 VALUES
-  (12010, '合规中心', 12000, 7, 'compliance', 'dcs/profile/compliance', NULL, '1', '0',
+  (12010, '合规中心', 12000, 7, 'compliance', 'smartdock/profile/compliance', NULL, '1', '0',
    'C', '0', '0', 'profile:deletion:query', 'lock', 103, 1, '2026-10-20 00:00:00',
    '批11：PII 字段清单 / 主体删除向导 / 导出审计'),
   (12011, '删除-执行', 12010, 1, '', NULL, NULL, '1', '0',

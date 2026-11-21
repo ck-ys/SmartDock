@@ -22,9 +22,9 @@
       <!-- 反馈弹窗归壳层持有：顶栏头像菜单与左下用户行开的是同一个框 -->
       <feedback-dialog v-model:visible="feedbackOpen" :initial-tab="feedbackTab" />
       <!-- DCS AI 助手（批E：悬浮球+抽屉；组件内自判权限与租户开关，未开启=零渲染） -->
-      <dcs-assistant />
+      <smartdock-assistant />
       <!-- 交互三件 ①：Ctrl+K / Cmd+K 命令面板（数据源=权限过滤后的路由菜单） -->
-      <dcs-command-palette />
+      <CommandPalette />
     </div>
   </div>
 </template>
@@ -32,11 +32,11 @@
 <script setup lang="ts">
 import SideBar from './components/Sidebar/index.vue';
 import { AppMain, Navbar, Settings } from './components';
-import FeedbackDialog from '@/views/dcs/feedback/components/FeedbackDialog.vue';
+import FeedbackDialog from '@/views/smartdock/feedback/components/FeedbackDialog.vue';
 // S-38：悬浮球仅壳常驻，抽屉主体在组件内 dynamic import
-const DcsAssistant = defineAsyncComponent(() => import('@/components/DcsAssistant/index.vue'));
+const Assistant = defineAsyncComponent(() => import('@/components/Assistant/index.vue'));
 // 交互三件 ①：命令面板随壳常驻；异步加载避免与 permission store → router → Layout 形成同步环
-const DcsCommandPalette = defineAsyncComponent(() => import('@/components/DcsCommandPalette/index.vue'));
+const CommandPalette = defineAsyncComponent(() => import('@/components/CommandPalette/index.vue'));
 import { useAppStore } from '@/store/modules/app';
 import { useSettingsStore } from '@/store/modules/settings';
 import { useTagsViewStore } from '@/store/modules/tagsView';

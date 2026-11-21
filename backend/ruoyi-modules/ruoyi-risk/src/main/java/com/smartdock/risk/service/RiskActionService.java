@@ -9,9 +9,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.tenant.helper.TenantHelper;
-import com.smartdock.risk.config.DcsRolloutProperties;
-import com.smartdock.risk.domain.DcsRiskAction;
-import com.smartdock.risk.mapper.DcsRiskActionMapper;
+import com.smartdock.risk.config.RolloutProperties;
+import com.smartdock.risk.domain.RiskAction;
+import com.smartdock.risk.mapper.RiskActionMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -28,19 +28,19 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class RiskActionService {
     /** 风险处置表 Mapper(可逆封禁/下线记录) */
-    private final DcsRiskActionMapper actionMapper;
+    private final RiskActionMapper actionMapper;
     /** 处置策略(等级→动作类型/时长映射) */
     private final RiskActionPolicy policy;
 
     /** 灰度配置(L3/L4 处置总开关) */
     @Autowired(required = false)
-    private DcsRolloutProperties rolloutProperties;
+    private RolloutProperties rolloutProperties;
 
     /**
      * 同步风险评估结果到可逆处置表(L3/L4 触发 TEMP_FREEZE / 强制下线等, 幂等 + 短路于人工解除)。
      * @return 新建或已存在的 ACTIVE 处置; 评估为空/开关关闭/被人工决策抑制时返回 null
      */
-    public DcsRiskAction syncAssessment(String tenantId, RiskScoreService.RiskAssessment assessment, String reason) {
+    public RiskAction syncAssessment(String tenantId, RiskScoreService.RiskAssessment assessment, String reason) {
         // 短路1: L3/L4 处置总开关关闭 → 直接返回, 不做任何处置(灰度发布用)
         if (rolloutProperties != null && !rolloutProperties.isL34EnforcementEnabled()) return null;
 
@@ -55,7 +55,7 @@ public class RiskActionService {
         if (decision == null) return null;
 
         // 短路4: 已有同类型 ACTIVE 处置 → 幂等返回, 不重复创建(避免一次风控触发多条封禁)
-        DcsRiskAction existing = active(tenantId, assessment.userId(), decision.actionType());
+        RiskAction existing = active(tenantId, assessment.userId(), decision.actionType());
         if (existing != null) return existing;
 
         // 短路5: 运维人工已决策(DISMISS) → 抑制本次自动处置, 避免与人工判断冲突
@@ -63,7 +63,7 @@ public class RiskActionService {
 
         // 正式创建处置记录: 设置所有字段(脱敏IP/雪花ID/过期时间=现在+duration)
         Date now = new Date();
-        DcsRiskAction action = new DcsRiskAction();
+        RiskAction action = new RiskAction();
         action.setActionId(IdUtil.getSnowflakeNextId());
         action.setTenantId(tenantId);
         action.setUserId(assessment.userId());
@@ -93,19 +93,19 @@ public class RiskActionService {
     }
 
     /** 分页查询处置记录(支持按状态/类型/用户筛选); 自动先 expireDue 过期处置。 */
-    public Page<DcsRiskAction> page(String tenantId, String status, String actionType, Long userId, PageQuery pageQuery) {
+    public Page<RiskAction> page(String tenantId, String status, String actionType, Long userId, PageQuery pageQuery) {
         expireDue(tenantId);
         return TenantHelper.ignore(() -> actionMapper.selectPage(pageQuery.build(),
-            new LambdaQueryWrapper<DcsRiskAction>()
-                .eq(DcsRiskAction::getTenantId, tenantId)
-                .eq(status != null && !status.isBlank(), DcsRiskAction::getStatus, status)
-                .eq(actionType != null && !actionType.isBlank(), DcsRiskAction::getActionType, actionType)
-                .eq(userId != null, DcsRiskAction::getUserId, userId)
-                .orderByDesc(DcsRiskAction::getStartTime)));
+            new LambdaQueryWrapper<RiskAction>()
+                .eq(RiskAction::getTenantId, tenantId)
+                .eq(status != null && !status.isBlank(), RiskAction::getStatus, status)
+                .eq(actionType != null && !actionType.isBlank(), RiskAction::getActionType, actionType)
+                .eq(userId != null, RiskAction::getUserId, userId)
+                .orderByDesc(RiskAction::getStartTime)));
     }
 
     /** 查询单条处置详情(校验租户归属); 不存在或不属于该租户抛 ServiceException。 */
-    public DcsRiskAction detail(String tenantId, Long actionId) {
+    public RiskAction detail(String tenantId, Long actionId) {
         expireDue(tenantId);
         return requireAction(tenantId, actionId);
     }
@@ -114,9 +114,9 @@ public class RiskActionService {
     public long countActive(String tenantId) {
         if (!isEnforcementEnabled()) return 0L;
         expireDue(tenantId);
-        Long count = TenantHelper.ignore(() -> actionMapper.selectCount(new LambdaQueryWrapper<DcsRiskAction>()
-            .eq(DcsRiskAction::getTenantId, tenantId)
-            .eq(DcsRiskAction::getStatus, "ACTIVE")));
+        Long count = TenantHelper.ignore(() -> actionMapper.selectCount(new LambdaQueryWrapper<RiskAction>()
+            .eq(RiskAction::getTenantId, tenantId)
+            .eq(RiskAction::getStatus, "ACTIVE")));
         return count == null ? 0L : count;
     }
 
@@ -128,24 +128,24 @@ public class RiskActionService {
     public void release(String tenantId, Long actionId, Long operatorId, String reason) {
         String normalized = policy.requireReason(reason);
         expireDue(tenantId);
-        DcsRiskAction current = requireActionForUpdate(tenantId, actionId);
+        RiskAction current = requireActionForUpdate(tenantId, actionId);
         if (!"ACTIVE".equals(current.getStatus())) throw new ServiceException("仅生效中的处置可以解除");
         Date now = new Date();
-        LambdaUpdateWrapper<DcsRiskAction> update = new LambdaUpdateWrapper<DcsRiskAction>()
-                .eq(DcsRiskAction::getTenantId, tenantId)
-                .eq(DcsRiskAction::getActionId, actionId)
-                .eq(DcsRiskAction::getStatus, "ACTIVE")
-                .set(DcsRiskAction::getStatus, "RELEASED")
-                .set(DcsRiskAction::getReleasedBy, operatorId)
-                .set(DcsRiskAction::getReleasedTime, now)
-                .set(DcsRiskAction::getReleaseReason, normalized);
+        LambdaUpdateWrapper<RiskAction> update = new LambdaUpdateWrapper<RiskAction>()
+                .eq(RiskAction::getTenantId, tenantId)
+                .eq(RiskAction::getActionId, actionId)
+                .eq(RiskAction::getStatus, "ACTIVE")
+                .set(RiskAction::getStatus, "RELEASED")
+                .set(RiskAction::getReleasedBy, operatorId)
+                .set(RiskAction::getReleasedTime, now)
+                .set(RiskAction::getReleaseReason, normalized);
         if ("PENDING".equals(current.getReviewStatus())) {
             update
-                .set(DcsRiskAction::getReviewStatus, "DISMISSED")
-                .set(DcsRiskAction::getReviewedBy, operatorId)
-                .set(DcsRiskAction::getReviewedTime, now)
-                .set(DcsRiskAction::getReviewConclusion, "DISMISSED")
-                .set(DcsRiskAction::getReviewReason, normalized);
+                .set(RiskAction::getReviewStatus, "DISMISSED")
+                .set(RiskAction::getReviewedBy, operatorId)
+                .set(RiskAction::getReviewedTime, now)
+                .set(RiskAction::getReviewConclusion, "DISMISSED")
+                .set(RiskAction::getReviewReason, normalized);
         }
         int updated = TenantHelper.ignore(() -> actionMapper.update(null, update));
         if (updated == 0) throw new ServiceException("仅生效中的处置可以解除");
@@ -162,25 +162,25 @@ public class RiskActionService {
         String normalizedConclusion = policy.requireConclusion(conclusion);
         String normalizedReason = policy.requireReason(reason);
         expireDue(tenantId);
-        DcsRiskAction current = requireActionForUpdate(tenantId, actionId);
+        RiskAction current = requireActionForUpdate(tenantId, actionId);
         if (!"PENDING".equals(current.getReviewStatus())) throw new ServiceException("该处置已经完成复核");
         Date now = new Date();
-        LambdaUpdateWrapper<DcsRiskAction> update = new LambdaUpdateWrapper<DcsRiskAction>()
-                .eq(DcsRiskAction::getTenantId, tenantId)
-                .eq(DcsRiskAction::getActionId, actionId)
-                .eq(DcsRiskAction::getReviewStatus, "PENDING")
-                .set(DcsRiskAction::getReviewStatus, normalizedConclusion)
-                .set(DcsRiskAction::getReviewedBy, operatorId)
-                .set(DcsRiskAction::getReviewedTime, now)
-                .set(DcsRiskAction::getReviewConclusion, normalizedConclusion)
-                .set(DcsRiskAction::getReviewReason, normalizedReason);
+        LambdaUpdateWrapper<RiskAction> update = new LambdaUpdateWrapper<RiskAction>()
+                .eq(RiskAction::getTenantId, tenantId)
+                .eq(RiskAction::getActionId, actionId)
+                .eq(RiskAction::getReviewStatus, "PENDING")
+                .set(RiskAction::getReviewStatus, normalizedConclusion)
+                .set(RiskAction::getReviewedBy, operatorId)
+                .set(RiskAction::getReviewedTime, now)
+                .set(RiskAction::getReviewConclusion, normalizedConclusion)
+                .set(RiskAction::getReviewReason, normalizedReason);
         if ("DISMISSED".equals(normalizedConclusion) && "ACTIVE".equals(current.getStatus())) {
             update
-                .eq(DcsRiskAction::getStatus, "ACTIVE")
-                .set(DcsRiskAction::getStatus, "RELEASED")
-                .set(DcsRiskAction::getReleasedBy, operatorId)
-                .set(DcsRiskAction::getReleasedTime, now)
-                .set(DcsRiskAction::getReleaseReason, normalizedReason);
+                .eq(RiskAction::getStatus, "ACTIVE")
+                .set(RiskAction::getStatus, "RELEASED")
+                .set(RiskAction::getReleasedBy, operatorId)
+                .set(RiskAction::getReleasedTime, now)
+                .set(RiskAction::getReleaseReason, normalizedReason);
         }
         int updated = TenantHelper.ignore(() -> actionMapper.update(null, update));
         if (updated == 0) throw new ServiceException("该处置已经完成复核");
@@ -278,29 +278,29 @@ public class RiskActionService {
         return rolloutProperties == null || rolloutProperties.isL34EnforcementEnabled();
     }
 
-    private DcsRiskAction active(String tenantId, Long userId, String actionType) {
+    private RiskAction active(String tenantId, Long userId, String actionType) {
         Date now = new Date();
-        return TenantHelper.ignore(() -> actionMapper.selectOne(new LambdaQueryWrapper<DcsRiskAction>()
-            .eq(DcsRiskAction::getTenantId, tenantId)
-            .eq(DcsRiskAction::getUserId, userId)
-            .eq(DcsRiskAction::getActionType, actionType)
-            .eq(DcsRiskAction::getStatus, "ACTIVE")
-            .gt(DcsRiskAction::getExpireTime, now)
+        return TenantHelper.ignore(() -> actionMapper.selectOne(new LambdaQueryWrapper<RiskAction>()
+            .eq(RiskAction::getTenantId, tenantId)
+            .eq(RiskAction::getUserId, userId)
+            .eq(RiskAction::getActionType, actionType)
+            .eq(RiskAction::getStatus, "ACTIVE")
+            .gt(RiskAction::getExpireTime, now)
             .last("LIMIT 1")));
     }
 
     private boolean manualDecisionSuppresses(String tenantId, RiskScoreService.RiskAssessment assessment,
                                              String actionType) {
         Date now = new Date();
-        DcsRiskAction decision = TenantHelper.ignore(() -> actionMapper.selectOne(
-            new LambdaQueryWrapper<DcsRiskAction>()
-                .eq(DcsRiskAction::getTenantId, tenantId)
-                .eq(DcsRiskAction::getUserId, assessment.userId())
-                .eq(DcsRiskAction::getActionType, actionType)
-                .gt(DcsRiskAction::getExpireTime, now)
-                .and(q -> q.eq(DcsRiskAction::getStatus, "RELEASED")
-                    .or().eq(DcsRiskAction::getReviewStatus, "DISMISSED"))
-                .orderByDesc(DcsRiskAction::getReleasedTime)
+        RiskAction decision = TenantHelper.ignore(() -> actionMapper.selectOne(
+            new LambdaQueryWrapper<RiskAction>()
+                .eq(RiskAction::getTenantId, tenantId)
+                .eq(RiskAction::getUserId, assessment.userId())
+                .eq(RiskAction::getActionType, actionType)
+                .gt(RiskAction::getExpireTime, now)
+                .and(q -> q.eq(RiskAction::getStatus, "RELEASED")
+                    .or().eq(RiskAction::getReviewStatus, "DISMISSED"))
+                .orderByDesc(RiskAction::getReleasedTime)
                 .last("LIMIT 1")));
         if (decision == null || !Objects.equals(decision.getSourceTrack(), assessment.sourceTrack())) return false;
         boolean suppressed = decision.getRiskScore() != null && decision.getRiskScore() >= assessment.totalScore();
@@ -314,29 +314,29 @@ public class RiskActionService {
     private void expireDue(String tenantId) {
         Date now = new Date();
         int expired = TenantHelper.ignore(() -> actionMapper.update(null,
-            new LambdaUpdateWrapper<DcsRiskAction>()
-                .eq(DcsRiskAction::getTenantId, tenantId)
-                .eq(DcsRiskAction::getStatus, "ACTIVE")
-                .le(DcsRiskAction::getExpireTime, now)
-                .set(DcsRiskAction::getStatus, "EXPIRED")));
+            new LambdaUpdateWrapper<RiskAction>()
+                .eq(RiskAction::getTenantId, tenantId)
+                .eq(RiskAction::getStatus, "ACTIVE")
+                .le(RiskAction::getExpireTime, now)
+                .set(RiskAction::getStatus, "EXPIRED")));
         if (expired > 0) log.info("[RiskAction] expired tenant={} count={}", tenantId, expired);
     }
 
-    private DcsRiskAction requireAction(String tenantId, Long actionId) {
+    private RiskAction requireAction(String tenantId, Long actionId) {
         if (actionId == null) throw new ServiceException("处置ID不能为空");
-        DcsRiskAction action = TenantHelper.ignore(() -> actionMapper.selectOne(new LambdaQueryWrapper<DcsRiskAction>()
-            .eq(DcsRiskAction::getTenantId, tenantId)
-            .eq(DcsRiskAction::getActionId, actionId)
+        RiskAction action = TenantHelper.ignore(() -> actionMapper.selectOne(new LambdaQueryWrapper<RiskAction>()
+            .eq(RiskAction::getTenantId, tenantId)
+            .eq(RiskAction::getActionId, actionId)
             .last("LIMIT 1")));
         if (action == null) throw new ServiceException("处置不存在或不属于当前租户");
         return action;
     }
 
-    private DcsRiskAction requireActionForUpdate(String tenantId, Long actionId) {
+    private RiskAction requireActionForUpdate(String tenantId, Long actionId) {
         if (actionId == null) throw new ServiceException("处置ID不能为空");
-        DcsRiskAction action = TenantHelper.ignore(() -> actionMapper.selectOne(new LambdaQueryWrapper<DcsRiskAction>()
-            .eq(DcsRiskAction::getTenantId, tenantId)
-            .eq(DcsRiskAction::getActionId, actionId)
+        RiskAction action = TenantHelper.ignore(() -> actionMapper.selectOne(new LambdaQueryWrapper<RiskAction>()
+            .eq(RiskAction::getTenantId, tenantId)
+            .eq(RiskAction::getActionId, actionId)
             .last("LIMIT 1 FOR UPDATE")));
         if (action == null) throw new ServiceException("处置不存在或不属于当前租户");
         return action;

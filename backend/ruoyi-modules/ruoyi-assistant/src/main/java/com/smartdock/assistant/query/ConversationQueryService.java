@@ -5,9 +5,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartdock.assistant.domain.gateway.RunStatusGateway;
 import com.smartdock.assistant.domain.model.AssistantTodoItem;
-import com.smartdock.assistant.domain.model.DcsAssistantCompaction;
-import com.smartdock.assistant.domain.model.DcsAssistantConversation;
-import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.AssistantCompaction;
+import com.smartdock.assistant.domain.model.AssistantConversation;
+import com.smartdock.assistant.domain.model.AssistantMessage;
 import com.smartdock.assistant.mapper.AssistantCompactionMapper;
 import com.smartdock.assistant.mapper.AssistantConversationMapper;
 import com.smartdock.assistant.mapper.AssistantMessageMapper;
@@ -47,13 +47,13 @@ public class ConversationQueryService {
      * （归档折叠条）；ALL=两者都列（会话页本地分组）。del_flag 兜底过滤（本表清理以物理删
      * 为主，软删行不出现）。
      */
-    public List<DcsAssistantConversation> listConversations(String tenantId, Long userId,
+    public List<AssistantConversation> listConversations(String tenantId, Long userId,
                                                             int limit, int offset, String status) {
         return conversationMapper.selectList(conversationQuery(tenantId, userId, status)
             // id 决胜（AU-19）：last_message_time 并列（PG DESC NULLS FIRST + 同秒多行）时
             // 排序不稳定，跨页会漂移——前端「加载更多」按页追加会漏行/重行
-            .orderByDesc(DcsAssistantConversation::getLastMessageTime)
-            .orderByDesc(DcsAssistantConversation::getId)
+            .orderByDesc(AssistantConversation::getLastMessageTime)
+            .orderByDesc(AssistantConversation::getId)
             .last("LIMIT " + limit + " OFFSET " + offset));
     }
 
@@ -68,7 +68,7 @@ public class ConversationQueryService {
      * RUNNING 的 thread 集合标"生成中"——刷新/重开后侧栏与列表仍能识别在途轮。
      * 无 RUNNING 行时一行都不改（保持 null，前端按 false 渲染）。
      */
-    public void markRunning(List<DcsAssistantConversation> rows, String tenantId, Long userId) {
+    public void markRunning(List<AssistantConversation> rows, String tenantId, Long userId) {
         if (rows == null || rows.isEmpty()) {
             return;
         }
@@ -76,13 +76,13 @@ public class ConversationQueryService {
         if (runningThreads.isEmpty()) {
             return;
         }
-        for (DcsAssistantConversation row : rows) {
+        for (AssistantConversation row : rows) {
             row.setRunning(runningThreads.contains(row.getThreadId()));
         }
     }
 
     /** 按 threadId 取会话（自动化通知深链数据源；不带归属过滤——调用方自判，见下方法） */
-    public DcsAssistantConversation conversationByThread(String tenantId, String threadId) {
+    public AssistantConversation conversationByThread(String tenantId, String threadId) {
         return conversationMapper.selectByThread(tenantId, threadId);
     }
 
@@ -90,18 +90,20 @@ public class ConversationQueryService {
      * 按 threadId 取本人会话（7B 从 {@code AssistantConversationController#byThread} 收进来）：
      * 不存在与异主一律返回 null——不区分，防探测（同 thread 首绑口径）；响应文案由调用方给。
      */
-    public DcsAssistantConversation conversationByThreadOwned(String tenantId, Long userId, String threadId) {
-        DcsAssistantConversation row = conversationMapper.selectByThread(tenantId, threadId);
-        if (row == null || !userId.equals(row.getUserId())) {
+    public AssistantConversation conversationByThreadOwned(String tenantId, Long userId, String threadId) {
+        AssistantConversation row = conversationMapper.selectByThread(tenantId, threadId);
+        // 批 9（2026-11-21，7B 登记 P2-2 修复）：userId 为空（登录态缺位）按无权处理返回 null，
+        // 不许 NPE 把 5xx 抛给用户——归属判定 fail-closed
+        if (row == null || userId == null || !userId.equals(row.getUserId())) {
             return null;
         }
         return row;
     }
 
     /** 历史消息（本人会话；E2 会话重建/独立会话页数据源） */
-    public List<DcsAssistantMessage> listMessages(String tenantId, Long userId, Long conversationId,
+    public List<AssistantMessage> listMessages(String tenantId, Long userId, Long conversationId,
                                                   int limit, int offset) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
+        AssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
         if (conv == null) {
             throw new ServiceException("会话不存在或无权访问", 403);
         }
@@ -110,13 +112,13 @@ public class ConversationQueryService {
 
     /** 尾页消息（最新 N 条，返回前反转回时间序）。批A 二审 P1：压缩后的历史重载/长会话
      *  打开必须取尾部——ASC 首页在 >100 条会话上会把最新回答与压缩分隔条截掉 */
-    public List<DcsAssistantMessage> listMessagesTail(String tenantId, Long userId, Long conversationId,
+    public List<AssistantMessage> listMessagesTail(String tenantId, Long userId, Long conversationId,
                                                        int limit) {
-        DcsAssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
+        AssistantConversation conv = conversationMapper.selectOwned(tenantId, conversationId, userId);
         if (conv == null) {
             throw new ServiceException("会话不存在或无权访问", 403);
         }
-        List<DcsAssistantMessage> rows =
+        List<AssistantMessage> rows =
             new ArrayList<>(messageMapper.selectPageOwnedDesc(tenantId, conversationId, userId, limit));
         Collections.reverse(rows);
         return rows;
@@ -125,7 +127,7 @@ public class ConversationQueryService {
     /** 本会话最新一条 assistant 消息（批5 Q7-3：前端 done 后拉追问建议）。
      *  批 7C-1（2026-11-20）从 legacy 会话服务搬入——消息写路径已迁 {@code service.MessageWriteService}，
      *  只读不再寄生在写服务上。 */
-    public DcsAssistantMessage latestAssistant(String tenantId, Long userId, Long conversationId) {
+    public AssistantMessage latestAssistant(String tenantId, Long userId, Long conversationId) {
         return messageMapper.selectLatestAssistant(tenantId, conversationId, userId);
     }
 
@@ -156,7 +158,7 @@ public class ConversationQueryService {
         if (count == 0) {
             return new CompactionBill(null, null, null, 0);
         }
-        DcsAssistantCompaction latest = compactionMapper.selectLatestByConversation(tenantId, conversationId);
+        AssistantCompaction latest = compactionMapper.selectLatestByConversation(tenantId, conversationId);
         if (latest == null) {
             return new CompactionBill(null, null, null, 0);
         }
@@ -171,11 +173,11 @@ public class ConversationQueryService {
     /**
      * 当前会话 TODO 清单（前端打开会话恢复分区；无清单返回空数组）。
      *
-     * <p>只读会话行的一个 JSON 列（{@code dcs_assistant_conversation.todo_items}）；
+     * <p>只读会话行的一个 JSON 列（{@code assistant_conversation.todo_items}）；
      * 写入侧在 {@code service.MessageWriteService#saveTodo}。批 7C-2 从 legacy 搬入。</p>
      */
     public List<AssistantTodoItem> todoOf(String tenantId, Long userId, String threadId) {
-        DcsAssistantConversation conv = conversationMapper.selectByThread(tenantId, threadId);
+        AssistantConversation conv = conversationMapper.selectByThread(tenantId, threadId);
         if (conv == null || !conv.getUserId().equals(userId)
             || conv.getTodoItems() == null || conv.getTodoItems().isBlank()) {
             return List.of();
@@ -198,16 +200,16 @@ public class ConversationQueryService {
      *  异常降级（WARN + 返回空表）与旧实现逐行一致。</p> */
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private LambdaQueryWrapper<DcsAssistantConversation> conversationQuery(String tenantId, Long userId, String status) {
+    private LambdaQueryWrapper<AssistantConversation> conversationQuery(String tenantId, Long userId, String status) {
         String safe = status == null ? "ACTIVE" : status.toUpperCase();
-        LambdaQueryWrapper<DcsAssistantConversation> q =
-            new LambdaQueryWrapper<DcsAssistantConversation>()
-                .eq(DcsAssistantConversation::getTenantId, tenantId)
-                .eq(DcsAssistantConversation::getUserId, userId)
-                .eq(DcsAssistantConversation::getDelFlag, "0");
+        LambdaQueryWrapper<AssistantConversation> q =
+            new LambdaQueryWrapper<AssistantConversation>()
+                .eq(AssistantConversation::getTenantId, tenantId)
+                .eq(AssistantConversation::getUserId, userId)
+                .eq(AssistantConversation::getDelFlag, "0");
         if (!"ALL".equals(safe)) {
             // ALL 之外一律按单值精确过滤（含非法值兜底 ACTIVE，controller 侧已 clamp）
-            q.eq(DcsAssistantConversation::getStatus, "ARCHIVED".equals(safe) ? "ARCHIVED" : "ACTIVE");
+            q.eq(AssistantConversation::getStatus, "ARCHIVED".equals(safe) ? "ARCHIVED" : "ACTIVE");
         }
         return q;
     }

@@ -12,7 +12,7 @@ import java.util.Map;
  *
  * <p>覆盖范围: @Async 方法、@TransactionalEventListener(AFTER_COMMIT + @Async)、
  * Spring 管理的 ThreadPoolTaskExecutor。Redis Stream consumer 是自建线程池(非 Spring
- * 管理), 需在 DcsStreamMqProducer/Consumer 手动把 traceId 塞进消息体再恢复 MDC。</p>
+ * 管理), 需在 MQ 生产者/消费者（批9 前名为 DcsStreamMqProducer/Consumer）手动把 traceId 塞进消息体再恢复 MDC。</p>
  *
  * @author smartdock
  */

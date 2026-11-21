@@ -138,8 +138,8 @@ class AguiAuthStatusFilterTest {
     @Test
     void nonAguiPathKeepsLegacyWrapContract() {
         // 回归护栏：非 /agui 路径的未登录响应维持全站 200+code401 包裹契约，过滤器不得外溢
-        ResponseEntity<String> unauth = rest.getForEntity("/dcs/assistant/status", String.class);
-        System.out.println("[批F-T1] 无 token /dcs/assistant/status -> HTTP "
+        ResponseEntity<String> unauth = rest.getForEntity("/assistant/status", String.class);
+        System.out.println("[批F-T1] 无 token /assistant/status -> HTTP "
             + unauth.getStatusCode().value() + " body.code=" + extractCode(unauth.getBody()));
         assertNotEquals(401, unauth.getStatusCode().value(),
             "非 /agui 路径不得改为真实 401（全站包裹契约不动——本过滤器只管 /agui/*）");

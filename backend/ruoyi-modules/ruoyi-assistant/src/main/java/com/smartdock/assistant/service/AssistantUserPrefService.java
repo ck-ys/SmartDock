@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.RequiredArgsConstructor;
 import org.dromara.common.core.exception.ServiceException;
 import org.springframework.stereotype.Service;
-import com.smartdock.assistant.domain.model.DcsAssistantUserPref;
+import com.smartdock.assistant.domain.model.AssistantUserPref;
 import com.smartdock.assistant.domain.bo.AssistantUserPrefBo;
 import com.smartdock.assistant.domain.vo.AssistantUserPrefVo;
 import com.smartdock.assistant.mapper.AssistantUserPrefMapper;
@@ -39,7 +39,7 @@ public class AssistantUserPrefService {
 
     /** 读本人偏好；缺行=默认值，saved=false */
     public AssistantUserPrefVo load(String tenantId, Long userId) {
-        DcsAssistantUserPref row = mapper.selectOwn(tenantId, userId);
+        AssistantUserPref row = mapper.selectOwn(tenantId, userId);
         AssistantUserPrefVo vo = new AssistantUserPrefVo();
         if (row == null) {
             vo.setSaved(false);

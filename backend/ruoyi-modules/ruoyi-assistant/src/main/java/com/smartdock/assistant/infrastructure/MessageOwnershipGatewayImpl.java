@@ -1,7 +1,7 @@
 package com.smartdock.assistant.infrastructure;
 
 import com.smartdock.assistant.domain.gateway.MessageOwnershipGateway;
-import com.smartdock.assistant.domain.model.DcsAssistantMessage;
+import com.smartdock.assistant.domain.model.AssistantMessage;
 import com.smartdock.assistant.mapper.AssistantMessageMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -25,7 +25,7 @@ public class MessageOwnershipGatewayImpl implements MessageOwnershipGateway {
         if (messageId == null) {
             return false;
         }
-        DcsAssistantMessage msg = messageMapper.selectById(messageId);
+        AssistantMessage msg = messageMapper.selectById(messageId);
         return msg != null
             && Objects.equals(msg.getTenantId(), tenantId)
             && Objects.equals(msg.getUserId(), userId);

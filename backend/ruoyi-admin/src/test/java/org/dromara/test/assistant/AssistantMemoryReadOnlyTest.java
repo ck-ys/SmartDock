@@ -1,6 +1,6 @@
 package org.dromara.test.assistant;
 
-import com.smartdock.assistant.domain.model.DcsAssistantMemory;
+import com.smartdock.assistant.domain.model.AssistantMemory;
 import com.smartdock.assistant.mapper.AssistantMemoryMapper;
 import com.smartdock.assistant.mapper.AssistantMemoryPrefMapper;
 import com.smartdock.assistant.service.AssistantMemoryService;
@@ -44,7 +44,7 @@ class AssistantMemoryReadOnlyTest {
         AssistantMemoryService service = new AssistantMemoryService(memoryMapper, prefMapper, piiFilter);
 
         when(prefMapper.selectOwn("000000", 7L)).thenReturn(null); // 缺行=本人开关默认开
-        DcsAssistantMemory row = new DcsAssistantMemory();
+        AssistantMemory row = new AssistantMemory();
         row.setId(99L);
         row.setContent("以后叫我老王");
         when(memoryMapper.listByUserStatus("000000", 7L, AssistantMemoryFacts.ST_ACTIVE))

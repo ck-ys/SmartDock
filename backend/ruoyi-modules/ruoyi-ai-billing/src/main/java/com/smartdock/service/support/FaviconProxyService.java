@@ -43,7 +43,7 @@ public class FaviconProxyService {
         if (host == null || host.length() > 253 || !HOST_PATTERN.matcher(host).matches()) {
             return null;
         }
-        String key = "dcs:favicon:" + host;
+        String key = "smartdock:favicon:" + host;
         // 缓存读放 try 内（三审 P2）：Redis 抖动按 miss 处理继续出网，不让缓存故障放大成 500
         try {
             String cached = RedisUtils.getCacheObject(key);

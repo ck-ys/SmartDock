@@ -22,7 +22,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.dcs_assistant_conversation_title_bak_20261030 AS
 SELECT id, tenant_id, thread_id, title, update_time
-  FROM public.dcs_assistant_conversation
+  FROM public.assistant_conversation
  WHERE title IS NOT NULL
    AND (btrim(title) LIKE '{"%'
         OR btrim(title) LIKE '[{%'
@@ -30,7 +30,7 @@ SELECT id, tenant_id, thread_id, title, update_time
 
 INSERT INTO public.dcs_assistant_conversation_title_bak_20261030 (id, tenant_id, thread_id, title, update_time)
 SELECT c.id, c.tenant_id, c.thread_id, c.title, c.update_time
-  FROM public.dcs_assistant_conversation c
+  FROM public.assistant_conversation c
  WHERE c.title IS NOT NULL
    AND (btrim(c.title) LIKE '{"%'
         OR btrim(c.title) LIKE '[{%'
@@ -41,7 +41,7 @@ SELECT c.id, c.tenant_id, c.thread_id, c.title, c.update_time
           WHERE b.id = c.id
             AND b.title IS NOT DISTINCT FROM c.title);
 
-UPDATE public.dcs_assistant_conversation
+UPDATE public.assistant_conversation
    SET title = NULL
  WHERE title IS NOT NULL
    AND (btrim(title) LIKE '{"%'
