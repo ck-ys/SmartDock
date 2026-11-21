@@ -86,15 +86,19 @@
 | 自定义分析 | 11 种维度 × 4 种指标（浏览量/人数/会话数/事件数）自由组合 |
 | 实时看板 | 最近 5 分钟事件流与活跃用户 |
 
-演示数据：前后端启动后执行 `backend/script/demo/seed-analytics-demo.js`（管理员
-账号经 CSV 导入端点写入，**同一天内**可重复执行、按 eventUid 幂等，跨天重跑会生成
-一批新事件；目标环境需关闭验证码），再点「重建汇总」。
+演示数据：前后端启动后执行 `backend/script/demo/seed-internal-ops-demo.js --days 30`
+（内部协作故事口径：4 个真实用户 30 天的登录/发布/提交/审核；uid 前缀 `demo-io-`，
+**同一天内**可重复执行、按 eventUid 幂等；跨天或换 `--days` 重播前，先按 `demo-io-`
+前缀清掉旧演示事件再重跑——uid 同、内容会漂），再点「数据分析 → 重建汇总」。
 业务系统接入走事件协议（`ProfileEventPublisher`），离线数据走「数据导入 → CSV 补录」。
 
 ## 5. 管理员进阶配置
 
 - **AI 供应商**：「系统 → AI 配置」录入各供应商 base_url + API Key（装好系统后第一步），
   再维护模型价格与积分套餐；
+- **更新日志**：菜单「更新日志」，数据库驱动（`dcs_changelog`）。超管可写：先存草稿，
+  点「发布」才对外可见并通知目标租户的管理员；已发布版本再编辑只补发新增租户、不重复打扰。
+  普通角色只读「已发布且名单含本租户」的版本；
 - **文件安全**：OSS 上传自动过守卫（宏/伪装/敏感词），待审件进「文件审核」队列；
   白名单/类目豁免在风控中心配置；
 - **通知幂等**：业务通知带 dedup_key，重复事件不会给用户刷屏；
@@ -104,7 +108,7 @@
 
 **是什么**：助手对话里可以调用外部 MCP（Model Context Protocol）服务的工具；
 `backend/mcp-demo/weather-server.mjs` 是内置演示服务（查天气 + 反问补城市），零 npm 依赖，
-需 node ≥ 18，STDIO 传输。
+需 node ≥ 18，STDIO 传输（以子进程的标准输入输出通信）。
 
 **服务端配置项**（application.yml，均有默认值）：
 
@@ -112,7 +116,7 @@
 |------|------|------|
 | `smartdock.mcp.allowed-dirs` | 空（禁用 STDIO 注册） | STDIO 脚本允许目录（绝对路径，逗号分隔，防目录穿越） |
 | `smartdock.mcp.allowed-http-hosts` | `localhost,127.0.0.1` | HTTP 传输 host 白名单 |
-| `smartdock.mcp.elicit-timeout-seconds` | 300 | 工具反问的答题等待上限（60–540 钳位） |
+| `smartdock.mcp.elicit-timeout-seconds` | 300 | 工具反问的答题等待上限（60–540，钳位=超范围按边界截取） |
 | `smartdock.mcp.tool-budget-seconds` | 120 | 单次工具调用自身预算（不含答题） |
 
 **注册步骤**（管理台 → AI 助手 → AI 助手管理 → 外部工具页签）：

@@ -27,7 +27,7 @@ public AguiAgentRegistryCustomizer dcsAssistantAgentRegistryCustomizer() {
 | 创建时机 | 首个请求线程按登录租户惰性创建；未配置模型的租户收到 `AiNotConfiguredException`，不做静默降级 |
 | 实例粒度 | 每次新会话（`userId + threadId`）新建实例，配合 `AssistantRuntimeContextResolver` 的租户作用域实现会话隔离 |
 | 共享能力 | 工具注册、权限上下文、记忆、技能、PII、计费、AGUI 事件、状态存储由引擎统一提供 |
-| 多 agent | 一个运行时可注册多个工厂，共用租户、供应商配置与计费账本；协同编排（handoff/团队）需在工厂层自行实现 |
+| 多 agent | 一个运行时可注册多个工厂，共用租户、供应商配置与计费账本；协同编排（handoff/团队：一个智能体把任务移交给另一个、或组队分工的玩法）需在工厂层自行实现 |
 
 ## 2. ReActAgent 装配
 
@@ -100,9 +100,9 @@ ReActAgent agent = ReActAgent.builder()
 
 ## 4. 技能与提示词资产
 
-**技能库（渐进披露，B 批起官方框架装载）**：
+**技能库（渐进披露：先只给一句话摘要，模型判断用得上再取全文；B 批起官方框架装载）**：
 
-- 技能资产为官方 **SKILL.md 格式**：`resources/skills/<技能名>/SKILL.md`，YAML frontmatter（`name/description/version/displayName/minRole`）+ 正文；**frontmatter 的一句话说明（description）是模型判断什么时候用这个技能的唯一依据**（旧的 triggers 触发词机制已于 2026-10-28 移除，写了也不认）；
+- 技能资产为官方 **SKILL.md 格式**：`resources/skills/<技能名>/SKILL.md`，YAML frontmatter（文件头部用 YAML 写的元数据区：`name/description/version/displayName/minRole`）+ 正文；**frontmatter 的一句话说明（description）是模型判断什么时候用这个技能的唯一依据**（旧的 triggers 触发词机制已于 2026-10-28 移除，写了也不认）；
 - 装载走官方 **AgentSkillRepository 分层仓**（`AssistantSkillSource`）：classpath `/skills`（内置）→ `config/skills/<技能名>/SKILL.md`（部署期覆写/增删，后层同名胜出）→ **数据库在线层**（管理台「能力 → 技能库」直接编辑，最高优先级；2026-10-28 起）；旧 `config/prompts/skills/*.md` 平铺覆写路径已废弃；
 - 系统提示词的技能目录段由官方 **DynamicSkillMiddleware** 每次调用动态重组（我们子类 `AssistantSkillGateMiddleware` 管可见性）；
 - 正文进入上下文的三条路都过同一道闸（frontmatter `minRole` + 租户工具开关矩阵 `skill:<技能名>` 行，off=剔除、member/admin=只升不降；**停用的技能对所有角色整技能遮罩，超管也不可见**）：模型调官方 `load_skill_through_path` 自取、用户当轮选中注入（`SkillInjectModelDecorator`）、`view_skill` 工具兜底自取；

@@ -43,7 +43,7 @@
   select 族带 `options` 数组，`required` 为 0/1。
 - `dcs_submission`：提交。同一 (task, user) 多行即**多版本**（version 递增），
   `status ∈ {PENDING_AUDIT, APPROVED, REJECTED}`；`data` JSONB 存字段值。
-- `dcs_notice`：站内通知。`dedup_key` + 部分唯一索引（`uk_dcs_notice_dedup`）实现幂等投递。
+- `dcs_notice`：站内通知。`dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束；`uk_dcs_notice_dedup`）实现幂等投递。
 
 ### 2.2 状态机与关键不变量
 

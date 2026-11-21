@@ -30,10 +30,12 @@ docker compose up -d --build
 | 服务 | 镜像 | 说明 |
 |---|---|---|
 | postgres | postgres:17-alpine | 首次启动自动执行 `../backend/script/sql/baseline/`（01→07 依序，含 05 演示数据；不需要时在首次启动前移出该文件）|
-| redis | redis:7-alpine | 会话/幂等/限流，AOF 开启 |
+| redis | redis:7-alpine | 会话/幂等/限流，AOF 开启（AOF：Redis 的追加式持久化文件，重启不丢已写入数据）|
 | minio | quay.io/minio（钉版）| 附件对象存储；9000 API / 9001 管理台（仅本机回环）|
 | backend | 自建（JDK21）| 8080；数据源/Redis 全走环境变量注入 |
-| frontend | nginx:1.27-alpine | 80；等保加固头 + 登录限流 + SSE 直通代理 |
+| frontend | nginx:1.27-alpine | 80；等保（网络安全等级保护测评的安全加固口径）加固头 + 登录限流 + SSE 直通代理 |
+
+> 仓里的 `backend/script/docker/` 是上游 RuoYi 遗留的 MySQL 旧栈（`image: mysql:8.0.42`），与本仓 PostgreSQL 口径不符——**勿用**；一键起栈只认本目录 `deploy/`。
 
 PostgreSQL/Redis 默认口令为 `changeit`，MinIO 为 `minioadmin`，请用环境变量覆盖：
 
@@ -69,7 +71,7 @@ docker compose up -d
 2. **每台实例 id 唯一**：`DCS_ASSISTANT_INSTANCE_ID=backend-a` / `backend-b`（或用默认的
    `hostname:pid:随机码`）。同一个 id 起两个进程会被启动校验拒绝——否则两边都认
    「owner 是我」，互相收掉对方的活 run。
-3. **入口按会话粘性分流**：nginx 必须按 `X-Thread-Id` 做一致性哈希，并把
+3. **入口按会话粘性分流**：nginx 必须按 `X-Thread-Id` 做一致性哈希（同一会话固定落到同一台机器的分流算法），并把
    `DCS_ASSISTANT_STICKY_REQUIRE_HEADER=true` 打开（缺头直接 400，避免静默落错机）：
 
    ```nginx
@@ -119,5 +121,5 @@ docker compose up -d
 
 ```bash
 docker compose ps                    # postgres/redis/minio 各自的 healthcheck 状态
-docker logs -f smartdock-backend --tail 200   # 后端无独立探针, 看启动日志与 GC/异常
+docker logs -f smartdock-backend --tail 200   # 后端无独立探针, 看启动日志与 GC（垃圾回收）/异常
 ```

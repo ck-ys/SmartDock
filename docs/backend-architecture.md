@@ -464,7 +464,7 @@ flowchart LR
 | 只有 `COLLECTING` 期成员可提交 | 任务关闭后提交接口拒绝 |
 | 同一 (task, user) 已有 `PENDING_AUDIT`/`APPROVED` 时不可重复提交 | 退回后重提生成新版本，旧版本只读保留 |
 | 审核用 CAS | `WHERE status='PENDING_AUDIT'` 条件更新，防双审 |
-| 通知幂等 | `dedup_key` + 部分唯一索引 `uk_dcs_notice_dedup` |
+| 通知幂等 | `dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束）`uk_dcs_notice_dedup` |
 | 审计只追加 | `dcs_audit` append-only，`trail` 按提交聚合回放 |
 
 #### 4.3.3 主流程：发布 → 提交 → 审核
@@ -607,7 +607,7 @@ sequenceDiagram
 | `AiBillingService` | `recordTransactional` | 幂等回查 → 取生效价格 → 算价 → 同事务扣钱包 → 插 `dcs_ai_usage` |
 | 同上 | `recordTransactionalCredits` | 积分模式：同事务扣积分，钱包不动，快照标 `walletDeducted:false` |
 | `TenantWalletService` | `deductForAiUsageJoinTx` | 条件 UPDATE "足额才扣"，写流水；余额不足只留痕不阻断 |
-| `DcsAiCreditServiceImpl` | `preGate` / `deduct` | 订阅/周池/加油包夹逼扣减；幂等流水 |
+| `DcsAiCreditServiceImpl` | `preGate` / `deduct` | 订阅/周池/加油包夹逼扣减（两个上限口径取更紧的那个，两头都够才扣）；幂等流水 |
 | `AiBillingCalculator` | `calculate` | 纯计算：token/次数计费、服务费、币种、账单快照 |
 | `WalletReconcileJob` | `reconcile` | 每晚 02:30 对账（余额 vs 流水净额、流水链、空 biz_id、助手计费），只告警不动账 |
 
@@ -1073,15 +1073,14 @@ flowchart LR
 ```mermaid
 stateDiagram-v2
   [*] --> RUNNING: resolver 登记 run + 落 user 消息
-  RUNNING --> DONE: 正常结束
-  RUNNING --> FAILED: 模型/工具错误
-  RUNNING --> WAITING: 工具要人工确认（HITL）
-  WAITING --> RUNNING: 下一次 /agui/run 带 resume
-  RUNNING --> STALLED: 60 秒零事件 / 10 分钟停滞
-  STALLED --> DONE: 收割器收尾 + 退回合
+  RUNNING --> COMPLETED: 正常结束（条件 UPDATE）
+  RUNNING --> FAILED: 模型/工具错误（原因码落 run_issue）
+  RUNNING --> INTERRUPTED: 用户停止 / 断连 / 卡死被收割
+  note right of RUNNING: 等人工确认（HITL）仍是 RUNNING，仅收割豁免
+  note right of INTERRUPTED: 卡死=收割产生（60秒零事件/10分钟停滞）
 ```
 
-> 状态名以 `DcsAssistantRun` 的枚举为准，上图用白话表示语义。
+> 真实状态只有四个：`RUNNING / COMPLETED / FAILED / INTERRUPTED`（`dcs_assistant_run.status`，String 不是枚举）。等人工确认不是 WAITING 态——run 仍是 RUNNING、只做收割豁免；「卡死」也不是独立态——收割器把停滞 run 直接迁成 INTERRUPTED。
 
 关键类：
 
@@ -1484,7 +1483,7 @@ AutomationRunner.run
 - **前端构建产物与 CDN 部署**：本文只查后端。
 - **SnailJob 服务端的调度元数据**：由独立服务维护，本仓无 DDL。
 - **模型供应商的真实计费口径**：只查本仓落账逻辑，不验证供应商账单。
-- **多实例网络分区/脑裂**：只查粘性路由和 `owner_instance` 代码路径，未做故障注入。
+- **多实例网络分区/脑裂**（脑裂：实例间失联后各自以为只有自己在干活）：只查粘性路由和 `owner_instance` 代码路径，未做故障注入。
 
 ---
 

@@ -19,7 +19,7 @@
 | `profile_recalc_batch` | 批量重算批次 | `status`、`total_subjects`、`done_subjects`、`last_subject_id`、`error_msg` |
 | `profile_score_snapshot` | 版本化快照 | `total_score`、`dimension_detail(jsonb)`、`rule_version`、`prev_snapshot_id`、`calc_time` |
 | `profile_score_model` / `profile_model_run` / `profile_model_snapshot` | 通用评分模型（RFM 只是预设；按 `subject_type` 分套） | `model_config(jsonb)`、分箱/权重、模型快照链 |
-| `profile_segment` / `profile_segment_member` / `profile_segment_run` | 标签分群 | 规则 DSL、静态名单、成员快照、运行记录 |
+| `profile_segment` / `profile_segment_member` / `profile_segment_run` | 标签分群 | 规则 DSL（用配置表达式描述规则的专用小语言）、静态名单、成员快照、运行记录 |
 | `profile_review_queue` | 低分复核队列 | 触发来源、分数、状态、确认/忽略人 |
 | `profile_engine_config` | 按业务源的引擎开关 | 自动重算、复核、去抖窗口 |
 | `analytics_session` / `analytics_daily` | 行为分析：会话与日汇总 | 访客、渠道、设备、地域、PV/UV/访问次数、跳出 |
@@ -116,7 +116,7 @@ public class OrderEventReporter {
 | 模型管理 | 新建/复制/启停/删除；内置模型不可删，可改分箱与权重 |
 | 运行与快照 | 每次运行写 `profile_model_run` 与逐主体 `profile_model_snapshot`，`prev_snapshot_id` 串趋势 |
 | 分箱 | `fixed`（固定边界）或 `percentile`（分位点）；方向 `higher` / `lower` |
-| RFM 预设 | R/F/M 三维 × 2 分位 = 8 个中文分层（重要价值客户、一般保持客户……），另附高/中/低价值兜底 |
+| RFM 预设 | R/F/M（最近一次消费 Recency / 消费频率 Frequency / 消费金额 Monetary）三维 × 2 分位 = 8 个中文分层（重要价值客户、一般保持客户……），另附高/中/低价值兜底 |
 | 自动重算 | 新事件写入后按 `profile_engine_config.debounce_ms` 合并触发，同主体只算一次 |
 
 画像 RFM 页面提供分层分布、维度质量、平均标准分趋势、主体明细和模型配置编辑。

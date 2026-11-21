@@ -124,7 +124,7 @@ sequenceDiagram
 | 顺序 | 做什么 | 为什么 |
 |---:|---|---|
 | 1 | 引入 `virtual:uno.css`、Element Plus 暗色变量、`@/assets/styles/index.scss` | 全局样式底座 |
-| 2 | `applyInitialSkin()` | 在 `createApp` 前定 `html[data-skin]`，避免首帧先按 T1 渲染再跳皮肤 |
+| 2 | `applyInitialSkin()` | 在 `createApp` 前定 `html[data-skin]`，避免首帧先按 T1（默认皮肤，另一套是 T7；见 §10 theme-framed.scss）渲染再跳皮肤 |
 | 3 | 引入 `App.vue`、`store`、`router` | 应用入口 |
 | 4 | 注册指令 `./directive` | `copyText`/`hasPermi`/`hasRoles` |
 | 5 | 注册全局插件 `./plugins/index` | `$tab`/`$modal`/`$cache`/`$download`/`$auth`/`useDict`/`getConfigKey`/`parseTime`/`handleTree`/`animate` |
@@ -391,7 +391,7 @@ sequenceDiagram
 | 文件 | 用途 | 传输 | 关键行为 |
 |---|---|---|---|
 | `utils/sse.ts` | **通知推送**（不是对话） | `EventSource` / `useEventSource` | URL 带 `Authorization` + `clientid`；解析 `{event,data}`；`DCS_NOTIFY` 去重后进 notice store；自动重连 5 次/5s |
-| `api/dcs/assistant/aguiClient.ts` | **AI 对话** | `fetch` POST + 手写 SSE 帧解析 | `POST /agui/run/dcs-assistant`；`Accept: text/event-stream`；`X-Thread-Id`；指数退避重试；600s 停滞看门狗；`attach()` 续看 |
+| `api/dcs/assistant/aguiClient.ts` | **AI 对话** | `fetch` POST + 手写 SSE 帧解析 | `POST /agui/run/dcs-assistant`；`Accept: text/event-stream`；`X-Thread-Id`；指数退避重试（每次重试等待时间翻倍）；600s 停滞看门狗；`attach()` 续看 |
 
 挂载点：`layout/index.vue` 的 `onMounted` 里 `initSSE(BASE_URL + '/resource/sse')`；AGUI 由助手组件按需发起。
 
