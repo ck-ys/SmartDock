@@ -7,6 +7,8 @@
 
 ![智能体请求链路](images/ai-flow.svg)
 
+[这张图看不清？放大查看 →](diagrams.html#ai-flow)
+
 ## 1. 多智能体注册模型
 
 agent 不是硬编码单例，而是注册表中的工厂。starter 通过 `ObjectProvider` 收集所有

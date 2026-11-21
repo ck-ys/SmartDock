@@ -4,11 +4,13 @@
 
 > **想按代码层级逐层读**：见 [后端架构详解](backend-architecture.md)（构建层级/四层分包/逐域业务接口/智能体全链路，含核心类与方法表）与 [前端架构详解](frontend-architecture.md)（启动链/动态路由与权限/请求层/助手三宿主与 AGUI 事件消费）。本篇保留模块级总览，作为两份详解的索引与交叉对照；冲突时以详解里的 `file:line` 证据为准。
 >
-> **想要带流程图和清单的网页版**：[后端开发手册](backend-dev-manual.html)（12 章 · 26 张流程图）与 [前端开发手册](frontend-dev-manual.html)（13 章 · 17 张流程图），可直接在浏览器打开；图里的文字可选中复制，较宽的图点一下可放大。
+> **想要带流程图和清单的网页版**：[后端开发手册](backend-dev-manual.html)（12 章 · 34 张图）与 [前端开发手册](frontend-dev-manual.html)（13 章 · 20 张图），可直接在浏览器打开；图里的文字可选中复制，较宽的图点一下可放大。
 
 ## 1. 全局分层
 
 ![SmartDock 技术架构](images/architecture.svg)
+
+[这张图看不清？放大查看 →](diagrams.html#architecture)
 
 上图是模块级视图（两条引擎 + 内置 demo + 平台件 + 数据与外部服务）；[README](../README.md)
 里的简版架构图（`images/architecture-overview.svg`）只画主干，读代码时以这张为准。
@@ -48,6 +50,8 @@
 ### 2.2 状态机与关键不变量
 
 ![内置 demo：任务与提交状态机](images/business-flow.svg)
+
+[这张图看不清？放大查看 →](diagrams.html#business-flow)
 
 下面是同一套状态机的文字版（精确迁移条件以代码为准）：
 

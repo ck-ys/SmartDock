@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>架构图册 · SmartDock</title>
+<meta name="description" content="SmartDock 的架构与流程图合集：技术架构、内置 demo 状态机、智能体请求链路、画像事件流水线。点任意一张放大查看细节。">
+<link rel="icon" href="images/brand-mark.svg" type="image/svg+xml">
+<style>
+/* 架构图册页 — 复用开发手册的设计令牌（纸白底、墨色字、单一业务蓝、1px 静边框） */
+:root{
+  --paper:#fbfbfa; --surface:#fff; --surface-2:#f5f7fa;
+  --ink:#1e2a38; --ink-2:#334155; --muted:#64748b; --faint:#94a3b8;
+  --line:#e3e7ee; --line-strong:#cfd8e3;
+  --accent:#2f6feb; --accent-ink:#1d4ed8; --accent-soft:#eef4ff;
+  --code-bg:#f6f8fb; --radius:8px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC","Noto Sans SC","Hiragino Sans GB",sans-serif;
+  --mono:"Cascadia Code","JetBrains Mono","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.75 var(--font);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--accent-ink);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+code{font-family:var(--mono);background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:.08em .35em;font-size:.88em;color:var(--ink-2)}
+
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+
+/* 页头 */
+.top{padding:40px 0 26px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.top .kick{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:0 0 8px}
+.top h1{font-size:27px;line-height:1.3;margin:0 0 10px;letter-spacing:-.01em}
+.top p{margin:0;color:var(--muted);max-width:72ch}
+.top .back{margin-top:14px;font-size:13px}
+
+/* 卡片网格 */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 32px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 4px 14px rgba(30,42,56,.07)}
+/* 键盘 Tab 聚焦时才亮圈；鼠标点过不留「选中」错觉（:has(:focus-visible) 只在真键盘焦点时成立） */
+.card:has(:focus-visible){border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+/* 从 Markdown 深链过来时，落点卡片亮一下边框，省得在四张图里找 */
+.card:target{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.thumb{display:block;width:100%;height:224px;background:var(--surface-2);border:0;border-bottom:1px solid var(--line);padding:0;margin:0;cursor:zoom-in;position:relative;overflow:hidden}
+.thumb img{display:block;width:100%;height:100%;object-fit:contain;padding:10px}
+/* 点过之后浏览器会留一圈黑 outline（UA 默认），看着像「已选中」而不是「刚点过」；
+   键盘 Tab 过来时仍要有可见焦点，所以只接管鼠标态 */
+.thumb:focus{outline:none}
+.thumb:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.meta .open:focus{outline:none}
+.meta .open:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+.meta{padding:12px 14px 14px}
+.meta h2{font-size:15px;margin:0 0 4px;letter-spacing:-.005em}
+.meta .dim{font-size:11.5px;color:var(--faint);font-family:var(--mono);margin:0 0 8px}
+.meta p{margin:0;font-size:13px;color:var(--muted);line-height:1.6}
+.meta .open{display:inline-block;margin-top:9px;font-size:12.5px;font-weight:600;color:var(--accent-ink);background:none;border:0;padding:0;cursor:zoom-in;font-family:inherit}
+.meta .open:hover{text-decoration:underline;text-underline-offset:3px}
+
+/* 页脚 */
+.foot{border-top:1px solid var(--line);padding:18px 0 48px;font-size:12.5px;color:var(--faint)}
+.foot p{margin:0 0 6px}
+.foot code{font-size:11.5px}
+
+/* 放大层 */
+.zoom{position:fixed;inset:0;z-index:100;display:none;background:rgba(16,21,28,.96);padding:20px;flex-direction:column}
+.zoom.open{display:flex}
+.zoom-stage{flex:1;overflow:auto;background:var(--surface);border-radius:var(--radius);display:flex;align-items:flex-start;justify-content:center;padding:16px}
+.zoom-stage object{display:block;flex:0 0 auto}
+.zoom-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 0 4px;flex-wrap:wrap}
+.zoom-bar button{font:inherit;font-size:12.5px;padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#dbe3ec;cursor:pointer;transition:.14s}
+.zoom-bar button:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.4)}
+.zoom-bar button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.zoom-bar .znum{font-family:var(--mono);font-size:12px;color:#94a3b8;margin-left:6px;min-width:44px;text-align:center}
+.zoom-close{position:absolute;top:22px;right:24px;z-index:2;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(16,21,28,.82);color:#f1f5f9;font-size:19px;line-height:1;cursor:pointer;transition:.14s;backdrop-filter:blur(2px)}
+.zoom-close:hover{background:rgba(16,21,28,.95);border-color:rgba(255,255,255,.55)}
+.zoom-cap{margin:0;padding:0 0 6px;text-align:center;font-size:12px;color:#94a3b8;font-family:var(--mono)}
+body.lb-open{overflow:hidden}
+
+/* 手机档 */
+@media (max-width:760px){
+  .top h1{font-size:22px}
+  .grid{grid-template-columns:1fr;gap:14px}
+  .thumb{height:172px}
+  .zoom{padding:10px}
+  .zoom-stage{padding:8px}
+}
+
+/* 打印：放大层隐藏、缩略图全显 */
+@media print{
+  .zoom{display:none!important}
+  .card:hover{transform:none;box-shadow:none}
+  .thumb{cursor:default}
+}
+
+/* 减少动效偏好 */
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.01ms!important;animation-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <p class="kick">SmartDock · 架构图册</p>
+  <h1>架构图册</h1>
+  <p>架构与流程图的完整尺寸版本。Gitee 上的 Markdown 正文宽度有限，图会缩到看不清细节——点任意一张在这里按原始尺寸查看，可放大到 200%。</p>
+  <p class="back"><a href="../README.md">← 回到 README</a> · <a href="backend-dev-manual.html">后端开发手册</a> · <a href="frontend-dev-manual.html">前端开发手册</a></p>
+</header>
+
+<main class="grid" id="grid">
+  <article class="card" id="architecture">
+    <button class="thumb" type="button" data-src="images/architecture.svg" data-w="1240" data-h="940" data-name="技术架构" aria-label="放大查看：技术架构">
+      <img src="images/architecture.svg" alt="SmartDock 技术架构：Vue 3.5 SPA、画像与分析、AI 助手、任务中心、文件安全、系统管理六块" loading="eager">
+    </button>
+    <div class="meta">
+      <h2>技术架构</h2>
+      <p class="dim">1240 × 940 · 分层与依赖方向</p>
+      <p>两个可独立复用的引擎 + 一个内置 demo，同进程分层，不引入额外中间件。</p>
+      <button class="open" type="button" data-src="images/architecture.svg" data-w="1240" data-h="940" data-name="技术架构">放大查看 →</button>
+    </div>
+  </article>
+
+  <article class="card" id="business-flow">
+    <button class="thumb" type="button" data-src="images/business-flow.svg" data-w="1240" data-h="720" data-name="内置 demo 任务与提交状态机" aria-label="放大查看：内置 demo 任务与提交状态机">
+      <img src="images/business-flow.svg" alt="内置 demo 的任务与提交状态机：task 与 submission 两张表的生命周期" loading="eager">
+    </button>
+    <div class="meta">
+      <h2>内置 demo：任务与提交状态机</h2>
+      <p class="dim">1240 × 720 · 任务生命周期</p>
+      <p>一条刻意做小的业务主线：既给画像引擎供事件，也给智能体供工具。</p>
+      <button class="open" type="button" data-src="images/business-flow.svg" data-w="1240" data-h="720" data-name="内置 demo 任务与提交状态机">放大查看 →</button>
+    </div>
+  </article>
+
+  <article class="card" id="ai-flow">
+    <button class="thumb" type="button" data-src="images/ai-flow.svg" data-w="1240" data-h="890" data-name="智能体请求链路" aria-label="放大查看：智能体请求链路">
+      <img src="images/ai-flow.svg" alt="智能体运行时一次请求的完整链路：Composer、AGUI、AgentScope、工具循环、SSE 回传" loading="eager">
+    </button>
+    <div class="meta">
+      <h2>智能体请求链路</h2>
+      <p class="dim">1240 × 890 · 一次请求全程</p>
+      <p>从输入框到模型回复：鉴权、装配、工具循环、流式回传各自在哪一层。</p>
+      <button class="open" type="button" data-src="images/ai-flow.svg" data-w="1240" data-h="890" data-name="智能体请求链路">放大查看 →</button>
+    </div>
+  </article>
+
+  <article class="card" id="profile-flow">
+    <button class="thumb" type="button" data-src="images/profile-flow.svg" data-w="1240" data-h="730" data-name="用户画像事件流水线" aria-label="放大查看：用户画像事件流水线">
+      <img src="images/profile-flow.svg" alt="用户画像事件流水线：业务动作发事件、profile_event 落库、指标计算、评分快照" loading="eager">
+    </button>
+    <div class="meta">
+      <h2>用户画像：事件 → 指标 → 快照</h2>
+      <p class="dim">1240 × 730 · 事件到快照</p>
+      <p>业务动作只负责发事件；评分规则、窗口与缺失策略全部配置化，接入新系统不改评分链路。</p>
+      <button class="open" type="button" data-src="images/profile-flow.svg" data-w="1240" data-h="730" data-name="用户画像事件流水线">放大查看 →</button>
+    </div>
+  </article>
+</main>
+
+<footer class="foot">
+  <p>收录清单：<code>architecture.svg</code>、<code>business-flow.svg</code>、<code>ai-flow.svg</code>、<code>profile-flow.svg</code>。这些图同时被 <code>architecture.md</code>、<code>agent-engine.md</code>、<code>profile-engine.md</code> 引用——Markdown 里新增架构图时请同步此页。</p>
+  <p>更细的流程图与分层图在后端开发手册（34 张）与前端开发手册（20 张），那两份手册自带逐步演示与分步聚焦。</p>
+</footer>
+
+</div>
+
+<!-- 放大层：<object> 而非内联 clone —— file:// 下 <object> 能加载本地 SVG，内联 clone 需要 fetch 会被 CORS 拦 -->
+<div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="放大查看架构图">
+  <button class="zoom-close" type="button" id="zoomClose" aria-label="关闭">×</button>
+  <div class="zoom-stage" id="zoomStage"></div>
+  <div class="zoom-bar" id="zoomBar"></div>
+  <p class="zoom-cap" id="zoomCap"></p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var zoom = document.getElementById("zoom");
+  var stage = document.getElementById("zoomStage");
+  var bar = document.getElementById("zoomBar");
+  var cap = document.getElementById("zoomCap");
+  var closeBtn = document.getElementById("zoomClose");
+
+  var cur = { obj: null, w: 0, h: 0, scale: 1, name: "", opener: null };
+  var LEVELS = [0.5, 0.75, 1, 1.5, 2];
+  var btns = [];
+
+  function setScale(scale) {
+    if (!cur.obj) return;
+    cur.scale = scale;
+    cur.obj.style.width = Math.round(cur.w * scale) + "px";
+    cur.obj.style.height = Math.round(cur.h * scale) + "px";
+    btns.forEach(function (b) {
+      b.classList.toggle("on", Math.abs(b.__scale - scale) < 0.001);
+    });
+    /* 窄屏上最小档也可能比可视区宽（1240px 的图放进 370px 要缩到 30%，字就糊了），
+       这时横向得靠拖动——明说出来，别让人以为图被切了 */
+    var overflow =
+      cur.obj.offsetWidth > stage.clientWidth - 32 ||
+      cur.obj.offsetHeight > stage.clientHeight - 32;
+    cap.textContent =
+      cur.name + " · 原始尺寸 " + Math.round(cur.w) + " × " + Math.round(cur.h) +
+      " px · 当前 " + Math.round(scale * 100) + "% · " +
+      (overflow ? "可拖动查看全图 · " : "") + "按 Esc 关闭";
+  }
+
+  /* 打开时挑一个「能看全」的默认档：图高 940 在 1440×900 上按 100% 会切掉底部两排，
+     用户第一眼就得先滚一下才知道下面还有内容。所以按可视区反算，取不超框的最大档。 */
+  function bestScale() {
+    var avail = stage.clientHeight - 32; /* 减去 .zoom-stage 的上下 padding */
+    var availW = stage.clientWidth - 32;
+    if (avail <= 0 || availW <= 0) return 1;
+    var fit = Math.min(avail / cur.h, availW / cur.w);
+    var pick = LEVELS[0];
+    LEVELS.forEach(function (lv) { if (lv <= fit + 0.001) pick = lv; });
+    return pick;
+  }
+
+  function openZoom(src, w, h, name, opener) {
+    cur.w = w || 1240;
+    cur.h = h || 800;
+    cur.name = name || "架构图";
+    cur.opener = opener || null;
+    stage.innerHTML = "";
+    var obj = document.createElement("object");
+    obj.type = "image/svg+xml";
+    obj.data = src;
+    obj.setAttribute("aria-label", cur.name);
+    stage.appendChild(obj);
+    cur.obj = obj;
+    bar.innerHTML = "";
+    btns = [];
+    LEVELS.forEach(function (lv) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = Math.round(lv * 100) + "%";
+      b.__scale = lv;
+      b.addEventListener("click", function () { setScale(lv); });
+      btns.push(b);
+      bar.appendChild(b);
+    });
+    var num = document.createElement("span");
+    num.className = "znum";
+    num.textContent = Math.round(cur.w) + "px";
+    bar.appendChild(num);
+    zoom.classList.add("open");
+    document.body.classList.add("lb-open");
+    setScale(bestScale());
+    closeBtn.focus();
+  }
+
+  function closeZoom() {
+    zoom.classList.remove("open");
+    document.body.classList.remove("lb-open");
+    stage.innerHTML = "";
+    cur.obj = null;
+    if (cur.opener && cur.opener.focus) cur.opener.focus();
+    cur.opener = null;
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("[data-src]"), function (el) {
+    el.addEventListener("click", function () {
+      openZoom(
+        el.getAttribute("data-src"),
+        parseFloat(el.getAttribute("data-w")),
+        parseFloat(el.getAttribute("data-h")),
+        el.getAttribute("data-name"),
+        el
+      );
+    });
+  });
+
+  closeBtn.addEventListener("click", closeZoom);
+  zoom.addEventListener("click", function (e) {
+    if (e.target === zoom) closeZoom();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && zoom.classList.contains("open")) closeZoom();
+  });
+})();
+</script>
+</body>
+</html>

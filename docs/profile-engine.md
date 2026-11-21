@@ -5,6 +5,8 @@
 
 ![用户画像：事件 → 指标 → 快照](images/profile-flow.svg)
 
+[这张图看不清？放大查看 →](diagrams.html#profile-flow)
+
 ## 1. 完整数据模型
 
 | 表 | 作用 | 关键字段 |
