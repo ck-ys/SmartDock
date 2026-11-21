@@ -677,6 +677,17 @@ li::marker { color: var(--faint); }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 9px;
+  position: relative;
+}
+/* 分岔行与上一步之间补一条居中短竖线，不再靠位置暗示「从第 N 步分岔」 */
+.fl-forks::before {
+  content: ""; position: absolute; left: 50%; top: -9px;
+  width: 1px; height: 9px; background: #ccd7e6;
+}
+/* 分岔后还接下一步时，向下补一条汇出线（下一个流程块顶部） */
+.fl-forks + .dgm-flow::before {
+  content: ""; position: absolute; left: 50%; top: -9px;
+  width: 1px; height: 9px; background: #ccd7e6;
 }
 .fork {
   display: flex; gap: 8px; align-items: flex-start;
@@ -690,6 +701,8 @@ li::marker { color: var(--faint); }
 }
 .fk.y { color: #1d5c3a; background: #eaf6ef; border: 1px solid #bfe3cd; }
 .fk.n { color: #7a4a12; background: #fdf4e6; border: 1px solid #f0d6ac; }
+/* 并列等价分支专用：中性灰，与图例「绿=通行/橙=拒绝」解耦 */
+.fk.m { color: #5b6b82; background: #f3f6fa; border: 1px solid #dbe3ee; }
 
 .dgm-grid {
   display: grid;
@@ -770,6 +783,8 @@ li::marker { color: var(--faint); }
   color: #5b6b82; background: #f3f6fa; border: 1px solid #dbe3ee;
 }
 .fl-side.bad { color: #a4361f; background: #fdf0ec; border: 1px solid #f2c9bc; }
+/* 设计行为（非失败）专用琥珀：如「缺失 → est」 */
+.fl-side.warn { color: #7a4a12; background: #fdf4e6; border: 1px solid #f0d6ac; }
 
 @media (max-width: 760px) {
   .dgm-grid, .fl-forks { grid-template-columns: 1fr; }
@@ -1201,4 +1216,60 @@ body.lb-open { overflow: hidden; }
   .diagram-body { grid-template-columns: 1fr; }
   .diagram-read { border-left: 0; border-top: 1px solid #ddd; }
   .diagram-canvas svg { width: 100% !important; }
+}
+
+/* ---------- 流程步骤聚焦（悬停预览 / 点击钉住 / 键盘上下步） ---------- */
+/* 淡化/过渡时长由「prefers-reduced-motion」全局规则（上方 0.01ms）自动降级为无动画 */
+.fl-step { transition: opacity 0.16s ease; }
+/* 作用域是「图卡」不是「单条流程」：一张图卡里的步骤编号是连续的（1,2,3 | 4），
+   却被 fork 行分成多个 .dgm-flow —— 只淡当前容器会漏掉后半截步骤，看着像坏了 */
+.diagram-figure.flow-focus .fl-step:not(.step-active) { opacity: 0.35; }
+.fl-step.step-active .fl-n {
+  background: #dce9ff;
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.fl-step:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 3px var(--accent);
+  border-radius: 6px;
+}
+
+/* ---------- 逐步演示工具条（≥3 步的图卡顶部由 JS 注入） ---------- */
+.dgm-demo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.dgm-demo button {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: 12.5px var(--font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dgm-demo button:hover { color: var(--ink); border-color: var(--faint); }
+.dgm-demo button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-soft), 0 0 0 3px var(--accent);
+}
+.dgm-demo .demo-count {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+/* ---------- 打印：工具条隐藏、聚焦淡化还原为全亮 ---------- */
+@media print {
+  .dgm-demo { display: none !important; }
+  .diagram-figure.flow-focus .fl-step { opacity: 1 !important; }
+  .fl-step:focus { box-shadow: none; }
 }

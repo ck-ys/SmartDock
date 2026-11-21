@@ -107,6 +107,7 @@
           <li><a href="#s-8-9" data-target="s-8-9">计划坞与确认坞</a></li>
           <li><a href="#s-8-10" data-target="s-8-10">附件与压缩</a></li>
           <li><a href="#s-8-11" data-target="s-8-11">助手排障</a></li>
+          <li><a href="#s-8-12" data-target="s-8-12">自动化工作台</a></li>
         </ul>
       </li>
       <li><a class="nav-ch" href="#ch-9" data-target="h-9"><span class="n">09</span>布局与壳层</a></li>
@@ -174,7 +175,9 @@
         <span><i class="sw"></i><b>方框</b> 动作或组件</span>
         <span><i class="sw dash"></i><b>虚线</b> 异步/可选</span>
         <span><i class="sw red"></i><b>红色</b> 禁止/危险</span>
-        <span><i class="sw split"></i><b>绿/橙卡</b> 通行/拒绝分支</span>
+        <span><i class="sw split"></i><b>绿/橙卡</b> 通行/受阻（拒绝、回退或另走一路）</span>
+        <span><b>蓝胶囊</b> 阶段标签</span>
+        <span><b>灰胶囊</b> 中性注记</span>
         <span><b>菱形</b> 判断分支</span>
         <span><b>→</b> 阅读方向</span>
       </div>
@@ -238,8 +241,8 @@
             <tr><td>代码块</td><td>是骨架，不是全文；字段按实际业务补全。</td></tr>
             <tr><td>“图 N”</td><td>指本手册的图，附录 13.1 有完整图目录。</td></tr>
             <tr><td><span class="fl-n">1</span></td><td>流程步骤的先后顺序；数字越大越靠后。</td></tr>
-            <tr><td><span class="fl-side phase">阶段</span></td><td>这一步属于哪个阶段（蓝底）；<span class="fl-side bad">失败 → 结果</span> 表示该步失败或分支去向（红底）。</td></tr>
-            <tr><td><span class="fk y">绿卡</span> <span class="fk n">橙卡</span></td><td>二选一分支：绿=通行或正常路径，橙=异常或被拒路径。</td></tr>
+            <tr><td><span class="fl-side phase">阶段</span></td><td>这一步属于哪个阶段（蓝底）；<span class="fl-side bad">失败 → 结果</span> 表示该步失败或分支去向（红底）；<span class="fl-side">灰底</span> 是中性注记（设计行为或并列去向，不是报错）。</td></tr>
+            <tr><td><span class="fk y">绿卡</span> <span class="fk n">橙卡</span> <span class="fk m">灰卡</span></td><td>分岔卡：绿=通行或正常路径，橙=受阻（被拒、回退或另走一路）；灰=并列等价去向的注记，不分对错。</td></tr>
             <tr><td>横条（分层）</td><td>从上往下是依赖方向：上层可以依赖下层，下层不能反向依赖。</td></tr>
           </tbody>
         </table>
@@ -257,7 +260,7 @@
             <tr><td>权限</td><td><code>v-hasPermi="['a:b:c']"</code>，三段式</td><td>两段式匹配不上超管 <code>*:*:*</code></td></tr>
             <tr><td>路由</td><td>后端 <code>sys_menu</code> 驱动动态路由</td><td>手写路由后与菜单重复</td></tr>
             <tr><td>样式</td><td>只用 <code>var(--dcs-*)</code> 令牌</td><td>写死 px 会被 <code>tokens.test.ts</code> 抓</td></tr>
-            <tr><td>SVG 样式</td><td>一律 <code>:style</code> CSS 对象</td><td>attribute 值 ≠ 渲染值</td></tr>
+            <tr><td>SVG 样式</td><td>一律 <code>:style</code> CSS 对象</td><td>attribute（写在标签上的属性）值 ≠ 渲染值</td></tr>
             <tr><td>测试</td><td>vitest + vite build</td><td>只跑 build 不跑单测</td></tr>
           </tbody>
         </table>
@@ -377,7 +380,7 @@
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 2. 启动链：从 index.html 到第一个页面</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 2. 启动链：从 index.html 到第一个页面</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -545,7 +548,7 @@ npx vite --port 5188 --host --strictPort</pre></div>
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 4.3 动态菜单：sys_menu 怎么变成侧栏</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 4.3 动态菜单：sys_menu 怎么变成侧栏</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -644,7 +647,7 @@ npx vite --port 5188 --host --strictPort</pre></div>
   <div class="fl-step">
     <span class="fl-n">9</span>
     <div class="fl-b"><b>把整个响应体交回业务函数</b><small>拦截器不自动解 data，保留 code/msg 供业务判断</small></div>
-    <span class="fl-side bad">不自动解包</span>
+    <span class="fl-side">不自动解包</span>
   </div>
   <div class="fl-step">
     <span class="fl-n">10</span>
@@ -667,7 +670,7 @@ npx vite --port 5188 --host --strictPort</pre></div>
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 5.1 一次普通请求</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 5.1 一次普通请求</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -704,7 +707,7 @@ export function listTask(query: TaskQuery): AxiosPromise&lt;TableDataInfo&lt;Tas
       <div class="grid2">
         <div class="mini">
           <h4>下载</h4>
-          <p>用封装好的 <code>download</code> 工具，带 token 走 blob；不要用 <code>window.open</code> 裸链，会丢鉴权头。</p>
+          <p>用封装好的 <code>download</code> 工具，带 token（登录令牌）走 blob（以二进制流下载，鉴权头才带得上）；不要用 <code>window.open</code> 裸链，会丢鉴权头。</p>
         </div>
         <div class="mini">
           <h4>上传</h4>
@@ -713,6 +716,7 @@ export function listTask(query: TaskQuery): AxiosPromise&lt;TableDataInfo&lt;Tas
       </div>
 
       <h3 id="s-4-4">SSE 两种通道</h3>
+      <p>SSE（服务器单向推送的流式事件：连接建一次，服务端持续发帧，页面只听不说）。</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>通道</th><th>用途</th><th>实现</th></tr></thead>
@@ -1122,7 +1126,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 8.3 一次发送的完整链路</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 8.3 一次发送的完整链路</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1139,7 +1143,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
       </div>
       <div class="callout note">
         <span class="t">思考档位是产品行为</span>
-        <p>“快速 / 平衡 / 深入”是一个字段，影响模型推理预算。mock 与实现都必须保留 brain 图标、文字、chevron 三件套，不能简化成灰字。</p>
+        <p>“快速 / 平衡 / 深入”是一个字段，影响模型推理预算。mock 与实现都必须保留 brain 图标、文字、chevron（下拉小箭头）三件套，不能简化成灰字。</p>
       </div>
 
       <h3 id="s-8-3">事件与渲染</h3>
@@ -1238,7 +1242,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 8.6 HITL（人工确认）全流程</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 8.6 HITL（人工确认）全流程</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1357,7 +1361,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 8.7 帧→卡片映射</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 8.7 帧→卡片映射</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1372,7 +1376,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
             <tr><td><code>memory_turn</code></td><td>本回合记忆写入回执</td></tr>
             <tr><td><code>model_degrade</code></td><td>模型降级提示</td></tr>
             <tr><td><code>auto_done</code></td><td>自动化回合完成信号</td></tr>
-            <tr><td><code>dcs-resume-truncated</code></td><td>续看溢出提示（toast）：重放超 4096 帧从中间开始，与压缩无关</td></tr>
+            <tr><td><code>dcs-resume-truncated</code></td><td>续看溢出提示（toast：短暂弹出后自动消失的提示条）：重放超 4096 帧从中间开始，与压缩无关</td></tr>
           </tbody>
         </table>
       </div>
@@ -1432,7 +1436,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 8.8 回合状态机</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 8.8 回合状态机</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1440,8 +1444,8 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
         <table>
           <thead><tr><th>机制</th><th>口径</th></tr></thead>
           <tbody>
-            <tr><td>打字机</td><td>tick 每 60ms 合帧追赶；流结束后才做全量 markdown 渲染——流式期间看到的是纯文本切片</td></tr>
-            <tr><td>贴底滚动</td><td>ResizeObserver 置脏 + rAF 写 scrollTop；距底超过 92px 才显示回底按钮</td></tr>
+            <tr><td>打字机</td><td>tick（渲染循环每 60ms 一拍）合帧追赶；流结束后才做全量 markdown 渲染——流式期间看到的是纯文本切片</td></tr>
+            <tr><td>贴底滚动</td><td>ResizeObserver 置脏（标记“尺寸变了待重算”）+ rAF（浏览器下一帧绘制前的回调）写 scrollTop；距底超过 92px 才显示回底按钮</td></tr>
             <tr><td>费用</td><td><code>cost_meta</code> 帧写入 costYuan / tokens；前端不自己累加</td></tr>
           </tbody>
         </table>
@@ -1498,7 +1502,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 8.9 计划坞决策路径</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 8.9 计划坞决策路径</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1594,7 +1598,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》第 12 章</a>
+    <a href="frontend-architecture.md">《前端架构详解》第 12 章</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1609,6 +1613,24 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
             <tr><td>卡在确认</td><td>pending 列表与回传 id 数量是否一致</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <h3 id="s-8-12">自动化工作台</h3>
+      <p>定时自动化让助手在没人盯着的时候自己跑。页面在 <code>views/dcs/agent/automation/</code>（index 列表 + edit 新建/编辑卡），路由 <code>/agent/automation</code>，从智能体工作台进入；每人有自建条数上限，超了提示先删一条。API 全集在 <code>api/dcs/assistant/automation.ts</code>。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>环节</th><th>怎么做</th><th>注意</th></tr></thead>
+          <tbody>
+            <tr><td>新建</td><td>列表右上「新建定时任务」，或从四张模板卡（写周报 / 查逾期 / 每日摘要 / 文档同步）一键预填</td><td>模板 prompt 只承诺真实具备的能力：只读查询 + 汇总 + 通知</td></tr>
+            <tr><td>填什么</td><td>标题 + prompt（到点就以它发起一轮）；触发 = 每天（DAILY）或每周几（WEEKLY）+ 时间，保存前有人话日程预览（scheduleText）</td><td>可挂只读外部服务白名单 mcpServers；<code>ask_user</code> 跑批不注册——没人答题，提示词别写成要反问的</td></tr>
+            <tr><td>开关与触发</td><td>卡片开关开/停（内置项由管理员开关）；「立即跑」手动触发一次，提交后跑完发站内通知，列表 10 秒轮询刷新</td><td>同 thread 已有 run 在跑会撞 409；两种触发都记进运行历史（SCHEDULE / MANUAL）</td></tr>
+            <tr><td>看历史</td><td>点标题进编辑卡看运行记录：状态 RUNNING / SUCCESS / FAILED / MISSED，带时长、摘要（summary）与 threadId 深链（<code>/agent?thread=</code>）跳回会话</td><td>MISSED = 到点没跑成（如重启错过）；连续失败看 consecutiveFailures</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout note">
+        <span class="t">前端只认两件事</span>
+        <p>跑批回合不打扰对话：完成信号走 <code>auto_done</code> 自定义帧（见 8.7）。日程「下次什么时候跑」一律以后端返回的 <code>nextRunAt</code> 为准，前端不算日程、不自己轮询触发。</p>
       </div>
     </section>
 
@@ -1675,7 +1697,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》· 9. 布局与壳层</a>
+    <a href="frontend-architecture.md">《前端架构详解》· 9. 布局与壳层</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1686,7 +1708,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
             <tr><td>顶栏</td><td><code>Navbar</code></td><td>面包屑、搜索、全屏、用户菜单</td></tr>
             <tr><td>侧栏</td><td><code>Sidebar</code></td><td>动态菜单、折叠、当前项高亮</td></tr>
             <tr><td>标签页</td><td><code>TagsView</code></td><td>多页切换、缓存、右键菜单</td></tr>
-            <tr><td>内容区</td><td><code>AppMain</code></td><td>路由出口 + keep-alive</td></tr>
+            <tr><td>内容区</td><td><code>AppMain</code></td><td>路由出口 + keep-alive（Vue 缓存组件：切走再回来状态不丢）</td></tr>
             <tr><td>全局挂载</td><td><code>layout/index.vue</code></td><td>挂助手等跨页组件（L37）</td></tr>
           </tbody>
         </table>
@@ -1735,7 +1757,7 @@ frontend/src/assets/styles/tokens-baseline.json // 存量豁免，只减不增</
           <tbody>
             <tr><td><code>.env.development</code></td><td>本地开发：代理前缀、调试开关</td></tr>
             <tr><td><code>.env.production</code></td><td>生产构建：真实 API 前缀</td></tr>
-            <tr><td><code>.env.staging</code></td><td>预发（如存在）</td></tr>
+            <tr><td><code>.env.staging</code></td><td>预发（预发布环境：上线前用生产同款配置彩排的环境；如存在）</td></tr>
           </tbody>
         </table>
       </div>
@@ -1768,6 +1790,8 @@ npm run preview   # 预览构建产物（仅本机验证）</pre></div>
             <tr><td>工具函数单测</td><td>分帧、格式化、权限判断、令牌扫描</td><td><code>npm run test</code></td></tr>
             <tr><td>组件测试</td><td>关键交互与状态分支</td><td>同上</td></tr>
             <tr><td>构建</td><td>类型、导入、产物</td><td><code>npm run build</code></td></tr>
+            <tr><td>代码质量</td><td>ESLint 检查 / Prettier 格式化</td><td><code>npm run lint:eslint</code> / <code>npm run prettier</code></td></tr>
+            <tr><td>类型检查</td><td>vue-tsc 全量类型</td><td><code>npm run type-check</code></td></tr>
             <tr><td>活体</td><td>真实后端 + 浏览器双视角</td><td>手工按验收步骤走</td></tr>
           </tbody>
         </table>
@@ -1803,6 +1827,7 @@ npm run preview   # 预览构建产物（仅本机验证）</pre></div>
         <label class="check"><input type="checkbox" data-key="f-11-6"><span class="ct"><b>修复类有前后对比页</b><small>修复前真机截图、修复后截图、人话说明。</small></span></label>
         <label class="check"><input type="checkbox" data-key="f-11-7"><span class="ct"><b>更新日志已补</b><small>≤3 条人话条目，类型正确，验收首位徽标。</small></span></label>
         <label class="check"><input type="checkbox" data-key="f-11-8"><span class="ct"><b>人话日志已追加</b><small>做了什么 / 为什么 / 怎么验证 / 踩了什么坑。</small></span></label>
+        <label class="check"><input type="checkbox" data-key="f-11-9"><span class="ct"><b>动了可见界面 → 重拍 README 六图</b><small><code>node scripts/readme-screenshots.mjs</code>（1440×900 亮色），并同步更新图注版本号。</small></span></label>
         <div class="checklist-foot"><span>勾选会保存在本机浏览器</span><button type="button" data-clear-checks>清空本页勾选</button></div>
       </div>
     </section>
@@ -1888,7 +1913,7 @@ npm run preview   # 预览构建产物（仅本机验证）</pre></div>
     </div>
   </div>
   <div class="diagram-links">
-    <a href="frontend-architecture.md">《前端架构详解》第 12 章</a>
+    <a href="frontend-architecture.md">《前端架构详解》第 12 章</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1915,7 +1940,7 @@ npm run preview   # 预览构建产物（仅本机验证）</pre></div>
       <ul>
         <li><b>接口 200 但列表空</b>：看响应 <code>rows/total</code>；确认查询参数与分页；确认不是后端租户过滤。</li>
         <li><b>接口 200 但页面报错</b>：看是不是多取了一层 <code>.data</code>。</li>
-        <li><b>样式不生效</b>：看是否有 <code>scoped</code> 穿透问题；看是否被更高优先级覆盖；SVG 看是否写成了 attribute。</li>
+        <li><b>样式不生效</b>：看是否有 <code>scoped</code> 穿透问题（scoped 样式只作用于本组件，要 <code>:deep()</code> 才碰得到子组件）；看是否被更高优先级覆盖；SVG 看是否写成了 attribute。</li>
         <li><b>改了没反应</b>：确认 Vite 热更新已生效；端口是否连到旧实例。</li>
       </ul>
 
@@ -1933,7 +1958,7 @@ npm run preview   # 预览构建产物（仅本机验证）</pre></div>
       </div>
       <div class="callout note">
         <span class="t">Playwright 注意事项</span>
-        <p>助手页有长连接，<code>networkidle</code> 会一直等不到。用 <code>domcontentloaded</code> + 显式等待元素，不要用 networkidle 判加载完成。</p>
+        <p>助手页有长连接，<code>networkidle</code>（Playwright 的“等到网络完全空闲”等待条件）会一直等不到。用 <code>domcontentloaded</code>（DOM 建好就过、不等网络）+ 显式等待元素，不要用 networkidle 判加载完成。</p>
       </div>
     </section>
 

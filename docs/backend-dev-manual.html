@@ -200,7 +200,9 @@
         <span><i class="sw"></i><b>方框</b> 动作或组件</span>
         <span><i class="sw dash"></i><b>虚线</b> 异步/可选</span>
         <span><i class="sw red"></i><b>红色</b> 禁止/危险</span>
-        <span><i class="sw split"></i><b>绿/橙卡</b> 通行/拒绝分支</span>
+        <span><i class="sw split"></i><b>绿/橙卡</b> 通行/受阻（拒绝、回退或另走一路）</span>
+        <span><b>蓝胶囊</b> 阶段标签</span>
+        <span><b>灰胶囊</b> 中性注记</span>
         <span><b>菱形</b> 判断分支</span>
         <span><b>→</b> 阅读方向</span>
       </div>
@@ -279,7 +281,7 @@
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 0. 一分钟总览</a>
+    <a href="backend-architecture.md">《后端架构详解》· 0. 一分钟总览</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -335,8 +337,8 @@
             <tr><td>代码块</td><td>是骨架，不是全文；字段、注解按实际业务补全。</td></tr>
             <tr><td>“图 N”</td><td>指本手册的图，附录 12.1 有完整图目录。</td></tr>
             <tr><td><span class="fl-n">1</span></td><td>流程步骤的先后顺序；数字越大越靠后。</td></tr>
-            <tr><td><span class="fl-side phase">阶段</span></td><td>这一步属于哪个阶段（蓝底）；<span class="fl-side bad">失败 → 结果</span> 表示该步失败或分支去向（红底）。</td></tr>
-            <tr><td><span class="fk y">绿卡</span> <span class="fk n">橙卡</span></td><td>二选一分支：绿=通行或正常路径，橙=异常或被拒路径。</td></tr>
+            <tr><td><span class="fl-side phase">阶段</span></td><td>这一步属于哪个阶段（蓝底）；<span class="fl-side bad">失败 → 结果</span> 表示该步失败或分支去向（红底）；<span class="fl-side">灰底</span> 是中性注记（设计行为或并列去向，不是报错）。</td></tr>
+            <tr><td><span class="fk y">绿卡</span> <span class="fk n">橙卡</span> <span class="fk m">灰卡</span></td><td>分岔卡：绿=通行或正常路径，橙=受阻（被拒、回退或另走一路）；灰=并列等价去向的注记，不分对错。</td></tr>
             <tr><td>横条（分层）</td><td>从上往下是依赖方向：上层可以依赖下层，下层不能反向依赖。</td></tr>
           </tbody>
         </table>
@@ -355,7 +357,7 @@
             <tr><td>租户</td><td>业务表带 <code>tenant_id</code></td><td>手写 SQL 被租户插件注入报“列不存在”</td></tr>
             <tr><td>权限</td><td>三段式，如 <code>analytics:center:edit</code></td><td>两段式匹配不上超管 <code>*:*:*</code></td></tr>
             <tr><td>DDL</td><td>baseline + migration 双写</td><td>只写一份，新环境或老环境必有一边建不出来</td></tr>
-            <tr><td>事务</td><td><code>rollbackFor = Exception.class</code></td><td>默认只回滚运行时异常，受检异常会提交半条数据</td></tr>
+            <tr><td>事务</td><td><code>rollbackFor = Exception.class</code></td><td>默认只回滚运行时异常，受检异常（编译器强迫你接住的 checked exception）会提交半条数据</td></tr>
           </tbody>
         </table>
       </div>
@@ -386,10 +388,11 @@
         <table>
           <thead><tr><th>聚合</th><th>模块</th><th>职责</th><th>依赖方向</th></tr></thead>
           <tbody>
-            <tr><td rowspan="4">入口</td><td><code>ruoyi-admin</code></td><td>Spring Boot 入口、组合根、跨模块 adapter</td><td>指向所有业务模块</td></tr>
-            <tr><td><code>ruoyi-common</code>（24 个子模块）</td><td>MyBatis/Redis/Sa-Token/租户/加密/OSS/SSE 等底座</td><td>被所有模块依赖</td></tr>
+            <tr><td rowspan="4">入口</td><td><code>ruoyi-admin</code></td><td>Spring Boot 入口、组合根（把所有模块拼装进一个进程的装配点）、跨模块 adapter</td><td>指向所有业务模块</td></tr>
+            <tr><td><code>ruoyi-common</code>（24 个子模块）</td><td>MyBatis/Redis/Sa-Token/租户/加密/OSS/SSE（服务器单向推流的通道，打字机与通知靠它）等底座</td><td>被所有模块依赖</td></tr>
             <tr><td><code>ruoyi-extend</code>（2 个）</td><td>监控/扩展</td><td>独立</td></tr>
             <tr><td><code>ruoyi-modules</code>（9 个）</td><td>system / profile-engine / assistant / assistant-spi / dcs / ai-billing / file-security / risk / job</td><td>业务模块之间按图单向依赖</td></tr>
+            <tr><td>工具</td><td><code>tools/mcp/</code>（dock-pg-mcp / dock-redis-mcp，2 个）</td><td>随仓开源的数据面 MCP server（查 PG / Redis 用的本地工具）；构建与连接配置见目录内 README</td><td>独立于 Maven 构建</td></tr>
           </tbody>
         </table>
       </div>
@@ -462,14 +465,14 @@
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 2.3 模块依赖图（谁可以调谁）</a>
+    <a href="backend-architecture.md">《后端架构详解》· 2.3 模块依赖图（谁可以调谁）</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
 
       <div class="callout note">
         <span class="t">读依赖图的三个结论</span>
-        <p>① <code>ruoyi-dcs</code> 不依赖 <code>ruoyi-assistant</code> 实现，只依赖 <code>assistant-spi</code>；② <code>file-security</code> 依赖 <code>risk</code> 和 <code>system</code>；③ 全图没有双向箭头，当前无 POM 级循环依赖。</p>
+        <p>① <code>ruoyi-dcs</code> 不依赖 <code>ruoyi-assistant</code> 实现，只依赖 <code>assistant-spi</code>；② <code>file-security</code> 依赖 <code>risk</code> 和 <code>system</code>；③ 全图没有双向箭头，当前无 POM（Maven 依赖清单 pom.xml）级循环依赖。</p>
       </div>
 
       <h3 id="s-2-2">四层与包</h3>
@@ -550,7 +553,7 @@
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 3. 一次普通 HTTP 请求怎么走</a>
+    <a href="backend-architecture.md">《后端架构详解》· 3. 一次普通 HTTP 请求怎么走</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -570,7 +573,7 @@
       </div>
 
       <h3 id="s-2-4">组合根</h3>
-      <p>跨模块协作不在业务模块里互相 new，而是<b>消费方定义端口，admin 组合根实现</b>。位置：<code>ruoyi-admin/src/main/java/org/dromara/web/adapter/</code>。</p>
+      <p>跨模块协作不在业务模块里互相 new，而是<b>消费方定义端口（这里的「端口」是业务接口的抽象叫法，不是 5188/8090 那种网络端口），admin 组合根实现</b>。位置：<code>ruoyi-admin/src/main/java/org/dromara/web/adapter/</code>。</p>
       <div class="table-wrap compact">
         <table>
           <thead><tr><th>Adapter</th><th>把谁的活接到谁</th></tr></thead>
@@ -595,7 +598,7 @@
             <li><code>json</code> — Jackson 全局配置</li>
             <li><code>mybatis</code> — 数据权限 / 多租户插件</li>
             <li><code>redis</code> — Redisson 配置</li>
-            <li><code>satoken</code> — 鉴权 DAO</li>
+            <li><code>satoken</code> — 鉴权 DAO（登录态存取的底层接口）</li>
             <li><code>security</code> — 安全配置</li>
             <li><code>tenant</code> — 租户实体与拦截</li>
             <li><code>log</code> — 操作日志切面</li>
@@ -815,7 +818,7 @@ CREATE INDEX IF NOT EXISTS idx_dcs_xxx_status ON dcs_xxx (tenant_id, status);</p
         <div class="mini">
           <h4>新增定时任务</h4>
           <ul>
-            <li>任务类放 <code>job/</code> 或所属域，方法无状态、可重入。</li>
+            <li>任务类放 <code>job/</code> 或所属域，方法无状态、可重入（跑到一半再跑一遍也不会出错）。</li>
             <li>大表分批：单轮 1 万行、封顶 100 轮，参照 <code>ProfileRetentionJob</code>。</li>
             <li>需要幂等：用唯一键或“先占坑再处理”，不要依赖执行一次。</li>
             <li>多实例要加分布式锁，避免两个节点同时跑。</li>
@@ -876,7 +879,7 @@ CREATE INDEX IF NOT EXISTS idx_dcs_xxx_status ON dcs_xxx (tenant_id, status);</p
         <div class="mini">
           <h4>不建</h4>
           <ul>
-            <li>自有单表 CRUD：<code>BaseMapper</code> 已经是抽象</li>
+            <li>自有单表 CRUD（增删改查）：<code>BaseMapper</code> 已经是抽象</li>
             <li>只有一个实现的内部方法</li>
             <li>为了“看起来整洁”给每张表套一层</li>
           </ul>
@@ -981,7 +984,7 @@ try {
         </div>
         <div class="mini">
           <h4>afterCommit 里写库要新事务</h4>
-          <p><code>afterCommit</code> 时资源仍绑定且不会再提交；写库必须 <code>REQUIRES_NEW</code>，否则静默丢失。</p>
+          <p><code>afterCommit</code> 时资源仍绑定且不会再提交；写库必须 <code>REQUIRES_NEW</code>（挂起当前事务、另开一个独立新事务），否则静默丢失。</p>
         </div>
         <div class="mini">
           <h4>锁要包住事务提交</h4>
@@ -1004,13 +1007,14 @@ try {
       </div>
 
       <h3 id="s-5-6">JSONB 与大表</h3>
+      <p>JSONB（PostgreSQL 的 JSON 字段类型：整块存、能按结构查询、能建索引——本仓大量业务属性都存它）。</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>场景</th><th>做法</th><th>坑</th></tr></thead>
           <tbody>
             <tr><td>JSONB 写入</td><td>自定义 SQL 显式 <code>::jsonb</code></td><td>不转会当成字符串存，查询/索引全失效</td></tr>
-            <tr><td>JSONB 查询</td><td>用 <code>-&gt;&gt;</code> / <code>@&gt;</code>，必要时建 GIN 索引</td><td>把 JSONB 当文本 <code>LIKE</code>，慢且不准</td></tr>
-            <tr><td>大表清理</td><td>分批：单轮 1 万行、封顶 100 轮</td><td>一次 DELETE 全表会锁表、撑爆 WAL</td></tr>
+            <tr><td>JSONB 查询</td><td>用 <code>-&gt;&gt;</code> / <code>@&gt;</code>，必要时建 GIN 索引（PG 为 JSONB/数组这类“整块值”建的倒排索引）</td><td>把 JSONB 当文本 <code>LIKE</code>，慢且不准</td></tr>
+            <tr><td>大表清理</td><td>分批：单轮 1 万行、封顶 100 轮</td><td>一次 DELETE 全表会锁表、撑爆 WAL（PG 预写日志）</td></tr>
             <tr><td>慢查询</td><td>先看执行计划，再补组合索引</td><td>索引列顺序错，等于没建</td></tr>
           </tbody>
         </table>
@@ -1175,8 +1179,8 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </div>
 <div class="fl-forks">
-  <div class="fork"><b class="fk y">画像链</b><small>ProfileRecalcTrigger（@Async 去抖）→ ProfileScoreEngine.recalcSubject → 写 profile_score_snapshot（prev_snapshot_id 串链）→ ProfileReviewService 低分复核</small></div>
-  <div class="fork"><b class="fk n">分析链</b><small>AnalyticsRollupTrigger（@Async 2 秒去抖）→ AnalyticsService.rebuildRecent → AnalyticsSessionizer 会话重建 → analytics_session / analytics_daily</small></div>
+  <div class="fork"><b class="fk m">画像链</b><small>ProfileRecalcTrigger（@Async 去抖）→ ProfileScoreEngine.recalcSubject → 写 profile_score_snapshot（prev_snapshot_id 串链）→ ProfileReviewService 低分复核</small></div>
+  <div class="fork"><b class="fk m">分析链</b><small>AnalyticsRollupTrigger（@Async 2 秒去抖）→ AnalyticsService.rebuildRecent → AnalyticsSessionizer 会话重建 → analytics_session / analytics_daily</small></div>
 </div>
 <div class="dgm-note">两条链并行且互不依赖：分数没变不代表分析没跑，反之亦然。排查「发了事件没反应」先看第 4 步是否真的提交（回滚就没有 afterCommit），再看对应 Trigger 的去抖窗口是否还没到。</div>
 </div>
@@ -1188,19 +1192,19 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 4.1.3 主流程：一条事件如何变成分数</a>
+    <a href="backend-architecture.md">《后端架构详解》· 4.1.3 主流程：一条事件如何变成分数</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
 
       <h4>评分模型：一份 JSON，不是一堆 if</h4>
-      <p>模型定义在 <code>ProfileModelDefinition</code> 解析：<code>preset</code>（GENERIC / RFM）+ <code>dimensions[]</code>，每个维度是「指标 + 分箱 + 权重」。分箱支持四种给法：<code>edges</code>（按边界切）、<code>quantiles</code>（按分位）、<code>bands</code>（枚举档）、<code>n</code>（等宽 N 段）；权重和必须大于 0，由 <code>ProfileModelConfig</code> 校验。计算入口 <code>ProfileScoreEngine.recalcSubject</code>：每个维度归一到 100 后加权合成总分；分箱打分在 <code>ProfileBinResolver.resolve</code>。</p>
+      <p>模型定义在 <code>ProfileModelDefinition</code> 解析：<code>preset</code>（预设：GENERIC 通用 / RFM——按最近一次消费 Recency、消费频率 Frequency、消费金额 Monetary 分层的经典模型）+ <code>dimensions[]</code>，每个维度是「指标 + 分箱（把连续数值切成档位再给分）+ 权重」。分箱支持四种给法：<code>edges</code>（按边界切）、<code>quantiles</code>（按分位）、<code>bands</code>（枚举档）、<code>n</code>（等宽 N 段）；权重和必须大于 0，由 <code>ProfileModelConfig</code> 校验。计算入口 <code>ProfileScoreEngine.recalcSubject</code>：每个维度归一到 100 后加权合成总分；分箱打分在 <code>ProfileBinResolver.resolve</code>。</p>
       <div class="callout note">
         <span class="t">RFM 不是特判，是预设</span>
         <p>通用模型没有独立的「等级」字段——等级只随 RFM 预设输出：八类分层是 <code>ProfileRfmLevel</code> 的纯函数，R/F/M 三档分界（rfmMid）定义在 <code>ProfileModelDefinition</code>。写文档别再写「指标→分箱→权重→等级」，等级不是通用链路的一环。</p>
       </div>
       <h4>快照链：每次计算都能回放</h4>
-      <p>每次计算都插一行快照，新行带 <code>prev_snapshot_id</code> 指向上一行，串成链。写入在 advisory 锁内做「读尾快照 → 插新行」两步，防止并发时链分叉成树。任何历史分数都能沿链回溯，评分模型改了也不影响旧快照的解释。</p>
+      <p>每次计算都插一行快照，新行带 <code>prev_snapshot_id</code> 指向上一行，串成链。写入在 advisory 锁（PG 按名字约定的轻量锁：不锁行只锁名字，靠大家自觉先抢锁）内做「读尾快照 → 插新行」两步，防止并发时链分叉成树。任何历史分数都能沿链回溯，评分模型改了也不影响旧快照的解释。</p>
       
 <figure class="diagram-card" id="fig-backend-24">
   <div class="diagram-head">
@@ -1216,7 +1220,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
 <div class="dgm dgm-flow">
   <div class="fl-step">
     <span class="fl-n">1</span>
-    <div class="fl-b"><b>事件已落账</b><small><code>profile_event</code>，append-only；这一步之前走发布器与身份归并</small></div>
+    <div class="fl-b"><b>事件已落账</b><small><code>profile_event</code>，append-only（只加不改、不删）；这一步之前走发布器与身份归并</small></div>
     <span class="fl-side phase">输入</span>
   </div>
   <div class="fl-step">
@@ -1234,7 +1238,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
   <div class="fl-step">
     <span class="fl-n">5</span>
-    <div class="fl-b"><b>advisory 锁：读尾快照</b><small>锁内两步走，并发重算不会互相插队</small></div>
+    <div class="fl-b"><b>advisory 锁：读尾快照</b><small>锁内两步走，并发重算不会互相插队（advisory 锁=PG 按名字约定的轻量锁）</small></div>
     <span class="fl-side phase">留痕</span>
   </div>
   <div class="fl-step">
@@ -1253,11 +1257,11 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
     <div class="diagram-read">
       <p class="read-title">读图顺序</p>
-      <ol><li>上半段是纯计算：取指标 → 分箱 → 归一 → 加权，全部由模型 JSON 驱动。</li><li>下半段是留痕：advisory 锁内读尾快照再插新行，链永远是单链不成树。</li><li>低分复核在快照之后判断，且带去重——分数不再下降就不重复打扰。</li><li>占位分（50）不触发复核，新主体刚建档时不会立刻进队列。</li></ol>
+      <ol><li>上半段是纯计算：取指标 → 分箱 → 归一 → 加权，全部由模型 JSON 驱动。</li><li>下半段是留痕：advisory 锁（PG 按名字约定的轻量锁）内读尾快照再插新行，链永远是单链不成树。</li><li>低分复核在快照之后判断，且带去重——分数不再下降就不重复打扰。</li><li>占位分（50）不触发复核，新主体刚建档时不会立刻进队列。</li></ol>
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 评分与快照</a>
+    <a href="backend-architecture.md">《后端架构详解》· 评分与快照</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1325,7 +1329,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
           <tbody>
             <tr><td>显式 sessionId 优先</td><td>事件带了就用（分组键 <code>s:sessionId</code>），不再看时间间隔</td></tr>
             <tr><td>30 分钟无操作切分</td><td>没有显式 id 时，距上一事件超过 30 分钟就开新会话</td></tr>
-            <tr><td>隐式键锚定首事件</td><td>隐式会话键按首事件所在的分钟桶生成，防止滚动窗口把同一串事件来回拆并</td></tr>
+            <tr><td>隐式键锚定首事件</td><td>隐式会话键按首事件所在的分钟桶生成，防止滚动窗口（重算窗口跟着最新事件往前滑）把同一串事件来回拆并</td></tr>
             <tr><td>跳出 = 单页会话</td><td>会话内最后一个 page 事件就是入口页时算跳出；page_leave 不算「继续」</td></tr>
           </tbody>
         </table>
@@ -1358,7 +1362,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       <div class="band-row wrap">
         <span class="chip-node">显式 sessionId 优先</span>
         <span class="chip-node">30 分钟无操作切分</span>
-        <span class="chip-node">隐式键锚定首事件分钟桶</span>
+        <span class="chip-node">隐式键锚定首事件所在分钟分桶</span>
         <span class="chip-node">跳出 = 单页会话</span>
       </div>
     </div>
@@ -1398,7 +1402,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 会话与六分析</a>
+    <a href="backend-architecture.md">《后端架构详解》· 会话与六分析</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1407,14 +1411,14 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
           <thead><tr><th>核心类/方法</th><th>做什么</th></tr></thead>
           <tbody>
             <tr><td><code>AnalyticsSessionizer</code></td><td>会话切分（上表四条规则的实现）</td></tr>
-            <tr><td><code>AnalyticsRollupTrigger</code></td><td>事件写入后 2 秒去抖触发重建汇总</td></tr>
+            <tr><td><code>AnalyticsRollupTrigger</code></td><td>事件写入后 2 秒去抖（连续触发合并成一次，等最后一拍才执行）触发重建汇总</td></tr>
             <tr><td><code>AnalyticsService</code></td><td>六类分析的查询与计算都在这一个类（见上图），入口在 <code>AnalyticsController</code></td></tr>
             <tr><td><code>AnalyticsReplayService</code></td><td>重建/回放；验证时先重建再断言</td></tr>
           </tbody>
         </table>
       </div>
       <h4>CSV 补录（离线数据唯一入口）</h4>
-      <p>外部采集口与 SDK 已移除，离线数据只有 CSV 一条路：<code>AnalyticsController</code> 上传 → <code>AnalyticsService.importCsv</code>。限制：单文件 5MB、5000 行、自动剥 BOM、必须有 <code>eventName</code> 列。补录后要走一次「重建汇总」才进报表。</p>
+      <p>外部采集口与 SDK 已移除，离线数据只有 CSV 一条路：<code>AnalyticsController</code> 上传 → <code>AnalyticsService.importCsv</code>。限制：单文件 5MB、5000 行、自动剥 BOM（Excel/记事本存 CSV 常塞进文件头的字节，不剥会污染第一列）、必须有 <code>eventName</code> 列。补录后要走一次「重建汇总」才进报表。</p>
       <div class="callout note">
         <span class="t">验证时序</span>
         <p>事件写入后自动汇总是 2 秒去抖；验证要 sleep ≥ 5 秒，或手动触发重建。刚写完就查，数字没变是正常的。</p>
@@ -1485,7 +1489,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   <div class="fl-step">
     <span class="fl-n">6</span>
     <div class="fl-b"><b>校验任务状态 / 成员 + 字段校验 + 写新版本行</b><small>每次提交新增一行版本，不覆盖旧数据；responseHours 在这一步算</small></div>
-    <span class="fl-side bad">重复提交 → 新版本</span>
+    <span class="fl-side">重复提交 → 新版本</span>
   </div>
   <div class="fl-step">
     <span class="fl-n">7</span>
@@ -1524,7 +1528,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 4.3.3 主流程：发布 → 提交 → 审核</a>
+    <a href="backend-architecture.md">《后端架构详解》· 4.3.3 主流程：发布 → 提交 → 审核</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1541,6 +1545,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         </table>
       </div>
       <p>表就七张：<code>dcs_task / dcs_task_field / dcs_submission / dcs_audit / dcs_notice / dcs_feedback / dcs_changelog</code>。它给画像发的事件全部经 <code>ProfileEventPublisher</code>，本模块不直接写画像表。</p>
+      <p>其中 <code>dcs_changelog</code>（更新日志）的发布口径：超管可写，草稿存库、发布才对外可见；发布时通知目标租户的管理员；已发布版本再编辑只补发新增租户、不重复打扰（口径写在 <code>DcsChangelogService</code> 类注释上）。管理台操作步骤见 <a href="usage.md">使用指引 §5</a>。</p>
 
       <h3 id="s-7-4">风控 risk</h3>
       <p><b>解决什么</b>：行为事件按规则打分分级，双轨取高做决策；外加敏感词、内容审核、验证码三件配套。它目前只被 file-security 调用（驳回后发风险事件），助手不直接引用它。</p>
@@ -1579,8 +1584,8 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </div>
 <div class="fl-forks">
-  <div class="fork"><b class="fk y">规则轨</b><small>单事件类型的最高级（一条爆规则就够高）</small></div>
-  <div class="fork"><b class="fk n">全局轨</b><small>总分对应的档（慢积累也能升档）</small></div>
+  <div class="fork"><b class="fk m">规则轨</b><small>单事件类型的最高级（一条爆规则就够高）</small></div>
+  <div class="fork"><b class="fk m">全局轨</b><small>总分对应的档（慢积累也能升档）</small></div>
 </div>
 <div class="dgm-flow" style="margin-top:9px">
   <div class="fl-step">
@@ -1599,7 +1604,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 双轨决策</a>
+    <a href="backend-architecture.md">《后端架构详解》· 双轨决策</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1685,7 +1690,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
   <div class="fl-step">
     <span class="fl-n">3</span>
-    <div class="fl-b"><b>透传模型流，同时聚合 usage</b><small>边转发边累计 token，不额外缓冲整段回复</small></div>
+    <div class="fl-b"><b>透传模型流，同时聚合 usage</b><small>边转发边累计 usage（上游返回的用量：token 数），不额外缓冲整段回复</small></div>
     <span class="fl-side phase">调用</span>
   </div>
   <div class="fl-step">
@@ -1698,8 +1703,8 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     <div class="fl-b"><b>幂等键回查 + findEffectivePrice + 算价</b><small>同一 usage 重复上报只记一次；价格取生效版本</small></div>
   </div>
   <div class="fl-forks">
-    <div class="fork"><b class="fk y">钱包模式</b><small>TenantWalletService.deductForAiUsageJoinTx<br/>写 dcs_tenant_wallet + dcs_tenant_wallet_ledger</small></div>
-    <div class="fork"><b class="fk n">积分模式</b><small>积分服务 deduct<br/>写 dcs_ai_credit_ledger</small></div>
+    <div class="fork"><b class="fk m">钱包模式</b><small>TenantWalletService.deductForAiUsageJoinTx<br/>写 dcs_tenant_wallet + dcs_tenant_wallet_ledger</small></div>
+    <div class="fork"><b class="fk m">积分模式</b><small>积分服务 deduct<br/>写 dcs_ai_credit_ledger</small></div>
   </div>
   <div class="fl-step">
     <span class="fl-n">6</span>
@@ -1712,11 +1717,11 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
     <div class="diagram-read">
       <p class="read-title">读图顺序</p>
-      <ol><li>从上往下：前置闸 → 透传并聚合 → 算价 → 两种扣费模式二选一 → 落用量单据。</li><li>前置闸不通过就不发起上游调用，避免「先花钱再发现没钱」。</li><li>钱包模式和积分模式走不同服务、不同账本表，但都落在同一条 dcs_ai_usage 上。</li><li>算价用的是「生效价」，不是配置里的现值；同一 usage 有幂等键，不会重复扣。</li></ol>
+      <ol><li>从上往下：前置闸 → 透传并聚合 → 算价 → 两种扣费模式二选一 → 落用量单据。</li><li>前置闸不通过就不发起上游调用，避免「先花钱再发现没钱」。</li><li>钱包模式和积分模式走不同服务、不同账本表，但都落在同一条 dcs_ai_usage 上。</li><li>算价用的是「生效价」，不是配置里的现值；同一 usage（上游返回的用量：token 数）有幂等键，不会重复扣。</li></ol>
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 4.5.2 主流程：一次模型调用如何扣费</a>
+    <a href="backend-architecture.md">《后端架构详解》· 4.5.2 主流程：一次模型调用如何扣费</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1769,22 +1774,25 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 取价与额度</a>
+    <a href="backend-architecture.md">《后端架构详解》· 取价与额度</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
       <h4>价格怎么定</h4>
       <p><code>findEffectivePrice</code> 的取价顺序固定：<b>租户价优先于全局价，精确模型名优先于通配 <code>*</code>，且必须 enabled</b>。所以「改了价格没生效」先查三件事：改的是租户价还是全局价、模型名写的是精确还是通配、记录是否启用。</p>
+      <p>价格还能自动识别：AI 配置页的「识别」走 <code>AiPriceAutoDetectService</code>，从供应商文档页 / 聚合 API 抓价格，三级降级（聚合 API → 正则 → AI）。抓外部 URL 前做 SSRF 校验（防内网探测）——域名必须命中 <code>dcs_ai_doc_domain</code> 白名单（文档域=允许抓取的域名清单，支持子域，在「识别域名管理」菜单维护），不在名单直接拒绝。</p>
       <h4>两本账 + 配额闸</h4>
       <div class="table-wrap compact">
         <table>
           <thead><tr><th>轨</th><th>表</th><th>扣减入口</th></tr></thead>
           <tbody>
             <tr><td>钱包</td><td><code>dcs_tenant_wallet</code> + <code>dcs_tenant_wallet_ledger</code></td><td><code>TenantWalletService.deductForAiUsage</code>（JoinTx 版与业务同事务）</td></tr>
-            <tr><td>积分</td><td><code>dcs_ai_credit_ledger / _plan / _subscription</code></td><td><code>DcsAiCreditServiceImpl.deduct(idempotencyKey)</code>；调用前 <code>preGate</code> 判额度：周池 + 滚动窗口，不足时切加油包 tank</td></tr>
+            <tr><td>积分</td><td><code>dcs_ai_credit_ledger / _plan / _subscription</code></td><td><code>DcsAiCreditServiceImpl.deduct(idempotencyKey)</code>；调用前 <code>preGate</code> 判额度：周池（按周重置的额度池）+ 滚动窗口（往前滑的 N 天用量窗口），不足时切加油包 tank（加油包=额度外买的补充包；tank 是代码字段名）</td></tr>
           </tbody>
         </table>
       </div>
+      <h4>充值订单：渠道与状态</h4>
+      <p><code>DcsWalletPaymentOrderController</code> 只有 list / create / close 三个端点。<b>MANUAL 渠道创建即到账</b>：状态直接写 PAID，并立刻给钱包充值；<code>WECHAT_PAY / ALIPAY / MOCK</code> 只建 PENDING 订单等回调——<b>仓内没有回调端点</b>，线上支付目前是占位，没有接通。排查「充了钱没到账」先看渠道：非 MANUAL 建出来的单子不会自己变 PAID。</p>
       <h4>供应商密钥池</h4>
       <p><code>ProviderKeyPool</code> 管多把 provider key 轮换；坏 key 在内存里冷却 30 分钟再用。模型接入走端口：<code>AiCapabilityPort</code> 接口定义在 ai-billing，assistant 侧提供实现——方向是「助手实现计费域的端口」，不是反过来。</p>
       <div class="callout danger">
@@ -1838,10 +1846,10 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
 </div>
 <div class="fl-forks">
-  <div class="fork"><b class="fk n">guard 命中</b><small>→ PENDING（待人工审核）</small></div>
+  <div class="fork"><b class="fk m">guard 命中</b><small>→ PENDING（待人工审核）</small></div>
   <div class="fork"><b class="fk y">反馈 / 助手类目</b><small>→ EXEMPT，留痕但不审</small></div>
   <div class="fork"><b class="fk y">开关关 / 管理员 / 类目未启用</b><small>→ SKIPPED，跳过审核</small></div>
-  <div class="fork"><b class="fk n">其余</b><small>→ PENDING（待人工审核）</small></div>
+  <div class="fork"><b class="fk m">其余</b><small>→ PENDING（待人工审核）</small></div>
 </div>
 <div class="dgm-flow" style="margin-top:9px">
   <div class="fl-step">
@@ -1854,7 +1862,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   <div class="fork"><b class="fk y">通过</b><small>CAS 写 approved；若是头像则回写到用户资料</small></div>
   <div class="fork"><b class="fk n">驳回</b><small>CAS 写 rejected + 通知上传人 + 发风控事件</small></div>
 </div>
-<div class="dgm-note">「文件传上去了但列表里没有」先看判定结果：EXEMPT / SKIPPED 不进审核队列是设计行为；「审核后状态没变」看 CAS 是否失败（别人先审过了）。</div>
+<div class="dgm-note">「文件传上去了但列表里没有」先看判定结果：EXEMPT / SKIPPED 不进审核队列是设计行为；「审核后状态没变」看 CAS 是否失败（别人先审过了）。徽章口径：橙只表示拒绝/驳回；→PENDING 的分岔用灰徽章——进人工审核是「需人处理」，不是被拒。</div>
 </div>
       
     </div>
@@ -1864,7 +1872,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 4.6.2 主流程：上传 → 判定 → 审核</a>
+    <a href="backend-architecture.md">《后端架构详解》· 4.6.2 主流程：上传 → 判定 → 审核</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -1996,7 +2004,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
   <div class="fl-step">
     <span class="fl-n">11</span>
-    <div class="fl-b"><b>三条链同时挂到 Agent 上</b><small>模型装饰器链 Billing → PII → Memory → Date → Skill → Thinking；工具 + 权限上下文（平台 8 个 + SPI + MCP）；中间件链 PlanGate / SkillGate / SkillUsage / Heartbeat / Eviction / Compaction</small></div>
+    <div class="fl-b"><b>三条链同时挂到 Agent 上</b><small>模型装饰器链六件：Billing（计费）→ PII（脱敏）→ Memory（记忆）→ Date（日期）→ Skill（技能）→ Thinking（思考档）；工具 + 权限上下文（平台 8 个 + SPI + MCP）；中间件链六件：PlanGate（计划闸）/ SkillGate（技能闸）/ SkillUsage（技能用量上报）/ Heartbeat（心跳）/ Eviction（大结果驱逐落盘）/ Compaction（上下文压缩）</small></div>
   </div>
   <div class="fl-step">
     <span class="fl-n">12</span>
@@ -2018,7 +2026,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 5.2 全链路全景图</a>
+    <a href="backend-architecture.md">《后端架构详解》· 5.2 全链路全景图</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2033,14 +2041,14 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <table>
           <thead><tr><th>#</th><th>闸</th><th>拒绝时发生什么</th></tr></thead>
           <tbody>
-            <tr><td>1</td><td>登录与租户</td><td>401/403，前端清 token 回登录</td></tr>
+            <tr><td>1</td><td>登录与租户</td><td>401/403，前端清 token（登录令牌）回登录</td></tr>
             <tr><td>2</td><td>agentId 解析</td><td>找不到 agent → 明确错误帧</td></tr>
             <tr><td>3</td><td>会话归属</td><td>不是你的 thread → 拒绝，不泄露存在性</td></tr>
             <tr><td>4</td><td>模型可用性</td><td>模型/渠道停用 → 可读错误，不重试</td></tr>
             <tr><td>5</td><td>额度与余额</td><td>余额不足 → 计费事件 + 终答提示</td></tr>
             <tr><td>6</td><td>工具权限</td><td>工具被租户/角色闸挡 → 不进候选列表</td></tr>
             <tr><td>7</td><td>技能门</td><td>计划/技能未过闸 → 不注入</td></tr>
-            <tr><td>8</td><td>PII 与脱敏</td><td>命中敏感模式 → 替换后再发模型</td></tr>
+            <tr><td>8</td><td>PII（个人身份信息）与脱敏</td><td>命中敏感模式 → 替换后再发模型</td></tr>
             <tr><td>9</td><td>并发占用</td><td>同 thread 已有 run → 409 或排队</td></tr>
             <tr><td>10</td><td>计费幂等</td><td>同订阅重复帧 → 不重复扣</td></tr>
           </tbody>
@@ -2120,7 +2128,12 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
 
       <div class="callout danger">
         <span class="t">顺序不能随便调</span>
-        <p>PII 必须在计费之外、模型调用之内；如果把 PII 放到计费外层，脱敏后的 token 数与计费口径会对不上；把记忆放到 PII 外层，则会先读明文记忆再脱敏，泄露面变大；动态值（日期 / 记忆 / 技能）一律在末位追加——进前缀会击穿全租户的 prompt 缓存。</p>
+        <p>一句话拆成三条，各错各的：</p>
+        <ol>
+          <li><b>PII（个人身份信息：手机号/邮箱/证件号）位置错了，计费口径就错</b>——PII 必须在计费之外、模型调用之内；放到计费外层，模型看到的已是脱敏文本，按脱敏后的 token 数（token=模型按文字量计费/算上下文的计量单位）对不上按原文的计费口径。</li>
+          <li><b>记忆放到 PII 外层会先读明文</b>——先注入明文记忆再脱敏，泄露面变大。</li>
+          <li><b>动态值（日期 / 记忆 / 技能）一律在末位追加</b>——进了开头的前缀，全租户当天共用的 prompt 缓存（供应商对「开头相同」的请求少收钱的省钱缓存）当天全废。</li>
+        </ol>
       </div>
 
       <h3 id="s-8-7">工具系统</h3>
@@ -2221,7 +2234,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 5.9.1 三层仓库</a>
+    <a href="backend-architecture.md">《后端架构详解》· 5.9.1 三层仓库</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2243,12 +2256,12 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   </div>
   <div class="diagram-body">
     <div class="diagram-figure">
-      <div class="diagram-canvas" role="button" tabindex="0" aria-label="放大查看：5.10.2 run 生命周期：一次 run 有哪些状态？多实例下谁来收尾？" data-w="709" data-h="369" data-name="5.10.2 run 生命周期"><svg id="mbackend16" xmlns="http://www.w3.org/2000/svg" class="flow-svg statediagram" viewBox="0 0 708.9404296875 369.3999938964844" role="graphics-document document" aria-roledescription="stateDiagram" width="100%" style="max-width:709px" preserveAspectRatio="xMidYMid meet"><style>#mbackend16{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;font-size:14px;fill:#1e2a38;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#mbackend16 .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#mbackend16 .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#mbackend16 .error-icon{fill:#ffffff;}#mbackend16 .error-text{fill:#000000;stroke:#000000;}#mbackend16 .edge-thickness-normal{stroke-width:1px;}#mbackend16 .edge-thickness-thick{stroke-width:3.5px;}#mbackend16 .edge-pattern-solid{stroke-dasharray:0;}#mbackend16 .edge-thickness-invisible{stroke-width:0;fill:none;}#mbackend16 .edge-pattern-dashed{stroke-dasharray:3;}#mbackend16 .edge-pattern-dotted{stroke-dasharray:2;}#mbackend16 .marker{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 .marker.cross{stroke:#6b7c93;}#mbackend16 svg{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;font-size:14px;}#mbackend16 p{margin:0;}#mbackend16 defs [id$="-barbEnd"]{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 g.stateGroup text{fill:#b9c8e0;stroke:none;font-size:10px;}#mbackend16 g.stateGroup text{fill:#1e2a38;stroke:none;font-size:10px;}#mbackend16 g.stateGroup .state-title{font-weight:bolder;fill:#1e2a38;}#mbackend16 g.stateGroup rect{fill:#eef4ff;stroke:#b9c8e0;}#mbackend16 g.stateGroup line{stroke:#6b7c93;stroke-width:1;}#mbackend16 .transition{stroke:#6b7c93;stroke-width:1;fill:none;}#mbackend16 .stateGroup .composit{fill:#f4f4f4;border-bottom:1px;}#mbackend16 .stateGroup .alt-composit{fill:#e0e0e0;border-bottom:1px;}#mbackend16 .state-note{stroke:#f3c98b;fill:#fff7ed;}#mbackend16 .state-note text{fill:#7c3e06;stroke:none;font-size:10px;}#mbackend16 .stateLabel .box{stroke:none;stroke-width:0;fill:#eef4ff;opacity:0.5;}#mbackend16 .edgeLabel .label rect{fill:#eef4ff;opacity:0.5;}#mbackend16 .edgeLabel{background-color:#fbfbfa;text-align:center;}#mbackend16 .edgeLabel p{background-color:#fbfbfa;}#mbackend16 .edgeLabel rect{opacity:0.5;background-color:#fbfbfa;fill:#fbfbfa;}#mbackend16 .edgeLabel .label text{fill:#1e2a38;}#mbackend16 .label div .edgeLabel{color:#1e2a38;}#mbackend16 .stateLabel text{fill:#1e2a38;font-size:10px;font-weight:bold;}#mbackend16 .node circle.state-start{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 .node .fork-join{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 .node circle.state-end{fill:#b9c8e0;stroke:#f4f4f4;stroke-width:1.5;}#mbackend16 .end-state-inner{fill:#f4f4f4;stroke-width:1.5;}#mbackend16 .node rect{fill:#eef4ff;stroke:#b9c8e0;stroke-width:1px;}#mbackend16 .node polygon{fill:#eef4ff;stroke:#b9c8e0;stroke-width:1px;}#mbackend16 [id$="-barbEnd"]{fill:#6b7c93;}#mbackend16 .statediagram-cluster rect{fill:#eef4ff;stroke:#b9c8e0;stroke-width:1px;}#mbackend16 .cluster-label,#mbackend16 .nodeLabel{color:#1e2a38;}#mbackend16 .statediagram-cluster rect.outer{rx:5px;ry:5px;}#mbackend16 .statediagram-state .divider{stroke:#b9c8e0;}#mbackend16 .statediagram-state .title-state{rx:5px;ry:5px;}#mbackend16 .statediagram-cluster.statediagram-cluster .inner{fill:#f4f4f4;}#mbackend16 .statediagram-cluster.statediagram-cluster-alt .inner{fill:#ffffff;}#mbackend16 .statediagram-cluster .inner{rx:0;ry:0;}#mbackend16 .statediagram-state rect.basic{rx:5px;ry:5px;}#mbackend16 .statediagram-state rect.divider{stroke-dasharray:10,10;fill:#ffffff;}#mbackend16 .note-edge{stroke-dasharray:5;}#mbackend16 .statediagram-note rect{fill:#fff7ed;stroke:#f3c98b;stroke-width:1px;rx:0;ry:0;}#mbackend16 .statediagram-note rect{fill:#fff7ed;stroke:#f3c98b;stroke-width:1px;rx:0;ry:0;}#mbackend16 .statediagram-note text{fill:#7c3e06;}#mbackend16 .statediagram-note .nodeLabel{color:#7c3e06;}#mbackend16 .statediagram .edgeLabel{color:red;}#mbackend16 [id$="-dependencyStart"],#mbackend16 [id$="-dependencyEnd"]{fill:#6b7c93;stroke:#6b7c93;stroke-width:1;}#mbackend16 .statediagramTitleText{text-anchor:middle;font-size:18px;fill:#1e2a38;}#mbackend16 [data-look="neo"].statediagram-cluster rect{fill:#eef4ff;stroke:url(#mbackend16-gradient);stroke-width:1;}#mbackend16 [data-look="neo"].statediagram-cluster rect.outer{rx:5px;ry:5px;filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 .node .neo-node{stroke:#b9c8e0;}#mbackend16 [data-look="neo"].node rect,#mbackend16 [data-look="neo"].cluster rect,#mbackend16 [data-look="neo"].node polygon{stroke:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].swimlane.cluster rect{filter:none;}#mbackend16 [data-look="neo"].node path{stroke:url(#mbackend16-gradient);stroke-width:1px;}#mbackend16 [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].node .neo-line path{stroke:#b9c8e0;filter:none;}#mbackend16 [data-look="neo"].node circle{stroke:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].node circle .state-start{fill:#000000;}#mbackend16 [data-look="neo"].icon-shape .icon{fill:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].icon-shape .icon-neo path{stroke:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 :root{--mermaid-font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;}</style><g><defs><marker id="mbackend16_stateDiagram-barbEnd" refX="19" refY="7" markerWidth="20" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path d="M 19,7 L9,13 L14,7 L9,1 Z"></path></marker></defs><g class="root"><g class="clusters"></g><g class="edgePaths"><path d="M396.828,22L396.828,29.367C396.828,36.733,396.828,51.467,396.828,66.2C396.828,80.933,396.828,95.667,396.828,103.033L396.828,110.4" id="mbackend16-edge0" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge0" data-points="W3sieCI6Mzk2LjgyODEyNSwieSI6MjJ9LHsieCI6Mzk2LjgyODEyNSwieSI6NjYuMjAwMDAwNzYyOTM5NDV9LHsieCI6Mzk2LjgyODEyNSwieSI6MTEwLjQwMDAwMTUyNTg3ODl9XQ==" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M433.348,145.4L446.043,151.483C458.738,157.567,484.128,169.733,496.823,184.817C509.519,199.9,509.519,217.9,509.519,235.9C509.519,253.9,509.519,271.9,515.473,286.983C521.427,302.067,533.336,314.233,539.291,320.317L545.245,326.4" id="mbackend16-edge1" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge1" data-points="W3sieCI6NDMzLjM0ODE3MTY1Nzk4NjEsInkiOjE0NS40MDAwMDE1MjU4Nzg5fSx7IngiOjUwOS41MTg1NTQ2ODc1LCJ5IjoxODEuOTAwMDAxNTI1ODc4OX0seyJ4Ijo1MDkuNTE4NTU0Njg3NSwieSI6MjM1LjkwMDAwMTUyNTg3ODl9LHsieCI6NTA5LjUxODU1NDY4NzUsInkiOjI4OS45MDAwMDE1MjU4Nzg5fSx7IngiOjU0NS4yNDQ5MzYzNDI1OTI2LCJ5IjozMjYuNDAwMDAxNTI1ODc4OX1d" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M354.695,134.575L304.911,142.463C255.127,150.35,155.559,166.125,105.775,180.096C55.991,194.067,55.991,206.233,55.991,212.317L55.991,218.4" id="mbackend16-edge2" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge2" data-points="W3sieCI6MzU0LjY5NTMxMjUsInkiOjEzNC41NzUyNDI3Mzg3MTIwNn0seyJ4Ijo1NS45OTA3MjI2NTYyNSwieSI6MTgxLjkwMDAwMTUyNTg3ODl9LHsieCI6NTUuOTkwNzIyNjU2MjUsInkiOjIxOC40MDAwMDE1MjU4Nzg5fV0=" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M354.695,139.703L329.589,146.736C304.483,153.768,254.271,167.834,240.024,180.95C225.776,194.067,247.492,206.233,258.35,212.317L269.208,218.4" id="mbackend16-edge3" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge3" data-points="W3sieCI6MzU0LjY5NTMxMjUsInkiOjEzOS43MDI2MTA1MDc4NjkzNH0seyJ4IjoyMDQuMDU5NTcwMzEyNSwieSI6MTgxLjkwMDAwMTUyNTg3ODl9LHsieCI6MjY5LjIwODIwMjIyMDc3NTQzLCJ5IjoyMTguNDAwMDAxNTI1ODc4OX1d" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M331.679,218.4L342.538,212.317C353.396,206.233,375.112,194.067,385.97,181.9C396.828,169.733,396.828,157.567,396.828,151.483L396.828,145.4" id="mbackend16-edge4" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge4" data-points="W3sieCI6MzMxLjY3OTQ5MzA5MTcyNDU3LCJ5IjoyMTguNDAwMDAxNTI1ODc4OX0seyJ4IjozOTYuODI4MTI1LCJ5IjoxODEuOTAwMDAxNTI1ODc4OX0seyJ4IjozOTYuODI4MTI1LCJ5IjoxNDUuNDAwMDAxNTI1ODc4OX1d" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M438.961,138.317L468.339,145.581C497.717,152.845,556.473,167.372,585.851,180.72C615.229,194.067,615.229,206.233,615.229,212.317L615.229,218.4" id="mbackend16-edge5" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge5" data-points="W3sieCI6NDM4Ljk2MDkzNzUsInkiOjEzOC4zMTczODk5NTI5NzAzfSx7IngiOjYxNS4yMjk0OTIxODc1LCJ5IjoxODEuOTAwMDAxNTI1ODc4OX0seyJ4Ijo2MTUuMjI5NDkyMTg3NSwieSI6MjE4LjQwMDAwMTUyNTg3ODl9XQ==" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M615.229,253.4L615.229,259.483C615.229,265.567,615.229,277.733,609.275,289.9C603.321,302.067,591.412,314.233,585.458,320.317L579.503,326.4" id="mbackend16-edge6" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge6" data-points="W3sieCI6NjE1LjIyOTQ5MjE4NzUsInkiOjI1My40MDAwMDE1MjU4Nzg5fSx7IngiOjYxNS4yMjk0OTIxODc1LCJ5IjoyODkuOTAwMDAxNTI1ODc4OX0seyJ4Ijo1NzkuNTAzMTEwNTMyNDA3NCwieSI6MzI2LjQwMDAwMTUyNTg3ODl9XQ==" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path></g><g class="edgeLabels"><g class="edgeLabel" transform="translate(396.828125, 66.20000076293945)"><g class="label" data-id="edge0" transform="translate(-0.3232421875, -16.20000171661377)"><g><rect class="background" style="" x="-90.4453125" y="-2.9999990463256836" width="181.537109375" height="38.400001525878906"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">resolver</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 登记</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> run</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> +</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 落</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> user</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">消息</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(509.5185546875, 235.9000015258789)"><g class="label" data-id="edge1" transform="translate(0, -8.500000953674316)"><g><rect class="background" style="" x="-31" y="-2.9999990463256836" width="62" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">正常结束</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(55.99072265625, 181.9000015258789)"><g class="label" data-id="edge2" transform="translate(0.00146484375, -8.500000953674316)"><g><rect class="background" style="" x="-47.9921875" y="-2.9999990463256836" width="95.9814453125" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">模型/工具错误</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(243.4232, 170.87312)"><g class="label" data-id="edge3" transform="translate(0, -8.500000953674316)"><g><rect class="background" style="" x="-80.078125" y="-2.9999990463256836" width="160.15625" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">工具要人工确认（HITL）</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(396.828125, 181.9000015258789)"><g class="label" data-id="edge4" transform="translate(-0.0263671875, -8.500000953674316)"><g><rect class="background" style="" x="-92.6640625" y="-2.9999990463256836" width="185.380859375" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">下一次</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> /agui/run</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 带</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> resume</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(615.2294921875, 181.9000015258789)"><g class="label" data-id="edge5" transform="translate(0, -8.500000953674316)"><g><rect class="background" style="" x="-85.7109375" y="-2.9999990463256836" width="171.421875" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">60</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 秒零事件</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> /</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 10</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 分钟停滞</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(615.2294921875, 289.9000015258789)"><g class="label" data-id="edge6" transform="translate(-0.4931640625, -8.500000953674316)"><g><rect class="background" style="" x="-67.34375" y="-2.9999990463256836" width="135.673828125" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">收割器收尾</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> +</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 退回合</tspan></tspan></text></g></g></g></g><g class="nodes"><g class="node default" id="mbackend16-state-root_start-0" data-look="classic" transform="translate(396.828125, 15)"><circle class="state-start" r="7" width="14" height="14"></circle></g><g class="node  statediagram-state " id="mbackend16-state-RUNNING-5" data-look="classic" transform="translate(396.828125, 127.9000015258789)"><rect class="basic label-container" style="" rx="5" ry="5" x="-42.1328125" y="-17.5" width="84.265625" height="35"></rect><g class="label" style="" transform="translate(-34.1328125, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">RUNNING</tspan></tspan></text></g></g></g><g class="node  statediagram-state " id="mbackend16-state-DONE-6" data-look="classic" transform="translate(562.3740234375, 343.9000015258789)"><rect class="basic label-container" style="" rx="5" ry="5" x="-28.7275390625" y="-17.5" width="57.455078125" height="35"></rect><g class="label" style="" transform="translate(-20.7275390625, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">DONE</tspan></tspan></text></g></g></g><g class="node  statediagram-state " id="mbackend16-state-FAILED-2" data-look="classic" transform="translate(55.99072265625, 235.9000015258789)"><rect class="basic label-container" style="" rx="5" ry="5" x="-31.150390625" y="-17.5" width="62.30078125" height="35"></rect><g class="label" style="" transform="translate(-23.150390625, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">FAILED</tspan></tspan></text></g></g></g><g class="node  statediagram-state " id="mbackend16-state-WAITING-4" data-look="classic" transform="translate(300.44384765625, 235.9000015258789)"><rect class="basic label-container" style="" rx="5" ry="5" x="-39.3046875" y="-17.5" width="78.609375" height="35"></rect><g class="label" style="" transform="translate(-31.3046875, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">WAITING</tspan></tspan></text></g></g></g><g class="node  statediagram-state " id="mbackend16-state-STALLED-6" data-look="classic" transform="translate(615.2294921875, 235.9000015258789)"><rect class="basic label-container" style="" rx="5" ry="5" x="-36.94384765625" y="-17.5" width="73.8876953125" height="35"></rect><g class="label" style="" transform="translate(-28.94384765625, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">STALLED</tspan></tspan></text></g></g></g></g></g></g><defs><filter id="mbackend16-drop-shadow" height="130%" width="130%"><feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"></feDropShadow></filter></defs><defs><filter id="mbackend16-drop-shadow-small" height="150%" width="150%"><feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"></feDropShadow></filter></defs><linearGradient id="mbackend16-gradient" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#b9c8e0" stop-opacity="1"></stop><stop offset="100%" stop-color="hsl(216, 0%, 87.4509803922%)" stop-opacity="1"></stop></linearGradient></svg></div>
+      <div class="diagram-canvas" role="button" tabindex="0" aria-label="放大查看：5.10.2 run 生命周期：一次 run 有哪些状态？多实例下谁来收尾？" data-w="880" data-h="509" data-name="5.10.2 run 生命周期"><svg id="mbackend16" xmlns="http://www.w3.org/2000/svg" class="flow-svg statediagram" viewBox="0 0 879.6015625 508.60003662109375" role="graphics-document document" aria-roledescription="stateDiagram" width="100%" style="max-width:880px" preserveAspectRatio="xMidYMid meet"><style>#mbackend16{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;font-size:14px;fill:#1e2a38;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#mbackend16 .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#mbackend16 .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#mbackend16 .error-icon{fill:#ffffff;}#mbackend16 .error-text{fill:#000000;stroke:#000000;}#mbackend16 .edge-thickness-normal{stroke-width:1px;}#mbackend16 .edge-thickness-thick{stroke-width:3.5px;}#mbackend16 .edge-pattern-solid{stroke-dasharray:0;}#mbackend16 .edge-thickness-invisible{stroke-width:0;fill:none;}#mbackend16 .edge-pattern-dashed{stroke-dasharray:3;}#mbackend16 .edge-pattern-dotted{stroke-dasharray:2;}#mbackend16 .marker{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 .marker.cross{stroke:#6b7c93;}#mbackend16 svg{font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;font-size:14px;}#mbackend16 p{margin:0;}#mbackend16 defs [id$="-barbEnd"]{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 g.stateGroup text{fill:#b9c8e0;stroke:none;font-size:10px;}#mbackend16 g.stateGroup text{fill:#1e2a38;stroke:none;font-size:10px;}#mbackend16 g.stateGroup .state-title{font-weight:bolder;fill:#1e2a38;}#mbackend16 g.stateGroup rect{fill:#eef4ff;stroke:#b9c8e0;}#mbackend16 g.stateGroup line{stroke:#6b7c93;stroke-width:1;}#mbackend16 .transition{stroke:#6b7c93;stroke-width:1;fill:none;}#mbackend16 .stateGroup .composit{fill:#f4f4f4;border-bottom:1px;}#mbackend16 .stateGroup .alt-composit{fill:#e0e0e0;border-bottom:1px;}#mbackend16 .state-note{stroke:#f3c98b;fill:#fff7ed;}#mbackend16 .state-note text{fill:#7c3e06;stroke:none;font-size:10px;}#mbackend16 .stateLabel .box{stroke:none;stroke-width:0;fill:#eef4ff;opacity:0.5;}#mbackend16 .edgeLabel .label rect{fill:#eef4ff;opacity:0.5;}#mbackend16 .edgeLabel{background-color:#fbfbfa;text-align:center;}#mbackend16 .edgeLabel p{background-color:#fbfbfa;}#mbackend16 .edgeLabel rect{opacity:0.5;background-color:#fbfbfa;fill:#fbfbfa;}#mbackend16 .edgeLabel .label text{fill:#1e2a38;}#mbackend16 .label div .edgeLabel{color:#1e2a38;}#mbackend16 .stateLabel text{fill:#1e2a38;font-size:10px;font-weight:bold;}#mbackend16 .node circle.state-start{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 .node .fork-join{fill:#6b7c93;stroke:#6b7c93;}#mbackend16 .node circle.state-end{fill:#b9c8e0;stroke:#f4f4f4;stroke-width:1.5;}#mbackend16 .end-state-inner{fill:#f4f4f4;stroke-width:1.5;}#mbackend16 .node rect{fill:#eef4ff;stroke:#b9c8e0;stroke-width:1px;}#mbackend16 .node polygon{fill:#eef4ff;stroke:#b9c8e0;stroke-width:1px;}#mbackend16 [id$="-barbEnd"]{fill:#6b7c93;}#mbackend16 .statediagram-cluster rect{fill:#eef4ff;stroke:#b9c8e0;stroke-width:1px;}#mbackend16 .cluster-label,#mbackend16 .nodeLabel{color:#1e2a38;}#mbackend16 .statediagram-cluster rect.outer{rx:5px;ry:5px;}#mbackend16 .statediagram-state .divider{stroke:#b9c8e0;}#mbackend16 .statediagram-state .title-state{rx:5px;ry:5px;}#mbackend16 .statediagram-cluster.statediagram-cluster .inner{fill:#f4f4f4;}#mbackend16 .statediagram-cluster.statediagram-cluster-alt .inner{fill:#ffffff;}#mbackend16 .statediagram-cluster .inner{rx:0;ry:0;}#mbackend16 .statediagram-state rect.basic{rx:5px;ry:5px;}#mbackend16 .statediagram-state rect.divider{stroke-dasharray:10,10;fill:#ffffff;}#mbackend16 .note-edge{stroke-dasharray:5;}#mbackend16 .statediagram-note rect{fill:#fff7ed;stroke:#f3c98b;stroke-width:1px;rx:0;ry:0;}#mbackend16 .statediagram-note rect{fill:#fff7ed;stroke:#f3c98b;stroke-width:1px;rx:0;ry:0;}#mbackend16 .statediagram-note text{fill:#7c3e06;}#mbackend16 .statediagram-note .nodeLabel{color:#7c3e06;}#mbackend16 .statediagram .edgeLabel{color:red;}#mbackend16 [id$="-dependencyStart"],#mbackend16 [id$="-dependencyEnd"]{fill:#6b7c93;stroke:#6b7c93;stroke-width:1;}#mbackend16 .statediagramTitleText{text-anchor:middle;font-size:18px;fill:#1e2a38;}#mbackend16 [data-look="neo"].statediagram-cluster rect{fill:#eef4ff;stroke:url(#mbackend16-gradient);stroke-width:1;}#mbackend16 [data-look="neo"].statediagram-cluster rect.outer{rx:5px;ry:5px;filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 .node .neo-node{stroke:#b9c8e0;}#mbackend16 [data-look="neo"].node rect,#mbackend16 [data-look="neo"].cluster rect,#mbackend16 [data-look="neo"].node polygon{stroke:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].swimlane.cluster rect{filter:none;}#mbackend16 [data-look="neo"].node path{stroke:url(#mbackend16-gradient);stroke-width:1px;}#mbackend16 [data-look="neo"].node .outer-path{filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].node .neo-line path{stroke:#b9c8e0;filter:none;}#mbackend16 [data-look="neo"].node circle{stroke:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].node circle .state-start{fill:#000000;}#mbackend16 [data-look="neo"].icon-shape .icon{fill:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 [data-look="neo"].icon-shape .icon-neo path{stroke:url(#mbackend16-gradient);filter:drop-shadow( 1px 2px 2px rgba(185,185,185,1));}#mbackend16 :root{--mermaid-font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;}</style><g><defs><marker id="mbackend16_stateDiagram-barbEnd" refX="19" refY="7" markerWidth="20" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto"><path d="M 19,7 L9,13 L14,7 L9,1 Z"></path></marker></defs><g class="root"><g class="clusters"><g class="note-cluster" id="mbackend16-state-RUNNING----parent-4"><rect x="352.21923828125" y="233.8000030517578" width="252.1533203125" height="108.4000015258789" fill="none"></rect></g><g class="note-cluster" id="mbackend16-state-INTERRUPTED----parent-5"><rect x="518.3828125" y="392.2000045776367" width="353.21875" height="108.4000015258789" fill="none"></rect></g></g><g class="edgePaths"><path d="M382.182,22L382.182,29.367C382.182,36.733,382.182,51.467,382.182,66.2C382.182,80.933,382.182,95.667,382.182,103.033L382.182,110.4" id="mbackend16-edge0" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge0" data-points="W3sieCI6MzgyLjE4MjM3MzA0Njg3NSwieSI6MjJ9LHsieCI6MzgyLjE4MjM3MzA0Njg3NSwieSI6NjYuMjAwMDAwNzYyOTM5NDV9LHsieCI6MzgyLjE4MjM3MzA0Njg3NSwieSI6MTEwLjQwMDAwMTUyNTg3ODl9XQ==" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M340.05,136.969L299.298,145.741C258.546,154.513,177.043,172.056,136.291,188.195C95.539,204.333,95.539,219.067,95.539,232.55C95.539,246.033,95.539,258.267,95.539,264.383L95.539,270.5" id="mbackend16-edge1" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge1" data-points="W3sieCI6MzQwLjA0OTU2MDU0Njg3NSwieSI6MTM2Ljk2OTA5MzU1Njc5MDV9LHsieCI6OTUuNTM5MDYyNSwieSI6MTg5LjYwMDAwMjI4ODgxODM2fSx7IngiOjk1LjUzOTA2MjUsInkiOjIzMy44MDAwMDMwNTE3NTc4fSx7IngiOjk1LjUzOTA2MjUsInkiOjI3MC41MDAwMDM4MTQ2OTcyN31d" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M354.922,145.4L343.446,152.767C331.971,160.133,309.02,174.867,297.544,189.6C286.069,204.333,286.069,219.067,286.069,232.55C286.069,246.033,286.069,258.267,286.069,264.383L286.069,270.5" id="mbackend16-edge2" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge2" data-points="W3sieCI6MzU0LjkyMTY0OTAwMjUwNDYsInkiOjE0NS40MDAwMDE1MjU4Nzg5fSx7IngiOjI4Ni4wNjg4NDc2NTYyNSwieSI6MTg5LjYwMDAwMjI4ODgxODM2fSx7IngiOjI4Ni4wNjg4NDc2NTYyNSwieSI6MjMzLjgwMDAwMzA1MTc1Nzh9LHsieCI6Mjg2LjA2ODg0NzY1NjI1LCJ5IjoyNzAuNTAwMDAzODE0Njk3Mjd9XQ==" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M424.315,136.21L469.428,145.109C514.541,154.007,604.767,171.803,649.879,188.068C694.992,204.333,694.992,219.067,694.992,232.55C694.992,246.033,694.992,258.267,694.992,264.383L694.992,270.5" id="mbackend16-edge3" class=" edge-thickness-normal edge-pattern-solid transition" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="edge3" data-points="W3sieCI6NDI0LjMxNTE4NTU0Njg3NSwieSI6MTM2LjIxMDQ2NTA4MzIzMTA3fSx7IngiOjY5NC45OTIxODc1LCJ5IjoxODkuNjAwMDAyMjg4ODE4MzZ9LHsieCI6Njk0Ljk5MjE4NzUsInkiOjIzMy44MDAwMDMwNTE3NTc4fSx7IngiOjY5NC45OTIxODc1LCJ5IjoyNzAuNTAwMDAzODE0Njk3Mjd9XQ==" data-look="classic" marker-end="url(#mbackend16_stateDiagram-barbEnd)"></path><path d="M409.443,145.4L420.919,152.767C432.394,160.133,455.345,174.867,466.82,189.6C478.296,204.333,478.296,219.067,478.296,230.6C478.296,242.133,478.296,250.467,478.296,254.633L478.296,258.8" id="mbackend16-RUNNING-RUNNING----note-4" class=" edge-thickness-normal edge-pattern-solid transition note-edge" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="RUNNING-RUNNING----note-4" data-points="W3sieCI6NDA5LjQ0MzA5NzA5MTI0NTQsInkiOjE0NS40MDAwMDE1MjU4Nzg5fSx7IngiOjQ3OC4yOTU4OTg0Mzc1LCJ5IjoxODkuNjAwMDAyMjg4ODE4MzZ9LHsieCI6NDc4LjI5NTg5ODQzNzUsInkiOjIzMy44MDAwMDMwNTE3NTc4fSx7IngiOjQ3OC4yOTU4OTg0Mzc1LCJ5IjoyNTguODAwMDAzMDUxNzU3OH1d" data-look="classic"></path><path d="M694.992,305.5L694.992,311.617C694.992,317.733,694.992,329.967,694.992,340.25C694.992,350.533,694.992,358.867,694.992,367.2C694.992,375.533,694.992,383.867,694.992,392.2C694.992,400.533,694.992,408.867,694.992,413.033L694.992,417.2" id="mbackend16-INTERRUPTED-INTERRUPTED----note-5" class=" edge-thickness-normal edge-pattern-solid transition note-edge" style="fill:none;;;fill:none" data-edge="true" data-et="edge" data-id="INTERRUPTED-INTERRUPTED----note-5" data-points="W3sieCI6Njk0Ljk5MjE4NzUsInkiOjMwNS41MDAwMDM4MTQ2OTcyN30seyJ4Ijo2OTQuOTkyMTg3NSwieSI6MzQyLjIwMDAwNDU3NzYzNjd9LHsieCI6Njk0Ljk5MjE4NzUsInkiOjM2Ny4yMDAwMDQ1Nzc2MzY3fSx7IngiOjY5NC45OTIxODc1LCJ5IjozOTIuMjAwMDA0NTc3NjM2N30seyJ4Ijo2OTQuOTkyMTg3NSwieSI6NDE3LjIwMDAwNDU3NzYzNjd9XQ==" data-look="classic"></path></g><g class="edgeLabels"><g class="edgeLabel" transform="translate(382.182373046875, 66.20000076293945)"><g class="label" data-id="edge0" transform="translate(-0.3232421875, -16.20000171661377)"><g><rect class="background" style="" x="-90.4453125" y="-2.9999990463256836" width="181.537109375" height="38.400001525878906"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">resolver</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 登记</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> run</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> +</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 落</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> user</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">消息</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(95.5390625, 189.60000228881836)"><g class="label" data-id="edge1" transform="translate(0.5, -8.500000953674316)"><g><rect class="background" style="" x="-88.0390625" y="-2.9999990463256836" width="175.078125" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">正常结束（条件</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> UPDATE）</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(286.06884765625, 189.60000228881836)"><g class="label" data-id="edge2" transform="translate(0.00146484375, -16.20000171661377)"><g><rect class="background" style="" x="-82.9921875" y="-2.9999990463256836" width="165.9814453125" height="38.400001525878906"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">模型/工具错误（原因码落</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">run_issue）</tspan></tspan></text></g></g></g><g class="edgeLabel" transform="translate(694.9921875, 189.60000228881836)"><g class="label" data-id="edge3" transform="translate(0, -8.500000953674316)"><g><rect class="background" style="" x="-93.28125" y="-2.9999990463256836" width="186.5625" height="23"></rect><text y="-10.1" text-anchor="middle" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">用户停止</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> /</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 断连</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> /</tspan><tspan font-style="normal" class="text-inner-tspan" font-weight="normal"> 卡死被收割</tspan></tspan></text></g></g></g><g class="edgeLabel"><g class="label" data-id="RUNNING-RUNNING----note-4" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g><g class="edgeLabel"><g class="label" data-id="INTERRUPTED-INTERRUPTED----note-5" transform="translate(0, 0)"><text y="-10.1" text-anchor="middle"><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em" text-anchor="middle"></tspan></text></g></g><g><rect class="background" style="stroke: none"></rect></g></g><g class="nodes"><g class="node default" id="mbackend16-state-root_start-0" data-look="classic" transform="translate(382.182373046875, 15)"><circle class="state-start" r="7" width="14" height="14"></circle></g><g class="node  statediagram-state " id="mbackend16-state-RUNNING-4" data-look="classic" transform="translate(382.182373046875, 127.9000015258789)"><rect class="basic label-container" style="" rx="5" ry="5" x="-42.1328125" y="-17.5" width="84.265625" height="35"></rect><g class="label" style="" transform="translate(-34.1328125, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">RUNNING</tspan></tspan></text></g></g></g><g class="node  statediagram-state " id="mbackend16-state-COMPLETED-1" data-look="classic" transform="translate(95.5390625, 288.00000381469727)"><rect class="basic label-container" style="" rx="5" ry="5" x="-50.22607421875" y="-17.5" width="100.4521484375" height="35"></rect><g class="label" style="" transform="translate(-42.22607421875, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">COMPLETED</tspan></tspan></text></g></g></g><g class="node  statediagram-state " id="mbackend16-state-FAILED-2" data-look="classic" transform="translate(286.06884765625, 288.00000381469727)"><rect class="basic label-container" style="" rx="5" ry="5" x="-31.150390625" y="-17.5" width="62.30078125" height="35"></rect><g class="label" style="" transform="translate(-23.150390625, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">FAILED</tspan></tspan></text></g></g></g><g class="node  statediagram-state " id="mbackend16-state-INTERRUPTED-5" data-look="classic" transform="translate(694.9921875, 288.00000381469727)"><rect class="basic label-container" style="" rx="5" ry="5" x="-55.61962890625" y="-17.5" width="111.2392578125" height="35"></rect><g class="label" style="" transform="translate(-47.61962890625, -9.5)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">INTERRUPTED</tspan></tspan></text></g></g></g><g class="node statediagram-note " id="mbackend16-state-RUNNING----note-4" data-look="classic" transform="translate(478.2958984375, 288.00000381469727)"><g class="basic label-container outer-path"><path d="M-91.07666015625 -29.200000762939453 L91.07666015625 -29.200000762939453 L91.07666015625 29.200000762939453 L-91.07666015625 29.200000762939453" stroke="none" stroke-width="0" fill="#fff7ed" style=""></path><path d="M-91.07666015625 -29.200000762939453 C-24.114525897895547 -29.200000762939453, 42.847608360458906 -29.200000762939453, 91.07666015625 -29.200000762939453 M-91.07666015625 -29.200000762939453 C-31.91355121213339 -29.200000762939453, 27.249557731983217 -29.200000762939453, 91.07666015625 -29.200000762939453 M91.07666015625 -29.200000762939453 C91.07666015625 -14.077597712930556, 91.07666015625 1.0448053370783406, 91.07666015625 29.200000762939453 M91.07666015625 -29.200000762939453 C91.07666015625 -13.104760988957334, 91.07666015625 2.9904787850247843, 91.07666015625 29.200000762939453 M91.07666015625 29.200000762939453 C40.1468170802439 29.200000762939453, -10.783025995762202 29.200000762939453, -91.07666015625 29.200000762939453 M91.07666015625 29.200000762939453 C35.71282679451512 29.200000762939453, -19.651006567219767 29.200000762939453, -91.07666015625 29.200000762939453 M-91.07666015625 29.200000762939453 C-91.07666015625 14.328336621373294, -91.07666015625 -0.5433275201928645, -91.07666015625 -29.200000762939453 M-91.07666015625 29.200000762939453 C-91.07666015625 12.355939853984044, -91.07666015625 -4.488121054971366, -91.07666015625 -29.200000762939453" stroke="#f3c98b" stroke-width="1.3" fill="none" stroke-dasharray="0 0" style=""></path></g><g class="label noteLabel" style="" transform="translate(-78.07666015625, -16.20000171661377)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">等人工确认（HITL）仍是</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">RUNNING，仅收割豁免</tspan></tspan></text></g></g></g><g class="node statediagram-note " id="mbackend16-state-INTERRUPTED----note-5" data-look="classic" transform="translate(694.9921875, 446.4000053405762)"><g class="basic label-container outer-path"><path d="M-141.609375 -29.200000762939453 L141.609375 -29.200000762939453 L141.609375 29.200000762939453 L-141.609375 29.200000762939453" stroke="none" stroke-width="0" fill="#fff7ed" style=""></path><path d="M-141.609375 -29.200000762939453 C-37.431390367744285 -29.200000762939453, 66.74659426451143 -29.200000762939453, 141.609375 -29.200000762939453 M-141.609375 -29.200000762939453 C-34.45184948809772 -29.200000762939453, 72.70567602380456 -29.200000762939453, 141.609375 -29.200000762939453 M141.609375 -29.200000762939453 C141.609375 -8.163404474557048, 141.609375 12.873191813825358, 141.609375 29.200000762939453 M141.609375 -29.200000762939453 C141.609375 -15.459864646628352, 141.609375 -1.7197285303172514, 141.609375 29.200000762939453 M141.609375 29.200000762939453 C42.519052550976184 29.200000762939453, -56.57126989804763 29.200000762939453, -141.609375 29.200000762939453 M141.609375 29.200000762939453 C79.96738290271479 29.200000762939453, 18.325390805429578 29.200000762939453, -141.609375 29.200000762939453 M-141.609375 29.200000762939453 C-141.609375 6.414658877227904, -141.609375 -16.370683008483645, -141.609375 -29.200000762939453 M-141.609375 29.200000762939453 C-141.609375 10.978955038706637, -141.609375 -7.242090685526179, -141.609375 -29.200000762939453" stroke="#f3c98b" stroke-width="1.3" fill="none" stroke-dasharray="0 0" style=""></path></g><g class="label noteLabel" style="" transform="translate(-129.609375, -16.20000171661377)"><rect></rect><g><rect class="background" style="stroke: none"></rect><text y="-10.1" style=""><tspan class="text-outer-tspan row" x="0" y="-0.1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">卡死=收割产生（60秒零事件/10分钟停滞</tspan></tspan><tspan class="text-outer-tspan row" x="0" y="1em" dy="1.1em"><tspan font-style="normal" class="text-inner-tspan" font-weight="normal">）</tspan></tspan></text></g></g></g></g></g></g><defs><filter id="mbackend16-drop-shadow" height="130%" width="130%"><feDropShadow dx="4" dy="4" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"></feDropShadow></filter></defs><defs><filter id="mbackend16-drop-shadow-small" height="150%" width="150%"><feDropShadow dx="2" dy="2" stdDeviation="0" flood-opacity="0.06" flood-color="#000000"></feDropShadow></filter></defs><linearGradient id="mbackend16-gradient" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#b9c8e0" stop-opacity="1"></stop><stop offset="100%" stop-color="hsl(216, 0%, 87.4509803922%)" stop-opacity="1"></stop></linearGradient></svg></div>
       <p class="scroll-hint">手机可左右滑动看全图；点一下放大，文字可直接选中复制。<span class="swipe-cue">滑动 →</span></p>
     </div>
     <div class="diagram-read">
       <p class="read-title">读图顺序</p>
-      <ol><li>状态从 RUNNING 出发，终态是 DONE / FAILED，等待人工是 WAITING，卡死是 STALLED。</li><li>owner_instance 标记哪个实例在跑，粘性路由保证续看回到同一实例。</li><li>终端状态必须在释放 RUN_FINISHED 之前同步写库，否则前端会看到“结束了但没落账”。</li><li>流 hub 保留 4096 帧回放环，溢出补 dcs-resume-truncated。</li></ol>
+      <ol><li>只有四个状态：RUNNING / COMPLETED / FAILED / INTERRUPTED；等人工确认仍是 RUNNING（仅收割豁免），没有 WAITING / STALLED 态。</li><li>owner_instance 标记哪个实例在跑，粘性路由保证续看回到同一实例。</li><li>终端状态必须在释放 RUN_FINISHED 之前同步写库，否则前端会看到“结束了但没落账”。</li><li>回放汇（RunStreamHub）保留 4096 帧回放环，溢出补 dcs-resume-truncated。</li></ol>
     </div>
   </div>
   <div class="diagram-links">
@@ -2260,7 +2273,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <table>
           <thead><tr><th>状态</th><th>含义</th><th>前端表现</th></tr></thead>
           <tbody>
-            <tr><td>RUNNING</td><td>跑动中；等人工确认（ask_user / interrupt）也是它，仅做收割豁免</td><td>工作态 + 计时；HITL 卡</td></tr>
+            <tr><td>RUNNING</td><td>跑动中；等人工确认（ask_user / interrupt）也是它，仅做收割豁免（收割：后台定时任务把长期无动静的悬挂 run 强制收尾）</td><td>工作态 + 计时；HITL 卡</td></tr>
             <tr><td>COMPLETED</td><td>正常终答</td><td>消息落库</td></tr>
             <tr><td>FAILED</td><td>失败，六类原因码落 <code>dcs_assistant_run_issue</code></td><td>错误卡 + 重试入口</td></tr>
             <tr><td>INTERRUPTED</td><td>模型中断 / 用户停止 / 客户端断连</td><td>确认卡或停止态</td></tr>
@@ -2333,7 +2346,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 5.11.1 HITL 的真实流程</a>
+    <a href="backend-architecture.md">《后端架构详解》· 5.11.1 HITL 的真实流程</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2389,7 +2402,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
   <div class="fl-step">
     <span class="fl-n">3</span>
     <div class="fl-b"><b>透传流并聚合 usage</b><small>上游没给 usage 时按字符估算，结果标记 <code>est</code></small></div>
-    <span class="fl-side bad">缺失 → est</span>
+    <span class="fl-side warn">缺失 → est（估算）</span>
   </div>
   <div class="fl-step">
     <span class="fl-n">4</span>
@@ -2425,7 +2438,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 5.13 Agent 侧计费链</a>
+    <a href="backend-architecture.md">《后端架构详解》· 5.13 Agent 侧计费链</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2498,7 +2511,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 8.13 提示词装配</a>
+    <a href="backend-architecture.md">《后端架构详解》· 8.13 提示词装配</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2520,7 +2533,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       </div>
 
       <h3 id="s-8-14">记忆：一个写工具 + 一张用户私有表</h3>
-      <p>模型侧只有 <b>一个</b>记忆工具 <code>save_memory</code>（写）；读、编辑、清空、删单条全走 REST（<code>AssistantMemoryController</code>），不占工具面。落表 <code>dcs_assistant_memory</code>，行是<b>用户级私有</b>（tenant_id + user_id 双谓词）——没有租户共享记忆这种东西。</p>
+      <p>模型侧只有 <b>一个</b>记忆工具 <code>save_memory</code>（写）；读、编辑、清空、删单条全走 REST（<code>AssistantMemoryController</code>），不占工具面。落表 <code>dcs_assistant_memory</code>，行是<b>用户级私有</b>（tenant_id + user_id 双谓词——查询时同时按租户、用户两个条件过滤）——没有租户共享记忆这种东西。</p>
       <div class="table-wrap compact">
         <table>
           <thead><tr><th>开关</th><th>管什么</th></tr></thead>
@@ -2530,7 +2543,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
           </tbody>
         </table>
       </div>
-      <p>注入是动态的：<code>AssistantMemoryService.digest</code> 按最后一条用户提问做相关性打分取 TopK（30 秒缓存）；<code>MemoryInjectModelDecorator</code> 每次模型调用在末位追加 system「用户长期记忆：…」，无命中不注入；同时上报本轮注入条数与字数，供 <code>memory_turn</code> 帧显示。</p>
+      <p>注入是动态的：<code>AssistantMemoryService.digest</code> 按最后一条用户提问做相关性打分取 TopK（得分最高的前 K 条；30 秒缓存）；<code>MemoryInjectModelDecorator</code> 每次模型调用在末位追加 system「用户长期记忆：…」，无命中不注入；同时上报本轮注入条数与字数，供 <code>memory_turn</code> 帧显示。</p>
       <div class="callout note">
         <span class="t">排查「记忆没生效」</span>
         <p>顺序：租户开关 → 个人开关 → digest 有没有命中（看缓存与相关性）→ 注入条数（memory_turn 帧）。四步都过才是真没写入。</p>
@@ -2588,7 +2601,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 8.15 上下文预算与压缩</a>
+    <a href="backend-architecture.md">《后端架构详解》· 8.15 上下文预算与压缩</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2662,7 +2675,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 8.16 run 状态机</a>
+    <a href="backend-architecture.md">《后端架构详解》· 8.16 run 状态机</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2679,7 +2692,9 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         </table>
       </div>
       <h4>续看（attach）与回放汇</h4>
-      <p>刷新页面后续看：先查 DB 最新 RUNNING，再 <code>attach</code> 本进程的汇（RunStreamHub）。汇不在本实例或已被逐出 → 返回失败，前端回退刷历史——<b>跨实例不靠汇</b>，靠粘性：LB 按 <code>X-Thread-Id</code> 哈希路由（<code>AssistantStickyHeaderFilter</code> 校验），没有粘性头多实例一启动就报错。</p>
+      <p>刷新页面后续看：先查 DB 里该 thread 最新的 RUNNING run，再 <code>attach</code>（挂到本进程正在喂流的回放汇 RunStreamHub 上）重放缓冲帧。</p>
+      <p>attach 失败时前端怎么办：汇不在本实例或已被逐出 → 接口返回失败，前端回退成整页拉历史消息——丢的是续看体验，不是数据。</p>
+      <p>跨实例为什么不直接拉流：回放汇是进程内存里的缓冲，别的实例拿不到；所以多实例靠粘性路由兜底——LB（负载均衡网关）按 <code>X-Thread-Id</code> 做一致性哈希（同一会话固定落到同一台机器），<code>AssistantStickyHeaderFilter</code> 校验请求头；没配粘性头，多实例一启动就报错。</p>
       
 <figure class="diagram-card" id="fig-backend-31">
   <div class="diagram-head">
@@ -2723,7 +2738,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》· 8.16 多实例与续看</a>
+    <a href="backend-architecture.md">《后端架构详解》· 8.16 多实例与续看</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -2733,7 +2748,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       </div>
 
       <h3 id="s-8-17">8 个平台工具逐个说</h3>
-      <p>注册表就一张（<code>ToolRegistry</code>），8 个平台工具与权限规则同一循环注册。行为策略平台工具全是 ALLOW：写类靠 PlanGate 拦，不是靠工具自身弹确认。</p>
+      <p>注册表就一张（<code>ToolRegistry</code>），8 个平台工具与权限规则同一循环注册。行为策略平台工具全是 ALLOW：写类靠 PlanGate（计划闸：写类操作先出计划并获确认才放行）拦，不是靠工具自身弹确认。</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>工具</th><th>用途</th><th>读写</th><th>备注</th></tr></thead>
@@ -2751,7 +2766,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       </div>
       <div class="callout note">
         <span class="t">第九个不算平台工具</span>
-        <p><code>load_skill_through_path</code> 由官方技能中间件注册，不在上述 8 个里——数工具时别把它数进去。权限档 <code>ToolIdentity</code> 三档：MEMBER=0 / PUBLISHER·REVIEWER=1 / ADMIN=2；租户 <code>toolGate</code> 只能提档不能降档（member/admin 只升不降）。SPI 业务工具 <code>readOnly</code> 默认 false（fail-closed），写工具走 ASK 确认卡。</p>
+        <p><code>load_skill_through_path</code> 由官方技能中间件注册，不在上述 8 个里——数工具时别把它数进去。权限档 <code>ToolIdentity</code> 三档：MEMBER=0 / PUBLISHER·REVIEWER=1 / ADMIN=2；租户 <code>toolGate</code> 只能提档不能降档（member/admin 只升不降）。SPI 业务工具 <code>readOnly</code> 默认 false（fail-closed：没声明就按最严格处理——不标只读就当写工具，走 ASK 确认卡），写工具走 ASK 确认卡。</p>
       </div>
 
       <h3 id="s-8-18">加工具</h3>
@@ -2937,6 +2952,10 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         </table>
       </div>
       <div class="callout warn">
+        <span class="t">复原演示基线的三步</span>
+        <p>验完（或跨天/换参数重播前）按顺序走：①重灌演示数据 <code>node backend/script/demo/seed-internal-ops-demo.js --days 30</code>（内部协作故事口径，uid 前缀 <code>demo-io-</code>；同一天内重复执行按 eventUid 幂等跳过）；②先按 <code>demo-io-</code> 前缀清掉旧演示事件再重跑——跨天或换 <code>--days</code> 时 uid 同、内容会漂；③「数据分析 → 重建汇总」，数字回到基线 ±10%。</p>
+      </div>
+      <div class="callout warn">
         <span class="t">自动汇总有 2 秒去抖</span>
         <p>写完事件立刻查，数字没变是正常的。等 5 秒或手动重建汇总再断言。</p>
       </div>
@@ -3022,7 +3041,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
     </div>
   </div>
   <div class="diagram-links">
-    <a href="backend-architecture.md">《后端架构详解》第 10 章</a>
+    <a href="backend-architecture.md">《后端架构详解》第 10 章</a><span class="sep">·</span><span class="hint-note">手机横屏看更舒服（手绘图自适应重排，不缩放）</span>
   </div>
 </figure>
 
@@ -3099,7 +3118,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
       <div class="chapter-head">
         <div class="chapter-no">CHAPTER 11</div>
         <h2 id="h-11">上线清单</h2>
-        <p class="lead">上线只认清单，不认记忆。顺序是：构建 → 配环境 → 迁库 → 启动 → 冒烟 → 观察；任何一步没过就停，不要“先上了再说”。</p>
+        <p class="lead">上线只认清单，不认记忆。顺序是：构建 → 配环境 → 迁库 → 启动 → 冒烟（上线后最小验证：登录、开核心页、发一句话）→ 观察；任何一步没过就停，不要“先上了再说”。</p>
       </div>
 
       <h3 id="s-11-1">1. 构建与版本</h3>
@@ -3120,9 +3139,12 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
             <tr><td><code>SMARTDOCK_MCP_HEADERS_KEY</code></td><td>解密 MCP 请求头令牌</td><td>拒绝启动</td></tr>
             <tr><td>数据库连接</td><td>PG 地址/库/账号/口令</td><td>启动失败或连错库</td></tr>
             <tr><td>Redis 连接</td><td>缓存、锁、会话</td><td>启动失败或多实例锁失效</td></tr>
+            <tr><td>MinIO 连接</td><td>对象存储（附件、技能产物）</td><td>文件上传/下载不可用</td></tr>
+            <tr><td>SnailJob 服务端</td><td>定时任务调度（snailjob-server）</td><td>定时任务不触发</td></tr>
           </tbody>
         </table>
       </div>
+      <p>上表是「缺了起不来或核心功能坏」的最小集；可选项（邮件/短信/第三方登录等）的完整清单以 <a href="deploy.md">docs/deploy.md</a> 为准。</p>
       <div class="callout danger">
         <span class="t">两把钥匙必须不同且不进版本库</span>
         <p>16/24/32 位可见 ASCII。长度错、两把相同、沿用旧版内置钥匙，服务都会拒绝启动——这是故意的，不要为了“先起来”改代码。</p>
@@ -3223,11 +3245,12 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
             <tr><td>公共能力</td><td><code>ruoyi-common/**</code>（24 个子模块）</td></tr>
             <tr><td>系统管理</td><td><code>ruoyi-modules/ruoyi-system/**</code></td></tr>
             <tr><td>画像引擎</td><td><code>ruoyi-modules/ruoyi-profile-engine/**</code> 的 <code>com.smartdock.profile</code></td></tr>
-            <tr><td>分析中心</td><td><code>ruoyi-modules/ruoyi-analytics/**</code> 的 <code>com.smartdock.analytics</code></td></tr>
+            <tr><td>分析中心</td><td><code>ruoyi-modules/ruoyi-profile-engine/**</code> 的 <code>com.smartdock.analytics</code>（没有独立的 ruoyi-analytics 模块）</td></tr>
             <tr><td>智能体主链</td><td><code>ruoyi-modules/ruoyi-assistant/**</code></td></tr>
             <tr><td>智能体扩展点</td><td><code>ruoyi-modules/ruoyi-assistant-spi/**</code></td></tr>
             <tr><td>DDL</td><td><code>backend/script/sql/baseline/**</code> 与 <code>migration/**</code></td></tr>
             <tr><td>演示数据脚本</td><td><code>backend/script/demo/seed-internal-ops-demo.js</code></td></tr>
+            <tr><td>数据面 MCP server</td><td><code>tools/mcp/</code> 的 dock-pg-mcp / dock-redis-mcp（随仓开源；构建与 .zcode 连接配置见目录内 README）</td></tr>
           </tbody>
         </table>
       </div>
@@ -3245,6 +3268,8 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
             <tr><td>分群</td><td>规则分群（条件树+预览）与静态名单（CSV/逐行）</td></tr>
             <tr><td>快照链</td><td>每次评分存快照，<code>prev_snapshot_id</code> 串趋势</td></tr>
             <tr><td>AGUI</td><td>智能体事件流协议；28 个标准事件 + 11 个平台自定义帧</td></tr>
+            <tr><td>run</td><td>一次发送产生的执行；状态只有 RUNNING / COMPLETED / FAILED / INTERRUPTED 四个</td></tr>
+            <tr><td>thread</td><td>一个会话线程；同一 thread 复用同一 agent 实例</td></tr>
             <tr><td>HITL</td><td>人工确认：查 pending，带全量 interrupt id 重新发起 run</td></tr>
             <tr><td>SPI 工具</td><td>业务模块实现 <code>BizToolProvider</code> 暴露的只读工具</td></tr>
             <tr><td>MCP</td><td>外部工具服务器；后台登记，代码零改动</td></tr>
