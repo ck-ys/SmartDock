@@ -1,0 +1,6 @@
+# 技能资产（SKILL.md）必须保持 LF：SkillOfficialFormatZeroDiffUnitTest 逐字节比对
+# frontmatter 与正文（startsWith("---\nname: ...")），CRLF 会让它红。
+# 2026-11-22 批 10 实测：Windows 默认 core.autocrlf=true 且本仓无 .gitattributes，
+# checkout 后 create-mission/SKILL.md 变成 CRLF，两个零漂移护栏测试连跑两次都红。
+# 只钉这一个目录，不动全仓（避免一次性重新规范化所有文件）。
+backend/ruoyi-modules/ruoyi-assistant/src/main/resources/skills/** text eol=lf

@@ -1,5 +1,8 @@
 package com.smartdock.assistant.engine.persist;
 
+import com.smartdock.assistant.domain.model.AssistantRun;
+import com.smartdock.assistant.engine.core.AssistantInstanceContext;
+import com.smartdock.assistant.mapper.AssistantRunMapper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +16,9 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -33,6 +39,16 @@ class AssistantStaleAskingRecoveryUnitTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    /** 多实例批 3 起构造函数三参：这两个不 mock 时 @InjectMocks 注入 null，
+     *  ownerIsGone 里 runMapper.selectByThread 直接 NPE，被 recoverGoneOwners 的
+     *  catch(Exception) 吞成「只告警」——测试于是静默变成「update 永不调用」。
+     *  批 10（2026-11-22）补全，让「检出即翻转」这条断言真的走到 UPDATE。 */
+    @Mock
+    private AssistantRunMapper runMapper;
+
+    @Mock
+    private AssistantInstanceContext instanceContext;
+
     @InjectMocks
     private AssistantStaleAskingRecovery recovery;
 
@@ -50,10 +66,38 @@ class AssistantStaleAskingRecoveryUnitTest {
     void 检出陈旧悬挂_按守卫SQL翻转() {
         when(jdbcTemplate.queryForList(AssistantStaleAskingRecovery.SQL_DETECT, String.class))
             .thenReturn(List.of("t:000000:1:8d1209d0-3caf-4ceb-9c40-67035a72f476"));
+        // 最新 run = INTERRUPTED + 有归属但租约已死 → 允许自愈。
+        // 注意不能写成 ownerInstance=null：按原契约「INTERRUPTED 且无归属=旧数据不碰」
+        // （unknownIsGone=false，见 ownerIsGone(run,false)），那走的是拒绝分支。
+        AssistantRun run = new AssistantRun();
+        run.setStatus("INTERRUPTED");
+        run.setOwnerInstance("dead-instance");
+        when(runMapper.selectByThread(anyString(), anyString(), anyLong(), anyInt()))
+            .thenReturn(List.of(run));
+        when(instanceContext.isAlive("dead-instance")).thenReturn(false);
 
         recovery.afterSingletonsInstantiated();
 
-        verify(jdbcTemplate).update(AssistantStaleAskingRecovery.SQL_RECOVER);
+        verify(jdbcTemplate).update(AssistantStaleAskingRecovery.SQL_RECOVER,
+            "t:000000:1:8d1209d0-3caf-4ceb-9c40-67035a72f476");
+    }
+
+    @Test
+    void 活主会话_不翻转() {
+        // 反向护栏（批 10 补）：owner 还活着时绝不能碰——否则滚动重启会把另一台正在等
+        // 用户确认的会话翻成 allowed，HITL 直接卡死。没有这条，上面的绿也可能是「碰巧都翻」
+        when(jdbcTemplate.queryForList(AssistantStaleAskingRecovery.SQL_DETECT, String.class))
+            .thenReturn(List.of("t:000000:1:8d1209d0-3caf-4ceb-9c40-67035a72f476"));
+        AssistantRun run = new AssistantRun();
+        run.setStatus("INTERRUPTED");
+        run.setOwnerInstance("other-instance");
+        when(runMapper.selectByThread(anyString(), anyString(), anyLong(), anyInt()))
+            .thenReturn(List.of(run));
+        when(instanceContext.isAlive("other-instance")).thenReturn(true);
+
+        recovery.afterSingletonsInstantiated();
+
+        verify(jdbcTemplate, never()).update(anyString(), org.mockito.ArgumentMatchers.any(Object[].class));
     }
 
     @Test

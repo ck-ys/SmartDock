@@ -108,15 +108,24 @@ class AssistantSkillGateMiddlewareUnitTest {
     void realClasspathSkillsVisiblePerRole() {
         // 真仓（classpath /skills 经 AssistantSkillSource 合并视图）跑一遍：成员只见
         // data-reading，发布人以上全见——与装载替换前完全一致；仓为空=classpath 构建故障，直接红
+        // 批 10（2026-11-22）：断言数与 SkillAssets.SKILLS 同步，不再硬编码 4——写死数字时
+        // 加技能必红（批 9 起 resources/skills 已有 10 个而表里只有 4 条，本断言就是那处漂移）。
         List<AgentSkill> all = mergeViews();
-        assertThat(all).as("classpath 技能仓必须装载出 4 技能").hasSize(4);
+        assertThat(all).as("classpath 技能仓装载数必须与 SkillAssets.SKILLS 一致")
+            .hasSameSizeAs(SkillAssets.SKILLS);
         List<String> member = AssistantSkillGateMiddleware.filterVisibleImpl(all,
             ToolIdentity.LEVEL_MEMBER, null).stream().map(AgentSkill::getName).toList();
         List<String> publisher = AssistantSkillGateMiddleware.filterVisibleImpl(all,
             ToolIdentity.LEVEL_PUBLISHER, null).stream().map(AgentSkill::getName).toList();
-        assertThat(member).containsExactly("data-reading");
-        assertThat(publisher).containsExactlyInAnyOrder("data-reading", "create-mission",
-            "create-template", "urge-wording");
+        // 按表里的 minRole 现算期望值：member 档=minRole 0；publisher 及以上=minRole ≤1
+        List<String> expectMember = SkillAssets.SKILLS.stream()
+            .filter(s -> s.minRole() <= ToolIdentity.LEVEL_MEMBER).map(SkillAssets.Skill::id).toList();
+        List<String> expectPublisher = SkillAssets.SKILLS.stream()
+            .filter(s -> s.minRole() <= ToolIdentity.LEVEL_PUBLISHER).map(SkillAssets.Skill::id).toList();
+        assertThat(member).containsExactlyInAnyOrderElementsOf(expectMember);
+        assertThat(publisher).containsExactlyInAnyOrderElementsOf(expectPublisher);
+        // 反向护栏：两档清单必须真的有差别，否则上面的断言在「全技能都是 member」时也绿
+        assertThat(expectPublisher.size()).isGreaterThan(expectMember.size());
     }
 
     @Test
