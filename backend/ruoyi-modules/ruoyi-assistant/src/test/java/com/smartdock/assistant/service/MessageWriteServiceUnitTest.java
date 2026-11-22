@@ -146,6 +146,9 @@ class MessageWriteServiceUnitTest {
                     .getAnnotation(org.apache.ibatis.annotations.Update.class)).value());
         assertTrue(sql.contains("user_id=#{userId}"),
             "touch 必须带 user_id 谓词（纵深防御），当前 SQL：" + sql);
+        // 批 10 多审 SQL 席 P2：与同文件其余四条查询的谓词形态对齐（软删行不该被迟到消息刷新排序键）
+        assertTrue(sql.contains("del_flag='0'"),
+            "touch 必须带 del_flag='0'（与 selectByThread/selectOwned/updateTitleIfMatch/updateTodo 形态一致），当前 SQL：" + sql);
         assertEquals(3, AssistantConversationMapper.class
                 .getMethod("touch", String.class, Long.class, Long.class).getParameterCount(),
             "touch 参数个数必须是 3（tenant/id/userId）——少一个就说明谓词又被删了");

@@ -45,9 +45,15 @@ public interface AssistantConversationMapper extends BaseMapper<AssistantConvers
      * {@code conversationByThread} 的服务端查询，**没有一条来自客户端入参**——所以这是
      * <b>纵深防御缺失，不是可利用的越权</b>。补谓词的理由是别让它成为将来某条新调用链的陷阱：
      * 排序键被异主刷新本身不泄数据，但「按 id 就能改别人的行」这个形态不该留在 mapper 上。</p>
+     *
+     * <p>批 10 多审 SQL 席 P2（2026-11-22）：补 {@code del_flag='0'} 与同文件
+     * {@link #selectByThread} / {@link #selectOwned} / {@link #updateTitleIfMatch} /
+     * {@link #updateTodo} 的谓词形态对齐。当前能到达本方法的链路其会话行必然未删
+     * （上游查询全部带该谓词），故无行为变化；补齐是为了消除「同文件五种写法」的形态不一致——
+     * 软删行被迟到消息刷新排序键还会推迟 {@link #deleteExpired} 的物理清理。</p>
      */
     @Update("UPDATE assistant_conversation SET last_message_time=CURRENT_TIMESTAMP, update_time=CURRENT_TIMESTAMP"
-        + " WHERE tenant_id=#{tenantId} AND id=#{id} AND user_id=#{userId}")
+        + " WHERE tenant_id=#{tenantId} AND id=#{id} AND user_id=#{userId} AND del_flag='0'")
     int touch(@Param("tenantId") String tenantId, @Param("id") Long id, @Param("userId") Long userId);
 
     /** 标题侧车 CAS 写回（ZCode 对齐 Q1，批A 2026-10-10）：仅当标题仍是初始截断值时覆盖——
