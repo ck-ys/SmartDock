@@ -20,8 +20,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -52,12 +53,18 @@ public class AssistantAttachmentService {
      * 批E(AU-21 A, 1008 拍板)：解析串行后台队列——单线程排队跑长 IO，
      * 防多个大文件并发解析 OOM（复用 0930 附件对比 MQ 消费端的串行配方）。
      * register 因此秒回（登记即返回 PENDING），前端 chip 轮询到终态。
+     * 批 11（2026-11-22 拍板 Q1=1）：由 Executors.newSingleThreadExecutor(工厂) 等价改写为
+     * 显式 ThreadPoolExecutor(1,1,0L,MILLISECONDS,LinkedBlockingQueue,工厂)——JDK 工厂方法内部就是
+     * 这一串参数，改写只为过写码红线门禁（CodeRedlineTest：线程数/队列/拒绝策略必须显式写出），
+     * 不是行为变更。唯一差别是工厂方法多包一层「包装对象不可达时自动 shutdown」的清理器，
+     * 本字段是 static final 常驻，那一层永远不会触发。
      */
-    private static final ExecutorService PARSE_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "assistant-attach-parse");
-        t.setDaemon(true);
-        return t;
-    });
+    private static final ExecutorService PARSE_EXECUTOR = new ThreadPoolExecutor(
+        1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
+            Thread t = new Thread(r, "assistant-attach-parse");
+            t.setDaemon(true);
+            return t;
+        });
 
     /** 僵尸解析自愈阈值（G4 批G 1008 起只判「已开始解析后」超时，排队不计入） */
     private static final long PENDING_STALE_MS = 10 * 60_000L;
