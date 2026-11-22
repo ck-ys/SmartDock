@@ -301,4 +301,27 @@ class AssistantStatusContextServiceTest {
 
         assertEquals(List.of("messages"), vo.buckets().stream().map(ContextBreakdownVo.Bucket::key).toList());
     }
+
+    /**
+     * 批 10（2026-11-22）Q5 老尾巴：同一次 build 只查一次会话行。
+     *
+     * <p>原先 {@code build} 第 49 行查了一次拿归属，{@code contextTokensOf} 内部又查一次拿
+     * conversationId——同一个 (tenant, thread) 在一次请求里打两遍库。这不是正确性缺陷（两次
+     * 结果一致），是白白的往返；且两处各自吞异常/各自判空，将来任一处改了谓词就会出现
+     * 「归属判定用 A 版本、tokens 取值用 B 版本」的隐性分叉。</p>
+     */
+    @Test
+    void 同一次构建只查一次会话行() {
+        ConversationReadGateway conv = conv(new ConversationReadGateway.ConversationRef(CONV_ID, userIdValue()));
+        when(conv.latestContextTokens(TENANT, USER_ID, CONV_ID)).thenReturn(1234L);
+        PromptCatalogGateway catalog = catalog();
+        when(catalog.segments(false)).thenReturn(List.of(
+            new PromptCatalogGateway.PromptSegment("core", "核心规则", "ABCDEFGHIJ")));
+
+        svc(catalog, conv, mock(AssistantSkillVisibilityService.class),
+            mock(AssistantMemoryService.class), model(200000)).build(TENANT, USER_ID, THREAD);
+
+        org.mockito.Mockito.verify(conv, org.mockito.Mockito.times(1))
+            .conversationByThread(TENANT, THREAD);
+    }
 }

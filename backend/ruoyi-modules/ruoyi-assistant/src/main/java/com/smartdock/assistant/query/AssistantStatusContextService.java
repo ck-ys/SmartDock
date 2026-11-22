@@ -188,25 +188,23 @@ public class AssistantStatusContextService {
         // （批 7 · 7A 多审 dspro 席 P2-1：写成 new VO(contextTokensOf(...), windowTokensOf(...)) 会把求值顺序反过来；
         //  当前两侧各自吞异常、输出零差异，但批 9 若给窗口解析加请求级副作用就会变成可观测差异，故显式落到局部变量。）
         Long windowTokens = windowTokensOf(tenantId, threadId);
-        Long totalTokens = contextTokensOf(tenantId, userId, threadId);
+        // 批 10（2026-11-22）Q5：把上面已查到的 conv 传下去，不再让 contextTokensOf 二次打库
+        Long totalTokens = contextTokensOf(tenantId, userId, conv);
         return new ContextBreakdownVo(
             totalTokens, windowTokens,
             ContextBreakdownEstimator.METHOD, buckets);
     }
 
     /**
-     * 批B B2：threadId → 本会话最新 assistant 消息末次调用 tokens（无会话/无值返回 null）。
+     * 批B B2：本会话最新 assistant 消息末次调用 tokens（无值返回 null）。
      * B1 修：取「最新 tokens 非空行」——truncated/中断行恒空，取最新行会被空值遮蔽。
+     *
+     * <p>批 10（2026-11-22）Q5：入参由 threadId 改为已查好的 {@code conv}——{@link #build}
+     * 开头已按 (tenant, thread) 取过会话行，这里再查一次是白白多一次往返，且两处各自判空
+     * 会在将来任一处改谓词时分叉。调用方保证 conv 非空且已验归属。</p>
      */
-    private Long contextTokensOf(String tenantId, Long userId, String threadId) {
-        if (threadId == null || threadId.isBlank()) {
-            return null;
-        }
+    private Long contextTokensOf(String tenantId, Long userId, ConversationReadGateway.ConversationRef conv) {
         try {
-            ConversationReadGateway.ConversationRef conv = conversationRead.conversationByThread(tenantId, threadId);
-            if (conv == null) {
-                return null;
-            }
             return conversationRead.latestContextTokens(tenantId, userId, conv.id());
         } catch (Exception e) {
             return null;

@@ -207,7 +207,7 @@ public class MessageWriteService {
         msg.setToolSteps(toolSteps);
         msg.setTotalTokens(totalTokens);
         messageMapper.insert(msg);
-        conversationMapper.touch(tenantId, conversationId);
+        conversationMapper.touch(tenantId, conversationId, userId);
         return msg.getId();
     }
 }

@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -55,7 +56,7 @@ class MessageWriteServiceUnitTest {
         assertEquals("user", cap.getValue().getRole());
         assertEquals("normal", cap.getValue().getEndReason());
         verifyNoInteractions(piiFilter);
-        verify(conversationMapper).touch(TENANT, CONV);
+        verify(conversationMapper).touch(TENANT, CONV, USER);
     }
 
     @Test
@@ -90,7 +91,7 @@ class MessageWriteServiceUnitTest {
         svc().updatePartialMessage(TENANT, 9001L, "中途 13800138000", "[]", "partial");
 
         verify(messageMapper).updatePartial(9001L, TENANT, "中途 [手机号]", "[]", "partial");
-        verify(conversationMapper, never()).touch(anyString(), anyLong());
+        verify(conversationMapper, never()).touch(anyString(), anyLong(), anyLong());
     }
 
     @Test
@@ -120,12 +121,33 @@ class MessageWriteServiceUnitTest {
     void 删除partial行只按消息id与租户() {
         svc().deletePartialMessage(TENANT, 9001L);
         verify(messageMapper).deletePartial(9001L, TENANT);
-        verify(conversationMapper, never()).touch(anyString(), anyLong());
+        verify(conversationMapper, never()).touch(anyString(), anyLong(), anyLong());
     }
 
     @Test
     void 落库后必须刷新会话排序键() {
         svc().appendAssistantMessage(TENANT, CONV, USER, "x", "m", "stop");
-        verify(conversationMapper).touch(eq(TENANT), eq(CONV));
+        verify(conversationMapper).touch(eq(TENANT), eq(CONV), eq(USER));
+    }
+
+    /**
+     * 批 10（2026-11-22）：touch 的 SQL 必须带 {@code user_id} 谓词。
+     *
+     * <p>mock 测不到 SQL，所以直接读注解原文。原先只有 tenant+id——核实过三条生产调用链
+     * （Recorder 两处 / CompactionMiddleware / AutomationRunner）的 conversationId 都来自
+     * run 登记行或服务端会话查询、无一来自客户端入参，故这是<b>纵深防御缺失而非可利用越权</b>；
+     * 但「按 id 就能改别人的行」这个形态不该留在 mapper 上，本用例钉住它别被改回去。</p>
+     */
+    @Test
+    void touch必须带用户谓词() throws Exception {
+        String sql = String.join(" ", org.apache.ibatis.annotations.Update.class.cast(
+                AssistantConversationMapper.class
+                    .getMethod("touch", String.class, Long.class, Long.class)
+                    .getAnnotation(org.apache.ibatis.annotations.Update.class)).value());
+        assertTrue(sql.contains("user_id=#{userId}"),
+            "touch 必须带 user_id 谓词（纵深防御），当前 SQL：" + sql);
+        assertEquals(3, AssistantConversationMapper.class
+                .getMethod("touch", String.class, Long.class, Long.class).getParameterCount(),
+            "touch 参数个数必须是 3（tenant/id/userId）——少一个就说明谓词又被删了");
     }
 }

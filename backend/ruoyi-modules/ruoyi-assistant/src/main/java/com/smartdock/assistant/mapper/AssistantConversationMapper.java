@@ -36,10 +36,19 @@ public interface AssistantConversationMapper extends BaseMapper<AssistantConvers
     @Select("SELECT * FROM assistant_conversation WHERE tenant_id=#{tenantId} AND id=#{id} AND user_id=#{userId} AND del_flag='0'")
     AssistantConversation selectOwned(@Param("tenantId") String tenantId, @Param("id") Long id, @Param("userId") Long userId);
 
-    /** 消息到达即刷新列表排序键 */
+    /**
+     * 消息到达即刷新列表排序键。
+     *
+     * <p>批 10（2026-11-22）补 {@code user_id} 谓词：原先只有 tenant+id。核实过三条生产调用链
+     * （{@code AssistantRunRecorder} 的两处、{@code AssistantCompactionMiddleware} 的
+     * {@code resolve}、{@code AutomationRunner}），conversationId 一律来自 run 登记行或
+     * {@code conversationByThread} 的服务端查询，**没有一条来自客户端入参**——所以这是
+     * <b>纵深防御缺失，不是可利用的越权</b>。补谓词的理由是别让它成为将来某条新调用链的陷阱：
+     * 排序键被异主刷新本身不泄数据，但「按 id 就能改别人的行」这个形态不该留在 mapper 上。</p>
+     */
     @Update("UPDATE assistant_conversation SET last_message_time=CURRENT_TIMESTAMP, update_time=CURRENT_TIMESTAMP"
-        + " WHERE tenant_id=#{tenantId} AND id=#{id}")
-    int touch(@Param("tenantId") String tenantId, @Param("id") Long id);
+        + " WHERE tenant_id=#{tenantId} AND id=#{id} AND user_id=#{userId}")
+    int touch(@Param("tenantId") String tenantId, @Param("id") Long id, @Param("userId") Long userId);
 
     /** 标题侧车 CAS 写回（ZCode 对齐 Q1，批A 2026-10-10）：仅当标题仍是初始截断值时覆盖——
      *  用户已重命名或已被写过时 0 行命中，静默放弃（零加列实现 titleSource 语义） */
