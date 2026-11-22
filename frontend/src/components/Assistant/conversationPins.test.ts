@@ -33,12 +33,16 @@ describe('conversationPins', () => {
   });
 
   // E-10（2026-11-06）：全局键会把甲的置顶带给乙（列表里挂着别人会话 id）
+  // 批 9（d142abf）把实现里的 LEGACY_KEY 从 `assistant:pins` 改名成 `dcs:assistant:pins`，
+  // 本用例却仍往 `assistant:pins` 写"旧全局键"——那是改名后的**正常按用户键的初值**
+  // （PIN_KEY 的默认值），实现当然不会删它，断言恒假。批 10（2026-11-22）按新口径改写：
+  // 旧键 = `dcs:assistant:pins`，只删不迁。
   it('initConvPins 切到按用户键；旧全局键只删不迁（归属无法判定，不送给先登录者）', () => {
-    store.set('assistant:pins', JSON.stringify(['legacy']));
+    store.set('dcs:assistant:pins', JSON.stringify(['legacy']));
     store.delete('assistant:pins:1');
     initConvPins(1);
     expect(loadPins()).toEqual([]);
-    expect(store.has('assistant:pins')).toBe(false);
+    expect(store.has('dcs:assistant:pins')).toBe(false);
   });
 
   it('换账号看不到上一个人的置顶', () => {
