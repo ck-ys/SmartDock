@@ -48,7 +48,7 @@ withDefaults(
     metrics?: OperationsMetric[];
   }>(),
   {
-    eyebrow: 'DCS 运营工作台',
+    eyebrow: '',
     metrics: () => []
   }
 );

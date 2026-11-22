@@ -108,8 +108,8 @@ public class SysEmailBindService {
         String codeValue = email.toLowerCase() + "|" + code;
         RedisUtils.setCacheObject(CODE_KEY + tenantId + ":" + userId, codeValue, CODE_TTL);
         try {
-            MailUtils.sendText(email, "DCS 系统邮箱绑定验证码",
-                "您正在为 DCS 系统账号「" + LoginHelper.getUsername() + "」绑定登录邮箱，验证码：" + code + "（5 分钟内有效）。\n"
+            MailUtils.sendText(email, "SmartDock 邮箱绑定验证码",
+                "您正在为 SmartDock 账号「" + LoginHelper.getUsername() + "」绑定登录邮箱，验证码：" + code + "（5 分钟内有效）。\n"
                     + "若非本人操作请忽略本邮件，您的账号信息不会被修改。");
         } catch (Exception e) {
             // 发信失败不留验证码（防占坑：码在但用户收不到，占满 5 分钟窗口）；
@@ -187,8 +187,8 @@ public class SysEmailBindService {
         String oldEmail = user.getEmail();
         if (StringUtils.isNotBlank(oldEmail) && !oldEmail.equalsIgnoreCase(bindEmail)) {
             try {
-                MailUtils.sendText(oldEmail, "DCS 系统绑定邮箱已更换通知",
-                    "您的 DCS 系统账号「" + LoginHelper.getUsername() + "」绑定邮箱已由 " + maskEmail(oldEmail)
+                MailUtils.sendText(oldEmail, "SmartDock 绑定邮箱已更换通知",
+                    "您的 SmartDock 账号「" + LoginHelper.getUsername() + "」绑定邮箱已由 " + maskEmail(oldEmail)
                         + " 更换为 " + maskEmail(bindEmail) + "。若非本人操作，请立即联系管理员处理。");
             } catch (Exception mailEx) {
                 log.warn("换绑旧邮箱通知发送失败（不阻断绑定）: {}", mailEx.getMessage());

@@ -147,7 +147,7 @@ public class AiConfigController extends BaseController {
      * @return 计费参数识别结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-识别计费", businessType = BusinessType.OTHER)
+    @Log(title = "SmartDock AI配置-识别计费", businessType = BusinessType.OTHER)
     @PostMapping("/detect-price")
     public R<AiPriceDetectResult> detectPrice(@RequestBody DetectPriceBo bo) {
         return R.ok(priceAutoDetectService.detect(bo.getProvider(), bo.getModelName(), bo.getSourceUrl()));
@@ -160,7 +160,7 @@ public class AiConfigController extends BaseController {
      * @return 新建记录的ID
      */
     @SaCheckPermission("smartdock:ai:add")
-    @Log(title = "DCS AI配置", businessType = BusinessType.INSERT, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置", businessType = BusinessType.INSERT, excludeParamNames = "apiKey")
     @RepeatSubmit
     @PostMapping
     public R<Long> add(@Validated(AddGroup.class) @RequestBody AiConfigBo bo) {
@@ -174,7 +174,7 @@ public class AiConfigController extends BaseController {
      * @return 操作结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置", businessType = BusinessType.UPDATE, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置", businessType = BusinessType.UPDATE, excludeParamNames = "apiKey")
     @RepeatSubmit
     // 2026-10-16 PUT/DELETE→POST（铁律#21：WAF 只放行 GET/POST）
     @PostMapping("/edit")
@@ -189,7 +189,7 @@ public class AiConfigController extends BaseController {
      * @return 连通性测试结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-连接测试", businessType = BusinessType.OTHER)
+    @Log(title = "SmartDock AI配置-连接测试", businessType = BusinessType.OTHER)
     @PostMapping("/{configId:\\d+}/test")
     public R<AiTestResultVo> test(@PathVariable Long configId) {
         return R.ok(aiConfigService.testConnection(configId));
@@ -202,7 +202,7 @@ public class AiConfigController extends BaseController {
      * @return 可用模型列表
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-探测模型", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-探测模型", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
     @PostMapping("/probe/models")
     public R<List<AiModelVo>> probeModels(@Validated @RequestBody AiProbeBo bo) {
         return R.ok(aiConfigService.probeModels(bo));
@@ -215,7 +215,7 @@ public class AiConfigController extends BaseController {
      * @return 账户余额探测结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-探测余额", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-探测余额", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
     @PostMapping("/probe/balance")
     public R<AiBalanceVo> probeBalance(@Validated @RequestBody AiProbeBo bo) {
         return R.ok(aiConfigService.probeBalance(bo));
@@ -228,7 +228,7 @@ public class AiConfigController extends BaseController {
      * @return 响应速度探测结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-探测速度", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-探测速度", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
     @PostMapping("/probe/speed")
     public R<AiTestResultVo> probeSpeed(@Validated @RequestBody AiProbeBo bo) {
         return R.ok(aiConfigService.probeSpeed(bo));
@@ -242,7 +242,7 @@ public class AiConfigController extends BaseController {
      * @return 可用模型列表
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-探测模型(已存)", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-探测模型(已存)", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
     @PostMapping("/{configId:\\d+}/probe/models")
     public R<List<AiModelVo>> probeSavedModels(@PathVariable Long configId, @RequestBody(required = false) AiProbeBo bo) {
         return R.ok(aiConfigService.probeSavedModels(configId, bo));
@@ -256,7 +256,7 @@ public class AiConfigController extends BaseController {
      * @return 账户余额探测结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-探测余额(已存)", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-探测余额(已存)", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
     @PostMapping("/{configId:\\d+}/probe/balance")
     public R<AiBalanceVo> probeSavedBalance(@PathVariable Long configId, @RequestBody(required = false) AiProbeBo bo) {
         return R.ok(aiConfigService.probeSavedBalance(configId, bo));
@@ -270,7 +270,7 @@ public class AiConfigController extends BaseController {
      * @return 响应速度探测结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-探测速度(已存)", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-探测速度(已存)", businessType = BusinessType.OTHER, excludeParamNames = "apiKey")
     @PostMapping("/{configId:\\d+}/probe/speed")
     public R<AiTestResultVo> probeSavedSpeed(@PathVariable Long configId, @RequestBody(required = false) AiProbeBo bo) {
         return R.ok(aiConfigService.probeSavedSpeed(configId, bo));
@@ -296,7 +296,7 @@ public class AiConfigController extends BaseController {
      * @return 操作结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-切换活跃", businessType = BusinessType.UPDATE)
+    @Log(title = "SmartDock AI配置-切换活跃", businessType = BusinessType.UPDATE)
     @PostMapping("/{configId:\\d+}/activate")
     public R<Void> activate(@PathVariable Long configId) {
         // 七审 m3 P1-7：去 TenantHelper 传参匹配（超管动态租户下 getTenantId 与行租户错位
@@ -357,7 +357,7 @@ public class AiConfigController extends BaseController {
      * @return 更新后的接入（掩码出参）
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-厂商接入", businessType = BusinessType.UPDATE, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-厂商接入", businessType = BusinessType.UPDATE, excludeParamNames = "apiKey")
     @RepeatSubmit
     @PostMapping("/access")  // 2026-10-16 PUT→POST（铁律#21）：客户校园网 WAF 只放行 GET/POST，PUT 一发即被拦"后端接口连接异常"
     public R<AiProviderAccessVo> updateAccess(@Validated(EditGroup.class) @RequestBody AiProviderAccessBo bo) {
@@ -379,7 +379,7 @@ public class AiConfigController extends BaseController {
      * 语义让 UI「添加新钥匙」永远编辑首行插不进第二把——新增语义独立成端（POST，铁律#21）。
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-钥匙新增", businessType = BusinessType.INSERT, excludeParamNames = "apiKey")
+    @Log(title = "SmartDock AI配置-钥匙新增", businessType = BusinessType.INSERT, excludeParamNames = "apiKey")
     @RepeatSubmit
     @PostMapping("/access/add")
     public R<AiProviderAccessVo> addAccessKey(@RequestBody AiProviderAccessBo bo) {
@@ -388,7 +388,7 @@ public class AiConfigController extends BaseController {
 
     /** Q8：钥匙启停（不能停最后一把启用中的钥匙）。 */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI配置-钥匙启停", businessType = BusinessType.UPDATE)
+    @Log(title = "SmartDock AI配置-钥匙启停", businessType = BusinessType.UPDATE)
     @PostMapping("/access/change-status")
     public R<Void> changeKeyStatus(@RequestParam Long id, @RequestParam String enabled) {
         providerAccessService.changeKeyStatus(id, enabled);
@@ -397,7 +397,7 @@ public class AiConfigController extends BaseController {
 
     /** Q8：删除钥匙（软删，不能删最后一把启用中的钥匙）。 */
     @SaCheckPermission("smartdock:ai:remove")
-    @Log(title = "DCS AI配置-钥匙删除", businessType = BusinessType.DELETE)
+    @Log(title = "SmartDock AI配置-钥匙删除", businessType = BusinessType.DELETE)
     @PostMapping("/access/delete")
     public R<Void> deleteKey(@RequestParam Long id) {
         providerAccessService.deleteKey(id);
@@ -428,7 +428,7 @@ public class AiConfigController extends BaseController {
      * @return 操作结果
      */
     @SaCheckPermission("smartdock:ai:remove")
-    @Log(title = "DCS AI配置", businessType = BusinessType.DELETE)
+    @Log(title = "SmartDock AI配置", businessType = BusinessType.DELETE)
     // 2026-10-16 PUT/DELETE→POST（铁律#21：WAF 只放行 GET/POST）
     @PostMapping("/{configIds}")
     public R<Void> remove(@NotEmpty @PathVariable Long[] configIds) {

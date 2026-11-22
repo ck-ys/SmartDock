@@ -45,8 +45,8 @@ public class EmailOtpDeliveryService implements OtpDeliveryService {
             );
         }
         long validMinutes = Math.max(1, validFor.toMinutes());
-        String subject = "DCS 安全验证码";
-        String body = "您的 DCS 安全验证码为 " + code + "，" + validMinutes
+        String subject = "SmartDock 安全验证码";
+        String body = "您的 SmartDock 安全验证码为 " + code + "，" + validMinutes
             + " 分钟内有效。请勿向任何人泄露。";
         try {
             mailGateway.send(email, subject, body);

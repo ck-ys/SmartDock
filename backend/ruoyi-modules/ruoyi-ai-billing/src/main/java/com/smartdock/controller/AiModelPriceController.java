@@ -71,7 +71,7 @@ public class AiModelPriceController extends BaseController {
      * @return 新建记录的ID
      */
     @SaCheckPermission("smartdock:ai:add")
-    @Log(title = "DCS AI模型价格", businessType = BusinessType.INSERT)
+    @Log(title = "SmartDock AI模型价格", businessType = BusinessType.INSERT)
     @RepeatSubmit
     @PostMapping
     public R<Long> add(@Validated(AddGroup.class) @RequestBody AiModelPriceBo bo) {
@@ -85,7 +85,7 @@ public class AiModelPriceController extends BaseController {
      * @return 操作结果
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI模型价格", businessType = BusinessType.UPDATE)
+    @Log(title = "SmartDock AI模型价格", businessType = BusinessType.UPDATE)
     @RepeatSubmit
     // 2026-10-16 PUT/DELETE→POST（铁律#21：WAF 只放行 GET/POST）
     @PostMapping("/edit")
@@ -100,7 +100,7 @@ public class AiModelPriceController extends BaseController {
      * @return 操作结果
      */
     @SaCheckPermission("smartdock:ai:remove")
-    @Log(title = "DCS AI模型价格", businessType = BusinessType.DELETE)
+    @Log(title = "SmartDock AI模型价格", businessType = BusinessType.DELETE)
     // 2026-10-16 PUT/DELETE→POST（铁律#21：WAF 只放行 GET/POST）
     @PostMapping("/{priceIds}")
     public R<Void> remove(@NotEmpty @PathVariable Long[] priceIds) {
@@ -112,7 +112,7 @@ public class AiModelPriceController extends BaseController {
      * 人工价（manual_override='1'）跳过，不被覆盖；返回 inserted/updated/skipped 计数。
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI模型价格同步", businessType = BusinessType.UPDATE)
+    @Log(title = "SmartDock AI模型价格同步", businessType = BusinessType.UPDATE)
     @PostMapping("/sync-models-dev")
     public R<java.util.Map<String, Object>> syncModelsDev() {
         return R.ok(priceService.syncFromModelsDev(org.dromara.common.satoken.utils.LoginHelper.getTenantId()));
@@ -122,7 +122,7 @@ public class AiModelPriceController extends BaseController {
      * Q6-A：JSON 幂等导入价格（{"prices":[...]}），可重复执行。
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI模型价格导入", businessType = BusinessType.IMPORT)
+    @Log(title = "SmartDock AI模型价格导入", businessType = BusinessType.IMPORT)
     @PostMapping("/import")
     public R<java.util.Map<String, Object>> importJson(@RequestBody java.util.Map<String, Object> payload) {
         return R.ok(priceService.importJson(org.dromara.common.satoken.utils.LoginHelper.getTenantId(), payload));

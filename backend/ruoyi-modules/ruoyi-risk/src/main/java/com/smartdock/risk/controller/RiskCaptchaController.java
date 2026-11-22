@@ -72,7 +72,7 @@ public class RiskCaptchaController {
      * @param request 生成验证码请求（scene + action）
      * @return 生成的验证码结果
      */
-    @Log(title = "DCS验证码-生成", businessType = BusinessType.OTHER,
+    @Log(title = "SmartDock 验证码-生成", businessType = BusinessType.OTHER,
         isSaveRequestData = false, isSaveResponseData = false)
     @PostMapping("/generate")
     public R<CaptchaService.CaptchaResult> generate(@Valid @RequestBody GenerateRequest request) {
@@ -91,7 +91,7 @@ public class RiskCaptchaController {
      * @param request 校验验证码请求（token + answer + scene + action）
      * @return 验证码校验结果
      */
-    @Log(title = "DCS验证码-校验", businessType = BusinessType.OTHER,
+    @Log(title = "SmartDock 验证码-校验", businessType = BusinessType.OTHER,
         isSaveRequestData = false, isSaveResponseData = false)
     @PostMapping("/verify")
     public R<CaptchaService.VerificationResult> verify(@Valid @RequestBody VerifyRequest request) {

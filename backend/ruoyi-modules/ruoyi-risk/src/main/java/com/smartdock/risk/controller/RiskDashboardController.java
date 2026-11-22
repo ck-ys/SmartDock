@@ -150,7 +150,7 @@ public class RiskDashboardController extends BaseController {
      *
      * @return 包含 {@code level}(0-4) / {@code totalScore} / {@code needCaptcha}
      */
-    @Log(title = "DCS风控-当前用户风险评估", businessType = BusinessType.OTHER)
+    @Log(title = "SmartDock 风控-当前用户风险评估", businessType = BusinessType.OTHER)
     @GetMapping("/assess/me")
     public R<Map<String, Object>> assessMe() {
         Long userId = LoginHelper.getUserId();
@@ -172,7 +172,7 @@ public class RiskDashboardController extends BaseController {
      * @return 包含 level / totalScore / userScore / 最近 10 条事件
      */
     @SaCheckPermission(value = {"smartdock:risk:event:list", "smartdock:risk:list"}, mode = SaMode.OR)
-    @Log(title = "DCS风控-用户风险评估", businessType = BusinessType.OTHER)
+    @Log(title = "SmartDock 风控-用户风险评估", businessType = BusinessType.OTHER)
     @GetMapping("/assess/user/{userId}")
     public R<Map<String, Object>> assessUser(@PathVariable Long userId) {
         RiskScoreService.RiskAssessment assessment = riskScoreService.assess(userId, null);

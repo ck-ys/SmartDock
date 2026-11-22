@@ -113,8 +113,8 @@ public class SysPwdResetService {
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         RedisUtils.setCacheObject(CODE_KEY + tenantId + ":" + loginId, code, CODE_TTL);
         try {
-            MailUtils.sendText(user.getEmail(), "DCS 系统密码重置验证码",
-                "您正在重置 DCS 系统登录密码，验证码：" + code + "（5 分钟内有效）。\n"
+            MailUtils.sendText(user.getEmail(), "SmartDock 密码重置验证码",
+                "您正在重置 SmartDock 登录密码，验证码：" + code + "（5 分钟内有效）。\n"
                     + "若非本人操作请忽略本邮件，您的密码不会被修改。");
         } catch (Exception e) {
             // 发信失败不留验证码（防占坑：码在但用户收不到，占满 5 分钟窗口）；

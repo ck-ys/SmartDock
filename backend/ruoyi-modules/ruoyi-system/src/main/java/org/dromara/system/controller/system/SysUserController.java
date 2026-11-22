@@ -212,8 +212,8 @@ public class SysUserController extends BaseController {
             && user.getEmail() != null
             && !before.getEmail().equalsIgnoreCase(user.getEmail())) {
             try {
-                MailUtils.sendText(before.getEmail(), "DCS 系统绑定邮箱已被管理员更换通知",
-                    "您的 DCS 系统账号「" + before.getUserName() + "」绑定邮箱已由管理员变更。若非本人知情，请立即联系管理员处理。");
+                MailUtils.sendText(before.getEmail(), "SmartDock 绑定邮箱已被管理员更换通知",
+                    "您的 SmartDock 账号「" + before.getUserName() + "」绑定邮箱已由管理员变更。若非本人知情，请立即联系管理员处理。");
             } catch (Exception mailEx) {
                 log.warn("管理员直改邮箱的旧邮箱通知发送失败（不阻断主流程）: {}", mailEx.getMessage());
             }

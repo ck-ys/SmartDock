@@ -78,7 +78,7 @@ public class SensitiveWordController extends BaseController {
      * @return 新建记录的ID
      */
     @SaCheckPermission("smartdock:sensitive-word:add")
-    @Log(title = "DCS敏感词", businessType = BusinessType.INSERT)
+    @Log(title = "SmartDock 敏感词", businessType = BusinessType.INSERT)
     @RepeatSubmit
     @PostMapping
     public R<Long> add(@Validated(AddGroup.class) @RequestBody SensitiveWordBo bo) {
@@ -92,7 +92,7 @@ public class SensitiveWordController extends BaseController {
      * @return 操作结果
      */
     @SaCheckPermission("smartdock:sensitive-word:edit")
-    @Log(title = "DCS敏感词", businessType = BusinessType.UPDATE)
+    @Log(title = "SmartDock 敏感词", businessType = BusinessType.UPDATE)
     @RepeatSubmit
     // 2026-10-16 PUT/DELETE→POST（铁律#21：WAF 只放行 GET/POST）
     @PostMapping("/edit")
@@ -107,7 +107,7 @@ public class SensitiveWordController extends BaseController {
      * @return 操作结果
      */
     @SaCheckPermission("smartdock:sensitive-word:remove")
-    @Log(title = "DCS敏感词", businessType = BusinessType.DELETE)
+    @Log(title = "SmartDock 敏感词", businessType = BusinessType.DELETE)
     // 2026-10-16 PUT/DELETE→POST（铁律#21：WAF 只放行 GET/POST）
     @PostMapping("/{wordIds}")
     public R<Void> remove(@NotEmpty @PathVariable Long[] wordIds) {

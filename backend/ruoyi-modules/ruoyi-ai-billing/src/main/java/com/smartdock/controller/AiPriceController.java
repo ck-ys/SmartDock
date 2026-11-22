@@ -59,7 +59,7 @@ public class AiPriceController extends BaseController {
      * @return 保存记录的ID
      */
     @SaCheckPermission("smartdock:ai:edit")
-    @Log(title = "DCS AI模型价格-保存", businessType = BusinessType.UPDATE)
+    @Log(title = "SmartDock AI模型价格-保存", businessType = BusinessType.UPDATE)
     @PostMapping("/upsert")
     public R<Long> upsert(@RequestBody AiModelPrice entity) {
         // 先尝试找现有行(同租户同厂商同模型)
