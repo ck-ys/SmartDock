@@ -60,11 +60,11 @@ public class AssistantStickyHeaderFilter extends OncePerRequestFilter {
         if (instanceContext.redisEnabled() && !requireHeader) {
             log.error("[assistant-sticky] 危险配置：shared-state 已开（多实例）但 sticky.require-header=false。"
                 + "必须保证负载均衡按 X-Thread-Id 做一致性哈希；否则 HITL/续看/停止会落到错误实例，"
-                + "旧悬挂缓存还可能让该会话在错误实例上持续报错。建议 DCS_ASSISTANT_STICKY_REQUIRE_HEADER=true。");
+                + "旧悬挂缓存还可能让该会话在错误实例上持续报错。建议 SMARTDOCK_ASSISTANT_STICKY_REQUIRE_HEADER=true。");
         }
         if (!instanceContext.redisEnabled() && requireHeader) {
             log.error("[assistant-sticky] 危险配置：sticky.require-header=true 但 shared-state 仍是 local。"
-                + "多实例必须全集群切 DCS_ASSISTANT_SHARED_STATE_MODE=redis；local 节点会把别台的"
+                + "多实例必须全集群切 SMARTDOCK_ASSISTANT_SHARED_STATE_MODE=redis；local 节点会把别台的"
                 + "活 run 判死并收尾，混跑时用户会看到回答被中断。");
         }
     }

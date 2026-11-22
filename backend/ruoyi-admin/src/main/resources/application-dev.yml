@@ -4,9 +4,12 @@ captcha:
   enable: false
 
 --- # 风控2.0 内容机审(2026-09-22): dev 环境开观察模式(只记事件不拦截), 拦截开关保持 false
+    # 批 10（2026-11-22）多审契约席 P1：这两个值原先写死字面量，而 dev profile 是 activeByDefault，
+    # 会压过 application.yml 的占位符 —— 交付产物里 SMARTDOCK_CONTENT_* 环境变量静默失效。
+    # 改成占位符并保留 dev 的原默认值（机审 true / 拦截 false），双读口径与主文件一致。
 rollout:
-  content-moderation-enabled: true
-  content-block-enabled: false
+  content-moderation-enabled: ${SMARTDOCK_CONTENT_MODERATION_ENABLED:${DCS_CONTENT_MODERATION_ENABLED:true}}
+  content-block-enabled: ${SMARTDOCK_CONTENT_BLOCK_ENABLED:${DCS_CONTENT_BLOCK_ENABLED:false}}
 
 --- # 钱包对账巡检基线(批1 2026-09-25, 拍板Q1:A"环境各管各的账"): 以下为开发库历史存量基线;
     # 交付环境(docker profile)不配置本段=零基线从零对账, 客户新装机首夜不再误报
