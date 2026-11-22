@@ -31,7 +31,7 @@ flowchart TB
     direction TB
     SEC["Filter 链 + Sa-Token<br/>登录 / 权限 / 租户"]
     subgraph L3["业务域"]
-      DCS["ruoyi-mission<br/>采集 demo"]
+      MISSION["ruoyi-mission<br/>采集 demo"]
       PROFILE["ruoyi-profile-engine<br/>画像 + 分析"]
       ASSIST["ruoyi-assistant<br/>AI 助手"]
       BILL["ruoyi-ai-billing<br/>模型与计费"]
@@ -114,7 +114,7 @@ ruoyi-vue-plus（根 pom，packaging=pom）
 | `ruoyi-system` | 159 | 21 | 用户/角色/菜单/部门/字典/参数/租户/OSS/通知/监控 | 只依赖 common |
 | `ruoyi-mission` | 43 | 7 | 内置采集 demo：任务 → 填报 → 提交 → 审核 → 通知 | profile-engine、assistant-spi |
 | `ruoyi-profile-engine` | 188 | 18 | 画像引擎 + 行为分析中心（两块包：`com.smartdock.profile` / `com.smartdock.analytics`） | assistant-spi |
-| `ruoyi-assistant` | 213 | 23 | AI 助手：AGUI、会话、记忆、技能、MCP、HITL、自动化、计费装饰器 | dcs、system、ai-billing、assistant-spi |
+| `ruoyi-assistant` | 213 | 23 | AI 助手：AGUI、会话、记忆、技能、MCP、HITL、自动化、计费装饰器 | mission、system、ai-billing、assistant-spi |
 | `ruoyi-assistant-spi` | 5 | 0 | 业务工具 SPI 契约（纯 JDK + Lombok，零业务依赖） | 无 |
 | `ruoyi-ai-billing` | 114 | 11 | AI 模型配置、价格、用量、钱包、积分、服务费、对账 | system |
 | `ruoyi-risk` | 65 | 8 | 风控：风险事件、评分、处置、验证码、敏感词、内容机审 | system |
@@ -128,7 +128,7 @@ ruoyi-vue-plus（根 pom，packaging=pom）
 ```mermaid
 flowchart TB
   ADMIN["ruoyi-admin<br/>启动 + 组合根"]
-  DCS["ruoyi-mission<br/>采集 demo"]
+  MISSION["ruoyi-mission<br/>采集 demo"]
   PROFILE["ruoyi-profile-engine<br/>画像 + 分析"]
   ASSIST["ruoyi-assistant<br/>AI 助手"]
   SPI["ruoyi-assistant-spi<br/>业务工具插座"]
@@ -139,7 +139,7 @@ flowchart TB
   JOB["ruoyi-job<br/>SnailJob 示例"]
   COMMON["ruoyi-common/*<br/>24 个公共件"]
 
-  ADMIN --> DCS
+  ADMIN --> MISSION
   ADMIN --> PROFILE
   ADMIN --> ASSIST
   ADMIN --> BILL
@@ -147,10 +147,10 @@ flowchart TB
   ADMIN --> FILE
   ADMIN --> SYS
   ADMIN --> JOB
-  DCS --> PROFILE
-  DCS --> SPI
+  MISSION --> PROFILE
+  MISSION --> SPI
   PROFILE --> SPI
-  ASSIST --> DCS
+  ASSIST --> MISSION
   ASSIST --> BILL
   ASSIST --> SYS
   ASSIST --> SPI
@@ -158,7 +158,7 @@ flowchart TB
   RISK --> SYS
   FILE --> RISK
   FILE --> SYS
-  DCS -.-> COMMON
+  MISSION -.-> COMMON
   PROFILE -.-> COMMON
   ASSIST -.-> COMMON
   BILL -.-> COMMON
@@ -171,7 +171,7 @@ flowchart TB
 
 1. **`ruoyi-common/*` 永不反向依赖任何业务模块。** 公共件只提供能力（MyBatis、Redis、Sa-Token、OSS…），不知道业务存在。
 2. **业务模块之间尽量不直接 import。** 必须跨模块时，用"端口 + 组合根适配器"：消费方定义接口（`FileReviewGate`、`RiskBehaviorSink`、`MissionReviewProbe`），实现在 `ruoyi-admin/src/main/java/org/dromara/web/adapter/`。这样依赖方向在组合根收口，业务模块保持单向。
-3. **`ruoyi-mission` 是 demo，不是核心。** 它依赖画像引擎（把采集动作翻译成画像事件）和 `assistant-spi`（把采集工具插给 AI 助手），但画像引擎反过来不依赖 dcs。
+3. **`ruoyi-mission` 是 demo，不是核心。** 它依赖画像引擎（把采集动作翻译成画像事件）和 `assistant-spi`（把采集工具插给 AI 助手），但画像引擎反过来不依赖 mission。
 
 ### 2.4 包层级：域优先 + 四层
 
@@ -179,7 +179,7 @@ flowchart TB
 
 ```text
 com.smartdock.<域>.<层>
-  域：profile / analytics / dcs / risk / aibilling / filesecurity / assistant / shared
+  域：profile / analytics / mission / risk / aibilling / filesecurity / assistant / shared
   层：controller / service / mapper / domain/bo / domain/vo / domain/model
       / domain/gateway / infrastructure / query / protocol / engine / tools / support / config
 ```
@@ -206,9 +206,9 @@ com.smartdock.<域>.<层>
 | 租户插件 | `ruoyi-common/ruoyi-common-tenant/.../config/TenantConfig.java` |
 | MyBatis 插件顺序 | `ruoyi-common/ruoyi-common-mybatis/.../config/MybatisPlusConfig.java` |
 | 跨模块适配器 | `ruoyi-admin/.../org/dromara/web/adapter/` |
-| 智能体工厂 | `ruoyi-assistant/.../assistant/legacy/core/AssistantAgentFactory.java` |
-| AGUI 身份门卫 | `ruoyi-assistant/.../assistant/legacy/core/AssistantRuntimeContextResolver.java` |
-| AGUI 事件出帧 | `ruoyi-assistant/.../assistant/legacy/core/AssistantEventEnricher.java` |
+| 智能体工厂 | `ruoyi-assistant/.../assistant/engine/core/AssistantAgentFactory.java` |
+| AGUI 身份门卫 | `ruoyi-assistant/.../assistant/engine/core/AssistantRuntimeContextResolver.java` |
+| AGUI 事件出帧 | `ruoyi-assistant/.../assistant/engine/core/AssistantEventEnricher.java` |
 
 ---
 
@@ -351,7 +351,7 @@ flowchart LR
 
 | 类 | 路径 | 核心方法 | 具体做什么 |
 |---|---|---|---|
-| `ProfileEventServiceImpl` | `profile/event/ProfileEventServiceImpl.java` | `publish` / `publishQuiet` | 普通发布触发"打分 + 汇总"，quiet 只触发汇总（dcs 等高频动作不重复打分） |
+| `ProfileEventServiceImpl` | `profile/event/ProfileEventServiceImpl.java` | `publish` / `publishQuiet` | 普通发布触发"打分 + 汇总"，quiet 只触发汇总（mission 等高频动作不重复打分） |
 | 同上 | 同上 | `publishBatchDetailed` | 逐条隔离写，返回 written/duplicated/failures，供 CSV 补录精确对账 |
 | 同上 | 同上 | `writePrepared` | `REQUIRES_NEW` 内 `insertIgnore` 写事件，再独立短事务 upsert 主体/首见 |
 | `ProfileScoreEngine` | `profile/engine/ProfileScoreEngine.java` | `recalcSubject(source, subjectType, subjectId)` | 取启用维度 + 最新规则，逐维算分，加权归一化，写快照；无维度时落"占位 50 分"并标 `unconfigured` |
@@ -426,7 +426,7 @@ flowchart TB
 - **分析中心不建事件表**：它直接查 `profile_event`，所以"单源口径"才成立。外部网站采集口已于 2026-10-23 移除，数据进系统只有两条路：业务系统走 `ProfileEventPublisher`，离线数据走 CSV 补录。
 - **去抖不等于正确性**：JVM 内的 2 秒去抖只是省计算；真正防并发的是 Redisson 锁 + 水位。多实例部署时不要依赖 JVM 标记。
 
-### 4.3 采集 demo（dcs）
+### 4.3 采集 demo（mission）
 
 **一句话**：保留"任务 → 填报 → 提交 → 审核 → 通知"的最小闭环，作为平台的演示能力和 AI 工具的业务载体。
 
@@ -464,7 +464,7 @@ flowchart LR
 | 只有 `COLLECTING` 期成员可提交 | 任务关闭后提交接口拒绝 |
 | 同一 (task, user) 已有 `PENDING_AUDIT`/`APPROVED` 时不可重复提交 | 退回后重提生成新版本，旧版本只读保留 |
 | 审核用 CAS | `WHERE status='PENDING_AUDIT'` 条件更新，防双审 |
-| 通知幂等 | `dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束）`uk_dcs_notice_dedup` |
+| 通知幂等 | `dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束）`uk_notice_dedup` |
 | 审计只追加 | `audit` append-only，`trail` 按提交聚合回放 |
 
 #### 4.3.3 主流程：发布 → 提交 → 审核
@@ -746,8 +746,8 @@ SysTenantServiceImpl.insertByBo
 | 文件 → 风控 | 文件驳回后 `RiskEventCollector.record(FILE_REJECTED)` |
 | 文件 → 通知 | `FileReviewNoticeEvent` → `FileReviewNoticeAdapter` → `NoticeService` |
 | 计费 → 通知 | `WalletAlertEvent` → `WalletAlertNoticeAdapter` → `NoticeService` |
-| 画像 → 采集 | 分群触达 `ProfileReachChannel` 的实现是 dcs 的 `InAppReachChannel`（站内通知） |
-| 助手 → 业务 | `BizToolProvider` SPI：dcs/profile/analytics 三个提供方 |
+| 画像 → 采集 | 分群触达 `ProfileReachChannel` 的实现是 mission 的 `InAppReachChannel`（站内通知） |
+| 助手 → 业务 | `BizToolProvider` SPI：mission/profile/analytics 三个提供方 |
 
 ---
 
@@ -814,8 +814,8 @@ flowchart TB
 
 | 顺序 | 类 | 路径 | 做什么 |
 |---:|---|---|---|
-| 1 | `AguiAuthStatusFilter` | `legacy/core/AguiAuthStatusFilter.java:29` | 只拦 `/agui/*`；`StpUtil.checkLogin()` 失败时返回**真正的 HTTP 401**（不是 JSON 信封里的 401） |
-| 2 | `AssistantResumeUnlockFilter` | `legacy/core/AssistantResumeUnlockFilter.java:62` | 如果请求体没带 `resume`、thread 上还挂着确认卡、且请求者是卡的主人 → 自动注入 `resume=cancelled`，作废旧卡，避免"旧卡毒化 thread" |
+| 1 | `AguiAuthStatusFilter` | `engine/core/AguiAuthStatusFilter.java:29` | 只拦 `/agui/*`；`StpUtil.checkLogin()` 失败时返回**真正的 HTTP 401**（不是 JSON 信封里的 401） |
+| 2 | `AssistantResumeUnlockFilter` | `engine/core/AssistantResumeUnlockFilter.java:62` | 如果请求体没带 `resume`、thread 上还挂着确认卡、且请求者是卡的主人 → 自动注入 `resume=cancelled`，作废旧卡，避免"旧卡毒化 thread" |
 | 3 | Sa-Token `SaInterceptor` | `ruoyi-common-security/.../SecurityConfig.java` | 校验登录态 + `clientId`；**异步 dispatch 直接放行**（否则 SSE 二次分发会重复鉴权、放大异常） |
 
 框架侧：
@@ -838,7 +838,7 @@ URL path variable  >  X-Agent-Id header  >  forwardedProps.agentId  >  agentscop
 
 这是本仓在 Agent 链路上**最重的一个类**。它实现框架的 `AguiRuntimeContextResolver` 接口，每请求执行一次。
 
-文件：`backend/ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/legacy/core/AssistantRuntimeContextResolver.java`
+文件：`backend/ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/core/AssistantRuntimeContextResolver.java`
 
 #### 5.4.1 十道闸（顺序不能乱）
 
@@ -887,17 +887,17 @@ flowchart LR
 
 | 类 | 路径 | 核心方法 | 具体做什么 |
 |---|---|---|---|
-| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | `dcsAssistantAgentRegistryCustomizer()` | 向框架注册惰性工厂：`registerFactory("smartdock-assistant", agentFactory::createFromLogin)` |
+| `AssistantAgentConfiguration` | `engine/config/AssistantAgentConfiguration.java:31` | `assistantAgentRegistryCustomizer()` | 向框架注册惰性工厂：`registerFactory("smartdock-assistant", agentFactory::createFromLogin)` |
 | `AguiAgentRegistry`（框架） | starter jar | `registerFactory` / `getAgent` | 有 factory 就每次 `get()` 新实例；否则回退 singleton |
 | `DefaultAgentResolver`（框架） | starter jar | `resolveAgent(agentId, threadId, userId)` | `server-side-memory=true` 时走线程会话缓存，否则直接查注册表 |
 | `ThreadSessionManager`（框架） | starter jar | `getOrCreateAgent` / `removeSession` | 以 `(normalizeUser(userId), threadId)` 为键；首次或 agentId 变化才建，否则复用 |
-| `AssistantIdentityHolder` | `legacy/core/AssistantIdentityHolder.java:30` | `set` / `consumeEntry` | ThreadLocal 一次一递；校验同线程 + 30 秒时效；取不到按 401 fail-closed |
+| `AssistantIdentityHolder` | `engine/core/AssistantIdentityHolder.java:30` | `set` / `consumeEntry` | ThreadLocal 一次一递；校验同线程 + 30 秒时效；取不到按 401 fail-closed |
 
 **重要纠正**：旧文档说"每次新会话新建实例"，更准确的说法是"**每个新的 `(runtimeUserId, threadId)` 第一次出现时新建，之后复用**"。同一会话连续发消息不会重建 agent；只有缓存被 `removeSession`（模型/联网/权限面变化）或进程重启才会重建。
 
 ### 5.6 装配：AssistantAgentFactory 的 14 步
 
-文件：`backend/ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/legacy/core/AssistantAgentFactory.java`
+文件：`backend/ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/core/AssistantAgentFactory.java`
 
 入口有两个：
 
@@ -916,7 +916,7 @@ flowchart LR
 | 6 | `new Toolkit()`、`PermissionContextState.Builder`、会话工作区 `s/<租户>/<用户>/<thread>` | L228-234 |
 | 7 | `autoAllow` 谓词 + `AuditScope` + `AssistantActionLedgerHook`（写操作审计） | L239-244 |
 | 8 | `ToolRegistry.registerAll(...)`：注册 8 个平台工具，**同循环**生成 ALLOW/ASK 规则 | L245-260 |
-| 9 | `ProviderToolRegistry.registerProviders(...)`：注册 dcs/profile/analytics 三个 SPI 提供方 | L265-266 |
+| 9 | `ProviderToolRegistry.registerProviders(...)`：注册 mission/profile/analytics 三个 SPI 提供方 | L265-266 |
 | 10 | `McpPilotService.attachEnabled(...)`：挂启用中的 MCP 工具；单个失败只 warn 不连坐 | L271-277 |
 | 11 | 只读模式裁剪：只留 `view_skill` / `load_skill_through_path` / `read_file` + 只读 SPI + 勾选的只读 MCP | L283-302 |
 | 12 | `AssistantSkillGateMiddleware`：技能可见性权威过滤 | L308-315 |
@@ -972,7 +972,7 @@ flowchart TB
 | 层 | 谁提供 | 数量 | 例子 |
 |---|---|---:|---|
 | 平台内置 | `ToolRegistry.SPECS`（L87-138） | 8 | `web_search`、`read_attachment`、`submit_plan`、`ask_user`、`todo_write`、`save_memory`、`view_skill`、`read_file` |
-| 业务 SPI | `BizToolProvider` 实现方 | 3 个提供方 | dcs：查任务/查我的待办/查提交/建任务；profile：查画像/圈人/分群概况/低分复核；analytics：总览/趋势/漏斗/留存/路径/自定义 |
+| 业务 SPI | `BizToolProvider` 实现方 | 3 个提供方 | mission：查任务/查我的待办/查提交/建任务；profile：查画像/圈人/分群概况/低分复核；analytics：总览/趋势/漏斗/留存/路径/自定义 |
 | 外部 MCP | `McpPilotService` 挂载 | 动态 | 管理员配置的 MCP server 工具；受 `mcp:<server>` 闸和角色档限制 |
 
 另外 `load_skill_through_path` 是**框架技能中间件**注册的，不在 `ToolRegistry.SPECS` 里；本仓只给它补一条 ALLOW 规则（`AssistantAgentFactory.java:313-315`）。
@@ -993,7 +993,7 @@ flowchart TB
 
 ```java
 public interface BizToolProvider {
-    String namespace();                       // 命名空间，如 "dcs"
+    String namespace();                       // 命名空间，如 "mission"
     List<BizToolSpec> tools();                // 工具清单
     BizToolResult execute(BizToolCall call);  // 执行
     default void revoke(...) { }              // 可选：撤回
@@ -1064,7 +1064,7 @@ flowchart LR
 | 状态 | 存在哪 | 谁用 | 说明 |
 |---|---|---|---|
 | Agent 运行状态（消息历史、工具状态、权限上下文） | PostgreSQL `agentscope` schema | AgentScope 框架 | `agentscope_sessions` / `agentscope_snapshots` / `agentscope_store` |
-| 业务会话（会话列表、消息、run、反馈、收藏、记忆） | `dcs_assistant_*` 表 | 本仓 | 前端查询、管理页、审计、计费 |
+| 业务会话（会话列表、消息、run、反馈、收藏、记忆） | `assistant_*` 表 | 本仓 | 前端查询、管理页、审计、计费 |
 
 **`agentscope` schema 怎么隔离**：`AssistantStateStoreConfig` 用 `SearchPathDataSource` 包了一层 DataSource：每次借出连接先 `SET search_path TO agentscope, public`，归还前还原成默认。业务连接池完全不知道这件事。表由 migration 预建，代码侧不建表。
 
@@ -1094,7 +1094,7 @@ stateDiagram-v2
 | `service/MessageWriteService` | `appendUserMessage` / `appendAssistantMessage` | 消息落库；assistant 侧过 PII 掩码 |
 | `service/PurgeService` | `purgeUser` | 清人七表事务；框架表与补偿队列在事务外 |
 
-> 批 7C（2026-11-20）把原先 698 行的 `legacy/service/AssistantConversationService` 整个删掉，上面的职责拆到四个新根服务；`AssistantRunRecorder` 仍留 legacy（与批 9 的引擎边界相邻）。
+> 批 7C（2026-11-20）把原先 698 行的 `legacy/service/AssistantConversationService` 整个删掉，上面的职责拆到四个新根服务；`AssistantRunRecorder` 当时留在 legacy，批 9 起已随整树清零搬到 `engine/persist/AssistantRunRecorder.java`。
 | `AssistantRunRecorder` | `onEvents`（L385） | 文本/工具/思考分段缓冲落 `assistant_message`；RUN_FINISHED 前同步写终态 |
 | 同上 | `finalizeBuildFailure`（L794） | 建会话失败时同步 FAILED + 退回合，避免 60 秒僵尸 RUNNING |
 
@@ -1273,35 +1273,35 @@ AutomationRunner.run
 | `AguiRestController`（框架） | starter jar | AGUI HTTP 入口 | `runWithAgentId` | 解析 body，委托 MVC controller；`POST /agui/run/{agentId}` | 没有对话端点 |
 | `AguiMvcController`（框架） | starter jar | SSE 传输 | `handleInternal` | 建 `SseEmitter`，worker 线程跑 processor，逐帧写 SSE | 没有流式输出 |
 | `AguiRequestProcessor`（框架） | starter jar | 协议编排 | `process` / `resolveAgentId` | 解析 context → 选 agentId → 选 agent → 建 adapter → run | 协议无法启动 |
-| `AssistantRuntimeContextResolver` | `legacy/core/AssistantRuntimeContextResolver.java:68` | 身份/准入/落库门卫 | `resolve` | 10 道闸 + 身份桥 + Holder + 缓存失效 | 无鉴权、无限额、不落库，裸跑烧钱 |
-| `AssistantIdentityHolder` | `legacy/core/AssistantIdentityHolder.java:30` | 同线程身份桥 | `set` / `consumeEntry` | ThreadLocal 一次一递；同线程 + 30s 时效；取不到 401 | 工厂拿不到身份，建会话失败 |
-| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | 注册 agent 工厂 | `dcsAssistantAgentRegistryCustomizer` | `registerFactory("smartdock-assistant", ...)` | `/agui/run/smartdock-assistant` 找不到 agent |
+| `AssistantRuntimeContextResolver` | `engine/core/AssistantRuntimeContextResolver.java:68` | 身份/准入/落库门卫 | `resolve` | 10 道闸 + 身份桥 + Holder + 缓存失效 | 无鉴权、无限额、不落库，裸跑烧钱 |
+| `AssistantIdentityHolder` | `engine/core/AssistantIdentityHolder.java:30` | 同线程身份桥 | `set` / `consumeEntry` | ThreadLocal 一次一递；同线程 + 30s 时效；取不到 401 | 工厂拿不到身份，建会话失败 |
+| `AssistantAgentConfiguration` | `engine/config/AssistantAgentConfiguration.java:31` | 注册 agent 工厂 | `assistantAgentRegistryCustomizer` | `registerFactory("smartdock-assistant", ...)` | `/agui/run/smartdock-assistant` 找不到 agent |
 | `AguiAgentRegistry`（框架） | starter jar | agent 注册表 | `registerFactory` / `getAgent` | factory 优先，每次新实例；否则 singleton | 无 agent 可选 |
 | `ThreadSessionManager`（框架） | starter jar | 会话级 agent 缓存 | `getOrCreateAgent` / `removeSession` | `(user, thread)` 首次创建、之后复用 | 每轮重建，状态/成本都失控 |
-| `AssistantAgentFactory` | `legacy/core/AssistantAgentFactory.java:158` | Agent 总装配 | `create` / `createFromLogin` | 模型配置 → 装饰器 → 工具 → 中间件 → ReActAgent | 没有 agent |
-| `AssistantEventEnricher` | `legacy/core/AssistantEventEnricher.java:68` | 事件翻译/增强 | `enrich` | 落库、CUSTOM 帧、思考过滤、喂回放汇 | 前端看不到计划/费用/卡片，历史不落库 |
-| `AssistantRunRecorder` | `legacy/persist/AssistantRunRecorder.java:385` | run/消息持久化 | `onEvents` / `finishRun` / `finalizeBuildFailure` | 文本/工具/思考分段落库；终态同步写；建失败收尾 | 没有消息历史、没有终态、退不了回合 |
-| `AssistantRunStreamHub` | `legacy/core/AssistantRunStreamHub.java:94` | run 回放汇 | `accept` / `bridge` / `attach` | 4096 帧环形窗；attach 先重放再续播；断连只掉观众 | 刷新/换设备不能续看 |
+| `AssistantAgentFactory` | `engine/core/AssistantAgentFactory.java:158` | Agent 总装配 | `create` / `createFromLogin` | 模型配置 → 装饰器 → 工具 → 中间件 → ReActAgent | 没有 agent |
+| `AssistantEventEnricher` | `engine/core/AssistantEventEnricher.java:68` | 事件翻译/增强 | `enrich` | 落库、CUSTOM 帧、思考过滤、喂回放汇 | 前端看不到计划/费用/卡片，历史不落库 |
+| `AssistantRunRecorder` | `engine/persist/AssistantRunRecorder.java:385` | run/消息持久化 | `onEvents` / `finishRun` / `finalizeBuildFailure` | 文本/工具/思考分段落库；终态同步写；建失败收尾 | 没有消息历史、没有终态、退不了回合 |
+| `AssistantRunStreamHub` | `engine/core/AssistantRunStreamHub.java:94` | run 回放汇 | `accept` / `bridge` / `attach` | 4096 帧环形窗；attach 先重放再续播；断连只掉观众 | 刷新/换设备不能续看 |
 
 #### 表 B：模型、工具、技能、中间件
 
 | 类 | 文件:行 | 一句话职责 | 核心方法 | 具体做什么 | 去掉会怎样 |
 |---|---|---|---|---|---|
 | `AssistantModelFactory` | `infrastructure/AssistantModelFactory.java:118` | 选模型 + 建模型 | `resolveConfig` / `resolveConfigWithUserChoice` / `buildModel` | 用户选择 → 助手默认 → 上次使用 → 接口默认；建 `OpenAIChatModel` | 没有模型可调 |
-| `ThinkingTierModelDecorator` | `legacy/core/ThinkingTierModelDecorator.java:26` | 思考档翻译 | `stream` | `fast/balanced/deep` → `reasoning_effort` / `thinking.type` | 档位不生效 |
-| `SkillInjectModelDecorator` | `legacy/core/SkillInjectModelDecorator.java:24` | 当轮技能注入 | `stream` | 选中技能正文尾部追加；过可见性闸 | 手动选技能无效 |
-| `DateInjectModelDecorator` | `legacy/core/DateInjectModelDecorator.java:32` | 日期锚点 | `stream` | 追加"今天是…" | 模型不知道今天 |
-| `MemoryInjectModelDecorator` | `legacy/core/MemoryInjectModelDecorator.java:38` | 长期记忆注入 | `stream` | 按最后一条提问检索记忆，追加 system 消息 | 记忆不生效 |
-| `AssistantPiiModelDecorator` | `legacy/security/AssistantPiiModelDecorator.java:23` | 出网脱敏 | `stream` | 姓名/手机/证件/邮箱逐块脱敏 | 原始 PII 出网 |
+| `ThinkingTierModelDecorator` | `engine/core/ThinkingTierModelDecorator.java:26` | 思考档翻译 | `stream` | `fast/balanced/deep` → `reasoning_effort` / `thinking.type` | 档位不生效 |
+| `SkillInjectModelDecorator` | `engine/core/SkillInjectModelDecorator.java:24` | 当轮技能注入 | `stream` | 选中技能正文尾部追加；过可见性闸 | 手动选技能无效 |
+| `DateInjectModelDecorator` | `engine/core/DateInjectModelDecorator.java:32` | 日期锚点 | `stream` | 追加"今天是…" | 模型不知道今天 |
+| `MemoryInjectModelDecorator` | `engine/core/MemoryInjectModelDecorator.java:38` | 长期记忆注入 | `stream` | 按最后一条提问检索记忆，追加 system 消息 | 记忆不生效 |
+| `AssistantPiiModelDecorator` | `engine/security/AssistantPiiModelDecorator.java:23` | 出网脱敏 | `stream` | 姓名/手机/证件/邮箱逐块脱敏 | 原始 PII 出网 |
 | `BillingModelDecorator` | `infrastructure/BillingModelDecorator.java:216` | 计费 | `doStream` / `record` | 前置余额闸；聚合 usage；落账；成本累计 | 不扣费、不记 usage |
-| `ToolRegistry` | `legacy/core/ToolRegistry.java:155` | 平台工具唯一登记处 | `registerAll` / `effectiveMinRoleSingle` | 8 个工具按角色/闸注册，同循环写权限规则 | 平台工具全消失 |
-| `ProviderToolRegistry` | `legacy/core/ProviderToolRegistry.java:112` | SPI 工具注册 | `registerProviders` / `eligibleSpecs` | 收集 provider，过滤后桥接注册，写 ALLOW/ASK | 业务工具全不可用 |
-| `BizToolAgentAdapter` | `legacy/core/BizToolAgentAdapter.java:32` | SPI → 引擎工具 | `doExecute` / `checkPermissions` | 只读放行、写类 ASK、审计、进度 | SPI 工具无法执行 |
-| `AssistantSkillGateMiddleware` | `legacy/core/AssistantSkillGateMiddleware.java:55` | 技能可见性权威 | `filterVisible` / `visibleTo` | 停用遮罩 + minRole + 矩阵 | 技能对所有人可见 |
-| `AssistantSkillUsageMiddleware` | `legacy/core/AssistantSkillUsageMiddleware.java:58` | 技能使用统计 | `onActing` | 成功取用才 +1；手动胶囊去重 | 使用次数恒 0 |
-| `AssistantPlanGateMiddleware` | `legacy/core/AssistantPlanGateMiddleware.java:78` | 计划待确认写闸 | `onReasoning` / `onActing` | 摘写工具；拒同批写调用 | 没确认就能写 |
-| `HeartbeatMiddleware` | `legacy/core/HeartbeatMiddleware.java:49` | 流层心跳 | `withHeartbeat` | 每 20 秒发 `dcs-heartbeat` | 静默期前端误判断线 |
-| `AssistantCompactionMiddleware` | `legacy/core/AssistantCompactionMiddleware.java:82` | 自动压缩 | `onReasoning` / `microcompact` | 微压缩 → 全量摘要 → 写分隔条/审计；失败熔断 | 上下文超窗 |
+| `ToolRegistry` | `engine/core/ToolRegistry.java:155` | 平台工具唯一登记处 | `registerAll` / `effectiveMinRoleSingle` | 8 个工具按角色/闸注册，同循环写权限规则 | 平台工具全消失 |
+| `ProviderToolRegistry` | `engine/core/ProviderToolRegistry.java:112` | SPI 工具注册 | `registerProviders` / `eligibleSpecs` | 收集 provider，过滤后桥接注册，写 ALLOW/ASK | 业务工具全不可用 |
+| `BizToolAgentAdapter` | `engine/core/BizToolAgentAdapter.java:32` | SPI → 引擎工具 | `doExecute` / `checkPermissions` | 只读放行、写类 ASK、审计、进度 | SPI 工具无法执行 |
+| `AssistantSkillGateMiddleware` | `engine/core/AssistantSkillGateMiddleware.java:55` | 技能可见性权威 | `filterVisible` / `visibleTo` | 停用遮罩 + minRole + 矩阵 | 技能对所有人可见 |
+| `AssistantSkillUsageMiddleware` | `engine/core/AssistantSkillUsageMiddleware.java:58` | 技能使用统计 | `onActing` | 成功取用才 +1；手动胶囊去重 | 使用次数恒 0 |
+| `AssistantPlanGateMiddleware` | `engine/core/AssistantPlanGateMiddleware.java:78` | 计划待确认写闸 | `onReasoning` / `onActing` | 摘写工具；拒同批写调用 | 没确认就能写 |
+| `HeartbeatMiddleware` | `engine/core/HeartbeatMiddleware.java:49` | 流层心跳 | `withHeartbeat` | 每 20 秒发 `dcs-heartbeat` | 静默期前端误判断线 |
+| `AssistantCompactionMiddleware` | `engine/core/AssistantCompactionMiddleware.java:82` | 自动压缩 | `onReasoning` / `microcompact` | 微压缩 → 全量摘要 → 写分隔条/审计；失败熔断 | 上下文超窗 |
 
 #### 表 C：会话、HITL、技能仓、计费、自动化
 
@@ -1309,14 +1309,14 @@ AutomationRunner.run
 |---|---|---|---|---|---|
 | `RunLedgerService` | `service/RunLedgerService.java:58` | 会话/run 落库 | `ensureConversation` / `registerRun` / `persistUserRound` / `finishRun` | 首绑、登记、单事务落 user 轮、终态 | 没有会话历史 |
 | `ConversationResumeService` | `service/ConversationResumeService.java:39` | 续看判定 | `prepare` | 查最新 RUNNING run；能续就 attach，不能就轮询 | attach 端点失效 |
-| `AssistantHitlController` | `legacy/controller/AssistantHitlController.java:48` | 悬挂卡查询 | `pending` | 归属校验 + 缓存重建；跨实例 409 | 刷新后确认卡消失 |
-| `AssistantPendingInterruptCache` | `legacy/persist/AssistantPendingInterruptCache.java:59` | 悬挂卡缓存 | `store` / `peek` / `clear` | 按 thread 存 interrupt 卡 | 换设备无法恢复 |
-| `AssistantAskUserController` | `legacy/controller/AssistantAskUserController.java:49` | 反问作答 | `answer` / `snooze` | 独立端点作答，run 保持 RUNNING | 反问卡无法提交 |
-| `AssistantStateStoreConfig` | `legacy/config/AssistantStateStoreConfig.java:39` | Agent 状态存储 | `dcsAssistantStateStore` | 包装 DataSource，`search_path=agentscope,public` | 跨请求状态丢失 |
-| `AssistantSkillSource` | `legacy/core/AssistantSkillSource.java:88` | 技能三层仓 | `repositories` / `all` | classpath → config → DB 合并 | 技能只剩内置 |
-| `DatabaseSkillRepository` | `legacy/core/DatabaseSkillRepository.java:55` | 技能在线层 | `getAllSkills` / `disabledIds` | 读租户技能行；30s TTL；坏行跳过 | 管理台改技能不生效 |
+| `AssistantHitlController` | `controller/AssistantHitlController.java:48` | 悬挂卡查询 | `pending` | 归属校验 + 缓存重建；跨实例 409 | 刷新后确认卡消失 |
+| `AssistantPendingInterruptCache` | `engine/persist/AssistantPendingInterruptCache.java:59` | 悬挂卡缓存 | `store` / `peek` / `clear` | 按 thread 存 interrupt 卡 | 换设备无法恢复 |
+| `AssistantAskUserController` | `controller/AssistantAskUserController.java:49` | 反问作答 | `answer` / `snooze` | 独立端点作答，run 保持 RUNNING | 反问卡无法提交 |
+| `AssistantStateStoreConfig` | `engine/config/AssistantStateStoreConfig.java:39` | Agent 状态存储 | `assistantStateStore` | 包装 DataSource，`search_path=agentscope,public` | 跨请求状态丢失 |
+| `AssistantSkillSource` | `engine/core/AssistantSkillSource.java:88` | 技能三层仓 | `repositories` / `all` | classpath → config → DB 合并 | 技能只剩内置 |
+| `DatabaseSkillRepository` | `engine/core/DatabaseSkillRepository.java:55` | 技能在线层 | `getAllSkills` / `disabledIds` | 读租户技能行；30s TTL；坏行跳过 | 管理台改技能不生效 |
 | `AiBillingService` | `../ruoyi-ai-billing/.../AiBillingService.java:156` | 计费落账 | `recordTransactional` / `recordTransactionalCredits` | 幂等 → 算价 → 扣钱包/积分 → 插 usage | 不落账 |
-| `AutomationRunner` | `legacy/automation/service/AutomationRunner.java:210` | 无人值守执行 | `run` | 只读装配 + `agent.call().block()`，不走 AGUI | 自动化不执行 |
+| `AutomationRunner` | `service/AutomationRunner.java:210` | 无人值守执行 | `run` | 只读装配 + `agent.call().block()`，不走 AGUI | 自动化不执行 |
 
 ---
 
@@ -1328,15 +1328,15 @@ AutomationRunner.run
 |---|---|---|
 | 画像 profile | `profile_event`、`profile_event_archive`、`profile_subject`、`profile_identity_link/merge`、`profile_score_dimension/rule`、`profile_score_snapshot`、`profile_score_model`、`profile_model_run/snapshot`、`profile_segment*`、`profile_review_queue`、`profile_reach_*`、`profile_engine_config`、`profile_source_config`、`profile_protocol`、`profile_schema_registry`、`profile_pii_field` | `profile_pii_field` 是全局字段字典，无 `tenant_id` |
 | 分析 analytics | `analytics_session`、`analytics_daily`、`analytics_funnel`、`analytics_custom_report`、`analytics_replay_task`、`analytics_rebuild_log`、`analytics_visitor_first_seen` | 事件源直接查 `profile_event`，不另建事件表 |
-| 采集 demo dcs | `task`、`task_field`、`submission`、`audit`、`notice`、`feedback`、`dcs_changelog` | `dcs_changelog` 是全局表 |
+| 采集 demo mission | `task`、`task_field`、`submission`、`audit`、`notice`、`feedback`、`dcs_changelog` | `dcs_changelog` 是全局表 |
 | 风控 risk | `risk_event`、`risk_rule`、`risk_whitelist`、`risk_action`、`profile_review`、`captcha_log`、`sensitive_word`、`word_fp_feedback` | 全部带 `tenant_id` |
-| 计费 ai-billing | `ai_config`、`ai_model_price`、`ai_usage`、`ai_provider_access`、`ai_model_health`、`tenant_wallet`、`tenant_wallet_ledger`、`tenant_billing_mode`、`dcs_ai_credit_*`、`service_charge_rule`、`wallet_payment_order`、`wallet_alert_state`、`ai_doc_domain` | `ai_credit_plan` 是全局套餐表 |
+| 计费 ai-billing | `ai_config`、`ai_model_price`、`ai_usage`、`ai_provider_access`、`ai_model_health`、`tenant_wallet`、`tenant_wallet_ledger`、`tenant_billing_mode`、`ai_credit_*`、`service_charge_rule`、`wallet_payment_order`、`wallet_alert_state`、`ai_doc_domain` | `ai_credit_plan` 是全局套餐表 |
 | 文件安全 file-security | `file_review`、`file_review_config`、`file_guard_log` | 全部带 `tenant_id` |
 | 系统 system | `sys_user`、`sys_role`、`sys_dept`、`sys_post`、`sys_config`、`sys_dict_*`、`sys_notice`、`sys_oss`、`sys_social`、`sys_logininfor`、`sys_oper_log` | `sys_menu`、`sys_tenant`、`sys_tenant_package`、`sys_client`、`sys_oss_config`、关联表是全局表 |
 | 助手 assistant | `assistant_conversation`、`assistant_message`、`assistant_run`、`assistant_run_issue`、`assistant_favorite`、`assistant_feedback`、`assistant_memory`、`assistant_memory_pref`、`assistant_skill`、`assistant_skill_usage`、`assistant_user_pref`、`assistant_user_quota`、`assistant_attachment`、`assistant_action`、`assistant_compaction`、`assistant_config`、`assistant_model_setting`、`assistant_announcement`、`mcp_server`、`mcp_call_log` | 另有 `agentscope.*` 三张状态表 |
 | Agent 状态 | `agentscope.agentscope_sessions`、`agentscope.agentscope_snapshots`、`agentscope.agentscope_store` | 独立 schema，AgentScope 框架读写 |
 
-> 规模口径：`backend/script/sql/baseline/01_schema.sql` 里有 113 条 `CREATE TABLE`；2026-11-20 对演示库的盘点为 115 张表（含迁移新增），其中 57 张 `dcs_` 前缀。DDL 以 baseline 为准，增量走 `migration/*.sql`。
+> 规模口径：`backend/script/sql/baseline/` 下有 112 条 `CREATE TABLE`（`01_schema.sql` 105 + `07_analytics.sql` 7）；其中 `dcs_` 前缀只剩 1 张（`dcs_changelog`，数据面白名单）。DDL 以 baseline 为准，增量走 `migration/*.sql`。
 
 ### 6.2 租户隔离的三条规则
 
@@ -1519,7 +1519,7 @@ AutomationRunner.run
 | `AnalyticsHealthController` | `/analytics/health` | 1 |
 | `AnalyticsReplayController` | `/analytics/replay` | 5 |
 
-### A.3 采集 demo dcs（7 个）
+### A.3 采集 demo mission（7 个）
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
@@ -1649,14 +1649,14 @@ AutomationRunner.run
 | 风控评分 | `.../risk/service/RiskScoreService.java` |
 | 计费落账 | `.../ruoyi-ai-billing/.../service/support/AiBillingService.java` |
 | 文件审核 | `.../ruoyi-file-security/.../listener/OssUploadedEventListener.java` |
-| Agent 工厂 | `.../ruoyi-assistant/.../assistant/legacy/core/AssistantAgentFactory.java` |
-| Agent 门卫 | `.../assistant/legacy/core/AssistantRuntimeContextResolver.java` |
-| Agent 事件 | `.../assistant/legacy/core/AssistantEventEnricher.java` |
-| 工具注册 | `.../assistant/legacy/core/ToolRegistry.java` / `ProviderToolRegistry.java` |
-| 技能闸 | `.../assistant/legacy/core/AssistantSkillGateMiddleware.java` |
-| 压缩 | `.../assistant/legacy/core/AssistantCompactionPolicy.java` / `AssistantCompactionMiddleware.java` |
-| 状态存储 | `.../assistant/legacy/config/AssistantStateStoreConfig.java` |
-| 回放汇 | `.../assistant/legacy/core/AssistantRunStreamHub.java` |
+| Agent 工厂 | `.../ruoyi-assistant/.../assistant/engine/core/AssistantAgentFactory.java` |
+| Agent 门卫 | `.../assistant/engine/core/AssistantRuntimeContextResolver.java` |
+| Agent 事件 | `.../assistant/engine/core/AssistantEventEnricher.java` |
+| 工具注册 | `.../assistant/engine/core/ToolRegistry.java` / `ProviderToolRegistry.java` |
+| 技能闸 | `.../assistant/engine/core/AssistantSkillGateMiddleware.java` |
+| 压缩 | `.../assistant/engine/core/AssistantCompactionPolicy.java` / `AssistantCompactionMiddleware.java` |
+| 状态存储 | `.../assistant/engine/config/AssistantStateStoreConfig.java` |
+| 回放汇 | `.../assistant/engine/core/AssistantRunStreamHub.java` |
 | 前端 AGUI 客户端 | `frontend/src/api/smartdock/assistant/aguiClient.ts` |
 
 ---
@@ -1674,7 +1674,7 @@ AutomationRunner.run
 | 7 | `docs/agent-engine.md` L152-159：CUSTOM 帧 3 种 | 过时 | 实际 9 种 + 心跳 + 续看截断（见 5.12.2） |
 | 8 | `docs/agent-engine.md` L171：`AssistantHitlController` 承接放行/中止 | 错误 | 它只有 `GET /pending`；放行/中止走下一次 `/agui/run` 的 `resume` |
 | 9 | `docs/architecture.md` L114：前端 SSE 用 `utils/sse.ts` | 归属错误 | AGUI 对话走 `frontend/src/api/smartdock/assistant/aguiClient.ts`（fetch + ReadableStream）；`utils/sse.ts` 是通知推送的 EventSource |
-| 10 | `docs/architecture.md` L115：SPI 工具举例 | 过时 | 实际三个提供方：dcs（任务/待办/提交/建任务）、profile（画像/圈人/分群/复核）、analytics（总览/趋势/漏斗/留存/路径/自定义） |
+| 10 | `docs/architecture.md` L115：SPI 工具举例 | 过时 | 实际三个提供方：mission（任务/待办/提交/建任务）、profile（画像/圈人/分群/复核）、analytics（总览/趋势/漏斗/留存/路径/自定义） |
 | 11 | `docs/architecture.md` L118：幂等键防重复落账 | 表述过强 | 只防同一订阅内重复触发；跨订阅/agent 重建可能双记（见 4.5/9.1） |
 
 ---

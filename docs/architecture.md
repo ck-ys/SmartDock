@@ -26,7 +26,7 @@
 ├─ ruoyi-modules
 │    ruoyi-mission            微核心（不依赖任何业务模块）
 │    ruoyi-profile-engine 画像引擎（只依赖公共件）
-│    ruoyi-file-security  文件安全（依赖 dcs 的端口接口，不依赖实现）
+│    ruoyi-file-security  文件安全（依赖 ruoyi-system 的端口接口与 ruoyi-risk 上报，不依赖实现）
 │    ruoyi-risk / ruoyi-ai-billing / ruoyi-assistant
 └─ ruoyi-common/*     RuoYi 框架公共件（mybatis/satoken/redis/oss/...）
 ```
@@ -45,7 +45,7 @@
   select 族带 `options` 数组，`required` 为 0/1。
 - `submission`：提交。同一 (task, user) 多行即**多版本**（version 递增），
   `status ∈ {PENDING_AUDIT, APPROVED, REJECTED}`；`data` JSONB 存字段值。
-- `notice`：站内通知。`dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束；`uk_dcs_notice_dedup`）实现幂等投递。
+- `notice`：站内通知。`dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束；`uk_notice_dedup`）实现幂等投递。
 
 ### 2.2 状态机与关键不变量
 
@@ -120,7 +120,7 @@ OSS 上传事件 → `OssUploadedEventListener` 建单，判定序（顺序不�
 
 - Agent 按 `agentId` 注册到 AGUI 注册表，统一从 `POST /agui/run/{agentId}` 进入（内置 `smartdock-assistant` 助手应用；该端点由 starter jar 提供，不在本仓源码里）；
 - SSE 流式：前端走 `api/smartdock/assistant/aguiClient.ts` 的 `fetch + ReadableStream`（`utils/sse.ts` 是站内通知 EventSource，不是对话流）；
-- 工具循环三层：8 个平台工具（`ToolRegistry`）+ 3 个 `BizToolProvider` SPI（dcs/profile/analytics，共 14 个业务工具）+ 租户级 MCP；页面上下文随对话框携带；
+- 工具循环三层：8 个平台工具（`ToolRegistry`）+ 3 个 `BizToolProvider` SPI（mission/profile/analytics，共 14 个业务工具）+ 租户级 MCP；页面上下文随对话框携带；
 - 会话状态落 `agentscope` schema（JDBC state store，独立 schema 隔离）；
 - 计费：ai-billing 的钱包/积分双轨（`tenant_wallet`、`ai_credit_ledger`）；
   幂等键只覆盖同一订阅内的重复帧，跨订阅或 agent 重建后的重放仍可能重复计费（`BillingModelDecorator` 注释已承认该边界）；

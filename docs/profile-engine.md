@@ -319,7 +319,7 @@ profile_event
 public class LoyaltyDimension implements DimensionStrategy {
 
     @Override
-    public String source() { return "dcs"; }
+    public String source() { return ProfileSources.UNIFIED; }
 
     @Override
     public String dimCode() { return "loyalty"; }

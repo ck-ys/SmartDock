@@ -16,7 +16,7 @@ agent 不是硬编码单例，而是注册表中的工厂。starter 通过 `Obje
 
 ```java
 @Bean
-public AguiAgentRegistryCustomizer dcsAssistantAgentRegistryCustomizer() {
+public AguiAgentRegistryCustomizer assistantAgentRegistryCustomizer() {
     return registry -> registry.registerFactory(
         AssistantAgentFactory.AGENT_ID,      // "smartdock-assistant"
         agentFactory::createFromLogin);      // 按登录租户惰性创建

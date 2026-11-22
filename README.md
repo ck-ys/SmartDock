@@ -54,7 +54,7 @@ SmartDock 是一个**开源的智能体工作台**：左侧是会话，右侧是
 
 <p align="center">
   <img src="docs/images/screenshots/27-workspace-ask.gif" width="760" alt="工作台：一次完整问答（录屏）">
-  <br><sub>一次完整问答（真实录屏，加速播放）：提问 → 思考 → 调 <code>dcs_query_my_todos</code> → 流式回答 → 标注来源与用量</sub>
+  <br><sub>一次完整问答（真实录屏，加速播放）：提问 → 思考 → 调 <code>query_my_todos</code> → 流式回答 → 标注来源与用量</sub>
 </p>
 
 会话页长这样：左边是会话历史，中间是消息流。工具调用不是黑盒——「已完成 · 用了 1 个工具 · 37 秒」点开就是每一步的耗时和参数。
@@ -204,8 +204,8 @@ export SMARTDOCK_AI_CONFIG_KEY=$(openssl rand -base64 24)
 export SMARTDOCK_MCP_HEADERS_KEY=$(openssl rand -base64 24)
 ```
 
-> 前者保护 AI 厂商 Key（`dcs_ai_config.api_key` / `dcs_ai_provider_access.api_key`），
-> 后者保护 MCP 服务器请求头令牌（`dcs_mcp_server.headers`）。禁止写进源码或提交进仓库。
+> 前者保护 AI 厂商 Key（`ai_config.api_key` / `ai_provider_access.api_key`），
+> 后者保护 MCP 服务器请求头令牌（`mcp_server.headers`）。禁止写进源码或提交进仓库。
 > 从旧版本升级时，首次启动会自动把历史密文换成新钥匙；之后请到厂商后台把对应 API Key/令牌
 > 也换新——旧版内置钥匙已随公开源码泄露，换锁救不回已经流出去的凭证。
 
@@ -394,7 +394,7 @@ public class BizEventReporter {
 | `ruoyi-assistant-spi` | 业务工具 SPI 契约 |
 | `ruoyi-ai-billing` | AI 计费：供应商配置、钱包、积分、价格 |
 | `ruoyi-profile-engine` | 画像引擎（配套）：事件源、维度计算、快照版本化 |
-| `ruoyi-dcs` | 内置 Demo：任务/提交/审核/通知/画像事件 |
+| `ruoyi-mission` | 内置 Demo：任务/提交/审核/通知/画像事件 |
 | `ruoyi-system` | 平台基座：用户/租户/部门/角色/菜单/字典 |
 | `ruoyi-file-security` / `ruoyi-risk` / `ruoyi-job` | 文件安全、风控、调度 |
 
@@ -519,7 +519,7 @@ public AguiAgentRegistryCustomizer myAgentCustomizer() {
 
 ## 安全与上线前检查
 
-- 基线**不包含任何真实 AI Key**；`dcs.assistant.websearch.key` 默认留空（联网搜索未启用）。
+- 基线**不包含任何真实 AI Key**；`assistant.websearch.key` 默认留空（联网搜索未启用）。
 - **加密密钥只走环境变量**：`SMARTDOCK_AI_CONFIG_KEY`（保护 AI 厂商 Key）与 `SMARTDOCK_MCP_HEADERS_KEY`（保护 MCP 请求头令牌），两把必须不同、16/24/32 位；未配置/长度错/仍用旧版内置钥匙会**拒绝启动**。轮换后请同时到厂商后台更换对应 Key/令牌——旧钥匙一旦公开，换锁不能撤回已泄露的凭证。
 - `application.yml` 的 `jwt-secret-key`、RSA/AES 密钥以及数据库/Redis/MinIO 默认口令均为演示值，**上线前必须全部替换**。
 - 默认账号仅用于本地演示；生产环境请删除或改密，并按组织要求配置密码策略。
@@ -557,6 +557,7 @@ README 里的界面截图由 `frontend/scripts/readme-screenshots.mjs` 生成（
 - [用户画像引擎深度文档](docs/profile-engine.md)
 - [业务接入指南（10 分钟）](docs/profile-integration.md)
 - [架构设计](docs/architecture.md)
+- [架构图册（可缩放）](docs/diagrams.html)
 - [使用说明（按角色走读）](docs/usage.md)
 - [部署指南](docs/deploy.md)
 - [基线 SQL 说明](backend/script/sql/baseline/README.md)

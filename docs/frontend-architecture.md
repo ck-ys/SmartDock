@@ -32,7 +32,7 @@ flowchart TB
     S["Sidebar + Navbar + AppMain"]
   end
   subgraph PAGES["页面"]
-    DCS["views/smartdock/*<br/>画像/分析/任务/计费/风控…"]
+    MISSION["views/smartdock/*<br/>画像/分析/任务/计费/风控…"]
     AGENT["views/smartdock/agent<br/>智能体工作台"]
     ADMIN["views/smartdock/assistant<br/>会话/记忆/运营台"]
   end
@@ -44,16 +44,16 @@ flowchart TB
   end
   B["后端 8090"]
   M --> A --> P --> L --> S
-  S --> DCS
+  S --> MISSION
   S --> AGENT
   S --> ADMIN
-  DCS --> API
+  MISSION --> API
   AGENT --> AGUI
   ADMIN --> API
   API --> REQ
   REQ --> B
   AGUI --> B
-  DCS --> STORE
+  MISSION --> STORE
 ```
 
 ---
@@ -162,7 +162,7 @@ sequenceDiagram
 | `store` | Pinia 根实例与模块 | `store/modules/*` |
 | `types` | 全局/自动导入/Axios/环境变量/路由类型声明 | `types/global.d.ts` |
 | `utils` | `request`、`auth`、`crypto`、SSE、WebSocket、主题、字典、权限、格式化、错误、i18n | `utils/request.ts` |
-| `views` | 页面：RuoYi 系统/监控、登录/注册/协议/错误/重定向、DCS 业务页面 | `views/smartdock/*` |
+| `views` | 页面：RuoYi 系统/监控、登录/注册/协议/错误/重定向、smartdock 业务页面 | `views/smartdock/*` |
 
 ### 3.2 `views/smartdock/*` 页面族
 
@@ -199,7 +199,7 @@ sequenceDiagram
 | `api/smartdock/changelog/*` | `/changelog/*` | `ChangelogController` |
 | `api/smartdock/account-billing/*` | `/tenant-wallet/summary` + 旧三组 re-export | `TenantWalletController` 等 |
 
-`api/smartdock/core/` 是 DCS 微核心的"契约层"：与后端端点一一对应，页面只消费业务形状，不直接拼 URL。它里面的 `r<T>()` 取 `R<T>.data`，`table<T>()` 返回完整 `TableDataInfo<T>`。
+`api/smartdock/core/` 是 smartdock 微核心的"契约层"：与后端端点一一对应，页面只消费业务形状，不直接拼 URL。它里面的 `r<T>()` 取 `R<T>.data`，`table<T>()` 返回完整 `TableDataInfo<T>`。
 
 ---
 
@@ -697,8 +697,8 @@ flowchart TB
   L --> ST["Settings/<br/>主题/皮肤/布局"]
   L --> DA["Assistant/index.vue<br/>悬浮球 + 抽屉"]
   L --> CP["CommandPalette<br/>Ctrl+K 命令面板"]
-  SB --> DCS["views/smartdock/**"]
-  AM --> DCS
+  SB --> MISSION["views/smartdock/**"]
+  AM --> MISSION
 ```
 
 | 能力 | 实现 | 注意 |

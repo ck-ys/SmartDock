@@ -350,7 +350,7 @@
                 <td data-th="题">第 6 题</td>
                 <td data-th="推荐"><span class="pick">甲 · 只给要动的数</span></td>
                 <td data-th="要改什么">两处指标带各加一个修饰类：首页「低分主体」、用户画像页「关注 / 高风险」</td>
-                <td data-th="改动量"><span class="num">views/index.vue ＋ dcs/profile/index.vue，约 12 行</span></td>
+                <td data-th="改动量"><span class="num">views/index.vue ＋ smartdock/profile/index.vue，约 12 行</span></td>
                 <td data-th="证据" class="ev">真机模拟</td>
               </tr>
             </tbody>
@@ -461,16 +461,16 @@
         <h2>当前基线（真机，四皮肤）</h2>
         <p class="sub">下面是仓库里现在跑的版本，六道题都建立在它之上。后面的「试装」图是在这一版之上临时改 CSS 抓的，代码已回滚。</p>
         <figure class="wide">
-          <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/full-t1-light.jpg" alt="当前版本首页（默认皮肤）" />
+          <img src="./20261027-style-assets/full-t1-light.jpg" alt="当前版本首页（默认皮肤）" />
           <figcaption><b>默认皮肤 · 首页</b>：深侧栏已经就位，内容区是一整张白纸；选中项只比旁边深一点点。</figcaption>
         </figure>
         <div class="grid2" style="margin-top:20px">
           <figure class="fig">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/full-t1-dark.jpg" alt="当前版本深色档首页" />
+            <img src="./20261027-style-assets/full-t1-dark.jpg" alt="当前版本深色档首页" />
             <figcaption><b>深色档</b>：侧栏和内容面都是深色，层次靠 1px 线撑着。</figcaption>
           </figure>
           <figure class="fig">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/full-t7-light.jpg" alt="当前版本白侧栏皮肤首页" />
+            <img src="./20261027-style-assets/full-t7-light.jpg" alt="当前版本白侧栏皮肤首页" />
             <figcaption><b>白侧栏皮肤</b>：卡片圆角只有 4px，比默认皮肤更方一档。</figcaption>
           </figure>
         </div>
@@ -487,11 +487,11 @@
 
           <div class="grid2" style="margin-top:20px">
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-t1-before.jpg" alt="当前版本侧栏（红框标出选中行）" />
+              <img src="./20261027-style-assets/cmp-t1-before.jpg" alt="当前版本侧栏（红框标出选中行）" />
               <figcaption><b>现在</b>：红框里就是「当前页」这一行：它只比上下邻行深一点点，几乎看不出被选中；左缘那条蓝线是唯一的线索。</figcaption>
             </figure>
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-t1-after.jpg" alt="试装：选中项实心主色块（红框标出）" />
+              <img src="./20261027-style-assets/cmp-t1-after.jpg" alt="试装：选中项实心主色块（红框标出）" />
               <figcaption><b>试装</b>：同一行改成整行刷主色、字变白，左缘色条撤掉。红框框住的就是变化的那一块。</figcaption>
             </figure>
           </div>
@@ -527,11 +527,11 @@
 
           <div class="grid2" style="margin-top:20px">
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-dark-lifted.jpg" alt="深色档提亮档模拟（红框标出选中行）" />
+              <img src="./20261027-style-assets/cmp-dark-lifted.jpg" alt="深色档提亮档模拟（红框标出选中行）" />
               <figcaption><b>丁案模拟（提亮一档，不铺蓝）</b>：红框那一行已经额外加了蓝色左条和蓝色图标，可跟相邻行比，还是几乎看不出区别。</figcaption>
             </figure>
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-dark-solid.jpg" alt="深色档实心主色块（红框标出选中行）" />
+              <img src="./20261027-style-assets/cmp-dark-solid.jpg" alt="深色档实心主色块（红框标出选中行）" />
               <figcaption><b>甲案（实心块，蓝压深一档）</b>：同样是红框那一行，整块刷深蓝、字变白，一眼就能指出来。代价是页面多一块亮面。</figcaption>
             </figure>
           </div>
@@ -587,11 +587,11 @@
 
           <div class="grid2" style="margin-top:20px">
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-parent-before.jpg" alt="父子两行都刷实心块（红框分别标出父级与子项）" />
+              <img src="./20261027-style-assets/cmp-parent-before.jpg" alt="父子两行都刷实心块（红框分别标出父级与子项）" />
               <figcaption><b>试装第一版（已弃）</b>：上面红框是父级「画像与分析」，下面红框是当前页「用户画像」，两块蓝上下叠着，看上去像同时选中了两个菜单。</figcaption>
             </figure>
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-parent-after.jpg" alt="父级轻底、子项实心块（红框分别标出）" />
+              <img src="./20261027-style-assets/cmp-parent-after.jpg" alt="父级轻底、子项实心块（红框分别标出）" />
               <figcaption><b>试装修正版</b>：同样的两行，父级只剩一层浅底（框里几乎同色），实心块只留给当前页那一行。</figcaption>
             </figure>
           </div>
@@ -626,7 +626,7 @@
           <p class="sub">这一题的推荐我改过一次。原来推荐统一 12px（对齐 参考界面），把 8 和 12 摆在一起看之后改成统一 8px，理由在下面。</p>
 
           <figure class="wide" style="margin-top:20px">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-radius-pair.jpg" alt="同一张对话框，圆角 8px 与 12px 的实拍对比（上排放大 4 倍，下排 1:1 实际大小）" />
+            <img src="./20261027-style-assets/cmp-radius-pair.jpg" alt="同一张对话框，圆角 8px 与 12px 的实拍对比（上排放大 4 倍，下排 1:1 实际大小）" />
             <figcaption><b>这是真机拍的同一张「新增用户」对话框</b>，只是圆角值不同，左边 8px、右边 12px。上排为了看清弧线放大了 4 倍，此时能看出右边更圆一点；下排是 1:1 实际大小，也就是你在屏幕上真正看到的尺寸，两个小方块里的弧线几乎分不出来。差别总共就 4 个像素。</figcaption>
           </figure>
 
@@ -670,21 +670,21 @@
           <p class="sub">这是上一版六题里漏掉的、也是最靠结构的一条，而且我上一版的判断是错的。原来我推荐「先留着」，理由是「换成灰画布牵扯每个页面，要全站回归」。这次我把三个方向都真机做出来才发现：那个理由是估的，没验过，真实改动只有 6 处。下面是同一台机器、同一个视口拍的两组对照。</p>
 
           <figure class="wide" style="margin-top:20px">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-before-home.jpg" alt="现在：内容区是一整张白纸，四周露出 8px 灰边" />
+            <img src="./20261027-style-assets/cmp-canvas-before-home.jpg" alt="现在：内容区是一整张白纸，四周露出 8px 灰边" />
             <figcaption><b>现在（首页）</b>：注意内容区是一整张白纸，只在四周露出一圈 8px 的灰。卡片放在这张白纸上，所以只能靠 1px 细线区分，这就是「浮卡纸感」的来源。</figcaption>
           </figure>
           <figure class="wide" style="margin-top:16px">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-after-home.jpg" alt="丙案：灰画布铺满，白卡浮在上面" />
+            <img src="./20261027-style-assets/cmp-canvas-after-home.jpg" alt="丙案：灰画布铺满，白卡浮在上面" />
             <figcaption><b>丙案（首页）</b>：同一页，白纸没有了，整片是浅灰画布，白卡直接浮在灰上。顶栏和图签也一起并进灰底，不再单独一条白带。卡片有底、页面有层次。</figcaption>
           </figure>
 
           <div class="grid2" style="margin-top:16px">
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-before-analytics.jpg" alt="现在：分析页也是纸上放卡" />
+              <img src="./20261027-style-assets/cmp-canvas-before-analytics.jpg" alt="现在：分析页也是纸上放卡" />
               <figcaption><b>现在（分析页）</b>：不是首页特例，分析页一样是「白纸里放卡」。</figcaption>
             </figure>
             <figure class="fig">
-              <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-canvas-after-analytics.jpg" alt="丙案：分析页同样是灰画布加白卡" />
+              <img src="./20261027-style-assets/cmp-canvas-after-analytics.jpg" alt="丙案：分析页同样是灰画布加白卡" />
               <figcaption><b>丙案（分析页）</b>：同一套改动，分析页的指标带和图表卡自然浮在灰上。</figcaption>
             </figure>
           </div>
@@ -723,15 +723,15 @@
           <p class="sub">代码里现在写着「KPI 数字永远是主文字色，红黄绿只留给状态药丸」。第一轮问的是「要不要上色」，这一轮问「给哪个数上色、一屏上几个」。</p>
 
           <figure class="wide" style="margin-top:20px">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-kpi-before.jpg" alt="当前首页指标带：全部墨色（红框标出低分主体）" />
+            <img src="./20261027-style-assets/cmp-kpi-before.jpg" alt="当前首页指标带：全部墨色（红框标出低分主体）" />
             <figcaption><b>现在</b>：红框框住「低分主体 1」，它和旁边的 3、119、65.6 完全同一个颜色、同一个字号，扫一眼看不出它是「有事要处理」的那个。</figcaption>
           </figure>
           <figure class="wide" style="margin-top:16px">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-kpi-after.jpg" alt="试装：低分主体用琥珀色（红框标出）" />
+            <img src="./20261027-style-assets/cmp-kpi-after.jpg" alt="试装：低分主体用琥珀色（红框标出）" />
             <figcaption><b>试装（首页）</b>：还是红框那一格，现在数字变成琥珀色。其余三个数保持墨色不变，它是这一屏唯一需要人动手的数。</figcaption>
           </figure>
           <figure class="wide" style="margin-top:16px">
-            <img src="file:///D:/Git/git-gitee/smart-dock/.workshop/plans/20261027-style-assets/cmp-kpi-risk.jpg" alt="试装：关注黄、高风险红（红框分别标出）" />
+            <img src="./20261027-style-assets/cmp-kpi-risk.jpg" alt="试装：关注黄、高风险红（红框分别标出）" />
             <figcaption><b>试装（用户画像页）</b>：两个红框分别是「关注」和「高风险」：关注用琥珀、高风险用红，形成一条严重度阶梯；旁边的主体数和平均分仍是墨色。</figcaption>
           </figure>
 

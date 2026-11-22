@@ -95,7 +95,7 @@
         <ul class="nav-sub">
           <li><a href="#s-7-1" data-target="s-7-1">画像 profile</a></li>
           <li><a href="#s-7-2" data-target="s-7-2">分析 analytics</a></li>
-          <li><a href="#s-7-3" data-target="s-7-3">采集 demo dcs</a></li>
+          <li><a href="#s-7-3" data-target="s-7-3">采集 demo mission</a></li>
           <li><a href="#s-7-4" data-target="s-7-4">风控 risk</a></li>
           <li><a href="#s-7-5" data-target="s-7-5">计费 ai-billing</a></li>
           <li><a href="#s-7-6" data-target="s-7-6">文件安全</a></li>
@@ -391,7 +391,7 @@
             <tr><td rowspan="4">入口</td><td><code>ruoyi-admin</code></td><td>Spring Boot 入口、组合根（把所有模块拼装进一个进程的装配点）、跨模块 adapter</td><td>指向所有业务模块</td></tr>
             <tr><td><code>ruoyi-common</code>（24 个子模块）</td><td>MyBatis/Redis/Sa-Token/租户/加密/OSS/SSE（服务器单向推流的通道，打字机与通知靠它）等底座</td><td>被所有模块依赖</td></tr>
             <tr><td><code>ruoyi-extend</code>（2 个）</td><td>监控/扩展</td><td>独立</td></tr>
-            <tr><td><code>ruoyi-modules</code>（9 个）</td><td>system / profile-engine / assistant / assistant-spi / dcs / ai-billing / file-security / risk / job</td><td>业务模块之间按图单向依赖</td></tr>
+            <tr><td><code>ruoyi-modules</code>（9 个）</td><td>system / profile-engine / assistant / assistant-spi / mission / ai-billing / file-security / risk / job</td><td>业务模块之间按图单向依赖</td></tr>
             <tr><td>工具</td><td><code>tools/mcp/</code>（dock-pg-mcp / dock-redis-mcp，2 个）</td><td>随仓开源的数据面 MCP server（查 PG / Redis 用的本地工具）；构建与连接配置见目录内 README</td><td>独立于 Maven 构建</td></tr>
           </tbody>
         </table>
@@ -432,7 +432,7 @@
         <span class="chip-node muted">ruoyi-job<small>SnailJob 示例</small></span>
       </div>
       <div class="band-row wrap">
-        <span class="chip-node muted">已允许的横向依赖：dcs → profile · assistant → dcs / billing / system · billing / risk → system · file-security → risk / system</span>
+        <span class="chip-node muted">已允许的横向依赖：mission → profile · assistant → mission / billing / system · billing / risk → system · file-security → risk / system</span>
       </div>
     </div>
   </div>
@@ -751,7 +751,7 @@ public class XxxController extends BaseController {
   </div>
 </figure>
 
-      <div class="code"><span class="file">backend/script/sql/migration/2026-11-20_xxx.sql</span><pre>CREATE TABLE IF NOT EXISTS dcs_xxx (
+      <div class="code"><span class="file">backend/script/sql/migration/2026-11-20_xxx.sql</span><pre>CREATE TABLE IF NOT EXISTS mission_xxx (
   id              BIGINT       NOT NULL PRIMARY KEY,
   tenant_id       VARCHAR(20)  NOT NULL,
   name            VARCHAR(128) NOT NULL,
@@ -762,9 +762,9 @@ public class XxxController extends BaseController {
   create_time     TIMESTAMP,
   update_by       BIGINT,
   update_time     TIMESTAMP,
-  CONSTRAINT uk_dcs_xxx_name UNIQUE (tenant_id, name)
+  CONSTRAINT uk_mission_xxx_name UNIQUE (tenant_id, name)
 );
-CREATE INDEX IF NOT EXISTS idx_dcs_xxx_status ON dcs_xxx (tenant_id, status);</pre></div>
+CREATE INDEX IF NOT EXISTS idx_mission_xxx_status ON mission_xxx (tenant_id, status);</pre></div>
       <div class="callout danger">
         <span class="t">三条禁止</span>
         <p>禁止自增主键、禁止物理删除、禁止外键与级联。唯一性必须落 DB 唯一索引，不许“先查再插”——并发下必出脏数据。</p>
@@ -1424,7 +1424,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
         <p>事件写入后自动汇总是 2 秒去抖；验证要 sleep ≥ 5 秒，或手动触发重建。刚写完就查，数字没变是正常的。</p>
       </div>
 
-      <h3 id="s-7-3">采集 demo dcs</h3>
+      <h3 id="s-7-3">采集 demo mission</h3>
       <p><b>解决什么</b>：保留任务/待办/审核最小闭环，作为内置 demo。它不是主业务，但状态机和权限是完整样板——新域想做状态流转，先照它抄。</p>
       
 <figure class="diagram-card" id="fig-backend-06">
@@ -1657,7 +1657,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
           </tbody>
         </table>
       </div>
-      <p>表前缀 <code>dcs_risk_</code>（event/rule/action/whitelist）+ <code>sensitive_word / word_fp_feedback / captcha_log / profile_review</code>。file-security 驳回文件后在 afterCommit 里发 <code>RiskEventCommand</code>（幂等键 <code>file:review:{id}</code>），这是两个域唯一的接缝。</p>
+      <p>表前缀 <code>risk_</code>（event/rule/action/whitelist）+ <code>sensitive_word / word_fp_feedback / captcha_log / profile_review</code>。file-security 驳回文件后在 afterCommit 里发 <code>RiskEventCommand</code>（幂等键 <code>file:review:{id}</code>），这是两个域唯一的接缝。</p>
       <div class="callout warn">
         <span class="t">白名单在收集入口，不在决策后</span>
         <p>豁免是「事件根本不落」，不是「落了再放行」。排查「这人为什么没有风险分」先查白名单，再去对规则。</p>
@@ -2685,7 +2685,7 @@ if (row == null || !Objects.equals(row.getTenantId(), LoginHelper.getTenantId())
           <tbody>
             <tr><td>开跑</td><td><code>insertIgnoreRun</code> 写入 RUNNING，同刻绑定 tenant / user / thread / owner_instance</td></tr>
             <tr><td>收尾</td><td>终态都是<b>条件 UPDATE</b>（仅 <code>status='RUNNING'</code> 可迁移）；迟到的第二个终态直接丢弃，不会覆盖</td></tr>
-            <tr><td>实例身份</td><td>配置 <code>dcs.assistant.instance.id</code>，缺省 <code>hostname:pid:短码</code>；租约 45 秒、心跳 15 秒</td></tr>
+            <tr><td>实例身份</td><td>配置 <code>assistant.instance.id</code>，缺省 <code>hostname:pid:短码</code>；租约 45 秒、心跳 15 秒</td></tr>
             <tr><td>收割三档</td><td>本机 60 秒无事件 → INTERRUPTED(client-disconnect)；纯心跳 10 分钟 → no-terminal-event；RetentionJob 每 15 分钟兜底迁移悬挂 run</td></tr>
             <tr><td>跨实例</td><td>owner 非本机且 Redis 租约未过期则<b>不抢收</b>；无 owner 的旧数据 30 分钟后才收</td></tr>
           </tbody>

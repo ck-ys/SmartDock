@@ -526,7 +526,7 @@ npx vite --port 5188 --host --strictPort</pre></div>
   </div>
   <div class="fl-step">
     <span class="fl-n">6</span>
-    <div class="fl-b"><b>filterAsyncRouter：组件字符串 → 真实组件</b><small>如 <code>dcs/todo/index</code> 映射到实际 .vue；映射不到就是白屏或 404</small></div>
+    <div class="fl-b"><b>filterAsyncRouter：组件字符串 → 真实组件</b><small>如 <code>smartdock/mission/index</code> 映射到实际 .vue；映射不到就是白屏或 404</small></div>
     <span class="fl-side bad">映射不到 → 空白</span>
   </div>
   <div class="fl-step">
@@ -569,7 +569,7 @@ npx vite --port 5188 --host --strictPort</pre></div>
       <div class="code"><span class="file">模板里</span><pre>&lt;el-button v-hasPermi="['smartdock:task:publish']" type="primary" @click="publish"&gt;发布&lt;/el-button&gt;</pre></div>
       <div class="callout danger">
         <span class="t">两段式权限串无效</span>
-        <p><code>dcs:task</code> 这种两段式匹配不上超管的 <code>*:*:*</code>，结果是超管也看不到按钮。必须三段式。</p>
+        <p><code>smartdock:task</code> 这种两段式匹配不上超管的 <code>*:*:*</code>，结果是超管也看不到按钮。必须三段式。</p>
       </div>
 
       <h3 id="s-3-4">路由写法</h3>
