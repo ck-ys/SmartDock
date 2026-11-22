@@ -178,6 +178,7 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 - gateway 只在三类边界建：跨模块、流式长连接、外部服务；自有单表 CRUD 不建
 - 改结构前读 `backend/AGENTS.md`「包卫生与分层门禁」；收口跑 `PackageHygieneTest` + `LayeringTest`
 - **批 9（2026-11-21）起 dcs 六层清零，新代码不许再出现 dcs**：`Dcs*` 类名、`com.smartdock.dcs` 包、`dcs_` 表、`/dcs` 路径、`dcs:` 权限串、`dcs-assistant` agentId、`dcs.*` 配置键一律不写（权限用 `smartdock:` 三段式、配置键按域裸名如 `assistant.*`）。**数据面白名单例外**（有意保留，不改不迁）：`dcs_changelog` / `dcs_mid` / `dcs_assistant_conversation_title_bak_*` 表、画像 source `'dcs'`（`ProfileSources.UNIFIED`，历史数据不迁移）、烧录密钥名 `DcsAiCfgEncKey16` / `DcsMcpHeadersK16`（`EncryptKey*Runner` 识别旧钥匙用）、`PackageMigrationGuardTest` 钉死的迁移前旧全名、注释里带「批9 前名为」字样的历史叙述、`backend/script/sql/migration/` 历史迁移文件（批 9 已统一改写为新名表名/权限串，原文见 git 历史——保证「新 baseline + 全量迁移重放」自洽；存量旧库升级走 2026-11-21_b9_strip_dcs_prefix.sql）。守卫：`PackageMigrationGuardTest.batch9LegacyTreeMustBeAbsentFromClasspath`（classpath 整树缺席）+ `PackageHygieneTest`（legacy 双树 0 文件）
+- **前端 `.dcs-*` 类名与 `--dcs-*` 设计令牌：本批不改，整批推给视觉批（2026-11-22 批 10 拍板 Q3）**。理由与边界写清楚，别再重复讨论：357 处类名 / 75 文件 + 1094 处令牌 / 82 文件是**样式系统改名**，不是文字替换——9 处 JS 选择器（`querySelector` 6 + `closest` 3）、5 处截图脚本、2 个测试文件都按字符串匹配这些类名，`vite build` 与 `vitest` **都不会报错**，只会静默坏掉交互与截图。视觉批改名时必须：① 先补一条「类名清单」门禁测试（改前全绿、改名后仍全绿才算真改完）；② 同批改 JS 选择器与截图脚本；③ 走「样式改动必须视觉验收」全套（DOM 断言 + 截图 + 原生读图 + ≥2 种数据规模）。**在那之前，新代码允许继续用 `.dcs-*` 与 `--dcs-*`**（`tokens.test.ts` 只认 `var(--dcs-*)` 形态，用别的名字反而会红）。
 
 ---
 

@@ -120,7 +120,7 @@ public final class PromptAssets {
             - 我的待办：/smartdock/todo
             - 数据看板：/smartdock/dashboard
             行内：[任务名](/smartdock/mission/detail/编号)。
-            任务卡（重点任务推荐用；单独成段才能渲染成卡片，同一回答最多 3 张）：
+            任务卡（重点推荐用；单独成段才能渲染成卡片；按需给——用户问到的任务才给卡，别为了凑数把相关任务都堆上来）：
             [任务名](/smartdock/mission/detail/编号 "截止 MM-DD HH:mm · 进度 x/y · 还有 n 人未交")
             元信息取工具返回的真数，不编造；链接文字用任务名，别用「点这里」。
             """),
