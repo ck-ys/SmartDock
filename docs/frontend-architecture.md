@@ -419,15 +419,15 @@ sequenceDiagram
 |---|---|---|
 | 认证 | `Admin-Token` | 登录 token |
 | 租户 | `dynamic-tenant:<userId>` | 动态租户镜像 |
-| 助手 | `smartdock:assistant:thread:<userId>` | 当前会话 threadId |
-| 助手 | `smartdock:assistant:thinkLevel:<userId>` | 思考档位 |
-| 助手 | `smartdock:assistant:modelPin:<userId>:<threadId>` | 会话级模型 pin |
-| 助手 | `smartdock:assistant:webOn:<userId>:<threadId>` | 会话级联网开关；`0`=停用 |
-| 助手 | `smartdock:assistant:skill:<userId>:<threadId>` | 会话级技能 |
-| 助手 | `smartdock:assistant:autoLevel:<userId>` | 自主权档位 |
+| 助手 | `assistant:thread:<userId>` | 当前会话 threadId |
+| 助手 | `assistant:thinkLevel:<userId>` | 思考档位 |
+| 助手 | `assistant:modelPin:<userId>:<threadId>` | 会话级模型 pin |
+| 助手 | `assistant:webOn:<userId>:<threadId>` | 会话级联网开关；`0`=停用 |
+| 助手 | `assistant:skill:<userId>:<threadId>` | 会话级技能 |
+| 助手 | `assistant:autoLevel:<userId>` | 自主权档位 |
 | 助手 | `smartdock-agent-prefs:v1:<userId>` | 七项偏好 |
 | 助手 | `smartdock-agent-drafts:v1:<userId>:<scope>` | 草稿 |
-| 助手 | `smartdock:assistant:pins:<userId>` | 会话置顶 |
+| 助手 | `assistant:pins:<userId>` | 会话置顶 |
 | 登录 | `login-redirect-owner` | 401 重登 redirect 归属 |
 | 表格 | `table-columns:<storageKey>` | 列设置 |
 
@@ -667,7 +667,7 @@ sequenceDiagram
 | **首轮重试** | `startTurn` 内指数退避，最多 5 次 | 只在"零帧就断"时重发；已经收到帧再断**不重发**（重发会撞后端 409 双 RUNNING） |
 | **停滞看门狗** | 600s 没新帧判定卡死 | 触发后收口为错误态，允许用户重试/续看 |
 | **续看 attach** | `POST /assistant/conversation/attach?threadId=…` | 后端 `AssistantRunStreamHub` 4096 帧回放环；先回放再续推；溢出补 `dcs-resume-truncated` |
-| **刷新恢复** | `localStorage` 的 `smartdock:assistant:thread:<userId>` + attach | 刷新后先按 threadId 续看，失败再回退普通会话加载 |
+| **刷新恢复** | `localStorage` 的 `assistant:thread:<userId>` + attach | 刷新后先按 threadId 续看，失败再回退普通会话加载 |
 | **停止** | `POST /assistant/conversation/stop` | 停止后本轮状态收口；已产生的内容保留 |
 | **409 双跑** | 前端展示"该会话正在生成" | 不自动换 runId 重发；换 runId 重试是后端约束（会撞运行锁） |
 
@@ -675,11 +675,11 @@ sequenceDiagram
 
 | 控件 | 存储 | 上游字段 | 备注 |
 |---|---|---|---|
-| 思考档位（快速/平衡/深入） | `smartdock:assistant:thinkLevel:<userId>` | `thinkTier` | 三件套必须齐：brain 图标 + 文字 + chevron |
-| 模型选择 | `smartdock:assistant:modelPin:<userId>:<threadId>` | `modelConfigId` | 仅 `choiceOn && pin` 才带 |
-| 技能 | `smartdock:assistant:skill:<userId>:<threadId>` | `skillId` | 会话级 |
-| 联网 | `smartdock:assistant:webOn:<userId>:<threadId>` | `webSearchEnabled` | `'0'` 表示显式停用 |
-| 自主权 | `smartdock:assistant:autoLevel:<userId>` | `autoLevel` | 影响工具审批档 |
+| 思考档位（快速/平衡/深入） | `assistant:thinkLevel:<userId>` | `thinkTier` | 三件套必须齐：brain 图标 + 文字 + chevron |
+| 模型选择 | `assistant:modelPin:<userId>:<threadId>` | `modelConfigId` | 仅 `choiceOn && pin` 才带 |
+| 技能 | `assistant:skill:<userId>:<threadId>` | `skillId` | 会话级 |
+| 联网 | `assistant:webOn:<userId>:<threadId>` | `webSearchEnabled` | `'0'` 表示显式停用 |
+| 自主权 | `assistant:autoLevel:<userId>` | `autoLevel` | 影响工具审批档 |
 | 反问自动继续 | `smartdock-agent-prefs:v1:<userId>` | `askAutoContinue` | 默认开 |
 | 计划决策 | `planDock.ts` | `planDecision` / `planId` | 只在有计划卡时带 |
 | 附件 | — | 先上传 OSS，再登记附件 | 上传走 `fetch` + `FormData`，不用 Axios 实例 |
