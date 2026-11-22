@@ -83,18 +83,20 @@ docker compose up -d
    ```
 
    没有一致性哈希时，`/agui/run`、HITL 确认卡、反问作答、续看都可能落到没有现场的另一台；
-
-> **变量改名说明（2026-11-22）**：本节这些开关原名 `DCS_ASSISTANT_*`，现统一为
-> `SMARTDOCK_ASSISTANT_*`（与 `SMARTDOCK_AI_CONFIG_KEY` 等既有变量同一风格）。
-> `application.yml` 里做的是**双读**——新名优先、旧名兜底，所以已经按旧名部署的环境
-> 不用改也能正常起。旧名保留到下个大版本，新部署请一律用新名。
    此时助手会回「刷新页面后再试」的人话，但体验仍然会坏。
 4. **数据库先升级再放流量**：先执行 `backend/script/sql/migration/` 里本期新增的脚本
    （至少 `2026-11-01_assistant_run_owner.sql` 与 `2026-11-01_assistant_attachment_owner.sql`），
    再滚动重启后端；滚动期间先把旧节点从 upstream 摘掉，避免旧版本（没有 owner 字段）
    和新版本混跑。
 
-> 计划卡、确认结果、实例租约放在 Redis 的 `global:smartdock:asst:` 前缀下；
+> **变量改名说明（2026-11-22）**：本节这些开关原名 `DCS_ASSISTANT_*`，现统一为
+> `SMARTDOCK_ASSISTANT_*`（与 `SMARTDOCK_AI_CONFIG_KEY` 等既有变量同一风格）。
+> `application.yml` 里做的是**双读**——新名优先、旧名兜底，所以已经按旧名部署的环境
+> 不用改也能正常起。旧名保留到下个大版本，新部署请一律用新名。
+
+> 计划卡、确认结果、实例租约放在 Redis 的 `global:asst:` 前缀下
+> （`AssistantSharedState.KEY_PREFIX`；**不是** `global:smartdock:asst:`，
+> 按前缀排查时请以代码常量为准）；
 > 回答正文、用户作答内容不落 Redis。本机仍保留 `threadSessionManager` 的会话现场，
 > 所以「会话固定回原机器」是正确性前提，不是性能优化。
 

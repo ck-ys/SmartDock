@@ -300,8 +300,12 @@ profile:
 
 --- # 批量调度与运行开关（原 dcs: 节，批9 去前缀拍平；rollout/assistant 活配置，dashboard/review/notice/schedule 为历史留档值）
 dashboard:
-  # 看板 Redis 二级缓存 TTL(秒)：≤0=关闭缓存(验收要即时数据时用 0)，内部钳上限 1h；
-  # 只作用于 summary 与 analytics/overview 两个重查询端点(冷 3-4s)，冷端点不入缓存。dspro专审P2-2。
+  # ⚠️ 本键目前没有任何代码读取（批 10 多审契约席 P2 实证：全仓仅此处出现，
+  # 无 @Value / 无 ConfigurationProperties / 无 getProperty，前端也不读），
+  # 与本节标题「dashboard/review/notice/schedule 为历史留档值」一致——改它不会有任何效果。
+  # 原注释曾写「只作用于 summary 与 analytics/overview 两个重查询端点(冷 3-4s)」，那是错的：
+  # AnalyticsController.overview 与 profile 的 summary 都没有 Redis 二级缓存，
+  # 模块内的缓存都是进程内 ConcurrentHashMap 且 TTL 写死在代码里。改注释不改行为，别再被它误导。
   cache-ttl-seconds: ${SMARTDOCK_DASHBOARD_CACHE_TTL_SECONDS:${DCS_DASHBOARD_CACHE_TTL_SECONDS:180}}
 rollout:
   # Security/profile rollout switches. Override with environment variables and restart.
