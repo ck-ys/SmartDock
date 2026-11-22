@@ -302,21 +302,21 @@ profile:
 dashboard:
   # 看板 Redis 二级缓存 TTL(秒)：≤0=关闭缓存(验收要即时数据时用 0)，内部钳上限 1h；
   # 只作用于 summary 与 analytics/overview 两个重查询端点(冷 3-4s)，冷端点不入缓存。dspro专审P2-2。
-  cache-ttl-seconds: ${DCS_DASHBOARD_CACHE_TTL_SECONDS:180}
+  cache-ttl-seconds: ${SMARTDOCK_DASHBOARD_CACHE_TTL_SECONDS:${DCS_DASHBOARD_CACHE_TTL_SECONDS:180}}
 rollout:
   # Security/profile rollout switches. Override with environment variables and restart.
-  event-collection-enabled: ${DCS_EVENT_COLLECTION_ENABLED:true}
-  l2-enforcement-enabled: ${DCS_L2_ENFORCEMENT_ENABLED:true}
-  l34-enforcement-enabled: ${DCS_L34_ENFORCEMENT_ENABLED:true}
-  profile-scoring-enabled: ${DCS_PROFILE_SCORING_ENABLED:true}
-  ai-adjustment-enabled: ${DCS_AI_ADJUSTMENT_ENABLED:true}
-  recalculation-workers-enabled: ${DCS_RECALCULATION_WORKERS_ENABLED:true}
+  event-collection-enabled: ${SMARTDOCK_EVENT_COLLECTION_ENABLED:${DCS_EVENT_COLLECTION_ENABLED:true}}
+  l2-enforcement-enabled: ${SMARTDOCK_L2_ENFORCEMENT_ENABLED:${DCS_L2_ENFORCEMENT_ENABLED:true}}
+  l34-enforcement-enabled: ${SMARTDOCK_L34_ENFORCEMENT_ENABLED:${DCS_L34_ENFORCEMENT_ENABLED:true}}
+  profile-scoring-enabled: ${SMARTDOCK_PROFILE_SCORING_ENABLED:${DCS_PROFILE_SCORING_ENABLED:true}}
+  ai-adjustment-enabled: ${SMARTDOCK_AI_ADJUSTMENT_ENABLED:${DCS_AI_ADJUSTMENT_ENABLED:true}}
+  recalculation-workers-enabled: ${SMARTDOCK_RECALCULATION_WORKERS_ENABLED:${DCS_RECALCULATION_WORKERS_ENABLED:true}}
   # 迁移窗口可临时设为 false；稳定运行必须保持 true，禁止回退到可变维度目录。
-  strict-published-snapshots-enabled: ${DCS_ROLLOUT_STRICT_PUBLISHED_SNAPSHOTS_ENABLED:true}
+  strict-published-snapshots-enabled: ${SMARTDOCK_ROLLOUT_STRICT_PUBLISHED_SNAPSHOTS_ENABLED:${DCS_ROLLOUT_STRICT_PUBLISHED_SNAPSHOTS_ENABLED:true}}
   # 风控2.0 内容机审(2026-09-22): 总开关默认 false(新增行为默认关); 开启=四入口机审+记 TASK_CONTENT_RISK 事件
-  content-moderation-enabled: ${DCS_CONTENT_MODERATION_ENABLED:false}
+  content-moderation-enabled: ${SMARTDOCK_CONTENT_MODERATION_ENABLED:${DCS_CONTENT_MODERATION_ENABLED:false}}
   # BLOCK 拦截开关恒默认 false=观察模式(只记事件不拒绝提交); 业务确认误伤率后另行开启
-  content-block-enabled: ${DCS_CONTENT_BLOCK_ENABLED:false}
+  content-block-enabled: ${SMARTDOCK_CONTENT_BLOCK_ENABLED:${DCS_CONTENT_BLOCK_ENABLED:false}}
 review:
   # 「责任审核」新建开关。false 时新建 RESPONSIBILITY topic 被拒绝，已有责任审核任务不受影响。默认开启。
   responsibility-enabled: true
@@ -338,20 +338,20 @@ assistant:
   # 只留结构标记（前端仅「正在思考…」占位）；true=思考内容全放行，展示分层交前端
   # 「过程显示」偏好。运维全局关停用（如带宽紧张），默认 true
   reasoning-display:
-    enabled: ${DCS_ASSISTANT_REASONING_DISPLAY:true}
+    enabled: ${SMARTDOCK_ASSISTANT_REASONING_DISPLAY:${DCS_ASSISTANT_REASONING_DISPLAY:true}}
   # 多实例部署开关（单机保持默认 local/false，零 Redis 依赖）
   # shared-state.mode: local=本机 / dual=双写并比对（灰度）/ redis=跨实例
   # sticky.require-header: true 时跟“正在跑的这一轮”绑定的端点必须带 X-Thread-Id；
   #   前置条件=负载均衡按 X-Thread-Id 做一致性哈希（nginx hash $http_x_thread_id consistent）
   shared-state:
-    mode: ${DCS_ASSISTANT_SHARED_STATE_MODE:local}
+    mode: ${SMARTDOCK_ASSISTANT_SHARED_STATE_MODE:${DCS_ASSISTANT_SHARED_STATE_MODE:local}}
   sticky:
-    require-header: ${DCS_ASSISTANT_STICKY_REQUIRE_HEADER:false}
+    require-header: ${SMARTDOCK_ASSISTANT_STICKY_REQUIRE_HEADER:${DCS_ASSISTANT_STICKY_REQUIRE_HEADER:false}}
   instance:
     # 留空=hostname:pid:随机短码；固定值便于运维识别（同一时刻必须全集群唯一）
-    id: ${DCS_ASSISTANT_INSTANCE_ID:}
-    lease-seconds: ${DCS_ASSISTANT_INSTANCE_LEASE_SECONDS:45}
-    heartbeat-ms: ${DCS_ASSISTANT_INSTANCE_HEARTBEAT_MS:15000}
+    id: ${SMARTDOCK_ASSISTANT_INSTANCE_ID:${DCS_ASSISTANT_INSTANCE_ID:}}
+    lease-seconds: ${SMARTDOCK_ASSISTANT_INSTANCE_LEASE_SECONDS:${DCS_ASSISTANT_INSTANCE_LEASE_SECONDS:45}}
+    heartbeat-ms: ${SMARTDOCK_ASSISTANT_INSTANCE_HEARTBEAT_MS:${DCS_ASSISTANT_INSTANCE_HEARTBEAT_MS:15000}}
 schedule:
   # 总开关：false 时定时扫描跳过（手动触发接口仍可用）
   enabled: true

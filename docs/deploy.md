@@ -66,13 +66,13 @@ docker compose up -d
 单机默认 `local` 模式，零 Redis 依赖。要让两台以上后端同时服务 AI 助手，必须满足下面四条，
 缺一条就会出现「确认卡在 A、作答落到 B」「停止只停了个提示」这类假成功：
 
-1. **全集群同一个共享状态模式**：所有节点都设 `DCS_ASSISTANT_SHARED_STATE_MODE=redis`；
+1. **全集群同一个共享状态模式**：所有节点都设 `SMARTDOCK_ASSISTANT_SHARED_STATE_MODE=redis`；
    不要一部分 `local`、一部分 `redis`（`local` 节点会把别台的活 run 判死并收尾）。
-2. **每台实例 id 唯一**：`DCS_ASSISTANT_INSTANCE_ID=backend-a` / `backend-b`（或用默认的
+2. **每台实例 id 唯一**：`SMARTDOCK_ASSISTANT_INSTANCE_ID=backend-a` / `backend-b`（或用默认的
    `hostname:pid:随机码`）。同一个 id 起两个进程会被启动校验拒绝——否则两边都认
    「owner 是我」，互相收掉对方的活 run。
 3. **入口按会话粘性分流**：nginx 必须按 `X-Thread-Id` 做一致性哈希（同一会话固定落到同一台机器的分流算法），并把
-   `DCS_ASSISTANT_STICKY_REQUIRE_HEADER=true` 打开（缺头直接 400，避免静默落错机）：
+   `SMARTDOCK_ASSISTANT_STICKY_REQUIRE_HEADER=true` 打开（缺头直接 400，避免静默落错机）：
 
    ```nginx
    upstream smartdock_backend {
@@ -83,6 +83,11 @@ docker compose up -d
    ```
 
    没有一致性哈希时，`/agui/run`、HITL 确认卡、反问作答、续看都可能落到没有现场的另一台；
+
+> **变量改名说明（2026-11-22）**：本节这些开关原名 `DCS_ASSISTANT_*`，现统一为
+> `SMARTDOCK_ASSISTANT_*`（与 `SMARTDOCK_AI_CONFIG_KEY` 等既有变量同一风格）。
+> `application.yml` 里做的是**双读**——新名优先、旧名兜底，所以已经按旧名部署的环境
+> 不用改也能正常起。旧名保留到下个大版本，新部署请一律用新名。
    此时助手会回「刷新页面后再试」的人话，但体验仍然会坏。
 4. **数据库先升级再放流量**：先执行 `backend/script/sql/migration/` 里本期新增的脚本
    （至少 `2026-11-01_assistant_run_owner.sql` 与 `2026-11-01_assistant_attachment_owner.sql`），
