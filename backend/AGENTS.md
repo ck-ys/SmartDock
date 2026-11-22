@@ -115,11 +115,13 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 来自 p3c 56 条规则 + 手册的逐条实测筛选；排版/命名类一律不收（2026-11-13 命名拍板已管）。
 
 - **`@Transactional` 一律写 `rollbackFor = Exception.class`**：默认只回滚 `RuntimeException`，受检异常会**提交半条数据**。现存 109 处全带（2026-11-17 实测），新代码别破例。
-- **禁 `Executors.new*`**（`newScheduledThreadPool` / `newSingleThreadScheduledExecutor` 除外）：线程池必须 `ThreadPoolExecutor` 显式参数 + **命名 ThreadFactory**；无界队列在任务堆积时不是拒绝而是无限排队，thread dump 里全是 `pool-1-thread-N`。现存违规 1 处：`AssistantAttachmentService.PARSE_EXECUTOR`。
+- **禁 `Executors.new*`**（`newScheduledThreadPool` / `newSingleThreadScheduledExecutor` 除外）：线程池必须 `ThreadPoolExecutor` 显式参数 + **命名 ThreadFactory**；无界队列在任务堆积时不是拒绝而是无限排队，thread dump 里全是 `pool-1-thread-N`。现存 0 处（批 11，2026-11-22：原 1 处 `AssistantAttachmentService.PARSE_EXECUTOR` 已等价改写为 `ThreadPoolExecutor(1, 1, 0L, MILLISECONDS, LinkedBlockingQueue, 工厂)`，行为不变）。
 - **禁 `new BigDecimal(double)`**：二进制误差会让金额对账差一分；用 `new BigDecimal(String)` 或 `BigDecimal.valueOf`。
-- **foreach 里不改被遍历集合**：要删用 `removeIf`，要改先 `new ArrayList<>(src)`；否则运行时 CME。
-- **可空变量别写 `变量.equals("字面量")`**：反过来写 `"字面量".equals(变量)`。现存 3 处待清：`TenantHelper:200`、`AiBillingService:283`、`SvgXssScanner:68`。
+- foreach 里不改被遍历集合：要删用 `removeIf`，要改先 `new ArrayList<>(src)`；否则运行时 CME。
+- **可空变量别写 `变量.equals("字面量")`**：反过来写 `"字面量".equals(变量)`。**这条不做成门禁**（批 11 拍板 Q3=1，2026-11-22）：原报「现存 3 处待清」是误报——`TenantHelper:200` 前面有 `isNotBlank` 守卫、`AiBillingService:283` 的值来自 `substring`、`SvgXssScanner:68` 的值来自 `getAttributeLocalName`，三处都不会为 null；而文本扫描分不清「可能为 null」与「必然非空」，保留为 review 口径。
 - **`SimpleDateFormat` 不做静态共享字段**：内部 Calendar 非线程安全，并发下会串日期；新代码优先 `DateTimeFormatter`（现存 0 处静态、8 处局部 new，保持现状）。
+
+上面 6 条里，**第 1 / 2 / 3 / 4 / 6 条自批 11（2026-11-22）起是会失败的测试**：`org.dromara.test.arch.CodeRedlineTest`（`@Tag("local")`，随全量 local 组一起跑），零容忍、无白名单无基线，违反当场红并报到 `文件:行`。扫描面只有 `src/main/java`（测试代码里建临时线程池是合法的）。两条已知盲区靠 review 补：`new BigDecimal(变量)`（变量是 double 时文本扫描看不出来）、`for (x : 服务.取列表())` 体内改集合（接收者追不到）。
 
 ## 包卫生与分层门禁（2026-11-17 起强制）
 
