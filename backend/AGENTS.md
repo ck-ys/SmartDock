@@ -23,7 +23,7 @@ SmartDock backend — 基于 RuoYi-Vue-Plus 5.6.1 的多租户平台，定位**�
 
 - JUnit 5，按 `@Tag("local"/"dev"/"prod")` 过滤；**默认 skipTests=true，跑测试必须带 `-DskipTests=false -Dsurefire.groups=local`**
 - 测试分布在 `ruoyi-admin/src/test/java/org/dromara/`（系统/助手/守卫）与 `ruoyi-modules/ruoyi-profile-engine/src/test/java/com/smartdock/`（画像/分析纯函数）
-- 当前基线：**75 个测试全绿**——新增功能必须配 `@Tag("local")` 纯函数单测（写法参照 `AnalyticsSessionizerTest`）
+- 当前基线：全量 local 组全绿（具体数字以最近一次收口记录为准，别引旧数）——新增功能必须配 `@Tag("local")` 纯函数单测（写法参照 `AnalyticsSessionizerTest`）
 - ⚠️ 纯单测不能用 Spring 的 `JsonUtils`（静态初始化炸），自带 Jackson `ObjectMapper`
 - ⚠️ 交叉验证用默认 Maven 仓；带空格的 `-Dmaven.repo.local` 会让 surefire 的 `-javaagent` 启动失败
 - ⚠️ `MapstructUtils.CONVERTER` 是 static final 一次性绑定，纯 Mockito stub 无效时反射读出已绑定 mock 再 stub
@@ -114,14 +114,14 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 
 来自 p3c 56 条规则 + 手册的逐条实测筛选；排版/命名类一律不收（2026-11-13 命名拍板已管）。
 
-- **`@Transactional` 一律写 `rollbackFor = Exception.class`**：默认只回滚 `RuntimeException`，受检异常会**提交半条数据**。现存 109 处全带（2026-11-17 实测），新代码别破例。
-- **禁 `Executors.new*`**（`newScheduledThreadPool` / `newSingleThreadScheduledExecutor` 除外）：线程池必须 `ThreadPoolExecutor` 显式参数 + **命名 ThreadFactory**；无界队列在任务堆积时不是拒绝而是无限排队，thread dump 里全是 `pool-1-thread-N`。现存 0 处（批 11，2026-11-22：原 1 处 `AssistantAttachmentService.PARSE_EXECUTOR` 已等价改写为 `ThreadPoolExecutor(1, 1, 0L, MILLISECONDS, LinkedBlockingQueue, 工厂)`，行为不变）。
+- **`@Transactional` 一律写 `rollbackFor = Exception.class`**：默认只回滚 `RuntimeException`，受检异常会**提交半条数据**。现存 112 处全带（2026-11-22 实测：109 处 import 写法 + 3 处带包名写法），新代码别破例。
+- **禁 `Executors.new*`**（`newScheduledThreadPool` / `newSingleThreadScheduledExecutor` 除外）：线程池必须 `ThreadPoolExecutor` 显式参数 + **命名 ThreadFactory**；无界队列在任务堆积时不是拒绝而是无限排队，thread dump 里全是 `pool-1-thread-N`。违禁写法现存 0 处（批 11，2026-11-22：原 1 处 `AssistantAttachmentService.PARSE_EXECUTOR` 已等价改写为 `ThreadPoolExecutor(1, 1, 0L, MILLISECONDS, LinkedBlockingQueue, 工厂)`，行为不变；豁免的两个调度工厂另有 4 处）。JDK 21 的虚拟线程工厂 `newVirtualThreadPerTaskExecutor` / `newThreadPerTaskExecutor` 同在禁用之列——要用先改这条规矩。
 - **禁 `new BigDecimal(double)`**：二进制误差会让金额对账差一分；用 `new BigDecimal(String)` 或 `BigDecimal.valueOf`。
-- foreach 里不改被遍历集合：要删用 `removeIf`，要改先 `new ArrayList<>(src)`；否则运行时 CME。
-- **可空变量别写 `变量.equals("字面量")`**：反过来写 `"字面量".equals(变量)`。**这条不做成门禁**（批 11 拍板 Q3=1，2026-11-22）：原报「现存 3 处待清」是误报——`TenantHelper:200` 前面有 `isNotBlank` 守卫、`AiBillingService:283` 的值来自 `substring`、`SvgXssScanner:68` 的值来自 `getAttributeLocalName`，三处都不会为 null；而文本扫描分不清「可能为 null」与「必然非空」，保留为 review 口径。
-- **`SimpleDateFormat` 不做静态共享字段**：内部 Calendar 非线程安全，并发下会串日期；新代码优先 `DateTimeFormatter`（现存 0 处静态、8 处局部 new，保持现状）。
+- **foreach 里不改被遍历集合**：要删用 `removeIf`，要改先 `new ArrayList<>(src)`；否则运行时 CME。
+- **可空变量别写 `变量.equals("字面量")`**：反过来写 `"字面量".equals(变量)`。**这条不做成门禁**（批 11 拍板 Q3=1，2026-11-22）：原报「现存 3 处待清」是误报——`TenantHelper:200` 前面有 `isNotBlank` 守卫、`AiBillingService:283` 的值来自 `substring`、`SvgXssScanner:68` 的值是 `toLowerCase` 的返回值，三处都不会为 null；而文本扫描分不清「可能为 null」与「必然非空」，保留为 review 口径。
+- **`SimpleDateFormat` 不做静态共享字段**：内部 Calendar 非线程安全，并发下会串日期；新代码优先 `DateTimeFormatter`（现存 0 处静态、8 处局部 new，保持现状：3 处 import 写法 `DateUtils:133/146`、`AiUsageController:166`，5 处 `java.text.` 全限定名写法 `AiCreditController:219`、`AssistantActionService:222`、`AnalyticsService:1513/1952/1955`）。
 
-上面 6 条里，**第 1 / 2 / 3 / 4 / 6 条自批 11（2026-11-22）起是会失败的测试**：`org.dromara.test.arch.CodeRedlineTest`（`@Tag("local")`，随全量 local 组一起跑），零容忍、无白名单无基线，违反当场红并报到 `文件:行`。扫描面只有 `src/main/java`（测试代码里建临时线程池是合法的）。两条已知盲区靠 review 补：`new BigDecimal(变量)`（变量是 double 时文本扫描看不出来）、`for (x : 服务.取列表())` 体内改集合（接收者追不到）。
+上面 6 条里，**第 1 / 2 / 3 / 4 / 6 条自批 11（2026-11-22）起是会失败的测试**：`org.dromara.test.arch.CodeRedlineTest`（`@Tag("local")`，随全量 local 组一起跑），零容忍、无白名单无基线，违反当场红并报到 `文件:行`。扫描面只有 `src/main/java`（测试代码里建临时线程池是合法的）。**靠 review 补的漏报面**：`new BigDecimal(变量)`（变量是 double 时文本扫描看不出来）、`for (x : 服务.取列表())` 体内改集合（接收者追不到）、线程池构造参数（门禁只认「有没有用快捷工厂」——`new ThreadPoolExecutor(1, 1, 0L, MS, 队列)` 不传命名工厂也能过，不满足上面「显式参数 + 命名 ThreadFactory」的要求）。**已知误报面**：foreach 循环体里的 lambda / 异步任务改集合（其实是稍后才执行）、局部变量与被遍历集合重名——门禁报了先看是不是这两种；门禁没有豁免注释，是就改写法。判据自带常驻自检（该报的样例必须报、合法的必须放行），正则改坏了会当场红。
 
 ## 包卫生与分层门禁（2026-11-17 起强制）
 
@@ -137,9 +137,9 @@ script/sql/           # baseline/（全量基线）+ migration/（增量，按�
 存量违规冻结在 `backend/ruoyi-admin/src/test/resources/arch-baseline.json`。**修掉一条就删一行**（残留会红，防清单腐烂）；不许往清单里加新行。
 
 ```bash
-# 跑门禁（三个测试类八条规则全跑；MigrationGuard 是 dev 标签，groups 要带上）
+# 跑门禁（五个测试类：写码红线 + 包卫生 + 分层 + 权限串 + 改名守卫；最后一个是 dev 标签，groups 要带上）
 mvn -P local -DskipTests=false -pl ruoyi-admin -am test \
-  -Dtest=PackageHygieneTest,LayeringTest,PackageMigrationGuardTest \
+  -Dtest=CodeRedlineTest,PackageHygieneTest,LayeringTest,PermSegmentGuardTest,PackageMigrationGuardTest \
   -Dsurefire.groups=local,dev -DfailIfNoTests=false -Dsurefire.failIfNoSpecifiedTests=false
 # 搬迁/大清理后整份刷新基线（会把当前违规全部冻结，谨慎）
 ARCH_BASELINE_UPDATE=1 mvn -P local -DskipTests=false -pl ruoyi-admin -am test -Dtest=PackageHygieneTest,LayeringTest

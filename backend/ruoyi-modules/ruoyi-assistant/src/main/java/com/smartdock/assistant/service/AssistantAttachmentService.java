@@ -55,9 +55,10 @@ public class AssistantAttachmentService {
      * register 因此秒回（登记即返回 PENDING），前端 chip 轮询到终态。
      * 批 11（2026-11-22 拍板 Q1=1）：由 Executors.newSingleThreadExecutor(工厂) 等价改写为
      * 显式 ThreadPoolExecutor(1,1,0L,MILLISECONDS,LinkedBlockingQueue,工厂)——JDK 工厂方法内部就是
-     * 这一串参数，改写只为过写码红线门禁（CodeRedlineTest：线程数/队列/拒绝策略必须显式写出），
-     * 不是行为变更。唯一差别是工厂方法多包一层「包装对象不可达时自动 shutdown」的清理器，
-     * 本字段是 static final 常驻，那一层永远不会触发。
+     * 这一串参数，改写只为过写码红线门禁（CodeRedlineTest：禁用 Executors 快捷工厂），不是行为变更。
+     * 工厂方法多包一层「包装对象不可达时自动 shutdown」的清理器；本字段是 static final 常驻，
+     * 只要类不卸载就不会触发（本仓无 devtools、fat jar 部署，实际不会发生）。拒绝策略两版一致，
+     * 都是构造器默认值（队列无界，实际用不到拒绝）；全仓对本字段只有一处 submit，没人依赖包装类型。
      */
     private static final ExecutorService PARSE_EXECUTOR = new ThreadPoolExecutor(
         1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
