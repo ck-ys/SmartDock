@@ -365,6 +365,34 @@ class PackageHygieneTest {
             .isEmpty();
     }
 
+    /**
+     * 批 11 多审（契约席 P2-8）：文本块里用 {@code \""""} 嵌入三引号是合法写法。老实现把被转义的那个引号
+     * 当成结束符——后面的文本块内容被当成代码（假红），再往后又把真正的代码吞成文本块（假绿）。
+     * 这个去注释器被包卫生门禁与写码红线门禁共用，一处错两处瞎。
+     */
+    @Test
+    void 去注释器要认得文本块里转义的三引号() {
+        // 逐行拼，避免在文本块里再套文本块时数不清转义。
+        // 第三行要的是「反斜杠 + 三个引号」（文本块里转义掉的三引号），用 '\\' 拼进去，免得数字面量里的反斜杠
+        String src = String.join("\n",
+            "class A {",
+            "    String a = \"\"\"",
+            "        " + '\\' + "\"\"\"",
+            "        \"\"\";",
+            "    int real = 1;",
+            "    String b = \"\"\"",
+            "        for (String s : list) { list.add(s); }",
+            "        \"\"\";",
+            "    int after = 2;",
+            "}");
+        String out = stripCommentsAndStrings(src);
+        assertThat(out)
+            .as("文本块前后的真代码必须留下，块内文字必须抹掉")
+            .contains("int real = 1;")
+            .contains("int after = 2;")
+            .doesNotContain("list.add(s)");
+    }
+
     /** 排序后的 "key|count" 列表，便于 diff 与人工比对 */
     private static List<String> flatten(Map<String, Integer> map) {
         List<String> out = new ArrayList<>();
@@ -444,7 +472,7 @@ class PackageHygieneTest {
                 blankNonNewline(out, i, stop);
                 i = stop;
             } else if (c == '"' && i + 2 < n && src.charAt(i + 1) == '"' && src.charAt(i + 2) == '"') {
-                int end = src.indexOf("\"\"\"", i + 3);
+                int end = textBlockEnd(src, i + 3);
                 int stop = end < 0 ? n : end + 3;
                 blankNonNewline(out, i, stop);
                 i = stop;
@@ -479,6 +507,28 @@ class PackageHygieneTest {
             }
         }
         return new String(out);
+    }
+
+    /**
+     * 文本块的结束符：前面反斜杠个数为偶数（含 0）的三引号。{@code \""""} 里第一个引号是被转义的内容，
+     * 不算结束符——批 11 多审（契约席 P2-8）之前这里直接取第一个三引号，后面的文本块内容被当成代码。
+     */
+    private static int textBlockEnd(String src, int from) {
+        int k = from;
+        while (true) {
+            int end = src.indexOf("\"\"\"", k);
+            if (end < 0) {
+                return -1;
+            }
+            int backslashes = 0;
+            for (int b = end - 1; b >= 0 && src.charAt(b) == '\\'; b--) {
+                backslashes++;
+            }
+            if (backslashes % 2 == 0) {
+                return end;
+            }
+            k = end + 1;
+        }
     }
 
     private static void blankNonNewline(char[] out, int from, int to) {
