@@ -36,7 +36,7 @@ public class AssistantStateStoreConfig {
     static final String SCHEMA = "agentscope";
 
     @Bean
-    public AgentStateStore dcsAssistantStateStore(DataSource dataSource) {
+    public AgentStateStore assistantStateStore(DataSource dataSource) {
         JdbcAgentStateStore store = new JdbcAgentStateStore(
             new SearchPathDataSource(dataSource), new PostgresDialect());
         log.info("[smartdock-assistant] 会话状态存储已装配：schema={}（AgentScope 2.1 起不再建表，表由 migration 预建）", SCHEMA);

@@ -17,7 +17,7 @@ export const sumEventCount = (stats: RiskStat[] = []): number => stats.reduce((s
 
 export const sumRiskScore = (stats: RiskStat[] = []): number => stats.reduce((sum, item) => sum + toNumber(item.totalScore), 0);
 
-export const parseDcsServerTime = (value?: string): Date | null => {
+export const parseServerTime = (value?: string): Date | null => {
   if (!value) return null;
   const normalized = UNZONED_DATE_TIME.test(value) ? `${value.replace(' ', 'T')}${DCS_BUSINESS_TIME_OFFSET}` : value;
   const parsed = new Date(normalized);
@@ -25,7 +25,7 @@ export const parseDcsServerTime = (value?: string): Date | null => {
 };
 
 export const formatRiskRelativeTime = (value?: string, now = Date.now()): string => {
-  const parsed = parseDcsServerTime(value);
+  const parsed = parseServerTime(value);
   if (!parsed) return '';
   const diffSeconds = Math.max(0, Math.floor((now - parsed.getTime()) / 1000));
   if (diffSeconds < 10) return '刚刚';

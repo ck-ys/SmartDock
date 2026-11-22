@@ -29,7 +29,7 @@ public class AssistantAgentConfiguration {
     private final AssistantAgentFactory agentFactory;
 
     @Bean
-    public AguiAgentRegistryCustomizer dcsAssistantAgentRegistryCustomizer() {
+    public AguiAgentRegistryCustomizer assistantAgentRegistryCustomizer() {
         return registry -> {
             registry.registerFactory(AssistantAgentFactory.AGENT_ID, agentFactory::createFromLogin);
             log.info("[smartdock-assistant] agent 工厂已注册（按登录租户惰性创建），端点 POST /agui/run/{}",

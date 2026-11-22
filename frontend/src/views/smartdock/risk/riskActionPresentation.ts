@@ -1,4 +1,4 @@
-import { parseDcsServerTime } from './riskDashboardPresentation';
+import { parseServerTime } from './riskDashboardPresentation';
 
 export const ACTION_LABELS: Record<string, string> = {
   ENHANCED_VERIFICATION: '增强验证',
@@ -23,7 +23,7 @@ export const REVIEW_STATUS_LABELS: Record<string, string> = {
 };
 
 export const formatRemaining = (expireTime?: string, now = Date.now()): string => {
-  const expires = parseDcsServerTime(expireTime);
+  const expires = parseServerTime(expireTime);
   if (!expires) return '-';
   const seconds = Math.max(0, Math.ceil((expires.getTime() - now) / 1000));
   if (seconds === 0) return '等待状态刷新';

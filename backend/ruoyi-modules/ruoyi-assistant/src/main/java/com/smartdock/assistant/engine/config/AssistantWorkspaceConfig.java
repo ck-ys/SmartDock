@@ -22,7 +22,7 @@ import java.nio.file.Path;
 public class AssistantWorkspaceConfig {
 
     @Bean(destroyMethod = "close")
-    public WorkspaceManager dcsAssistantWorkspaceManager(
+    public WorkspaceManager assistantWorkspaceManager(
         @Value("${assistant.compaction.workspace-dir:./data/assistant-workspace}") String workspaceDir) {
         try {
             Path dir = Path.of(workspaceDir);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatRiskRelativeTime, parseDcsServerTime, sumEventCount, sumRiskScore } from './riskDashboardPresentation';
+import { formatRiskRelativeTime, parseServerTime, sumEventCount, sumRiskScore } from './riskDashboardPresentation';
 
 describe('risk dashboard presentation', () => {
   it('sums PostgreSQL map values even when numeric fields are strings', () => {
@@ -13,7 +13,7 @@ describe('risk dashboard presentation', () => {
   });
 
   it('parses timezone-less DCS timestamps as the configured Asia/Shanghai business time', () => {
-    const parsed = parseDcsServerTime('2026-07-26 20:19:40');
+    const parsed = parseServerTime('2026-07-26 20:19:40');
 
     expect(parsed?.toISOString()).toBe('2026-07-26T12:19:40.000Z');
     expect(formatRiskRelativeTime('2026-07-26 20:19:40', Date.parse('2026-07-26T12:20:00Z'))).toBe('20秒前');

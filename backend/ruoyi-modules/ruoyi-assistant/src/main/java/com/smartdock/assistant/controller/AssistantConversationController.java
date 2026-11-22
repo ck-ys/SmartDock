@@ -68,7 +68,7 @@ public class AssistantConversationController extends BaseController {
     private final RunLedgerService runLedgerService;
     private final AssistantActionService actionService;
     /** 业务批4 Q1：@ 候选读链（批3 微核心化：mentionCandidates 显式 userId, 无 Sa-Token 依赖） */
-    private final org.springframework.beans.factory.ObjectProvider<com.smartdock.mission.service.TaskService> dcsTaskServiceProvider;
+    private final org.springframework.beans.factory.ObjectProvider<com.smartdock.mission.service.TaskService> taskServiceProvider;
     /** 080/ISSUE-R13-3 修：清人后按 thread 清悬挂缓存/步骤缓冲（控制器收口避
      *  会话服务↔RunRecorder 循环依赖；旧会话服务已在批 7C-2 删除，收口仍保留） */
     private final com.smartdock.assistant.engine.persist.AssistantRunRecorder runRecorder;
@@ -229,13 +229,13 @@ public class AssistantConversationController extends BaseController {
         String tenantId = LoginHelper.getTenantId();
         Long meId = LoginHelper.getUserId();
         List<Map<String, String>> rows = new java.util.ArrayList<>();
-        com.smartdock.mission.service.TaskService dcsTaskService = dcsTaskServiceProvider.getIfAvailable();
-        if (dcsTaskService == null) {
+        com.smartdock.mission.service.TaskService taskService = taskServiceProvider.getIfAvailable();
+        if (taskService == null) {
             // 三审 dsflash P2: 业务模块缺席时助手照常应答(空候选), 对齐"零编译强依赖"口径
             return R.ok(rows);
         }
         try {
-            for (com.smartdock.mission.domain.Task t : dcsTaskService.mentionCandidates(
+            for (com.smartdock.mission.domain.Task t : taskService.mentionCandidates(
                 keyword == null ? null : keyword.trim(), 100, meId)) {
                 Map<String, String> row = new java.util.LinkedHashMap<>();
                 row.put("missionId", String.valueOf(t.getId()));

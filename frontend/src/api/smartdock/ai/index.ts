@@ -97,14 +97,14 @@ export const listAiApiFormats = (): AxiosPromise<AiApiFormatVO[]> =>
 export const listAiProviderDicts = (): AxiosPromise<any[]> => request({ url: `${CONFIG_BASE}/provider-dicts`, method: 'get' });
 
 /** 查询当前租户+厂商+模型的有效价格(切换模型时回填) */
-export const getDcsAiEffectivePrice = (params: { tenantId: string; provider: string; modelName: string }): AxiosPromise<any> =>
+export const getAiEffectivePrice = (params: { tenantId: string; provider: string; modelName: string }): AxiosPromise<any> =>
   request({ url: `/ai-price/effective`, method: 'get', params });
 
 /** 保存/更新模型价格(有则更新无则新增) */
 export const upsertAiModelPrice = (data: AiModelPriceForm): AxiosPromise<any> => request({ url: `/ai-price/upsert`, method: 'post', data });
 
 /** 智能识别计费参数(混合: 正则+AI, 从官方文档 URL 提取) */
-export const detectDcsAiPrice = (data: { provider: string; modelName: string; sourceUrl: string }): AxiosPromise<any> =>
+export const detectAiPrice = (data: { provider: string; modelName: string; sourceUrl: string }): AxiosPromise<any> =>
   request({ url: `${CONFIG_BASE}/detect-price`, method: 'post', data });
 
 export const addAiConfig = (data: AiConfigForm) => request({ url: CONFIG_BASE, method: 'post', data });
@@ -117,27 +117,27 @@ export const delAiConfig = (configIds: number | string | Array<number | string>)
 export const testAiConfig = (configId: number | string): AxiosPromise<AiTestResultVO> =>
   request({ url: `${CONFIG_BASE}/${configId}/test`, method: 'post' });
 
-export const probeDcsAiModels = (data: AiProbeForm): AxiosPromise<AiModelVO[]> =>
+export const probeAiModels = (data: AiProbeForm): AxiosPromise<AiModelVO[]> =>
   request({ url: `${CONFIG_BASE}/probe/models`, method: 'post', data });
 
-export const probeDcsAiBalance = (data: AiProbeForm): AxiosPromise<AiBalanceVO> =>
+export const probeAiBalance = (data: AiProbeForm): AxiosPromise<AiBalanceVO> =>
   request({ url: `${CONFIG_BASE}/probe/balance`, method: 'post', data });
 
-export const probeDcsAiSpeed = (data: AiProbeForm): AxiosPromise<AiTestResultVO> =>
+export const probeAiSpeed = (data: AiProbeForm): AxiosPromise<AiTestResultVO> =>
   request({ url: `${CONFIG_BASE}/probe/speed`, method: 'post', data });
 
-export const probeSavedDcsAiModels = (configId: number | string, data?: AiProbeForm): AxiosPromise<AiModelVO[]> =>
+export const probeSavedAiModels = (configId: number | string, data?: AiProbeForm): AxiosPromise<AiModelVO[]> =>
   request({ url: `${CONFIG_BASE}/${configId}/probe/models`, method: 'post', data });
 
-export const probeSavedDcsAiBalance = (configId: number | string, data?: AiProbeForm): AxiosPromise<AiBalanceVO> =>
+export const probeSavedAiBalance = (configId: number | string, data?: AiProbeForm): AxiosPromise<AiBalanceVO> =>
   request({ url: `${CONFIG_BASE}/${configId}/probe/balance`, method: 'post', data });
 
-export const probeSavedDcsAiSpeed = (configId: number | string, data?: AiProbeForm): AxiosPromise<AiTestResultVO> =>
+export const probeSavedAiSpeed = (configId: number | string, data?: AiProbeForm): AxiosPromise<AiTestResultVO> =>
   request({ url: `${CONFIG_BASE}/${configId}/probe/speed`, method: 'post', data });
 
 /** 批量查余额(业务批3-②): silent=true 走 request 静默通道(轮询场景不弹错不弹重登框);
  *  repeatSubmit:false——只读轮询 POST 免重复提交拦截(与用户手动查询 500ms 内同刻撞车会被误拦) */
-export const getDcsAiBalances = (configIds: Array<number | string>, silent = false): AxiosPromise<AiBalanceMap> =>
+export const getAiBalances = (configIds: Array<number | string>, silent = false): AxiosPromise<AiBalanceMap> =>
   request({
     url: `${CONFIG_BASE}/balances`,
     method: 'post',
@@ -168,18 +168,18 @@ export const listAiProviderAccessKeys = (params: { tenantId: string; provider: s
   request({ url: `${CONFIG_BASE}/access/list`, method: 'get', params });
 
 /** 钥匙启停（不能停最后一把启用中的钥匙） */
-export const changeDcsAiKeyStatus = (id: number | string, enabled: '0' | '1') =>
+export const changeAiKeyStatus = (id: number | string, enabled: '0' | '1') =>
   request({ url: `${CONFIG_BASE}/access/change-status`, method: 'post', params: { id, enabled } });
 
 /** 删除钥匙（软删，不能删最后一把启用中的钥匙） */
-export const deleteDcsAiKey = (id: number | string) => request({ url: `${CONFIG_BASE}/access/delete`, method: 'post', params: { id } });
+export const deleteAiKey = (id: number | string) => request({ url: `${CONFIG_BASE}/access/delete`, method: 'post', params: { id } });
 
 /** 单钥匙余额刷新（实查厂商端点落快照） */
-export const refreshDcsAiKeyBalance = (id: number | string): AxiosPromise<AiProviderAccessVO> =>
+export const refreshAiKeyBalance = (id: number | string): AxiosPromise<AiProviderAccessVO> =>
   request({ url: `${CONFIG_BASE}/access/${id}/balance`, method: 'post' });
 
 /** 整厂钥匙余额批量刷新（UNSUPPORTED 跳过零外呼） */
-export const refreshAllDcsAiKeyBalances = (params: { tenantId: string; provider: string }): AxiosPromise<AiProviderAccessVO[]> =>
+export const refreshAllAiKeyBalances = (params: { tenantId: string; provider: string }): AxiosPromise<AiProviderAccessVO[]> =>
   request({ url: `${CONFIG_BASE}/access/balance-all`, method: 'post', params });
 
 /** CC Switch: 批量健康检查(逐个 testConnection)；业务批4 Q17-A：可带 configIds 子集，空=全部 */
@@ -199,7 +199,7 @@ export interface AiModelHealthRow {
 export const getAiModelHealthLatest = (): AxiosPromise<Record<string, AiModelHealthRow>> =>
   request({ url: `${CONFIG_BASE}/health/latest`, method: 'get' });
 
-export const generateDcsAiFields = (data: AiFieldGenerateForm): AxiosPromise<AiFieldGenerateVO> =>
+export const generateAiFields = (data: AiFieldGenerateForm): AxiosPromise<AiFieldGenerateVO> =>
   request({ url: '/ai-field/generate', method: 'post', data });
 
 /** AI 用量台账分页查询 */

@@ -43,7 +43,7 @@
             </template>
           </el-table-column>
           <el-table-column label="创建时间" prop="createTime" width="160">
-            <template #default="{ row }">{{ row.createTime ? parseTime(parseDcsServerTime(row.createTime), '{y}-{m}-{d} {h}:{i}') : '-' }}</template>
+            <template #default="{ row }">{{ row.createTime ? parseTime(parseServerTime(row.createTime), '{y}-{m}-{d} {h}:{i}') : '-' }}</template>
           </el-table-column>
           <el-table-column label="操作" width="140">
             <template #default="{ row }">
@@ -107,7 +107,7 @@ import { Plus, Refresh, Delete, Edit } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
 import OperationsPageHeader from '@/components/OperationsPageHeader/index.vue';
 import { listWhitelist, addWhitelist, updateWhitelist, deleteWhitelist, type RiskWhitelistVO } from '@/api/smartdock/risk';
-import { parseDcsServerTime } from './riskDashboardPresentation';
+import { parseServerTime } from './riskDashboardPresentation';
 import { parseTime } from '@/utils/ruoyi';
 
 import { checkPermi } from '@/utils/permission';

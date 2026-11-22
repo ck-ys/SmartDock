@@ -160,7 +160,7 @@ import { Refresh, RefreshLeft, Search } from '@element-plus/icons-vue';
 import { useRouter } from 'vue-router';
 import OperationsPageHeader from '@/components/OperationsPageHeader/index.vue';
 import { listEvents, getEventDetail, EVENT_TYPE_LABELS, EVENT_SOURCE_LABELS, type RiskEventVO } from '@/api/smartdock/risk';
-import { parseDcsServerTime } from './riskDashboardPresentation';
+import { parseServerTime } from './riskDashboardPresentation';
 import { parseTime } from '@/utils/ruoyi';
 import { maskSensitiveDetail, maskToken } from './sensitiveMask';
 
@@ -193,7 +193,7 @@ const loading = ref(false);
 
 const formatTime = (t?: string) => {
   // G13a(2026-09-16): 统一日期格式为连字符, 不再用 toLocaleString 的斜杠形态
-  const d = parseDcsServerTime(t);
+  const d = parseServerTime(t);
   return d ? parseTime(d, '{y}-{m}-{d} {h}:{i}') : '';
 };
 

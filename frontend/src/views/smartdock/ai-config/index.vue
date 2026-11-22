@@ -1193,16 +1193,16 @@ import {
   listAiApiFormats,
   syncAiModelPricesFromModelsDev,
   importAiModelPrices,
-  detectDcsAiPrice,
-  getDcsAiEffectivePrice,
+  detectAiPrice,
+  getAiEffectivePrice,
   upsertAiModelPrice,
-  probeDcsAiBalance,
-  probeDcsAiModels,
-  probeDcsAiSpeed,
-  probeSavedDcsAiBalance,
-  probeSavedDcsAiModels,
-  probeSavedDcsAiSpeed,
-  getDcsAiBalances,
+  probeAiBalance,
+  probeAiModels,
+  probeAiSpeed,
+  probeSavedAiBalance,
+  probeSavedAiModels,
+  probeSavedAiSpeed,
+  getAiBalances,
   testAiConfig,
   updateAiConfig,
   healthCheckAiConfigs,
@@ -1216,10 +1216,10 @@ import {
   addAiProviderAccessKey,
   updateAiProviderAccess,
   listAiProviderAccessKeys,
-  changeDcsAiKeyStatus,
-  deleteDcsAiKey,
-  refreshDcsAiKeyBalance,
-  refreshAllDcsAiKeyBalances,
+  changeAiKeyStatus,
+  deleteAiKey,
+  refreshAiKeyBalance,
+  refreshAllAiKeyBalances,
   getAiModelHealthLatest,
   type AiModelHealthRow
 } from '@/api/smartdock/ai';
@@ -1596,7 +1596,7 @@ const reloadKeysView = async () => {
 const onToggleKey = async (row: AiProviderAccessVO) => {
   const next = row.enabled === '0' ? '1' : '0';
   try {
-    await changeDcsAiKeyStatus(row.id!, next as '0' | '1');
+    await changeAiKeyStatus(row.id!, next as '0' | '1');
     proxy?.$modal.msgSuccess(next === '1' ? '已启用，重新参与轮询' : '已停用（保留余额快照，可随时再启用）');
     await reloadKeysView();
     void refreshKeyBadge(String(row.tenantId), String(row.provider));
@@ -1613,7 +1613,7 @@ const onDeleteKey = async (row: AiProviderAccessVO) => {
     return;
   }
   try {
-    await deleteDcsAiKey(row.id!);
+    await deleteAiKey(row.id!);
     proxy?.$modal.msgSuccess('钥匙已删除');
     await reloadKeysView();
     await getList();
@@ -1626,7 +1626,7 @@ const onDeleteKey = async (row: AiProviderAccessVO) => {
 const onRefreshKeyBalance = async (row: AiProviderAccessVO) => {
   balanceRefreshingId.value = row.id!;
   try {
-    await refreshDcsAiKeyBalance(row.id!);
+    await refreshAiKeyBalance(row.id!);
   } catch {
     /* 失败已统一弹错（快照保留旧值） */
   } finally {
@@ -1648,7 +1648,7 @@ const onRefreshAllBalances = async () => {
   if (!targets[0]) return;
   balanceRefreshingAll.value = true;
   try {
-    await Promise.all(targets.map((t) => refreshAllDcsAiKeyBalances({ tenantId: t, provider }).catch(() => undefined)));
+    await Promise.all(targets.map((t) => refreshAllAiKeyBalances({ tenantId: t, provider }).catch(() => undefined)));
   } catch {
     /* 失败已统一弹错（部分钥匙的快照仍已落库） */
   } finally {
@@ -1959,7 +1959,7 @@ const syncInlinePriceForm = async () => {
   // 优先调 effective API 加载已持久化价格(切换模型时自动回填)
   if (form.value.provider && form.value.modelName) {
     try {
-      const res = await getDcsAiEffectivePrice({
+      const res = await getAiEffectivePrice({
         tenantId: String(form.value.tenantId || currentTenantId()),
         provider: form.value.provider,
         modelName: form.value.modelName
@@ -2024,7 +2024,7 @@ const saveInlinePrice = async () => {
 const detectPrice = async () => {
   priceDetecting.value = true;
   try {
-    const res = await detectDcsAiPrice({
+    const res = await detectAiPrice({
       provider: form.value.provider || '',
       modelName: form.value.modelName || '',
       sourceUrl: inlinePriceForm.value.sourceUrl
@@ -2538,7 +2538,7 @@ const refreshBalances = async () => {
     return;
   }
   try {
-    const res = await getDcsAiBalances(queryableIds, true);
+    const res = await getAiBalances(queryableIds, true);
     balanceResults.value = res.data || {};
   } catch (e: any) {
     // 登录过期：立即停表并置粘性标志（重登回来 onActivated 清除），静默退出不打扰
@@ -2938,7 +2938,7 @@ const handleProbeModels = async () => {
   if (!data && !shouldUseSavedProbe()) return;
   probeLoading.models = true;
   try {
-    const res = shouldUseSavedProbe() ? await probeSavedDcsAiModels(form.value.configId!, savedProbePayload()) : await probeDcsAiModels(data!);
+    const res = shouldUseSavedProbe() ? await probeSavedAiModels(form.value.configId!, savedProbePayload()) : await probeAiModels(data!);
     // 业务批4 Q16-A：获取后免费置顶（sort 稳定，组内保持厂商原序；当前已填模型随后 unshift 保证可见）
     const rows = res.data || [];
     modelOptions.value = rows.slice().sort((a, b) => Number(b.free === true) - Number(a.free === true));
@@ -2964,7 +2964,7 @@ const handleProbeBalance = async () => {
   if (!data && !shouldUseSavedProbe()) return;
   probeLoading.balance = true;
   try {
-    const res = shouldUseSavedProbe() ? await probeSavedDcsAiBalance(form.value.configId!, savedProbePayload()) : await probeDcsAiBalance(data!);
+    const res = shouldUseSavedProbe() ? await probeSavedAiBalance(form.value.configId!, savedProbePayload()) : await probeAiBalance(data!);
     balanceInfo.value = res.data;
   } finally {
     probeLoading.balance = false;
@@ -2980,7 +2980,7 @@ const handleProbeSpeed = async () => {
   }
   probeLoading.speed = true;
   try {
-    const res = shouldUseSavedProbe() ? await probeSavedDcsAiSpeed(form.value.configId!, savedProbePayload()) : await probeDcsAiSpeed(data!);
+    const res = shouldUseSavedProbe() ? await probeSavedAiSpeed(form.value.configId!, savedProbePayload()) : await probeAiSpeed(data!);
     speedInfo.value = res.data;
     if (res.data.success) {
       proxy?.$modal.msgSuccess(`测速成功：${res.data.latencyMs || '-'} ms`);

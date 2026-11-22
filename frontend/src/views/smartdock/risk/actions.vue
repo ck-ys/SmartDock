@@ -188,7 +188,7 @@ import {
   type RiskActionQuery,
   type RiskActionVO
 } from '@/api/smartdock/risk';
-import { parseDcsServerTime } from './riskDashboardPresentation';
+import { parseServerTime } from './riskDashboardPresentation';
 import { parseTime } from '@/utils/ruoyi';
 import { ACTION_DESCRIPTIONS, ACTION_LABELS, ACTION_STATUS_LABELS, REVIEW_STATUS_LABELS, formatRemaining } from './riskActionPresentation';
 
@@ -222,7 +222,7 @@ const dialogTitle = computed(() => DIALOG_TITLES[reviewDialog.mode] || '操作')
 
 const formatDate = (value?: string) => {
   // G13a(2026-09-16): 统一日期格式为连字符
-  const d = parseDcsServerTime(value);
+  const d = parseServerTime(value);
   return d ? parseTime(d, '{y}-{m}-{d} {h}:{i}') : '-';
 };
 const statusPillClass = (status: string, enforcementEnabled?: boolean) => {
