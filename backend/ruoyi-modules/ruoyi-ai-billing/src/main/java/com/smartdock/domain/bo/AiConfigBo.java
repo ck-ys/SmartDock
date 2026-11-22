@@ -13,7 +13,7 @@ import org.dromara.common.mybatis.core.domain.BaseEntity;
 import com.smartdock.domain.AiConfig;
 
 /**
- * DCS AI 模型配置业务对象。
+ * AI 模型配置业务对象。
  *
  * @author smartdock
  */

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 红队核心 8 条 CI 资产（批G G6，spec §13 S-31：注入×3 / 越权×2 / 计费×2 / PII×1，
  * 每版发布前跑；探针底稿=P15b/P15c/P15d/P07，本类为其生产化防线的确定性回归）。
- * 完整红队 18 条用例底稿见 document/evidence/assistant-p0/（安全报告 G 节）。
+ * 完整红队 18 条用例底稿原在 document/evidence/assistant-p0/（安全报告 G 节），该目录未纳入本仓，本类只保留核心 8 条。
  *
  * <p>@Tag("local")：需要本机可连的 PostgreSQL（127.0.0.1:5432/smartdock），
  * 脱离默认 CI 组——批7 清洗后不再静默依赖内网开发库。</p>

@@ -5,7 +5,7 @@ import com.smartdock.domain.AiConfig;
 import com.smartdock.domain.vo.AiConfigVo;
 
 /**
- * DCS AI 模型配置 Mapper。
+ * AI 模型配置 Mapper。
  *
  * @author smartdock
  */

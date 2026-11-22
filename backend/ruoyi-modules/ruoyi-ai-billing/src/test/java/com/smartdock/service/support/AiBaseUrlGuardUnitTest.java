@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * ai-config probe 端点 SSRF 防御校验 (B1, 见 document/DCS_AUDIT_2026_06_22.md)。
+ * ai-config probe 端点 SSRF 防御校验 (内部审计 DCS_AUDIT_2026_06_22 的 B1 条)。
  *
  * <p>背景: 早期 probe 端点接受前端任意 baseUrl 直接发起 HTTP 请求, 攻击者可让服务器
  * 探测内网/云元数据/投递 API Key。修复: 必须命中预置 provider 的域名白名单 + 禁内网。</p>

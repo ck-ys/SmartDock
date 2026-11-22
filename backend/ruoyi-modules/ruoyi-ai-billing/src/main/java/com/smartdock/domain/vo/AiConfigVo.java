@@ -9,7 +9,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * DCS AI 模型配置视图对象。
+ * AI 模型配置视图对象。
  *
  * @author smartdock
  */

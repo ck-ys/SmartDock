@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * DCS AI 模型价格配置 Controller。
+ * AI 模型价格配置 Controller。
  *
  * @author smartdock
  */

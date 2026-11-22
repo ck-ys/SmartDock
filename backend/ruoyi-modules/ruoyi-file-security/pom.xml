@@ -18,7 +18,7 @@
         - 驳回通知发 FileReviewNoticeEvent 域事件, 由 dcs 侧 FileReviewNoticePublisher 翻译进通知管道(同步 @EventListener 相位红线)
         - 任务审核人存在性经 MissionReviewProbe 端口反转, dcs 侧 MissionReviewProbeImpl 落地查询
         2026-09-24 从 ruoyi-mission 机械迁移成独立模块(拍板 Q1:A,
-        见 document/plans/FILESECURITY_AIGATEWAY_RECONCILE_PLAN_20260924.md);
+        见内部设计资料 FILESECURITY_AIGATEWAY_RECONCILE_PLAN_20260924; 未纳入本仓);
         Java 包名保留 com.smartdock.*(零 import 改动), 依赖方向 dcs→file-security 单向,
         本模块依赖 ruoyi-system(端口)/ruoyi-risk(风控上报), 不依赖 ruoyi-mission。
     </description>

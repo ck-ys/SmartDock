@@ -1,7 +1,7 @@
 package com.smartdock.assistant.engine.tools;
 
 /**
- * 工具契约常量 v1（批B B0，2026-10-04；契约表= document/evidence/assistant-p1/tool-contracts.md）。
+ * 工具契约常量 v1（批B B0，2026-10-04；契约表原在 document/evidence/assistant-p1/tool-contracts.md，该目录未纳入本仓）。
  *
  * <p>五件查询工具共用的返回形状/超时/截断口径——常量集中此处，工具实现与测试断言
  * 同源，防口径漂移。</p>

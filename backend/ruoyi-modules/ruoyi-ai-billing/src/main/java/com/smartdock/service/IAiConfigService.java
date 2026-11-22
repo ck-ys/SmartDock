@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * DCS AI 模型配置 Service。
+ * AI 模型配置 Service。
  *
  * @author smartdock
  */

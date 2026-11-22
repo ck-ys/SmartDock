@@ -16,11 +16,11 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface EncryptField {
 
-    // ===== DCS 调用指南 =====
-    // DCS 引用频次: 4+ 个文件
-    // 典型用法: DCS AI 配置的 API 密钥(apiKey/secretKey)用 @EncryptField 加密存储到 DB; 查询时通过 MyBatis 拦截器自动解密, 业务代码无感知
-    // ⚠️ DCS 踩过的坑: LIKE 模糊查询加密字段不生效(密文每次不同), 等值查询才有效; 加密字段不建议做查询条件
-    // ===== DCS 调用指南 结束 =====
+    // ===== 调用指南 =====
+    // 引用频次: 4+ 个文件
+    // 典型用法: AI 配置的 API 密钥(apiKey/secretKey)用 @EncryptField 加密存储到 DB; 查询时通过 MyBatis 拦截器自动解密, 业务代码无感知
+    // ⚠️ 踩过的坑: LIKE 模糊查询加密字段不生效(密文每次不同), 等值查询才有效; 加密字段不建议做查询条件
+    // ===== 调用指南 结束 =====
 
     /**
      * 加密算法

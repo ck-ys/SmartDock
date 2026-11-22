@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 《多任务智能转发系统用户服务协议》静态页（免登录可达，constantRoutes 顶层平铺）。
- * 正文为结构化 Vue 模板（不用 v-html）；文本起草对照 document/plans/LOGIN_AGREEMENT_GATING_PLAN_20260907.md §5.0/§5.1。
+ * 正文为结构化 Vue 模板（不用 v-html）；文本起草对照内部资料 LOGIN_AGREEMENT_GATING_PLAN_20260907 §5.0/§5.1（该资料未纳入本仓）。
  * 修改正文须同步更新页头版本号与生效日期（git 历史即版本链）。
  */
 import AgreementPageLayout from './AgreementPageLayout.vue';

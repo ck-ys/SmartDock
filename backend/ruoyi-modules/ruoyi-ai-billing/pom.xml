@@ -17,7 +17,7 @@
         - 计费底座: 租户钱包/充值订单/流水/服务计费规则(通用 serviceCode 口径, 未来非 AI 消费方可直接接入)
         - 钱包告警发 WalletAlertEvent 域事件, 由 dcs 侧 WalletAlertNoticeAdapter 翻译进通知管道
         2026-09-24 从 ruoyi-mission 机械迁移成独立模块(grill Q1-Q7 全 A 拍板,
-        见 document/plans/AI_WALLET_MODULE_SPLIT_PLAN_20260924.md);
+        见内部设计资料 AI_WALLET_MODULE_SPLIT_PLAN_20260924; 未纳入本仓);
         Java 包名保留 com.smartdock.*(Q3A 零 import 改动), 依赖方向 dcs→ai-billing 单向(Q2A)。
         注意: spring-ai 必须用 starter(AiChatClientFactory 注入的 RetryTemplate 由其自动配置供应)。
     </description>

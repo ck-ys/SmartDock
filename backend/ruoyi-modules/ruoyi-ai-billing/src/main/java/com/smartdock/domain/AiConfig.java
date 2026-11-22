@@ -13,7 +13,7 @@ import java.io.Serial;
 import java.math.BigDecimal;
 
 /**
- * DCS AI 模型配置。
+ * AI 模型配置。
  *
  * <p>该表由超管跨租户维护, 因此显式保存 tenantId 但不继承 TenantEntity。</p>
  *

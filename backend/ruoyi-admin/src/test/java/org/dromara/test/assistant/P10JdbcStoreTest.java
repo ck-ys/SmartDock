@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * P0-T10 探针：AgentScope 2.0.3 JdbcStore 落 PostgreSQL 实测。
- * <p>判据（计划 document/plans/DCS_ASSISTANT_P0_VERIFICATION_PLAN_20260923.md Task 10）：</p>
+ * <p>判据（源自 P0 验证计划 Task 10；该计划文件属内部资料，未纳入本仓）：</p>
  * <ul>
  *   <li>#3213 双层实证：①autoCreateTable 默认 true，装配时无条件执行 CREATE TABLE IF NOT EXISTS，
  *       PG 对该语句的权限检查不豁免 IF NOT EXISTS——受控账号（无 DDL 权限）必炸；

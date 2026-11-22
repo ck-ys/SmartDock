@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * <ul>
  *   <li>一律 @Tag("p0probe")（禁 dev 标签——pom surefire groups=dev 会把探针混入 264 个存量测试默认回归）</li>
  *   <li>运行期 Class.forName 探测（非编译期 import）：类名不对=运行 FAIL 而非编译失败，天然 TDD 红</li>
- *   <li>类名以 AgentScope 2.0.3 实际为准调准；PASS/FAIL 都是证据（FAIL 全文留 document/evidence/assistant-p0/）</li>
+ *   <li>类名以 AgentScope 2.0.3 实际为准调准；PASS/FAIL 都是证据（FAIL 全文原计划留 document/evidence/assistant-p0/，该目录从未纳入本仓）</li>
  * </ul>
  * 跑法：.codex/run-dcs-test.ps1 -TestClass P0DependencyProbeTest -Groups p0probe
  */

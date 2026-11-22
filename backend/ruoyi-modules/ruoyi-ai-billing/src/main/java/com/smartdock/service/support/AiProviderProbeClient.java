@@ -521,7 +521,7 @@ public class AiProviderProbeClient {
     }
 
     /**
-     * baseUrl SSRF 防御校验 (B1, 见 document/DCS_AUDIT_2026_06_22.md)。
+     * baseUrl SSRF 防御校验 (内部审计 DCS_AUDIT_2026_06_22 的 B1 条)。
      *
      * <p>规则:</p>
      * <ol>

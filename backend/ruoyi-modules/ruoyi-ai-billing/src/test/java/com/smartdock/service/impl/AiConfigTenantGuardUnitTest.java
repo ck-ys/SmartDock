@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * AI 配置 queryById/testConnection 跨租户校验 (F9, 见 document/DCS_AUDIT_2026_06_22.md)。
+ * AI 配置 queryById/testConnection 跨租户校验 (内部审计 DCS_AUDIT_2026_06_22 的 F9 条)。
  *
  * <p>背景: queryById/testConnection 用 TenantHelper.ignore 跨租户读, 普通租户管理员
  * 可枚举 configId 读他人配置的 baseUrl/modelName/remark (apiKey 已 mask), testConnection

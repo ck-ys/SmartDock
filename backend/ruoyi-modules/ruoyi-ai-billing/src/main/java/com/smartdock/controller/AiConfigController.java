@@ -52,7 +52,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * DCS AI 模型配置 Controller。
+ * AI 模型配置 Controller。
  *
  * @author smartdock
  */

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 《多任务智能转发系统隐私政策》静态页（免登录可达，constantRoutes 顶层平铺）。
- * 正文起草对照 document/plans/LOGIN_AGREEMENT_GATING_PLAN_20260907.md §5.0 起草对照清单
+ * 正文起草对照内部资料 LOGIN_AGREEMENT_GATING_PLAN_20260907 §5.0 起草对照清单（该资料未纳入本仓）
  * （m3 领域复核的 8 个必告知项逐条落文——协议文本与系统真实行为一致是合规底线）。
  * 修改正文须同步更新页头版本号与生效日期（git 历史即版本链）。
  */

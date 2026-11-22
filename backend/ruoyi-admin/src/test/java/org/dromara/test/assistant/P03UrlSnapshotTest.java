@@ -55,7 +55,7 @@ class P03UrlSnapshotTest {
     @Autowired
     SaServletFilter saServletFilter;
 
-    /** 快照与事件证据落盘位置（target 下，不入 git；正式证据整理进 document/evidence/assistant-p0/） */
+    /** 快照与事件证据落盘位置（target 下，不入 git；正式证据原计划整理进 document/evidence/assistant-p0/，该目录从未纳入本仓） */
     private static final Path OUT = Path.of("target", "p03");
 
     @Test

@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n';
  * 用法：父级放 <AgreementCheckbox ref="agreementRef" />，提交函数最前面调
  * agreementRef.value?.verify() —— 返回 false 时组件已自行弹 warning+抖动+聚焦，父级直接 return。
  *
- * 实施硬约束（dspro 深读裁决，见 document/plans/LOGIN_AGREEMENT_GATING_PLAN_20260907.md §4.1）：
+ * 实施硬约束（内部深读裁决 LOGIN_AGREEMENT_GATING_PLAN_20260907 §4.1；该资料未纳入本仓）：
  * 1. 勾选状态只存在于本组件内部，严禁并入父级 loginForm 对象——记住密码回填（getLoginData 整体替换对象）会丢失勾选态；
  * 2. verify() 必须同步，不得 async——动画 await 期间二次点击存在重入窗口；
  * 3. 未勾选拦截时不触碰父级 loading/验证码状态（同步 return，零副作用）。

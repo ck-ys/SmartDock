@@ -46,7 +46,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * DCS AI 模型配置 Service 实现。
+ * AI 模型配置 Service 实现。
  *
  * @author smartdock
  */
@@ -1127,7 +1127,7 @@ public class AiConfigServiceImpl implements IAiConfigService {
 
     /**
      * SSRF 防御: probe 请求的 baseUrl 必须命中指定 provider 的预置域名白名单 (B1, 见
-     * document/DCS_AUDIT_2026_06_22.md)。拒绝内网/环回/链路本地/非 https, 防止探测内网或
+     * 内部审计 DCS_AUDIT_2026_06_22 的 B1 条)。拒绝内网/环回/链路本地/非 https, 防止探测内网或
      * 通过 bearerAuth 投递 API Key 到攻击者服务器。
      */
     private void assertBaseUrlAllowed(AiProbeBo bo) {
@@ -1228,7 +1228,7 @@ public class AiConfigServiceImpl implements IAiConfigService {
     }
 
     /**
-     * 校验当前用户能否访问指定 AI 配置 (F9, 见 document/DCS_AUDIT_2026_06_22.md)。
+     * 校验当前用户能否访问指定 AI 配置 (内部审计 DCS_AUDIT_2026_06_22 的 F9 条)。
      *
      * <p>背景: queryById/testConnection 用 TenantHelper.ignore 跨租户读, 普通租户管理员
      * 可枚举 configId 读他人配置。修复: 抽纯函数, 在 service 入口校验。</p>

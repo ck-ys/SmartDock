@@ -15,7 +15,7 @@
         DCS 工作助手模块 (AI Work Assistant) — AgentScope Java 驱动
         - P0 阶段（当前）：仅探针模块骨架 + AgentScope 七件套依赖引入，不含任何业务代码
         - 一站规划：HarnessAgent 推理循环/query_*+act_* 工具面/HITL 确认卡/计费装饰/workspace md 体系
-        - 实现依据 document/DCS_ASSISTANT_SPEC_20260923.md；进度计划 document/plans/DCS_ASSISTANT_P0_VERIFICATION_PLAN_20260923.md
+        - 实现依据内部规格 DCS_ASSISTANT_SPEC_20260923；进度计划 DCS_ASSISTANT_P0_VERIFICATION_PLAN_20260923（均为内部资料，未纳入本仓）
         - 版本纪律：全家走根 pom 的 io.github.ck-ys.agentscope:agentscope-bom 钉版本（升级只改一个号）
     </description>
 
@@ -39,7 +39,7 @@
             <!-- T5 预警坑提前实锤(2026-10-03): 本件传递 redisson 4.2.0 会顶掉项目基线 3.52.0
                  (4.x 移除 org.redisson.api.NameMapper 等 → ruoyi-common-redis RedisConfig introspect 失败,
                   admin 全部 Spring 测试上下文起不来)。排除之, extensions-redis 走项目自带 3.52.0;
-                 版本对账结论记 document/evidence/assistant-p0/00-deptree.txt (Task 5 全量复核) -->
+                 版本对账结论记内部证据 assistant-p0/00-deptree.txt (Task 5 全量复核; 未纳入本仓) -->
             <exclusions>
                 <exclusion>
                     <groupId>org.redisson</groupId>

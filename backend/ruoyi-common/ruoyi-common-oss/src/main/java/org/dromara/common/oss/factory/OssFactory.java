@@ -23,11 +23,11 @@ import java.util.concurrent.locks.ReentrantLock;
 @Slf4j
 public class OssFactory {
 
-    // ===== DCS 调用指南 =====
-    // DCS 引用频次: 1+ 个文件
-    // 典型用法: DCS 附件上传/下载; instance() 拿当前 OSS 客户端(本地 local/阿里云 aliyun/MinIO 切换由 sys_oss_config 表配置 + Redis 缓存 configKey 决定)
+    // ===== 调用指南 =====
+    // 引用频次: 1+ 个文件
+    // 典型用法: 附件上传/下载; instance() 拿当前 OSS 客户端(本地 local/阿里云 aliyun/MinIO 切换由 sys_oss_config 表配置 + Redis 缓存 configKey 决定)
     // 安全边界: 客户端实例按 "tenantId:configKey" 缓存隔离, 多租户配置互不覆盖; 改配置后需清 Redis 缓存重建实例
-    // ===== DCS 调用指南 结束 =====
+    // ===== 调用指南 结束 =====
 
     private static final Map<String, OssClient> CLIENT_CACHE = new ConcurrentHashMap<>();
     private static final ReentrantLock LOCK = new ReentrantLock();
