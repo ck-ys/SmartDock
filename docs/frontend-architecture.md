@@ -32,14 +32,14 @@ flowchart TB
     S["Sidebar + Navbar + AppMain"]
   end
   subgraph PAGES["页面"]
-    DCS["views/dcs/*<br/>画像/分析/任务/计费/风控…"]
-    AGENT["views/dcs/agent<br/>智能体工作台"]
-    ADMIN["views/dcs/assistant<br/>会话/记忆/运营台"]
+    DCS["views/smartdock/*<br/>画像/分析/任务/计费/风控…"]
+    AGENT["views/smartdock/agent<br/>智能体工作台"]
+    ADMIN["views/smartdock/assistant<br/>会话/记忆/运营台"]
   end
   subgraph DATA["数据与通信"]
-    API["api/dcs/**<br/>契约层"]
+    API["api/smartdock/**<br/>契约层"]
     REQ["utils/request.ts<br/>Axios 拦截器"]
-    AGUI["api/dcs/assistant/aguiClient.ts<br/>AGUI SSE"]
+    AGUI["api/smartdock/assistant/aguiClient.ts<br/>AGUI SSE"]
     STORE["store/modules/*<br/>Pinia"]
   end
   B["后端 8090"]
@@ -148,7 +148,7 @@ sequenceDiagram
 
 | 目录 | 放什么 | 典型文件 |
 |---|---|---|
-| `api` | 后端接口模块，按域拆分；`api/dcs` 是业务，`api/system`/`api/monitor` 是 RuoYi 底座 | `api/dcs/assistant/index.ts`、`api/dcs/core/profile.ts` |
+| `api` | 后端接口模块，按域拆分；`api/smartdock` 是业务，`api/system`/`api/monitor` 是 RuoYi 底座 | `api/smartdock/assistant/index.ts`、`api/smartdock/core/profile.ts` |
 | `assets` | 图标、图片、Logo、401/404 图、全局样式与设计令牌 | `assets/styles/dcs-tokens.scss` |
 | `components` | 共享/全局组件；`Assistant` 是 AI 助手全家桶 | `components/Assistant/*` |
 | `composables` | 跨组件复用的组合式函数 | `tenantMirror.ts`、`useWorkspace.ts` |
@@ -162,9 +162,9 @@ sequenceDiagram
 | `store` | Pinia 根实例与模块 | `store/modules/*` |
 | `types` | 全局/自动导入/Axios/环境变量/路由类型声明 | `types/global.d.ts` |
 | `utils` | `request`、`auth`、`crypto`、SSE、WebSocket、主题、字典、权限、格式化、错误、i18n | `utils/request.ts` |
-| `views` | 页面：RuoYi 系统/监控、登录/注册/协议/错误/重定向、DCS 业务页面 | `views/dcs/*` |
+| `views` | 页面：RuoYi 系统/监控、登录/注册/协议/错误/重定向、DCS 业务页面 | `views/smartdock/*` |
 
-### 3.2 `views/dcs/*` 页面族
+### 3.2 `views/smartdock/*` 页面族
 
 | 页面族 | 作用 |
 |---|---|
@@ -181,25 +181,25 @@ sequenceDiagram
 | `support` | 只有共享 `SupportPageHead.vue`，没有独立页面 |
 | `utils` | `safeLoad.ts`，带可见错误提示的异步加载辅助 |
 
-### 3.3 `api/dcs/*` 与后端怎么对应
+### 3.3 `api/smartdock/*` 与后端怎么对应
 
 | 前端模块 | 主要端点 | 后端 Controller |
 |---|---|---|
-| `api/dcs/core/task.ts` | `/dcs/task/*`、`/dcs/stats/overview` | `TaskController`、`StatsController` |
-| `api/dcs/core/submission.ts` | `/dcs/submission/*`、`/dcs/audit/*` | `SubmissionController`、`AuditController` |
-| `api/dcs/core/notice.ts` | `/dcs/notice/*` | `NoticeController` |
-| `api/dcs/core/analytics.ts` | `/analytics/*`、`/analytics/replay/*`、`/analytics/health` | `AnalyticsController`、`AnalyticsReplayController`、`AnalyticsHealthController` |
-| `api/dcs/core/profile.ts` | `/profile/*` | 15 个 profile Controller（见后端文档附录 A.1） |
-| `api/dcs/assistant/*` | `/dcs/assistant/**`、`/agui/run/dcs-assistant` | 23 个 assistant Controller + AGUI 运行时 |
-| `api/dcs/ai/*` | `/dcs/ai-config`、`/dcs/ai-price`、`/dcs/ai-model-price`、`/dcs/ai-usage`、`/dcs/ai/capability` | `AiConfigController` 等 5 个 |
-| `api/dcs/risk/*` | `/dcs/risk/*`、`/dcs/captcha/*` | 8 个 risk Controller |
-| `api/dcs/fileReview/*` | `/dcs/fileReview/*` | `FileReviewController` |
-| `api/dcs/feedback/*` | `/dcs/feedback/*` | `FeedbackController` |
-| `api/dcs/announcement/*` | `/dcs/announcement/*` | `SysNoticePortalController` |
-| `api/dcs/changelog/*` | `/dcs/changelog/*` | `ChangelogController` |
-| `api/dcs/account-billing/*` | `/dcs/tenant-wallet/summary` + 旧三组 re-export | `TenantWalletController` 等 |
+| `api/smartdock/core/task.ts` | `/task/*`、`/mission/stats/overview` | `TaskController`、`StatsController` |
+| `api/smartdock/core/submission.ts` | `/submission/*`、`/audit/*` | `SubmissionController`、`AuditController` |
+| `api/smartdock/core/notice.ts` | `/notice/*` | `NoticeController` |
+| `api/smartdock/core/analytics.ts` | `/analytics/*`、`/analytics/replay/*`、`/analytics/health` | `AnalyticsController`、`AnalyticsReplayController`、`AnalyticsHealthController` |
+| `api/smartdock/core/profile.ts` | `/profile/*` | 15 个 profile Controller（见后端文档附录 A.1） |
+| `api/smartdock/assistant/*` | `/assistant/**`、`/agui/run/smartdock-assistant` | 23 个 assistant Controller + AGUI 运行时 |
+| `api/smartdock/ai/*` | `/ai-config`、`/ai-price`、`/ai-model-price`、`/ai-usage`、`/ai/capability` | `AiConfigController` 等 5 个 |
+| `api/smartdock/risk/*` | `/risk/*`、`/captcha/*` | 8 个 risk Controller |
+| `api/smartdock/fileReview/*` | `/fileReview/*` | `FileReviewController` |
+| `api/mission/feedback/*` | `/mission/feedback/*` | `FeedbackController` |
+| `api/smartdock/announcement/*` | `/announcement/*` | `SysNoticePortalController` |
+| `api/smartdock/changelog/*` | `/changelog/*` | `ChangelogController` |
+| `api/smartdock/account-billing/*` | `/tenant-wallet/summary` + 旧三组 re-export | `TenantWalletController` 等 |
 
-`api/dcs/core/` 是 DCS 微核心的"契约层"：与后端端点一一对应，页面只消费业务形状，不直接拼 URL。它里面的 `r<T>()` 取 `R<T>.data`，`table<T>()` 返回完整 `TableDataInfo<T>`。
+`api/smartdock/core/` 是 DCS 微核心的"契约层"：与后端端点一一对应，页面只消费业务形状，不直接拼 URL。它里面的 `r<T>()` 取 `R<T>.data`，`table<T>()` 返回完整 `TableDataInfo<T>`。
 
 ---
 
@@ -216,12 +216,12 @@ sequenceDiagram
 
 | 路由 | 说明 |
 |---|---|
-| `/agent` | 智能体工作台，`views/dcs/agent/index.vue`，`hidden: true`，**不套业务 Layout**（独立全屏） |
+| `/agent` | 智能体工作台，`views/smartdock/agent/index.vue`，`hidden: true`，**不套业务 Layout**（独立全屏） |
 | `/agent/settings` | 工作台设置，顶层全屏路由 |
-| `/dcs/mission/detail/:id` | 任务详情，`hidden: true` |
+| `/mission/detail/:id` | 任务详情，`hidden: true` |
 | `/insight/profile-detail/:source/:subjectId` | 画像详情，`hidden: true` |
-| `/dcs/review-task` | 审核事项，`hidden: true` |
-| 多条 legacy redirect | `/dcs/profile` → `/insight/profile`、`/tenant/tenant-wallet*` → `/tenant/account-billing?tab=...` |
+| `/review-task` | 审核事项，`hidden: true` |
+| 多条 legacy redirect | `/profile` → `/insight/profile`、`/tenant/tenant-wallet*` → `/tenant/account-billing?tab=...` |
 
 > 注意：静态隐藏路由上虽然写了 `permissions` 字段，但 `permission.ts` 的全局守卫**没有消费它**。实际访问控制靠页面自检 + 后端接口权限。这是代码事实，不是缺陷判断。
 
@@ -257,7 +257,7 @@ flowchart TB
 
 1. **先恢复动态租户，再挂路由**：否则壳层显示 B 单位、首屏数据还是 A 单位。`restoreDynamicTenant` 在 `composables/tenantMirror.ts`。
 2. **404 统一改道 `/403`**：前端分不清"系统有但本人无权"和"真不存在"，统一按无权处理。
-3. **`isRelogin` 防重复弹窗**：401 时只弹一次重登框；`dcs:login-redirect-owner` 记录重定向归属，换账号后不会跳到上个账号有权限的页面。
+3. **`isRelogin` 防重复弹窗**：401 时只弹一次重登框；`login-redirect-owner` 记录重定向归属，换账号后不会跳到上个账号有权限的页面。
 
 ### 4.3 动态菜单：`sys_menu` 怎么变成侧栏
 
@@ -318,7 +318,7 @@ mounted(el, binding) {
 sequenceDiagram
   autonumber
   participant P as 页面
-  participant A as api/dcs/** 函数
+  participant A as api/smartdock/** 函数
   participant R as utils/request.ts
   participant V as Vite 代理 /dev-api
   participant C as Spring Controller
@@ -364,7 +364,7 @@ sequenceDiagram
 | 其他非 200 | 4601（验证码挑战）不弹通知；其余非 silent 用 `ElNotification.error`；reject |
 | 200 | `Promise.resolve(res.data)`，**返回整个响应体** |
 
-**为什么页面里到处是 `res.data`**：拦截器故意不按 `data` 解包，保留 `R<T>` 信封，让调用方自己决定。`api/dcs/core` 里的 `r<T>()` 和 `table<T>()` 就是两种解包姿势。
+**为什么页面里到处是 `res.data`**：拦截器故意不按 `data` 解包，保留 `R<T>` 信封，让调用方自己决定。`api/smartdock/core` 里的 `r<T>()` 和 `table<T>()` 就是两种解包姿势。
 
 ### 5.3 下载与上传
 
@@ -381,7 +381,7 @@ sequenceDiagram
 
 - 切换：`/system/tenant/dynamic/{tenantId}`
 - 清除：`/system/tenant/dynamic/clear`
-- 本地镜像：`dcs:dynamic-tenant:<userId>`（`composables/tenantMirror.ts`）
+- 本地镜像：`dynamic-tenant:<userId>`（`composables/tenantMirror.ts`）
 - 刷新后 `restoreDynamicTenant(userId, tenantId)` 把镜像重新下发给服务端，再放行路由
 
 这是"为什么刷新后单位没丢"的机制。
@@ -391,7 +391,7 @@ sequenceDiagram
 | 文件 | 用途 | 传输 | 关键行为 |
 |---|---|---|---|
 | `utils/sse.ts` | **通知推送**（不是对话） | `EventSource` / `useEventSource` | URL 带 `Authorization` + `clientid`；解析 `{event,data}`；`DCS_NOTIFY` 去重后进 notice store；自动重连 5 次/5s |
-| `api/dcs/assistant/aguiClient.ts` | **AI 对话** | `fetch` POST + 手写 SSE 帧解析 | `POST /agui/run/dcs-assistant`；`Accept: text/event-stream`；`X-Thread-Id`；指数退避重试（每次重试等待时间翻倍）；600s 停滞看门狗；`attach()` 续看 |
+| `api/smartdock/assistant/aguiClient.ts` | **AI 对话** | `fetch` POST + 手写 SSE 帧解析 | `POST /agui/run/smartdock-assistant`；`Accept: text/event-stream`；`X-Thread-Id`；指数退避重试（每次重试等待时间翻倍）；600s 停滞看门狗；`attach()` 续看 |
 
 挂载点：`layout/index.vue` 的 `onMounted` 里 `initSSE(BASE_URL + '/resource/sse')`；AGUI 由助手组件按需发起。
 
@@ -418,18 +418,18 @@ sequenceDiagram
 | 域 | 键 | 用途 |
 |---|---|---|
 | 认证 | `Admin-Token` | 登录 token |
-| 租户 | `dcs:dynamic-tenant:<userId>` | 动态租户镜像 |
-| 助手 | `dcs:assistant:thread:<userId>` | 当前会话 threadId |
-| 助手 | `dcs:assistant:thinkLevel:<userId>` | 思考档位 |
-| 助手 | `dcs:assistant:modelPin:<userId>:<threadId>` | 会话级模型 pin |
-| 助手 | `dcs:assistant:webOn:<userId>:<threadId>` | 会话级联网开关；`0`=停用 |
-| 助手 | `dcs:assistant:skill:<userId>:<threadId>` | 会话级技能 |
-| 助手 | `dcs:assistant:autoLevel:<userId>` | 自主权档位 |
+| 租户 | `dynamic-tenant:<userId>` | 动态租户镜像 |
+| 助手 | `smartdock:assistant:thread:<userId>` | 当前会话 threadId |
+| 助手 | `smartdock:assistant:thinkLevel:<userId>` | 思考档位 |
+| 助手 | `smartdock:assistant:modelPin:<userId>:<threadId>` | 会话级模型 pin |
+| 助手 | `smartdock:assistant:webOn:<userId>:<threadId>` | 会话级联网开关；`0`=停用 |
+| 助手 | `smartdock:assistant:skill:<userId>:<threadId>` | 会话级技能 |
+| 助手 | `smartdock:assistant:autoLevel:<userId>` | 自主权档位 |
 | 助手 | `smartdock-agent-prefs:v1:<userId>` | 七项偏好 |
 | 助手 | `smartdock-agent-drafts:v1:<userId>:<scope>` | 草稿 |
-| 助手 | `dcs:assistant:pins:<userId>` | 会话置顶 |
-| 登录 | `dcs:login-redirect-owner` | 401 重登 redirect 归属 |
-| 表格 | `dcs:table-columns:<storageKey>` | 列设置 |
+| 助手 | `smartdock:assistant:pins:<userId>` | 会话置顶 |
+| 登录 | `login-redirect-owner` | 401 重登 redirect 归属 |
+| 表格 | `table-columns:<storageKey>` | 列设置 |
 
 ---
 
@@ -437,24 +437,24 @@ sequenceDiagram
 
 | 页面/入口 | 前端 API | 主要端点 | 后端 Controller |
 |---|---|---|---|
-| 智能体工作台 `/agent` | `api/dcs/assistant/index.ts` + `aguiClient` | `/dcs/assistant/status`、`/conversation/*`、`/hitl/pending`、`/plan/state`、`/agui/run/dcs-assistant` | `AssistantStatusController`、`AssistantConversationController`、`AssistantHitlController` + AGUI |
-| 会话管理页（`views/dcs/assistant/session/index.vue`，URL 由动态菜单决定） | 同上 | `/conversation/list`、`/by-thread`、`/{id}/messages`、`/{id}/title`、`/conversation/stop`、`/conversation/attach` | `AssistantConversationController` |
-| 记忆管理 | 同上 | `/dcs/assistant/memory/*` | `AssistantMemoryController` |
-| 技能管理 | 同上 | `/dcs/assistant/skills`、`/skill/*` | `AssistantSkillViewerController`、`AssistantSkillAdminController` |
-| MCP | 同上 | `/dcs/assistant/mcp/*` | `AssistantMcpController` |
-| 自动化 | `api/dcs/assistant/automation.ts` | `/dcs/assistant/automations/*` | `AssistantAutomationController` |
-| 助手运营台 | `api/dcs/assistant/index.ts` | `/dcs/assistant/admin/*`、`/quota/*`、`/toolgate`、`/tools`、`/config`、`/feedback/*` | `AssistantStatusController`、`AssistantQuotaController`、`AssistantToolGateController` 等 |
-| 画像 | `api/dcs/core/profile.ts` | `/profile/*` | 15 个 profile Controller |
-| 分析 | `api/dcs/core/analytics.ts` | `/analytics/*` | `AnalyticsController` 等 |
-| 任务/待办/审核 | `api/dcs/core/task.ts`、`submission.ts`、`notice.ts` | `/dcs/task/*`、`/dcs/submission/*`、`/dcs/audit/*`、`/dcs/notice/*` | `TaskController` 等 |
-| 账户与账单 | `api/dcs/account-billing/*` | `/dcs/tenant-wallet/summary` + 旧三组 | `TenantWalletController` 等 |
-| AI 额度 | `api/dcs/ai-credit/*` | `/dcs/ai-credit/*` | `AiCreditController` |
-| AI 配置/用量 | `api/dcs/ai/*` | `/dcs/ai-config/*`、`/dcs/ai-price/*`、`/dcs/ai-usage/*` | `AiConfigController` 等 |
-| 风控 | `api/dcs/risk/*`、`api/dcs/sensitive-word/*` | `/dcs/risk/*`、`/dcs/sensitive-word/*`、`/dcs/captcha/*` | 8 个 risk Controller |
-| 文件审查 | `api/dcs/fileReview/*` | `/dcs/fileReview/*` | `FileReviewController` |
-| 首页 `/index` | 组合调用 | `/analytics/overview`、`/profile/overview`、`/dcs/stats/overview`、`/dcs/assistant/status`、`/dcs/changelog/list` | 对应 Controller |
+| 智能体工作台 `/agent` | `api/smartdock/assistant/index.ts` + `aguiClient` | `/assistant/status`、`/conversation/*`、`/hitl/pending`、`/plan/state`、`/agui/run/smartdock-assistant` | `AssistantStatusController`、`AssistantConversationController`、`AssistantHitlController` + AGUI |
+| 会话管理页（`views/smartdock/assistant/session/index.vue`，URL 由动态菜单决定） | 同上 | `/conversation/list`、`/by-thread`、`/{id}/messages`、`/{id}/title`、`/conversation/stop`、`/conversation/attach` | `AssistantConversationController` |
+| 记忆管理 | 同上 | `/assistant/memory/*` | `AssistantMemoryController` |
+| 技能管理 | 同上 | `/assistant/skills`、`/skill/*` | `AssistantSkillViewerController`、`AssistantSkillAdminController` |
+| MCP | 同上 | `/assistant/mcp/*` | `AssistantMcpController` |
+| 自动化 | `api/smartdock/assistant/automation.ts` | `/assistant/automations/*` | `AssistantAutomationController` |
+| 助手运营台 | `api/smartdock/assistant/index.ts` | `/assistant/admin/*`、`/quota/*`、`/toolgate`、`/tools`、`/config`、`/feedback/*` | `AssistantStatusController`、`AssistantQuotaController`、`AssistantToolGateController` 等 |
+| 画像 | `api/smartdock/core/profile.ts` | `/profile/*` | 15 个 profile Controller |
+| 分析 | `api/smartdock/core/analytics.ts` | `/analytics/*` | `AnalyticsController` 等 |
+| 任务/待办/审核 | `api/smartdock/core/task.ts`、`submission.ts`、`notice.ts` | `/task/*`、`/submission/*`、`/audit/*`、`/notice/*` | `TaskController` 等 |
+| 账户与账单 | `api/smartdock/account-billing/*` | `/tenant-wallet/summary` + 旧三组 | `TenantWalletController` 等 |
+| AI 额度 | `api/smartdock/ai-credit/*` | `/ai-credit/*` | `AiCreditController` |
+| AI 配置/用量 | `api/smartdock/ai/*` | `/ai-config/*`、`/ai-price/*`、`/ai-usage/*` | `AiConfigController` 等 |
+| 风控 | `api/smartdock/risk/*`、`api/smartdock/sensitive-word/*` | `/risk/*`、`/sensitive-word/*`、`/captcha/*` | 8 个 risk Controller |
+| 文件审查 | `api/smartdock/fileReview/*` | `/fileReview/*` | `FileReviewController` |
+| 首页 `/index` | 组合调用 | `/analytics/overview`、`/profile/overview`、`/mission/stats/overview`、`/assistant/status`、`/changelog/list` | 对应 Controller |
 
-> 遗留项：`api/dcs/audit-log` 目录存在，但未找到同名后端 Controller，也未发现页面导入，疑似未接线；`views/dcs/support` 只有共享页头、没有独立页面；`tenant-wallet`/`tenant-wallet-ledger`/`wallet-payment-order`/`ai-doc-domain` 旧页面文件仍在，但路由已重定向。
+> 遗留项：`api/smartdock/audit-log` 目录存在，但未找到同名后端 Controller，也未发现页面导入，疑似未接线；`views/smartdock/support` 只有共享页头、没有独立页面；`tenant-wallet`/`tenant-wallet-ledger`/`wallet-payment-order`/`ai-doc-domain` 旧页面文件仍在，但路由已重定向。
 
 ---
 
@@ -468,8 +468,8 @@ sequenceDiagram
 flowchart LR
   subgraph HOST["三个宿主"]
     H1["layout/index.vue<br/>异步挂 Assistant/index.vue<br/>（全局悬浮球 + 抽屉）"]
-    H2["views/dcs/agent/index.vue<br/>/agent 全屏工作台"]
-    H3["views/dcs/assistant/session/index.vue<br/>会话管理页（动态菜单挂载）"]
+    H2["views/smartdock/agent/index.vue<br/>/agent 全屏工作台"]
+    H3["views/smartdock/assistant/session/index.vue<br/>会话管理页（动态菜单挂载）"]
   end
   subgraph CORE["共享核心"]
     U["useAssistant.ts<br/>getAssistant(userId) 单例"]
@@ -489,7 +489,7 @@ flowchart LR
 |---|---|---|---|
 | 悬浮球 + 抽屉 | `layout/index.vue:37` 异步组件 | 右下角球，点开右侧抽屉 | 任意业务页面随手问；抽屉里是精简会话 |
 | `/agent` | 独立全屏路由（不套业务 Layout） | 左会话列表 + 中消息流 + 右状态栏 | 完整工作台：模型、技能、联网、自主权、计划、TODO |
-| 会话管理页 | `views/dcs/assistant/session/index.vue` | 业务 Layout 内 | 运营/审计视角看会话与消息 |
+| 会话管理页 | `views/smartdock/assistant/session/index.vue` | 业务 Layout 内 | 运营/审计视角看会话与消息 |
 
 > 路径说明：`/ai/assistant-admin` 是管理端的常量跳转目标（`router/index.ts:24`，工作台设置/记忆页用它跳助手管理端），不是会话页 URL；该常量对应哪个页面由 `sys_menu` 菜单数据决定，会话管理页也挂在动态菜单下，前端不写死。
 
@@ -531,7 +531,7 @@ sequenceDiagram
   participant C as Composer.vue
   participant UA as useAssistant.runTurn
   participant AC as aguiClient.startTurn
-  participant B as 后端 /agui/run/dcs-assistant
+  participant B as 后端 /agui/run/smartdock-assistant
   participant P as parseSseFrames
   participant D as dispatch
   participant T as 回合状态
@@ -542,7 +542,7 @@ sequenceDiagram
   UA->>UA: 建本地用户消息 + 助手占位回合
   UA->>UA: 组装 forwardedProps（思考档/模型/技能/联网/自主权/计划决策）
   UA->>AC: startTurn(threadId, message, props, handlers)
-  AC->>B: POST /agui/run/dcs-assistant<br/>Authorization + clientid + X-Thread-Id
+  AC->>B: POST /agui/run/smartdock-assistant<br/>Authorization + clientid + X-Thread-Id
   B-->>AC: text/event-stream 帧
   loop 每个 SSE 帧
     AC->>P: parseSseFrames(buffer)
@@ -637,7 +637,7 @@ sequenceDiagram
   F->>D: 渲染待确认项（工具名/参数/风险）
   U->>D: 点"允许"或"拒绝"（可改参数）
   D->>F: resolveHitl(decision)
-  F->>B: 新 POST /agui/run/dcs-assistant<br/>resume 覆盖本轮全部 interrupt id
+  F->>B: 新 POST /agui/run/smartdock-assistant<br/>resume 覆盖本轮全部 interrupt id
   B->>M: 工具按决定执行/跳过，继续跑
   M-->>F: 后续事件 / RUN_FINISHED
 ```
@@ -646,7 +646,7 @@ sequenceDiagram
 
 - **批准/拒绝不是独立 REST 端点**，而是"下一轮 `/agui/run` 带 `resume`"。后端 `AssistantHitlController` 只有 `GET /pending`，没有 approve/abort。
 - `resume` 必须覆盖**本轮所有** interrupt id：只恢复一个，其余仍挂起，下一轮会再次收到确认。
-- 页面刷新后 `turn.hitl` 会丢，但后端 pending 还在：前端进来会拉 `GET /dcs/assistant/hitl/pending` 重新出坞。
+- 页面刷新后 `turn.hitl` 会丢，但后端 pending 还在：前端进来会拉 `GET /assistant/hitl/pending` 重新出坞。
 - 确认卡上改过的参数（`editedArgs`）随 `resolveHitl` 一起回传，不是在前端本地改工具参数。
 
 ### 8.7 计划 / TODO / 反问 / 费用 / 记忆
@@ -666,20 +666,20 @@ sequenceDiagram
 |---|---|---|
 | **首轮重试** | `startTurn` 内指数退避，最多 5 次 | 只在"零帧就断"时重发；已经收到帧再断**不重发**（重发会撞后端 409 双 RUNNING） |
 | **停滞看门狗** | 600s 没新帧判定卡死 | 触发后收口为错误态，允许用户重试/续看 |
-| **续看 attach** | `POST /dcs/assistant/conversation/attach?threadId=…` | 后端 `AssistantRunStreamHub` 4096 帧回放环；先回放再续推；溢出补 `dcs-resume-truncated` |
-| **刷新恢复** | `localStorage` 的 `dcs:assistant:thread:<userId>` + attach | 刷新后先按 threadId 续看，失败再回退普通会话加载 |
-| **停止** | `POST /dcs/assistant/conversation/stop` | 停止后本轮状态收口；已产生的内容保留 |
+| **续看 attach** | `POST /assistant/conversation/attach?threadId=…` | 后端 `AssistantRunStreamHub` 4096 帧回放环；先回放再续推；溢出补 `dcs-resume-truncated` |
+| **刷新恢复** | `localStorage` 的 `smartdock:assistant:thread:<userId>` + attach | 刷新后先按 threadId 续看，失败再回退普通会话加载 |
+| **停止** | `POST /assistant/conversation/stop` | 停止后本轮状态收口；已产生的内容保留 |
 | **409 双跑** | 前端展示"该会话正在生成" | 不自动换 runId 重发；换 runId 重试是后端约束（会撞运行锁） |
 
 ### 8.9 输入区控件 → 上游参数
 
 | 控件 | 存储 | 上游字段 | 备注 |
 |---|---|---|---|
-| 思考档位（快速/平衡/深入） | `dcs:assistant:thinkLevel:<userId>` | `thinkTier` | 三件套必须齐：brain 图标 + 文字 + chevron |
-| 模型选择 | `dcs:assistant:modelPin:<userId>:<threadId>` | `modelConfigId` | 仅 `choiceOn && pin` 才带 |
-| 技能 | `dcs:assistant:skill:<userId>:<threadId>` | `skillId` | 会话级 |
-| 联网 | `dcs:assistant:webOn:<userId>:<threadId>` | `webSearchEnabled` | `'0'` 表示显式停用 |
-| 自主权 | `dcs:assistant:autoLevel:<userId>` | `autoLevel` | 影响工具审批档 |
+| 思考档位（快速/平衡/深入） | `smartdock:assistant:thinkLevel:<userId>` | `thinkTier` | 三件套必须齐：brain 图标 + 文字 + chevron |
+| 模型选择 | `smartdock:assistant:modelPin:<userId>:<threadId>` | `modelConfigId` | 仅 `choiceOn && pin` 才带 |
+| 技能 | `smartdock:assistant:skill:<userId>:<threadId>` | `skillId` | 会话级 |
+| 联网 | `smartdock:assistant:webOn:<userId>:<threadId>` | `webSearchEnabled` | `'0'` 表示显式停用 |
+| 自主权 | `smartdock:assistant:autoLevel:<userId>` | `autoLevel` | 影响工具审批档 |
 | 反问自动继续 | `smartdock-agent-prefs:v1:<userId>` | `askAutoContinue` | 默认开 |
 | 计划决策 | `planDock.ts` | `planDecision` / `planId` | 只在有计划卡时带 |
 | 附件 | — | 先上传 OSS，再登记附件 | 上传走 `fetch` + `FormData`，不用 Axios 实例 |
@@ -697,7 +697,7 @@ flowchart TB
   L --> ST["Settings/<br/>主题/皮肤/布局"]
   L --> DA["Assistant/index.vue<br/>悬浮球 + 抽屉"]
   L --> CP["CommandPalette<br/>Ctrl+K 命令面板"]
-  SB --> DCS["views/dcs/**"]
+  SB --> DCS["views/smartdock/**"]
   AM --> DCS
 ```
 
@@ -784,14 +784,14 @@ type-check vue-tsc --noEmit
 
 | 项 | 说明 |
 |---|---|
-| `api/dcs/audit-log` 疑似未接线 | 目录存在，未找到同名后端 Controller，也未发现页面 import |
-| `views/dcs/support` 没有独立页面 | 只有共享 `SupportPageHead.vue` |
+| `api/smartdock/audit-log` 疑似未接线 | 目录存在，未找到同名后端 Controller，也未发现页面 import |
+| `views/smartdock/support` 没有独立页面 | 只有共享 `SupportPageHead.vue` |
 | 旧钱包页面仍在 | `tenant-wallet`、`tenant-wallet-ledger`、`wallet-payment-order` 文件保留，路由已重定向到 `account-billing` |
 | 静态路由 `permissions` 不被消费 | `permission.ts` 只做登录/角色/动态路由，不检查 `route.permissions` |
 | `v-hasPermi` 非响应式 | `mounted` 时删 DOM，权限变化不会自动恢复 |
 | AGUI 常量多于消费 | `AGUI_EVENT` 定义了完整协议，`dispatch` 只实现第 8.4 节那批 |
 | 标签页 UI 注释掉 | `tags-view` 组件未启用，但 `tagsViewStore` 仍用于 keep-alive |
-| 助手 agentId 硬编码 | 前端固定 `/agui/run/dcs-assistant`；换默认 agent 要前后端一起改 |
+| 助手 agentId 硬编码 | 前端固定 `/agui/run/smartdock-assistant`；换默认 agent 要前后端一起改 |
 
 ### 13.2 尚未验证（需运行或环境）
 
@@ -826,7 +826,7 @@ type-check vue-tsc --noEmit
 | 动态菜单转换 | `src/store/modules/permission.ts` |
 | 权限指令 | `src/directive/permission/index.ts` |
 | 通知 SSE | `src/utils/sse.ts` |
-| AGUI 客户端 | `src/api/dcs/assistant/aguiClient.ts`（`startTurn:403`、`attach:471`、`parseSseFrames:50`、`dispatch:88`） |
+| AGUI 客户端 | `src/api/smartdock/assistant/aguiClient.ts`（`startTurn:403`、`attach:471`、`parseSseFrames:50`、`dispatch:88`） |
 | 助手状态机 | `src/components/Assistant/useAssistant.ts`（`runTurn:1572`、`resolveHitl:1970`、`onCustom:939`、`getAssistant:2761`） |
 | 输入区 | `src/components/Assistant/Composer.vue` |
 | 消息流 | `src/components/Assistant/MsgFlow.vue`、`TurnBlock.vue` |
@@ -840,8 +840,8 @@ type-check vue-tsc --noEmit
 
 | 旧说法 | 实际 | 依据 |
 |---|---|---|
-| "AGUI SSE 走 `utils/sse.ts`" | 走 `api/dcs/assistant/aguiClient.ts` 的 `fetch + ReadableStream`；`utils/sse.ts` 是通知 EventSource | 两文件实现与调用点 |
-| "前端只有 `/agent` 一个助手入口" | 三个宿主：全局悬浮球/抽屉、`/agent`、会话管理页（`views/dcs/assistant/session/index.vue`） | `layout/index.vue:37` + 两个 `AssistantWorkspace` 宿主 |
+| "AGUI SSE 走 `utils/sse.ts`" | 走 `api/smartdock/assistant/aguiClient.ts` 的 `fetch + ReadableStream`；`utils/sse.ts` 是通知 EventSource | 两文件实现与调用点 |
+| "前端只有 `/agent` 一个助手入口" | 三个宿主：全局悬浮球/抽屉、`/agent`、会话管理页（`views/smartdock/assistant/session/index.vue`） | `layout/index.vue:37` + 两个 `AssistantWorkspace` 宿主 |
 | "HITL 有 approve/abort 接口" | 只有 `GET /pending`；决定走下一轮 `/agui/run` 的 `resume` | `AssistantHitlController` + `resolveHitl` |
 | "计划卡是纯展示" | 三按钮会把 `planDecision`/`planId` 带回后端 | `PlanCard.vue` + `runTurn` 的 forwardedProps |
 | "标签页仍在使用" | `tags-view` UI 已注释，store 仅用于 keep-alive | `layout/index.vue` 模板 |

@@ -18,14 +18,14 @@ agent 不是硬编码单例，而是注册表中的工厂。starter 通过 `Obje
 @Bean
 public AguiAgentRegistryCustomizer dcsAssistantAgentRegistryCustomizer() {
     return registry -> registry.registerFactory(
-        AssistantAgentFactory.AGENT_ID,      // "dcs-assistant"
+        AssistantAgentFactory.AGENT_ID,      // "smartdock-assistant"
         agentFactory::createFromLogin);      // 按登录租户惰性创建
 }
 ```
 
 | 关注点 | 行为 |
 |---|---|
-| 路由 | `POST /agui/run/{agentId}`；不带 `agentId` 时由 `app.agui.default-agent-id`（默认 `dcs-assistant`）兜底 |
+| 路由 | `POST /agui/run/{agentId}`；不带 `agentId` 时由 `app.agui.default-agent-id`（默认 `smartdock-assistant`）兜底 |
 | 创建时机 | 首个请求线程按登录租户惰性创建；未配置模型的租户收到 `AiNotConfiguredException`，不做静默降级 |
 | 实例粒度 | 每次新会话（`userId + threadId`）新建实例，配合 `AssistantRuntimeContextResolver` 的租户作用域实现会话隔离 |
 | 共享能力 | 工具注册、权限上下文、记忆、技能、PII、计费、AGUI 事件、状态存储由引擎统一提供 |
@@ -60,7 +60,7 @@ Set<String> registered = ToolRegistry.registerAll(toolkit, identity, deps, pb);
 registered.addAll(providerToolRegistry.registerProviders(toolkit, identity, aguiThreadId, pb));
 
 ReActAgent agent = ReActAgent.builder()
-    .name("dcs-assistant")
+    .name("smartdock-assistant")
     .sysPrompt(PromptAssets.filterCheatsheet(
         PromptAssets.sysPrompt(memoryOn, false), registered)
         + SkillAssets.catalog(identity.getRoleLevel()))
@@ -164,7 +164,7 @@ AgentScope 2.0.3 的 `AguiEventType` 共 **28 类**：
 ## 7. 管理与运维面
 
 智能体除了对话主链，还配套一组管理页面与接口（控制器位于
-`ruoyi-assistant` 的 `controller/` 包，前端页面在 `views/dcs/assistant/` 下）：
+`ruoyi-assistant` 的 `controller/` 包，前端页面在 `views/smartdock/assistant/` 下）：
 
 | 面 | 内容 |
 |---|---|

@@ -49,7 +49,7 @@
 <rect x='0' y='0' width='1240' height='720' rx='0' fill='#ffffff' stroke='none' stroke-width='1.2'/>
 <text x='60' y='44' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='27' fill='#14202d' font-weight='700' text-anchor='start'>内置 demo：任务与提交状态机</text>
 <text x='60' y='69' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='12.5' fill='#4b5563' font-weight='400' text-anchor='start'>一条刻意做小的业务主线：既给画像引擎供事件，也给智能体供工具</text>
-<text x='1180' y='47' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='10.5' fill='#6b7280' font-weight='400' text-anchor='end'>DcsTask / DcsSubmission</text>
+<text x='1180' y='47' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='10.5' fill='#6b7280' font-weight='400' text-anchor='end'>TaskService / SubmissionService</text>
 <text x='60' y='104' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='11.8' fill='#14202d' font-weight='700' text-anchor='start'>任务生命周期（发布人）</text>
 <rect x='100' y='132' width='180' height='78' rx='11' fill='#f7f8fa' stroke='#d8dce3' stroke-width='1.1'/>
 <text x='116' y='158' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='11.6' fill='#374151' font-weight='700' text-anchor='start'>DRAFT</text>

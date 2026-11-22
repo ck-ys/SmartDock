@@ -19,12 +19,12 @@
 
 ```
 ┌─ frontend (Vue3 + Element Plus)
-│    views/dcs/{mission,todo,audit,notice,dashboard,profile}   ← 微核心页面族
-│    api/dcs/core/*                                            ← 契约层（与后端端点一一对应）
+│    views/smartdock/{mission,todo,audit,notice,dashboard,profile}   ← 微核心页面族
+│    api/smartdock/core/*                                            ← 契约层（与后端端点一一对应）
 ├─ ruoyi-admin（组合根）
 │    web/adapter/*    ← 跨模块端口适配（通知桥/审核探针），依赖方向在此收口
 ├─ ruoyi-modules
-│    ruoyi-dcs            微核心（不依赖任何业务模块）
+│    ruoyi-mission            微核心（不依赖任何业务模块）
 │    ruoyi-profile-engine 画像引擎（只依赖公共件）
 │    ruoyi-file-security  文件安全（依赖 dcs 的端口接口，不依赖实现）
 │    ruoyi-risk / ruoyi-ai-billing / ruoyi-assistant
@@ -34,18 +34,18 @@
 **依赖铁律**：微核心不 import 任何兄弟模块；跨模块协作一律通过
 「端口接口定义在消费方、实现落在 admin 组合根（web/adapter）」的单向依赖收口。
 
-## 2. 微核心（ruoyi-dcs，包 com.smartdock.dcs）
+## 2. 微核心（ruoyi-mission，包 com.smartdock.mission）
 
 ### 2.1 数据模型（三张主表 + 通知）
 
-- `dcs_task`：任务头。`status ∈ {DRAFT, COLLECTING, CLOSED}` 三态；
+- `task`：任务头。`status ∈ {DRAFT, COLLECTING, CLOSED}` 三态；
   `assignee_user_ids`（目标成员）、`auditor_user_ids`（审核人）为 JSONB 数组，
   `audit_mode = PUBLISHER`（发布人直审）。
-- `dcs_task_field`：动态字段定义。`field_type ∈ {text, number, date, select, multi_select, attachment}`，
+- `task_field`：动态字段定义。`field_type ∈ {text, number, date, select, multi_select, attachment}`，
   select 族带 `options` 数组，`required` 为 0/1。
-- `dcs_submission`：提交。同一 (task, user) 多行即**多版本**（version 递增），
+- `submission`：提交。同一 (task, user) 多行即**多版本**（version 递增），
   `status ∈ {PENDING_AUDIT, APPROVED, REJECTED}`；`data` JSONB 存字段值。
-- `dcs_notice`：站内通知。`dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束；`uk_dcs_notice_dedup`）实现幂等投递。
+- `notice`：站内通知。`dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束；`uk_dcs_notice_dedup`）实现幂等投递。
 
 ### 2.2 状态机与关键不变量
 
@@ -63,18 +63,18 @@
 
 - 只有 `COLLECTING` 期成员可提交；已有 PENDING_AUDIT/APPROVED 时不可重复提交。
 - 退回后重提生成新版本，旧版本只读保留（审计轨迹）。
-- `dcs_audit` 表只追加（append-only）记录每次决定，`trail` 端点按提交聚合回放。
+- `audit` 表只追加（append-only）记录每次决定，`trail` 端点按提交聚合回放。
 
 ### 2.3 权限锚（最小集）
 
 | 权限串 | 用途 |
 |---|---|
-| `dcs:task:list/add/edit/publish` | 发布人侧 |
-| `dcs:submission:submit` | 成员侧（提交/我的提交）|
-| `dcs:audit:audit` | 审核决定与队列 |
-| `dcs:notice:list` | 站内通知 |
+| `smartdock:task:list/add/edit/publish` | 发布人侧 |
+| `smartdock:submission:submit` | 成员侧（提交/我的提交）|
+| `smartdock:audit:audit` | 审核决定与队列 |
+| `smartdock:notice:list` | 站内通知 |
 
-`GET /dcs/task/{id}` 返回 `{task, fields, mySubmission}` 三段式，前端详情页一次拿全。
+`GET /task/{id}` 返回 `{task, fields, mySubmission}` 三段式，前端详情页一次拿全。
 
 ## 3. 画像引擎（ruoyi-profile-engine，包 com.smartdock.profile）
 
@@ -118,11 +118,11 @@ OSS 上传事件 → `OssUploadedEventListener` 建单，判定序（顺序不�
 
 ## 5. 智能体运行时（ruoyi-assistant）
 
-- Agent 按 `agentId` 注册到 AGUI 注册表，统一从 `POST /agui/run/{agentId}` 进入（内置 `dcs-assistant` 助手应用；该端点由 starter jar 提供，不在本仓源码里）；
-- SSE 流式：前端走 `api/dcs/assistant/aguiClient.ts` 的 `fetch + ReadableStream`（`utils/sse.ts` 是站内通知 EventSource，不是对话流）；
+- Agent 按 `agentId` 注册到 AGUI 注册表，统一从 `POST /agui/run/{agentId}` 进入（内置 `smartdock-assistant` 助手应用；该端点由 starter jar 提供，不在本仓源码里）；
+- SSE 流式：前端走 `api/smartdock/assistant/aguiClient.ts` 的 `fetch + ReadableStream`（`utils/sse.ts` 是站内通知 EventSource，不是对话流）；
 - 工具循环三层：8 个平台工具（`ToolRegistry`）+ 3 个 `BizToolProvider` SPI（dcs/profile/analytics，共 14 个业务工具）+ 租户级 MCP；页面上下文随对话框携带；
 - 会话状态落 `agentscope` schema（JDBC state store，独立 schema 隔离）；
-- 计费：ai-billing 的钱包/积分双轨（`dcs_tenant_wallet`、`dcs_ai_credit_ledger`）；
+- 计费：ai-billing 的钱包/积分双轨（`tenant_wallet`、`ai_credit_ledger`）；
   幂等键只覆盖同一订阅内的重复帧，跨订阅或 agent 重建后的重放仍可能重复计费（`BillingModelDecorator` 注释已承认该边界）；
 - 包结构：新代码只进 `com.smartdock.assistant.<层>`，四层各放什么——
   controller 只做门卫（权限/参数/返回包装）、service 编排用例、
@@ -131,13 +131,13 @@ OSS 上传事件 → `OssUploadedEventListener` 建单，判定序（顺序不�
 
 ## 6. 前端契约层
 
-`frontend/src/api/dcs/core/` 与后端端点一一对应，是前后端的**单一事实源**：
+`frontend/src/api/smartdock/core/` 与后端端点一一对应，是前后端的**单一事实源**：
 RuoYi 拦截器对 `R<T>` 信封原样返回、对 `TableDataInfo` 返回裸 `{total, rows}`——
 core 层内统一解包，页面只消费业务形状。
 
 ## 7. 测试地图
 
-- 微核心状态机/三方鉴权：`ruoyi-dcs` 模块测试
+- 微核心状态机/三方鉴权：`ruoyi-mission` 模块测试
 - 引擎评分/重算：`ruoyi-profile-engine`
 - 适配器桥接（租户穿越/幂等）：`ruoyi-admin/src/test/.../adapter`
 - 前端：vitest 34 个测试文件、275 条用例（AGUI 帧解析/助手状态迁移/令牌门禁等；没有 jsdom 组件挂载测试，也没有 E2E）

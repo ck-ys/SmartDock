@@ -31,7 +31,7 @@ flowchart TB
     direction TB
     SEC["Filter 链 + Sa-Token<br/>登录 / 权限 / 租户"]
     subgraph L3["业务域"]
-      DCS["ruoyi-dcs<br/>采集 demo"]
+      DCS["ruoyi-mission<br/>采集 demo"]
       PROFILE["ruoyi-profile-engine<br/>画像 + 分析"]
       ASSIST["ruoyi-assistant<br/>AI 助手"]
       BILL["ruoyi-ai-billing<br/>模型与计费"]
@@ -112,7 +112,7 @@ ruoyi-vue-plus（根 pom，packaging=pom）
 |---|---:|---:|---|---|
 | `ruoyi-admin` | 30 | 4 | 启动类、登录认证、跨模块适配器（`web/adapter`）、启动 Runner | 依赖下面所有业务模块 |
 | `ruoyi-system` | 159 | 21 | 用户/角色/菜单/部门/字典/参数/租户/OSS/通知/监控 | 只依赖 common |
-| `ruoyi-dcs` | 43 | 7 | 内置采集 demo：任务 → 填报 → 提交 → 审核 → 通知 | profile-engine、assistant-spi |
+| `ruoyi-mission` | 43 | 7 | 内置采集 demo：任务 → 填报 → 提交 → 审核 → 通知 | profile-engine、assistant-spi |
 | `ruoyi-profile-engine` | 188 | 18 | 画像引擎 + 行为分析中心（两块包：`com.smartdock.profile` / `com.smartdock.analytics`） | assistant-spi |
 | `ruoyi-assistant` | 213 | 23 | AI 助手：AGUI、会话、记忆、技能、MCP、HITL、自动化、计费装饰器 | dcs、system、ai-billing、assistant-spi |
 | `ruoyi-assistant-spi` | 5 | 0 | 业务工具 SPI 契约（纯 JDK + Lombok，零业务依赖） | 无 |
@@ -128,7 +128,7 @@ ruoyi-vue-plus（根 pom，packaging=pom）
 ```mermaid
 flowchart TB
   ADMIN["ruoyi-admin<br/>启动 + 组合根"]
-  DCS["ruoyi-dcs<br/>采集 demo"]
+  DCS["ruoyi-mission<br/>采集 demo"]
   PROFILE["ruoyi-profile-engine<br/>画像 + 分析"]
   ASSIST["ruoyi-assistant<br/>AI 助手"]
   SPI["ruoyi-assistant-spi<br/>业务工具插座"]
@@ -171,7 +171,7 @@ flowchart TB
 
 1. **`ruoyi-common/*` 永不反向依赖任何业务模块。** 公共件只提供能力（MyBatis、Redis、Sa-Token、OSS…），不知道业务存在。
 2. **业务模块之间尽量不直接 import。** 必须跨模块时，用"端口 + 组合根适配器"：消费方定义接口（`FileReviewGate`、`RiskBehaviorSink`、`MissionReviewProbe`），实现在 `ruoyi-admin/src/main/java/org/dromara/web/adapter/`。这样依赖方向在组合根收口，业务模块保持单向。
-3. **`ruoyi-dcs` 是 demo，不是核心。** 它依赖画像引擎（把采集动作翻译成画像事件）和 `assistant-spi`（把采集工具插给 AI 助手），但画像引擎反过来不依赖 dcs。
+3. **`ruoyi-mission` 是 demo，不是核心。** 它依赖画像引擎（把采集动作翻译成画像事件）和 `assistant-spi`（把采集工具插给 AI 助手），但画像引擎反过来不依赖 dcs。
 
 ### 2.4 包层级：域优先 + 四层
 
@@ -264,7 +264,7 @@ sequenceDiagram
 以 `TaskController` 为例：
 
 ```java
-@SaCheckPermission("dcs:task:publish")
+@SaCheckPermission("smartdock:task:publish")
 @PostMapping("/publish/{taskId}")
 public R<Void> publish(@PathVariable Long taskId) {
     taskService.publish(taskId, LoginHelper.getUserId());
@@ -430,19 +430,19 @@ flowchart TB
 
 **一句话**：保留"任务 → 填报 → 提交 → 审核 → 通知"的最小闭环，作为平台的演示能力和 AI 工具的业务载体。
 
-**代码落点**：`backend/ruoyi-modules/ruoyi-dcs/src/main/java/com/smartdock/dcs/`
+**代码落点**：`backend/ruoyi-modules/ruoyi-mission/src/main/java/com/smartdock/`
 
 #### 4.3.1 接口地图
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `TaskController` | `/dcs/task` | 8 | 任务分页、我的任务、详情、创建/更新/发布/关闭 |
-| `SubmissionController` | `/dcs/submission` | 2 | 提交、我的提交 |
-| `AuditController` | `/dcs/audit` | 3 | 待审列表、审核决定、审计轨迹 |
-| `FeedbackController` | `/dcs/feedback` | 7 | 产品反馈 |
-| `NoticeController` | `/dcs/notice` | 2 | 我的通知、标记已读 |
-| `ChangelogController` | `/dcs/changelog` | 5 | 更新日志（全局表） |
-| `StatsController` | `/dcs/stats` | 1 | 发布人/成员双视角概览 |
+| `TaskController` | `/task` | 8 | 任务分页、我的任务、详情、创建/更新/发布/关闭 |
+| `SubmissionController` | `/submission` | 2 | 提交、我的提交 |
+| `AuditController` | `/audit` | 3 | 待审列表、审核决定、审计轨迹 |
+| `FeedbackController` | `/mission/feedback` | 7 | 产品反馈 |
+| `NoticeController` | `/notice` | 2 | 我的通知、标记已读 |
+| `ChangelogController` | `/changelog` | 5 | 更新日志（全局表） |
+| `StatsController` | `/mission/stats` | 1 | 发布人/成员双视角概览 |
 
 #### 4.3.2 状态机与不变量
 
@@ -465,7 +465,7 @@ flowchart LR
 | 同一 (task, user) 已有 `PENDING_AUDIT`/`APPROVED` 时不可重复提交 | 退回后重提生成新版本，旧版本只读保留 |
 | 审核用 CAS | `WHERE status='PENDING_AUDIT'` 条件更新，防双审 |
 | 通知幂等 | `dedup_key` + 部分唯一索引（只对满足条件的行生效的唯一约束）`uk_dcs_notice_dedup` |
-| 审计只追加 | `dcs_audit` append-only，`trail` 按提交聚合回放 |
+| 审计只追加 | `audit` append-only，`trail` 按提交聚合回放 |
 
 #### 4.3.3 主流程：发布 → 提交 → 审核
 
@@ -498,7 +498,7 @@ sequenceDiagram
 |---|---|---|
 | `TaskService` | `publish` / `close` | 校验 → CAS 状态迁移 → 翻译画像事件 → 通知成员 |
 | `SubmissionService` | `submit` | 任务/成员/字段校验 → `insertJsonb` 新版本 → 发事件 → 通知审核人 |
-| `AuditService` | `decide` | 归属校验 → `auditStatus` CAS → 写 `dcs_audit` → 发事件 → 通知提交人 |
+| `AuditService` | `decide` | 归属校验 → `auditStatus` CAS → 写 `audit` → 发事件 → 通知提交人 |
 | `NoticeService` | `notify` | 按用户投递，`dedup_key` 幂等 |
 | `ToolProvider` | `tools` / `execute` | 把"查任务/查我的待办/查提交/建任务"插给 AI 助手 |
 
@@ -512,14 +512,14 @@ sequenceDiagram
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `RiskDashboardController` | `/dcs/risk` | 3 | 看板、我的风险分、指定用户风险分 |
-| `RiskEventController` | `/dcs/risk` | 2 | 事件列表/详情 |
-| `RiskActionController` | `/dcs/risk` | 11 | 处置动作列表/解除/复核、画像高风险复核 |
-| `RiskRuleController` | `/dcs/risk` | 5 | 规则增删改查/启停 |
-| `RiskWhitelistController` | `/dcs/risk` | 4 | 白名单 |
-| `RiskContentConfigController` | `/dcs/risk/content-config` | 2 | 内容机审开关 |
-| `SensitiveWordController` | `/dcs/sensitive-word` | 8 | 敏感词库 |
-| `RiskCaptchaController` | `/dcs/captcha` | 4 | 验证码 need/generate/verify/verify-otp |
+| `RiskDashboardController` | `/risk` | 3 | 看板、我的风险分、指定用户风险分 |
+| `RiskEventController` | `/risk` | 2 | 事件列表/详情 |
+| `RiskActionController` | `/risk` | 11 | 处置动作列表/解除/复核、画像高风险复核 |
+| `RiskRuleController` | `/risk` | 5 | 规则增删改查/启停 |
+| `RiskWhitelistController` | `/risk` | 4 | 白名单 |
+| `RiskContentConfigController` | `/risk/content-config` | 2 | 内容机审开关 |
+| `SensitiveWordController` | `/sensitive-word` | 8 | 敏感词库 |
+| `RiskCaptchaController` | `/captcha` | 4 | 验证码 need/generate/verify/verify-otp |
 
 #### 4.4.2 主流程
 
@@ -528,7 +528,7 @@ flowchart LR
   A["业务动作<br/>登录/提交/文件驳回"] --> B["RiskEventCollector.record<br/>@Async"]
   B --> C{"白名单/幂等键命中?"}
   C -- 是 --> X["跳过"]
-  C -- 否 --> D["dcs_risk_event"]
+  C -- 否 --> D["risk_event"]
   D --> E["RiskScoreService.assess<br/>事件分 + 全局分取更严"]
   E --> F{"L0–L4"}
   F -- L3/L4 --> G["RiskActionService<br/>临时冻结等处置"]
@@ -541,7 +541,7 @@ flowchart LR
 
 | 类 | 核心方法 | 具体做什么 |
 |---|---|---|
-| `RiskEventCollector` | `record` | `@Async` 采集；白名单/幂等/规则权重；落 `dcs_risk_event`；同时写画像 `RISK` 行为 |
+| `RiskEventCollector` | `record` | `@Async` 采集；白名单/幂等/规则权重；落 `risk_event`；同时写画像 `RISK` 行为 |
 | `RiskScoreService` | `assess(userId, ip)` | 事件类型规则分 vs 全局累计分，`HybridRiskPolicy` 取更严，输出 L0–L4 |
 | `RiskActionService` | `syncAssessment` | L3/L4 才处置；先过期旧 ACTIVE，再按 `userId:actionType` 唯一键幂等插入 |
 | `CaptchaService` | `generate` / `verify` | L1–L4 难度；Redis 存挑战；L4 加 OTP；成功后发一次性 pass |
@@ -550,7 +550,7 @@ flowchart LR
 
 **关键点**：
 
-- **两套"画像复核"不是一回事**：`profile_review_queue` 是画像引擎的"低分复核"；`dcs_profile_review` 是风控侧的"画像高风险人工复核"。名字像，表和入口都不同。
+- **两套"画像复核"不是一回事**：`profile_review_queue` 是画像引擎的"低分复核"；`profile_review` 是风控侧的"画像高风险人工复核"。名字像，表和入口都不同。
 - **白名单优先于规则**：IP/用户白名单命中直接跳过，避免内部人员被误伤。
 
 ### 4.5 计费（ai-billing）
@@ -563,17 +563,17 @@ flowchart LR
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `AiConfigController` | `/dcs/ai-config` | 29 | 模型/供应商/密钥/探活/默认槽 |
-| `AiModelPriceController` | `/dcs/ai-model-price` | 7 | 模型价格 |
-| `AiPriceController` | `/dcs/ai-price` | 2 | 生效价格 |
-| `AiUsageController` | `/dcs/ai-usage` | 5 | 用量查询/汇总 |
-| `AiCreditController` | `/dcs/ai-credit` | 12 | 积分套餐/订阅/加油包/流水 |
-| `TenantWalletController` | `/dcs/tenant-wallet` | 8 | 钱包/充值/扣减/阈值 |
-| `TenantWalletLedgerController` | `/dcs/tenant-wallet-ledger` | 1 | 钱包流水 |
-| `WalletPaymentOrderController` | `/dcs/wallet-payment-order` | 3 | 充值订单 |
-| `ServiceChargeRuleController` | `/dcs/service-charge-rule` | 5 | 服务费规则 |
-| `AiDocDomainController` | `/dcs/ai-doc-domain` | 5 | 文档域名白名单 |
-| `AiFaviconController` | `/dcs/ai/favicon` | 1 | Favicon 代理（匿名 + IP 限流） |
+| `AiConfigController` | `/ai-config` | 29 | 模型/供应商/密钥/探活/默认槽 |
+| `AiModelPriceController` | `/ai-model-price` | 7 | 模型价格 |
+| `AiPriceController` | `/ai-price` | 2 | 生效价格 |
+| `AiUsageController` | `/ai-usage` | 5 | 用量查询/汇总 |
+| `AiCreditController` | `/ai-credit` | 12 | 积分套餐/订阅/加油包/流水 |
+| `TenantWalletController` | `/tenant-wallet` | 8 | 钱包/充值/扣减/阈值 |
+| `TenantWalletLedgerController` | `/tenant-wallet-ledger` | 1 | 钱包流水 |
+| `WalletPaymentOrderController` | `/wallet-payment-order` | 3 | 充值订单 |
+| `ServiceChargeRuleController` | `/service-charge-rule` | 5 | 服务费规则 |
+| `AiDocDomainController` | `/ai-doc-domain` | 5 | 文档域名白名单 |
+| `AiFaviconController` | `/ai/favicon` | 1 | Favicon 代理（匿名 + IP 限流） |
 
 #### 4.5.2 主流程：一次模型调用如何扣费
 
@@ -592,19 +592,19 @@ sequenceDiagram
   S->>S: 幂等键回查 + findEffectivePrice + 算价
   alt 钱包模式
     S->>W: deductForAiUsageJoinTx
-    W->>DB: dcs_tenant_wallet + dcs_tenant_wallet_ledger
+    W->>DB: tenant_wallet + tenant_wallet_ledger
   else 积分模式
     S->>C: deduct
-    C->>DB: dcs_ai_credit_ledger
+    C->>DB: ai_credit_ledger
   end
-  S->>DB: dcs_ai_usage（一条用量单据）
+  S->>DB: ai_usage（一条用量单据）
 ```
 
 **核心类**：
 
 | 类 | 核心方法 | 具体做什么 |
 |---|---|---|
-| `AiBillingService` | `recordTransactional` | 幂等回查 → 取生效价格 → 算价 → 同事务扣钱包 → 插 `dcs_ai_usage` |
+| `AiBillingService` | `recordTransactional` | 幂等回查 → 取生效价格 → 算价 → 同事务扣钱包 → 插 `ai_usage` |
 | 同上 | `recordTransactionalCredits` | 积分模式：同事务扣积分，钱包不动，快照标 `walletDeducted:false` |
 | `TenantWalletService` | `deductForAiUsageJoinTx` | 条件 UPDATE "足额才扣"，写流水；余额不足只留痕不阻断 |
 | `AiCreditServiceImpl` | `preGate` / `deduct` | 订阅/周池/加油包夹逼扣减（两个上限口径取更紧的那个，两头都够才扣）；幂等流水 |
@@ -626,7 +626,7 @@ sequenceDiagram
 
 | Controller | 基础路径 | 方法数 | 管什么 |
 |---|---|---:|---|
-| `FileReviewController` | `/dcs/fileReview` | 9 | 审核列表/通过/驳回/配置/guard 统计与日志 |
+| `FileReviewController` | `/fileReview` | 9 | 审核列表/通过/驳回/配置/guard 统计与日志 |
 
 #### 4.6.2 主流程：上传 → 判定 → 审核
 
@@ -676,7 +676,7 @@ flowchart TB
 | 租户/套餐 | `SysTenantController` / `SysTenantPackageController` | `/system/tenant`、`/system/tenant/package` |
 | OSS | `SysOssController` / `SysOssConfigController` | `/resource/oss`、`/resource/oss/config` |
 | 社交/个人中心 | `SysSocialController` / `SysProfileController` | `/system/social`、`/system/user/profile` |
-| 公告门户 | `SysNoticePortalController` | `/dcs/announcement` |
+| 公告门户 | `SysNoticePortalController` | `/announcement` |
 | 监控 | `CacheController` / `SysLogininforController` / `SysOperLogController` / `SysUserOnlineController` | `/monitor/*` |
 
 #### 4.7.2 核心链路：动态菜单与租户初始化
@@ -777,7 +777,7 @@ SysTenantServiceImpl.insertByBo
 agentscope:
   agui:
     server-side-memory: true      # 打开服务端会话缓存
-    default-agent-id: dcs-assistant
+    default-agent-id: smartdock-assistant
 ```
 
 路径前缀没配，所以实际端点就是 `/agui/run/{agentId}`。
@@ -786,7 +786,7 @@ agentscope:
 
 ```mermaid
 flowchart TB
-  U["前端 aguiClient<br/>POST /agui/run/dcs-assistant"] --> F1["AguiAuthStatusFilter<br/>未登录 → 真 401"]
+  U["前端 aguiClient<br/>POST /agui/run/smartdock-assistant"] --> F1["AguiAuthStatusFilter<br/>未登录 → 真 401"]
   F1 --> F2["AssistantResumeUnlockFilter<br/>悬挂确认卡 → 注入 resume=cancelled"]
   F2 --> C1["框架 AguiRestController<br/>（starter jar 内）"]
   C1 --> C2["框架 AguiMvcController<br/>建 SseEmitter + worker 线程"]
@@ -832,7 +832,7 @@ flowchart TB
 URL path variable  >  X-Agent-Id header  >  forwardedProps.agentId  >  agentscope.agui.default-agent-id  >  "default"
 ```
 
-所以 `/agui/run/dcs-assistant` 永远选 `dcs-assistant`；`/agui/run` 不带 path 时才看 header / props / 默认。
+所以 `/agui/run/smartdock-assistant` 永远选 `smartdock-assistant`；`/agui/run` 不带 path 时才看 header / props / 默认。
 
 ### 5.4 门卫：AssistantRuntimeContextResolver 逐闸
 
@@ -845,7 +845,7 @@ URL path variable  >  X-Agent-Id header  >  forwardedProps.agentId  >  agentscop
 | # | 闸 | 方法/行号 | 检查什么 | 失败返回 |
 |---:|---|---|---|---|
 | 1 | 登录 | `resolve` L68-76 | Bearer token → `LoginHelper.getLoginUser(token)` | 401 |
-| 2 | 助手权限 | L84-89 | `LoginHelper.isSuperAdmin` 或权限集含 `*:*:*` / `dcs:assistant:use` | 403「角色未开通」 |
+| 2 | 助手权限 | L84-89 | `LoginHelper.isSuperAdmin` 或权限集含 `*:*:*` / `smartdock:assistant:use` | 403「角色未开通」 |
 | 3 | 租户解析 | L95 / `resolveTenantId` L352 | 超管动态租户（Redis 键）优先，否则登录快照租户 | 回退快照，不阻断 |
 | 4 | 输入体积 | L100 `inputGuard.validate` | 最后一条 user 消息 > 16000 字符 | 400 |
 | 5 | 租户开关 | L103 `configService.assertOpen` | 租户是否开通助手 | 403；PG 异常 503 |
@@ -880,14 +880,14 @@ flowchart LR
   P["AguiRequestProcessor"] --> D["DefaultAgentResolver"]
   D -->|server-side-memory=true| T["ThreadSessionManager"]
   T -->|命中| A["复用已有 ReActAgent"]
-  T -->|未命中| R["AguiAgentRegistry.getAgent('dcs-assistant')"]
+  T -->|未命中| R["AguiAgentRegistry.getAgent('smartdock-assistant')"]
   R --> F["AssistantAgentFactory.createFromLogin()"]
   F --> A
 ```
 
 | 类 | 路径 | 核心方法 | 具体做什么 |
 |---|---|---|---|
-| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | `dcsAssistantAgentRegistryCustomizer()` | 向框架注册惰性工厂：`registerFactory("dcs-assistant", agentFactory::createFromLogin)` |
+| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | `dcsAssistantAgentRegistryCustomizer()` | 向框架注册惰性工厂：`registerFactory("smartdock-assistant", agentFactory::createFromLogin)` |
 | `AguiAgentRegistry`（框架） | starter jar | `registerFactory` / `getAgent` | 有 factory 就每次 `get()` 新实例；否则回退 singleton |
 | `DefaultAgentResolver`（框架） | starter jar | `resolveAgent(agentId, threadId, userId)` | `server-side-memory=true` 时走线程会话缓存，否则直接查注册表 |
 | `ThreadSessionManager`（框架） | starter jar | `getOrCreateAgent` / `removeSession` | 以 `(normalizeUser(userId), threadId)` 为键；首次或 agentId 变化才建，否则复用 |
@@ -1020,7 +1020,7 @@ public interface BizToolProvider {
 flowchart LR
   A["classpath /skills<br/>（内置）"] --> M["合并视图<br/>同名后层覆盖"]
   B["config/skills/技能名/SKILL.md<br/>（部署期覆写）"] --> M
-  C["数据库 dcs_assistant_skill<br/>（租户在线层，最高优先）"] --> M
+  C["数据库 assistant_skill<br/>（租户在线层，最高优先）"] --> M
   M --> G{"可见性闸<br/>停用遮罩 → minRole → skill:技能名 矩阵"}
   G -- 可见 --> V["模型技能目录 / 当轮注入 / view_skill"]
   G -- 不可见 --> X["剔除"]
@@ -1030,7 +1030,7 @@ flowchart LR
 |---|---|---:|---|
 | classpath | `resources/skills/<名>/SKILL.md` | 最低 | 随包发布 |
 | 部署目录 | `config/skills/<名>/SKILL.md` | 中 | 改文件后重启 |
-| 数据库 | `dcs_assistant_skill` | 最高 | 管理台保存后 Redis 广播即时失效 + 30 秒兜底 |
+| 数据库 | `assistant_skill` | 最高 | 管理台保存后 Redis 广播即时失效 + 30 秒兜底 |
 
 单技能正文上限 **20000 字符**，超了保存直接被拒。内置 10 个技能：`create-mission`、`create-template`、`data-analysis`、`data-reading`、`draft-notice`、`feedback-summary`、`meeting-minutes`、`ppt-outline`、`urge-wording`、`weekly-report`。
 
@@ -1080,7 +1080,7 @@ stateDiagram-v2
   note right of INTERRUPTED: 卡死=收割产生（60秒零事件/10分钟停滞）
 ```
 
-> 真实状态只有四个：`RUNNING / COMPLETED / FAILED / INTERRUPTED`（`dcs_assistant_run.status`，String 不是枚举）。等人工确认不是 WAITING 态——run 仍是 RUNNING、只做收割豁免；「卡死」也不是独立态——收割器把停滞 run 直接迁成 INTERRUPTED。
+> 真实状态只有四个：`RUNNING / COMPLETED / FAILED / INTERRUPTED`（`assistant_run.status`，String 不是枚举）。等人工确认不是 WAITING 态——run 仍是 RUNNING、只做收割豁免；「卡死」也不是独立态——收割器把停滞 run 直接迁成 INTERRUPTED。
 
 关键类：
 
@@ -1095,7 +1095,7 @@ stateDiagram-v2
 | `service/PurgeService` | `purgeUser` | 清人七表事务；框架表与补偿队列在事务外 |
 
 > 批 7C（2026-11-20）把原先 698 行的 `legacy/service/AssistantConversationService` 整个删掉，上面的职责拆到四个新根服务；`AssistantRunRecorder` 仍留 legacy（与批 9 的引擎边界相邻）。
-| `AssistantRunRecorder` | `onEvents`（L385） | 文本/工具/思考分段缓冲落 `dcs_assistant_message`；RUN_FINISHED 前同步写终态 |
+| `AssistantRunRecorder` | `onEvents`（L385） | 文本/工具/思考分段缓冲落 `assistant_message`；RUN_FINISHED 前同步写终态 |
 | 同上 | `finalizeBuildFailure`（L794） | 建会话失败时同步 FAILED + 退回合，避免 60 秒僵尸 RUNNING |
 
 #### 5.10.3 多实例语义
@@ -1103,7 +1103,7 @@ stateDiagram-v2
 | 机制 | 类 | 作用 |
 |---|---|---|
 | 粘性路由 | `AssistantStickyHeaderFilter` | 按 `X-Thread-Id` 把同一会话粘到同一实例 |
-| run 归属 | `dcs_assistant_run.owner_instance` | stop/HITL 发现卡在另一个活实例 → 409，提示刷新粘回 |
+| run 归属 | `assistant_run.owner_instance` | stop/HITL 发现卡在另一个活实例 → 409，提示刷新粘回 |
 | 进程内缓存 | `ThreadSessionManager` / `AssistantPendingInterruptCache` / `AssistantRunStreamHub` | 单实例内存；进程重启会丢，靠 DB + 恢复 Job 兜底 |
 | 恢复 Job | `AssistantRetentionJob` | 收尾挂起 run、恢复陈旧 ASKING、清过期悬挂卡 |
 
@@ -1119,7 +1119,7 @@ stateDiagram-v2
 | 结构化反问 | 模型调 `ask_user` | `AskUserTools` → `AssistantAskUserBridge` | `ask_user` CUSTOM 帧 |
 | TODO | 模型调 `todo_write` | `TodoTools` → `AssistantTodoSignal` | `todo` CUSTOM 帧 |
 | 附件 | 前端上传后注册 | `AssistantAttachmentService` | 工具结果，不单独出帧 |
-| 压缩 | 上下文超触发线 | `AssistantCompactionMiddleware` | 不单独出帧；写 system 分隔条 + `dcs_assistant_compaction` |
+| 压缩 | 上下文超触发线 | `AssistantCompactionMiddleware` | 不单独出帧；写 system 分隔条 + `assistant_compaction` |
 | 心跳 | 每 20 秒 | `HeartbeatMiddleware` | `dcs-heartbeat` CUSTOM 帧 |
 | 费用 | 回合结束 | `AssistantCostLedger` | `cost_meta` CUSTOM 帧 |
 | 记忆 | 回合结束 | `AssistantMemoryTurnLedger` | `memory_turn` CUSTOM 帧 |
@@ -1249,18 +1249,18 @@ AutomationRunner.run
 
 按这个顺序查，基本能定位：
 
-1. **角色**：有没有 `dcs:assistant:use`？没有 → 连对话入口都进不去。
-2. **租户开通**：`dcs_assistant_config` 里该租户是否开通？没开 → 403「未开通」。
-3. **用户状态**：`dcs_assistant_user_quota` 是否 `disabled=1`？日回合/预算是否超了？
-4. **模型配置**：`dcs_ai_config` 是否有可用 CHAT 行、租户归属、CNY、启用？用户自选是否在允许范围？
-5. **供应商 Key**：`dcs_ai_provider_access` / 环境变量是否可用？Key 池是否冷却？
+1. **角色**：有没有 `smartdock:assistant:use`？没有 → 连对话入口都进不去。
+2. **租户开通**：`assistant_config` 里该租户是否开通？没开 → 403「未开通」。
+3. **用户状态**：`assistant_user_quota` 是否 `disabled=1`？日回合/预算是否超了？
+4. **模型配置**：`ai_config` 是否有可用 CHAT 行、租户归属、CNY、启用？用户自选是否在允许范围？
+5. **供应商 Key**：`ai_provider_access` / 环境变量是否可用？Key 池是否冷却？
 6. **工具闸**：`tool_gate` JSON 里该工具是否 `off` / `admin`？
 7. **技能**：frontmatter `minRole`、`skill:<name>` 矩阵、`disabled` 遮罩，三者取最严。
 8. **联网**：`web_search` 需要会话开关 + 租户搜索 Key + 日配额，三者缺一不可。
 9. **MCP**：server 是否启用、`mcp:<server>` 闸是否放行、挂载是否失败（失败只 warn，不阻断会话）。
 10. **缓存**：改了模型/工具闸/技能后，下一请求生效；技能正文和思考档是逐请求读取，不用等缓存。
 
-管理台有一个专门诊断接口：`GET /dcs/assistant/capability/panorama`（`AssistantCapabilityPanoramaController`），输出当前租户可用的模型/工具/开关面。
+管理台有一个专门诊断接口：`GET /assistant/capability/panorama`（`AssistantCapabilityPanoramaController`），输出当前租户可用的模型/工具/开关面。
 
 ### 5.16 核心类 / 核心方法总表（最常查的三张表）
 
@@ -1275,7 +1275,7 @@ AutomationRunner.run
 | `AguiRequestProcessor`（框架） | starter jar | 协议编排 | `process` / `resolveAgentId` | 解析 context → 选 agentId → 选 agent → 建 adapter → run | 协议无法启动 |
 | `AssistantRuntimeContextResolver` | `legacy/core/AssistantRuntimeContextResolver.java:68` | 身份/准入/落库门卫 | `resolve` | 10 道闸 + 身份桥 + Holder + 缓存失效 | 无鉴权、无限额、不落库，裸跑烧钱 |
 | `AssistantIdentityHolder` | `legacy/core/AssistantIdentityHolder.java:30` | 同线程身份桥 | `set` / `consumeEntry` | ThreadLocal 一次一递；同线程 + 30s 时效；取不到 401 | 工厂拿不到身份，建会话失败 |
-| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | 注册 agent 工厂 | `dcsAssistantAgentRegistryCustomizer` | `registerFactory("dcs-assistant", ...)` | `/agui/run/dcs-assistant` 找不到 agent |
+| `AssistantAgentConfiguration` | `legacy/config/AssistantAgentConfiguration.java:31` | 注册 agent 工厂 | `dcsAssistantAgentRegistryCustomizer` | `registerFactory("smartdock-assistant", ...)` | `/agui/run/smartdock-assistant` 找不到 agent |
 | `AguiAgentRegistry`（框架） | starter jar | agent 注册表 | `registerFactory` / `getAgent` | factory 优先，每次新实例；否则 singleton | 无 agent 可选 |
 | `ThreadSessionManager`（框架） | starter jar | 会话级 agent 缓存 | `getOrCreateAgent` / `removeSession` | `(user, thread)` 首次创建、之后复用 | 每轮重建，状态/成本都失控 |
 | `AssistantAgentFactory` | `legacy/core/AssistantAgentFactory.java:158` | Agent 总装配 | `create` / `createFromLogin` | 模型配置 → 装饰器 → 工具 → 中间件 → ReActAgent | 没有 agent |
@@ -1328,12 +1328,12 @@ AutomationRunner.run
 |---|---|---|
 | 画像 profile | `profile_event`、`profile_event_archive`、`profile_subject`、`profile_identity_link/merge`、`profile_score_dimension/rule`、`profile_score_snapshot`、`profile_score_model`、`profile_model_run/snapshot`、`profile_segment*`、`profile_review_queue`、`profile_reach_*`、`profile_engine_config`、`profile_source_config`、`profile_protocol`、`profile_schema_registry`、`profile_pii_field` | `profile_pii_field` 是全局字段字典，无 `tenant_id` |
 | 分析 analytics | `analytics_session`、`analytics_daily`、`analytics_funnel`、`analytics_custom_report`、`analytics_replay_task`、`analytics_rebuild_log`、`analytics_visitor_first_seen` | 事件源直接查 `profile_event`，不另建事件表 |
-| 采集 demo dcs | `dcs_task`、`dcs_task_field`、`dcs_submission`、`dcs_audit`、`dcs_notice`、`dcs_feedback`、`dcs_changelog` | `dcs_changelog` 是全局表 |
-| 风控 risk | `dcs_risk_event`、`dcs_risk_rule`、`dcs_risk_whitelist`、`dcs_risk_action`、`dcs_profile_review`、`dcs_captcha_log`、`dcs_sensitive_word`、`dcs_word_fp_feedback` | 全部带 `tenant_id` |
-| 计费 ai-billing | `dcs_ai_config`、`dcs_ai_model_price`、`dcs_ai_usage`、`dcs_ai_provider_access`、`dcs_ai_model_health`、`dcs_tenant_wallet`、`dcs_tenant_wallet_ledger`、`dcs_tenant_billing_mode`、`dcs_ai_credit_*`、`dcs_service_charge_rule`、`dcs_wallet_payment_order`、`dcs_wallet_alert_state`、`dcs_ai_doc_domain` | `dcs_ai_credit_plan` 是全局套餐表 |
-| 文件安全 file-security | `dcs_file_review`、`dcs_file_review_config`、`dcs_file_guard_log` | 全部带 `tenant_id` |
+| 采集 demo dcs | `task`、`task_field`、`submission`、`audit`、`notice`、`feedback`、`dcs_changelog` | `dcs_changelog` 是全局表 |
+| 风控 risk | `risk_event`、`risk_rule`、`risk_whitelist`、`risk_action`、`profile_review`、`captcha_log`、`sensitive_word`、`word_fp_feedback` | 全部带 `tenant_id` |
+| 计费 ai-billing | `ai_config`、`ai_model_price`、`ai_usage`、`ai_provider_access`、`ai_model_health`、`tenant_wallet`、`tenant_wallet_ledger`、`tenant_billing_mode`、`dcs_ai_credit_*`、`service_charge_rule`、`wallet_payment_order`、`wallet_alert_state`、`ai_doc_domain` | `ai_credit_plan` 是全局套餐表 |
+| 文件安全 file-security | `file_review`、`file_review_config`、`file_guard_log` | 全部带 `tenant_id` |
 | 系统 system | `sys_user`、`sys_role`、`sys_dept`、`sys_post`、`sys_config`、`sys_dict_*`、`sys_notice`、`sys_oss`、`sys_social`、`sys_logininfor`、`sys_oper_log` | `sys_menu`、`sys_tenant`、`sys_tenant_package`、`sys_client`、`sys_oss_config`、关联表是全局表 |
-| 助手 assistant | `dcs_assistant_conversation`、`dcs_assistant_message`、`dcs_assistant_run`、`dcs_assistant_run_issue`、`dcs_assistant_favorite`、`dcs_assistant_feedback`、`dcs_assistant_memory`、`dcs_assistant_memory_pref`、`dcs_assistant_skill`、`dcs_assistant_skill_usage`、`dcs_assistant_user_pref`、`dcs_assistant_user_quota`、`dcs_assistant_attachment`、`dcs_assistant_action`、`dcs_assistant_compaction`、`dcs_assistant_config`、`dcs_assistant_model_setting`、`dcs_assistant_announcement`、`dcs_mcp_server`、`dcs_mcp_call_log` | 另有 `agentscope.*` 三张状态表 |
+| 助手 assistant | `assistant_conversation`、`assistant_message`、`assistant_run`、`assistant_run_issue`、`assistant_favorite`、`assistant_feedback`、`assistant_memory`、`assistant_memory_pref`、`assistant_skill`、`assistant_skill_usage`、`assistant_user_pref`、`assistant_user_quota`、`assistant_attachment`、`assistant_action`、`assistant_compaction`、`assistant_config`、`assistant_model_setting`、`assistant_announcement`、`mcp_server`、`mcp_call_log` | 另有 `agentscope.*` 三张状态表 |
 | Agent 状态 | `agentscope.agentscope_sessions`、`agentscope.agentscope_snapshots`、`agentscope.agentscope_store` | 独立 schema，AgentScope 框架读写 |
 
 > 规模口径：`backend/script/sql/baseline/01_schema.sql` 里有 113 条 `CREATE TABLE`；2026-11-20 对演示库的盘点为 115 张表（含迁移新增），其中 57 张 `dcs_` 前缀。DDL 以 baseline 为准，增量走 `migration/*.sql`。
@@ -1359,9 +1359,9 @@ AutomationRunner.run
 | 表/字段 | 存什么 | 为什么用 JSONB |
 |---|---|---|
 | `profile_event.props` | 事件属性 | 不同事件字段不同，Schema 轻校验 |
-| `dcs_task.assignee_user_ids` / `auditor_user_ids` | 用户 ID 数组 | 一次任务多人，避免关联表 |
-| `dcs_submission.data` | 动态字段值 | 字段定义在 `dcs_task_field`，值随定义变 |
-| `dcs_assistant_config.tool_gate` | 工具开关矩阵 | 工具名动态增长，不想每次加列 |
+| `task.assignee_user_ids` / `auditor_user_ids` | 用户 ID 数组 | 一次任务多人，避免关联表 |
+| `submission.data` | 动态字段值 | 字段定义在 `task_field`，值随定义变 |
+| `assistant_config.tool_gate` | 工具开关矩阵 | 工具名动态增长，不想每次加列 |
 | `profile_score_model` 配置 | 分箱/权重 | 整份模型是一棵 JSON 树 |
 
 ### 6.5 DDL 纪律
@@ -1395,8 +1395,8 @@ AutomationRunner.run
 
 | 环境变量 | 保护什么 | 规则 |
 |---|---|---|
-| `SMARTDOCK_AI_CONFIG_KEY` | `dcs_ai_config.api_key`、`dcs_ai_provider_access.api_key` | 16/24/32 位可见 ASCII；未配/长度错/仍旧钥匙 → **服务拒绝启动** |
-| `SMARTDOCK_MCP_HEADERS_KEY` | `dcs_mcp_server.headers` | 必须与上一把不同 |
+| `SMARTDOCK_AI_CONFIG_KEY` | `ai_config.api_key`、`ai_provider_access.api_key` | 16/24/32 位可见 ASCII；未配/长度错/仍旧钥匙 → **服务拒绝启动** |
+| `SMARTDOCK_MCP_HEADERS_KEY` | `mcp_server.headers` | 必须与上一把不同 |
 
 `EncryptKeyStartupRunner` 启动校验；`EncryptKeyMigrationRunner` 自动换锁（旧钥匙只解密、绝不加密）。字段上的 `@EncryptField` 只写占位符 `${smartdock.encrypt.*}`，禁止字面量。
 
@@ -1407,7 +1407,7 @@ AutomationRunner.run
 | 事件账本 | `(tenant_id, source, event_uid)` 唯一 + `insertIgnore` |
 | 站内通知 | `dedup_key` + 部分唯一索引 |
 | 表单重复提交 | `@RepeatSubmit` + Redis 切面 |
-| 计费 | `dcs_ai_usage` 幂等键 + 钱包/积分流水幂等键（注意 4.5 的边界） |
+| 计费 | `ai_usage` 幂等键 + 钱包/积分流水幂等键（注意 4.5 的边界） |
 | 分群/评分并发 | Redisson 锁 + `advisoryXactLock` |
 
 ### 7.5 限流、日志、时区
@@ -1444,7 +1444,7 @@ AutomationRunner.run
 | `ruoyi-ai-billing` | 19 | `AiBillingCalculatorUnitTest`、`ProviderKeyPoolUnitTest` |
 | `ruoyi-risk` | 19 | `RiskScoreServiceUnitTest`、`CaptchaServiceUnitTest` |
 | `ruoyi-file-security` | 12 | `FileGuardDecisionUnitTest`、`PdfJsScannerUnitTest` |
-| `ruoyi-dcs` | 4 | `StateMachineTest`、`FieldValidatorTest` |
+| `ruoyi-mission` | 4 | `StateMachineTest`、`FieldValidatorTest` |
 | `ruoyi-system` / `ruoyi-job` / `ruoyi-assistant-spi` | 0 | 无 `src/test` |
 
 ### 8.3 跑测试的两个坑
@@ -1523,48 +1523,48 @@ AutomationRunner.run
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `TaskController` | `/dcs/task` | 8 |
-| `SubmissionController` | `/dcs/submission` | 2 |
-| `AuditController` | `/dcs/audit` | 3 |
-| `FeedbackController` | `/dcs/feedback` | 7 |
-| `NoticeController` | `/dcs/notice` | 2 |
-| `ChangelogController` | `/dcs/changelog` | 5 |
-| `StatsController` | `/dcs/stats` | 1 |
+| `TaskController` | `/task` | 8 |
+| `SubmissionController` | `/submission` | 2 |
+| `AuditController` | `/audit` | 3 |
+| `FeedbackController` | `/mission/feedback` | 7 |
+| `NoticeController` | `/notice` | 2 |
+| `ChangelogController` | `/changelog` | 5 |
+| `StatsController` | `/mission/stats` | 1 |
 
 ### A.4 风控 risk（8 个）
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `RiskDashboardController` | `/dcs/risk` | 3 |
-| `RiskEventController` | `/dcs/risk` | 2 |
-| `RiskActionController` | `/dcs/risk` | 11 |
-| `RiskRuleController` | `/dcs/risk` | 5 |
-| `RiskWhitelistController` | `/dcs/risk` | 4 |
-| `RiskContentConfigController` | `/dcs/risk/content-config` | 2 |
-| `SensitiveWordController` | `/dcs/sensitive-word` | 8 |
-| `RiskCaptchaController` | `/dcs/captcha` | 4 |
+| `RiskDashboardController` | `/risk` | 3 |
+| `RiskEventController` | `/risk` | 2 |
+| `RiskActionController` | `/risk` | 11 |
+| `RiskRuleController` | `/risk` | 5 |
+| `RiskWhitelistController` | `/risk` | 4 |
+| `RiskContentConfigController` | `/risk/content-config` | 2 |
+| `SensitiveWordController` | `/sensitive-word` | 8 |
+| `RiskCaptchaController` | `/captcha` | 4 |
 
 ### A.5 计费 ai-billing（11 个）
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `AiConfigController` | `/dcs/ai-config` | 29 |
-| `AiModelPriceController` | `/dcs/ai-model-price` | 7 |
-| `AiPriceController` | `/dcs/ai-price` | 2 |
-| `AiUsageController` | `/dcs/ai-usage` | 5 |
-| `AiCreditController` | `/dcs/ai-credit` | 12 |
-| `TenantWalletController` | `/dcs/tenant-wallet` | 8 |
-| `TenantWalletLedgerController` | `/dcs/tenant-wallet-ledger` | 1 |
-| `WalletPaymentOrderController` | `/dcs/wallet-payment-order` | 3 |
-| `ServiceChargeRuleController` | `/dcs/service-charge-rule` | 5 |
-| `AiDocDomainController` | `/dcs/ai-doc-domain` | 5 |
-| `AiFaviconController` | `/dcs/ai/favicon` | 1 |
+| `AiConfigController` | `/ai-config` | 29 |
+| `AiModelPriceController` | `/ai-model-price` | 7 |
+| `AiPriceController` | `/ai-price` | 2 |
+| `AiUsageController` | `/ai-usage` | 5 |
+| `AiCreditController` | `/ai-credit` | 12 |
+| `TenantWalletController` | `/tenant-wallet` | 8 |
+| `TenantWalletLedgerController` | `/tenant-wallet-ledger` | 1 |
+| `WalletPaymentOrderController` | `/wallet-payment-order` | 3 |
+| `ServiceChargeRuleController` | `/service-charge-rule` | 5 |
+| `AiDocDomainController` | `/ai-doc-domain` | 5 |
+| `AiFaviconController` | `/ai/favicon` | 1 |
 
 ### A.6 文件安全 file-security（1 个）
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `FileReviewController` | `/dcs/fileReview` | 9 |
+| `FileReviewController` | `/fileReview` | 9 |
 
 ### A.7 系统管理 system（21 个）
 
@@ -1586,7 +1586,7 @@ AutomationRunner.run
 | `SysOssConfigController` | `/resource/oss/config` | 6 |
 | `SysSocialController` | `/system/social` | 1 |
 | `SysProfileController` | `/system/user/profile` | 4 |
-| `SysNoticePortalController` | `/dcs/announcement` | 4 |
+| `SysNoticePortalController` | `/announcement` | 4 |
 | `CacheController` | `/monitor/cache` | 1 |
 | `SysLogininforController` | `/monitor/logininfor` | 5 |
 | `SysOperLogController` | `/monitor/operlog` | 4 |
@@ -1596,29 +1596,29 @@ AutomationRunner.run
 
 | Controller | 基础路径 | 方法数 |
 |---|---|---:|
-| `AssistantCapabilityPanoramaController` | `/dcs/assistant/capability` | 1 |
-| `AssistantFavoriteController` | `/dcs/assistant/favorite` | 3 |
-| `AssistantFeedbackController` | `/dcs/assistant` | 3 |
-| `AssistantMcpController` | `/dcs/assistant/mcp` | 6 |
-| `AssistantMemoryController` | `/dcs/assistant/memory` | 9 |
-| `AssistantQuotaController` | `/dcs/assistant/quota` | 5 |
-| `AssistantSkillAdminController` | `/dcs/assistant/skill` | 4 |
-| `AssistantSkillViewerController` | `/dcs/assistant/skills` | 1 |
-| `AssistantToolGateController` | `/dcs/assistant/toolgate` | 2 |
-| `AssistantUserPrefController` | `/dcs/assistant/user-pref` | 2 |
-| `AssistantActionController` | `/dcs/assistant` | 4 |
-| `AssistantAnnouncementController` | `/dcs/assistant/announcement` | 4 |
-| `AssistantAskUserController` | `/dcs/assistant` | 3 |
-| `AssistantAttachmentController` | `/dcs/assistant/attachment` | 3 |
-| `AssistantAutomationController` | `/dcs/assistant/automations` | 11 |
-| `AssistantConversationController` | `/dcs/assistant` | 17 |
-| `AssistantElicitationController` | `/dcs/assistant` | 1 |
-| `AssistantHitlController` | `/dcs/assistant/hitl` | 1 |
-| `AssistantModelSettingController` | `/dcs/assistant/model-setting` | 4 |
-| `AssistantReportController` | `/dcs/assistant/report` | 1 |
-| `AssistantStatusController` | `/dcs/assistant` | 13 |
-| `AssistantToolViewerController` | `/dcs/assistant/tools` | 1 |
-| `CapabilityController` | `/dcs/ai/capability` | 3 |
+| `AssistantCapabilityPanoramaController` | `/assistant/capability` | 1 |
+| `AssistantFavoriteController` | `/assistant/favorite` | 3 |
+| `AssistantFeedbackController` | `/assistant` | 3 |
+| `AssistantMcpController` | `/assistant/mcp` | 6 |
+| `AssistantMemoryController` | `/assistant/memory` | 9 |
+| `AssistantQuotaController` | `/assistant/quota` | 5 |
+| `AssistantSkillAdminController` | `/assistant/skill` | 4 |
+| `AssistantSkillViewerController` | `/assistant/skills` | 1 |
+| `AssistantToolGateController` | `/assistant/toolgate` | 2 |
+| `AssistantUserPrefController` | `/assistant/user-pref` | 2 |
+| `AssistantActionController` | `/assistant` | 4 |
+| `AssistantAnnouncementController` | `/assistant/announcement` | 4 |
+| `AssistantAskUserController` | `/assistant` | 3 |
+| `AssistantAttachmentController` | `/assistant/attachment` | 3 |
+| `AssistantAutomationController` | `/assistant/automations` | 11 |
+| `AssistantConversationController` | `/assistant` | 17 |
+| `AssistantElicitationController` | `/assistant` | 1 |
+| `AssistantHitlController` | `/assistant/hitl` | 1 |
+| `AssistantModelSettingController` | `/assistant/model-setting` | 4 |
+| `AssistantReportController` | `/assistant/report` | 1 |
+| `AssistantStatusController` | `/assistant` | 13 |
+| `AssistantToolViewerController` | `/assistant/tools` | 1 |
+| `CapabilityController` | `/ai/capability` | 3 |
 
 ### A.9 admin 自身（4 个）
 
@@ -1645,7 +1645,7 @@ AutomationRunner.run
 | 画像事件入口 | `backend/ruoyi-modules/ruoyi-profile-engine/src/main/java/com/smartdock/profile/event/ProfileEventServiceImpl.java` |
 | 评分引擎 | `.../profile/engine/ProfileScoreEngine.java` |
 | 会话重建 | `.../analytics/engine/AnalyticsSessionizer.java` |
-| 采集状态机 | `.../dcs/statemachine/TaskStateMachine.java` / `SubmissionStateMachine.java` |
+| 采集状态机 | `.../statemachine/TaskStateMachine.java` / `SubmissionStateMachine.java` |
 | 风控评分 | `.../risk/service/RiskScoreService.java` |
 | 计费落账 | `.../ruoyi-ai-billing/.../service/support/AiBillingService.java` |
 | 文件审核 | `.../ruoyi-file-security/.../listener/OssUploadedEventListener.java` |
@@ -1657,7 +1657,7 @@ AutomationRunner.run
 | 压缩 | `.../assistant/legacy/core/AssistantCompactionPolicy.java` / `AssistantCompactionMiddleware.java` |
 | 状态存储 | `.../assistant/legacy/config/AssistantStateStoreConfig.java` |
 | 回放汇 | `.../assistant/legacy/core/AssistantRunStreamHub.java` |
-| 前端 AGUI 客户端 | `frontend/src/api/dcs/assistant/aguiClient.ts` |
+| 前端 AGUI 客户端 | `frontend/src/api/smartdock/assistant/aguiClient.ts` |
 
 ---
 
@@ -1673,7 +1673,7 @@ AutomationRunner.run
 | 6 | `docs/agent-engine.md` L140：AgentScope 2.0.3 | 过时 | 实际 `io.github.ck-ys.agentscope:agentscope-bom:2.1.0-ckys3` |
 | 7 | `docs/agent-engine.md` L152-159：CUSTOM 帧 3 种 | 过时 | 实际 9 种 + 心跳 + 续看截断（见 5.12.2） |
 | 8 | `docs/agent-engine.md` L171：`AssistantHitlController` 承接放行/中止 | 错误 | 它只有 `GET /pending`；放行/中止走下一次 `/agui/run` 的 `resume` |
-| 9 | `docs/architecture.md` L114：前端 SSE 用 `utils/sse.ts` | 归属错误 | AGUI 对话走 `frontend/src/api/dcs/assistant/aguiClient.ts`（fetch + ReadableStream）；`utils/sse.ts` 是通知推送的 EventSource |
+| 9 | `docs/architecture.md` L114：前端 SSE 用 `utils/sse.ts` | 归属错误 | AGUI 对话走 `frontend/src/api/smartdock/assistant/aguiClient.ts`（fetch + ReadableStream）；`utils/sse.ts` 是通知推送的 EventSource |
 | 10 | `docs/architecture.md` L115：SPI 工具举例 | 过时 | 实际三个提供方：dcs（任务/待办/提交/建任务）、profile（画像/圈人/分群/复核）、analytics（总览/趋势/漏斗/留存/路径/自定义） |
 | 11 | `docs/architecture.md` L118：幂等键防重复落账 | 表述过强 | 只防同一订阅内重复触发；跨订阅/agent 重建可能双记（见 4.5/9.1） |
 

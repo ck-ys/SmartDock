@@ -58,7 +58,7 @@
 <rect x='346' y='112' width='262' height='72' rx='10' fill='#f7f8fa' stroke='#d8dce3' stroke-width='1.0'/>
 <rect x='346' y='121' width='3' height='54' rx='1.5' fill='#4b5563' stroke='none' stroke-width='1.2'/>
 <text x='360' y='143' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='12.2' fill='#14202d' font-weight='600' text-anchor='start'>POST /agui/run/{agentId}</text>
-<text x='360' y='166' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='10.0' fill='#4b5563' font-weight='400' text-anchor='start'>内置 dcs-assistant · SSE 响应</text>
+<text x='360' y='166' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='10.0' fill='#4b5563' font-weight='400' text-anchor='start'>内置 smartdock-assistant · SSE 响应</text>
 <rect x='632' y='112' width='262' height='72' rx='10' fill='#f7f8fa' stroke='#d8dce3' stroke-width='1.0'/>
 <rect x='632' y='121' width='3' height='54' rx='1.5' fill='#8b939f' stroke='none' stroke-width='1.2'/>
 <text x='646' y='143' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='12.2' fill='#14202d' font-weight='600' text-anchor='start'>AguiAuthStatusFilter</text>

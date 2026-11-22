@@ -1,6 +1,6 @@
 # 画像接入指南（10 分钟版）
 
-> 本文是「怎么把你的业务系统接进画像」的**唯一真源**。系统内置的「任务转发」演示模块（`ruoyi-modules/ruoyi-dcs`）是官方参考实现，套路与本文一致；它是早期代码，事件名 setter 用的还是旧名 `setEventType`、编号第一段也没带模块名——新接入请按本文写（`setEventName` + 模块名前缀），demo 只是结构参考。
+> 本文是「怎么把你的业务系统接进画像」的**唯一真源**。系统内置的「任务转发」演示模块（`ruoyi-modules/ruoyi-mission`）是官方参考实现，套路与本文一致；它是早期代码，事件名 setter 用的还是旧名 `setEventType`、编号第一段也没带模块名——新接入请按本文写（`setEventName` + 模块名前缀），demo 只是结构参考。
 >
 > 适用：当前版本（**单源口径已生效**：`source` 字段兼容保留，传任意值或不传都会被引擎统一收口，你的调用代码怎么写都能落库）。
 
@@ -12,18 +12,18 @@
 
 ## 1. 主例子：照内置「任务转发」demo 抄
 
-内置 demo 模块 `ruoyi-dcs`（多任务转发采集演示）就是为「给你抄」准备的，三个文件看懂即可照搬：
+内置 demo 模块 `ruoyi-mission`（多任务转发采集演示）就是为「给你抄」准备的，三个文件看懂即可照搬：
 
 | 看什么 | 打开哪个文件 | 学什么 |
 |---|---|---|
-| 注入与调用 | `ruoyi-dcs/.../service/DcsTaskService.java` | 构造注入 `ProfileEventPublisher`，业务方法里发事件，失败只记日志不阻断业务 |
+| 注入与调用 | `ruoyi-mission/.../service/TaskService.java` | 构造注入 `ProfileEventPublisher`，业务方法里发事件，失败只记日志不阻断业务 |
 | 事件怎么填 | 同上 `publish()` 附近 | 事件名点分小写、属性数值放数字、显示名兜底 |
 | 编号怎么定 | `ruoyi-profile-engine/.../ProfileUids.java` | 三段式/四段式幂等编号（第 5 节） |
 
 ## 2. 挂模块五步（新建业务模块必读）
 
 1. `backend/ruoyi-modules/pom.xml` 的模块清单加一行你的模块名；
-2. 你模块的 pom 依赖照抄 `ruoyi-dcs/pom.xml` 即可——它**已经包含** `org.dromara:ruoyi-profile-engine` 这行（版本由父工程统一管理），自建 pom 时照抄不要再重复声明；
+2. 你模块的 pom 依赖照抄 `ruoyi-mission/pom.xml` 即可——它**已经包含** `org.dromara:ruoyi-profile-engine` 这行（版本由父工程统一管理），自建 pom 时照抄不要再重复声明；
 3. `backend/ruoyi-admin/pom.xml` 加上你模块的依赖。**不加这行模块不会进安装包，且不会报错**；
 4. **包名红线**：代码必须放 `com.smartdock.你的模块名` 包下。启动扫描和数据库映射扫描都按这个前缀写死，包名放错=功能静默失效；
 5. Service 里注入 `ProfileEventPublisher`（普通 Spring 接口，构造注入），照第 3 节发事件。

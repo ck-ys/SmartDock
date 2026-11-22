@@ -172,7 +172,7 @@
   <div class="tscroll"><table>
     <colgroup><col style="width:34%"><col style="width:44%"><col style="width:12%"><col style="width:10%"></colgroup>
     <tr><th>问题</th><th>证据锚点</th><th>级别</th><th>归题</th></tr>
-    <tr><td>「邀请注册」整个功能是死的：后端四个接口（生成/列表/撤销/角色）整套不存在，角色下拉永远空的、列表永远「暂无」，生成永远被拦</td><td><span class="path">system/user/index.vue:100；api/system/inviteLink/index.ts:27-42；实测 GET /dcs/inviteLink/list 与 /roles 均返回 code:404「请求地址不存在」</span></td><td><span class="pill p-bad">点了就卡死</span></td><td>题1</td></tr>
+    <tr><td>「邀请注册」整个功能是死的：后端四个接口（生成/列表/撤销/角色）整套不存在，角色下拉永远空的、列表永远「暂无」，生成永远被拦</td><td><span class="path">system/user/index.vue:100；api/system/inviteLink/index.ts:27-42；实测 GET /inviteLink/list 与 /roles 均返回 code:404「请求地址不存在」</span></td><td><span class="pill p-bad">点了就卡死</span></td><td>题1</td></tr>
     <tr><td>文件管理「预览开关」按钮挂的权限串全系统没人持有：非超管永远看不到，而按钮实际调用的接口看的是另一个权限串</td><td><span class="path">system/oss/index.vue:55 ↔ SysConfigController.java:110</span></td><td><span class="pill p-warn">中危</span></td><td>题2</td></tr>
     <tr><td>AI 助手管理页没绑给任何常规角色：租户管理员进不去</td><td><span class="path">baseline/04_role_menu.sql 对 11925/11927 零匹配；活库仅一个雪花角色持有</span></td><td><span class="pill p-warn">中危</span></td><td>题3</td></tr>
     <tr><td>演示库菜单落后于 SQL 权威口径：库缺 11972，11971 还挂着旧名字旧权限串</td><td><span class="path">实查 smartdock_shots：缺 11972；SQL 新态在 02_reference.sql:581/582</span></td><td><span class="pill p-warn">中危</span></td><td>题3</td></tr>
@@ -234,8 +234,8 @@
             <span class="tag" style="left:50%;top:10%;transform:translateX(-50%)">角色下拉是空的；列表永远「暂无邀请链接」</span>
           </div>
           <div class="evd"><b>接口实测（2026-10-27，弹窗打开即触发）：</b><br>
-            GET <code>/dcs/inviteLink/roles</code> → <code>{"code":404,"msg":"请求地址不存在"}</code><br>
-            GET <code>/dcs/inviteLink/list?pageNum=1&amp;pageSize=10</code> → <code>{"code":404,"msg":"请求地址不存在"}</code><br>
+            GET <code>/inviteLink/roles</code> → <code>{"code":404,"msg":"请求地址不存在"}</code><br>
+            GET <code>/inviteLink/list?pageNum=1&amp;pageSize=10</code> → <code>{"code":404,"msg":"请求地址不存在"}</code><br>
             点「生成邀请链接」→ 前端提示<b>「请选择注册后角色」</b>（角色接口死了选不了，永远过不去）。</div>
           <p class="say"><b>卡死闭环：</b>角色拉不出来 → 表单填不完 → 生成永远被拦；报错被吞掉，用户只当「还没有邀请记录」。功能等于不存在，但界面上一直挂着。</p>
         </div>
@@ -486,7 +486,7 @@
           </div>
           <div class="evd"><b>实测（2026-10-27，真机操作）：</b><br>
             Schema 框填入 <code>{"foo":"bar","这是胡写的":true}</code> → 点「校验」<br>
-            POST <code>/profile/schema/dcs/validate</code> 返回 <code>{"valid":true,"errors":[]}</code><br>
+            POST <code>/profile/schema/validate</code> 返回 <code>{"valid":true,"errors":[]}</code><br>
             页面在按钮旁亮出绿色<b>「校验通过」</b>——schema 本体一个字都没被验。</div>
           <p class="say">这不是「没填样本」的问题（空 JSON 有前端护栏），而是<b>校验根本没把 schema 当校验对象</b>：填什么合法 JSON 都绿灯。</p>
         </div>
