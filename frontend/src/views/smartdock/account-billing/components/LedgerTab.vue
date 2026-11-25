@@ -11,113 +11,165 @@
 
     <!-- 钱包账（¥）：原 tenant-wallet-ledger 迁移 -->
     <template v-if="dim === 'wallet'">
-      <div class="ui-toolbar">
-        <el-form :model="walletQuery" :inline="true" class="search-form" @submit.prevent>
-          <el-form-item label="租户ID">
-            <el-input v-model="walletQuery.tenantId" placeholder="租户ID" clearable style="width: 160px" @keyup.enter="handleQuery" />
-          </el-form-item>
-          <el-form-item label="钱包ID">
-            <el-input v-model="walletQuery.walletId" placeholder="钱包ID" clearable style="width: 150px" @keyup.enter="handleQuery" />
-          </el-form-item>
-          <el-form-item label="方向">
-            <el-select v-model="walletQuery.direction" clearable placeholder="全部" style="width: 120px" @change="handleQuery">
-              <el-option label="收入 IN" value="IN" />
-              <el-option label="支出 OUT" value="OUT" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="业务类型">
-            <el-select v-model="walletQuery.bizType" clearable placeholder="全部" style="width: 130px" @change="handleQuery">
-              <el-option v-for="(label, key) in BIZ_TYPE_TEXT" :key="key" :label="label" :value="key" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
-            <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
-          </el-form-item>
-        </el-form>
+      <!-- Q5：余额头 —— 「还剩多少」提到页签顶部，不用切到总览页签 -->
+      <div class="ledger-hero">
+        <div class="ledger-hero__main">
+          <span class="ledger-hero__label">可用余额</span>
+          <strong class="ledger-hero__value">{{ money(walletAvailable) }}</strong>
+          <span class="ledger-hero__sub">{{ walletHeroHint }}</span>
+        </div>
+        <div class="ledger-hero__side">
+          <div class="ledger-hero__cell">
+            <span class="ledger-hero__cell-label">当前筛选 · 收入</span>
+            <strong class="ledger-hero__cell-value amount-in">+{{ money(summary.totalIn) }}</strong>
+          </div>
+          <div class="ledger-hero__cell">
+            <span class="ledger-hero__cell-label">当前筛选 · 支出</span>
+            <strong class="ledger-hero__cell-value amount-out">-{{ money(summary.totalOut) }}</strong>
+          </div>
+          <div class="ledger-hero__cell">
+            <span class="ledger-hero__cell-label">净额</span>
+            <strong class="ledger-hero__cell-value" :class="summary.net >= 0 ? 'amount-in' : 'amount-out'">{{ money(summary.net) }}</strong>
+          </div>
+        </div>
       </div>
 
-      <div class="ui-table-wrap">
-        <el-table v-loading="loading" :data="ledgerList" class="ui-table dcs-table-only">
-          <el-table-column label="流水ID" prop="ledgerId" min-width="165" align="center">
-            <template #default="{ row }"
-              ><span class="dcs-ops-id">{{ row.ledgerId }}</span></template
-            >
-          </el-table-column>
-          <el-table-column label="租户ID" prop="tenantId" min-width="75" show-overflow-tooltip />
-          <el-table-column label="钱包ID" prop="walletId" min-width="165" align="center">
-            <template #default="{ row }"
-              ><span class="dcs-ops-id">{{ row.walletId }}</span></template
-            >
-          </el-table-column>
-          <el-table-column label="业务类型" width="80" align="center">
-            <template #default="{ row }">
+      <!-- Q5：筛选条 —— 日期预设 + 自定义区间 + 类型快选；Q6：手机档收进「筛选」抽屉 -->
+      <div class="ui-toolbar ledger-filter-bar">
+        <div class="ledger-presets">
+          <button
+            v-for="p in DATE_PRESETS"
+            :key="p.key"
+            type="button"
+            class="ledger-preset"
+            :class="{ on: activePreset === p.key }"
+            @click="applyPreset(p.key)"
+          >
+            {{ p.label }}
+          </button>
+          <el-date-picker
+            v-model="walletQuery.dateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="~"
+            start-placeholder="开始"
+            end-placeholder="结束"
+            class="ledger-range"
+            @change="onDateChange"
+          />
+        </div>
+        <div class="ledger-filter-actions">
+          <el-select v-model="walletQuery.direction" clearable placeholder="全部方向" style="width: 118px" @change="handleQuery">
+            <el-option label="收入" value="IN" />
+            <el-option label="支出" value="OUT" />
+          </el-select>
+          <el-select v-model="walletQuery.bizType" clearable placeholder="全部类型" style="width: 128px" @change="handleQuery">
+            <el-option v-for="(label, key) in BIZ_TYPE_TEXT" :key="key" :label="label" :value="key" />
+          </el-select>
+          <el-input
+            v-model="walletQuery.serviceCode"
+            placeholder="服务编码"
+            clearable
+            style="width: 150px"
+            @keyup.enter="handleQuery"
+          />
+          <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
+        </div>
+      </div>
+
+      <!-- 高级筛选（租户ID/钱包ID 是排障字段，默认收起；Q8：技术参数不挡主路径） -->
+      <el-collapse v-model="advancedOpen" class="ledger-advanced">
+        <el-collapse-item name="advanced">
+          <template #title><span class="ledger-advanced__title">技术参数（排障用：按租户 / 钱包精确筛选）</span></template>
+          <el-form :model="walletQuery" :inline="true" class="search-form" @submit.prevent>
+            <el-form-item label="租户ID">
+              <el-input v-model="walletQuery.tenantId" placeholder="租户ID" clearable style="width: 160px" @keyup.enter="handleQuery" />
+            </el-form-item>
+            <el-form-item label="钱包ID">
+              <el-input v-model="walletQuery.walletId" placeholder="钱包ID" clearable style="width: 160px" @keyup.enter="handleQuery" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
+            </el-form-item>
+          </el-form>
+        </el-collapse-item>
+      </el-collapse>
+
+      <!-- Q3：按日期分组的账本（桌面 + 手机同一份数据，手机档换卡片样式） -->
+      <div v-loading="loading" class="ledger-days">
+        <div v-if="walletDays.length === 0" class="ui-empty">
+          <p class="ui-empty__title">这段时间没有流水</p>
+          <p class="ui-empty__hint">换个日期范围或清掉筛选条件再试。</p>
+        </div>
+        <section v-for="day in walletDays" :key="day.day || 'unknown'" class="ledger-day">
+          <header class="ledger-day__head">
+            <span class="ledger-day__date">{{ day.label }}</span>
+            <span class="ledger-day__weekday">{{ day.weekday }}</span>
+            <span class="ledger-day__sums">
+              <span v-if="day.totalIn > 0" class="amount-in">+{{ money(day.totalIn) }}</span>
+              <span v-if="day.totalOut > 0" class="amount-out">-{{ money(day.totalOut) }}</span>
+              <span class="ledger-day__count">{{ day.rows.length }} 笔</span>
+            </span>
+          </header>
+          <div class="ledger-day__rows">
+            <div v-for="row in day.rows" :key="row.ledgerId" class="ledger-row">
+              <span class="ledger-row__time">{{ timeOf(row.createTime) }}</span>
+              <span class="ledger-row__name">{{ rowSummary(row) }}</span>
+              <span class="ui-pill ledger-row__biz">{{ bizTypeLabel(row.bizType) }}</span>
+              <span class="ledger-row__amount" :class="row.direction === 'IN' ? 'amount-in' : 'amount-out'">
+                {{ row.direction === 'IN' ? '+' : '-' }}{{ money(row.amount) }}
+              </span>
+              <span class="ledger-row__balance">余额 {{ money(row.balanceAfter) }}</span>
+              <!-- Q3：流水ID / 钱包ID 收进「详情」，默认不占宽度 -->
+              <el-popover placement="left" :width="260" trigger="click">
+                <template #reference>
+                  <el-button link class="ui-row-action ledger-row__more">详情</el-button>
+                </template>
+                <div class="ledger-detail">
+                  <div><span>流水ID</span><b>{{ row.ledgerId }}</b></div>
+                  <div><span>租户ID</span><b>{{ row.tenantId }}</b></div>
+                  <div><span>钱包ID</span><b>{{ row.walletId }}</b></div>
+                  <div v-if="row.idempotencyKey"><span>幂等键</span><b class="ledger-detail__wrap">{{ row.idempotencyKey }}</b></div>
+                </div>
+              </el-popover>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Q6：手机档（≤992）沿用通用卡片，补「当天小计」 -->
+      <div class="dcs-mobile-list">
+        <div v-if="walletDays.length === 0" class="ui-empty">
+          <p class="ui-empty__title">这段时间没有流水</p>
+          <p class="ui-empty__hint">换个日期范围或清掉筛选条件再试。</p>
+        </div>
+        <template v-for="day in walletDays" :key="day.day || 'unknown'">
+          <div class="ledger-mobile-day">
+            <span class="ledger-mobile-day__date">{{ day.label }} {{ day.weekday }}</span>
+            <span class="ledger-mobile-day__sums">
+              <span v-if="day.totalOut > 0" class="amount-out">支出 {{ money(day.totalOut) }}</span>
+              <span v-if="day.totalIn > 0" class="amount-in">收入 {{ money(day.totalIn) }}</span>
+            </span>
+          </div>
+          <div v-for="row in day.rows" :key="row.ledgerId" class="dcs-mobile-card">
+            <div class="dcs-card-head">
+              <span class="dcs-card-title">{{ rowSummary(row) }}</span>
+              <span class="dcs-card-badge"
+                ><span class="ui-pill" :class="row.direction === 'IN' ? 'ui-pill--pos' : 'ui-pill--neg'">{{ directionLabel(row.direction) }}</span></span
+              >
+            </div>
+            <div class="dcs-card-meta">
               <span class="ui-pill">{{ bizTypeLabel(row.bizType) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="方向" width="70" align="center">
-            <template #default="{ row }">
-              <span class="ui-pill" :class="row.direction === 'IN' ? 'ui-pill--pos' : 'ui-pill--neg'">{{ directionLabel(row.direction) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="金额" width="115" align="right">
-            <template #default="{ row }">
               <span :class="row.direction === 'IN' ? 'amount-in' : 'amount-out'">
                 {{ row.direction === 'IN' ? '+' : '-' }}{{ money(row.amount) }}
               </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="余额变化" min-width="175" align="right">
-            <template #default="{ row }">
-              <span class="balance-change">
-                {{ money(row.balanceBefore) }}
-                <el-icon class="arrow"><ArrowRight /></el-icon>
-                <span :class="Number(row.balanceAfter || 0) >= Number(row.balanceBefore || 0) ? 'amount-in' : 'amount-out'">{{
-                  money(row.balanceAfter)
-                }}</span>
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="服务" width="125" show-overflow-tooltip>
-            <template #default="{ row }">
-              <!-- 服务码中文化（raw code 进 title 供排障）；充值/赠送等非 AI 行不显服务 -->
-              <span :title="row.serviceCode || undefined">{{ row.serviceCodeLabel || serviceCodeLabel(row.serviceCode) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="时间" prop="createTime" width="160" />
-          <template #empty>
-            <div class="ui-empty">
-              <p class="ui-empty__title">暂无钱包流水</p>
-              <p class="ui-empty__hint">调整筛选条件后再试，或等待资金操作产生流水。</p>
+              <span>余额 {{ money(row.balanceAfter) }}</span>
             </div>
-          </template>
-        </el-table>
-      </div>
-
-      <!-- U-09：≤992 钱包流水表格改卡片（9 列约 1130px） -->
-      <div class="dcs-mobile-list">
-        <div v-if="ledgerList.length === 0" class="ui-empty">
-          <p class="ui-empty__title">暂无钱包流水</p>
-          <p class="ui-empty__hint">调整筛选条件后再试，或等待资金操作产生流水。</p>
-        </div>
-        <div v-for="row in ledgerList" :key="row.ledgerId" class="dcs-mobile-card">
-          <div class="dcs-card-head">
-            <span class="dcs-card-title">{{ row.serviceCodeLabel || serviceCodeLabel(row.serviceCode) }}</span>
-            <span class="dcs-card-badge"
-              ><span class="ui-pill" :class="row.direction === 'IN' ? 'ui-pill--pos' : 'ui-pill--neg'">{{ directionLabel(row.direction) }}</span></span
-            >
+            <div class="dcs-card-foot">
+              <span class="dcs-card-time">{{ timeOf(row.createTime) }} · 钱包 {{ shortId(row.walletId) }}</span>
+            </div>
           </div>
-          <div class="dcs-card-meta">
-            <span class="ui-pill">{{ bizTypeLabel(row.bizType) }}</span>
-            <span :class="row.direction === 'IN' ? 'amount-in' : 'amount-out'">
-              {{ row.direction === 'IN' ? '+' : '-' }}{{ money(row.amount) }}
-            </span>
-            <span>余额 {{ money(row.balanceBefore) }} → {{ money(row.balanceAfter) }}</span>
-          </div>
-          <div class="dcs-card-foot">
-            <span class="dcs-card-time">{{ row.createTime }} · 钱包 {{ row.walletId }}</span>
-          </div>
-        </div>
+        </template>
       </div>
     </template>
 
@@ -250,8 +302,11 @@
 import { Search, Refresh, RefreshLeft, ArrowRight } from '@element-plus/icons-vue';
 import type { OperationsMetric } from '@/components/OperationsPageHeader/index.vue';
 import { checkPermi } from '@/utils/permission';
-import { listWalletLedger, type WalletLedgerVO } from '@/api/smartdock/account-billing';
+import { listWalletLedger, getWalletLedgerSummary, type WalletLedgerVO, type WalletLedgerSummaryVO } from '@/api/smartdock/account-billing';
+import { getWalletSummary } from '@/api/smartdock/account-billing';
 import { listCreditLedger, listLedgerUsers, type CreditLedgerVO } from '@/api/smartdock/ai-credit';
+import { groupByDay, pageTotals } from '@/utils/ledgerGroup';
+import { useUserStore } from '@/store/modules/user';
 
 defineOptions({ name: 'AccountBillingLedgerTab' });
 
@@ -284,13 +339,40 @@ const dim = ref<'wallet' | 'credit'>('wallet');
 const loading = ref(false);
 const ledgerList = ref<WalletLedgerVO[]>([]);
 const total = ref(0);
+/** Q5：合计跟筛选走（后端 /summary），不再拿当前页累加——翻页就变会被读成数字在跳 */
+const summary = ref<WalletLedgerSummaryVO>({ totalIn: 0, totalOut: 0, net: 0, count: 0 });
+/** Q5：余额头 —— 可用余额（超管=平台总量，客户=本单位；文案必须跟着身份走，不能一律写「本单位」） */
+const walletAvailable = ref<number | null>(null);
+const isSuperAdmin = computed(() => useUserStore().roles.includes('superadmin'));
+/** Q5：日期预设 */
+const DATE_PRESETS = [
+  { key: 'today', label: '今天' },
+  { key: 'week', label: '本周' },
+  { key: 'month', label: '本月' },
+  { key: 'lastMonth', label: '上月' }
+] as const;
+type PresetKey = (typeof DATE_PRESETS)[number]['key'] | '';
+const activePreset = ref<PresetKey>('');
+/** Q8：技术参数（租户ID/钱包ID）默认收起，不挡主路径 */
+const advancedOpen = ref<string[]>([]);
 const walletQuery = reactive({
   pageNum: 1,
-  pageSize: 20,
+  pageSize: 50,
   tenantId: '',
   walletId: '',
   direction: '',
-  bizType: ''
+  bizType: '',
+  serviceCode: '',
+  dateRange: null as [string, string] | null
+});
+
+/** Q3：按日期分组的账本视图（纯函数，见 utils/ledgerGroup.ts） */
+const walletDays = computed(() => groupByDay(ledgerList.value));
+
+/** 余额头副文案：口径跟着身份走——超管看到的是平台总量，不能标成「本单位」 */
+const walletHeroHint = computed(() => {
+  if (walletAvailable.value === null) return '余额取数失败，点上方刷新重试';
+  return isSuperAdmin.value ? '全平台钱包余额合计；合计按当前筛选条件算' : '本单位的钱包余额；合计按当前筛选条件算';
 });
 
 /** 服务码中文映射（与后端写入点一一对应；后端 ledger VO 下发 serviceCodeLabel，此处兜底） */
@@ -307,6 +389,19 @@ const SERVICE_CODE_TEXT: Record<string, string> = {
   AI_CREDIT_BOOST: '加油包购买'
 };
 const serviceCodeLabel = (code?: string | null) => (code ? SERVICE_CODE_TEXT[code] || code : '--');
+
+/**
+ * 流水主列摘要：后端下发的人话摘要优先（手动充值/扣减的 reason 在 extra_json 里，
+ * 这些行的 serviceCode 为空——直接取 serviceCodeLabel 会整列显示 "--"）。
+ * 兜底顺序：summary → 服务码中文 → 业务类型中文 → "--"。
+ */
+const rowSummary = (row: { summary?: string | null; serviceCode?: string | null; serviceCodeLabel?: string | null; bizType?: string | null }) => {
+  const s = String(row.summary || '').trim();
+  if (s) return s;
+  const byCode = String(row.serviceCodeLabel || '').trim() || (row.serviceCode ? serviceCodeLabel(row.serviceCode) : '');
+  if (byCode && byCode !== '--') return byCode;
+  return bizTypeLabel(String(row.bizType || ''));
+};
 
 const BIZ_TYPE_TEXT: Record<string, string> = {
   RECHARGE: '充值',
@@ -327,14 +422,79 @@ const directionLabel = (d: string) => {
 
 const money = (value?: number) => `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/** 只取时间部分（HH:mm）；取不到给原串 */
+const timeOf = (t?: string | null) => {
+  const s = String(t || '');
+  const m = s.match(/\d{2}:\d{2}/);
+  return m ? m[0] : s || '--';
+};
+
+const shortId = (id?: number | string) => String(id || '').slice(-4);
+
+/** 按天算日期预设区间（GMT+8 口径由后端保证，这里只给 yyyy-MM-dd） */
+const presetRange = (key: PresetKey): [string, string] | null => {
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now = new Date();
+  if (key === 'today') {
+    const d = fmt(now);
+    return [d, d];
+  }
+  if (key === 'week') {
+    // 本周一 0 点起（周一为一周开始）
+    const dow = now.getDay() === 0 ? 7 : now.getDay();
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (dow - 1));
+    return [fmt(monday), fmt(now)];
+  }
+  if (key === 'month') {
+    return [fmt(new Date(now.getFullYear(), now.getMonth(), 1)), fmt(now)];
+  }
+  if (key === 'lastMonth') {
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    return [fmt(first), fmt(last)];
+  }
+  return null;
+};
+
+const applyPreset = (key: PresetKey) => {
+  activePreset.value = activePreset.value === key ? '' : key;
+  walletQuery.dateRange = activePreset.value ? presetRange(activePreset.value) : null;
+  handleQuery();
+};
+
+const onDateChange = () => {
+  // 手动改日期就退出预设高亮（预设只是快捷方式，不是状态）
+  activePreset.value = '';
+  handleQuery();
+};
+
+/** 列表与合计共用同一组参数，保证同口径 */
+const walletParams = () => {
+  const [beginTime, endTime] = walletQuery.dateRange || [undefined, undefined];
+  return {
+    tenantId: walletQuery.tenantId || undefined,
+    walletId: walletQuery.walletId || undefined,
+    serviceCode: walletQuery.serviceCode || undefined,
+    direction: walletQuery.direction || undefined,
+    bizType: walletQuery.bizType || undefined,
+    beginTime,
+    endTime
+  };
+};
+
 const getList = async () => {
   const seq = ++walletSeq;
   loading.value = true;
   try {
-    const res: any = await listWalletLedger(walletQuery);
+    const params = walletParams();
+    const [res, sum] = await Promise.all([
+      listWalletLedger({ ...params, pageNum: walletQuery.pageNum, pageSize: walletQuery.pageSize }),
+      getWalletLedgerSummary(params)
+    ]);
     if (seq !== walletSeq) return; // 过期响应丢弃(同维连点/跨维快切)
     ledgerList.value = res.rows || [];
     total.value = res.total || 0;
+    summary.value = sum.data || { totalIn: 0, totalOut: 0, net: 0, count: 0 };
     if (dim.value === 'wallet') emitWalletMetrics();
   } catch {
     if (seq === walletSeq) proxy?.$modal.msgError('流水加载失败');
@@ -343,24 +503,28 @@ const getList = async () => {
   }
 };
 
+/** 余额头：取可用余额（口径与总览页同源 /tenant-wallet/summary）
+ *  ⚠后端 BigDecimal 序列化成字符串（"1500.0000"），不能用 typeof === 'number' 判空——那会恒落 null */
+const loadWalletAvailable = async () => {
+  try {
+    const res: any = await getWalletSummary();
+    const raw = res.data?.totalBalance;
+    const n = raw === null || raw === undefined || raw === '' ? NaN : Number(raw);
+    walletAvailable.value = Number.isFinite(n) ? n : null;
+  } catch {
+    walletAvailable.value = null;
+  }
+};
+
 const emitWalletMetrics = () => {
   if (metricsDisposed) return;
-  const rows = ledgerList.value;
+  // Q5：KPI 带改用后端合计（与列表同口径），不再拿当前页累加
+  const s = summary.value;
   emit('metrics', [
-    { label: '钱包流水总数', value: total.value, hint: '符合当前筛选条件', tone: 'primary' },
-    {
-      label: '当前页收入',
-      value: money(rows.filter((i) => i.direction === 'IN').reduce((s, i) => s + Number(i.amount || 0), 0)),
-      hint: '当前页 IN 流水合计',
-      tone: 'success'
-    },
-    {
-      label: '当前页支出',
-      value: money(rows.filter((i) => i.direction === 'OUT').reduce((s, i) => s + Number(i.amount || 0), 0)),
-      hint: '当前页 OUT 流水合计',
-      tone: 'danger'
-    },
-    { label: '业务类型', value: new Set(rows.map((i) => i.bizType).filter(Boolean)).size, hint: '当前页资金变动类型', tone: 'neutral' }
+    { label: '符合筛选的流水', value: s.count, hint: '当前筛选条件全量口径', tone: 'primary' },
+    { label: '收入合计', value: money(s.totalIn), hint: '当前筛选条件', tone: 'success' },
+    { label: '支出合计', value: money(s.totalOut), hint: '当前筛选条件', tone: 'danger' },
+    { label: '净额', value: money(s.net), hint: '收入 − 支出', tone: s.net >= 0 ? 'success' : 'danger' }
   ]);
 };
 
@@ -495,6 +659,7 @@ const switchDim = (d: 'wallet' | 'credit') => {
     if (!ledgerUsers.value.length) loadLedgerUsers();
   } else {
     getList();
+    if (walletAvailable.value === null) loadWalletAvailable();
   }
 };
 
@@ -514,7 +679,10 @@ const resetQuery = () => {
     walletQuery.walletId = '';
     walletQuery.direction = '';
     walletQuery.bizType = '';
+    walletQuery.serviceCode = '';
+    walletQuery.dateRange = null;
     walletQuery.pageNum = 1;
+    activePreset.value = '';
     getList();
   } else {
     creditQuery.bizType = '';
@@ -527,6 +695,7 @@ const resetQuery = () => {
 
 onMounted(() => {
   getList();
+  loadWalletAvailable();
 });
 </script>
 
@@ -635,5 +804,281 @@ onMounted(() => {
 }
 .balance-change .arrow {
   color: var(--app-faint);
+}
+
+/* ===== Q5：余额头 ===== */
+.ledger-hero {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 12px 0 14px;
+  overflow: hidden;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: var(--app-card-radius);
+}
+.ledger-hero__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 14px 18px;
+}
+.ledger-hero__label {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.3;
+}
+.ledger-hero__value {
+  color: var(--app-text);
+  font-size: var(--dcs-font-2xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.ledger-hero__sub {
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.4;
+}
+.ledger-hero__side {
+  display: flex;
+  flex: 0 0 auto;
+}
+.ledger-hero__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  min-width: 118px;
+  padding: 14px 16px;
+  border-left: 1px solid var(--app-rule);
+}
+.ledger-hero__cell-label {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-xs);
+  line-height: 1.3;
+}
+.ledger-hero__cell-value {
+  font-size: var(--dcs-font-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Q5：日期预设 ===== */
+.ledger-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+.ledger-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ledger-preset {
+  height: calc(var(--dcs-control-h) - 6px);
+  padding: 0 14px;
+  border: 1px solid var(--app-rule);
+  border-radius: var(--dcs-pill-radius);
+  background: transparent;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-md);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.ledger-preset:hover {
+  color: var(--app-text);
+}
+.ledger-preset.on {
+  background: var(--app-raised);
+  color: var(--app-text);
+  font-weight: 600;
+}
+.ledger-range {
+  max-width: 240px;
+}
+.ledger-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===== Q8：技术参数折叠 ===== */
+.ledger-advanced {
+  border-top: 0;
+  margin-bottom: 4px;
+}
+.ledger-advanced__title {
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+}
+
+/* ===== Q3：按日期分组的账本 ===== */
+.ledger-days {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.ledger-day {
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-card-radius);
+  overflow: hidden;
+}
+.ledger-day__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 14px;
+  background: var(--app-raised);
+  border-bottom: 1px solid var(--app-rule);
+}
+.ledger-day__date {
+  color: var(--app-text);
+  font-size: var(--dcs-font-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ledger-day__weekday {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+}
+.ledger-day__sums {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-left: auto;
+  font-size: var(--dcs-font-sm);
+  font-variant-numeric: tabular-nums;
+}
+.ledger-day__count {
+  color: var(--app-faint);
+}
+.ledger-day__rows {
+  display: flex;
+  flex-direction: column;
+}
+.ledger-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 64px 108px 132px 56px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--app-rule);
+  font-size: var(--dcs-font-md);
+}
+.ledger-row:first-child {
+  border-top: 0;
+}
+.ledger-row__time {
+  color: var(--app-faint);
+  font-variant-numeric: tabular-nums;
+}
+.ledger-row__name {
+  overflow: hidden;
+  color: var(--app-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ledger-row__biz {
+  justify-self: start;
+}
+.ledger-row__amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ledger-row__balance {
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ledger-row__more {
+  justify-self: end;
+}
+.ledger-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--dcs-font-sm);
+}
+.ledger-detail > div {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+.ledger-detail span {
+  color: var(--app-faint);
+  flex: 0 0 auto;
+}
+.ledger-detail b {
+  color: var(--app-text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+/* ===== Q6：手机档当天小计（只在卡片视图里出现） ===== */
+.ledger-mobile-day {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 2px 6px;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+}
+.ledger-mobile-day__date {
+  color: var(--app-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ledger-mobile-day__sums {
+  display: inline-flex;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 桌面档隐藏卡片版当天小计；手机档隐藏分组账本（两套视图互斥） */
+@media (min-width: 993px) {
+  .ledger-mobile-day {
+    display: none;
+  }
+}
+@media (max-width: 992px) {
+  .ledger-days {
+    display: none;
+  }
+  /* 手机档余额头竖排：三格合计换行到下一行，避免横向挤压 */
+  .ledger-hero {
+    flex-direction: column;
+  }
+  .ledger-hero__side {
+    border-top: 1px solid var(--app-rule);
+  }
+  .ledger-hero__cell {
+    flex: 1 1 0;
+    min-width: 0;
+    border-left: 1px solid var(--app-rule);
+    padding: 10px 12px;
+  }
+  .ledger-hero__cell:first-child {
+    border-left: 0;
+  }
 }
 </style>

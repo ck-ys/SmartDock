@@ -314,18 +314,28 @@
     <!-- 2026-11-11 拍板 Q3-2/Q4-2：有原因码（服务端判因、刷新不丢）按码出人话+下一步；
          无码（拉取未到/历史旧行）回退通用文案。原文仅管理员可展开（Q2-2 脱敏后落库） -->
     <div v-if="emptyFail" class="ecard">
-      这轮没等到回答：{{ issueLine }}
+      <!-- Q11（2026-11-25 钱包批=案1）：额度用尽三行说清三件事——原因 / 找谁 / 出路。
+           原版只有一句「请联系管理员充值或换模型」，成员看完不知道该找谁、还能不能继续。 -->
+      <div v-if="issueAction === 'quota'" class="ec-quota">
+        <p class="ec-quota__why">这轮没等到回答：<b>{{ issueLine }}</b></p>
+        <p class="ec-quota__who">找谁：联系{{ issueAdmin ? '平台管理员' : '你们单位的管理员' }}充值</p>
+        <p class="ec-quota__way">
+          出路：可以先
+          <button v-if="turn.question" class="ec-recover ec-recover--inline" @click="emit('resend-run', turn.question)">重新问一次</button>
+          <span v-else class="ec-note">稍后再试</span>
+          ，或换一个免费模型继续。
+        </p>
+      </div>
+      <template v-else>
+        这轮没等到回答：{{ issueLine }}
+        <button v-if="turn.question && (issueAction === 'retry' || issueAction === null)" class="ec-recover" @click="emit('resend-run', turn.question)">↻ 重新问一次</button>
+        <span v-if="issueAction === 'wait'" class="ec-note">等几秒再试就好</span>
+        <span v-else-if="issueAction === 'admin'" class="ec-note">请联系管理员更换钥匙</span>
+      </template>
       <details v-if="turn.issueDetail && issueAdmin" class="ec-detail">
         <summary>查看服务商原文</summary>
         <code>{{ turn.issueDetail }}</code>
       </details>
-      <!-- 终审 P2-3：quota 的跳转按钮只有能进「AI 模型与钥匙」的人（管理员）才给，
-           普通成员点了会落 404 兜底路由——quota 最常见受众恰是普通成员，给灰字出路 -->
-      <button v-if="issueAction === 'quota' && issueAdmin" class="ec-recover" @click="emit('mdnav', AI_CONFIG_PATH)">去「AI 模型与钥匙」查看</button>
-      <span v-else-if="issueAction === 'quota'" class="ec-note">请联系管理员充值或换模型</span>
-      <button v-else-if="turn.question && (issueAction === 'retry' || issueAction === null)" class="ec-recover" @click="emit('resend-run', turn.question)">↻ 重新问一次</button>
-      <span v-if="issueAction === 'wait'" class="ec-note">等几秒再试就好</span>
-      <span v-else-if="issueAction === 'admin'" class="ec-note">请联系管理员更换钥匙</span>
     </div>
 
     <!-- 错误卡（AU-35 1008拍板A：挂起中断类=恢复优先双按钮——code+框架文案双保险判定，
@@ -3208,6 +3218,28 @@ function onMdClick(e: MouseEvent | KeyboardEvent) {
   &:hover {
     background: var(--dcs-color-danger-light-9, #fef0f0);
   }
+}
+/* Q11（2026-11-25 钱包批）：额度用尽三行卡——原因 / 找谁 / 出路，行距压紧但三行不并成一句 */
+.ec-quota {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ec-quota p {
+  margin: 0;
+}
+.ec-quota__why b {
+  font-weight: 600;
+}
+.ec-quota__who,
+.ec-quota__way {
+  color: var(--dcs-color-danger);
+  opacity: 0.86;
+}
+.ec-recover--inline {
+  margin-left: 2px;
+  padding: 1px 8px;
+  font-size: 12px;
 }
 /* 2026-11-11 Q4-2：限流/鉴权类不给按钮，只给一句「接下来做什么」的灰字提示 */
 .ec-note {

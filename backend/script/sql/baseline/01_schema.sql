@@ -3712,6 +3712,15 @@ CREATE INDEX idx_wallet_ledger_wallet_time ON public.tenant_wallet_ledger USING 
 
 
 --
+-- Name: idx_tw_ledger_tenant_time; Type: INDEX; Schema: public; Owner: -
+--
+
+-- 2026-11-25 钱包流水批 Q5：按日期筛选 + 合计走 (tenant_id, create_time)；
+-- 列表默认时间倒序，DESC 进索引让反向扫描同样命中；部分索引与查询条件 del_flag='0' 一致。
+CREATE INDEX idx_tw_ledger_tenant_time ON public.tenant_wallet_ledger USING btree (tenant_id, create_time DESC) WHERE (del_flag = '0'::bpchar);
+
+
+--
 -- Name: idx_wallet_payment_order_tenant_time; Type: INDEX; Schema: public; Owner: -
 --
 

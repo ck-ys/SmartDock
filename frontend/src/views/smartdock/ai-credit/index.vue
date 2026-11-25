@@ -11,11 +11,11 @@
       </template>
     </OperationsPageHeader>
 
-    <!-- 区2：当前订阅 + 三本账（业务批8 Q7 丁：头部消费方式开关，二选一显式切换） -->
+    <!-- 区1（Q2=案1）：余额 Hero —— 一屏回答「这周还能用多少」；细节收进下方折叠区 -->
     <el-card shadow="never" class="dcs-ops-table-card status-card">
       <template #header>
         <div class="card-head">
-          <span>当前状态</span>
+          <span>本周额度</span>
           <div class="mode-switch">
             <span class="mode-label">消费方式</span>
             <el-radio-group :model-value="consumeMode" @change="onSwitchMode">
@@ -28,17 +28,62 @@
           </div>
         </div>
       </template>
-      <div class="sub-line">
-        <span v-if="summary.subscribed" class="ui-pill ui-pill--pos">{{ summary.planName }} · 至 {{ shortDate(summary.endTime) }}</span>
-        <span v-else class="ui-pill ui-pill--muted">未订阅</span>
-        <span class="sub-hint">{{
-          consumeMode === 'CREDIT'
-            ? '积分消费中：助手对话扣积分不扣钱包；免费档模型（0 元）不扣积分；积分用尽可买加油包或切回钱包按量'
-            : '钱包按量中：助手对话按实际用量扣租户钱包（元）；订阅套餐后自动切换为积分消费'
-        }}</span>
+
+      <!-- Q2：主角 —— 剩余积分 + 约多少轮对话；不订阅时说明现在扣的是钱包 -->
+      <div class="credit-hero">
+        <div class="credit-hero__main">
+          <span class="credit-hero__label">{{ summary.subscribed ? '本周还能用' : '本周可用额度' }}</span>
+          <strong class="credit-hero__value">{{ fmt(weeklyLeft) }}</strong>
+          <span class="credit-hero__unit">积分<span v-if="weeklyLeft > 0" class="credit-hero__approx"> · 约 {{ fmt(roundsOf(weeklyLeft)) }} 轮对话</span></span>
+          <span class="credit-hero__hint">
+            {{ summary.subscribed ? `周一 0 点恢复满额 ${fmt(summary.weeklyCap)}；本周已用 ${fmt(summary.weeklyUsed)}` : '当前按钱包计费，积分池不动；订阅套餐后对话改扣积分' }}
+          </span>
+        </div>
+        <div class="credit-hero__side">
+          <div class="credit-hero__cell">
+            <span class="credit-hero__cell-label">当前档位</span>
+            <span class="credit-hero__cell-value">
+              <span v-if="summary.subscribed" class="ui-pill ui-pill--pos">{{ summary.planName }}</span>
+              <span v-else class="ui-pill ui-pill--muted">未订阅</span>
+            </span>
+            <span class="credit-hero__cell-hint">{{ summary.subscribed ? `至 ${shortDate(summary.endTime)}` : '下方选一个档位开始' }}</span>
+          </div>
+          <div class="credit-hero__cell">
+            <span class="credit-hero__cell-label">加油包余额</span>
+            <span class="credit-hero__cell-value">{{ fmt(summary.tankBalance) }}</span>
+            <span class="credit-hero__cell-hint">一次性，不受周池限制</span>
+          </div>
+        </div>
       </div>
-      <!-- 业务反馈批1015c Q8/Q11(拍板A)：走钱包时积分池不动=预期（这轮扣的是钱包），但池卡
-           照常显示 100%，演示/实测屡被当成 bug——显式引导条说真话，并指路钱包流水 -->
+
+      <!-- Q8：术语收进「技术参数」——窗口/整周期/滚动规则放这里，需要时展开 -->
+      <el-collapse v-model="techOpen" class="credit-tech">
+        <el-collapse-item name="tech">
+          <template #title>
+            <span class="credit-tech__title">技术参数（5 小时窗口、整周期总额、扣减顺序）</span>
+          </template>
+          <div class="credit-tech__body">
+            <div class="credit-tech__row">
+              <span class="credit-tech__k">{{ summary.windowHours }} 小时窗口</span>
+              <span class="credit-tech__v">剩余 {{ fmt(windowLeft) }} / {{ fmt(summary.windowCap) }} 积分</span>
+            </div>
+            <p class="credit-tech__note">滚动窗口只限周池扣减：{{ summary.windowHours }} 小时内用超 {{ fmt(summary.windowCap) }} 积分会短暂受限，超出部分自动走加油包。</p>
+            <template v-if="summary.subscribed && summary.totalQuota > 0">
+              <div class="credit-tech__row">
+                <span class="credit-tech__k">整周期总额</span>
+                <span class="credit-tech__v">剩余 {{ fmt(totalRemaining) }} / {{ fmt(summary.totalQuota) }} 积分</span>
+              </div>
+              <p class="credit-tech__note">本订阅期已用 {{ fmt(summary.termUsed) }} 积分（{{ totalUsedPct }}%）· 暂不限制，按周池节奏走。</p>
+            </template>
+            <div class="credit-tech__row">
+              <span class="credit-tech__k">扣减顺序</span>
+              <span class="credit-tech__v">周池 → 加油包</span>
+            </div>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
+
+      <!-- 走钱包时积分池不动=预期，显式说真话并指路钱包流水 -->
       <el-alert
         v-if="consumeMode !== 'CREDIT'"
         class="wallet-lead"
@@ -47,46 +92,6 @@
         show-icon
         title="当前按钱包计费：助手对话的扣费记录在「钱包流水」页，本页积分池不会变动；订阅套餐后自动切换为积分消费"
       />
-      <el-row :gutter="16">
-        <el-col :xs="24" :sm="24" :md="12" :lg="8">
-          <div class="ledger-box">
-            <div class="ledger-title">本周周池 · 剩余</div>
-            <div class="ledger-num">
-              {{ fmt(weeklyLeft) }} <span class="ledger-unit">/ {{ fmt(summary.weeklyCap) }} 积分</span>
-            </div>
-            <el-progress :percentage="weeklyPct" :stroke-width="8" :show-text="false" :color="barColor(weeklyPct)" />
-            <div class="ledger-hint">周一 0 点整池恢复 · 本周已用 {{ fmt(summary.weeklyUsed) }} 积分</div>
-          </div>
-        </el-col>
-        <el-col :xs="24" :sm="24" :md="12" :lg="8">
-          <div class="ledger-box">
-            <div class="ledger-title">{{ summary.windowHours }} 小时窗口 · 剩余</div>
-            <div class="ledger-num">
-              {{ fmt(windowLeft) }} <span class="ledger-unit">/ {{ fmt(summary.windowCap) }} 积分</span>
-            </div>
-            <el-progress :percentage="windowPct" :stroke-width="8" :show-text="false" :color="barColor(windowPct)" />
-            <div class="ledger-hint">滚动窗口只限周池扣减，超限部分自动走加油包 · 窗口内已用 {{ fmt(summary.windowUsed) }} 积分</div>
-          </div>
-        </el-col>
-        <el-col :xs="24" :sm="24" :md="12" :lg="8">
-          <div class="ledger-box">
-            <div class="ledger-title">加油包余额</div>
-            <div class="ledger-num">{{ fmt(summary.tankBalance) }} <span class="ledger-unit">积分</span></div>
-            <div class="ledger-hint">一次性余额，不受周池与窗口限制，用完为止；购买入口见下方「订阅档位」区</div>
-          </div>
-        </el-col>
-        <el-col v-if="summary.subscribed && summary.totalQuota > 0" :xs="24" :sm="24" :md="12" :lg="8">
-          <!-- Q12：整周期总额账盒——总剩余+已用%（先软后硬：只展示与预警，不拦扣费） -->
-          <div class="ledger-box">
-            <div class="ledger-title">整周期总额 · 剩余</div>
-            <div class="ledger-num">
-              {{ fmt(totalRemaining) }} <span class="ledger-unit">/ {{ fmt(summary.totalQuota) }} 积分</span>
-            </div>
-            <el-progress :percentage="totalPct" :stroke-width="8" :show-text="false" :color="barColor(totalPct)" />
-            <div class="ledger-hint">本订阅期已用 {{ fmt(summary.termUsed) }} 积分（{{ totalUsedPct }}%）· 用满会不会断：暂不限制，按周池节奏走</div>
-          </div>
-        </el-col>
-      </el-row>
     </el-card>
 
     <!-- 区1：档位（业务批8 Q4：description 上卡 + 中间档高亮 + 技术参数收灰字 + 加油包升格窄卡） -->
@@ -466,6 +471,8 @@ const busy = ref<string | null>(null);
 const consumeMode = ref<'WALLET' | 'CREDIT'>('WALLET');
 /** 业务批8 Q4：各档在订租户数（超管改价影响提示） */
 const planActiveCounts = ref<Record<string, number>>({});
+/** Q8：技术参数折叠（5 小时窗口 / 整周期总额 / 扣减顺序）默认收起，不挡主路径 */
+const techOpen = ref<string[]>([]);
 /** 业务批8 Q4：套餐编辑弹窗（任何参数可改；kind/planCode 只读） */
 const planEdit = reactive({
   visible: false,
@@ -538,16 +545,11 @@ const planTotal = (p: CreditPlanVO) =>
   Number(p.totalCredits) > 0 ? Number(p.totalCredits) : Number(p.weeklyCredits || 0) * Number(p.durationWeeks || 0);
 /** Q12：整周期剩余与已用%（先软后硬：展示口径，不参与扣费闸） */
 const totalRemaining = computed(() => Math.max(0, (summary.value.totalQuota || 0) - (summary.value.termUsed || 0)));
-const totalPct = computed(() =>
-  summary.value.totalQuota > 0 ? Math.min(100, Math.round((totalRemaining.value / summary.value.totalQuota) * 100)) : 0
-);
-/** 业务批(1029)回修：hint 的「已用%」独立成口径——totalPct 已统一为剩余口径（1015 批统一时漏改），不能再拿它当已用% */
+/** 业务批(1029)回修：hint 的「已用%」独立成口径——不能再拿剩余%当已用% */
 const totalUsedPct = computed(() =>
   summary.value.totalQuota > 0 ? Math.min(100, Math.round((summary.value.termUsed / summary.value.totalQuota) * 100)) : 0
 );
 const windowLeft = computed(() => Math.max(0, summary.value.windowCap - summary.value.windowUsed));
-const weeklyPct = computed(() => (summary.value.weeklyCap > 0 ? Math.min(100, Math.round((weeklyLeft.value / summary.value.weeklyCap) * 100)) : 0));
-const windowPct = computed(() => (summary.value.windowCap > 0 ? Math.min(100, Math.round((windowLeft.value / summary.value.windowCap) * 100)) : 0));
 
 const headerMetrics = computed(() => [
   {
@@ -568,10 +570,6 @@ const headerMetrics = computed(() => [
 
 const fmt = (n?: number | null) => `${Number(n || 0).toLocaleString('zh-CN')}`;
 const shortDate = (s?: string | null) => (s ? String(s).slice(0, 10) : '--');
-const barColor = (pct: number) =>
-  // 业务批(1015) Q8：改剩余口径后配色语义翻转——余量≤10% 红、≤30% 橙、充足绿（积分主题色）；
-  // 其余进度条（如订阅卡）仍走已用口径的不受影响
-  pct <= 10 ? 'var(--el-color-danger)' : pct <= 30 ? 'var(--el-color-warning)' : 'var(--el-color-success)';
 const bizTag = (t: string) => {
   const map: Record<string, { label: string; tone: 'info' | 'warning' | 'success' | 'primary' }> = {
     DEDUCT: { label: '消耗', tone: 'primary' },
@@ -906,17 +904,6 @@ onMounted(() => {
   color: var(--app-faint);
   font-size: 14px;
 }
-.sub-line {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.sub-hint {
-  font-size: 12px;
-  color: var(--app-muted);
-}
 .head-sub {
   font-size: 12px;
   color: var(--app-faint);
@@ -925,34 +912,137 @@ onMounted(() => {
 .status-card :deep(.el-card__body) {
   padding-top: 12px;
 }
-.ledger-box {
+
+/* ===== Q2：余额 Hero（主角 = 本周还能用多少 + 约多少轮） ===== */
+.credit-hero {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: var(--app-surface);
   border: 1px solid var(--app-rule);
   border-radius: var(--app-card-radius);
-  padding: 14px 16px;
-  height: 100%;
 }
-.ledger-title {
-  font-size: 13px;
-  color: var(--app-muted);
-  margin-bottom: 6px;
+.credit-hero__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 16px 20px;
 }
-.ledger-num {
-  font-size: var(--dcs-kpi-size);
-  font-weight: 600;
+.credit-hero__label {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.3;
+}
+.credit-hero__value {
   color: var(--app-text);
-  margin-bottom: 8px;
-  /* 六审回修（视觉席）：数字列 tabular-nums——比例数字下 1/4/7 宽窄不一，刷新后数字抖动 */
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.credit-hero__unit {
+  color: var(--app-muted);
+  font-size: var(--dcs-font-md);
+}
+.credit-hero__approx {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+}
+.credit-hero__hint {
+  margin-top: 4px;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.4;
+}
+.credit-hero__side {
+  display: flex;
+  flex: 0 0 auto;
+}
+.credit-hero__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  justify-content: center;
+  min-width: 132px;
+  padding: 16px 18px;
+  border-left: 1px solid var(--app-rule);
+}
+.credit-hero__cell-label {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-xs);
+  line-height: 1.3;
+}
+.credit-hero__cell-value {
+  color: var(--app-text);
+  font-size: var(--dcs-font-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.credit-hero__cell-hint {
+  color: var(--app-faint);
+  font-size: var(--dcs-font-xs);
+  line-height: 1.3;
+}
+
+/* ===== Q8：技术参数折叠 ===== */
+.credit-tech {
+  border-top: 0;
+  border-bottom: 0;
+}
+.credit-tech__title {
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+}
+.credit-tech__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 2px 4px;
+}
+.credit-tech__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--dcs-font-sm);
+}
+.credit-tech__k {
+  color: var(--app-faint);
+}
+.credit-tech__v {
+  color: var(--app-text);
   font-variant-numeric: tabular-nums;
 }
-.ledger-unit {
-  font-size: 12px;
-  color: var(--app-faint);
-  font-weight: 400;
+.credit-tech__note {
+  margin: 0 0 4px;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-xs);
+  line-height: 1.5;
 }
-.ledger-hint {
-  font-size: 12px;
-  color: var(--app-faint);
-  margin-top: 8px;
+
+/* 手机档：Hero 竖排，三格换行，避免横向挤压 */
+@media (max-width: 992px) {
+  .credit-hero {
+    flex-direction: column;
+  }
+  .credit-hero__value {
+    font-size: 26px;
+  }
+  .credit-hero__side {
+    border-top: 1px solid var(--app-rule);
+  }
+  .credit-hero__cell {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 12px 14px;
+  }
+  .credit-hero__cell:first-child {
+    border-left: 0;
+  }
 }
 .plan-card {
   position: relative;

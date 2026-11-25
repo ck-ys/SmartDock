@@ -15,6 +15,8 @@ export interface TenantWalletVO {
   lowBalanceThreshold: number;
   negativeAllowed: string;
   remark: string;
+  /** 单位名称（后端随钱包下发；前端查 sys_tenant 需要平台权限，客户管理员没有） */
+  tenantName?: string;
   createTime: string;
 }
 

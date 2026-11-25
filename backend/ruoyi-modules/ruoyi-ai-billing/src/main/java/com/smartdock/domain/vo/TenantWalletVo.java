@@ -43,6 +43,13 @@ public class TenantWalletVo implements Serializable {
     /** 是否允许负值("1"=允许透支, "0"=不允许) */
     private String negativeAllowed;
     private String remark;
+    /**
+     * 单位名称（sys_tenant.company_name）。
+     *
+     * <p>Q4 拍板：多单位卡片以单位名称为主标识。前端不能自己查 sys_tenant
+     * （要 system:tenant:list，客户管理员没有），所以由后端随钱包一起下发。</p>
+     */
+    private String tenantName;
     /** 乐观锁版本号 */
     private Integer version;
     private Date createTime;

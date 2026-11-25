@@ -237,3 +237,14 @@ FROM public.sys_role_menu rm
 JOIN public.sys_role r ON r.role_id = rm.role_id
 WHERE rm.menu_id = 11920
   AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = rm.role_id AND x.menu_id = 12062);
+
+-- 2026-11-25 钱包/额度体验批 Q9=案1：租户管理员（role 6）授「本单位只读 + 充值/购买套餐」
+-- 只授四项：账户与账单 9067 / 钱包流水 9068 / 积分套餐 11940 / 订阅与加油包 11941，
+-- 外加平台运营目录 6（不授目录子菜单挂不上导航）。
+-- 有意不授：9097 充值（直接改余额=平台的钱）、9098 扣减、9099 冻结、11942 改价与赠送。
+-- 安全前提：后端已按登录租户强制收窄（TenantWalletLedgerService / TenantWalletService / AiCreditController）。
+-- 对应迁移：migration/2026-11-25_wallet_ledger_date_index_and_tenant_admin.sql
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT 6, m.menu_id
+FROM (VALUES (6), (9067), (9068), (11940), (11941)) AS m(menu_id)
+WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = 6 AND x.menu_id = m.menu_id);

@@ -1,5 +1,6 @@
 package com.smartdock.service.support;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
@@ -11,6 +12,8 @@ import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.mybatis.core.page.TableDataInfo;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.dromara.system.domain.SysTenant;
+import org.dromara.system.mapper.SysTenantMapper;
 import com.smartdock.domain.ServiceChargeRule;
 import com.smartdock.domain.TenantWallet;
 import com.smartdock.domain.TenantWalletLedger;
@@ -35,6 +38,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 租户钱包核心服务: 充值/扣减/冻结/兜底决策/低余额检测。
@@ -64,6 +69,8 @@ public class TenantWalletService {
     private final ServiceChargeRuleMapper ruleMapper;
     /** 钱包告警状态 Mapper(低余额/告警去重) */
     private final WalletAlertStateMapper alertStateMapper;
+    /** 租户 Mapper(只用于把 tenantId 补成单位名称, 见 fillTenantNames) */
+    private final SysTenantMapper tenantMapper;
 
     // ========== 查询 ==========
 
@@ -83,7 +90,32 @@ public class TenantWalletService {
         wrapper.orderByDesc(TenantWallet::getCreateTime);
         Page<TenantWalletVo> page = walletMapper.selectVoPage(pageQuery.build(), wrapper);
         page.getRecords().forEach(this::fillAvailable);
+        fillTenantNames(page.getRecords());
         return TableDataInfo.build(page);
+    }
+
+    /**
+     * 补单位名称（Q4：多单位卡片以单位名称为主标识）。
+     *
+     * <p>sys_tenant 在租户拦截器排除表里，一次批量查只取 company_name，不放大任何资金可见范围。
+     * 前端不能自己查：{@code system:tenant:list} 是平台权限，客户管理员没有。</p>
+     */
+    private void fillTenantNames(List<TenantWalletVo> records) {
+        if (CollUtil.isEmpty(records)) {
+            return;
+        }
+        Set<String> tenantIds = records.stream().map(TenantWalletVo::getTenantId)
+            .filter(StrUtil::isNotBlank).collect(Collectors.toSet());
+        if (tenantIds.isEmpty()) {
+            return;
+        }
+        Map<String, String> nameById = tenantMapper.selectList(new LambdaQueryWrapper<SysTenant>()
+                .select(SysTenant::getTenantId, SysTenant::getCompanyName)
+                .in(SysTenant::getTenantId, tenantIds))
+            .stream()
+            .filter(t -> StrUtil.isNotBlank(t.getCompanyName()))
+            .collect(Collectors.toMap(SysTenant::getTenantId, SysTenant::getCompanyName, (a, b) -> a));
+        records.forEach(r -> r.setTenantName(nameById.get(r.getTenantId())));
     }
 
     /**

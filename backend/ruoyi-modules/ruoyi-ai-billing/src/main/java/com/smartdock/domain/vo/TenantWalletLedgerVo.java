@@ -34,6 +34,13 @@ public class TenantWalletLedgerVo implements Serializable {
     private String serviceCode;
     /** 服务编码中文标签（业务批 2026-10-15 Q2：后端统一下发，新服务码不再依赖前端映射） */
     private String serviceCodeLabel;
+    /**
+     * 流水摘要（人话）：优先取 extra_json.reason（操作人填写的原因），无则回退服务码中文标签。
+     *
+     * <p>手动充值/扣减写流水时 service_code 为空、原因只存进 extra_json，
+     * 前端主列此前只能显示 "--"。摘要由后端算，避免每个调用方各自解析 JSON。</p>
+     */
+    private String summary;
     /** 方向: IN=入账(余额增加), OUT=出账(余额减少) */
     private String direction;
     /** 金额(正数, 实际增减方向由 direction 决定) */

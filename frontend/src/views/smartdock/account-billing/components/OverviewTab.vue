@@ -2,118 +2,72 @@
   <el-card shadow="never" class="dcs-ops-table-card">
     <div class="ui-toolbar">
       <el-form :model="queryParams" :inline="true" class="search-form" @submit.prevent>
-        <el-form-item label="租户ID">
-          <el-input v-model="queryParams.tenantId" placeholder="请输入租户ID" clearable style="width: 220px" @keyup.enter="handleQuery" />
+        <el-form-item label="单位">
+          <el-input v-model="queryParams.tenantId" placeholder="租户ID（留空看全部）" clearable style="width: 220px" @keyup.enter="handleQuery" />
         </el-form-item>
         <el-form-item>
           <el-button :icon="Search" @click="handleQuery">搜索</el-button>
           <el-button :icon="RefreshLeft" @click="resetQuery">重置</el-button>
         </el-form-item>
       </el-form>
+      <!-- Q7/Q10：能力驱动 —— 有权限才显示，没权限不占位（不是灰按钮） -->
       <div class="ab-toolbar-actions">
-        <el-button type="primary" :icon="Plus" @click="openInit">初始化钱包</el-button>
+        <el-button v-hasPermi="['smartdock:wallet:recharge']" type="primary" :icon="Plus" @click="openInit">初始化钱包</el-button>
         <el-button :icon="Refresh" @click="reloadAll">刷新</el-button>
       </div>
     </div>
 
-    <div class="ui-table-wrap">
-      <el-table v-loading="loading" :data="walletList" class="ui-table dcs-table-only">
-        <el-table-column label="钱包" min-width="150">
-          <template #default="{ row }">
-            <span :title="`钱包ID ${row.walletId}`" class="dcs-ops-id">{{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="90" align="center">
-          <template #default="{ row }">
-            <span class="ui-pill" :class="row.walletType === 'MAIN' ? 'ui-pill--pos' : 'ui-pill--muted'">{{ walletTypeLabel(row.walletType) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="余额" width="120" align="right">
-          <template #default="{ row }">{{ money(row.balanceAmount) }}</template>
-        </el-table-column>
-        <el-table-column label="冻结" width="110" align="right">
-          <template #default="{ row }">
-            <span :class="{ 'amount-warn': Number(row.frozenAmount || 0) > 0 }">{{ money(row.frozenAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="可用" width="120" align="right">
-          <template #default="{ row }">
-            <span :class="{ 'amount-danger': Number(row.availableAmount || 0) < 0 }">{{ money(row.availableAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="110" align="center">
-          <template #default="{ row }">
-            <span class="ab-status-cell">
-              <span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
-              <span v-if="isLowBalance(row)" class="ui-pill ui-pill--warn">低于阈值</span>
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="低余额阈值" width="110" align="right">
-          <template #default="{ row }">{{ money(row.lowBalanceThreshold) }}</template>
-        </el-table-column>
-        <el-table-column label="创建时间" prop="createTime" width="160" />
-        <el-table-column label="操作" width="170" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button link class="ui-row-action" @click="openRecharge(row)">充值</el-button>
-            <el-button link class="ui-row-action" @click="openThreshold(row)">调阈值</el-button>
-            <el-dropdown trigger="click" @command="(cmd: string) => onMoreCommand(cmd, row)">
-              <el-button link class="ab-more-btn ui-row-action" aria-label="更多资金操作">
-                ···<el-icon class="ab-more-caret"><CaretBottom /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="deduct">扣减</el-dropdown-item>
-                  <el-dropdown-item v-if="row.status !== 'DISABLED'" command="toggle">{{
-                    row.status === 'ACTIVE' ? '冻结' : '解冻'
-                  }}</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <div class="ui-empty">
-            <p class="ui-empty__title">暂无钱包</p>
-            <p class="ui-empty__hint">初始化钱包后，这里会显示租户钱包的余额、冻结与阈值状态。</p>
+    <!-- Q4：单位卡片网格 —— 每家一张卡，余额是最大的字，卡上直接带入口 -->
+    <div v-loading="loading" class="wallet-grid">
+      <div v-if="walletList.length === 0" class="ui-empty">
+        <p class="ui-empty__title">还没有钱包</p>
+        <p class="ui-empty__hint">初始化钱包后，这里会显示每个单位的余额、冻结与提醒线。</p>
+      </div>
+      <article v-for="row in walletList" :key="row.walletId" class="wallet-card" :class="{ 'wallet-card--low': isLowBalance(row) }">
+        <header class="wallet-card__head">
+          <div class="wallet-card__name">
+            <span class="wallet-card__tenant">{{ row.tenantName || `租户 ${row.tenantId}` }}</span>
+            <span class="wallet-card__id">{{ row.tenantId }}{{ row.remark ? ` · ${row.remark}` : '' }}</span>
           </div>
-        </template>
-      </el-table>
+          <span class="wallet-card__badges">
+            <span class="ui-pill" :class="walletStatusPill(row.status)">{{ walletStatusText(row.status).label }}</span>
+            <span v-if="isLowBalance(row)" class="ui-pill ui-pill--warn">{{ LOW_BALANCE.label }}</span>
+          </span>
+        </header>
+
+        <div class="wallet-card__amount">
+          <strong class="wallet-card__balance">{{ money(row.balanceAmount) }}</strong>
+          <span class="wallet-card__meta">
+            可用 {{ money(row.availableAmount) }} · 冻结 {{ money(row.frozenAmount) }}
+          </span>
+        </div>
+
+        <!-- Q12：状态一句话解释（状态名本身不足以让人知道该干嘛） -->
+        <p class="wallet-card__hint">{{ isLowBalance(row) ? LOW_BALANCE.hint : walletStatusText(row.status).hint }}</p>
+
+        <footer class="wallet-card__actions">
+          <el-button v-hasPermi="['smartdock:wallet:recharge']" link type="primary" @click="openRecharge(row)">充值</el-button>
+          <el-button v-hasPermi="['smartdock:wallet:status']" link class="ui-row-action" @click="openThreshold(row)">调提醒线</el-button>
+          <el-button link class="ui-row-action" @click="goLedger(row)">看流水</el-button>
+          <el-dropdown v-if="canManage" trigger="click" @command="(cmd: string) => onMoreCommand(cmd, row)">
+            <el-button link class="ab-more-btn ui-row-action" aria-label="更多资金操作">
+              更多<el-icon class="ab-more-caret"><CaretBottom /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-if="permDeduct" command="deduct">扣减</el-dropdown-item>
+                <el-dropdown-item v-if="permStatus && row.status !== 'DISABLED'" command="toggle">{{
+                  row.status === 'ACTIVE' ? '冻结' : '解冻'
+                }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </footer>
+      </article>
     </div>
 
-    <!-- U-09：≤992 钱包表格改卡片（9 列约 1135px） -->
-    <div class="dcs-mobile-list">
-      <div v-if="walletList.length === 0" class="ui-empty">
-        <p class="ui-empty__title">暂无钱包</p>
-        <p class="ui-empty__hint">初始化钱包后，这里会显示租户钱包的余额、冻结与阈值状态。</p>
-      </div>
-      <div v-for="row in walletList" :key="row.walletId" class="dcs-mobile-card">
-        <div class="dcs-card-head">
-          <span class="dcs-card-title">租户 {{ row.tenantId }} · 尾{{ shortId(row.walletId) }}</span>
-          <span class="dcs-card-badge"
-            ><span class="ui-pill" :class="statusPillClass(row.status)">{{ statusLabel(row.status) }}</span>
-            <span v-if="isLowBalance(row)" class="ui-pill ui-pill--warn">低于阈值</span></span
-          >
-        </div>
-        <div class="dcs-card-meta">
-          <span class="ui-pill" :class="row.walletType === 'MAIN' ? 'ui-pill--pos' : 'ui-pill--muted'">{{ walletTypeLabel(row.walletType) }}</span>
-          <span>余额 {{ money(row.balanceAmount) }}</span>
-          <span :class="{ 'amount-warn': Number(row.frozenAmount || 0) > 0 }">冻结 {{ money(row.frozenAmount) }}</span>
-          <span :class="{ 'amount-danger': Number(row.availableAmount || 0) < 0 }">可用 {{ money(row.availableAmount) }}</span>
-        </div>
-        <div class="dcs-card-foot">
-          <span class="dcs-card-time">阈值 {{ money(row.lowBalanceThreshold) }}</span>
-          <div class="dcs-card-actions">
-            <el-button link type="primary" @click="openRecharge(row)">充值</el-button>
-            <el-button link class="ui-row-action" @click="openThreshold(row)">调阈值</el-button>
-            <el-button link class="ui-row-action" @click="onMoreCommand('deduct', row)">扣减</el-button>
-            <el-button v-if="row.status !== 'DISABLED'" link class="ui-row-action" @click="onMoreCommand('toggle', row)">
-              {{ row.status === 'ACTIVE' ? '冻结' : '解冻' }}
-            </el-button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Q10：客户视角可能看不到某些按钮——统一说一句「找谁开通」，避免以为系统没有 -->
+    <p v-if="!canManage" class="ab-perm-note">需要充值、冻结或调整提醒线？联系平台管理员开通相应权限。</p>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
 
@@ -188,6 +142,8 @@
  */
 import { Plus, Search, Refresh, RefreshLeft, CaretBottom } from '@element-plus/icons-vue';
 import type { OperationsMetric } from '@/components/OperationsPageHeader/index.vue';
+import { checkPermi } from '@/utils/permission';
+import { LOW_BALANCE, walletStatusPill, walletStatusText } from '@/utils/walletStatus';
 import {
   listTenantWallet,
   initMainWallet,
@@ -201,6 +157,13 @@ import {
 } from '@/api/smartdock/account-billing';
 
 defineOptions({ name: 'AccountBillingOverviewTab' });
+
+/** Q7/Q10：能力驱动显隐——有权限才出按钮，没权限不占位（不是灰按钮） */
+const permRecharge = checkPermi(['smartdock:wallet:recharge']);
+const permDeduct = checkPermi(['smartdock:wallet:deduct']);
+const permStatus = checkPermi(['smartdock:wallet:status']);
+/** 「更多」下拉里只要有一项就不空转 */
+const canManage = computed(() => permDeduct || permStatus);
 
 const emit = defineEmits<{ metrics: [m: OperationsMetric[]] }>();
 
@@ -236,20 +199,13 @@ const walletTypeLabel = (t: string) => {
   return map[t] || t || '--';
 };
 
-const statusLabel = (s: string) => {
-  const map: Record<string, string> = { ACTIVE: '正常', FROZEN: '已冻结', DISABLED: '已停用' };
-  return map[s] || s || '--';
-};
-
-/** 状态药丸：与全站四组语义色对齐（正常=成功 / 冻结=警告 / 停用=中性） */
-const statusPillClass = (s: string) => {
-  const map: Record<string, string> = { ACTIVE: 'ui-pill--pos', FROZEN: 'ui-pill--warn', DISABLED: 'ui-pill--muted' };
-  return map[s] || 'ui-pill--muted';
-};
-
 const money = (value?: number) => `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const shortId = (id?: number | string) => String(id || '').slice(-4);
+/** Q4：「看流水」带租户过滤跳转，落地就能看到这一家的账 */
+const router = useRouter();
+const goLedger = (row: TenantWalletVO) => {
+  router.push({ path: '/tenant/account-billing', query: { tab: 'ledger', tenantId: row.tenantId } });
+};
 
 /** 余额低于阈值 → 状态列补「低于阈值」warn 药丸（U-18：撤整行彩底+左缘彩条，状态色只上药丸） */
 const isLowBalance = (row: TenantWalletVO) => {
@@ -513,5 +469,108 @@ onMounted(reloadAll);
   justify-content: center;
   gap: 4px;
   flex-wrap: wrap;
+}
+/* ===== Q4：单位卡片网格 ===== */
+.wallet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  min-width: 0;
+  padding: 4px 0 12px;
+}
+.wallet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--app-rule);
+  border-radius: var(--app-card-radius);
+  background: var(--app-surface);
+}
+/* 低于提醒线：只加一条左缘提示，不刷整卡彩底 */
+.wallet-card--low {
+  border-left: 2px solid var(--el-color-warning);
+}
+.wallet-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.wallet-card__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wallet-card__tenant {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: var(--dcs-font-md);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wallet-card__id {
+  overflow: hidden;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wallet-card__badges {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.wallet-card__amount {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wallet-card__balance {
+  color: var(--app-text);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.wallet-card__meta {
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+  font-variant-numeric: tabular-nums;
+}
+.wallet-card__hint {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: var(--dcs-font-sm);
+  line-height: 1.45;
+}
+.wallet-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 4px;
+  border-top: 1px solid var(--app-rule);
+}
+.ab-perm-note {
+  margin: 4px 0 12px;
+  color: var(--app-faint);
+  font-size: var(--dcs-font-sm);
+}
+/* 手机档：卡片单列，余额略小 */
+@media (max-width: 992px) {
+  .wallet-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wallet-card__balance {
+    font-size: 26px;
+  }
 }
 </style>

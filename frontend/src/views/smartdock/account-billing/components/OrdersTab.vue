@@ -152,6 +152,7 @@ import { Plus, Search, Refresh, RefreshLeft } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import type { OperationsMetric } from '@/components/OperationsPageHeader/index.vue';
 import { listWalletPaymentOrder, createWalletPaymentOrder, closeWalletPaymentOrder, type WalletPaymentOrderVO } from '@/api/smartdock/account-billing';
+import { orderStatusPill, orderStatusText } from '@/utils/walletStatus';
 
 defineOptions({ name: 'AccountBillingOrdersTab' });
 
@@ -187,16 +188,9 @@ const channelLabel = (c: string) => {
   return map[c] || c || '--';
 };
 
-const statusLabel = (s: string) => {
-  const map: Record<string, string> = { PENDING: '待支付', PAID: '已支付', CLOSED: '已关闭' };
-  return map[s] || s || '--';
-};
-
-/** 状态药丸：待支付=警告 / 已支付=成功 / 已关闭=中性 */
-const statusPillClass = (s: string) => {
-  const map: Record<string, string> = { PENDING: 'ui-pill--warn', PAID: 'ui-pill--pos', CLOSED: 'ui-pill--muted' };
-  return map[s] || 'ui-pill--muted';
-};
+/** Q12：订单状态话术与配色统一走 utils/walletStatus（唯一权威，别在本页再写一套映射） */
+const statusLabel = (s: string) => orderStatusText(s).label;
+const statusPillClass = (s: string) => orderStatusPill(s);
 
 const money = (value?: number) => `¥${Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
