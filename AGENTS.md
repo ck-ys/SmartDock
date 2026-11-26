@@ -205,8 +205,16 @@ D:\Git\git-gitee\smart-dock\   # 单仓：前端 + 后端（gitee 开源）
 
 1. 本机没有 5432 的 PG、也没有 6379 的 Redis；yml 里 `127.0.0.1` 是模板默认，起后端必须带覆盖参数（见验收提示词铁律）。
 2. 查本仓数据面**一律用 `dock-pg` / `dock-redis`**；会话里若同时挂载了默认库不属于本项目的其它 PG/Redis 工具，一律不用。
-3. 库分工（本机开发环境）：画像/分析取数、演示数据与截图 → `smartdock_shots`（演示基线见「领域概念速查」）；跑后端的实验库 → `smartdock_scratch`。同实例上除 `smartdock_` 前缀的库一律不许读写。
+3. 库分工（本机开发环境，2026-11-25 定稿）：**正式库 = `smartdock_shots`**（后端 8090、演示、截图、验收全用它；画像/分析取数与演示基线见「领域概念速查」）；**实验库 = `smartdock_scratch`**（只在这里做重建/破坏性测试）。同实例上除 `smartdock_` 前缀的库一律不许读写。
 4. MCP 纪律：先列清单、再看列定义、后写 SQL；`pg_query` 每次一条、参数 `$1/$2` 绑定；DDL/DML 前先同条件 SELECT 验证影响面并等用户确认；行数估算不作数，真数用 `count(*)`。
+
+**正式库保护（2026-11-25 拍板，写死别再犯）：**
+
+- `smartdock_shots` 是**唯一正式库**：禁止 `DROP` / 重建 / 清空 / 用 baseline 重新初始化；结构变更只走 `backend/script/sql/migration/*.sql` 增量迁移。2026-11-21 批 9 曾用「新基线重建全零」把库里的模型配置清空，教训在案。
+- 动正式库前必须先备份到 `.workshop/evidence/db-backups/`（gitignored）：至少导出 `ai_config` / `ai_provider_access` / `assistant_model_setting` 三张表，能整库 dump 就整库 dump。
+- 2026-11-25 已从远端旧库恢复 **23 条模型配置（10 条未删除）+ 4 条厂商接入 + 1 条默认模型设置**；4 个历史快照库（`smartdock_baseline_check` / `smartdock_baseline_test` / `smartdock_gate_20261023b` / `smartdock_replay_20261018`）已备份后删除。
+- 远端旧库的钥匙密文与本机 `SMARTDOCK_AI_CONFIG_KEY` 不匹配，恢复后需在「AI 模型与钥匙 → 钥匙管理」重填 4 把厂商钥匙（DeepSeek / MiniMax / OpenCode / OpenRouter）；模型配置本身不用重配。
+- dcs 相关一律不动：`dcs_mid`、`dcs_server` 两个库，以及正式库内的 `dcs_changelog` 等白名单表。
 
 ---
 
