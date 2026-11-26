@@ -55,6 +55,12 @@ public class AiCreditPlan implements Serializable {
     /** 业务批7 Q1：订阅期每人每天联网搜索次数档位（0/NULL=沿用租户默认；种子 LITE/PRO/MAX=50/150/400） */
     private Integer websearchLimitPerUserDaily;
 
+    /**
+     * 额度三级管控批（2026-11-26 / Q4=3 + Q8=3 + Q18=1）：套餐建议值——该档位下每人每天建议积分上限。
+     * NULL/0=没给建议，算上限时落到平台兜底数。超管在套餐页填，企业可改（企业默认列）。
+     */
+    private Integer suggestedDailyCreditPerUser;
+
     private String description;
 
     /** 1=在售 0=下架 */

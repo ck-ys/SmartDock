@@ -40,4 +40,10 @@ public class AssistantUserQuota implements Serializable {
 
     /** 禁用开关：1=管理员暂停该用户的 AI 助手使用 0=正常 */
     private String disabled;
+
+    /**
+     * 额度三级管控批（2026-11-26）：个人覆盖——该用户每天积分上限。
+     * null=跟随企业默认；-2=显式「跟随」（写入归一成 NULL）；-1=不限；正数=上限。
+     */
+    private Integer creditLimitOverride;
 }

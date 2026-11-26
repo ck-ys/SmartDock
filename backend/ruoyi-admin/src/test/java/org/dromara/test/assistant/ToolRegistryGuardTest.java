@@ -70,7 +70,10 @@ class ToolRegistryGuardTest {
     private static ToolRegistry.ToolDeps readyDeps(Boolean memoryEnabled, String threadId, boolean interactive) {
         return new ToolRegistry.ToolDeps(
             KEY_CONFIG, null, null,
-            null, null, memoryEnabled, threadId, "000000", null, null, null, null, null,
+            null, null, memoryEnabled, threadId, "000000", null, null, null, null,
+            // 额度三级管控批 Q16=1：搜索服务表不注入（null=只读系统参数，与老版本一致）
+            null,
+            null,
             // 题7：read_file 构造只存根路径，不读盘
             java.nio.file.Path.of("."),
             // 题12：ask_user 只存桥引用

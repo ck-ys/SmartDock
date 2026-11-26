@@ -21,6 +21,7 @@ import org.dromara.common.core.domain.model.LoginUser;
 // (包名未迁), 旧 dcs 业务模块删除后依赖仍闭合
 import com.smartdock.domain.AiConfig;
 import com.smartdock.service.IAiModelPriceService;
+import com.smartdock.service.IAiSearchService;
 import com.smartdock.service.support.AiBillingService;
 import com.smartdock.service.support.TenantWalletService;
 import com.smartdock.assistant.service.MessageWriteService;
@@ -102,6 +103,8 @@ public class AssistantAgentFactory {
     private final com.smartdock.assistant.engine.persist.AssistantRunRecorder runRecorder;
     /** 用户额度服务(业务批3-④: 联网限额三层合成唯一出口) */
     private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
+    /** 额度三级管控批（Q16=1）：搜索服务表——优先读它的 key、成功搜一次给资源包估算 +1 */
+    private final IAiSearchService searchService;
     /** 批2 SPI 化: BizToolProvider 注册器(零 provider 时为空表, 助手无业务模块也能起) */
     private final ProviderToolRegistry providerToolRegistry;
     /** 动作账本(三批③ 2026-11-01: 写操作审计 hook 落行/收口的 service 依赖) */
@@ -227,6 +230,10 @@ public class AssistantAgentFactory {
             // （装饰器包住整个 model，侧车调用与正文共用一条计费链），旧注释"侧车不注入"
             // 与实际不符——侧车小额消耗同样走积分，与钱包口径行为一致
             .creditService(creditService)
+            // 额度三级管控批（2026-11-26 / Q9=2）：个人积分上限闸——每次调模型前直查账本，
+            // 挂在企业池 preGate 之前。侧车走同一个装饰器，被拦时只是这次不生成标题/追问，
+            // 对话本身不受影响（那两处的异常本来就全吞）
+            .quotaService(quotaService)
             // AI 缺口批 Q8：主对话链接钥匙池上报（失败冷却/成功清冷却；侧车不接零影响）
             .keyPool(providerKeyPool)
             // 2026-11-11 Q2-2 补丁：模型失败侧落问题行——框架对服务商故障不出 RUN_ERROR
@@ -253,7 +260,7 @@ public class AssistantAgentFactory {
             new ToolRegistry.ToolDeps(
                 configService, piiFilter, attachmentService,
                 planSignal, memoryTurnService, memoryOn, aguiThreadId, user.getTenantId(),
-                todoSignal, messageWriteService, webSearchQuota, quotaService, tenantCfg.toolGate(),
+                todoSignal, messageWriteService, webSearchQuota, quotaService, searchService, tenantCfg.toolGate(),
                 // 题7 案1：工作区根 = 本会话驱逐落盘目录（read_file 只在此根下回读）
                 threadWorkspace,
                 // 题12 案1：结构化反问桥（ask_user）

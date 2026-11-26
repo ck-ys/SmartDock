@@ -101,6 +101,14 @@ public class AssistantMcpController extends BaseController {
             if (!"1".equals(s.getEnabled())) {
                 continue;
             }
+            // 额度三级管控批（2026-11-26 / Q19 前置②）：本批把 11927（AI 助手管理）授给内置
+            // 「租户管理员」，这个端点会跟着对他开放。listAll() 是 TenantHelper.ignore 下的
+            // 全平台行，原样返回等于把别家的 MCP 服务名 / 命令 / 参数 / 地址 / 请求头键名全露出去。
+            // 写操作本来就有 requireSuperAdmin 挡着，读面在这里按租户收窄：非超管只看本租户的行。
+            // tenant_id 为空的历史行按「平台级」处理，只给超管看
+            if (!LoginHelper.isSuperAdmin() && !tenantId.equals(s.getTenantId())) {
+                continue;
+            }
             String override = gate == null ? null : gate.get("mcp:" + s.getServerName());
             int effective = "off".equals(override) ? -1
                 : "admin".equals(override) ? com.smartdock.assistant.engine.tools.ToolIdentity.LEVEL_ADMIN

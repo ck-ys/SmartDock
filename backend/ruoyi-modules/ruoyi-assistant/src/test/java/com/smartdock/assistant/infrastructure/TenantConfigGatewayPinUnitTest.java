@@ -35,7 +35,7 @@ class TenantConfigGatewayPinUnitTest {
     private static AssistantConfigService.EffectiveConfig eff(String digestEnabled) {
         return new AssistantConfigService.EffectiveConfig(true, true, 50,
             new BigDecimal("100"), "1", 3000, 10, digestEnabled, "助手",
-            java.util.Map.of());
+            java.util.Map.of(), null);
     }
 
     // ── 钉 ① digestEnabled "1"/"0" → boolean ──────────────────────
@@ -58,7 +58,7 @@ class TenantConfigGatewayPinUnitTest {
         AssistantConfigService svc = mock(AssistantConfigService.class);
         BigDecimal budget = new BigDecimal("88.50");
         when(svc.effective(TENANT)).thenReturn(new AssistantConfigService.EffectiveConfig(
-            true, true, 50, budget, "1", 3000, 10, "1", "助手", java.util.Map.of()));
+            true, true, 50, budget, "1", 3000, 10, "1", "助手", java.util.Map.of(), null));
 
         assertEquals(budget, new TenantConfigGatewayImpl(svc).dailyBudget(TENANT));
     }

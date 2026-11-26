@@ -168,6 +168,12 @@ public class AutomationRunner {
             if (!limits.creditsMode() || limits.roundLimit() <= 0) {
                 dailyQuota.tryTurn(tenantId, automation.getUserId(), limits.roundLimit());
             }
+            // 额度三级管控批（2026-11-26 / Q6 补条件）：积分模式先查个人额度——走这条「不算失败」
+            // 的路（下面的 catch 传 false），否则用户额度恢复后还得手动重开被停用的自动化。
+            // 装饰器里那道闸是兜底：进门放行、模型阶段才超的情形，靠下面的 catch 认额度类异常
+            if (limits.creditsMode()) {
+                quotaService.assertPersonalCredits(tenantId, automation.getUserId(), "自动化进门");
+            }
             try {
                 if (!limits.creditsMode()) {
                     dailyQuota.checkBudget(tenantId, tenantConfig.dailyBudget(tenantId));
@@ -240,6 +246,13 @@ public class AutomationRunner {
             // 被闸关时一个工具都挂不上，这时的失败没有任何外部因素可归因，必须照常计数，
             // 否则一条残留勾选就能让坏掉的自动化永远停不下来。
             boolean countFailure = mountedMcp.isEmpty();
+            // 额度三级管控批（2026-11-26 / Q6 补条件）：模型阶段被个人额度闸拦下的那次也不能计失败。
+            // 这正是「还剩 5 分、这次要 10 分」走的路——只修进门那一半，续跑阶段照样把自动化耗死
+            // （连 3 次自动停用，用户额度恢复后还得手动重开）。只认自家闸的记号，不认厂商 429：
+            // 厂商限流是外部因素，但那条已经被 mountedMcp 判据覆盖，这里不越界扩大
+            if (countFailure && isPersonalCreditRejection(t)) {
+                countFailure = false;
+            }
             try {
                 messageWriteService.appendAssistantMessage(tenantId, conversationId,
                     automation.getUserId(), "（这次自动化没有跑完）" + reason, null, "error");
@@ -382,6 +395,29 @@ public class AutomationRunner {
     }
 
     /** 给用户看的原因：业务异常原文；其它一律不暴露内部细节 */
+    /**
+     * 额度三级管控批（Q6 补条件）：判定「这次失败是不是被个人额度闸拒的」。
+     *
+     * <p>沿 cause / suppressed 链找自家闸的记号——框架会把 ServiceException 包一层再抛，
+     * 只看最外层 {@code getMessage()} 会漏。纯函数，单测直调。</p>
+     */
+    static boolean isPersonalCreditRejection(Throwable t) {
+        int hops = 0;
+        for (Throwable cur = t; cur != null && hops < 8; cur = cur.getCause() == cur ? null : cur.getCause(), hops++) {
+            String msg = cur.getMessage();
+            if (msg != null && msg.contains(AssistantDailyQuota.PERSONAL_CREDIT_MARKER)) {
+                return true;
+            }
+            for (Throwable s : cur.getSuppressed()) {
+                if (s != null && s.getMessage() != null
+                    && s.getMessage().contains(AssistantDailyQuota.PERSONAL_CREDIT_MARKER)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static String friendly(Throwable t) {
         if (t instanceof ServiceException se && se.getMessage() != null && !se.getMessage().isBlank()) {
             return se.getMessage();

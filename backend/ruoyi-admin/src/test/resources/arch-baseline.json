@@ -1,11 +1,11 @@
 {
-  "controllerForeignService" : [
+  "controllerForeignService": [
     "com.smartdock.assistant.controller.AssistantConversationController -> com.smartdock.mission.service.TaskService",
     "com.smartdock.assistant.controller.AssistantModelSettingController -> com.smartdock.service.IAiConfigService",
     "com.smartdock.assistant.controller.AssistantStatusController -> com.smartdock.service.support.AiBillingService",
     "com.smartdock.assistant.controller.AssistantStatusController -> org.dromara.common.core.service.ConfigService"
   ],
-  "controllerMapper" : [
+  "controllerMapper": [
     "com.smartdock.assistant.controller.AssistantAnnouncementController -> com.smartdock.assistant.mapper.AssistantAnnouncementMapper",
     "com.smartdock.assistant.controller.AssistantConversationController -> com.fasterxml.jackson.databind.ObjectMapper",
     "com.smartdock.assistant.controller.AssistantConversationController -> com.smartdock.assistant.mapper.AssistantRunMapper",
@@ -14,7 +14,7 @@
     "com.smartdock.assistant.controller.AssistantMcpController -> com.smartdock.assistant.mapper.McpCallLogMapper",
     "com.smartdock.assistant.controller.AssistantSkillAdminController -> com.smartdock.assistant.mapper.AssistantSkillMapper"
   ],
-  "inlineFqn" : [
+  "inlineFqn": [
     "ruoyi-admin/src/main/java/org/dromara/web/adapter/RiskBehaviorSinkAdapter.java|com.smartdock.profile.event.ProfileSources|1",
     "ruoyi-admin/src/main/java/org/dromara/web/adapter/TenantScopes.java|java.util.function.Supplier|1",
     "ruoyi-admin/src/main/java/org/dromara/web/service/SysEmailBindService.java|java.util.UUID|1",
@@ -54,11 +54,8 @@
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiConfigServiceImpl.java|java.util.List|2",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiConfigServiceImpl.java|java.util.Set|3",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiConfigServiceImpl.java|org.dromara.common.redis.utils.RedisUtils|2",
-    "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|com.smartdock.domain.AiConfig|6",
-    "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|java.util.ArrayList|2",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|java.util.Date|4",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|java.util.Objects|1",
-    "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|java.util.Optional|1",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|org.dromara.common.core.exception.ServiceException|1",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|org.dromara.common.mybatis.core.page.PageQuery|1",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/service/impl/AiCreditServiceImpl.java|org.dromara.common.mybatis.core.page.TableDataInfo|2",
@@ -129,7 +126,6 @@
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/controller/AssistantStatusController.java|com.smartdock.assistant.infrastructure.AssistantWebSearchQuota|1",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/controller/AssistantStatusController.java|com.smartdock.assistant.service.AssistantFollowupService|1",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/controller/AssistantStatusController.java|com.smartdock.assistant.service.AssistantSkillUsageService|1",
-    "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/controller/AssistantStatusController.java|com.smartdock.assistant.service.AssistantUserQuotaService|2",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/controller/AssistantStatusController.java|com.smartdock.domain.AiConfig|2",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/controller/AssistantStatusController.java|com.smartdock.service.support.AiBillingService|1",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/controller/AssistantStatusController.java|java.util.ArrayList|2",
@@ -308,7 +304,6 @@
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/tools/ToolSupport.java|java.util.concurrent.ThreadPoolExecutor|2",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/tools/ToolSupport.java|org.dromara.common.core.utils.SpringUtils|3",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/tools/WebSearchTools.java|com.smartdock.assistant.engine.core.AssistantTenantScope|2",
-    "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/tools/WebSearchTools.java|com.smartdock.assistant.infrastructure.AssistantWebSearchQuota|3",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/tools/WebSearchTools.java|java.util.function.Supplier|2",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/engine/tools/WebSearchTools.java|org.dromara.common.tenant.helper.TenantHelper|1",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/infrastructure/AssistantAdmissionGate.java|com.smartdock.assistant.engine.core.AssistantTenantScope|1",
@@ -379,8 +374,6 @@
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantTitleService.java|com.smartdock.assistant.infrastructure.AssistantDailyQuota|2",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantTitleService.java|com.smartdock.assistant.service.AssistantConfigService|2",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantTitleService.java|com.smartdock.service.IAiCreditService|2",
-    "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java|com.smartdock.assistant.infrastructure.AssistantWebSearchQuota|1",
-    "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java|com.smartdock.assistant.service.AssistantConfigService|3",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java|com.smartdock.domain.AiCreditSubscription|1",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java|com.smartdock.service.IAiCreditService|1",
     "ruoyi-modules/ruoyi-assistant/src/main/java/com/smartdock/assistant/service/AssistantUserQuotaService.java|java.util.ArrayList|1",
@@ -545,7 +538,7 @@
     "ruoyi-modules/ruoyi-system/src/main/java/org/dromara/system/mapper/SysNoticeReadMapper.java|java.util.Date|1",
     "ruoyi-modules/ruoyi-system/src/main/java/org/dromara/system/service/impl/SysUserServiceImpl.java|org.dromara.system.domain.SysRole|3"
   ],
-  "controllerMapReturn" : [
+  "controllerMapReturn": [
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/controller/AiCreditController.java|5",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/controller/AiModelPriceController.java|2",
     "ruoyi-modules/ruoyi-ai-billing/src/main/java/com/smartdock/controller/AiUsageController.java|2",

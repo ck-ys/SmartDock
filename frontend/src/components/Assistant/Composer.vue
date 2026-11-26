@@ -225,12 +225,14 @@
             </span>
             <!-- 2026-11-15 三审席2 P1：分母兜底不能装成真值——窗口未配置时原先的
                  「（未配置，按 20 万算）」被删，读者会把 20 万当管理员配置。恢复成独立一行，
-                 不跟容量行挤（300px 卡片里容量行已经快满）。 -->
-            <span v-if="ctxShown && ctxWindowUnknown" class="ctx-fb">模型窗口未配置，分母按 20 万算</span>
+                 不跟容量行挤（300px 卡片里容量行已经快满）。
+                 额度三级管控批 Q15=1：这句收进「展开全部」——它是管理员一次性问题，用户天天看到 -->
+            <span v-if="ctxDetailOpen && ctxShown && ctxWindowUnknown" class="ctx-fb">模型窗口未配置，分母按 20 万算</span>
             <span v-if="ctxShown && ctxStackSegments.length" class="cstack" aria-hidden="true" :title="`整条=上下文窗口 · 填充=已用（${Math.round(ctxPct * 100)}%）· 填充里的色块=构成（估算）`">
               <i v-for="(s, i) in ctxStackSegments" :key="i" :style="s" />
             </span>
-            <template v-if="(ctxBreakdown?.buckets?.length ?? 0) > 0">
+            <!-- Q15=1：七段构成是排查用的，平时没人看——收进「展开全部」 -->
+            <template v-if="ctxDetailOpen && (ctxBreakdown?.buckets?.length ?? 0) > 0">
               <span
                 v-for="(b, i) in ctxBreakdown!.buckets"
                 :key="b.key"
@@ -242,69 +244,111 @@
                 <span class="bp">约 {{ b.pct }}%</span>
               </span>
             </template>
-            <span v-else class="ctxsub">{{ ctxEmptyHint }}</span>
+            <span v-else-if="ctxDetailOpen" class="ctxsub">{{ ctxEmptyHint }}</span>
             <span class="ctxdiv" />
             <template v-if="billingMode === 'credits'">
-              <!-- 业务批(1015) Q8：常显消费方式徽标——演示/实测"池子不动"的困惑根因=不知这轮扣哪本账 -->
-              <span class="ctxrow" title="助手对话当前扣哪本账：积分订阅=扣周池/加油包（钱包不动）；在「租户管理 → 积分套餐」可切换">
-                <span class="cl">消费方式</span>
-                <span class="ctx-tag tag-credit">积分订阅</span>
+              <!-- 额度三级管控批（Q8=3）：我的今日额度——成员也看得到（Q11=1：公司池那两行只给管理员）
+                   Q15=1：这条是首屏两行之一（常看），所以永远显示；「消费方式」等收进展开层 -->
+              <span
+                v-if="creditLimit != null"
+                class="ctxrow"
+                :title="
+                  creditUnlimited
+                    ? '今天不限积分（' + (creditSourceLabel || '个人设置') + '）；明早 0 点重置'
+                    : '今天已花 ' +
+                      fmtCredit(creditUsedToday ?? 0) +
+                      ' / ' +
+                      fmtCredit(creditLimit) +
+                      ' 积分（上限来自' +
+                      (creditSourceLabel || '平台兜底') +
+                      '）· 明早 0 点重置'
+                "
+              >
+                <span class="cl">我的今日</span>
+                <span class="cbar"><i :style="{ width: creditPersonalPct + '%' }" /></span>
+                <span v-if="creditUnlimited">不限</span>
+                <span v-else>剩 {{ fmtCredit(creditPersonalLeft ?? 0) }} / {{ fmtCredit(creditLimit) }}</span>
               </span>
-              <!-- Q6 案1（2026-11-14）：三行微条改「剩」口径——三行统一低饱和绿（告急转赭），
-                   重置时间从 hover 挪进行内（.mreset 一行说清两本账怎么回） -->
-              <span v-if="creditSummary" class="mbrows">
-                <span
-                  class="mbrow"
-                  :class="{ warn: creditWindowLeft > 0 && creditWindowLeftPct <= 20, empty: creditWindowLeft <= 0 }"
-                  :title="`近 5 小时滑动窗口：剩 ${fmtCredit(creditWindowLeft)} / ${fmtCredit(creditSummary.windowCap)} · 早期消耗随时间移出窗口自动回额（防刷护栏）`"
-                >
-                  <span class="mn">5小时窗</span>
-                  <span class="mtrack"><i :style="{ width: creditWindowLeftPct + '%' }" /></span>
-                  <span class="mv"><span class="ml">剩</span><span class="mvn">{{ creditWindowLeftPct }}%</span></span>
-                </span>
-                <span
-                  class="mbrow"
-                  :class="{ warn: creditWeeklyLeft > 0 && creditWeeklyLeftPct <= 20, empty: creditWeeklyLeft <= 0 }"
-                  :title="`本周积分池：剩 ${fmtCredit(creditWeeklyLeft)} / ${fmtCredit(creditSummary.weeklyCap)} · 每周一 0 点整池恢复 · 明细见「租户管理 → 积分套餐」`"
-                >
-                  <span class="mn">周池</span>
-                  <span class="mtrack"><i :style="{ width: creditWeeklyLeftPct + '%' }" /></span>
-                  <span class="mv"><span class="ml">剩</span><span class="mvn">{{ creditWeeklyLeftPct }}%</span></span>
-                </span>
-                <span
-                  v-if="creditTankShow"
-                  class="mbrow"
-                  :title="`管理员追加的加油包余额：剩 ${fmtCredit(creditSummary?.tankBalance)} · 用完即止不恢复`"
-                >
-                  <span class="mn">加油包</span>
-                  <span class="mtrack"><i style="width: 100%" /></span>
-                  <span class="mv">{{ fmtCredit(creditSummary?.tankBalance ?? 0) }}</span>
-                </span>
-                <span class="mreset">5 小时窗滑动回额 · 周池每周一 0 点恢复</span>
+              <!-- Q15=1：剩 ≤20% 才说恢复时间——平时不用占一行 -->
+              <span v-if="creditLimit != null && !creditUnlimited && creditPersonalPct >= 80" class="ctxsub">
+                我的今日明早 0 点恢复
               </span>
-              <!-- dsflash P2-3：summary 未就绪时微条整组不渲染，避免 0 值误报「已用完」 -->
-              <span v-else class="ctxsub">三本账待测</span>
+              <!-- Q15=1：消费方式 / 公司池三行 / 三本账说明全收进「展开全部」 -->
+              <template v-if="ctxDetailOpen">
+                <!-- 业务批(1015) Q8：常显消费方式徽标——演示/实测"池子不动"的困惑根因=不知这轮扣哪本账 -->
+                <span class="ctxrow" title="助手对话当前扣哪本账：积分订阅=扣周池/加油包（钱包不动）；在「租户管理 → 积分套餐」可切换">
+                  <span class="cl">消费方式</span>
+                  <span class="ctx-tag tag-credit">积分订阅</span>
+                </span>
+                <!-- Q6 案1（2026-11-14）：三行微条改「剩」口径——三行统一低饱和绿（告急转赭），
+                     重置时间从 hover 挪进行内（.mreset 一行说清两本账怎么回） -->
+                <span v-if="creditSummary && canSeeCompanyPool" class="mbrows">
+                  <span
+                    class="mbrow"
+                    :class="{ warn: creditWindowLeft > 0 && creditWindowLeftPct <= 20, empty: creditWindowLeft <= 0 }"
+                    :title="`近 5 小时滑动窗口：剩 ${fmtCredit(creditWindowLeft)} / ${fmtCredit(creditSummary.windowCap)} · 早期消耗随时间移出窗口自动回额（防刷护栏）`"
+                  >
+                    <span class="mn">5小时窗</span>
+                    <span class="mtrack"><i :style="{ width: creditWindowLeftPct + '%' }" /></span>
+                    <span class="mv"><span class="ml">剩</span><span class="mvn">{{ creditWindowLeftPct }}%</span></span>
+                  </span>
+                  <span
+                    class="mbrow"
+                    :class="{ warn: creditWeeklyLeft > 0 && creditWeeklyLeftPct <= 20, empty: creditWeeklyLeft <= 0 }"
+                    :title="`本周积分池：剩 ${fmtCredit(creditWeeklyLeft)} / ${fmtCredit(creditSummary.weeklyCap)} · 每周一 0 点整池恢复 · 明细见「租户管理 → 积分套餐」`"
+                  >
+                    <span class="mn">周池</span>
+                    <span class="mtrack"><i :style="{ width: creditWeeklyLeftPct + '%' }" /></span>
+                    <span class="mv"><span class="ml">剩</span><span class="mvn">{{ creditWeeklyLeftPct }}%</span></span>
+                  </span>
+                  <span
+                    v-if="creditTankShow"
+                    class="mbrow"
+                    :title="`管理员追加的加油包余额：剩 ${fmtCredit(creditSummary?.tankBalance)} · 用完即止不恢复`"
+                  >
+                    <span class="mn">加油包</span>
+                    <span class="mtrack"><i style="width: 100%" /></span>
+                    <span class="mv">{{ fmtCredit(creditSummary?.tankBalance ?? 0) }}</span>
+                  </span>
+                  <span class="mreset">5 小时窗滑动回额 · 周池每周一 0 点恢复</span>
+                </span>
+                <!-- dsflash P2-3：summary 未就绪时微条整组不渲染，避免 0 值误报「已用完」。
+                     额度三级管控批（Q11=1）：成员看不到公司池，此处不摆「待测」占位（那是在说公司池） -->
+                <span v-else-if="canSeeCompanyPool" class="ctxsub">三本账待测</span>
+              </template>
             </template>
             <template v-else>
-              <!-- 业务批(1015) Q8：钱包分支同样常显消费方式（与积分套餐页口径一致） -->
-              <span class="ctxrow" title="助手对话当前扣哪本账：钱包按量=按实际用量扣租户钱包（元）；订阅积分套餐后自动切换为扣积分">
-                <span class="cl">消费方式</span>
-                <span class="ctx-tag tag-wallet">钱包按量</span>
-              </span>
               <span class="ctxrow" :title="`每人每天各有一份，互不影响 · 还能聊 ${remain} 个来回 · 明早 0 点恢复`">
                 <span class="cl">今日额度</span>
                 <span class="cbar"><i :style="{ width: usedPct * 100 + '%' }" /></span>
                 <span>{{ used }} / {{ limit }}</span>
               </span>
+              <!-- Q15=1：钱包分支的「消费方式」同样收进展开层 -->
+              <span v-if="ctxDetailOpen" class="ctxrow" title="助手对话当前扣哪本账：钱包按量=按实际用量扣租户钱包（元）；订阅积分套餐后自动切换为扣积分">
+                <span class="cl">消费方式</span>
+                <span class="ctx-tag tag-wallet">钱包按量</span>
+              </span>
             </template>
+            <!-- Q15=1：分层开关——默认只留常看的两行；这里一次点击看明细，信息量与字数解耦 -->
+            <button class="ctx-more" type="button" @click.stop="ctxDetailOpen = !ctxDetailOpen">
+              {{ ctxDetailOpen ? '收起明细' : `展开全部 ${ctxDetailCount} 项` }}
+              <span class="ctx-more-arrow" :class="{ open: ctxDetailOpen }">▸</span>
+            </button>
             <span class="ctxdiv" />
             <!-- Q6 案1 底部小字：联网 · 缓存（≥78% 才显，ZCode 同款门槛） · 消费方式 · 「占比为估算」常驻 -->
             <span class="ctxfoot">
               <span
-                :class="{ 'web-out': webOn && !webDisabled && webLeft <= 0 }"
-                :title="webDisabled ? '管理员未开放联网（额度为 0）' : `每天 ${webLimit} 次 · 明早 0 点恢复`"
+                :class="{ 'web-out': webOn && !webDisabled && !webUnlimited && webLeft <= 0 }"
+                :title="
+                  webUnlimited
+                    ? `不限次数 · 今天已搜 ${webUsed} 次`
+                    : webDisabled
+                      ? '管理员未开放联网（额度为 0）'
+                      : `每天 ${webLimit} 次 · 明早 0 点恢复`
+                "
               >
-                联网 {{ webUsed }}/{{ webLimit }}{{ webDisabled ? '（未开放）' : '' }}
+                <template v-if="webUnlimited">联网 {{ webUsed }}/不限</template>
+                <template v-else>联网 {{ webUsed }}/{{ webLimit }}{{ webDisabled ? '（未开放）' : '' }}</template>
               </span>
               <template v-if="ctxCachePct !== null">
                 <span class="fs">·</span>
@@ -441,11 +485,13 @@
           <div
             class="arow webrow"
             :title="
-              webDisabled
-                ? '联网搜索未开放（额度为 0），请联系管理员'
-                : webOn
-                  ? `联网自动 · 今天还能搜 ${webLeft} 次（问了外部知识才消耗）· 点击停用`
-                  : '已停用：本会话不再搜网页（站内数据问答不受影响）· 点击恢复自动'
+              webUnlimited
+                ? `联网不限次数（今天已搜 ${webUsed} 次，问了外部知识才消耗）· 点击停用`
+                : webDisabled
+                  ? '联网搜索未开放（额度为 0），请联系管理员'
+                  : webOn
+                    ? `联网自动 · 今天还能搜 ${webLeft} 次（问了外部知识才消耗）· 点击停用`
+                    : '已停用：本会话不再搜网页（站内数据问答不受影响）· 点击恢复自动'
             "
           >
             <IconSpan name="globe" /><b>联网搜索</b>
@@ -1124,6 +1170,29 @@ const ringAria = computed(() => {
 });
 /** 点击=悬停同款卡（细则④：触屏无 hover 也能看） */
 const ringCardOpen = ref(false);
+/**
+ * 额度三级管控批（Q15=1）：状态卡分层开关。默认只留常看的两条（上下文占比 / 我的今日），
+ * 窗口分母说明、七段构成、消费方式、公司池三行全收进来。**每次打开卡片重置为收起**——
+ * 否则上一次点开过的明细会在下一次悬停时又冒出来，「首屏两行」就名存实亡。
+ */
+const ctxDetailOpen = ref(false);
+/** 「展开全部 N 项」的 N：按实际会渲染的行数算（卡上显示行数随租户配置变，不能写死） */
+const ctxDetailCount = computed(() => {
+  let n = 0;
+  if (ctxShown.value) n += 1; // 上下文容量行（首屏已显示，这里只数明细层能多出来的）
+  if (ctxShown.value && ctxWindowUnknown.value) n += 1; // 窗口分母说明
+  if ((ctxBreakdown.value?.buckets?.length ?? 0) > 0) n += ctxBreakdown.value!.buckets.length;
+  if (billingMode.value === 'credits') {
+    n += 1; // 消费方式
+    if (creditSummary.value && canSeeCompanyPool.value) {
+      n += 2; // 5小时窗 + 周池
+      if (creditTankShow.value) n += 1; // 加油包
+    }
+  } else {
+    n += 1; // 消费方式（钱包）
+  }
+  return n;
+});
 
 /* ---- 批 A Q6（2026-11-14 拍板案1）：上下文构成——七桶占比全部为估算（行内「约」+脚注常驻），
        0 桶后端已剔除；2026-11-15 按用户对质参照删掉逐段子列表（ZCode/WorkBuddy 只有桶行），
@@ -1251,6 +1320,8 @@ const ctxRingEl = ref<HTMLElement | null>(null);
 function toggleRingCard() {
   ringCardOpen.value = !ringCardOpen.value;
   if (ringCardOpen.value) {
+    // Q15=1：每次打开都从「首屏两行」起——上次展开过的明细不该自己又冒出来
+    ctxDetailOpen.value = false;
     // 手机档（2026-11-09 实拍）：250px 的卡右锚在圆环上，390 宽会把左半截顶出屏。
     // 打开后量一次，只往右推「超出量 + 8px 边距」，不猜容器宽度。
     nextTick(() => {
@@ -1316,17 +1387,23 @@ const sessionCacheHitRequests = ref(0);
 /** 业务反馈批1015b Q11：今日平均缓存命中率（后端 LiteLLM 口径，样本<3 为 null） */
 const cacheHitRateToday = ref<number | null>(null);
 const webLeft = computed(() => Math.max(0, webLimit.value - webUsed.value));
+/** 额度三级管控批（Q12=1）：-1 = 不限。**必须先于 webDisabled 判**——否则「界面写不限、实际按钮置灰」 */
+const webUnlimited = computed(() => webLimit.value === -1);
 /** 租户把联网额度关到 0（m3 二轮 P1）：「未开放」≠「当日用完」——文案/红色状态条都不得承诺明早恢复 */
-const webDisabled = computed(() => webLimit.value <= 0);
+const webDisabled = computed(() => !webUnlimited.value && webLimit.value <= 0);
 /** R1：用户级禁用闸（抽屉 banner='disabled' 传导）——输入只读+置灰，发送在 onSend 拦截 */
 const disabled = computed(() => props.state.banner === 'disabled');
 /** 联网钮两态 title（自动/已停用，未开放见第一分支；语义与面板行/状态弹窗一致） */
 const wbtnTitle = computed(() =>
-  webDisabled.value
-    ? '联网搜索未开放（额度为 0）'
-    : webOn.value
-      ? `联网自动 · 今天还能搜 ${webLeft.value} 次 · 点击停用`
-      : `联网搜索已停用 · 点击恢复自动（每天 ${webLimit.value} 次免费，问了外部知识才消耗）`
+  webUnlimited.value
+    ? webOn.value
+      ? `联网自动 · 不限次数（今天已搜 ${webUsed.value} 次）· 点击停用`
+      : '联网搜索已停用 · 点击恢复自动（不限次数，问了外部知识才消耗）'
+    : webDisabled.value
+      ? '联网搜索未开放（额度为 0）'
+      : webOn.value
+        ? `联网自动 · 今天还能搜 ${webLeft.value} 次 · 点击停用`
+        : `联网搜索已停用 · 点击恢复自动（每天 ${webLimit.value} 次免费，问了外部知识才消耗）`
 );
 /** R1 跨 tab 同步：localStorage 'storage' 事件只在其它 tab 修改时触发本 tab（浏览器语义，
  *  本 tab 写不回环）；最新写入胜出=登记不修口径，同一会话两个 tab 开关态实时一致。
@@ -1348,9 +1425,11 @@ function toggleWeb(on: boolean) {
   writeWebOn(userStore.userId, props.state.threadId, on, localStorage);
   pushToast(
     on
-      ? webDisabled.value
-        ? '联网已恢复自动，但本租户未开放联网搜索（额度为 0），暂时搜不了外部资料'
-        : `联网已自动：外部知识问题由模型判断是否搜网，出答案会带来源（今天剩 ${webLeft.value} 次）`
+      ? webUnlimited.value
+        ? `联网已自动：外部知识问题由模型判断是否搜网，出答案会带来源（不限次数，今天已搜 ${webUsed.value} 次）`
+        : webDisabled.value
+          ? '联网已恢复自动，但本租户未开放联网搜索（额度为 0），暂时搜不了外部资料'
+          : `联网已自动：外部知识问题由模型判断是否搜网，出答案会带来源（今天剩 ${webLeft.value} 次）`
       : '联网已停用：本会话不再搜网页，站内数据问答不受影响',
     'ok'
   );
@@ -1421,6 +1500,43 @@ const creditWindowLeftPct = computed(() => {
   return cap > 0 ? Math.min(100, Math.round((creditWindowLeft.value / cap) * 100)) : 0;
 });
 const creditTankShow = computed(() => (creditSummary.value?.tankBalance ?? 0) > 0);
+
+/* 额度三级管控批（2026-11-26 / Q8=3 + Q11=1）：个人今日积分额度
+   —— 后端只在积分模式下下发这四个字段；-1 = 不限（越过套餐档，Q20=1） */
+const creditLimit = ref<number | null>(null);
+const creditLimitSource = ref<string | null>(null);
+const creditUsedToday = ref<number | null>(null);
+/** 今日积分上限是否「不限」 */
+const creditUnlimited = computed(() => (creditLimit.value ?? 0) < 0);
+/** 「我的今日 剩 X / 上限」——只剩百分比也行，但 Q8 明确要求写「剩多少」 */
+const creditPersonalLeft = computed(() => {
+  if (creditLimit.value == null || creditUsedToday.value == null) return null;
+  if (creditUnlimited.value) return null;
+  return Math.max(0, creditLimit.value - creditUsedToday.value);
+});
+/** 上限哪来的（Q8 补条件：不写，管理员第一句就是「为什么他是 50，我设的是 100」） */
+const creditSourceLabel = computed(() => {
+  switch (creditLimitSource.value) {
+    case 'personal':
+      return '个人单独设的';
+    case 'tenant':
+      return '企业默认';
+    case 'plan':
+      return '套餐建议值';
+    case 'platform':
+      return '平台兜底';
+    default:
+      return '';
+  }
+});
+/** 今日积分进度条百分比（不限时画 0——画满格会让人以为快用完了） */
+const creditPersonalPct = computed(() => {
+  const cap = creditLimit.value ?? 0;
+  if (cap <= 0 || creditUsedToday.value == null) return 0;
+  return Math.min(100, Math.round((creditUsedToday.value / cap) * 100));
+});
+/** 管理员才看得到公司池那两条（Q11=1）——成员只看得到自己的今日额度 */
+const canSeeCompanyPool = computed(() => checkPermi(['smartdock:aicredit:list']));
 /** 明细入口直达「租户管理→积分套餐」流水页（学 WorkBuddy 的明细入口） */
 const router = useRouter();
 /** k3 P1-2：明细页菜单(menu 11940)只授租户管理员/超管——订阅租户普通成员没有该路由，
@@ -1508,6 +1624,11 @@ async function refreshStatus() {
     } else if (typeof d?.remainingTurnsToday === 'number') {
       used.value = Math.max(0, limit.value - d.remainingTurnsToday);
     }
+    // 额度三级管控批（2026-11-26 / Q8=3）：个人今日积分额度——只在积分模式下后端才下发。
+    // 缺字段一律置 null（不是 0：「--」比谎报「今天花了 0」诚实）
+    creditLimit.value = typeof d?.creditLimit === 'number' ? d.creditLimit : null;
+    creditLimitSource.value = typeof d?.creditLimitSource === 'string' ? d.creditLimitSource : null;
+    creditUsedToday.value = typeof d?.creditsUsedToday === 'number' ? d.creditsUsedToday : null;
     const prevCtx = ctxTokens.value;
     ctxTokens.value = typeof d?.contextTokens === 'number' ? d.contextTokens : null;
     // 批A-1 回修：后端实算触发线优先（本地公式仅兜底；旧后端未下发时字段缺省）
@@ -3344,6 +3465,34 @@ html.dark .brow .btool.bicon.wbtn.on {
         font-size: 10px;
         line-height: 1.5;
         color: var(--dcs-text-placeholder);
+      }
+      /* 额度三级管控批 Q15=1：分层开关——一行小按钮，不抢首屏视线（灰字 + 小三角） */
+      .ctx-more {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        align-self: flex-start;
+        margin: 2px 0 0;
+        padding: 2px 4px;
+        border: none;
+        background: none;
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--dcs-text-placeholder);
+        cursor: pointer;
+
+        &:hover {
+          color: var(--el-color-primary);
+        }
+      }
+      .ctx-more-arrow {
+        display: inline-block;
+        font-size: 10px;
+        transition: transform 0.15s;
+
+        &.open {
+          transform: rotate(90deg);
+        }
       }
       .mbrow {
         display: flex;

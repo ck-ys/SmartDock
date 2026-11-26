@@ -1,6 +1,7 @@
 package com.smartdock.assistant.engine.core;
 
 import com.smartdock.assistant.engine.tools.ToolIdentity;
+import com.smartdock.service.IAiSearchService;
 import com.smartdock.assistant.service.MessageWriteService;
 import com.smartdock.assistant.support.AssistantWebSearchHolder;
 import io.agentscope.core.permission.PermissionBehavior;
@@ -52,6 +53,9 @@ public final class ToolRegistry {
         MessageWriteService messageWriteService,
         com.smartdock.assistant.infrastructure.AssistantWebSearchQuota webSearchQuota,
         com.smartdock.assistant.service.AssistantUserQuotaService quotaService,
+        /** 额度三级管控批（Q16=1）：搜索服务表——优先从这里读 key，成功搜一次给资源包估算 +1。
+         *  null=不接（单测/未注入，行为与老版本一致：只读系统参数、不计资源包） */
+        IAiSearchService searchService,
         /** 三审回修 P1-1：view_skill 自取过闸用的租户矩阵快照 */
         java.util.Map<String, String> toolGate,
         /** 题7 案1：驱逐中间件落盘目录（助手工作区）；read_file 只在此根下回读 */
@@ -92,7 +96,7 @@ public final class ToolRegistry {
         new ToolSpec(Set.of("web_search"),
             PermissionBehavior.ALLOW, ToolIdentity.LEVEL_MEMBER,
             (id, d) -> new com.smartdock.assistant.engine.tools.WebSearchTools(id, d.configService(), d.piiFilter(),
-                d.webSearchQuota(), d.quotaService()),
+                d.webSearchQuota(), d.quotaService()).searchService(d.searchService()),
             d -> com.smartdock.assistant.engine.tools.WebSearchTools.shouldRegisterWebSearch(
                 AssistantWebSearchHolder.isOn(d.aguiThreadId()), d.tenantId(),
                 () -> com.smartdock.assistant.engine.tools.WebSearchTools.readTenantKey(d.configService(), d.tenantId()))),

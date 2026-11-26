@@ -569,17 +569,19 @@
               </template>
               <template v-else>每人 {{ cfg.dailyRoundLimitPerUser }} 回合 · 明早 0 点恢复</template>
             </el-descriptions-item>
-            <!-- 业务批3-④：租户联网默认（每人每日免费次数；0=全租户关停。改值走「用户额度」页单人覆盖或租户配置 API，本页先展示） -->
+            <!-- 业务批3-④：租户联网默认（每人每日免费次数；0=全租户关停，-1=不限）
+                 额度三级管控批 Q20=1：积分模式下企业填的正数**已生效**（旧口径被套餐档盖掉），
+                 只有企业没配过这一行时才用套餐档兜底 -->
             <el-descriptions-item label="每日联网次数">
               <template v-if="subActive">
-                按套餐档位<span class="cell-note"
-                  >未配档时兜底 {{ cfg.websearchLimitPerUser ?? 20 }} 次{{
-                    (cfg.websearchLimitPerUser ?? 20) === 0 ? ' · 已关停' : ''
-                  }}</span
-                >
+                <template v-if="(cfg.websearchLimitPerUser ?? 20) === -1">每人 <b>不限</b></template>
+                <template v-else-if="(cfg.websearchLimitPerUser ?? 20) === 0">每人 <b class="q-stopped">已关停</b></template>
+                <template v-else>每人 {{ cfg.websearchLimitPerUser ?? 20 }} 次<span class="cell-note">企业默认，已生效</span></template>
               </template>
               <template v-else>
-                每人 {{ cfg.websearchLimitPerUser ?? 20 }} 次<template v-if="(cfg.websearchLimitPerUser ?? 20) === 0"> · 已关停</template>
+                <template v-if="(cfg.websearchLimitPerUser ?? 20) === -1">每人 <b>不限</b></template>
+                <template v-else-if="(cfg.websearchLimitPerUser ?? 20) === 0">每人 <b class="q-stopped">已关停</b></template>
+                <template v-else>每人 {{ cfg.websearchLimitPerUser ?? 20 }} 次</template>
               </template>
             </el-descriptions-item>
             <!-- 题3：人民币符号紧贴数字（本页原「¥ 50.00 / ¥1.02」两套写法并存） -->
@@ -865,7 +867,7 @@
             </div>
             <span class="sec-note">{{
               subActive
-                ? '积分消费：回合只要不是 0 就按不限次执行（0 = 急停）；联网按订阅套餐档位、每天照常计数——「重置今日」仍要用'
+                ? '积分消费：每人每天最多花多少积分（用完被拦下，明早 0 点恢复）；回合只要不是 0 就按不限次执行；联网按 个人 ＞ 企业 ＞ 套餐档兜底 取数'
                 : '先看租户默认，再给个别用户设单人上限；0 = 关停对应能力'
             }}</span>
           </div>
@@ -874,9 +876,9 @@
           <div v-if="subActive" class="quota-offline">
             <span class="qo-ico">ⓘ</span>
             <span>
-              当前租户按<b>积分消费</b>：对话扣积分，回合只要不是 0 就按<b>不限次</b>执行；联网每天按<b>套餐档位</b>计数。
-              所以这里的<b>正数</b>在积分态不影响实际限制，但 <b>0 仍然生效</b>——回合填 0（或单人回合设 0）= 对话急停，联网填 0 = 关闭联网。
-              三个入口都保留：<b>「重置今日」会同时清回合和联网计数</b>，联网次数用完必须用它。
+              当前租户按<b>积分消费</b>：每人每天最多花多少积分，用完会被拦下，<b>明早 0 点恢复</b>。
+              回合只要不是 0 就按<b>不限次</b>执行（0 = 急停）；联网按<b>个人设的 ＞ 企业默认 ＞ 套餐档兜底</b>取数，每天照常计数。
+              三个入口都保留：<b>「重置今日」只清回合与联网计数，已花掉的积分不会退回</b>。
             </span>
           </div>
           <!-- 概览条：左=租户默认口径（来自本页配置卡数据源）；右=本页速览（口径=当前页，不跨页误导） -->
@@ -891,13 +893,17 @@
                     >每人 <b class="q-stopped">已停用</b> 回合/天
                     <span class="qo-note">租户默认配了 0 = 急停，点「改默认」可解除</span></template
                   >
-                  · {{ cfg.websearchLimitPerUser ?? 20 }} 次联网/天
+                  · {{ webDefaultText }}
                   <span class="qo-note">{{
-                    (cfg.websearchLimitPerUser ?? 20) > 0 ? '套餐配了档位以套餐为准，此处兜底' : '配了 0 = 关闭联网'
+                    (cfg.websearchLimitPerUser ?? 20) === -1
+                      ? '不限（越过套餐档）'
+                      : (cfg.websearchLimitPerUser ?? 20) === 0
+                        ? '配了 0 = 关闭联网'
+                        : '企业默认，已生效'
                   }}</span></template
                 >
                 <template v-else
-                  >每人 {{ cfg.dailyRoundLimitPerUser }} 回合/天 · {{ cfg.websearchLimitPerUser ?? 20 }} 次联网/天
+                  >每人 {{ cfg.dailyRoundLimitPerUser }} 回合/天 · {{ webDefaultText }}
                   <span class="qo-note">设过单人上限的不受此默认影响</span></template
                 >
               </span>
@@ -922,7 +928,7 @@
                     class="qo-edit-btn"
                     :title="
                       subActive
-                        ? '积分消费下：回合 0 = 急停、正数 = 不限；联网 0 = 关闭、正数只在套餐未配档时兜底'
+                        ? '积分消费下：回合 0 = 急停、正数 = 不限；联网 0 = 关闭、「不限」可越过套餐档'
                         : '改本租户每人每天的回合数 / 联网次数默认值'
                     "
                     >改默认</el-button
@@ -933,10 +939,53 @@
                     <span>每人每天回合数</span>
                     <el-input-number v-model="defaultEdit.round" :min="0" :max="10000" size="small" style="width: 132px" />
                   </div>
-                  <div class="qo-form-row" :class="{ 'qo-danger': defaultEdit.web === 0 }">
+                  <div class="qo-form-row" :class="{ 'qo-danger': defaultEdit.webMode === 'number' && defaultEdit.web === 0 }">
                     <span>每人每天联网次数</span>
-                    <el-input-number v-model="defaultEdit.web" :min="0" :max="10000" size="small" style="width: 132px" />
+                    <!-- 额度三级管控批（Q12=1）：联网列多一个「不限」明选项——数字框放不进 -1，
+                         所以用 select 承载三态（数字 / 不限 / 关停仍是数字 0）。 -->
+                    <el-select v-model="defaultEdit.webMode" size="small" style="width: 100px">
+                      <el-option label="填数字" value="number" />
+                      <el-option label="不限" value="unlimited" />
+                    </el-select>
+                    <el-input-number
+                      v-if="defaultEdit.webMode === 'number'"
+                      v-model="defaultEdit.web"
+                      :min="0"
+                      :max="10000"
+                      size="small"
+                      style="width: 132px; margin-left: 6px"
+                    />
                   </div>
+                  <!-- 额度三级管控批（Q12 / Q14 / Q20）：企业默认积分上限——三选一，与联网同一套「明选项」语义 -->
+                  <div class="qo-form-row qo-form-credit">
+                    <span>每人每天积分上限</span>
+                    <el-select v-model="defaultEdit.creditMode" size="small" style="width: 132px">
+                      <el-option label="跟随套餐建议值" value="follow" />
+                      <el-option label="不限" value="unlimited" />
+                      <el-option label="自定义数字" value="custom" />
+                    </el-select>
+                    <el-input-number
+                      v-if="defaultEdit.creditMode === 'custom'"
+                      v-model="defaultEdit.credit"
+                      :min="1"
+                      :max="10000"
+                      size="small"
+                      style="width: 108px; margin-left: 6px"
+                    />
+                  </div>
+                  <!-- 一键套用三档：数字按「周池 ÷ 7 天 ÷ 在册人数」现算（Q21=1），不读套餐建议值 -->
+                  <div v-if="creditTiers.length" class="qo-tiers">
+                    <span class="qo-tiers-k">一键套用</span>
+                    <el-button
+                      v-for="t in creditTiers"
+                      :key="t.key"
+                      size="small"
+                      :type="defaultEdit.credit === t.value && defaultEdit.creditMode === 'custom' ? 'primary' : 'default'"
+                      @click="applyCreditTier(t.value)"
+                      >{{ t.label }} {{ t.value }}</el-button
+                    >
+                  </div>
+                  <div v-if="creditTiers.length" class="qo-form-tip qo-tier-formula">{{ creditTierFormula }}</div>
                   <!-- Q8 深化：动态提示——平时讲语义，从非 0 改成 0 时立刻升级为关停警示 -->
                   <div class="qo-form-tip" :class="{ 'qo-tip-danger': defaultShutting.any }">
                     <template v-if="defaultShutting.any"
@@ -948,7 +997,7 @@
                   </div>
                   <!-- Q8 深化：订阅租户提示——2026-10-31 审查回修：讲清「正数不限 / 0 才急停 / 联网仍计数」 -->
                   <div v-if="subActive" class="qo-form-tip">
-                    ⓘ 积分消费中：回合数<b>正数不设上限</b>，只有填 <b>0</b> 才是急停（立刻停全租户对话）；联网数 0 = 关闭，正数在套餐未配档时兜底
+                    ⓘ 积分消费中：回合数<b>正数不设上限</b>，只有填 <b>0</b> 才是急停（立刻停全租户对话）；联网数 0 = 关闭，选<b>「不限」</b>可越过套餐档
                   </div>
                   <!-- Q8 深化：生效预览（与单人上限弹窗 q-preview 同款语义，保存前看得见确切效果） -->
                   <div class="qo-preview">
@@ -1013,34 +1062,61 @@
             </el-table-column>
             <!-- 题2：窄屏收起低价值列（部门），把宽度让给「今日用量」与钉右的操作列；桌面不变 -->
             <el-table-column v-if="!isNarrow" label="部门" prop="deptName" width="130" show-overflow-tooltip />
-            <el-table-column label="今日用量" width="170" align="center">
+            <el-table-column label="今日用量" width="200" align="center">
               <template #default="{ row }">
                 <!-- UI-UX 批：比例可视化进度条——蓝(正常)→橙(≥80%)→红(用完)，一眼找出快用完的人
-                     Q31：积分消费下回合不限次，进度条与「x / 上限」都失去意义，改显「已用 / 不限」 -->
+                     Q31：积分消费下回合不限次，进度条与「x / 上限」都失去意义，改显「已用 / 不限」
+                     额度三级管控批（Q1=1）：积分模式下这一列的主角换成「积分 已花 / 上限」——
+                     回合数只留作小字参考（Q1 案 1：只限积分，回合数只显示、不限） -->
                 <div class="quota-turn-cell">
-                  <div class="q-usage">
-                    <div v-if="!subActive" class="q-usage-bar">
-                      <i :class="quotaBarTier(row)" :style="{ width: quotaBarPct(row) + '%' }" />
+                  <template v-if="subActive">
+                    <div class="q-usage">
+                      <div class="q-usage-bar">
+                        <i :class="creditBarTier(row)" :style="{ width: creditBarPct(row) + '%' }" />
+                      </div>
+                      <span :class="{ 'quota-exhausted': creditExhausted(row) }">
+                        {{ fmt(row.creditsUsedToday ?? 0) }} /
+                        <b v-if="creditUnlimited(row)">不限</b><b v-else>{{ fmt(row.effectiveCreditLimit ?? 0) }}</b>
+                        <span class="q-unit">积分</span>
+                      </span>
                     </div>
-                    <span
-                      v-if="subActive"
-                      class="q-unlimited"
+                    <div class="q-credit-src">
+                      {{ creditSourceText(row) }}
+                      <span class="q-round-ref">· 回合 {{ row.turnsUsedToday }}<template v-if="!quotaRoundStopped(row)">（不限）</template></span>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="q-usage">
+                      <div class="q-usage-bar">
+                        <i :class="quotaBarTier(row)" :style="{ width: quotaBarPct(row) + '%' }" />
+                      </div>
+                      <span
+                        :class="{ 'quota-exhausted': row.effectiveRoundLimit > 0 && row.turnsUsedToday >= row.effectiveRoundLimit }"
+                      >
+                        {{ row.turnsUsedToday }} / {{ row.effectiveRoundLimit }}
+                      </span>
+                    </div>
+                  </template>
+                  <div
+                    v-if="
+                      row.roundLimitOverride != null ||
+                      row.websearchLimitOverride != null ||
+                      row.creditLimitOverride != null
+                    "
+                    class="q-badges"
+                  >
+                    <el-tag
+                      v-if="row.creditLimitOverride != null"
+                      size="small"
+                      type="warning"
+                      class="quota-tag"
                       :title="
-                        quotaRoundStopped(row)
-                          ? '该用户回合上限为 0 = 对话急停；点「限额」改成 0 以上的数字即可恢复'
-                          : '积分消费按积分扣，回合正数不设上限；今天已用 ' + row.turnsUsedToday + ' 回合'
+                        row.creditLimitOverride === -1
+                          ? '该用户单独设了「不限」积分——越过企业默认和套餐建议值'
+                          : '该用户单独设了积分上限，不受企业默认影响'
                       "
-                      >{{ row.turnsUsedToday }} /
-                      <b v-if="!quotaRoundStopped(row)">不限</b><b v-else class="q-stopped">已停用</b></span
+                      >单人积分{{ row.creditLimitOverride === -1 ? '不限' : row.creditLimitOverride }}</el-tag
                     >
-                    <span
-                      v-else
-                      :class="{ 'quota-exhausted': row.effectiveRoundLimit > 0 && row.turnsUsedToday >= row.effectiveRoundLimit }"
-                    >
-                      {{ row.turnsUsedToday }} / {{ row.effectiveRoundLimit }}
-                    </span>
-                  </div>
-                  <div v-if="row.roundLimitOverride != null || row.websearchLimitOverride != null" class="q-badges">
                     <el-tag
                       v-if="row.roundLimitOverride != null"
                       size="small"
@@ -1063,11 +1139,13 @@
                       :title="
                         !subActive
                           ? '该用户单独设了联网次数上限，不受租户默认影响'
-                          : row.websearchLimitOverride === 0
-                            ? '积分消费下联网上限 0 = 关闭该用户联网；点「限额」改成 0 以上即可恢复'
-                            : '积分消费下联网按套餐档位计数，正数仅在套餐未配档时兜底'
+                          : row.websearchLimitOverride === -1
+                            ? '该用户单独设了「不限」联网——越过企业默认和套餐档'
+                            : row.websearchLimitOverride === 0
+                              ? '积分消费下联网上限 0 = 关闭该用户联网；点「限额」改成 0 以上即可恢复'
+                              : '企业默认优先，个人设的数在套餐未配档时兜底'
                       "
-                      >联网单人{{ row.websearchLimitOverride }}</el-tag
+                      >联网单人{{ row.websearchLimitOverride === -1 ? '不限' : row.websearchLimitOverride }}</el-tag
                     >
                   </div>
                 </div>
@@ -1102,7 +1180,7 @@
                   size="small"
                   :title="
                     subActive
-                      ? '给该用户单独设回合 / 联网上限；积分消费下 0 = 停用对应能力，正数不设上限（联网在套餐未配档时兜底）'
+                      ? '给该用户单独设积分 / 回合 / 联网上限；积分和联网都能选「不限」，回合 0 = 停用'
                       : '给该用户单独设回合 / 联网上限'
                   "
                   @click="openQuotaLimits(row)"
@@ -1682,9 +1760,10 @@
     <!-- 业务批3-③(#16)+批④(#17)：单人限额覆盖弹窗——两列独立「留空=跟随租户默认」 -->
     <el-dialog v-model="quotaLimitsDialog" title="设置单人额度上限" width="640px" append-to-body class="q-dialog">
       <el-alert type="info" :closable="false" show-icon class="ov-alert">
-        <template #title>每列留空 = 该项跟随租户默认；填数字 = 只对这一个人生效（两列互不影响）</template>
+        <template #title>每列留空 = 该项跟随租户默认；填数字 = 只对这一个人生效（各列互不影响）</template>
         <template v-if="subActive" #default>
-          积分消费中：回合上限只有 <b>0</b> 才是急停（正数不设上限）；联网上限 0 = 关闭该用户联网，正数在套餐未配档时兜底。
+          积分消费中：回合上限只有 <b>0</b> 才是急停（正数不设上限）；联网上限 0 = 关闭该用户联网。
+          <b>积分上限</b>选「不限」会越过企业默认和套餐建议值。
         </template>
       </el-alert>
       <el-form label-width="120px">
@@ -1703,18 +1782,54 @@
           <span class="unit-note">回合 / 天</span>
         </el-form-item>
         <el-form-item label="每日联网次数">
+          <!-- 额度三级管控批（Q12=1 / Q14=1）：联网行三选一——跟随企业默认 / 不限 / 自定义数字。
+               以前只能填数字，想「不限」根本没有入口（板上 Q14 的原话）。 -->
+          <el-select
+            v-model="quotaLimitsForm.webMode"
+            :disabled="quotaLimitsFollowDefault"
+            size="default"
+            style="width: 200px"
+          >
+            <el-option label="跟随企业默认" value="follow" />
+            <el-option label="不限" value="unlimited" />
+            <el-option label="自定义数字" value="custom" />
+          </el-select>
           <el-input-number
+            v-if="quotaLimitsForm.webMode === 'custom'"
             v-model="quotaLimitsForm.websearchLimit"
             :min="1"
             :max="10000"
             :disabled="quotaLimitsFollowDefault"
             :placeholder="`默认 ${tenantWebDefault}`"
-            style="width: 200px"
+            style="width: 132px; margin-left: 8px"
           />
           <span class="unit-note">次 / 天</span>
         </el-form-item>
+        <!-- 额度三级管控批（Q12 / Q14 / Q20）：积分这一行三选一——跟随 / 不限 / 自定义数字。
+             不给 0：0 在回合/联网上是急停语义，积分列沿用会让一个 0 出现两种解释 -->
+        <el-form-item label="每日积分上限">
+          <el-select
+            v-model="quotaLimitsForm.creditMode"
+            :disabled="quotaLimitsFollowDefault"
+            size="default"
+            style="width: 200px"
+          >
+            <el-option label="跟随企业默认" value="follow" />
+            <el-option label="不限" value="unlimited" />
+            <el-option label="自定义数字" value="custom" />
+          </el-select>
+          <el-input-number
+            v-if="quotaLimitsForm.creditMode === 'custom'"
+            v-model="quotaLimitsForm.creditLimit"
+            :min="1"
+            :max="10000"
+            :disabled="quotaLimitsFollowDefault"
+            style="width: 132px; margin-left: 8px"
+          />
+          <span class="unit-note">积分 / 天</span>
+        </el-form-item>
         <el-form-item label=" " label-width="120px">
-          <el-checkbox v-model="quotaLimitsFollowDefault">两项都跟随租户默认（清空单人覆盖）</el-checkbox>
+          <el-checkbox v-model="quotaLimitsFollowDefault">三项都跟随企业默认（清空单人覆盖）</el-checkbox>
         </el-form-item>
         <!-- UI-UX 批：生效预览提级为醒目块——保存前看得见保存后的确切效果（灰底小字易被忽略） -->
         <div class="q-preview">
@@ -1801,6 +1916,8 @@ import {
   type AssistantHealthReport
 } from '@/api/smartdock/assistant';
 import { listTenantWallet } from '@/api/smartdock/tenant-wallet';
+// 额度三级管控批（Q21=1）：档位按钮要读本周积分池（周池 ÷ 7 ÷ 在册人数 现算）
+import { getMyCreditSummary } from '@/api/smartdock/ai-credit';
 import { addConfig, listConfig, updateConfig } from '@/api/system/config';
 // 业务批4 Q14-A/Q15-B：厂商真标复用 AI 模型配置页组件（未收录厂商降级字母徽章）
 import ProviderLogo from '@/views/smartdock/ai-config/ProviderLogo.vue';
@@ -1821,6 +1938,8 @@ import { ACT, LOG_ST, logSt } from '@/components/Assistant/useAssistant';
 import { fmtIsoTime } from '@/components/Assistant/util';
 import { applyAssistantName } from '@/components/Assistant/nameState';
 import { skillLastUsedText } from './skillUsageText';
+// 额度三级管控批（Q21=1）：档位现算抽成纯函数，按 0/1/20 人三规模单测（creditTier.test.ts）
+import { computeCreditTiers, creditTierFormulaText } from './creditTier';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -1848,13 +1967,41 @@ const walletTxt = ref('—');
 /* ===== 业务批7 Q8：租户默认值行内编辑（概览条「改默认」弹层；PUT /config 部分提交语义安全）。
    深化设计（重中之重，2026-10-14 拍板）：① 0=关停行内标红+动态警示；② 从非 0 改 0 保存前二次确认；
    ③ 保存后生效预览（与单人上限弹窗同款语义）；④ 订阅租户提示（Q1 起订阅期回合不限次，默认空转） ===== */
-const defaultEdit = reactive({ round: 50, web: 20 });
+const defaultEdit = reactive({
+  round: 50,
+  web: 20,
+  /** 额度三级管控批（Q12=1）：企业默认联网次数的两态——填数字（含 0 = 关停）/ 不限(-1) */
+  webMode: 'number' as 'number' | 'unlimited',
+  /** 额度三级管控批：企业默认积分上限的三选一（follow / unlimited / custom） */
+  creditMode: 'follow' as 'follow' | 'unlimited' | 'custom',
+  credit: 100
+});
 const defaultSaving = ref(false);
 /** 题5：弹层开着时，别处保存（如助手称呼）会整体刷新 cfg，把这里没保存的草稿静默重置回旧值 */
 const defaultPopoverOpen = ref(false);
 const syncDefaultEdit = () => {
   defaultEdit.round = cfg.value?.dailyRoundLimitPerUser ?? 50;
-  defaultEdit.web = cfg.value?.websearchLimitPerUser ?? 20;
+  const wv = cfg.value?.websearchLimitPerUser ?? 20;
+  // 额度三级管控批（Q12=1）：-1=不限 → 切到「不限」档；其余（含 0 关停）回数字框
+  if (wv === -1) {
+    defaultEdit.webMode = 'unlimited';
+    defaultEdit.web = 20;
+  } else {
+    defaultEdit.webMode = 'number';
+    defaultEdit.web = wv;
+  }
+  // 额度三级管控批：库里的三态反推回三选一——null=跟随、-1=不限、正数=自定义
+  const cl = cfg.value?.dailyCreditLimitPerUser;
+  if (cl == null) {
+    defaultEdit.creditMode = 'follow';
+    defaultEdit.credit = 100;
+  } else if (cl === -1) {
+    defaultEdit.creditMode = 'unlimited';
+    defaultEdit.credit = 100;
+  } else {
+    defaultEdit.creditMode = 'custom';
+    defaultEdit.credit = cl;
+  }
 };
 /** 订阅生效中（billingMode=credits）：回合默认空转，仅提示不阻拦（管理员可能为订阅到期提前配好） */
 const subActive = ref(false);
@@ -1875,23 +2022,70 @@ function onDefaultPopoverHide() {
 function resetDefaultEdit() {
   syncDefaultEdit();
 }
+
+/* ===== 额度三级管控批（2026-11-26 / Q21=1）：三个档位按钮，数字按「周池 ÷ 7 天 ÷ 在册人数」现算 =====
+   板上钉死的两条：
+   ① 在册人数取「全量 count」，不读随筛选变的分页 total——否则管理员一搜索，建议值就跳；
+   ② 取整规则：标准档先四舍五入，省心/火力 = 标准档 × 0.5 / ×2 再四舍五入（4 人 → 36/71/142）。
+   0 个人时按钮整组不出现（除零没有意义，也没法给建议）。
+   算术本身在 ./creditTier.ts（纯函数，可按 0/1/20 人三规模单测）。 */
+const creditWeeklyCap = ref(0);
+const creditHeadcount = ref(0);
+const creditTiers = computed(() => computeCreditTiers(creditWeeklyCap.value, creditHeadcount.value));
+/** 算式提示：把「这个数怎么来的」直接写出来，管理员不用自己算 */
+const creditTierFormula = computed(() =>
+  creditTierFormulaText(creditWeeklyCap.value, creditHeadcount.value, fmt)
+);
+function applyCreditTier(v: number) {
+  defaultEdit.creditMode = 'custom';
+  defaultEdit.credit = v;
+}
+/** 读周池与在册人数（各一次，失败静默——档位按钮不出现即可，不影响其它功能） */
+async function loadCreditTierBasis() {
+  try {
+    const s = (await getMyCreditSummary()) as unknown as { data?: { summary?: { weeklyCap?: number } } };
+    creditWeeklyCap.value = Number(s?.data?.summary?.weeklyCap ?? 0) || 0;
+  } catch {
+    creditWeeklyCap.value = 0;
+  }
+  try {
+    // 全量在册人数：不带 keyword / disabledOnly，pageSize=1 只为拿 total
+    const r = (await pageAssistantQuota({ pageNum: 1, pageSize: 1 })) as unknown as { data?: { total?: number } };
+    creditHeadcount.value = Number(r?.data?.total ?? 0) || 0;
+  } catch {
+    creditHeadcount.value = 0;
+  }
+}
 /** 保存后生效预览：0 直译"关停"，不说"0 回合"这种没人懂的话；
  *  Q31 回修（2026-10-31）：积分消费下回合正数=不限（只有 0 是急停），联网正数只在套餐未配档时兜底 */
 const defaultPreviewText = computed(() => {
+  // 额度三级管控批：积分上限这一行的预览（三态各自说人话，不出现 -1/-2 这种记号）
+  const creditTxt =
+    defaultEdit.creditMode === 'follow'
+      ? '积分按套餐建议值'
+      : defaultEdit.creditMode === 'unlimited'
+        ? '积分不限'
+        : `积分 ${defaultEdit.credit} 分/天`;
+  // 额度三级管控批（Q12=1）：联网这一行的预览——「不限」不再被 >0 判断当成关停
+  const webUnlimited = defaultEdit.webMode === 'unlimited';
   if (subActive.value) {
     const rt = defaultEdit.round > 0 ? '回合不限（正数不设上限）' : '对话急停（配 0）';
-    const wt =
-      defaultEdit.web > 0 ? `联网按套餐档位（未配档兜底 ${defaultEdit.web} 次/天）` : '联网关闭（配 0）';
-    return `每人 ${rt} · ${wt}`;
+    const wt = webUnlimited
+      ? '联网不限（越过套餐档）'
+      : defaultEdit.web > 0
+        ? `联网 ${defaultEdit.web} 次/天（企业默认，已生效）`
+        : '联网关闭（配 0）';
+    return `每人 ${rt} · ${wt} · ${creditTxt}`;
   }
   const rt = defaultEdit.round > 0 ? `${defaultEdit.round} 回合/天` : '对话关停';
-  const wt = defaultEdit.web > 0 ? `${defaultEdit.web} 次联网/天` : '联网关停';
-  return `每人 ${rt} · ${wt}`;
+  const wt = webUnlimited ? '联网不限' : defaultEdit.web > 0 ? `${defaultEdit.web} 次联网/天` : '联网关停';
+  return `每人 ${rt} · ${wt} · ${creditTxt}`;
 });
-/** 关停检测：当前值非 0 且编辑值为 0（=本次操作将触发紧急刹车） */
+/** 关停检测：当前值非 0 且编辑值为 0（=本次操作将触发紧急刹车）——「不限」不算关停 */
 const defaultShutting = computed(() => {
   const r0 = (cfg.value?.dailyRoundLimitPerUser ?? 50) > 0 && defaultEdit.round === 0;
-  const w0 = (cfg.value?.websearchLimitPerUser ?? 20) > 0 && defaultEdit.web === 0;
+  const w0 =
+    defaultEdit.webMode === 'number' && (cfg.value?.websearchLimitPerUser ?? 20) > 0 && defaultEdit.web === 0;
   return { round: r0, web: w0, any: r0 || w0 };
 });
 async function saveTenantDefaults() {
@@ -1908,7 +2102,21 @@ async function saveTenantDefaults() {
   }
   defaultSaving.value = true;
   try {
-    await updateAssistantConfig({ dailyRoundLimitPerUser: defaultEdit.round, websearchLimitPerUser: defaultEdit.web });
+    // 额度三级管控批：企业默认积分上限三选一 → 落库三态
+    // follow = -2（显式「跟随套餐」；null 清不回，会被 service 层当「保持原值」）
+    // unlimited = -1；custom = 正数
+    const creditLimit =
+      defaultEdit.creditMode === 'follow'
+        ? -2
+        : defaultEdit.creditMode === 'unlimited'
+          ? -1
+          : defaultEdit.credit;
+    await updateAssistantConfig({
+      dailyRoundLimitPerUser: defaultEdit.round,
+      // 额度三级管控批（Q12=1）：选了「不限」发 -1（后端校验已放开），否则发数字（含 0 = 关停）
+      websearchLimitPerUser: defaultEdit.webMode === 'unlimited' ? -1 : defaultEdit.web,
+      dailyCreditLimitPerUser: creditLimit
+    });
     ElMessage.success('租户默认已保存（未设单人上限的用户即刻生效）');
     await loadConfig();
   } catch {
@@ -3924,12 +4132,27 @@ const quotaLimitsDialog = ref(false);
 const quotaSaving = ref(false);
 const quotaLimitsUser = ref('');
 const quotaLimitsUserId = ref<number | string>('');
-const quotaLimitsForm = reactive({ roundLimit: undefined as number | undefined, websearchLimit: undefined as number | undefined });
+const quotaLimitsForm = reactive({
+  roundLimit: undefined as number | undefined,
+  websearchLimit: undefined as number | undefined,
+  /** 额度三级管控批（Q12=1）：联网这一行也三选一——跟随企业默认 / 不限 / 自定义数字 */
+  webMode: 'follow' as 'follow' | 'unlimited' | 'custom',
+  /** 额度三级管控批：积分这一行的三选一 + 数字（与另两列一样 null=跟随） */
+  creditMode: 'follow' as 'follow' | 'unlimited' | 'custom',
+  creditLimit: undefined as number | undefined
+});
 const quotaLimitsFollowDefault = ref(false);
 
 /** 租户默认回合/联网上限（弹窗占位提示与"当前生效"话术用；批④起联网列落 config） */
 const tenantRoundDefault = computed(() => cfg.value?.dailyRoundLimitPerUser ?? 50);
 const tenantWebDefault = computed(() => cfg.value?.websearchLimitPerUser ?? 20);
+/** 企业默认联网次数的说法（额度三级管控批 Q12=1 起三态：-1 不限 / 0 关停 / 正数） */
+const webDefaultText = computed(() => {
+  const v = cfg.value?.websearchLimitPerUser ?? 20;
+  if (v === -1) return '不限';
+  if (v === 0) return '已关停';
+  return `${v} 次联网/天`;
+});
 
 /** UI-UX 批（2026-10-13）：本页速览——已用完/快用完(≥80%)/已禁用人数（口径=当前页，
  *  概览条明示"本页"防跨页误读；不加后端汇总接口，纯前端可算） */
@@ -3964,6 +4187,43 @@ const quotaBarTier = (row: AssistantQuotaRow): string => {
   return 't-blue';
 };
 
+/** 整数千分位（额度档位数字用；fmtMoney 会带两位小数，档位是整数不适用） */
+const fmt = (v?: number | null): string => {
+  const n = Number(v);
+  return (Number.isFinite(n) ? Math.round(n) : 0).toLocaleString('zh-CN');
+};
+
+/* ===== 额度三级管控批：积分进度条三件套（与回合那套同色阶，口径独立） ===== */
+/** 积分「不限」：-1 = 越过套餐档（Q20=1） */
+const creditUnlimited = (row: AssistantQuotaRow): boolean => (row.effectiveCreditLimit ?? 0) < 0;
+const creditExhausted = (row: AssistantQuotaRow): boolean => {
+  if (creditUnlimited(row)) return false;
+  const cap = row.effectiveCreditLimit ?? 0;
+  return cap > 0 && (row.creditsUsedToday ?? 0) >= cap;
+};
+const creditBarPct = (row: AssistantQuotaRow): number => {
+  // 不限时不画进度（画满格会让人以为快用完了）
+  if (creditUnlimited(row)) return 0;
+  const cap = row.effectiveCreditLimit ?? 0;
+  if (cap <= 0) return 0;
+  return Math.min(100, Math.round(((row.creditsUsedToday ?? 0) / cap) * 100));
+};
+const creditBarTier = (row: AssistantQuotaRow): string => {
+  if (creditUnlimited(row)) return 't-gray';
+  const cap = row.effectiveCreditLimit ?? 0;
+  if (cap <= 0) return 't-gray';
+  if ((row.creditsUsedToday ?? 0) >= cap) return 't-red';
+  return creditBarPct(row) >= 80 ? 't-orange' : 't-blue';
+};
+/** 上限哪来的（Q8 补条件：不写这句，管理员第一句话就是「为什么他是 50，我设的是 100」） */
+const creditSourceText = (row: AssistantQuotaRow): string => {
+  const src = row.creditLimitSource;
+  if (src === 'personal') return '个人单独设的';
+  if (src === 'tenant') return '企业默认';
+  if (src === 'plan') return '套餐建议值';
+  if (src === 'platform') return '平台兜底';
+  return '—';
+};
 /** UI-UX 批：费用千分位（¥1,234.56——裸 6 位小数读不出量级，管理页费用列统一口径） */
 const fmtMoney = (v?: number | null): string => {
   // 回修（glm53 P2-6）：null/undefined/NaN 一律落 0 展示，不让 toLocaleString 把 NaN 原样上屏
@@ -3973,32 +4233,40 @@ const fmtMoney = (v?: number | null): string => {
 /** 回修（m3 P1-1）：勾"跟随租户默认"后实时按保存结果展示，不再停留在单人旧值误导；
  *  批④起双列各自跟随（round/websearch 可一列覆盖一列默认，后端四象限分流承接） */
 const quotaLimitsCurrentText = computed(() => {
+  // 额度三级管控批：积分那一行的说法（null=跟随 / -1=不限 / 正数=上限），三处预览共用
+  const creditTxt = (() => {
+    if (quotaLimitsFollowDefault.value || quotaLimitsForm.creditLimit == null) return '积分跟随企业默认';
+    const c = quotaLimitsForm.creditLimit;
+    if (c === -1) return '积分不限（越过企业默认和套餐建议值）';
+    return `每天最多 ${c} 积分`;
+  })();
+  // 额度三级管控批（Q12=1）：联网那一行的说法——三态各说人话，不把 -1 印成「-1 次」
+  const webTxt = (() => {
+    if (quotaLimitsFollowDefault.value || quotaLimitsForm.webMode === 'follow') {
+      const d = tenantWebDefault.value;
+      const base = d === -1 ? '企业默认不限' : d === 0 ? '企业默认已关停' : `企业默认 ${d} 次`;
+      return `联网跟随${base}`;
+    }
+    if (quotaLimitsForm.webMode === 'unlimited') return '联网不限（越过企业默认和套餐档）';
+    return `联网每天 ${quotaLimitsForm.websearchLimit ?? '—'} 次`;
+  })();
   if (subActive.value) {
-    // Q31 回修：积分消费下回合正数=不限、0=急停；联网正数只在套餐未配档时兜底
+    // Q31 回修：积分消费下回合正数=不限、0=急停
     const r = quotaLimitsFollowDefault.value ? null : quotaLimitsForm.roundLimit;
-    const w = quotaLimitsFollowDefault.value ? null : quotaLimitsForm.websearchLimit;
     const rt =
       r == null
         ? `回合不限（租户默认 ${tenantRoundDefault.value > 0 ? '正数' : '0 = 急停'}）`
         : r === 0
           ? '回合已停用（0 = 急停）'
           : '回合不限（正数不设上限）';
-    const wt =
-      w == null
-        ? `联网按套餐档位（未配档兜底 ${tenantWebDefault.value} 次）`
-        : w === 0
-          ? '联网已关闭（0）'
-          : `联网按套餐档位（未配档兜底 ${w} 次）`;
-    return `${rt} · ${wt}`;
+    return `${creditTxt} · ${rt} · ${webTxt}`;
   }
   if (quotaLimitsFollowDefault.value) {
-    return `默认 ${tenantRoundDefault.value} 回合 · ${tenantWebDefault.value} 次联网 / 天`;
+    return `${creditTxt} · 默认 ${tenantRoundDefault.value} 回合 · ${webTxt}`;
   }
   const r = quotaLimitsForm.roundLimit;
-  const w = quotaLimitsForm.websearchLimit;
   const rt = r != null ? `单人 ${r}` : `默认 ${tenantRoundDefault.value}`;
-  const wt = w != null ? `单人 ${w}` : `默认 ${tenantWebDefault.value}`;
-  return `${rt} 回合 · ${wt} 次联网 / 天`;
+  return `${creditTxt} · ${rt} 回合 · ${webTxt}`;
 });
 
 async function loadQuotaPage() {
@@ -4025,7 +4293,7 @@ async function onQuotaReset(row: AssistantQuotaRow) {
   try {
     await ElMessageBox.confirm(
       subActive.value
-        ? `把「${name}」今天的回合与联网计数清零？（积分消费下回合不限次，联网每天按套餐档位计数，用完要靠这里重置）`
+        ? `把「${name}」今天的回合与联网计数清零？（积分消费下回合不限次，联网每天照常计数，用完要靠这里重置；已花掉的积分不会退回）`
         : `把「${name}」今天的已用回合（${row.turnsUsedToday} / ${row.effectiveRoundLimit}）清零？清零后 ${name} 今天还能继续聊。`,
       '重置今日额度',
       { type: 'warning', confirmButtonText: '确定重置', cancelButtonText: '再想想' }
@@ -4050,26 +4318,72 @@ function openQuotaLimits(row: AssistantQuotaRow) {
   quotaLimitsUserId.value = row.userId;
   quotaLimitsUser.value = `${row.nickName || row.userName}${row.deptName ? ' · ' + row.deptName : ''}`;
   quotaLimitsForm.roundLimit = row.roundLimitOverride ?? undefined;
-  quotaLimitsForm.websearchLimit = row.websearchLimitOverride ?? undefined;
-  // 批④起双列独立：勾选态=两列都无覆盖（一列覆盖一列默认时打开为未勾，可按列清空输入）
-  quotaLimitsFollowDefault.value = row.roundLimitOverride == null && row.websearchLimitOverride == null;
+  // 额度三级管控批（Q12=1）：联网列三态反推回三选一（null=跟随、-1=不限、正数=自定义）
+  const wo = row.websearchLimitOverride;
+  if (wo == null) {
+    quotaLimitsForm.webMode = 'follow';
+    quotaLimitsForm.websearchLimit = undefined;
+  } else if (wo === -1) {
+    quotaLimitsForm.webMode = 'unlimited';
+    quotaLimitsForm.websearchLimit = undefined;
+  } else {
+    quotaLimitsForm.webMode = 'custom';
+    quotaLimitsForm.websearchLimit = wo;
+  }
+  // 额度三级管控批：库里三态反推回三选一（null=跟随、-1=不限、正数=自定义）
+  const co = row.creditLimitOverride;
+  if (co == null) {
+    quotaLimitsForm.creditMode = 'follow';
+    quotaLimitsForm.creditLimit = undefined;
+  } else if (co === -1) {
+    quotaLimitsForm.creditMode = 'unlimited';
+    quotaLimitsForm.creditLimit = undefined;
+  } else {
+    quotaLimitsForm.creditMode = 'custom';
+    quotaLimitsForm.creditLimit = co;
+  }
+  // 批④起双列独立：勾选态=三列都无覆盖（一列覆盖一列默认时打开为未勾，可按列清空输入）
+  quotaLimitsFollowDefault.value =
+    row.roundLimitOverride == null && row.websearchLimitOverride == null && row.creditLimitOverride == null;
   quotaLimitsDialog.value = true;
 }
 
 async function onSaveQuotaLimits() {
   quotaSaving.value = true;
   try {
-    // 勾「跟随默认」=两列全清；否则每列独立（空输入=该列跟随默认，后端四象限分流承接）
+    // 勾「跟随默认」=三列全清；否则每列独立（空输入=该列跟随默认，后端分象限承接）
     const follow = quotaLimitsFollowDefault.value;
+    // 额度三级管控批：积分列三态 → 落库记号（follow=-2 显式跟随、unlimited=-1、custom=正数）。
+    // 与另两列不同：积分列的 null 是「不动」而不是「清空」，所以「跟随」必须发 -2
+    const creditLimit = follow
+      ? -2
+      : quotaLimitsForm.creditMode === 'follow'
+        ? -2
+        : quotaLimitsForm.creditMode === 'unlimited'
+          ? -1
+          : (quotaLimitsForm.creditLimit ?? null);
+    // 额度三级管控批（Q12=1）：联网列三态 → 落库记号（follow=null 清回跟随、unlimited=-1、custom=正数）。
+    // 与积分列不同：联网列的 null 就是「清空跟随」（四象限分流承接），不需要 -2
+    const webLimit = follow
+      ? null
+      : quotaLimitsForm.webMode === 'follow'
+        ? null
+        : quotaLimitsForm.webMode === 'unlimited'
+          ? -1
+          : (quotaLimitsForm.websearchLimit ?? null);
     await updateAssistantQuotaLimits({
       userId: quotaLimitsUserId.value,
       roundLimit: follow ? null : (quotaLimitsForm.roundLimit ?? null),
-      websearchLimit: follow ? null : (quotaLimitsForm.websearchLimit ?? null)
+      websearchLimit: webLimit,
+      creditLimit
     });
+    const creditTxt =
+      creditLimit === -2 ? '积分跟随默认' : creditLimit === -1 ? '积分不限' : `积分 ${creditLimit}/天`;
+    const webTxt = webLimit === -1 ? '联网不限' : `${webLimit ?? '默认'} 次联网`;
     ElMessage.success(
       follow
-        ? '已恢复两项跟随租户默认'
-        : `已保存：${quotaLimitsForm.roundLimit ?? '默认'} 回合 · ${quotaLimitsForm.websearchLimit ?? '默认'} 次联网 / 天`
+        ? '已恢复三项跟随企业默认'
+        : `已保存：${quotaLimitsForm.roundLimit ?? '默认'} 回合 · ${webTxt} · ${creditTxt}`
     );
     quotaLimitsDialog.value = false;
     await loadQuotaPage();
@@ -4207,6 +4521,8 @@ onMounted(() => {
     void loadToolGate();
     void loadMcpServers();
     void loadMcpCallLog();
+    // 额度三级管控批（Q21=1）：档位按钮的「周池 ÷ 7 ÷ 在册人数」需要一个数据底座
+    void loadCreditTierBasis();
   }
 });
 </script>
@@ -5103,6 +5419,44 @@ onMounted(() => {
 .quota-tag {
   height: 18px;
   padding: 0 6px;
+}
+/* 额度三级管控批（Q1=1 / Q8 补条件）：积分行下面那两行小字——
+   「上限哪来的」+ 回合数只作参考（积分模式下回合不限，印「37 / 50」会误导） */
+.q-credit-src {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  .q-round-ref {
+    color: var(--el-text-color-placeholder);
+  }
+}
+.q-usage .q-unit {
+  margin-left: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+/* 档位按钮那一排（Q21=1）：小按钮 + 一行算式，不占弹层高度 */
+.qo-tiers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 2px 0 4px 0;
+  .qo-tiers-k {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+  }
+}
+.qo-tier-formula {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.qo-form-credit {
+  align-items: center;
 }
 .quota-exhausted {
   color: var(--el-color-danger);

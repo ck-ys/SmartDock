@@ -50,6 +50,19 @@ public class AiCreditLedger implements Serializable {
 
     private Date createTime;
 
+    /**
+     * 额度三级管控批（Q17=1）：<b>快照</b>——结算时用的模型名。
+     * 改倍率 / 换模型后旧流水这三个数一个字不动（板上验收：两笔都能解释）。
+     * 历史行为 NULL，不追填（当时的倍率已无从考证，编一个数就是假账）。
+     */
+    private String modelName;
+
+    /** 快照：结算时用的倍率（平台系数 × 手工系数）；NULL=历史行 */
+    private java.math.BigDecimal creditMultiplier;
+
+    /** 快照：结算时一轮的官方成本（元）；NULL=历史行 */
+    private java.math.BigDecimal unitPrice;
+
     /** 消耗人昵称（业务批8 Q6 双视角流水：服务侧批量回填，非表列） */
     @TableField(exist = false)
     private String operatorName;

@@ -476,6 +476,95 @@
           自动刷新；多把钥匙自动轮询分摊限流，失败/余额耗尽自动切下一把，改动立即生效于该厂商全部模型。
         </div>
       </el-tab-pane>
+
+      <!-- 多把钥匙批（2026-11-26 Q1=1）：搜索独立成第五个页签。
+           为什么搬出来：搜索不是模型（没有模型名/对话格式/上下文窗口），塞在「钥匙管理」里
+           语义就是错的；而且排在模型钥匙表下面 169px（390 下 294px），用户要滚才看得到，
+           两者表格又长得一样，实测有人点成了「新增模型钥匙」。独立页签点一下就直达。 -->
+      <el-tab-pane label="联网搜索" name="search" lazy>
+        <div class="search-sec">
+          <div class="search-sec-head">
+            <b>联网搜索</b>
+            <span class="search-sec-note">
+              可以挂多把钥匙：系统轮流使用，某把被限流/欠费/余额为 0 时自动跳过换下一把。余额是厂商账户里的钱（元，能自动查）；资源包是买来的次数（厂商没接口，按「你填总量 + 系统每搜一次减一」估算，以厂商后台为准）
+            </span>
+            <el-button v-hasPermi="['smartdock:ai:edit']" type="primary" icon="Plus" @click="openSearchEdit()">新增搜索服务</el-button>
+          </div>
+          <div class="search-tblwrap">
+          <el-table v-loading="searchLoading" :data="searchRows" class="ui-table" :empty-text="'还没接入搜索服务——联网搜索会用系统参数里的 key（如果有）'">
+            <el-table-column label="启用" width="70" align="center">
+              <template #default="{ row }">
+                <el-switch
+                  :model-value="row.enabled !== '0'"
+                  :aria-label="(row.label || '搜索服务') + ' 启停'"
+                  v-hasPermi="['smartdock:ai:edit']"
+                  @change="onToggleSearch(row)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="名称" min-width="170">
+              <template #default="{ row, $index }">
+                <span class="keys-name">{{ row.label || providerNameOfSearch(row.provider) }}</span>
+                <!-- 多把钥匙 Q2=1：第 1 把（最先建）= 主钥匙，标出来免得管理员不知道谁打头阵 -->
+                <span class="ui-pill ui-pill--muted">{{ $index === 0 ? '第 1 把 · 主钥匙' : '第 ' + ($index + 1) + ' 把' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="密钥" min-width="150">
+              <template #default="{ row }">
+                <code v-if="row.hasKey" class="keys-mask">{{ row.apiKeyMask || '****' }}</code>
+                <span v-else class="keys-mask keys-mask-empty">未填</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="余额 / 资源包" min-width="190">
+              <template #default="{ row }">
+                <!-- 两套口径分开写：账户余额（元，自动查）+ 资源包次数（估算） -->
+                <div class="search-bal">
+                  <span v-if="row.balanceStatus === 'OK' && row.balanceAmount != null">
+                    ￥{{ Number(row.balanceAmount).toFixed(2) }}
+                  </span>
+                  <span v-else-if="row.balanceStatus === 'ERROR'" class="search-bal-bad">查不到</span>
+                  <span v-else-if="row.balanceStatus === 'UNSUPPORTED'" class="search-bal-dash">—</span>
+                  <span v-else class="search-bal-dash">未查</span>
+                  <span v-if="row.packTotal != null" class="search-pack">
+                    包 {{ packLeftText(row) }}<template v-if="row.packExpireAt"> · {{ row.packExpireAt }} 止</template>
+                    <span class="search-pack-tag">估算</span>
+                  </span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="当前状态" width="150">
+              <template #default="{ row }">
+                <!-- 多把钥匙 Q3=1：余额查到是 0 且刚查过的会被系统跳过，界面上要说清 -->
+                <span v-if="isSearchKeySkipped(row)" class="ui-pill ui-pill--neg">余额 0 · 暂不使用</span>
+                <span v-else-if="row.enabled === '0'" class="ui-pill ui-pill--muted">已停用</span>
+                <span v-else class="ui-pill ui-pill--pos">正常使用</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="最近查询" width="150">
+              <template #default="{ row }">
+                <span class="search-checked">{{ row.balanceCheckedAt || '还没查过' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="190" align="center" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" :loading="searchRefreshingId === row.id" @click="onRefreshSearch(row)">
+                  查余额
+                </el-button>
+                <el-button v-hasPermi="['smartdock:ai:edit']" link type="primary" size="small" @click="openSearchEdit(row)">
+                  编辑
+                </el-button>
+                <el-button v-hasPermi="['smartdock:ai:edit']" link type="danger" size="small" @click="onRemoveSearch(row)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          </div>
+          <div class="keys-footnote">
+            余额走官方 <code>GET /v1/fund/remaining</code>；资源包次数厂商没有查询接口，是本地估算——如果你们在厂商后台或别的系统也直接调它，这里会偏乐观。
+          </div>
+        </div>
+      </el-tab-pane>
       <el-tab-pane label="识别域名" name="domains" lazy>
         <!-- 权限对齐后端锚 smartdock:ai:list（与菜单 9060 同串；smartdock:ai-doc-domain:* 系审查回修，全库无此串） -->
         <DocDomainPanel v-hasPermi="['smartdock:ai:list']" />
@@ -816,20 +905,14 @@
                     </el-form-item>
                   </el-col>
                   <el-col :span="24">
-                    <!-- 业务反馈批1015b Q13：积分倍率此前零编辑入口只能改库；订阅租户每回合扣分=基础分×此倍率 -->
-                    <el-form-item label="积分倍率" prop="creditMultiplier">
-                      <el-input-number
-                        v-model="form.creditMultiplier"
-                        :precision="1"
-                        :step="0.5"
-                        :min="0.5"
-                        :max="20"
-                        controls-position="right"
-                        style="width: 100%"
-                      />
-                      <div class="field-hint">
-                        ×1 免费档 / ×2 经济 / ×3 标准 / ≥×4 旗舰；留空视同 ×1，保存即刻生效（积分套餐页倍率表只读展示同值）
+                    <!-- 业务反馈批1015b Q13：积分倍率此前零编辑入口只能改库
+                         额度三级管控批 Q13=1：**唯一能改的地方改到「积分套餐 → 模型倍率」**——
+                         这里只读 + 「去调」，否则又出现两个地方能改、值不一样（板上点名的风险） -->
+                    <el-form-item label="积分倍率">
+                      <div class="field-hint" style="margin: 0">
+                        改到「积分套餐 → 模型倍率」统一调了——那里按官方价自动带出相对价，手工系数也只有一个入口。
                       </div>
+                      <el-button link type="primary" size="small" @click="router.push('/ai-credit')">去调 →</el-button>
                     </el-form-item>
                   </el-col>
                 </el-row>
@@ -1160,6 +1243,44 @@
         <el-button type="primary" :loading="importSubmitting" @click="submitImport">导入</el-button>
       </template>
     </el-dialog>
+
+    <!-- 额度三级管控批（Q16=1）：搜索服务编辑弹窗 -->
+    <el-dialog v-model="searchEdit.visible" :title="searchEdit.id ? '编辑搜索服务' : '新增搜索服务'" width="520px" append-to-body>
+      <el-alert type="info" :closable="false" show-icon class="mb-3">
+        <template #title>
+          账户余额由系统自动查（官方接口，单位元）；资源包次数厂商没有查询接口，填了总量之后系统每成功搜一次减一，<b>是估算</b>。
+        </template>
+      </el-alert>
+      <el-form label-width="110px">
+        <el-form-item label="搜索厂商">
+          <el-select v-model="searchEdit.provider" style="width: 100%" :disabled="!!searchEdit.id">
+            <el-option label="博查 Bocha" value="BOCHA" />
+          </el-select>
+          <div class="field-hint">将来接别家只多一行；每家的余量口径不同（金额 / 次数 / 百分比 / 查不到），不硬换算</div>
+        </el-form-item>
+        <el-form-item label="名称">
+          <el-input v-model="searchEdit.label" maxlength="64" placeholder="留空=按厂商显示" />
+        </el-form-item>
+        <el-form-item label="API Key">
+          <el-input v-model="searchEdit.apiKey" type="password" show-password placeholder="sk-..." />
+          <div class="field-hint">{{ searchEdit.id ? '留空 = 不改原来的 key' : '加密存储（与模型钥匙同一把钥匙）' }}</div>
+        </el-form-item>
+        <el-form-item label="资源包总次数">
+          <el-input-number v-model="searchEdit.packTotal" :min="0" :max="100000000" style="width: 180px" placeholder="没买包就留空" />
+          <div class="field-hint">厂商后台买的包总量（如体验包 1000 次）；留空 = 不估算</div>
+        </el-form-item>
+        <el-form-item label="资源包到期">
+          <el-date-picker v-model="searchEdit.packExpireAt" type="date" value-format="YYYY-MM-DD" placeholder="选填" style="width: 180px" />
+        </el-form-item>
+        <el-form-item label="控制台地址">
+          <el-input v-model="searchEdit.consoleUrl" placeholder="https://open.bochaai.com/" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="searchEdit.visible = false">取消</el-button>
+        <el-button type="primary" :loading="searchEdit.saving" @click="onSaveSearch">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1221,7 +1342,13 @@ import {
   refreshAiKeyBalance,
   refreshAllAiKeyBalances,
   getAiModelHealthLatest,
-  type AiModelHealthRow
+  type AiModelHealthRow,
+  // 额度三级管控批（Q16=1）：搜索服务
+  listAiSearchServices,
+  saveAiSearchService,
+  changeAiSearchStatus,
+  removeAiSearchService,
+  refreshAiSearchBalance
 } from '@/api/smartdock/ai';
 import type { AiProvider } from '@/api/smartdock/ai';
 import {
@@ -1472,9 +1599,149 @@ const balanceNote = (row: AiProviderAccessVO) => {
   return '厂商账户余额';
 };
 
+/* ===== 额度三级管控批（Q16=1）：搜索服务小节 =====
+   两套余量口径分开显示：余额（元，官方接口自动查）/ 资源包（次数，估算）。
+   查不到就显示「查不到」或「—」，绝不把次数换算成金额硬比（板上点名的坑②）。 */
+interface SearchRow {
+  id: number;
+  tenantId: string;
+  provider: string;
+  label?: string;
+  enabled: string;
+  apiKeyMask?: string | null;
+  hasKey: boolean;
+  consoleUrl?: string;
+  balanceAmount?: number | null;
+  balanceCurrency?: string | null;
+  balanceCheckedAt?: string | null;
+  balanceStatus?: string | null;
+  packTotal?: number | null;
+  packUsed?: number | null;
+  packExpireAt?: string | null;
+}
+const searchRows = ref<SearchRow[]>([]);
+const searchLoading = ref(false);
+const searchRefreshingId = ref<number | null>(null);
+const searchEdit = reactive({
+  visible: false,
+  saving: false,
+  id: 0,
+  provider: 'BOCHA',
+  label: '',
+  apiKey: '',
+  consoleUrl: '',
+  packTotal: undefined as number | undefined,
+  packExpireAt: ''
+});
+const providerNameOfSearch = (p: string) => (p === 'BOCHA' ? '博查 Bocha' : p);
+/** 资源包剩余（估算）：总量 - 系统累计调用；算不出返回「—」 */
+/**
+ * 多把钥匙 Q3=1：这把会不会被系统跳过？
+ * 与后端 SearchKeyPool.isFreshZeroBalance 同口径——余额查到是 0、且 24 小时内查过，选路时跳过。
+ * 老快照不据此跳过（防误伤），所以这里也要判时间窗，不能只看 amount=0。
+ */
+const isSearchKeySkipped = (row: SearchRow): boolean => {
+  if (row.enabled === '0') return false; // 停用单独显示
+  if (row.balanceStatus !== 'OK' || row.balanceAmount == null) return false;
+  if (Number(row.balanceAmount) > 0) return false;
+  const checked = row.balanceCheckedAt ? Date.parse(String(row.balanceCheckedAt).replace(' ', 'T')) : NaN;
+  if (Number.isNaN(checked)) return false; // 没有查询时间就当老快照，不跳过
+  return Date.now() - checked <= 24 * 60 * 60 * 1000;
+};
+const packLeftText = (row: SearchRow): string => {
+  if (row.packTotal == null) return '—';
+  const used = row.packUsed ?? 0;
+  const left = Math.max(0, row.packTotal - used);
+  return `${fmtNumSmall(left)}/${fmtNumSmall(row.packTotal)}`;
+};
+const fmtNumSmall = (n: number) => n.toLocaleString('zh-CN');
+
+const loadSearchRows = async () => {
+  searchLoading.value = true;
+  try {
+    const res: any = await listAiSearchServices();
+    searchRows.value = (res?.data ?? []) as SearchRow[];
+  } catch {
+    searchRows.value = [];
+  } finally {
+    searchLoading.value = false;
+  }
+};
+const openSearchEdit = (row?: SearchRow) => {
+  searchEdit.visible = true;
+  searchEdit.id = row?.id ?? 0;
+  searchEdit.provider = row?.provider ?? 'BOCHA';
+  searchEdit.label = row?.label ?? '';
+  // 编辑时不回填 key（后端只回掩码）——留空 = 不改
+  searchEdit.apiKey = '';
+  searchEdit.consoleUrl = row?.consoleUrl ?? 'https://open.bochaai.com/';
+  searchEdit.packTotal = row?.packTotal ?? undefined;
+  searchEdit.packExpireAt = row?.packExpireAt ?? '';
+};
+const onSaveSearch = async () => {
+  searchEdit.saving = true;
+  try {
+    await saveAiSearchService({
+      id: searchEdit.id || undefined,
+      provider: searchEdit.provider,
+      label: searchEdit.label || undefined,
+      apiKey: searchEdit.apiKey || undefined,
+      consoleUrl: searchEdit.consoleUrl || undefined,
+      packTotal: searchEdit.packTotal ?? null,
+      packExpireAt: searchEdit.packExpireAt || null
+    });
+    proxy?.$modal.msgSuccess('已保存');
+    searchEdit.visible = false;
+    await loadSearchRows();
+  } catch (e: any) {
+    proxy?.$modal.msgError(e?.msg || '保存失败');
+  } finally {
+    searchEdit.saving = false;
+  }
+};
+const onToggleSearch = async (row: SearchRow) => {
+  try {
+    await changeAiSearchStatus(row.id, row.enabled === '0' ? '1' : '0');
+    await loadSearchRows();
+  } catch {
+    proxy?.$modal.msgError('操作失败');
+  }
+};
+const onRemoveSearch = async (row: SearchRow) => {
+  try {
+    await proxy?.$modal.confirm(`删除搜索服务「${row.label || providerNameOfSearch(row.provider)}」？联网搜索会回落到系统参数里的 key（如果有）。`);
+  } catch {
+    return;
+  }
+  try {
+    await removeAiSearchService(row.id);
+    proxy?.$modal.msgSuccess('已删除');
+    await loadSearchRows();
+  } catch {
+    proxy?.$modal.msgError('删除失败');
+  }
+};
+const onRefreshSearch = async (row: SearchRow) => {
+  searchRefreshingId.value = row.id;
+  try {
+    const res: any = await refreshAiSearchBalance(row.id);
+    const d = res?.data ?? {};
+    if (d.status === 'OK') {
+      proxy?.$modal.msgSuccess(`余额 ￥${Number(d.balanceAmount ?? 0).toFixed(2)}`);
+    } else {
+      // 查不到就说查不到——不许显示 0（那是「没钱」），也不许拿旧值冒充新值
+      proxy?.$modal.msgWarning(d.message || '查不到余额');
+    }
+    await loadSearchRows();
+  } catch {
+    proxy?.$modal.msgError('查询失败');
+  } finally {
+    searchRefreshingId.value = null;
+  }
+};
+
 /** 载入钥匙列表并让表单对齐主钥匙（无行=首配形态） */
-const loadKeyList = async (tenantId: string, provider: string) => {
-  keysLoading.value = true;
+const loadKeyList = async (tenantId: string, provider: string) => {  keysLoading.value = true;
   try {
     const res: any = await listAiProviderAccessKeys({ tenantId, provider });
     keyList.value = (res?.data ?? []) as AiProviderAccessVO[];
@@ -2201,7 +2468,7 @@ const activeTab = ref('models');
 // 菜单IA重组批3(2026-10-16): 页签写进 URL（?tab=domains 深链，旧地址 /tenant/ai-doc-domain redirect 到此）
 const route = useRoute();
 const router = useRouter();
-const TAB_KEYS = ['models', 'prices', 'keys', 'domains'] as const;
+const TAB_KEYS = ['models', 'prices', 'keys', 'search', 'domains'] as const;
 const queryTab = String(route.query.tab || '');
 if ((TAB_KEYS as readonly string[]).includes(queryTab)) {
   activeTab.value = queryTab as (typeof TAB_KEYS)[number];
@@ -2267,7 +2534,10 @@ const priceText = (vo: AiConfigVO) => {
 
 /** 页签激活时按需加载: 价格目录页签拉价格表（批1015c Q1 撤「默认模型」页签, defaults 分支同删） */
 const ensureTabData = async (tab: string) => {
-  if (tab === 'keys') {
+  if (tab === 'search') {
+    // 多把钥匙批 Q1=1：搜索独立成页签后自己拉数据（失败静默成空表，空表文案已写明「还没接入」）
+    void loadSearchRows();
+  } else if (tab === 'keys') {
     // Q5：首次进钥匙管理页签——默认定位当前选中厂商（模型配置页的厂商卡），租户落"我的租户"
     if (!keysProvider.value) {
       keysProvider.value = (activeGroup.value?.provider ?? vendorGroups.value[0]?.provider ?? '') as AiProvider;
@@ -3113,6 +3383,56 @@ onUnmounted(() => {
   flex: 1;
   min-width: 200px;
 }
+/* 搜索服务小节头（额度三级管控批 Q16=1 补样式）。
+   加这一节时只写了模板没写样式，结果是「标题 + 70 字说明 + 按钮」全挤在一行流里：
+   按钮掉到说明下方、x 贴着最左边、90×20 的 link 尺寸，看着像那句话的续行，入口找不到。
+   照 keys-toolbar 同款：说明吃掉剩余宽度并折行，按钮靠右、与「新增钥匙」同为主按钮尺寸。 */
+.search-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+/* 多把钥匙批 390 实测：标题「联网搜索」被说明文字挤到左边换行、按钮掉到第三行。
+   窄屏让标题与按钮各占一行、说明折在中间，比三件挤两行好读。 */
+@media (max-width: 768px) {
+  .search-sec-head > b {
+    flex: 1 0 100%;
+  }
+  .search-sec-note {
+    flex: 1 0 100%;
+    min-width: 0;
+  }
+  .search-sec-head .el-button {
+    flex: 0 0 auto;
+  }
+}
+.search-sec-head > b {
+  font-size: 14px;
+  white-space: nowrap;
+}
+.search-sec-note {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  flex: 1;
+  min-width: 240px;
+}
+.search-sec-head .el-button {
+  flex: none;
+}
+/* 多把钥匙后列变多（名称/密钥/余额/状态/最近/操作），390 下塞不进。
+   让表格自身横向可滑，而不是把列压扁或裁掉（与拍板板流程图同口径）。 */
+.search-tblwrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 768px) {
+  .search-tblwrap .el-table {
+    min-width: 860px;
+  }
+}
+
 .keys-toolbar-actions {
   display: flex;
   gap: 8px;

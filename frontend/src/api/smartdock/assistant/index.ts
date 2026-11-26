@@ -306,6 +306,12 @@ export interface AssistantEffectiveConfig {
   digestEnabled?: string;
   /** 助手对外称呼（快刀批 Q6；后端合并平台默认，非空=租户已自定义） */
   assistantName?: string;
+  /**
+   * 企业默认每人每天积分上限（额度三级管控批 2026-11-26）。
+   * 后端 null=没设（算上限时落到套餐建议值）——不是 0，别用 `?? 0` 兜底。
+   * -1=不限；-2 读侧已归一成 null（写入时才会出现）。
+   */
+  dailyCreditLimitPerUser?: number | null;
 }
 
 /** 压缩策略派生值（批A-1：按当前默认模型上下文窗口自动算，管理页只读展示） */
@@ -342,6 +348,12 @@ export interface AssistantConfigUpdate {
   digestEnabled?: '1' | '0';
   /** 快刀批 Q6：助手称呼——非空=改；''=清除回落平台默认；不发/undefined=保持现值 */
   assistantName?: string;
+  /**
+   * 企业默认每人每天积分上限（额度三级管控批 2026-11-26）。
+   * 不发=保持现值；-2=清回「跟随套餐」；-1=不限；1..10000=上限。
+   * 注意 0 不合法（积分列不给急停语义，后端 400）。
+   */
+  dailyCreditLimitPerUser?: number | null;
   tenantId?: string;
 }
 
@@ -372,6 +384,14 @@ export interface AssistantQuotaRow {
   turnsUsedToday: number;
   effectiveRoundLimit: number;
   monthCost: number;
+  /** 额度三级管控批：个人积分上限覆盖（null=跟随企业默认；-1=不限；-2 读侧已归一成 null） */
+  creditLimitOverride?: number | null;
+  /** 今天已花积分（只算 biz_type='DEDUCT' 的扣减行；订阅/加油包/调整不算） */
+  creditsUsedToday?: number;
+  /** 生效积分上限（四级链的结果；-1=不限） */
+  effectiveCreditLimit?: number;
+  /** 上限哪来的：personal / tenant / plan / platform */
+  creditLimitSource?: string;
 }
 
 /** 用户额度分页（perm=smartdock:assistant:config） */
@@ -385,7 +405,13 @@ export function resetAssistantQuota(userId: number | string) {
 }
 
 /** 单人限额覆盖（null=清空跟随租户默认） */
-export function updateAssistantQuotaLimits(data: { userId: number | string; roundLimit?: number | null; websearchLimit?: number | null }) {
+export function updateAssistantQuotaLimits(data: {
+  userId: number | string;
+  roundLimit?: number | null;
+  websearchLimit?: number | null;
+  /** 额度三级管控批：null/不传=不动；-1=不限；-2=清回跟随企业默认；1..10000=上限 */
+  creditLimit?: number | null;
+}) {
   // 2026-10-16 PUT→POST（铁律#21：WAF 只放行 GET/POST）
   return request({ url: '/assistant/quota/limits', method: 'post', data });
 }

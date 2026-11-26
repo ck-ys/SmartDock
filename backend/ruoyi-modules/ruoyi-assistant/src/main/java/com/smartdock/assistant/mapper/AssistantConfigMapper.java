@@ -25,11 +25,14 @@ public interface AssistantConfigMapper extends BaseMapper<AssistantConfig> {
      * 部分更新的真正保护在 service 层的在位行合并（业务批3-④ dspro 注记）。
      */
     @Insert("INSERT INTO assistant_config (tenant_id, enabled, daily_round_limit_per_user,"
-        + " daily_budget_amount, memory_enabled, compaction_trigger_tokens, websearch_limit_per_user, digest_enabled, assistant_name, create_time)"
+        + " daily_budget_amount, memory_enabled, compaction_trigger_tokens, websearch_limit_per_user, digest_enabled, assistant_name,"
+        + " daily_credit_limit_per_user, create_time)"
         + " VALUES (#{c.tenantId}, COALESCE(#{c.enabled}, '0'), COALESCE(#{c.dailyRoundLimitPerUser}, 50),"
         + " COALESCE(#{c.dailyBudgetAmount}, 50.0000), COALESCE(#{c.memoryEnabled}, '0'),"
         + " COALESCE(#{c.compactionTriggerTokens}, 60000), COALESCE(#{c.websearchLimitPerUser}, 20),"
-        + " COALESCE(#{c.digestEnabled}, '0'), #{c.assistantName}, CURRENT_TIMESTAMP)"
+        + " COALESCE(#{c.digestEnabled}, '0'), #{c.assistantName},"
+        // 额度三级管控批：-2 = 显式「跟随套餐」的落库记号，写入即归一为 NULL（读侧与 NULL 同义）
+        + " NULLIF(CAST(#{c.dailyCreditLimitPerUser} AS integer), -2), CURRENT_TIMESTAMP)"
         + " ON CONFLICT (tenant_id) DO UPDATE SET"
         + " enabled = COALESCE(EXCLUDED.enabled, assistant_config.enabled),"
         + " daily_round_limit_per_user = COALESCE(EXCLUDED.daily_round_limit_per_user, assistant_config.daily_round_limit_per_user),"
@@ -41,6 +44,9 @@ public interface AssistantConfigMapper extends BaseMapper<AssistantConfig> {
         // 快刀批 Q6：称呼列可空且 service 层已合并出终值（含""→NULL 显式清除）——
         // 直写 EXCLUDED 不 COALESCE，否则清不掉旧称呼
         + " assistant_name = EXCLUDED.assistant_name,"
+        // 额度三级管控批：同理不 COALESCE——COALESCE 只能「保持原值」，清不回「跟随套餐」；
+        // service 层已在位行合并（null=保持原值、-2=显式清除），此处 EXCLUDED 即终值
+        + " daily_credit_limit_per_user = NULLIF(EXCLUDED.daily_credit_limit_per_user, -2),"
         + " update_time = CURRENT_TIMESTAMP")
     int upsert(@Param("c") AssistantConfig config);
 

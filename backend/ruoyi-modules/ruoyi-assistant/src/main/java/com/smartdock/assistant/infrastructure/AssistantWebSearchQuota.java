@@ -50,6 +50,20 @@ public class AssistantWebSearchQuota {
         return 1
         """;
 
+    /**
+     * 额度三级管控批（Q12=1）：<b>「不限」记号</b>——只给联网列（回合列不给，-1 会在
+     * {@code AssistantDailyQuota.tryTurn} 里被当成 0 急停抛 503）。
+     * 与 {@code AssistantUserQuotaService.UNLIMITED_CREDIT} 同值同义（积分列也用 -1）。
+     */
+    public static final int UNLIMITED_WEBSEARCH = -1;
+
+    /** 不限档的计数脚本：只 INCR 不比限（状态卡仍要显示今天搜了多少次） */
+    static final String SEARCH_COUNT_LUA = """
+        local c = redis.call('INCR', KEYS[1])
+        if c == 1 then redis.call('PEXPIRE', KEYS[1], tonumber(ARGV[1])) end
+        return c
+        """;
+
     /** 今日已用联网搜索次数（status 端点展示用；Redis 故障=0 只读降级） */
     public long searchesUsed(String tenantId, Long userId) {
         try {
@@ -87,6 +101,21 @@ public class AssistantWebSearchQuota {
      * @return 三态：COUNTED=放行并已计数；PASSED_UNCOUNTED=Redis 故障放行未计数；DENIED=拒
      */
     public Gate trySearch(String tenantId, Long userId, int limit) {
+        // 额度三级管控批（Q12=1 / Q20=1）：-1 = 不限。仍然计数（状态卡要显示今天搜了多少次），
+        // 只是不比上限。**必须在 limit<=0 之前判**——旧口径「见 0 就拒」会把 -1 也变成关停，
+        // 界面上写「不限」实际还在拦，正是板上说的「漏一处就是假」。
+        if (limit == UNLIMITED_WEBSEARCH) {
+            try {
+                RScript script = RedisUtils.getClient().getScript(StringCodec.INSTANCE);
+                TenantHelper.ignore(() -> script.eval(RScript.Mode.READ_WRITE, SEARCH_COUNT_LUA,
+                    RScript.ReturnType.INTEGER, List.of(searchKey(tenantId, userId)),
+                    String.valueOf(TTL_MS)));
+                return Gate.COUNTED;
+            } catch (Exception e) {
+                log.warn("[WebSearchQuota] 不限档计数失败(放行) tenant={} user={}", tenantId, userId, e);
+                return Gate.PASSED_UNCOUNTED;
+            }
+        }
         if (limit <= 0) {
             // 0=租户/单人侧把联网关到零（回合额度仍在）：当日全部搜索拒绝
             return Gate.DENIED;

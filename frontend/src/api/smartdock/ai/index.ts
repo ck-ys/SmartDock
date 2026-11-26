@@ -240,3 +240,23 @@ export const importAiModelPrices = (payload: { prices: Array<Record<string, any>
   skipped: number;
   total: number;
 }> => request({ url: `${PRICE_BASE}/import`, method: 'post', data: payload });
+
+// ===== 额度三级管控批（Q16=1）：联网搜索服务（余额 + 资源包估算）=====
+/** 搜索服务列表（只回掩码，不回明文 key） */
+export const listAiSearchServices = (): AxiosPromise<Array<Record<string, any>>> =>
+  request({ url: '/ai-search/list', method: 'get' });
+
+/** 新增/更新（按租户+厂商幂等；apiKey 留空=不改） */
+export const saveAiSearchService = (data: Record<string, any>): AxiosPromise<Record<string, any>> =>
+  request({ url: '/ai-search/save', method: 'post', data });
+
+/** 启停 */
+export const changeAiSearchStatus = (id: number | string, enabled: '0' | '1') =>
+  request({ url: `/ai-search/${id}/status`, method: 'post', params: { enabled } });
+
+/** 删除（逻辑删） */
+export const removeAiSearchService = (id: number | string) => request({ url: `/ai-search/${id}`, method: 'delete' });
+
+/** 查一次余额（查不到回 status=UNSUPPORTED/ERROR，不拿旧值冒充） */
+export const refreshAiSearchBalance = (id: number | string): AxiosPromise<Record<string, any>> =>
+  request({ url: `/ai-search/${id}/refresh-balance`, method: 'post' });

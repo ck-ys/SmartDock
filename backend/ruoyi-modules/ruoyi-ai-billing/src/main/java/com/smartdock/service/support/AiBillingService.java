@@ -178,12 +178,28 @@ public class AiBillingService {
     public Long recordTransactionalCredits(AiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
                                            long latencyMs, boolean success, String errorMsg,
                                            Long operatorId, String idempotencyKey, Long creditsToCharge) {
+        return recordTransactionalCredits(config, caller, scene, usageSnapshot, latencyMs, success, errorMsg,
+            operatorId, idempotencyKey, creditsToCharge, null, null, null);
+    }
+
+    /**
+     * 额度三级管控批（Q17=1）：带<b>快照</b>的重载——modelName / multiplier / unitPrice
+     * 由装饰器在<b>进门预检那一刻</b>取好传进来，结算写这三个值。
+     * 改倍率后旧流水数字不变（板上验收），新流水带新倍率——两笔都能解释。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long recordTransactionalCredits(AiConfig config, String caller, String scene, AiTokenUsageSnapshot usageSnapshot,
+                                           long latencyMs, boolean success, String errorMsg,
+                                           Long operatorId, String idempotencyKey, Long creditsToCharge,
+                                           String modelName, java.math.BigDecimal multiplier,
+                                           java.math.BigDecimal unitPrice) {
         Long usageId = doRecordTransactional(config, caller, scene, usageSnapshot, latencyMs, success, errorMsg,
             operatorId, idempotencyKey, false);
         if (creditsToCharge != null && usageId != null) {
             // 同事务扣积分: deduct 内部已按订阅态/余量夹逼, 失效留 WARN、缺口进 remark;
             // operatorId=会话用户(dspro P1-1: DEDUCT 行 create_by 数据源, 双视角流水三件套)
-            creditService.deduct(config.getTenantId(), creditsToCharge, scene, idempotencyKey + ":credit", operatorId);
+            creditService.deduct(config.getTenantId(), creditsToCharge, scene, idempotencyKey + ":credit", operatorId,
+                modelName, multiplier, unitPrice);
         }
         return usageId;
     }

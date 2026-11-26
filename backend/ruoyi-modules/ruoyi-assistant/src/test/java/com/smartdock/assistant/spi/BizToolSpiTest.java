@@ -148,9 +148,10 @@ class BizToolSpiTest {
     @Test
     void v5_platformToolsDontNeedBusinessModules() {
         // 批3 微核心化: ToolDeps 只剩平台依赖, 业务工具全走 SPI——全 null 依赖即可装配
+        // 额度三级管控批 Q16=1: 第 13 位是 searchService（null=不接搜索服务表，行为与老版本一致）
         com.smartdock.assistant.engine.core.ToolRegistry.ToolDeps emptyDeps =
             new com.smartdock.assistant.engine.core.ToolRegistry.ToolDeps(
-                null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null, null,
+                null, null, null, null, null, Boolean.FALSE, "t", "000000", null, null, null, null, null, null,
                 java.nio.file.Path.of("."), null, null, true);
         Toolkit toolkit = new Toolkit();
         Set<String> registered = com.smartdock.assistant.engine.core.ToolRegistry.registerAll(toolkit,

@@ -77,7 +77,10 @@ CREATE TABLE public.ai_credit_ledger (
     idempotency_key character varying(120),
     remark character varying(300),
     create_by bigint,
-    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    model_name character varying(128),
+    credit_multiplier numeric(8,2),
+    unit_price numeric(14,6)
 );
 
 
@@ -99,7 +102,8 @@ CREATE TABLE public.ai_credit_plan (
     enabled character(1) DEFAULT '1'::bpchar NOT NULL,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     websearch_limit_per_user_daily integer DEFAULT 0 NOT NULL,
-    total_credits bigint
+    total_credits bigint,
+    suggested_daily_credit_per_user integer
 );
 
 
@@ -185,6 +189,41 @@ CREATE TABLE public.ai_model_health (
     fail_streak integer DEFAULT 0 NOT NULL,
     check_time timestamp without time zone NOT NULL,
     create_time timestamp without time zone
+);
+
+
+--
+-- Name: ai_search_service; Type: TABLE; Schema: public; Owner: -
+--
+-- 额度三级管控批（Q16=1，2026-11-26）：联网搜索服务单独一张小表。
+-- 为什么不能并进 ai_provider_access（板上逐条核过）：① api_format 有 CHECK 只认三种对话格式；
+-- ② 厂商是枚举 AiProvider（14 家，没有博查）；③ 探测前过 isBaseUrlAllowed 域名白名单；
+-- ④ 钥匙管理的厂商下拉是从 ai_config 生成的，搜索没有模型，进不了下拉。
+-- 口径：balance_amount 是账户余额（元，官方接口查）；pack_total/pack_used 是资源包次数
+-- （厂商没有查询接口，靠「管理员填总量 + 系统每搜一次减一」估算，必须标「估算」）。
+
+CREATE TABLE public.ai_search_service (
+    id bigint NOT NULL,
+    tenant_id character varying(20) DEFAULT '000000'::character varying NOT NULL,
+    provider character varying(32) DEFAULT 'BOCHA'::character varying NOT NULL,
+    label character varying(64),
+    enabled character(1) DEFAULT '1'::bpchar NOT NULL,
+    api_key text,
+    console_url character varying(255),
+    balance_amount numeric(14,4),
+    balance_currency character varying(8),
+    balance_checked_at timestamp without time zone,
+    balance_status character varying(16),
+    pack_total integer,
+    pack_used integer DEFAULT 0 NOT NULL,
+    pack_expire_at date,
+    remark character varying(500),
+    create_dept bigint,
+    create_by bigint,
+    create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    update_by bigint,
+    update_time timestamp without time zone,
+    del_flag character(1) DEFAULT '0'::bpchar NOT NULL
 );
 
 
@@ -393,7 +432,8 @@ CREATE TABLE public.assistant_config (
     websearch_limit_per_user integer DEFAULT 20 NOT NULL,
     digest_enabled character(1) DEFAULT '0'::bpchar NOT NULL,
     assistant_name character varying(50),
-    tool_gate text
+    tool_gate text,
+    daily_credit_limit_per_user integer
 );
 
 
@@ -689,7 +729,8 @@ CREATE TABLE public.assistant_user_quota (
     create_by bigint,
     create_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     update_by bigint,
-    update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    update_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    credit_limit_override integer
 );
 
 
@@ -2622,6 +2663,25 @@ ALTER TABLE ONLY public.ai_model_health
 
 ALTER TABLE ONLY public.ai_model_price
     ADD CONSTRAINT pk_ai_model_price PRIMARY KEY (price_id);
+
+
+--
+-- Name: ai_search_service pk_ai_search_service; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_search_service
+    ADD CONSTRAINT pk_ai_search_service PRIMARY KEY (id);
+
+
+--
+-- Name: ai_search_service idx_ai_search_service_tp; Type: INDEX; Schema: public; Owner: -
+--
+-- 2026-11-26 拍板 Q2=1：唯一索引 → 普通索引，同厂商可挂多把钥匙。
+-- 主钥匙口径 = enabled 行里 id 最小（最先建）的那把，与 ProviderKeyPool 一致。
+
+CREATE INDEX idx_ai_search_service_tp
+    ON public.ai_search_service USING btree (tenant_id, provider)
+    WHERE (del_flag = '0'::bpchar);
 
 
 --

@@ -50,11 +50,13 @@ public class AssistantConfigService {
     private final AssistantAdmissionGate admissionGate;
 
     /** 生效配置视图（行存在与否 + 两级默认合并结果；websearchLimitPerUser 批④起联网配额租户默认；
-     *  digestEnabled 五需求批 R4b 起每日摘要开关；assistantName 快刀批 Q6 起助手称呼） */
+     *  digestEnabled 五需求批 R4b 起每日摘要开关；assistantName 快刀批 Q6 起助手称呼；
+     *  dailyCreditLimitPerUser 额度三级管控批（2026-11-26）起企业默认积分上限，
+     *  <b>可空是语义</b>：null=没设（算上限时落到套餐建议值），不能拿平台默认填平） */
     public record EffectiveConfig(boolean rowPresent, boolean enabled, int dailyRoundLimitPerUser,
                                   BigDecimal dailyBudgetAmount, String memoryEnabled, int compactionTriggerTokens,
                                   int websearchLimitPerUser, String digestEnabled, String assistantName,
-                                  java.util.Map<String, String> toolGate) {
+                                  java.util.Map<String, String> toolGate, Integer dailyCreditLimitPerUser) {
     }
 
     /** 读租户生效配置：无行=平台默认（默认关闭） */
@@ -64,7 +66,7 @@ public class AssistantConfigService {
             return new EffectiveConfig(false, false, PLATFORM_DAILY_ROUNDS,
                 PLATFORM_DAILY_BUDGET, PLATFORM_MEMORY_ENABLED, PLATFORM_COMPACTION_TOKENS,
                 PLATFORM_WEBSEARCH_LIMIT, PLATFORM_DIGEST_ENABLED, PLATFORM_ASSISTANT_NAME,
-                java.util.Map.of());
+                java.util.Map.of(), null);
         }
         return new EffectiveConfig(true, "1".equals(row.getEnabled()),
             row.getDailyRoundLimitPerUser() == null ? PLATFORM_DAILY_ROUNDS : row.getDailyRoundLimitPerUser(),
@@ -74,7 +76,14 @@ public class AssistantConfigService {
             row.getWebsearchLimitPerUser() == null ? PLATFORM_WEBSEARCH_LIMIT : row.getWebsearchLimitPerUser(),
             row.getDigestEnabled() == null ? PLATFORM_DIGEST_ENABLED : row.getDigestEnabled(),
             normalizeName(row.getAssistantName()),
-            parseToolGate(row.getToolGate()));
+            parseToolGate(row.getToolGate()),
+            // 额度三级管控批：-2 与 NULL 同义（写入侧已归一，这里兜历史脏值）
+            normalizeCreditLimit(row.getDailyCreditLimitPerUser()));
+    }
+
+    /** 企业默认积分上限归一（读侧）：-2 = 显式「跟随套餐」，与 NULL 同义；其余原样（含 -1 = 不限） */
+    public static Integer normalizeCreditLimit(Integer raw) {
+        return raw == null || raw == -2 ? null : raw;
     }
 
     /**
@@ -225,9 +234,11 @@ public class AssistantConfigService {
         }
         // 业务批3-④（dspro P2-2）：联网租户默认列范围校验——0=全租户未开放（DISABLED 语义，
         // 单人覆盖侧 validateLimit 下限是 1，只有租户列能整体关停），负数/超界拒绝
+        // 额度三级管控批（Q12=1 / Q20=1）：放开 -1 = 不限（可越过套餐档）；其余负数仍拒
         if (config.getWebsearchLimitPerUser() != null
+            && config.getWebsearchLimitPerUser() != -1
             && (config.getWebsearchLimitPerUser() < 0 || config.getWebsearchLimitPerUser() > 10000)) {
-            throw new ServiceException("每人每日联网次数须在 0~10000 之间（0=关闭联网搜索）", 400);
+            throw new ServiceException("每人每日联网次数须在 0~10000 之间（0=关闭联网搜索，-1=不限）", 400);
         }
         // 快刀批 Q6：助手称呼——提交了才动：trim、超长拒绝；空白=显式清除回落平台默认
         // （空串哨兵直通合并，upsert 前归一为 NULL；null=未提交保持原值）
@@ -237,6 +248,14 @@ public class AssistantConfigService {
                 throw new ServiceException("助手称呼最多 50 个字", 400);
             }
             config.setAssistantName(n);
+        }
+        // 额度三级管控批（Q4=3 / Q20=1）：企业默认积分上限值域——正数=上限（1..10000），
+        // -1=不限（越过套餐建议值），-2=显式「跟随套餐」（落库归一为 NULL）；不给 0（0 在
+        // 回合/联网上是急停语义，积分列不沿用，避免一个 0 出现两种解释）
+        Integer creditLimit = config.getDailyCreditLimitPerUser();
+        if (creditLimit != null && creditLimit != -1 && creditLimit != -2
+            && (creditLimit < 1 || creditLimit > 10000)) {
+            throw new ServiceException("每人每天积分上限须在 1~10000 之间，或选「不限」/「跟随套餐」", 400);
         }
         AssistantConfig existing = raw(config.getTenantId());
         if (existing != null) {
@@ -266,6 +285,11 @@ public class AssistantConfigService {
             // 快刀批 Q6：称呼合并——null=未提交保持原值（"" 已是显式清除哨兵，不进这支）
             if (config.getAssistantName() == null) {
                 config.setAssistantName(existing.getAssistantName());
+            }
+            // 额度三级管控批：null=未提交保持原值；-2=显式清除（直通到 mapper 归一成 NULL，
+            // 不进这支）。这一列不能靠 SQL 侧 COALESCE 兜——那只能保持原值、清不回「跟随套餐」
+            if (config.getDailyCreditLimitPerUser() == null) {
+                config.setDailyCreditLimitPerUser(existing.getDailyCreditLimitPerUser());
             }
         }
         if (config.getDigestEnabled() != null && !"0".equals(config.getDigestEnabled())

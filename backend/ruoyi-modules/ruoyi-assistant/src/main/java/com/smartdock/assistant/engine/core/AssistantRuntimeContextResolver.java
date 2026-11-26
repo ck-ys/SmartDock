@@ -124,6 +124,12 @@ public class AssistantRuntimeContextResolver implements AguiRuntimeContextResolv
         if (!limits.creditsMode() || limits.roundLimit() <= 0) {
             dailyQuota.tryTurn(tenantId, userId, limits.roundLimit());
         }
+        // ③b 个人积分闸（额度三级管控批 2026-11-26 / Q5=1 + Q9=2）：进门先拦一次，早失败体验好。
+        // 不能挂在 ④ 日预算后面——积分模式下日预算整段被跳过（见下面 if），故自带「积分模式才走」。
+        // 放在 tryTurn 之后、try 块之前：被拒的请求不消耗任何计数，也不需要回合补偿
+        if (limits.creditsMode()) {
+            quotaService.assertPersonalCredits(tenantId, userId, "进门");
+        }
         try {
             if (!limits.creditsMode()) {
                 // ④G5 租户日预算（账本真值直查）

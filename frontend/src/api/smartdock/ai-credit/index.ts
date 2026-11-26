@@ -15,6 +15,8 @@ export interface CreditPlanVO {
   windowHours: number;
   /** 业务批7 Q1：订阅档每日联网搜索次数（0=跟随租户默认） */
   websearchLimitPerUserDaily: number;
+  /** 额度三级管控批（Q18=1）：每人每日建议积分上限；null/0=没给建议，算上限时落到平台兜底 */
+  suggestedDailyCreditPerUser?: number | null;
   durationWeeks: number;
   /** 业务反馈批1015b Q12：整周期总积分额度（NULL=每周×周数推导；填写值为准） */
   totalCredits?: number | null;
@@ -66,6 +68,12 @@ export interface CreditLedgerVO {
   createBy: number;
   /** 业务批8 Q6：消耗人昵称（服务侧回填） */
   operatorName?: string;
+  /** 额度三级管控批（Q17=1）：快照——结算时用的模型名；null=历史行（改倍率不影响已有行） */
+  modelName?: string | null;
+  /** 快照：结算时用的倍率（平台系数 × 手工系数）；null=历史行 */
+  creditMultiplier?: number | null;
+  /** 快照：结算时一轮的官方成本（元）；null=历史行 */
+  unitPrice?: number | null;
   createTime: string;
 }
 
@@ -96,6 +104,8 @@ export interface CreditPlanSaveBO {
   windowHours?: number;
   durationWeeks?: number;
   websearchLimitPerUserDaily?: number;
+  /** 额度三级管控批（Q18=1）：每人每日建议积分上限；0/null=没建议 */
+  suggestedDailyCreditPerUser?: number | null;
   description?: string;
   totalCredits?: number | null;
 }
@@ -136,18 +146,39 @@ export const listCreditLedger = (params?: {
 export const listLedgerUsers = (): AxiosPromise<Array<{ userId: number; nickName: string }>> =>
   request({ url: `${BASE}/ledger/users`, method: 'get' });
 
-/** 业务批8 Q2：模型积分倍率表（当前租户在用 CHAT 模型） */
+/** 业务批8 Q2 / 额度三级管控批 Q13=1 + Q22=1：模型倍率表一行
+ *  ——「相对价」只给人看，「约积分/轮」才是真扣 */
 export interface ModelRateVO {
   configId: number;
   provider: string;
   modelName: string;
-  multiplier: number;
-  free: boolean;
-  /** 预估积分/轮（免费档=0） */
-  perRound: number;
   isDefault: boolean;
+  /** 是不是相对价的分母（平台默认模型） */
+  isBaseline: boolean;
+  /** 免费档（FIXED_PER_CALL 且单价 0） */
+  free: boolean;
+  /** 相对价：比基准模型贵多少倍；算不出成本时为 null（界面显示「—」） */
+  relativePrice: number | null;
+  /** 约积分/轮（真扣 = 一轮成本 × 100 × 平台系数 × 手工系数）；免费/算不出时 0 */
+  perRound: number;
+  /** 手工系数（null=自动）；1 与 null 等价 */
+  manualFactor: number | null;
+  /** auto / manual —— 改过的人带「恢复自动」 */
+  source: 'auto' | 'manual';
+  /** 成本算不算得出来（false 时前端显示「—」而不是 0） */
+  costKnown?: boolean;
 }
 
-export const getModelRates = (): AxiosPromise<ModelRateVO[]> => request({ url: `${BASE}/model-rates`, method: 'get' });
+/** 倍率表整包（Q22=1：平台系数要跟着返回，否则表头解释不了扣分怎么来的） */
+export interface ModelRateBundle {
+  rows: ModelRateVO[];
+  platformFactor: number;
+}
+
+export const getModelRates = (): AxiosPromise<ModelRateBundle> => request({ url: `${BASE}/model-rates`, method: 'get' });
+
+/** Q13=1：改某个模型的手工系数（不传 = 恢复自动） */
+export const updateModelMultiplier = (configId: number, multiplier?: number | null) =>
+  request({ url: `${BASE}/model-rates/multiplier`, method: 'post', params: { configId, multiplier } });
 
 export const getMyCreditSummary = (): AxiosPromise<MyCreditData> => request({ url: `${BASE}/my-summary`, method: 'get' });

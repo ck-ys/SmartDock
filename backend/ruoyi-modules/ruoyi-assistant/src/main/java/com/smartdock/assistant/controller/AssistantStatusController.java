@@ -1,5 +1,7 @@
 package com.smartdock.assistant.controller;
 
+import com.smartdock.assistant.service.AssistantUserQuotaService;
+
 import io.swagger.v3.oas.annotations.tags.Tag;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
@@ -46,7 +48,7 @@ public class AssistantStatusController extends BaseController {
     private final AssistantDailyQuota dailyQuota;
     /** 7C-1：会话与消息只读（按 thread 取会话 / 最新上下文 tokens / 压缩账单 7C-2 并入） */
     private final ConversationQueryService conversationQueryService;
-    private final com.smartdock.assistant.service.AssistantUserQuotaService quotaService;
+    private final AssistantUserQuotaService quotaService;
     /** 批3.5·题5：技能使用统计（最近用过端点数据源） */
     private final com.smartdock.assistant.service.AssistantSkillUsageService skillUsageService;
     /** 批 4 题 2 案 1：技能可见性判定统一入口（原 4 处手写复写收成一处） */
@@ -177,7 +179,7 @@ public class AssistantStatusController extends BaseController {
         Long userId = LoginHelper.getUserId();
         AssistantConfigService.EffectiveConfig cfg = configService.effective(tenantId);
         // 业务批7 Q1：计费感知限额——订阅租户回合=UNLIMITED_ROUNDS、联网=套餐档位
-        com.smartdock.assistant.service.AssistantUserQuotaService.BillingAwareLimits limits =
+        AssistantUserQuotaService.BillingAwareLimits limits =
             quotaService.billingAwareLimits(tenantId, userId);
         Map<String, Object> out = new LinkedHashMap<>();
         // 快刀批 Q6：助手称呼（租户可改，读侧两级默认合并后必有值）——前端 nameState 全局态数据源
@@ -200,6 +202,21 @@ public class AssistantStatusController extends BaseController {
         out.put("quotaDisabled", limits.disabled());
         out.put("websearchUsedToday", webSearchQuota.searchesUsed(tenantId, userId));
         out.put("websearchLimit", limits.websearchLimit());
+        // 额度三级管控批（2026-11-26 / Q8=3）：个人今日积分额度 + 上限是哪来的。
+        // 只在积分模式下发（钱包模式没这个概念，下发会让状态卡凭空多一行）；
+        // creditLimitSource 供前端写「个人设置 / 企业默认 / 套餐建议值 / 平台兜底」
+        if (limits.creditsMode()) {
+            AssistantUserQuotaService.CreditLimit cl =
+                quotaService.creditLimit(tenantId, userId);
+            out.put("creditLimit", cl.value());
+            out.put("creditLimitSource", cl.source());
+            long creditUsed = dailyQuota.creditsUsedToday(tenantId, userId);
+            // 读不到账本（-1）就下发 null——前端显示「--」，不能把「查不到」说成「花了 0」
+            out.put("creditsUsedToday", creditUsed < 0 ? null : creditUsed);
+            if (cl.value() > 0 && creditUsed >= 0) {
+                out.put("creditsRemainingToday", Math.max(0, cl.value() - creditUsed));
+            }
+        }
         out.put("contextTokens", contextTokensOf(tenantId, userId, threadId));
         // 批A 二审回修：本会话生效模型（用户 pin > 助手默认）的自动压缩触发线——
         // 前端水位三值以后端真值为准（自选关/默认行被裁出白名单时本地复算会偏差）

@@ -248,3 +248,22 @@ INSERT INTO public.sys_role_menu (role_id, menu_id)
 SELECT 6, m.menu_id
 FROM (VALUES (6), (9067), (9068), (11940), (11941)) AS m(menu_id)
 WHERE NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = 6 AND x.menu_id = m.menu_id);
+
+-- 2026-11-26 额度三级管控批 Q19=案1：租户管理员补授「企业自己管额度」闭环的 4 项
+-- 11927 AI助手管理（页面，perms=smartdock:assistant:config）+ 11935 额度操作（该页里的按钮，
+-- perms=smartdock:assistant:quota:edit）+ 9060 AI 模型与钥匙（perms=smartdock:ai:list，只授看）
+-- + 11940 积分套餐（已在上一段授过，此处幂等重列）。
+-- 页面和页里的按钮一起授——只授按钮会造出「能改额度、看不见页面」的半授权。
+-- 有意不授：9060 页内的新增/编辑/删除（smartdock:ai:add/edit/remove）、11940 的订阅/改价
+-- （11941/11942）——租户管理员只能看，不能接模型、不能改价。
+-- 前置（本批已修）：9060 的 /ai-config/list 非超管强制本租户；11927 带出的 MCP 列表按租户收窄。
+-- 按 role_key 授（不写死 role_id），与 04_role_menu.sql:227 先例同口径。
+-- 对应迁移：migration/2026-11-26_quota_three_tier_credit_columns.sql
+INSERT INTO public.sys_role_menu (role_id, menu_id)
+SELECT r.role_id, m.menu_id
+FROM public.sys_role r
+CROSS JOIN (VALUES (11927), (11935), (11940), (9060)) AS m(menu_id)
+WHERE r.role_key IN ('admin', 'tenant_admin')
+  AND r.del_flag = '0'
+  AND r.status = '0'
+  AND NOT EXISTS (SELECT 1 FROM public.sys_role_menu x WHERE x.role_id = r.role_id AND x.menu_id = m.menu_id);

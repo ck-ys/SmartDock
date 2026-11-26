@@ -75,7 +75,16 @@ class AssistantUserQuotaServiceUnitTest {
      *  批1 Q1=B toolGate 尾参占位空表 */
     private EffectiveConfig tenantDefault(int rounds, int websearch) {
         return new EffectiveConfig(true, true, rounds, new BigDecimal("20"), "1", 60000, websearch, "0", null,
-            java.util.Map.of());
+            java.util.Map.of(), null);
+    }
+
+    /**
+     * 额度三级管控批（Q20=1）专用：企业<b>没有配过</b>租户行（rowPresent=false）——
+     * 只有这种情况下套餐档位才当联网兜底（旧口径是「正数一律被套餐盖掉」）。
+     */
+    private EffectiveConfig noTenantRow(int websearch) {
+        return new EffectiveConfig(false, true, 50, new BigDecimal("20"), "1", 60000, websearch, "0", null,
+            java.util.Map.of(), null);
     }
 
     /** 覆盖行实体（null 列=跟随默认） */
@@ -208,6 +217,63 @@ class AssistantUserQuotaServiceUnitTest {
     }
 
     @Test
+    void 积分列_只有传了值才发语句_null不动() {
+        // 额度三级管控批（2026-11-26）：积分列与回合/联网两列正交——
+        // 不传（null）= 不发语句，避免每次改回合/联网都白写一次积分列
+        service.updateLimits(TENANT, USER, 50, 20, null);
+        verify(quotaMapper).upsert(any());
+        verify(quotaMapper, never()).upsertCreditOnly(any());
+    }
+
+    @Test
+    void 积分列_三态各自落库_负二清回跟随_负一不限() {
+        // -2 = 显式「跟随企业默认」：直通 mapper（SQL 里 NULLIF 归一成 NULL）
+        service.updateLimits(TENANT, USER, null, null, -2);
+        ArgumentCaptor<AssistantUserQuota> c1 = ArgumentCaptor.forClass(AssistantUserQuota.class);
+        verify(quotaMapper).upsertCreditOnly(c1.capture());
+        assertThat(c1.getValue().getCreditLimitOverride()).isEqualTo(-2);
+
+        org.mockito.Mockito.clearInvocations(quotaMapper);
+
+        // -1 = 不限（越过套餐建议值，Q20=1）
+        service.updateLimits(TENANT, USER, null, null, -1);
+        ArgumentCaptor<AssistantUserQuota> c2 = ArgumentCaptor.forClass(AssistantUserQuota.class);
+        verify(quotaMapper).upsertCreditOnly(c2.capture());
+        assertThat(c2.getValue().getCreditLimitOverride()).isEqualTo(-1);
+
+        org.mockito.Mockito.clearInvocations(quotaMapper);
+
+        // 正数 = 上限
+        service.updateLimits(TENANT, USER, null, null, 300);
+        ArgumentCaptor<AssistantUserQuota> c3 = ArgumentCaptor.forClass(AssistantUserQuota.class);
+        verify(quotaMapper).upsertCreditOnly(c3.capture());
+        assertThat(c3.getValue().getCreditLimitOverride()).isEqualTo(300);
+    }
+
+    @Test
+    void 积分列_与另两列同批保存_两条语句都发() {
+        // 三列一起改：回合/联网走原四象限那套，积分走独立一条（不扩成 8 种组合）
+        service.updateLimits(TENANT, USER, 50, 20, 300);
+        verify(quotaMapper).upsert(any());
+        verify(quotaMapper).upsertCreditOnly(any());
+    }
+
+    @Test
+    void 积分列_0和超界_400拒绝_不落库() {
+        // 积分列不给 0：0 在回合/联网上是「急停」语义，积分列沿用会一个 0 两种解释
+        assertThatThrownBy(() -> service.updateLimits(TENANT, USER, null, null, 0))
+            .isInstanceOf(ServiceException.class)
+            .hasMessage("积分上限须在 1~10000 之间，或选「不限」/「跟随企业默认」")
+            .extracting(e -> ((ServiceException) e).getCode())
+            .isEqualTo(400);
+        assertThatThrownBy(() -> service.updateLimits(TENANT, USER, null, null, 10001))
+            .isInstanceOf(ServiceException.class);
+        assertThatThrownBy(() -> service.updateLimits(TENANT, USER, null, null, -3))
+            .isInstanceOf(ServiceException.class);
+        verify(quotaMapper, never()).upsertCreditOnly(any());
+    }
+
+    @Test
     void 禁用保存_走upsert_disabled置1() {
         service.setDisabled(TENANT, USER, true);
         ArgumentCaptor<AssistantUserQuota> cap = ArgumentCaptor.forClass(AssistantUserQuota.class);
@@ -294,14 +360,30 @@ class AssistantUserQuotaServiceUnitTest {
     }
 
     @Test
-    void 订阅生效_回合切不限次_联网切套餐档位() {
+    void 订阅生效_回合切不限次_联网按企业默认_不被套餐档盖掉() {
         stubLimits(null);
+        when(creditService.consumeMode(TENANT)).thenReturn("CREDIT");
+        when(creditService.activeSubscription(TENANT)).thenReturn(java.util.Optional.of(sub(210002L)));
+        AssistantUserQuotaService.BillingAwareLimits limits = service.billingAwareLimits(TENANT, USER);
+        assertThat(limits.creditsMode()).isTrue();
+        assertThat(limits.roundLimit()).isEqualTo(AssistantUserQuotaService.UNLIMITED_ROUNDS);
+        // 额度三级管控批（Q20=1）改行为：企业配过行（这里是 20）就以企业为准，
+        // 套餐档不再覆盖它——旧口径是「正数一律被套餐档盖掉」，那让企业填的数字变成摆设。
+        // 这里不断套餐档的值（那要靠下面「企业没配过行」那条），而是断「压根没去问套餐档」
+        assertThat(limits.websearchLimit()).isEqualTo(20);
+        verify(creditService, never()).subscriberWebsearchLimit(TENANT);
+    }
+
+    @Test
+    void 订阅生效_企业没配过行_联网才回落套餐档() {
+        // Q20=1 的另一半：只有「企业根本没配过」时套餐档才当兜底
+        when(configService.effective(TENANT)).thenReturn(noTenantRow(20));
+        when(quotaMapper.selectOne(any())).thenReturn(null);
         when(creditService.consumeMode(TENANT)).thenReturn("CREDIT");
         when(creditService.activeSubscription(TENANT)).thenReturn(java.util.Optional.of(sub(210002L)));
         when(creditService.subscriberWebsearchLimit(TENANT)).thenReturn(java.util.Optional.of(150));
         AssistantUserQuotaService.BillingAwareLimits limits = service.billingAwareLimits(TENANT, USER);
         assertThat(limits.creditsMode()).isTrue();
-        assertThat(limits.roundLimit()).isEqualTo(AssistantUserQuotaService.UNLIMITED_ROUNDS);
         assertThat(limits.websearchLimit()).isEqualTo(150);
     }
 
@@ -326,11 +408,13 @@ class AssistantUserQuotaServiceUnitTest {
         when(quotaMapper.selectOne(any())).thenReturn(null);
         when(creditService.consumeMode(TENANT)).thenReturn("CREDIT");
         when(creditService.activeSubscription(TENANT)).thenReturn(java.util.Optional.of(sub(210001L)));
-        when(creditService.subscriberWebsearchLimit(TENANT)).thenReturn(java.util.Optional.of(50));
         AssistantUserQuotaService.BillingAwareLimits limits = service.billingAwareLimits(TENANT, USER);
         assertThat(limits.creditsMode()).isTrue();
         assertThat(limits.roundLimit()).isZero();
-        assertThat(limits.websearchLimit()).isEqualTo(50);
+        // 额度三级管控批（Q20=1）：企业配过行（tenantDefault 的联网=20）就以企业为准，
+        // 套餐档只在企业没配过行时兜底。回合的急停语义不受影响（上面那条仍然成立）
+        assertThat(limits.websearchLimit()).isEqualTo(20);
+        verify(creditService, never()).subscriberWebsearchLimit(TENANT);
     }
 
     @Test
@@ -349,8 +433,10 @@ class AssistantUserQuotaServiceUnitTest {
         stubLimits(null);
         when(creditService.consumeMode(TENANT)).thenReturn("CREDIT");
         when(creditService.activeSubscription(TENANT)).thenReturn(java.util.Optional.of(sub(210001L)));
-        when(creditService.subscriberWebsearchLimit(TENANT)).thenReturn(java.util.Optional.empty());
+        // 额度三级管控批（Q20=1）：企业配过行时压根不问套餐档，所以这里不再打桩——
+        // 打桩会被 Mockito 判「多余」；「问了但没配」那条路径由「企业没配过行」用例覆盖
         assertThat(service.billingAwareLimits(TENANT, USER).websearchLimit()).isEqualTo(20);
+        verify(creditService, never()).subscriberWebsearchLimit(TENANT);
         // 租户联网 0=关停：订阅无权打开
         when(configService.effective(TENANT)).thenReturn(tenantDefault(50, 0));
         assertThat(service.billingAwareLimits(TENANT, USER).websearchLimit()).isZero();

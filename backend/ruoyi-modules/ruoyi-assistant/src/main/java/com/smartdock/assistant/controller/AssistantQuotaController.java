@@ -54,13 +54,15 @@ public class AssistantQuotaController extends BaseController {
         return R.ok();
     }
 
-    /** 单人限额覆盖（roundLimit/websearchLimit，null=清空跟随租户默认）；铁律#21：PUT→POST（2026-10-16 批17 Q4） */
+    /** 单人限额覆盖（roundLimit/websearchLimit，null=清空跟随租户默认；creditLimit 2026-11-26 起：
+     *  null=不动、-1=不限、-2=清回跟随企业默认、正数=上限）；铁律#21：PUT→POST（2026-10-16 批17 Q4） */
     @SaCheckPermission("smartdock:assistant:quota:edit")
     @Log(title = "AI助手-额度限额", businessType = BusinessType.UPDATE)
     @PostMapping("/limits")
     public R<Void> limits(@RequestBody Map<String, Object> body) {
         quotaService.updateLimits(LoginHelper.getTenantId(), asLong(body.get("userId")),
-            asInteger(body.get("roundLimit")), asInteger(body.get("websearchLimit")));
+            asInteger(body.get("roundLimit")), asInteger(body.get("websearchLimit")),
+            asInteger(body.get("creditLimit")));
         return R.ok();
     }
 

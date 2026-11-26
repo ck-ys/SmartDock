@@ -1,14 +1,18 @@
 package com.smartdock.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.common.core.exception.ServiceException;
+import org.dromara.common.core.service.ConfigService;
 import org.dromara.common.tenant.helper.TenantHelper;
+import com.smartdock.domain.AiConfig;
 import com.smartdock.domain.AiCreditLedger;
 import com.smartdock.domain.AiCreditPlan;
 import com.smartdock.domain.AiCreditSubscription;
+import com.smartdock.domain.AiModelPrice;
 import com.smartdock.domain.TenantBillingMode;
 import com.smartdock.domain.bo.AiCreditPlanBo;
 import com.smartdock.mapper.AiCreditLedgerMapper;
@@ -17,6 +21,7 @@ import com.smartdock.mapper.AiCreditPlanMapper;
 import com.smartdock.mapper.AiCreditSubscriptionMapper;
 import com.smartdock.mapper.TenantBillingModeMapper;
 import com.smartdock.service.IAiCreditService;
+import com.smartdock.service.IAiModelPriceService;
 import com.smartdock.service.support.TenantWalletService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +33,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -52,6 +58,13 @@ public class AiCreditServiceImpl implements IAiCreditService {
     private final AiConfigMapper aiConfigMapper;
     /** 业务批8 Q4：订阅/加油包从租户钱包扣款（同事务条件扣减，余额不足人话 409） */
     private final TenantWalletService tenantWalletService;
+    /** 额度三级管控批（Q13=1 + Q22=1）：倍率表要按官方价现算——价目行查询走这个服务 */
+    private final IAiModelPriceService priceService;
+    /** 额度三级管控批（Q22=1）：平台加价系数存 sys_config（键见 PLATFORM_FACTOR_KEY） */
+    private final ConfigService configService;
+
+    /** Q22=1：平台加价系数键——扣分 = 一轮成本 × 100 × 平台系数 × 手工系数；缺省 1.0 */
+    public static final String PLATFORM_FACTOR_KEY = "ai.credit.platform-factor";
 
     @Override
     public List<AiCreditPlan> plans() {
@@ -155,6 +168,13 @@ public class AiCreditServiceImpl implements IAiCreditService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deduct(String tenantId, long credits, String scene, String idempotencyKey, Long operatorId) {
+        deduct(tenantId, credits, scene, idempotencyKey, operatorId, null, null, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deduct(String tenantId, long credits, String scene, String idempotencyKey, Long operatorId,
+                       String modelName, BigDecimal multiplier, BigDecimal unitPrice) {
         if (credits <= 0 || tenantId == null) {
             return;
         }
@@ -194,6 +214,11 @@ public class AiCreditServiceImpl implements IAiCreditService {
         // 三审回修（dspro P2-3）：DEDUCT 行时间显式取 App 时钟与窗口/周界判定同源——
         // 原 DB 默认时钟与 JVM 实测差 ~39s，JVM/DB 时区漂移时窗口会被拉长/平移
         row.setCreateTime(new Date());
+        // 额度三级管控批（Q17=1）：快照三列——结算这一刻的模型 / 倍率 / 一轮成本。
+        // 改倍率后旧流水这三个数不变（板上验收：两笔都能解释）；历史行为 NULL，不追填
+        row.setModelName(modelName);
+        row.setCreditMultiplier(multiplier);
+        row.setUnitPrice(unitPrice);
         // 六审回修（dspro P0-1 方案A）：本方法已并入 usage 落账同一事务（经 AiBillingService
         // recordTransactionalCredits 调入），插入改 ON CONFLICT 消化重放——同事务内再
         // catch(DuplicateKeyException) 会把 PG 事务置 aborted 连累 usage 一起回滚
@@ -211,7 +236,7 @@ public class AiCreditServiceImpl implements IAiCreditService {
         // selectOne+updateById——双 active 残留时 selectOne 抛 TooManyResults 使订阅永久 500）；
         // 并发第二条由部分唯一索引 uk_credit_sub_active 兜底撞键，翻友好话术
         TenantHelper.ignore(() -> subscriptionMapper.update(null,
-            new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<AiCreditSubscription>()
+            new LambdaUpdateWrapper<AiCreditSubscription>()
                 .eq(AiCreditSubscription::getTenantId, tenantId)
                 .eq(AiCreditSubscription::getStatus, "1")
                 .set(AiCreditSubscription::getStatus, "0")));
@@ -293,11 +318,21 @@ public class AiCreditServiceImpl implements IAiCreditService {
     }
 
     @Override
-    public java.util.Optional<Integer> subscriberWebsearchLimit(String tenantId) {
+    public Optional<Integer> subscriberWebsearchLimit(String tenantId) {
         return activeSubscription(tenantId).map(sub -> {
             AiCreditPlan plan = TenantHelper.ignore(() -> planMapper.selectById(sub.getPlanId()));
             Integer limit = plan == null ? null : plan.getWebsearchLimitPerUserDaily();
             return (limit != null && limit > 0) ? limit : null;
+        });
+    }
+
+    @Override
+    public Optional<Integer> subscriberSuggestedDailyCredit(String tenantId) {
+        return activeSubscription(tenantId).map(sub -> {
+            AiCreditPlan plan = TenantHelper.ignore(() -> planMapper.selectById(sub.getPlanId()));
+            Integer suggested = plan == null ? null : plan.getSuggestedDailyCreditPerUser();
+            // 0 与 null 同义：套餐页填 0 = 没给建议（Q18=1），落到平台兜底数
+            return (suggested != null && suggested > 0) ? suggested : null;
         });
     }
 
@@ -358,7 +393,7 @@ public class AiCreditServiceImpl implements IAiCreditService {
             return List.of();
         }
         Map<Long, String> names = nickNameMap(ids);
-        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        List<Map<String, Object>> out = new ArrayList<>();
         for (Long id : ids) {
             Map<String, Object> m = new HashMap<>();
             m.put("userId", id);
@@ -368,33 +403,212 @@ public class AiCreditServiceImpl implements IAiCreditService {
         return out;
     }
 
+    /**
+     * 额度三级管控批（Q13=1 + Q22=1）：模型倍率表——把「相对价」和「扣分」拆成两个数。
+     *
+     * <p><b>两个数不是一回事</b>（板上原话）：</p>
+     * <ul>
+     *   <li><b>相对价</b>（给人看）= 该模型一轮官方成本 ÷ 基准模型一轮官方成本。
+     *       基准 = 平台默认模型（CHAT 里 isDefault=1；没有默认时取第一个）。
+     *       它回答「这个模型比基准贵多少倍」，不参与扣分。</li>
+     *   <li><b>扣分</b>（真扣）= 一轮官方成本（元）× 100 × 平台系数 × 该模型手工系数。
+     *       平台系数先落 sys_config 键 {@code ai.credit.platform-factor}（缺省 1.0）；
+     *       手工系数 = ai_config.credit_multiplier（缺省/非正 = 1）。</li>
+     * </ul>
+     *
+     * <p><b>一轮的形状</b>（写进表头，免得两个数对不上）：输入 2 万 token + 输出 800 token，
+     * <b>缓存折扣不计</b>——与真实扣费 {@code BillingModelDecorator#priceOf} 同口径
+     * （它也只算 prompt×入价 + completion×出价）。板上的 0.2016 元 / 8.69× 就是按这个形状算的。</p>
+     */
     @Override
     public List<Map<String, Object>> modelRates(String tenantId) {
-        // 业务批8 Q2：当前租户在用 CHAT 模型的倍率表。预估积分/轮 = 实测基准 0.65 积分/轮
-        //（dsv4.1fh 无倍率时代实测均值 1.3 的折半）× 倍率，一位小数展示；免费档倍率无意义置 0
-        List<com.smartdock.domain.AiConfig> configs = TenantHelper.ignore(() ->
-            aiConfigMapper.selectList(new LambdaQueryWrapper<com.smartdock.domain.AiConfig>()
-                .eq(com.smartdock.domain.AiConfig::getTenantId, tenantId)
-                .eq(com.smartdock.domain.AiConfig::getUseType, "CHAT")
-                .eq(com.smartdock.domain.AiConfig::getEnabled, "1")));
-        List<Map<String, Object>> out = new java.util.ArrayList<>();
-        for (com.smartdock.domain.AiConfig c : configs) {
+        List<AiConfig> configs = TenantHelper.ignore(() ->
+            aiConfigMapper.selectList(new LambdaQueryWrapper<AiConfig>()
+                .eq(AiConfig::getTenantId, tenantId)
+                .eq(AiConfig::getUseType, "CHAT")
+                .eq(AiConfig::getEnabled, "1")));
+        if (configs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        // 基准模型：平台默认（isDefault=1）优先，没有就取第一个——分母不能空
+        AiConfig baseline = configs.stream()
+            .filter(c -> "1".equals(c.getIsDefault()))
+            .findFirst().orElse(configs.get(0));
+        BigDecimal baselineCost = roundCostOf(baseline);
+        BigDecimal platformFactor = platformFactor();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (AiConfig c : configs) {
             Map<String, Object> m = new HashMap<>();
             m.put("configId", c.getConfigId());
             m.put("provider", c.getProvider());
             m.put("modelName", c.getModelName());
-            m.put("multiplier", c.getCreditMultiplier() == null ? 1 : c.getCreditMultiplier());
+            m.put("isDefault", "1".equals(c.getIsDefault()));
+            m.put("isBaseline", c.getConfigId() != null && c.getConfigId().equals(baseline.getConfigId()));
             boolean free = c.getUnitPricePerCall() != null && c.getUnitPricePerCall().signum() == 0
                 && "FIXED_PER_CALL".equals(c.getBillingMode());
             m.put("free", free);
-            m.put("perRound", free ? 0
-                : BigDecimal.valueOf(0.65)
-                    .multiply(c.getCreditMultiplier() == null ? BigDecimal.ONE : c.getCreditMultiplier())
-                    .setScale(1, RoundingMode.HALF_UP).doubleValue());
-            m.put("isDefault", "1".equals(c.getIsDefault()));
+            BigDecimal cost = roundCostOf(c);
+            // 成本算不出来（价目表缺行）时不能显示 0——那是「免费」，会被读成「随便用」
+            m.put("costKnown", cost != null);
+            // 相对价（只给人看）：基准自己就是 1.00；算不出成本时 null，界面显示「—」而不是编个数
+            m.put("relativePrice", relativePriceOf(cost, baselineCost));
+            BigDecimal manual = resolveManualFactor(c.getCreditMultiplier());
+            m.put("manualFactor", manual);
+            // 扣分（真扣）：一轮成本 × 100 × 平台系数 × 手工系数；免费档 0
+            m.put("perRound", perRoundOf(cost, platformFactor, manual, free));
+            m.put("source", manual != null ? "manual" : "auto");
             out.add(m);
         }
         return out;
+    }
+
+    /**
+     * 一轮成本（元）：输入 2 万 token + 输出 800 token，缓存折扣不计
+     * （与 {@code BillingModelDecorator#priceOf} 同口径）。查不到价目行时返回 null。
+     */
+    private BigDecimal roundCostOf(AiConfig c) {
+        try {
+            AiModelPrice p = priceService.findEffectivePrice(
+                c.getTenantId(), c.getProvider(), c.getModelName());
+            if (p == null) {
+                return null;
+            }
+            return roundCostOfPrices(p.getInputPricePerMillion(), p.getOutputPricePerMillion());
+        } catch (Exception e) {
+            log.warn("[AiCredit] 价目行查询失败，倍率表该行按「—」展示 model={}", c.getModelName(), e);
+            return null;
+        }
+    }
+
+    /** 一轮 token 形状（写进倍率表头，免得两个数对不上）：输入 2 万 + 输出 800，缓存折扣不计 */
+    static final long ROUND_INPUT_TOKENS = 20_000L;
+    static final long ROUND_OUTPUT_TOKENS = 800L;
+
+    /**
+     * 一轮成本纯算术（元）：价目缺项当 0，两位价都缺 = 0 成本（不是 null——
+     * null 只表示「连价目行都没有」，两者在界面上说法不同）。
+     * 抽成静态是为了让倍率换算能单测（板 07「② 倍率换算」）。
+     */
+    static BigDecimal roundCostOfPrices(BigDecimal inputPricePerMillion, BigDecimal outputPricePerMillion) {
+        BigDecimal in = inputPricePerMillion == null ? BigDecimal.ZERO : inputPricePerMillion;
+        BigDecimal outP = outputPricePerMillion == null ? BigDecimal.ZERO : outputPricePerMillion;
+        return BigDecimal.valueOf(ROUND_INPUT_TOKENS).multiply(in)
+            .add(BigDecimal.valueOf(ROUND_OUTPUT_TOKENS).multiply(outP))
+            .divide(BigDecimal.valueOf(1_000_000), 6, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 相对价（只给人看，不参与扣分）= 该模型一轮成本 ÷ 基准模型一轮成本，两位小数。
+     * 任一侧算不出来就返回 null——界面显示「—」，<b>不许编个数</b>（编 0 会被读成免费）。
+     */
+    static Double relativePriceOf(BigDecimal cost, BigDecimal baselineCost) {
+        if (cost == null || baselineCost == null || baselineCost.signum() <= 0) {
+            return null;
+        }
+        return cost.divide(baselineCost, 2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    /**
+     * 手工系数归一：null / ≤0 / 恰好 1 都算「没设」（= 自动，返回 null）。
+     * 之所以把 1 也当没设：库里存 1 和存 NULL 在界面上都是「自动」，
+     * 留着 1 会让「来源」列显示 manual，与用户理解相反。
+     */
+    static BigDecimal resolveManualFactor(BigDecimal raw) {
+        if (raw == null || raw.signum() <= 0 || raw.compareTo(BigDecimal.ONE) == 0) {
+            return null;
+        }
+        return raw;
+    }
+
+    /**
+     * 扣分（真扣）= 一轮成本（元）× 100 × 平台系数 × 手工系数，四舍五入到整数。
+     *
+     * <p>成本算不出来（价目表缺行）时返回 0 而不是抛——倍率表要能整表渲染，
+     * 界面上该行同时带 {@code costKnown=false}，会显示「—」。</p>
+     */
+    static long perRoundOf(BigDecimal cost, BigDecimal platformFactor, BigDecimal manualFactor, boolean free) {
+        if (free || cost == null) {
+            return 0L;
+        }
+        BigDecimal pf = platformFactor == null || platformFactor.signum() <= 0 ? BigDecimal.ONE : platformFactor;
+        BigDecimal mf = manualFactor == null ? BigDecimal.ONE : manualFactor;
+        return cost.movePointRight(2).multiply(pf).multiply(mf)
+            .setScale(0, RoundingMode.HALF_UP).longValue();
+    }
+
+    /**
+     * 平台加价系数（Q22=1）：扣分 = 一轮成本 × 100 × 平台系数 × 手工系数。
+     * 先落 sys_config 键 {@code ai.credit.platform-factor}，缺省 1.0（= 老口径，行为不变）。
+     * 值非法（≤0 / 解析不出）一律回落 1.0——这个数写错会影响所有租户的扣分。
+     */
+    @Override
+    public BigDecimal platformFactor() {
+        try {
+            String raw = TenantHelper.ignore(() -> configService.getConfigValue(PLATFORM_FACTOR_KEY));
+            return parsePlatformFactor(raw);
+        } catch (Exception e) {
+            log.warn("[AiCredit] 平台系数读取失败，按 1.0 兜底", e);
+            return BigDecimal.ONE;
+        }
+    }
+
+    /**
+     * 平台系数解析（纯函数，单测直调）：空 / 非数字 / ≤0 一律回落 1.0。
+     * 这个数写错会影响全平台扣分，所以宁可按原价也不按 0 或负数扣。
+     */
+    static BigDecimal parsePlatformFactor(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return BigDecimal.ONE;
+        }
+        try {
+            BigDecimal v = new BigDecimal(raw.trim());
+            return v.signum() > 0 ? v : BigDecimal.ONE;
+        } catch (NumberFormatException e) {
+            return BigDecimal.ONE;
+        }
+    }
+
+    /**
+     * 手工系数写入口径（纯函数，单测直调）：null / 1 = 「自动」→ <b>落 1，不落 NULL</b>。
+     *
+     * <p>2026-11-26 活体实测缺陷：{@code ai_config.credit_multiplier} 是
+     * {@code NOT NULL DEFAULT 1}（业务批8 就有的列），原实现「恢复自动」写 NULL
+     * 直接撞约束抛 500。读侧 {@link #resolveManualFactor} 把 1 当「没设」，
+     * 所以落 1 与落 NULL 语义等价，且不撞约束。</p>
+     */
+    static BigDecimal normalizeMultiplierForWrite(BigDecimal multiplier) {
+        return multiplier == null || multiplier.compareTo(BigDecimal.ONE) == 0
+            ? BigDecimal.ONE : multiplier;
+    }
+
+    /**
+     * 手工系数写入（Q13=1「倍率表改可编辑」）：multiplier 为 null/1 = 恢复自动。
+     *
+     * <p><b>「自动」在库里落 1，不是 NULL</b>——2026-11-26 活体实测发现
+     * {@code ai_config.credit_multiplier} 是 {@code NOT NULL DEFAULT 1}（业务批8 就有的列），
+     * 写 NULL 会直接撞约束抛 500（「恢复自动」按钮点了报未知异常）。
+     * 读侧 {@link #resolveManualFactor} 本来就把 1 当「没设」，所以落 1 与落 NULL 语义等价。</p>
+     */
+    @Override
+    public void updateModelMultiplier(String tenantId, Long configId, BigDecimal multiplier) {
+        if (configId == null) {
+            throw new ServiceException("模型配置 ID 不能为空", 400);
+        }
+        BigDecimal value = normalizeMultiplierForWrite(multiplier);
+        if (value.signum() <= 0 || value.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new ServiceException("手工系数须在 0~100 之间（1 = 按成本价，等于「自动」）", 400);
+        }
+        TenantHelper.ignore(() -> {
+            AiConfig origin = aiConfigMapper.selectById(configId);
+            if (origin == null || !tenantId.equals(origin.getTenantId())) {
+                throw new ServiceException("模型配置不存在或不属于本租户", 404);
+            }
+            aiConfigMapper.update(null,
+                new LambdaUpdateWrapper<AiConfig>()
+                    .eq(AiConfig::getConfigId, configId)
+                    .set(AiConfig::getCreditMultiplier, value));
+            return null;
+        });
     }
 
     /** 行内回填消耗人昵称（一次批量查，空行跳过） */
@@ -557,6 +771,9 @@ public class AiCreditServiceImpl implements IAiCreditService {
             : (isNew ? 12 : plan.getDurationWeeks()));
         plan.setWebsearchLimitPerUserDaily(bo.getWebsearchLimitPerUserDaily() != null
             ? bo.getWebsearchLimitPerUserDaily() : (isNew ? 0 : plan.getWebsearchLimitPerUserDaily()));
+        // 额度三级管控批（Q18=1）：建议值同口径——没传=保旧值（新增落 NULL=没建议）
+        plan.setSuggestedDailyCreditPerUser(bo.getSuggestedDailyCreditPerUser() != null
+            ? bo.getSuggestedDailyCreditPerUser() : (isNew ? null : plan.getSuggestedDailyCreditPerUser()));
         plan.setDescription(bo.getDescription());
     }
 

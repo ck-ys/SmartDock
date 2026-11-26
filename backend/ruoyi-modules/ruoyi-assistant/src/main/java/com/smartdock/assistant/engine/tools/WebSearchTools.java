@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.smartdock.assistant.infrastructure.AssistantWebSearchQuota;
 import com.smartdock.assistant.support.AssistantPiiFilter;
 import com.smartdock.assistant.service.AssistantUserQuotaService;
+import com.smartdock.service.IAiSearchService;
 import org.dromara.common.core.service.ConfigService;
 
 import java.net.URI;
@@ -67,6 +68,21 @@ public class WebSearchTools {
      * 避免「没配也能搜」与账单串户。默认租户自身同样按本租户 key 解析。</p>
      */
     private String resolveSearchKey(String tenantId) {
+        // 额度三级管控批（Q16=1）：新表（ai_search_service）填了就用它——那是「钥匙管理」页上
+        // 管理员看得见的那一份；没填仍回落到系统参数，存量租户零影响。
+        if (searchService != null) {
+            try {
+                String fromTable = searchService.resolveApiKey(tenantId, "BOCHA");
+                if (fromTable != null && !fromTable.isBlank()) {
+                    String t = fromTable.trim();
+                    if (isUsableKey(t)) {
+                        return t;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("[smartdock-assistant] 搜索服务表读 key 失败, 回落系统参数 tenant={}", tenantId, e);
+            }
+        }
         // 2026-11-11 STEP02：走先存后还的包装——裸 dynamic 在登录线程上会删掉「切换单位」持久态
         String key = com.smartdock.assistant.engine.core.AssistantTenantScope.call(
             tenantId, () -> configService.getConfigValue(CONFIG_KEY));
@@ -147,6 +163,51 @@ public class WebSearchTools {
     private final AssistantWebSearchQuota webSearchQuota;
     /** 限额源（单人覆盖>租户默认，批③三层合成唯一出口） */
     private final AssistantUserQuotaService quotaService;
+
+    /**
+     * 额度三级管控批（Q16=1）：搜索服务表——成功搜一次给资源包估算 +1，
+     * 并优先从这里读 key（新表填了就用新表的，没填仍走系统参数，存量租户零影响）。
+     * null = 不接（单测/未注入，行为与老版本一致）。
+     */
+    private IAiSearchService searchService;
+
+    /** Q16=1：链式注入（构造器签名不动，单测与侧车零改动） */
+    public WebSearchTools searchService(IAiSearchService svc) {
+        this.searchService = svc;
+        return this;
+    }
+
+    /**
+     * 多把钥匙 Q3=1：本次搜索成功 → 清掉这把的冷却。
+     * 回报失败绝不影响搜索结果的返回（钥匙池只是调度优化）。
+     */
+    private void reportPoolSuccess(String tenantId) {
+        if (searchService == null) {
+            return;
+        }
+        try {
+            searchService.reportSearchResult(tenantId, "BOCHA", null);
+        } catch (Exception e) {
+            log.debug("[smartdock-assistant] 搜索钥匙池成功回报失败(忽略): {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 多把钥匙 Q3=1：本次搜索因上游状态码失败 → 让钥匙池按码冷却这把。
+     * 只把 HTTP 状态码包成异常传过去，由 SearchKeyPool.classify 统一判定
+     * （429→10 分钟、401/402/403→30 分钟、其它不冷却）。
+     */
+    private void reportPoolFailure(String tenantId, int httpStatus) {
+        if (searchService == null) {
+            return;
+        }
+        try {
+            searchService.reportSearchResult(tenantId, "BOCHA",
+                new java.io.IOException("web_search upstream HTTP " + httpStatus));
+        } catch (Exception e) {
+            log.debug("[smartdock-assistant] 搜索钥匙池失败回报失败(忽略): {}", e.getMessage());
+        }
+    }
 
     public WebSearchTools(ToolIdentity identity, ConfigService configService, AssistantPiiFilter piiFilter,
                           AssistantWebSearchQuota webSearchQuota, AssistantUserQuotaService quotaService) {
@@ -229,22 +290,26 @@ public class WebSearchTools {
             int limit = quotaService.billingAwareLimits(tenantId, userId).websearchLimit();
             // 0/负=租户/单人侧把联网关到零：语义是「未开放」而非「当日用完」（dspro P2-2），
             // 不能承诺「明日 0 点恢复」（明天照样不行）；也不触 Redis 计数
-            if (limit <= 0) {
+            // 额度三级管控批（Q12=1）：-1 = 不限，必须排在 <=0 之前——否则界面写「不限」，
+            // 到这里仍报「未开放」，正是板上说的「界面写不限、实际还在拦」
+            // 额度三级管控批（Q12=1）：-1 = 不限，不能落进「未开放」分支（否则界面写「不限」，
+            // 到这里仍报未开放）。计数交给下面那道三态闸统一做——在这里先计一次会重复计。
+            if (limit <= 0 && limit != AssistantWebSearchQuota.UNLIMITED_WEBSEARCH) {
                 out.put("status", "DISABLED");
                 out.put("message", "联网搜索当前未开放（额度为 0），请联系管理员在「AI 助手管理」调整后再试。请转告用户。");
                 return ToolSupport.secureJson(out, identity);
             }
             // 三态闸（dspro P2-1 回修）：COUNTED=已计数可补偿退款；PASSED_UNCOUNTED=fail-open
             // 放行未计数（Redis 抖动），退款守卫只认 COUNTED——否则会 DECR 掉当日既有计数多退额度
-            com.smartdock.assistant.infrastructure.AssistantWebSearchQuota.Gate gate =
+            AssistantWebSearchQuota.Gate gate =
                 webSearchQuota.trySearch(tenantId, userId, limit);
-            if (gate == com.smartdock.assistant.infrastructure.AssistantWebSearchQuota.Gate.DENIED) {
+            if (gate == AssistantWebSearchQuota.Gate.DENIED) {
                 out.put("status", "LIMIT");
                 out.put("message", "今日联网搜索次数已用完（每人每天 " + limit
                     + " 次），明日 0 点自动恢复；如需提前恢复请联系管理员在「AI 助手管理-用户额度」重置。请转告用户，不要重试。");
                 return ToolSupport.secureJson(out, identity);
             }
-            counted = gate == com.smartdock.assistant.infrastructure.AssistantWebSearchQuota.Gate.COUNTED;
+            counted = gate == AssistantWebSearchQuota.Gate.COUNTED;
 
             String effective = piiFilter.mask(q, tenantId);
             int n = count == null ? DEFAULT_COUNT : Math.max(1, Math.min(MAX_COUNT, count));
@@ -269,6 +334,8 @@ public class WebSearchTools {
                     if (counted) {
                         webSearchQuota.refundSearch(tenantId, userId);
                     }
+                    // 多把钥匙 Q3=1：让钥匙池按状态码冷却这把（429 歇 10 分钟 / 401 歇 30 分钟）
+                    reportPoolFailure(tenantId, hr.getStatus());
                     out.put("status", "UPSTREAM_ERROR");
                     out.put("message", describeHttpFailure(hr.getStatus()));
                     log.warn("[smartdock-assistant] web_search 上游非 200(已补偿额度): {} body={}",
@@ -284,6 +351,8 @@ public class WebSearchTools {
                 if (counted) {
                     webSearchQuota.refundSearch(tenantId, userId);
                 }
+                // 上游 HTTP 200 但内容异常：不算钥匙的错（钥匙是好的），不冷却——报成功清掉历史冷却
+                reportPoolSuccess(tenantId);
                 out.put("status", "UPSTREAM_ERROR");
                 out.put("message", "搜索服务返回了无法解析的响应（HTTP 200 但内容异常），本次不消耗联网次数，请稍后再试。");
                 log.warn("[smartdock-assistant] web_search 上游 200 空结构(已补偿额度): body={}",
@@ -291,6 +360,13 @@ public class WebSearchTools {
                 return ToolSupport.secureJson(out, identity);
             }
             out.put("status", "OK");
+            // 多把钥匙 Q3=1：这次调用成功，清掉这把钥匙的冷却（健康钥匙提前回池）
+            reportPoolSuccess(tenantId);
+            // 额度三级管控批（Q16=1）：资源包估算计数——只在**成功**这一次加（上游失败上面已 refund，
+            // 不该让企业为一个没搜到的结果扣包次数）。失败不影响本次搜索（估算以厂商后台为准）
+            if (searchService != null) {
+                searchService.countSearch(tenantId, "BOCHA");
+            }
             out.put("query", effective);
             ArrayNode rows = out.putArray("rows");
             int added = 0;

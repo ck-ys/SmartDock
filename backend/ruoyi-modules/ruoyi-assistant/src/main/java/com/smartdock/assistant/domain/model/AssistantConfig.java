@@ -53,4 +53,11 @@ public class AssistantConfig implements Serializable {
 
     /** 批1 Q1=B（2026-10-21）：工具开关矩阵 JSON（工具名→off/member/admin），空=全部按内置门槛 */
     private String toolGate;
+
+    /**
+     * 额度三级管控批（2026-11-26）：企业默认——每人每天积分上限。
+     * NULL=跟随套餐建议值；-2=显式「跟随套餐」（写入归一成 NULL，见 {@code AssistantConfigMapper.upsert}）；
+     * -1=不限（越过套餐建议值，Q20=1）；正数=上限。
+     */
+    private Integer dailyCreditLimitPerUser;
 }

@@ -1,5 +1,7 @@
 package com.smartdock.assistant.infrastructure;
 
+import com.smartdock.assistant.service.AssistantUserQuotaService;
+
 import com.smartdock.assistant.service.AssistantCostLedger;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.TextBlock;
@@ -99,6 +101,12 @@ public class BillingModelDecorator implements Model {
     /** R5 积分模式（2026-10-13）：null=钱包计费（原路径零改动）；主链注入后订阅租户走积分前置闸+积分落账 */
     private IAiCreditService creditService;
 
+    /**
+     * 额度三级管控批（2026-11-26 / Q9=2）：个人积分上限闸。null=不判（侧车/单测零行为变化）。
+     * 挂在企业池 preGate <b>之前</b>——先判「这个人今天还有没有额度」，再判「公司池还有没有」。
+     */
+    private AssistantUserQuotaService quotaService;
+
     /** 2026-11-11 Q2-2 补丁：模型失败侧落问题行用（null=侧车/单测，不落） */
     private RunLedgerService runLedgerService;
 
@@ -121,6 +129,12 @@ public class BillingModelDecorator implements Model {
     /** R5：链式注入积分服务（AssistantAgentFactory 主链；侧车/单测不传=钱包计费） */
     public BillingModelDecorator creditService(IAiCreditService svc) {
         this.creditService = svc;
+        return this;
+    }
+
+    /** 额度三级管控批：链式注入个人额度服务（主链注入；不传=不判个人上限） */
+    public BillingModelDecorator quotaService(AssistantUserQuotaService svc) {
+        this.quotaService = svc;
         return this;
     }
 
@@ -230,12 +244,35 @@ public class BillingModelDecorator implements Model {
         // 自动回写 WALLET），钱包/积分双轨由租户自己掌握，订阅成功自动切积分、到期自动切回
         boolean creditsMode = !zeroCostTier && creditService != null
             && "CREDIT".equals(creditService.consumeMode(config.getTenantId()));
+        /**
+         * 额度三级管控批（Q17=1）：<b>进门预检这一刻</b>就把倍率快照取好——结算写快照值。
+         * 取的是「平台系数 × 手工系数」，与扣分公式同源；取不到（异常）就 null，
+         * 流水三列落 NULL 并在下面 WARN，绝不拿一个编出来的数充快照。
+         */
+        java.math.BigDecimal snap = null;
+        if (creditsMode) {
+            try {
+                snap = creditService.platformFactor().multiply(creditMultiplier(config));
+            } catch (Exception e) {
+                log.warn("[AssistantBilling] 倍率快照取失败, 本笔流水快照列留空 tenant={} model={}",
+                    config.getTenantId(), config.getModelName(), e);
+            }
+        }
+        // lambda 里只能引 effectively-final——这里定成常量
+        final java.math.BigDecimal multiplierSnapshot = snap;
         if (!zeroCostTier) {
             if (creditsMode) {
+                // 额度三级管控批（Q9=2）：调模型前再直查一次个人额度（进门那次可能已过很久，
+                // 或这一轮多调几次模型）。放在企业池 preGate 之前——先判「这个人」，再判「公司池」
+                if (quotaService != null) {
+                    quotaService.assertPersonalCredits(config.getTenantId(), userId, "调模型前");
+                }
                 // 1 积分=1 分钱：回合门槛=估算元值×100 向上取整，只判门槛不预留；
-                // 业务批8 Q2：乘模型积分倍率（flash×2/旗舰×5 等，NULL=1）——重模型每回合吃更多积分
+                // 业务批8 Q2 / Q22=1：乘「平台系数 × 手工系数」——与落账同一份快照，
+                // 两处口径必须一致（否则闸按 A 算、账按 B 扣）
                 long estCredits = Math.max(1, estimate.movePointRight(2)
-                    .multiply(creditMultiplier(config)).setScale(0, RoundingMode.CEILING).longValue());
+                    .multiply(multiplierSnapshot != null ? multiplierSnapshot : creditMultiplier(config))
+                    .setScale(0, RoundingMode.CEILING).longValue());
                 IAiCreditService.GateResult gate = creditService.preGate(config.getTenantId(), estCredits);
                 if (gate.blocked()) {
                     log.warn("[AssistantBilling] 积分前置拦截: 租户 {} 估算 {} 积分",
@@ -343,15 +380,20 @@ public class BillingModelDecorator implements Model {
                     return;
                 }
                 record(seq, promptChars, replyChars.get(), lastUsage.get(),
-                    System.currentTimeMillis() - startAt, signal == reactor.core.publisher.SignalType.ON_ERROR, creditsMode);
+                    System.currentTimeMillis() - startAt, signal == reactor.core.publisher.SignalType.ON_ERROR,
+                    creditsMode, multiplierSnapshot);
             });
     }
 
     /**
      * 落账一次调用: 有 usage 用真实值; 缺失走估算兜底三件套(断言+告警+估算标记)。
+     *
+     * @param multiplierSnapshot 额度三级管控批（Q17=1）：进门预检那一刻取好的倍率
+     *                           （平台系数 × 手工系数）；null=取失败，落账按当前值算、快照列留空
      */
     private void record(long seq, int promptChars, long replyChars, ChatUsage usage,
-                        long latencyMs, boolean failed, boolean creditsMode) {
+                        long latencyMs, boolean failed, boolean creditsMode,
+                        java.math.BigDecimal multiplierSnapshot) {
         boolean estimated = usage == null;
         AiTokenUsageSnapshot snapshot;
         if (usage == null) {
@@ -376,10 +418,12 @@ public class BillingModelDecorator implements Model {
             + ":" + instanceId + ":" + seq;
         // 六审回修（dspro P1-1/k3 P1-1 续）：取整口径与闸统一——付费调用最低 1 积分无条件落账
         // （原 rawCredits>0 才扣，真实成本 <0.005 元被 HALF_UP 抹 0 = 闸按 1 积分拦、落账 0 积分免单）；
-        // 业务批8 Q2：乘模型积分倍率（与前置闸同源 creditMultiplier，两处口径必须一致）
+        // 业务批8 Q2 / Q22=1：乘「平台系数 × 手工系数」（进门预检取好的快照，与前置闸同源）
+        final java.math.BigDecimal effectiveMultiplier = multiplierSnapshot != null
+            ? multiplierSnapshot : creditMultiplier(config);
         final Long creditsToCharge = creditsMode && !failed
             ? Math.max(1, priceOf(snapshot).movePointRight(2)
-                .multiply(creditMultiplier(config))
+                .multiply(effectiveMultiplier)
                 .setScale(0, RoundingMode.HALF_UP).longValue())
             : null;
         // Q9（2026-10-15 拍板A，ZCode 同构）：主链真实回传才进会话级命中聚合——估算/侧车/
@@ -396,9 +440,10 @@ public class BillingModelDecorator implements Model {
                     // R5 积分模式（六审回修 dspro P0-1 方案A）：usage 单据与积分扣减在同一事务
                     // 内完成（creditsToCharge 由上面按 priceOf 镜像算好传入），不再事务外另扣——
                     // 消除"单据在流水无"的静默免单窗口
+                    // 额度三级管控批（Q17=1）：把进门预检时取好的快照一并写进流水三列
                     billingService.recordTransactionalCredits(config, CALLER, scene, snapshot,
                         latencyMs, !failed, failed ? "model stream error" : null, userId, idempotencyKey,
-                        creditsToCharge);
+                        creditsToCharge, config.getModelName(), effectiveMultiplier, priceOf(snapshot));
                 } else {
                     billingService.recordTransactional(config, CALLER, scene, snapshot,
                         latencyMs, !failed, failed ? "model stream error" : null, userId, idempotencyKey);

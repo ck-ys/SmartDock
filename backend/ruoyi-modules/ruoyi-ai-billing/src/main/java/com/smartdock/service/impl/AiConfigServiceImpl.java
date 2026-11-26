@@ -84,9 +84,21 @@ public class AiConfigServiceImpl implements IAiConfigService {
     /** 用量台账（Q3-A：解析「上次使用」的模型，供默认缺失时兜底） */
     private final AiUsageMapper usageMapper;
 
-    /** 分页查询 AI 配置(忽略租户隔离, 列表自动 mask API Key) */
+    /**
+     * 分页查询 AI 配置(忽略租户隔离, 列表自动 mask API Key)。
+     *
+     * <p><b>额度三级管控批（2026-11-26 / Q19 前置①）</b>：此查询在 {@code TenantHelper.ignore}
+     * 里跑，只在调用方传了 {@code bo.tenantId} 时才过滤租户——本批把 9060（AI 模型与钥匙）
+     * 授给内置「租户管理员」后，他会<b>跨租户看到别家的模型配置</b>（API Key 仍打码，但
+     * 接口地址、模型名、用量全都露）。故非超管强制收窄到本租户：传了别人的 tenantId 也
+     * 按自己的查，不报错（列表页本来就没传，行为不变）。</p>
+     */
     @Override
     public TableDataInfo<AiConfigVo> queryPageList(AiConfigBo bo, PageQuery pageQuery) {
+        if (!LoginHelper.isSuperAdmin()) {
+            // 非超管一律按自己的租户查；覆盖调用方传进来的任何 tenantId（防枚举别家）
+            bo.setTenantId(LoginHelper.getTenantId());
+        }
         Page<AiConfigVo> page = TenantHelper.ignore(() ->
             aiConfigMapper.selectVoPage(pageQuery.build(), buildWrapper(bo)));
         enrichWithPrice(page.getRecords());

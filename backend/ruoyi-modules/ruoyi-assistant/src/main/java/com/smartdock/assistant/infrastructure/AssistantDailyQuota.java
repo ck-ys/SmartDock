@@ -42,6 +42,14 @@ public class AssistantDailyQuota {
     static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyyMMdd");
     static final ZoneId TZ = ZoneId.of("Asia/Shanghai");
 
+    /**
+     * 个人额度拒绝的识别记号（额度三级管控批 / Q6 补条件）：自动化侧据此判定「这是额度类拒绝，
+     * 不计连续失败」——否则用户额度恢复后还得手动重开被自动停用的自动化。
+     * 用文案子串而不是新异常子类：ServiceException 是 final 类，且框架/装饰器/自动化三条路
+     * 都会把它包一层再抛，按类型判会漏；按文案判与 {@code AssistantRunIssues.QUOTA} 同族。
+     */
+    public static final String PERSONAL_CREDIT_MARKER = "个人额度用完";
+
     /** 回合判定：先比限后 INCR（被拒尝试不消耗额度，宁少拒不多扣）+首访 TTL，单脚本原子 */
     static final String TURN_LUA = """
         local c = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -182,5 +190,66 @@ public class AssistantDailyQuota {
 
     private String trendKey(String tenantId, Long userId) {
         return String.format(TURN_KEY_TEMPLATE, tenantId, userId, LocalDate.now(TZ).format(DAY));
+    }
+
+    /* ===== 额度三级管控批（2026-11-26）：每人每天积分上限闸 ===== */
+
+    /**
+     * 某用户今日已扣积分（直查账本，<b>不加缓存</b>）。
+     *
+     * <p>为什么不像 {@link #checkBudget} 那样加 30 秒缓存：那份缓存是给「企业日预算」用的，
+     * 语义是「宁少拒不多扣」；个人闸的口径是 Q9 案 2「每次调模型前直查」，加了缓存就变成
+     * 「最多超 30 秒的量」，和已拍的口径对不上。查询走现成索引
+     * {@code idx_credit_ledger_tenant_user (tenant_id, create_by, create_time)}。</p>
+     *
+     * <p>谓词只认 {@code biz_type='DEDUCT'}：订阅 / 加油包 / 调整这些行不是「个人花掉的」，
+     * 算进来会把上限吃掉。日界 Asia/Shanghai 半开区间（上界取次日 00:00，不用 23:59:59，
+     * 否则会漏掉 .001~.999 的行）。</p>
+     *
+     * <p>读失败返回 -1 表示「查不到」，由调用方放行并告警——与 checkBudget 的「读失败不拦」
+     * 同口径，不让账本闪断把已过闸的用户挡在门外。</p>
+     */
+    public long creditsUsedToday(String tenantId, Long userId) {
+        if (tenantId == null || userId == null) {
+            return -1L;
+        }
+        try {
+            LocalDate today = LocalDate.now(TZ);
+            Long used = TenantHelper.ignore(() -> jdbcTemplate.queryForObject(
+                "SELECT COALESCE(SUM(credits), 0) FROM ai_credit_ledger"
+                    + " WHERE tenant_id=? AND create_by=? AND biz_type='DEDUCT'"
+                    + " AND create_time >= ? AND create_time < ?",
+                Long.class, tenantId, userId, today.atStartOfDay(), today.plusDays(1).atStartOfDay()));
+            return used == null ? 0L : used;
+        } catch (Exception e) {
+            log.warn("[AssistantQuota] 个人积分用量读失败, 本次放行 tenant={} user={}", tenantId, userId, e);
+            return -1L;
+        }
+    }
+
+    /**
+     * 个人积分闸（额度三级管控批 / Q5=1：直接拦下，告知明早 0 点恢复）。
+     *
+     * <p>进门和调模型前各调一次（Q9=2：两次都直查账本，不预留），误差上限=「最多多花一次
+     * 调用的量」。{@code limit <= 0} 一律跳过：-1 = 不限（Q20=1），0 在积分列上不合法
+     * （保存侧已拒），真出现脏值也按「没设上限」放行而不是把人锁死。</p>
+     *
+     * @param limit 该用户今日积分上限（{@code resolveCreditLimit} 的结果）
+     * @param scene 用于告警区分「进门」还是「调模型前」
+     */
+    public void checkPersonalCredits(String tenantId, Long userId, int limit, String scene) {
+        if (limit <= 0) {
+            return;
+        }
+        long used = creditsUsedToday(tenantId, userId);
+        if (used < 0) {
+            return;
+        }
+        if (used >= limit) {
+            log.info("[AssistantQuota] 个人积分额度用尽: tenant={} user={} used={}/{} scene={}",
+                tenantId, userId, used, limit, scene);
+            throw new ServiceException("今天的" + PERSONAL_CREDIT_MARKER + "了（" + limit + " 积分），明日 0 点恢复。"
+                + "如需调整额度，请联系管理员", 429);
+        }
     }
 }

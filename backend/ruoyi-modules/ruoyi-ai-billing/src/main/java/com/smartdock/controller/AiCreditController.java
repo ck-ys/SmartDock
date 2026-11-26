@@ -220,11 +220,32 @@ public class AiCreditController extends BaseController {
     }
 
 
-    /** 业务批8 Q2：模型积分倍率表（当前租户在用 CHAT 模型 × 倍率 + 预估积分/轮） */
+    /**
+     * 模型倍率表（业务批8 Q2 / 额度三级管控批 Q13=1 + Q22=1）：每行拆成
+     * 「相对价（给人看）」和「约积分/轮（真扣）」两个数，外加来源 auto/manual；
+     * 一并返回平台系数（表头要写出来，否则两个数对不上）。
+     */
     @SaCheckPermission("smartdock:aicredit:list")
     @GetMapping("/model-rates")
-    public R<List<Map<String, Object>>> modelRates() {
-        return R.ok(creditService.modelRates(LoginHelper.getTenantId()));
+    public R<Map<String, Object>> modelRates() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("rows", creditService.modelRates(LoginHelper.getTenantId()));
+        data.put("platformFactor", creditService.platformFactor());
+        return R.ok(data);
+    }
+
+    /**
+     * 改某个模型的手工系数（Q13=1：倍率表从只读变可编辑）。
+     * multiplier 不传 = 恢复自动（1 也等于自动）。仅超管——改的是全租户扣分口径。
+     */
+    @SaCheckPermission("smartdock:aicredit:plan-edit")
+    @Log(title = "AI积分-模型倍率", businessType = BusinessType.UPDATE)
+    @RepeatSubmit
+    @PostMapping("/model-rates/multiplier")
+    public R<Void> updateModelMultiplier(@RequestParam Long configId,
+            @RequestParam(required = false) java.math.BigDecimal multiplier) {
+        creditService.updateModelMultiplier(LoginHelper.getTenantId(), configId, multiplier);
+        return R.ok();
     }
 
     /**

@@ -63,6 +63,11 @@ public class AiCreditPlanBo {
     @Min(value = 0, message = "联网次数档位不能为负")
     private Integer websearchLimitPerUserDaily;
 
+    /** 额度三级管控批（Q4=3 + Q8=3 + Q18=1）：每人每天建议积分上限；0/NULL=没建议，落到平台兜底 */
+    @Min(value = 0, message = "每人每日建议积分不能为负")
+    @Max(value = 100000, message = "每人每日建议积分超出上限")
+    private Integer suggestedDailyCreditPerUser;
+
     @Size(max = 300, message = "描述不超过 300 字符")
     private String description;
 }

@@ -123,6 +123,13 @@
                 >
               </li>
               <li v-if="p.websearchLimitPerUserDaily > 0">每日联网搜索 {{ fmt(p.websearchLimitPerUserDaily) }} 次</li>
+              <!-- 额度三级管控批 Q18=1：这是企业没自己设上限时的最后一级兜底（Q4=3 第三环）。
+                   与下面企业页的三个档位按钮不是同一个数：那三个按周池÷人数现算，这个只是预填/兜底 -->
+              <li v-if="(p.suggestedDailyCreditPerUser ?? 0) > 0">
+                每人每日建议 {{ fmt(p.suggestedDailyCreditPerUser!) }} 积分<span class="rounds-basis"
+                  >（企业没自己设时按这个数）</span
+                >
+              </li>
               <li>对话 / 工具 / 联网全场景可用</li>
             </ul>
             <!-- 业务批8 Q4：防刷窗口是风控参数，不当主卖点，收卡底一行灰字 -->
@@ -216,6 +223,12 @@
             <el-input-number v-model="planEdit.form.websearchLimitPerUserDaily" :min="0" :step="10" />
             <span class="edit-ro-hint">0=跟随租户默认</span>
           </el-form-item>
+          <!-- 额度三级管控批 Q18=1：超管定价时顺手定建议值（Q4=3 的第三环）。
+               注意它只用于「企业没设时兜底 / 企业页预填」，企业页三个档位按钮按周池÷人数现算，是另一个数 -->
+          <el-form-item label="每人每日建议积分">
+            <el-input-number v-model="planEdit.form.suggestedDailyCreditPerUser" :min="0" :max="100000" :step="10" />
+            <span class="edit-ro-hint">0=没给建议（企业没设时落到平台兜底 100）；换套餐不会改企业已设的值</span>
+          </el-form-item>
         </template>
         <el-form-item label="在售状态">
           <el-switch v-model="planEdit.enabled" active-text="在售" inactive-text="已下架" />
@@ -231,22 +244,36 @@
       </template>
     </el-dialog>
 
-    <!-- 区2.5：模型积分倍率（业务批8 Q2：不同模型每回合吃的积分不一样，订阅期间按此表扣分） -->
-    <el-card v-if="modelRates.length > 0" shadow="never" class="dcs-ops-table-card">
+    <!-- 区2.5：模型倍率（业务批8 Q2；额度三级管控批 Q13=1 + Q22=1 拆成两列）
+         Q13=1 要求「倍率表是唯一能改的地方」，所以这张表从只读改可编辑（改的只是手工系数），
+         模型弹窗里的那格改为只读 + 「去调」链接（见 ai-config/index.vue）。
+         Q13=1 另要求「0 个模型时也显示」——原来的 v-if="modelRates.length > 0" 会让新管理员
+         永远看不到这张表，改由卡内空态提示。 -->
+    <el-card shadow="never" class="dcs-ops-table-card">
       <template #header>
         <div class="card-head">
-          <span>模型积分倍率</span>
+          <span>模型倍率</span>
           <!-- step5 P1-D3 回修：原「按模型名后缀 ×N 生效」与计费规则矛盾——免费由计费配置判定
                （FIXED_PER_CALL 且单价 0），带 :free 后缀的模型照样按 token 计费扣分（表内即有反例） -->
-          <span class="head-sub">重模型每回合消耗更多积分；本表只读——想改倍率/免费？去「AI 模型配置 → 编辑模型」调整（与定价设置同步）</span>
+          <span class="head-sub">
+            相对价 = 比基准（{{ rateBaselineName }}）贵多少，<b>只给人看</b>；扣分 = 一轮成本 × 100 × 平台系数
+            {{ platformFactorText }} × 手工系数。一轮按「输入 2 万 token + 输出 800 token、缓存折扣不计」折算
+          </span>
+          <!-- 2026-11-26 活体实测（演示库默认模型是免费档，价目 0/0）：基准成本为 0 时相对价按定义算不出来，
+               整列都是「—」。不解释的话看着像坏了——这里直说原因和怎么看 -->
+          <span v-if="baselineIsFree" class="head-warn">
+            基准模型是免费档（价目 0 元），相对价算不出来（分母是 0），所以整列显示「—」；
+            看「约积分/轮」那一列才是实际扣多少。换一个付费模型当默认后相对价自动恢复。
+          </span>
         </div>
       </template>
+      <el-empty v-if="modelRates.length === 0" description="还没有可用的对话模型——先在「AI 模型与钥匙」接一个，这里就会出现它的相对价与每轮扣分" :image-size="72" />
       <!-- 业务批(1015) Q12：倍率表改厂商分组卡——后端 modelRates 平铺无序（模型裸 id+厂商裸 code
-           散落各处），前端按厂商分组（组头=logo+中文名+模型数，含默认组置顶），组内排序：默认→免费→倍率升序 -->
+           散落各处），前端按厂商分组（组头=logo+中文名+模型数，含默认组置顶），组内排序：默认→免费→相对价升序 -->
       <!-- 业务反馈批1015c Q12(拍板A)三刀：①组头可折叠（默认只展开含默认模型的组，厂商多时
-           不再全平铺）；②组内三列严格对齐（列头一次，模型名长短不一时右缘不再参差）；
-           ③徽章归一——免费=绿「免费」，其余=×N 单色阶（去掉"×1 免费档"字样防与免费徽章打架） -->
-      <div class="rate-groups">
+           不再全平铺）；②组内列严格对齐（列头一次，模型名长短不一时右缘不再参差）；
+           ③徽章归一——免费=绿「免费」，其余=相对价单色阶 -->
+      <div v-else class="rate-groups">
         <div v-for="g in rateGroups" :key="g.provider" class="rate-group">
           <button class="rate-ghead" type="button" :aria-expanded="!isRateCollapsed(g)" @click="toggleRate(g)">
             <ProviderLogo :provider="g.provider" :size="20" />
@@ -256,27 +283,85 @@
             <span class="rate-garrow" :class="{ open: !isRateCollapsed(g) }">▸</span>
           </button>
           <template v-if="!isRateCollapsed(g)">
-            <div class="rate-cols">
+            <div class="rate-cols rate-cols-4">
               <span>模型</span>
-              <span>档位</span>
+              <span class="ta-r">相对价</span>
               <span class="ta-r">约积分/轮</span>
+              <span class="ta-r">来源</span>
             </div>
             <div class="rate-gbody">
-              <div v-for="row in g.rows" :key="row.configId" class="rate-grow">
+              <div v-for="row in g.rows" :key="row.configId" class="rate-grow rate-grow-4">
                 <span class="rate-gname">
                   <span class="dcs-ops-id">{{ row.modelName }}</span>
                   <span v-if="row.isDefault" class="ui-pill ui-pill--pos rate-star">默认</span>
+                  <span v-if="row.isBaseline" class="ui-pill rate-base">基准</span>
                 </span>
-                <!-- 免费由计费配置判定（FIXED_PER_CALL 且单价 0），无视倍率占位（step5 P1-3 口径保持） -->
-                <span v-if="row.free" class="ui-pill ui-pill--pos">免费</span>
-                <span v-else class="ui-pill" :class="ratePillClass(row.multiplier)">×{{ row.multiplier }}</span>
-                <span class="rate-gcost">{{ row.free ? '不耗积分' : `约 ${row.perRound} 积分/轮` }}</span>
+                <!-- 相对价（只给人看）：基准自己 1.00×；算不出成本时「—」，绝不编数 -->
+                <span class="rate-grel">
+                  <template v-if="row.relativePrice == null">—</template>
+                  <template v-else>×{{ row.relativePrice.toFixed(2) }}</template>
+                </span>
+                <!-- 约积分/轮（真扣）：免费档 0；算不出成本「—」并说明原因（价目表缺这一行） -->
+                <span class="rate-gcost">
+                  <template v-if="row.free">不耗积分</template>
+                  <template v-else-if="row.costKnown === false">
+                    <span class="rate-dash" :title="`价目表里没有「${row.modelName}」这一行，算不出一轮成本——去「价格目录」补上就有数了`">—</span>
+                    <span class="rate-gmiss">缺价目</span>
+                  </template>
+                  <template v-else>约 {{ row.perRound }} 积分/轮</template>
+                </span>
+                <!-- 来源（Q13=1）：自动 / 手工 ×N +「恢复自动」——改过的人一眼看得出 -->
+                <span class="rate-gsrc">
+                  <template v-if="row.source === 'manual'">
+                    <el-tag size="small" type="warning" effect="plain">手工 ×{{ row.manualFactor }}</el-tag>
+                    <el-button
+                      v-if="checkPermi(['smartdock:aicredit:plan-edit'])"
+                      link
+                      type="primary"
+                      size="small"
+                      :loading="rateSavingId === row.configId"
+                      @click="onResetRate(row)"
+                      >恢复自动</el-button
+                    >
+                  </template>
+                  <template v-else>
+                    <el-tag v-if="row.free" size="small" type="success" effect="plain">免费</el-tag>
+                    <span v-else class="rate-auto">自动</span>
+                    <el-button
+                      v-if="checkPermi(['smartdock:aicredit:plan-edit'])"
+                      link
+                      type="primary"
+                      size="small"
+                      @click="openRateEdit(row)"
+                      >改</el-button
+                    >
+                  </template>
+                </span>
               </div>
             </div>
           </template>
         </div>
       </div>
     </el-card>
+
+    <!-- Q13=1：改手工系数的小弹层——只改这一列，不动价目表（价目表是给厂商调价用的入口） -->
+    <el-dialog v-model="rateEdit.open" title="改这个模型的手工系数" width="440px" append-to-body>
+      <el-form label-width="96px">
+        <el-form-item label="模型">
+          <span class="dcs-ops-id">{{ rateEdit.modelName }}</span>
+        </el-form-item>
+        <el-form-item label="手工系数">
+          <el-input-number v-model="rateEdit.value" :min="0.1" :max="100" :step="0.1" :precision="2" style="width: 160px" />
+        </el-form-item>
+      </el-form>
+      <div class="rate-edit-tip">
+        扣分 = 一轮成本 × 100 × 平台系数 {{ platformFactorText }} × 这个数。填 1 = 按成本价（等于「自动」）。
+      </div>
+      <template #footer>
+        <el-button @click="rateEdit.open = false">取消</el-button>
+        <el-button type="primary" :loading="rateSavingId === rateEdit.configId" @click="onSaveRate">保存</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 区3：流水对账（业务批7 Q4 真分页；业务批8 Q3 汇总条+扣分红+入账显量） -->
     <el-card shadow="never" class="dcs-ops-table-card">
@@ -384,6 +469,30 @@
               </div>
             </template>
           </el-table-column>
+          <!-- 额度三级管控批（Q17=1）：流水加「模型 / 倍率 / 一轮成本」三列——都是<b>结算快照</b>，
+               改倍率后旧流水这三个数一个字不动（历史行三列都是 NULL，显示「—」不追填） -->
+          <el-table-column label="模型" width="150" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="row.bizType === 'DEDUCT'" class="dcs-ops-id">{{ row.modelName || '—' }}</span>
+              <span v-else class="ledger-dash">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="倍率" width="80" align="right">
+            <template #default="{ row }">
+              <span v-if="row.bizType === 'DEDUCT' && row.creditMultiplier != null" class="ledger-num">
+                ×{{ Number(row.creditMultiplier).toFixed(2) }}
+              </span>
+              <span v-else class="ledger-dash">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="一轮成本" width="100" align="right">
+            <template #default="{ row }">
+              <span v-if="row.bizType === 'DEDUCT' && row.unitPrice != null" class="ledger-num">
+                ¥{{ Number(row.unitPrice).toFixed(4) }}
+              </span>
+              <span v-else class="ledger-dash">—</span>
+            </template>
+          </el-table-column>
           <el-table-column label="场景" width="170" show-overflow-tooltip>
             <template #default="{ row }">
               <span class="dcs-ops-id">{{ sceneLabel(row) }}</span>
@@ -433,6 +542,7 @@ import {
   listCreditLedger,
   listLedgerUsers,
   getModelRates,
+  updateModelMultiplier,
   type ModelRateVO,
   type CreditPlanVO,
   type CreditSummaryVO,
@@ -700,7 +810,67 @@ const reloadAll = () => {
 
 const loadModelRates = async () => {
   const res: any = await getModelRates();
-  modelRates.value = res.data || [];
+  // Q13=1 + Q22=1：接口从「数组」改成 { rows, platformFactor }——两个数对不上时表头能解释
+  const d = res.data || {};
+  modelRates.value = Array.isArray(d) ? d : (d.rows || []);
+  platformFactor.value = Array.isArray(d) ? 1 : Number(d.platformFactor ?? 1);
+};
+/** 平台加价系数（Q22=1）：表头与改倍率弹窗都要写出来，否则「扣分」这个数没人能复核 */
+const platformFactor = ref(1);
+const platformFactorText = computed(() => `×${platformFactor.value}`);
+/** 基准模型名（相对价的分母）：表头写清楚，否则「×8.69」不知道比谁贵 */
+const rateBaselineName = computed(() => modelRates.value.find((r) => r.isBaseline)?.modelName || '平台默认模型');
+/**
+ * 基准模型是不是免费档（价目 0 元）。免费档做分母时相对价恒为「—」——
+ * 2026-11-26 活体实测演示库就是这个状态（默认模型 poolside/laguna…:free，价目 0/0），
+ * 整列「—」看着像功能坏了，必须在表头说明原因（不是代码错，是基准成本真是 0）。
+ */
+const baselineIsFree = computed(() => {
+  const base = modelRates.value.find((r) => r.isBaseline);
+  return !!base && (base.free === true || base.perRound === 0);
+});
+/** 改手工系数（Q13=1） */
+const rateSavingId = ref<number | null>(null);
+const rateEdit = reactive({ open: false, configId: 0, modelName: '', value: 1 });
+const openRateEdit = (row: ModelRateVO) => {
+  rateEdit.open = true;
+  rateEdit.configId = row.configId;
+  rateEdit.modelName = row.modelName;
+  rateEdit.value = Number(row.manualFactor ?? 1);
+};
+const onSaveRate = async () => {
+  rateSavingId.value = rateEdit.configId;
+  try {
+    await updateModelMultiplier(rateEdit.configId, rateEdit.value);
+    ElMessage.success('已保存——下一轮对话起按新系数扣分，历史流水不受影响');
+    rateEdit.open = false;
+    await loadModelRates();
+  } catch (e) {
+    ElMessage.error((e as { msg?: string })?.msg || '保存失败，请稍后再试');
+  } finally {
+    rateSavingId.value = null;
+  }
+};
+const onResetRate = async (row: ModelRateVO) => {
+  try {
+    await ElMessageBox.confirm(
+      `把「${row.modelName}」的手工系数清掉，回到按官方价自动算？（下一轮起生效）`,
+      '恢复自动',
+      { type: 'warning', confirmButtonText: '恢复自动', cancelButtonText: '再想想' }
+    );
+  } catch {
+    return;
+  }
+  rateSavingId.value = row.configId;
+  try {
+    await updateModelMultiplier(row.configId, null);
+    ElMessage.success('已恢复自动');
+    await loadModelRates();
+  } catch (e) {
+    ElMessage.error((e as { msg?: string })?.msg || '操作失败，请稍后再试');
+  } finally {
+    rateSavingId.value = null;
+  }
 };
 
 /** 业务批(1015) Q12：presets 中文名目录（logo 落名与 ai-config 厂商中心同源） */
@@ -714,7 +884,7 @@ const loadProviderPresets = async () => {
     /* 目录拉不到时降级显示厂商代码 */
   }
 };
-/** 厂商分组 + 组内排序（默认 → 免费 → 倍率升序）；含默认的组置顶 */
+/** 厂商分组 + 组内排序（默认 → 免费 → 相对价升序）；含默认的组置顶 */
 interface RateGroup {
   provider: string;
   rows: typeof modelRates.value;
@@ -729,7 +899,7 @@ const rateGroups = computed<RateGroup[]>(() => {
   }
   const groups = [...map.entries()].map(([provider, rows]) => {
     rows.sort(
-      (a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0) || (a.free ? 0 : 1) - (b.free ? 0 : 1) || (a.multiplier ?? 0) - (b.multiplier ?? 0)
+      (a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0) || (a.free ? 0 : 1) - (b.free ? 0 : 1) || (a.relativePrice ?? 0) - (b.relativePrice ?? 0)
     );
     return { provider, rows, hasDefault: rows.some((r) => r.isDefault) };
   });
@@ -840,6 +1010,8 @@ const openPlanEdit = (p: CreditPlanVO) => {
     windowHours: p.windowHours,
     durationWeeks: p.durationWeeks,
     websearchLimitPerUserDaily: p.websearchLimitPerUserDaily,
+    // 额度三级管控批 Q18=1：null 原样带进来（输入框显示空 = 没给建议），不要折成 0——0 与空在这里同义但空更诚实
+    suggestedDailyCreditPerUser: p.suggestedDailyCreditPerUser ?? undefined,
     description: p.description
   };
   planEdit.enabled = p.enabled !== '0';
@@ -908,6 +1080,15 @@ onMounted(() => {
   font-size: 12px;
   color: var(--app-faint);
   font-weight: 400;
+}
+/* 基准是免费档时相对价整列「—」的原因说明（2026-11-26 活体实测补充）：
+   不解释会被读成「功能坏了」。用告警色而非错误色——这不是错，是分母为 0。 */
+.head-warn {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--el-color-warning-dark-2, #b88230);
 }
 .status-card :deep(.el-card__body) {
   padding-top: 12px;
@@ -1194,13 +1375,18 @@ onMounted(() => {
     margin-left: auto;
   }
 }
-/* Q12：组内改三列 grid 严格对齐（列头与数据行同模板），右列右对齐 */
+/* Q12：组内改 grid 严格对齐（列头与数据行同模板），右列右对齐 */
 .rate-cols,
 .rate-grow {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) 92px minmax(80px, 0.7fr);
   align-items: center;
   column-gap: 10px;
+}
+/* Q13=1 + Q22=1：拆成四列——模型 / 相对价（给人看）/ 约积分/轮（真扣）/ 来源（自动·手工+改） */
+.rate-cols-4,
+.rate-grow-4 {
+  grid-template-columns: minmax(0, 1.6fr) 78px minmax(88px, 0.6fr) 132px;
 }
 .rate-cols {
   padding: 6px 12px 2px;
@@ -1229,12 +1415,47 @@ onMounted(() => {
     gap: 6px;
     overflow: hidden;
   }
+  /* 相对价：中等字重+等宽数字——它是给人做比较的，不该比扣分那列更弱 */
+  .rate-grel {
+    font-size: 13px;
+    color: var(--app-text);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
   .rate-gcost {
     font-size: 12px;
     color: var(--app-muted);
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
+  /* 价目表缺行时「—」旁边的小标（2026-11-26 活体实测）：光一个「—」分不清
+     是「免费」还是「没价目」，补两个字一眼能看出要去哪里补数据 */
+  .rate-gmiss {
+    margin-left: 4px;
+    font-size: 12px;
+    color: var(--el-color-warning-dark-2, #b88230);
+  }
+  .rate-gsrc {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--app-muted);
+  }
+  .rate-auto {
+    color: var(--app-faint);
+  }
+  .rate-base {
+    background: var(--app-rule);
+    color: var(--app-muted);
+  }
+}
+.rate-edit-tip {
+  font-size: 12px;
+  color: var(--app-muted);
+  line-height: 1.6;
+  padding: 0 8px;
 }
 /* Q8/Q11：钱包模式引导条 */
 .wallet-lead {
@@ -1381,6 +1602,13 @@ onMounted(() => {
   color: var(--app-faint);
   font-weight: 400;
   line-height: 1.5;
+}
+/* 额度三级管控批（Q17=1）：流水三列快照——数字等宽（对账时能竖着扫），历史行统一灰短横 */
+.ledger-num {
+  font-variant-numeric: tabular-nums;
+}
+.ledger-dash {
+  color: var(--app-faint);
 }
 .ledger-pager {
   display: flex;

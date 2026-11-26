@@ -89,7 +89,7 @@ class G1DisciplineAndFingerprintTest {
 
     private static AssistantConfigService.EffectiveConfig cfg(Map<String, String> gate, String mem, int comp) {
         return new AssistantConfigService.EffectiveConfig(true, true, 50,
-            java.math.BigDecimal.ZERO, mem, comp, 20, "0", "小助手", gate);
+            java.math.BigDecimal.ZERO, mem, comp, 20, "0", "小助手", gate, null);
     }
 
     @Test

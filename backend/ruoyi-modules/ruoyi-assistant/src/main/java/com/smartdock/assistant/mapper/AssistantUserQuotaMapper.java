@@ -62,6 +62,20 @@ public interface AssistantUserQuotaMapper extends BaseMapper<AssistantUserQuota>
     int upsertWebClearRound(@Param("q") AssistantUserQuota quota);
 
     /**
+     * 额度三级管控批（2026-11-26）：只写积分列——填了数就写进去，传 -2 写 NULL（清回跟随企业默认），
+     * 不碰回合/联网两列（那两列继续走上面四条）。
+     * <b>不扩成 8 种组合</b>：积分列是后加的一维，与另两列的组合由 service 分两条语句表达。
+     * 首插：另两列留 NULL（=跟随企业默认）、disabled 落 DDL 默认 '0'。
+     */
+    @Insert("INSERT INTO assistant_user_quota (id, tenant_id, user_id, credit_limit_override, create_time)"
+        + " VALUES (#{q.id}, #{q.tenantId}, #{q.userId},"
+        + " NULLIF(CAST(#{q.creditLimitOverride} AS integer), -2), CURRENT_TIMESTAMP)"
+        + " ON CONFLICT (tenant_id, user_id) DO UPDATE SET"
+        + " credit_limit_override = EXCLUDED.credit_limit_override,"
+        + " update_time = CURRENT_TIMESTAMP")
+    int upsertCreditOnly(@Param("q") AssistantUserQuota quota);
+
+    /**
      * 用户额度页（联表分页数据行）：sys_user 昵称/部门 + 覆盖行原文。
      * keyword 模糊匹配昵称或账号；按 user_id 稳定序。
      * 页数据（今日回合/本月费用）由 Service 层补——Redis 与账本不进本 SQL。
@@ -71,6 +85,7 @@ public interface AssistantUserQuotaMapper extends BaseMapper<AssistantUserQuota>
         + " COALESCE(d.dept_name, '未分部门') AS deptname,"
         + " q.round_limit_override AS roundoverride,"
         + " q.websearch_limit_override AS websearchoverride,"
+        + " q.credit_limit_override AS creditoverride,"
         + " COALESCE(q.disabled, '0') AS disabled"
         + " FROM sys_user u"
         + " LEFT JOIN sys_dept d ON d.dept_id = u.dept_id"
@@ -104,4 +119,21 @@ public interface AssistantUserQuotaMapper extends BaseMapper<AssistantUserQuota>
         + " GROUP BY operator_id</script>")
     List<Map<String, Object>> selectMonthCostByUsers(@Param("tenantId") String tenantId,
                                                      @Param("userIds") List<Long> userIds);
+
+    /**
+     * 额度三级管控批（2026-11-26）：本页各人「今天已花积分」按人分组聚合。
+     * 与 {@link #selectMonthCostByUsers} 同一个写法，但换账本（积分账本）、换窗口（今天）、
+     * 且<b>谓词必须带 {@code biz_type='DEDUCT'}</b>——订阅 / 加油包 / 调整行不是个人花费，
+     * 算进来会让「今日用量」虚高，管理员照着调额度就调错。
+     * 日界用 Asia/Shanghai 半开区间（上界次日 00:00，不用 23:59:59）。
+     * 显式 {@code tenant_id = ?}：本 Mapper 类级 @InterceptorIgnore，租户谓词不会自动加。
+     */
+    @Select("<script>SELECT create_by AS userid, COALESCE(SUM(credits), 0) AS creditsused"
+        + " FROM ai_credit_ledger WHERE tenant_id = #{tenantId} AND biz_type = 'DEDUCT'"
+        + " AND create_time &gt;= date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')"
+        + " AND create_time &lt; date_trunc('day', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai') + interval '1 day'"
+        + " AND create_by IN <foreach collection='userIds' item='uid' open='(' separator=',' close=')'>#{uid}</foreach>"
+        + " GROUP BY create_by</script>")
+    List<Map<String, Object>> selectTodayCreditsByUsers(@Param("tenantId") String tenantId,
+                                                        @Param("userIds") List<Long> userIds);
 }

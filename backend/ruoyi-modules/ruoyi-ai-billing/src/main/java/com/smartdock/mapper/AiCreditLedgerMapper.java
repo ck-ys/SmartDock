@@ -52,11 +52,16 @@ public interface AiCreditLedgerMapper extends BaseMapperPlus<AiCreditLedger, AiC
      * 不能再用 catch(DuplicateKeyException) 吸收重放——PG 同事务内唯一冲突会把事务置
      * aborted，usage 插入也随之 25P02 回滚。改 ON CONFLICT 消化（须带部分索引的
      * WHERE 谓词才能命中 uk_credit_ledger_idem）。返回 0=重放被吸收。
+     *
+     * <p>额度三级管控批（Q17=1）起多三列快照（model_name / credit_multiplier / unit_price）：
+     * <b>显式列 INSERT，不许改成 INSERT ... SELECT *</b>——列序一变就静默错位。</p>
      */
     @Insert("INSERT INTO ai_credit_ledger (id, tenant_id, biz_type, credits, weekly_credits, tank_credits,"
-        + " scene, remark, idempotency_key, create_by, create_time)"
+        + " scene, remark, idempotency_key, create_by, create_time,"
+        + " model_name, credit_multiplier, unit_price)"
         + " VALUES (#{id}, #{tenantId}, #{bizType}, #{credits}, #{weeklyCredits}, #{tankCredits},"
-        + " #{scene}, #{remark}, #{idempotencyKey}, #{createBy}, #{createTime})"
+        + " #{scene}, #{remark}, #{idempotencyKey}, #{createBy}, #{createTime},"
+        + " #{modelName}, #{creditMultiplier}, #{unitPrice})"
         + " ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING")
     int insertIgnoreIdem(AiCreditLedger row);
 

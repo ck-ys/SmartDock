@@ -56,6 +56,14 @@ public interface IAiCreditService {
     void deduct(String tenantId, long credits, String scene, String idempotencyKey, Long operatorId);
 
     /**
+     * 额度三级管控批（Q17=1）：带<b>快照</b>的落账重载——modelName / multiplier / unitPrice
+     * 是结算这一刻的值，写进流水三列；改倍率或换模型后旧行一个字不动。
+     * 传 null 的字段落 NULL（历史行同形态：不追填，避免编数）。
+     */
+    void deduct(String tenantId, long credits, String scene, String idempotencyKey, Long operatorId,
+                String modelName, java.math.BigDecimal multiplier, java.math.BigDecimal unitPrice);
+
+    /**
      * 管理端订阅/续订某档位（旧生效行翻 0，新行 start=now，end=now+duration 周）。
      * 业务批8 Q4：grant=false 从租户钱包扣款（余额不足 409 人话整笔回滚）；grant=true
      * 赠送开通不扣钱（仅超管可用，Controller 侧拦截）。订阅成功自动把消费方式切 CREDIT。
@@ -70,6 +78,13 @@ public interface IAiCreditService {
      * 空=未订阅或套餐未配档位（调用方沿用租户默认口径）。
      */
     Optional<Integer> subscriberWebsearchLimit(String tenantId);
+
+    /**
+     * 额度三级管控批（2026-11-26 / Q4=3 + Q18=1）：订阅套餐的「每人每天建议积分上限」
+     * （ai_credit_plan.suggested_daily_credit_per_user）。
+     * 空=未订阅、或套餐没给建议（列 0/NULL）——调用方据此落到平台兜底数。
+     */
+    Optional<Integer> subscriberSuggestedDailyCredit(String tenantId);
 
     /**
      * 流水真分页（业务批7 Q4）：bizType/beginTime/endTime(yyyy-MM-dd) 可选过滤，
@@ -91,10 +106,23 @@ public interface IAiCreditService {
     List<java.util.Map<String, Object>> ledgerOperators(String tenantId);
 
     /**
-     * 业务批8 Q2：当前租户在用 CHAT 模型的积分倍率表（含预估积分/轮）——
-     * 管理页「模型积分倍率」卡数据源，倍率变更影响订阅租户的每回合扣分。
+     * 业务批8 Q2 / 额度三级管控批 Q13=1 + Q22=1：当前租户在用 CHAT 模型的倍率表。
+     * 每行两个不同的数：<b>relativePrice</b>=相对基准模型的官方价倍数（只给人看，不参与扣分）；
+     * <b>perRound</b>=真实扣分（一轮成本 × 100 × 平台系数 × 手工系数）。
      */
     List<java.util.Map<String, Object>> modelRates(String tenantId);
+
+    /**
+     * Q22=1：平台加价系数（sys_config 键 {@code ai.credit.platform-factor}，缺省 1.0）。
+     * 扣分 = 一轮成本（元）× 100 × 平台系数 × 该模型手工系数。
+     */
+    java.math.BigDecimal platformFactor();
+
+    /**
+     * Q13=1：改某个模型的手工系数（ai_config.credit_multiplier）。
+     * null 或 1 = 恢复自动（列写回 NULL，等价「没设过」）；正数 0~100。
+     */
+    void updateModelMultiplier(String tenantId, Long configId, java.math.BigDecimal multiplier);
 
     /** 用户侧近 N 条（明细弹层） */
     List<AiCreditLedger> recent(String tenantId, int limit);
