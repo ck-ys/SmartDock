@@ -22,7 +22,7 @@
       <!-- 反馈弹窗归壳层持有：顶栏头像菜单与左下用户行开的是同一个框 -->
       <feedback-dialog v-model:visible="feedbackOpen" :initial-tab="feedbackTab" />
       <!-- DCS AI 助手（批E：悬浮球+抽屉；组件内自判权限与租户开关，未开启=零渲染） -->
-      <smartdock-assistant />
+      <Assistant />
       <!-- 交互三件 ①：Ctrl+K / Cmd+K 命令面板（数据源=权限过滤后的路由菜单） -->
       <CommandPalette />
     </div>

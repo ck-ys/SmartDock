@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:components": "node scripts/check-unresolved-components.mjs",
     "lint:eslint": "eslint",
     "lint:eslint:fix": "eslint --fix",
     "prettier": "prettier --write .",

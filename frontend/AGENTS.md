@@ -16,6 +16,7 @@ Node >= 20.19.0 required。
 - **生产构建**：`npm run build:prod`（交付前必过）
 - **Lint**：`npm run lint:eslint` / `lint:eslint:fix`；**Format**：`npm run prettier`
 - **单测**：`npm run test`（Vitest，`vitest.config.ts`）——已有测试集中在助手 API 客户端（`api/**/assistant/aguiClient.test.ts`）与 AI 助手组件（`components/*Assistant*/*.test.ts`）；新增纯函数逻辑优先补 Vitest
+- **组件解析守卫**：`SHOTS_PASS=<演示账号口令> npm run check:components`——登录后把全部路由巡一遍，控制台出现「Failed to resolve component」就判失败（带阳性对照；要前后端都起着）。**改过壳层 / 模板标签 / 批量改名后必跑**：这类错 `build:prod` 和单测都不报，页面上只是少一块——批 9 改名后壳层 `layout/index.vue` 的 `<smartdock-assistant />` 对不上变量 `Assistant`，助手悬浮球静默消失了 6 天。带参数的详情页不在巡检范围内
 
 ## Auto-Import Behavior
 
