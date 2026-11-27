@@ -30,9 +30,10 @@ const RESOLVE_WARN = /Failed to resolve component: ([^\s.]+)/;
 const ROUTER_WARN = /Couldn't resolve component "([^"]+)"/;
 
 const browser = await chromium.launch({ headless: true });
+let page = null;
 try {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await ctx.newPage();
+  page = await ctx.newPage();
   let hits = [];
   let controlHits = 0;
   page.on('console', (m) => {
@@ -125,5 +126,19 @@ try {
   log('脚本自身出错（多半是没登录上）:', String(e.message).split('\n')[0]);
   process.exitCode = 2;
 } finally {
+  // 收尾把这次登录退掉：同一账号的在线会话有上限（本仓实测 12 个），每跑一次登录一次却不退出，
+  // 跑多了会把别人浏览器里同一个账号的登录顶下线。退不出去不改变上面的判定，但要报出来
+  const loggedOut = await (
+    page
+      ? page.evaluate(async () => {
+          const pinia = document.querySelector('#app')?.__vue_app__?.config?.globalProperties?.$pinia;
+          const store = pinia?._s?.get('user');
+          if (!store) return false;
+          await store.logout();
+          return true;
+        })
+      : Promise.resolve(false)
+  ).catch(() => false);
+  log(loggedOut ? '退出登录: 已退出' : '退出登录: 没退成（不影响判定，但这次运行会留下一个在线会话）');
   await browser.close();
 }
