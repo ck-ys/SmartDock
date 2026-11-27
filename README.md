@@ -453,7 +453,7 @@ public class BizEventReporter {
 </tr>
 <tr>
 <td width="50%"><img src="docs/images/screenshots/12-assistant-admin.png" alt="AI 助手管理端"><br><sub>管理端总览：开关、每日回合上限、联网次数与租户日预算，加上进程内运行健康</sub></td>
-<td width="50%"><img src="docs/images/screenshots/19-assistant-quota.png" alt="用户额度"><br><sub>用户额度：每人每日回合与联网次数、本月费用、超额状态，按人可调</sub></td>
+<td width="50%"><img src="docs/images/screenshots/19-assistant-quota.png" alt="每人每天额度"><br><sub>每人每天额度：企业设默认，再按人覆盖回合 / 联网 / 积分三项；今日用量、本月费用、谁能用一目了然</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="docs/images/screenshots/17-assistant-panorama.png" alt="能力全景"><br><sub>能力全景：助手会用哪些工具、怎么执行、什么门槛、本租户是否生效</sub></td>

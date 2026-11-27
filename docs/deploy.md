@@ -119,8 +119,22 @@ docker compose up -d
 ## 7. 升级
 
 - 后端：重新 `mvn package` 后 `docker compose up -d --build backend`；
+- 前端：重新 `npm run build:prod` 后 `docker compose up -d --build frontend`（`dist/` 是打进镜像的，见 `deploy/frontend/Dockerfile`）；
 - 数据库：本基线之后的结构变更一律新增 `NNN_*.sql` 增量脚本，按序执行；
 - 回滚：镜像钉版 + 数据卷常驻，`docker compose down`（不加 `-v`）可安全回退。
+
+**前端静态文件改用「绑定挂载」时的两个坑**（绑定挂载：把宿主机的 `dist/` 目录直接挂进 nginx 容器，容器读的就是宿主那份文件。一键起栈不是这种方式，以上一条为准）：
+
+1. **挂载只读时 `docker cp` 必失败**——往容器里拷文件会被拒。要换文件，改宿主机上的目录。
+2. **用 `mv` 把新旧目录对调后，容器读到的还是旧文件**——挂载在容器启动时就认准了当时那个目录，对调后它仍指着旧的那份；
+   `nginx -s reload` 不管用（它只重读配置，不重新挂载），必须 `docker restart <前端容器>`。
+
+验证（比看页面快，能直接抓到「没换过来」）：宿主与容器内各看一次入口 js 的文件名，两者必须一致。
+
+```bash
+grep -o 'index-[A-Za-z0-9_-]*\.js' <宿主 dist 目录>/index.html
+docker exec <前端容器> grep -o 'index-[A-Za-z0-9_-]*\.js' /usr/share/nginx/html/index.html
+```
 
 ## 8. 健康检查
 

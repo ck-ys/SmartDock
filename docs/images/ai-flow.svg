@@ -108,8 +108,8 @@
 <text x='672' y='328' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='9.2' fill='#4b5563' font-weight='400' text-anchor='start'>todo_write · save_memory · view_skill</text>
 <rect x='658' y='352' width='504' height='64' rx='9' fill='#ffffff' stroke='#e2e5ea' stroke-width='1.0'/>
 <text x='672' y='373' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='11.8' fill='#14202d' font-weight='600' text-anchor='start'>业务工具 SPI（demo 4）</text>
-<text x='672' y='390' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='9.2' fill='#4b5563' font-weight='400' text-anchor='start'>dcs_query_tasks · dcs_query_my_todos</text>
-<text x='672' y='404' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='9.2' fill='#4b5563' font-weight='400' text-anchor='start'>dcs_query_submissions · dcs_create_task</text>
+<text x='672' y='390' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='9.2' fill='#4b5563' font-weight='400' text-anchor='start'>query_tasks · query_my_todos</text>
+<text x='672' y='404' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='9.2' fill='#4b5563' font-weight='400' text-anchor='start'>query_submissions · create_task</text>
 <rect x='658' y='428' width='504' height='52' rx='9' fill='#ffffff' stroke='#e2e5ea' stroke-width='1.0'/>
 <text x='672' y='449' font-family="'Noto Sans SC','Source Han Sans SC','PingFang SC','Microsoft YaHei','Hiragino Sans GB',sans-serif" font-size='11.8' fill='#14202d' font-weight='600' text-anchor='start'>权限与门控</text>
 <text x='672' y='468' font-family="'JetBrains Mono','SFMono-Regular',Consolas,'Liberation Mono','Courier New',monospace" font-size='9.2' fill='#4b5563' font-weight='400' text-anchor='start'>roleLevel 0/1/2 · 权限三态 · 配置开关</text>
