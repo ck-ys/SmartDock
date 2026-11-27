@@ -48,3 +48,5 @@ frontend/data/
 .workbuddy/
 # 代码审查工具（mimosa）会往项目根/子目录写 finding ledger 与 hook 状态，非源码
 .mimosa/
+# video-agent-kit 插件每次会话往项目根写 .video_agent/plugin_root（内容是本机插件缓存路径，带用户名）
+.video_agent/
