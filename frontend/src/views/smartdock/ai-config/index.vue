@@ -2478,6 +2478,36 @@ watch(activeTab, (tab) => {
     router.replace({ query: { ...route.query, tab: tab === 'models' ? undefined : tab } });
   }
 });
+/**
+ * 多把钥匙批（2026-11-27 补）：窄屏把当前页签滚进视野。
+ * 页签凑到五个后 390 下「联网搜索」被挤出可视区（只露半个「联」字），
+ * 从别处深链进来时用户看不到自己停在哪一页。
+ *
+ * 注意：不能用 el.scrollIntoView()——实测只把 nav 滚了 16px 就停（EP 的 tab 滚动
+ * 由它自己的左右箭头按钮控制，scrollIntoView 的平滑滚动被它打断）。
+ * 直接算差值改 nav-scroll 的 scrollLeft 才可靠。
+ */
+watch(activeTab, async (tab) => {
+  await nextTick();
+  // 实测：手设 scrollLeft 有效，但 EP 在 tab 激活后会用自己的逻辑重置它——
+  // 所以必须排在它的更新之后。rAF 一帧不够（EP 那次重置更晚），
+  // 用 setTimeout 让出微任务与 EP 的 watch 回调，再算差值。
+  // 首次（immediate）还要多等：tab 宽度是挂载后才量出来的，早算拿到 0。
+  const scrollToActive = () => {
+    const scroll = document.querySelector('.ai-config-tabs .el-tabs__nav-scroll') as HTMLElement | null;
+    const el = document.querySelector('.ai-config-tabs .el-tabs__item.is-active') as HTMLElement | null;
+    if (!scroll || !el) return;
+    const sr = scroll.getBoundingClientRect();
+    const er = el.getBoundingClientRect();
+    if (sr.width === 0 || er.width === 0) return;
+    // 已经完整可见就不动（桌面上五个都放得下，滚了反而跳）
+    if (er.left >= sr.left && er.right <= sr.right) return;
+    // 让当前页签右边缘对齐容器右边缘（留 8px 余量）
+    scroll.scrollLeft += er.right - sr.right + 8;
+  };
+  setTimeout(scrollToActive, 60);
+  setTimeout(scrollToActive, 300); // EP 有时更晚才重置，补一发
+}, { immediate: true });
 /** 能力目录是否已按当前模型名命中(contextWindow 只读带出提示) */
 const capabilityMatched = ref(false);
 
@@ -3468,6 +3498,29 @@ onUnmounted(() => {
 }
 .ai-config-tabs :deep(.el-tabs__item) {
   font-size: 14px;
+}
+/* 多把钥匙批（2026-11-27 补）：页签凑到五个后，390 下「联网搜索」被挤出可视区——
+   实测只露出半个「联」字，用户看不出这是可点的第五个页签（1440 正常，所以首轮 390
+   截图只断言了按钮位置，漏了页签本身是否完整可见）。
+   EP 的 nav-wrap 自带横向滚动，但手机不显示滚动条、也没有「右边还有」的暗示。
+   做法：右侧加渐隐遮罩当暗示，并给 nav 补右侧内边距，让最后一个页签能完整滚进来。 */
+.ai-config-tabs :deep(.el-tabs__nav-scroll) {
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+}
+.ai-config-tabs :deep(.el-tabs__nav) {
+  /* 留出遮罩宽度，否则最后一个页签永远被遮住一角 */
+  padding-right: 28px;
+}
+/* 桌面放得下五个页签，遮罩反而会切掉「识别域名」的边——够宽就撤掉 */
+@media (min-width: 768px) {
+  .ai-config-tabs :deep(.el-tabs__nav-scroll) {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+  .ai-config-tabs :deep(.el-tabs__nav) {
+    padding-right: 0;
+  }
 }
 /* 批1015c Q1 撤「默认模型」页签：defaults-guide/default-group/default-current/
    default-switch/default-empty/assistant-default-card 样式族随模板一并下线 */
